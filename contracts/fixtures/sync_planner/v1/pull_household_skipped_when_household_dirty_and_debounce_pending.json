@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "pull_household_skipped_when_household_dirty_and_debounce_pending",
+  "input": {
+    "role": "owner",
+    "pull_requested": true,
+    "debounce_ms": 2000,
+    "now_ms": 1000,
+    "household_dirty": true,
+    "household_changed_at_ms": 0,
+    "profile_dirty": false,
+    "profile_id": "p1",
+    "addons": [
+      {
+        "url": "https://example.com/manifest.json",
+        "enabled": true,
+        "name": null
+      }
+    ],
+    "settings": {},
+    "catalog_prefs": {},
+    "trakt_auth": {},
+    "simkl_auth": {}
+  },
+  "expected": {
+    "rpc_calls": []
+  }
+}

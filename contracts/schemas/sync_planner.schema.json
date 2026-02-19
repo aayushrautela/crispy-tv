@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sync_planner fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "sync_planner"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "role",
+        "household_dirty",
+        "profile_dirty",
+        "profile_id",
+        "addons",
+        "settings",
+        "catalog_prefs",
+        "trakt_auth",
+        "simkl_auth"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "owner",
+            "member"
+          ]
+        },
+        "pull_requested": {
+          "type": "boolean"
+        },
+        "flush_requested": {
+          "type": "boolean"
+        },
+        "debounce_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "household_dirty": {
+          "type": "boolean"
+        },
+        "household_changed_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "profile_dirty": {
+          "type": "boolean"
+        },
+        "profile_changed_at_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "addons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "url"
+            ],
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "catalog_prefs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "trakt_auth": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "simkl_auth": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "now_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "rpc_calls"
+      ],
+      "properties": {
+        "rpc_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "params"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "get_household_addons",
+                  "replace_household_addons",
+                  "upsert_profile_data"
+                ]
+              },
+              "params": {
+                "type": "object"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "name": {
+                      "const": "get_household_addons"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "params": {
+                      "type": "object",
+                      "maxProperties": 0,
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "name": {
+                      "const": "replace_household_addons"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "params": {
+                      "type": "object",
+                      "required": [
+                        "p_addons"
+                      ],
+                      "properties": {
+                        "p_addons": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "url",
+                              "enabled"
+                            ],
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "name": {
+                      "const": "upsert_profile_data"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "params": {
+                      "type": "object",
+                      "required": [
+                        "p_profile_id",
+                        "p_settings",
+                        "p_catalog_prefs",
+                        "p_trakt_auth",
+                        "p_simkl_auth"
+                      ],
+                      "properties": {
+                        "p_profile_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "p_settings": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "p_catalog_prefs": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "p_trakt_auth": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "p_simkl_auth": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,27 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "no_dirty_no_calls",
+  "input": {
+    "role": "owner",
+    "household_dirty": false,
+    "profile_dirty": false,
+    "profile_id": "p1",
+    "addons": [
+      {
+        "url": "https://example.com/manifest.json",
+        "enabled": true,
+        "name": "Example"
+      }
+    ],
+    "settings": {
+      "theme": "dark"
+    },
+    "catalog_prefs": {},
+    "trakt_auth": {},
+    "simkl_auth": {}
+  },
+  "expected": {
+    "rpc_calls": []
+  }
+}

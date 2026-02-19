@@ -37,6 +37,12 @@ This directory defines parity-critical behavior for the rewrite apps.
 - `metadata_tmdb_enhancer`
   - TMDB may only fill missing metadata fields; it must not override addon-provided values.
   - `tmdb:*` IDs may be bridged to IMDb (`tt...`) for addon retries.
+- `sync_planner`
+  - Canonicalize shared (household) vs per-profile cloud payloads.
+  - Pull planning: `get_household_addons` is allowed only when there are no unsynced household changes.
+  - Shared addons are normalized (trim URL, strip trailing `/`, default enabled=true, canonical sort).
+  - Debounce planning: writes are delayed by `debounce_ms` using `now_ms` + `*_changed_at_ms`; `flush_requested` bypasses debounce.
+  - Only owners may plan household addon writes; per-profile writes always include settings + Trakt + Simkl.
 - `storage_v1`
   - Logical storage namespace/versioning and schema mismatch behavior.
 

@@ -1,0 +1,31 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "debounce_waits_before_2s",
+  "input": {
+    "role": "owner",
+    "debounce_ms": 2000,
+    "now_ms": 1999,
+    "household_dirty": true,
+    "household_changed_at_ms": 0,
+    "profile_dirty": true,
+    "profile_changed_at_ms": 0,
+    "profile_id": "profile-123",
+    "addons": [
+      {
+        "url": "https://a.example.com/manifest.json",
+        "enabled": true,
+        "name": "Alpha"
+      }
+    ],
+    "settings": {
+      "language": "en"
+    },
+    "catalog_prefs": {},
+    "trakt_auth": {},
+    "simkl_auth": {}
+  },
+  "expected": {
+    "rpc_calls": []
+  }
+}

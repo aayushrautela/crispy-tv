@@ -1,0 +1,80 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "owner_pushes_household_and_profile",
+  "input": {
+    "role": "owner",
+    "household_dirty": true,
+    "profile_dirty": true,
+    "profile_id": "profile-123",
+    "addons": [
+      {
+        "url": " https://a.example.com/manifest.json ",
+        "enabled": null,
+        "name": "  Alpha  "
+      },
+      {
+        "url": "https://b.example.com/manifest.json/",
+        "enabled": false,
+        "name": ""
+      },
+      {
+        "url": "   ",
+        "enabled": true,
+        "name": "Ignored"
+      }
+    ],
+    "settings": {
+      "language": " en ",
+      "theme": "dark"
+    },
+    "catalog_prefs": {
+      "genre": " sci-fi "
+    },
+    "trakt_auth": {
+      "access_token": "  t123  "
+    },
+    "simkl_auth": {
+      "access_token": " s456 "
+    }
+  },
+  "expected": {
+    "rpc_calls": [
+      {
+        "name": "replace_household_addons",
+        "params": {
+          "p_addons": [
+            {
+              "url": "https://a.example.com/manifest.json",
+              "enabled": true,
+              "name": "Alpha"
+            },
+            {
+              "url": "https://b.example.com/manifest.json",
+              "enabled": false
+            }
+          ]
+        }
+      },
+      {
+        "name": "upsert_profile_data",
+        "params": {
+          "p_profile_id": "profile-123",
+          "p_settings": {
+            "language": "en",
+            "theme": "dark"
+          },
+          "p_catalog_prefs": {
+            "genre": "sci-fi"
+          },
+          "p_trakt_auth": {
+            "access_token": "t123"
+          },
+          "p_simkl_auth": {
+            "access_token": "s456"
+          }
+        }
+      }
+    ]
+  }
+}

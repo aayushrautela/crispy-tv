@@ -15,6 +15,7 @@ SUITE_TO_SCHEMA = {
     "search_ranking_and_dedup": "search_ranking_and_dedup.schema.json",
     "metadata_addon_primary": "metadata_addon_primary.schema.json",
     "metadata_tmdb_enhancer": "metadata_tmdb_enhancer.schema.json",
+    "sync_planner": "sync_planner.schema.json",
     "storage_v1": "storage_v1.schema.json",
 }
 

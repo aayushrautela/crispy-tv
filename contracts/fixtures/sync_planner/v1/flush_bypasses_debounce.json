@@ -1,0 +1,57 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "flush_bypasses_debounce",
+  "input": {
+    "role": "owner",
+    "flush_requested": true,
+    "debounce_ms": 2000,
+    "now_ms": 1000,
+    "household_dirty": true,
+    "household_changed_at_ms": 999,
+    "profile_dirty": true,
+    "profile_changed_at_ms": 999,
+    "profile_id": "profile-123",
+    "addons": [
+      {
+        "url": "https://a.example.com/manifest.json",
+        "enabled": true,
+        "name": "Alpha"
+      }
+    ],
+    "settings": {
+      "theme": " dark "
+    },
+    "catalog_prefs": {},
+    "trakt_auth": {},
+    "simkl_auth": {}
+  },
+  "expected": {
+    "rpc_calls": [
+      {
+        "name": "replace_household_addons",
+        "params": {
+          "p_addons": [
+            {
+              "url": "https://a.example.com/manifest.json",
+              "enabled": true,
+              "name": "Alpha"
+            }
+          ]
+        }
+      },
+      {
+        "name": "upsert_profile_data",
+        "params": {
+          "p_profile_id": "profile-123",
+          "p_settings": {
+            "theme": "dark"
+          },
+          "p_catalog_prefs": {},
+          "p_trakt_auth": {},
+          "p_simkl_auth": {}
+        }
+      }
+    ]
+  }
+}

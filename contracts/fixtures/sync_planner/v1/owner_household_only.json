@@ -1,0 +1,47 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "owner_household_only",
+  "input": {
+    "role": "owner",
+    "household_dirty": true,
+    "profile_dirty": false,
+    "profile_id": "p1",
+    "addons": [
+      {
+        "url": "https://b.example.com/manifest.json",
+        "enabled": true,
+        "name": null
+      },
+      {
+        "url": "https://a.example.com/manifest.json/",
+        "enabled": true,
+        "name": " A "
+      }
+    ],
+    "settings": {},
+    "catalog_prefs": {},
+    "trakt_auth": {},
+    "simkl_auth": {}
+  },
+  "expected": {
+    "rpc_calls": [
+      {
+        "name": "replace_household_addons",
+        "params": {
+          "p_addons": [
+            {
+              "url": "https://a.example.com/manifest.json",
+              "enabled": true,
+              "name": "A"
+            },
+            {
+              "url": "https://b.example.com/manifest.json",
+              "enabled": true
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

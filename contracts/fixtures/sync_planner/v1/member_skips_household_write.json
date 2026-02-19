@@ -1,0 +1,40 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "member_skips_household_write",
+  "input": {
+    "role": "member",
+    "household_dirty": true,
+    "profile_dirty": true,
+    "profile_id": "p1",
+    "addons": [
+      {
+        "url": "https://example.com/manifest.json",
+        "enabled": true,
+        "name": null
+      }
+    ],
+    "settings": {
+      "theme": " light "
+    },
+    "catalog_prefs": {},
+    "trakt_auth": {},
+    "simkl_auth": {}
+  },
+  "expected": {
+    "rpc_calls": [
+      {
+        "name": "upsert_profile_data",
+        "params": {
+          "p_profile_id": "p1",
+          "p_settings": {
+            "theme": "light"
+          },
+          "p_catalog_prefs": {},
+          "p_trakt_auth": {},
+          "p_simkl_auth": {}
+        }
+      }
+    ]
+  }
+}

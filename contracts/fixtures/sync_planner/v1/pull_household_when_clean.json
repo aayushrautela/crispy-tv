@@ -1,0 +1,25 @@
+{
+  "contract_version": 1,
+  "suite": "sync_planner",
+  "case_id": "pull_household_when_clean",
+  "input": {
+    "role": "member",
+    "pull_requested": true,
+    "household_dirty": false,
+    "profile_dirty": false,
+    "profile_id": "p1",
+    "addons": [],
+    "settings": {},
+    "catalog_prefs": {},
+    "trakt_auth": {},
+    "simkl_auth": {}
+  },
+  "expected": {
+    "rpc_calls": [
+      {
+        "name": "get_household_addons",
+        "params": {}
+      }
+    ]
+  }
+}
