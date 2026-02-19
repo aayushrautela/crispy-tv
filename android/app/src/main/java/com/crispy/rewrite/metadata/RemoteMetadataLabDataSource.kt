@@ -1,10 +1,12 @@
 package com.crispy.rewrite.metadata
 
+import android.content.Context
 import android.net.Uri
 import com.crispy.rewrite.domain.metadata.AddonMetadataCandidate
 import com.crispy.rewrite.domain.metadata.MetadataRecord
 import com.crispy.rewrite.domain.metadata.MetadataSeason
 import com.crispy.rewrite.domain.metadata.MetadataVideo
+import com.crispy.rewrite.domain.metadata.formatIdForIdPrefixes
 import com.crispy.rewrite.player.MetadataLabDataSource
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.MetadataLabPayload
@@ -20,10 +22,12 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 class RemoteMetadataLabDataSource(
+    context: Context,
     addonManifestUrlsCsv: String,
     tmdbApiKey: String
 ) : MetadataLabDataSource {
-    private val addonClient = AddonMetadataClient(parseAddonEndpoints(addonManifestUrlsCsv))
+    private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
+    private val addonClient = AddonMetadataClient(addonRegistry)
     private val tmdbClient = TmdbMetadataClient(tmdbApiKey)
 
     override suspend fun load(
@@ -124,13 +128,6 @@ class RemoteMetadataLabDataSource(
     }
 }
 
-private data class AddonManifestSeed(
-    val manifestUrl: String,
-    val addonIdHint: String,
-    val baseUrl: String,
-    val encodedQuery: String?
-)
-
 private enum class AddonResourceKind(val apiPath: String) {
     META("meta"),
     STREAM("stream"),
@@ -158,15 +155,20 @@ private data class AddonEndpoint(
         }
     }
 
-    fun accepts(kind: AddonResourceKind, mediaType: MetadataLabMediaType, lookupId: String): Boolean {
+    fun formatLookupId(kind: AddonResourceKind, mediaType: MetadataLabMediaType, lookupId: String): String? {
         if (lookupId.isBlank()) {
-            return false
+            return null
         }
-        val prefixes = acceptedIdPrefixes(kind, mediaType)
-        if (prefixes.isEmpty()) {
-            return true
-        }
-        return prefixes.any { lookupId.startsWith(it) }
+
+        return formatIdForIdPrefixes(
+            input = lookupId,
+            mediaType = mediaType.asIdKind(),
+            idPrefixes = acceptedIdPrefixes(kind, mediaType)
+        )
+    }
+
+    fun accepts(kind: AddonResourceKind, mediaType: MetadataLabMediaType, lookupId: String): Boolean {
+        return formatLookupId(kind, mediaType, lookupId) != null
     }
 }
 
@@ -177,22 +179,12 @@ private data class AddonCandidate(
 )
 
 private class AddonMetadataClient(
-    manifestSeeds: List<AddonManifestSeed>
+    private val addonRegistry: MetadataAddonRegistry
 ) {
-    private val manifestSeeds = if (manifestSeeds.isEmpty()) {
-        listOf(
-            AddonManifestSeed(
-                manifestUrl = "https://v3-cinemeta.strem.io/manifest.json",
-                addonIdHint = "com.linvo.cinemeta",
-                baseUrl = "https://v3-cinemeta.strem.io",
-                encodedQuery = null
-            )
-        )
-    } else {
-        manifestSeeds
-    }
     @Volatile
     private var resolvedEndpoints: List<AddonEndpoint>? = null
+    @Volatile
+    private var resolvedFingerprint: String? = null
 
     fun fetchMeta(
         mediaType: MetadataLabMediaType,
@@ -211,12 +203,13 @@ private class AddonMetadataClient(
         val orderedEndpoints = orderedEndpoints(endpoints, preferredAddonId)
         val candidates = mutableListOf<AddonCandidate>()
         for (endpoint in orderedEndpoints) {
-            if (!endpoint.accepts(AddonResourceKind.META, mediaType, contentId)) {
+            val requestId = endpoint.formatLookupId(AddonResourceKind.META, mediaType, contentId)
+            if (requestId == null) {
                 continue
             }
-            val response = fetchAddonMeta(endpoint, mediaType, contentId) ?: continue
+            val response = fetchAddonMeta(endpoint, mediaType, requestId) ?: continue
             val metaObject = response.optJSONObject("meta") ?: continue
-            val record = parseAddonMetadata(metaObject, fallbackId = contentId)
+            val record = parseAddonMetadata(metaObject, fallbackId = requestId)
             val title =
                 nonBlank(metaObject.optString("name"))
                     ?: nonBlank(metaObject.optString("title"))
@@ -248,32 +241,44 @@ private class AddonMetadataClient(
         for (endpoint in orderedEndpoints) {
             var streamCount = 0
             var subtitleCount = 0
+            var streamRequestId: String? = null
+            var subtitleRequestId: String? = null
 
+            val formattedStreamLookupId = endpoint.formatLookupId(AddonResourceKind.STREAM, mediaType, streamLookupId)
             if (
                 endpoint.supports(AddonResourceKind.STREAM, mediaType) &&
-                    endpoint.accepts(AddonResourceKind.STREAM, mediaType, streamLookupId)
+                    formattedStreamLookupId != null
             ) {
-                streamCount = fetchResourceCount(endpoint, AddonResourceKind.STREAM, mediaType, streamLookupId)
+                streamRequestId = formattedStreamLookupId
+                streamCount = fetchResourceCount(
+                    endpoint,
+                    AddonResourceKind.STREAM,
+                    mediaType,
+                    formattedStreamLookupId
+                )
             }
 
+            val formattedSubtitleLookupId =
+                endpoint.formatLookupId(AddonResourceKind.SUBTITLES, mediaType, subtitleLookupId)
             if (
                 endpoint.supports(AddonResourceKind.SUBTITLES, mediaType) &&
-                    endpoint.accepts(AddonResourceKind.SUBTITLES, mediaType, subtitleLookupId)
+                    formattedSubtitleLookupId != null
             ) {
+                subtitleRequestId = formattedSubtitleLookupId
                 subtitleCount = fetchResourceCount(
                     endpoint,
                     AddonResourceKind.SUBTITLES,
                     mediaType,
-                    subtitleLookupId
+                    formattedSubtitleLookupId
                 )
             }
 
             if (streamCount > 0 || subtitleCount > 0) {
                 stats += MetadataTransportStat(
                     addonId = endpoint.addonId,
-                    streamLookupId = streamLookupId,
+                    streamLookupId = streamRequestId ?: streamLookupId,
                     streamCount = streamCount,
-                    subtitleLookupId = subtitleLookupId,
+                    subtitleLookupId = subtitleRequestId ?: subtitleLookupId,
                     subtitleCount = subtitleCount
                 )
             }
@@ -284,17 +289,49 @@ private class AddonMetadataClient(
 
     @Synchronized
     private fun resolveEndpoints(): List<AddonEndpoint> {
-        resolvedEndpoints?.let { return it }
-
-        val resolved = manifestSeeds.map { seed ->
-            resolveEndpoint(seed)
+        val seeds = addonRegistry.orderedSeeds()
+        if (seeds.isEmpty()) {
+            resolvedFingerprint = ""
+            resolvedEndpoints = emptyList()
+            return emptyList()
         }
+
+        val fingerprint =
+            seeds.joinToString(separator = "|") { seed ->
+                listOf(
+                    seed.installationId,
+                    seed.manifestUrl,
+                    seed.baseUrl,
+                    seed.encodedQuery.orEmpty(),
+                    seed.cachedManifestJson?.hashCode()?.toString().orEmpty()
+                ).joinToString(separator = "::")
+            }
+
+        resolvedEndpoints?.let { cached ->
+            if (resolvedFingerprint == fingerprint) {
+                return cached
+            }
+        }
+
+        val resolved = seeds.map { seed ->
+            resolveEndpoint(seed = seed)
+        }
+        resolvedFingerprint = fingerprint
         resolvedEndpoints = resolved
         return resolved
     }
 
     private fun resolveEndpoint(seed: AddonManifestSeed): AddonEndpoint {
-        val manifest = httpGetJson(seed.manifestUrl)
+        val networkManifest = httpGetJson(seed.manifestUrl)
+        if (networkManifest != null) {
+            addonRegistry.cacheManifest(seed, networkManifest)
+        }
+
+        val manifest =
+            networkManifest
+                ?: parseCachedManifest(seed.cachedManifestJson)
+                ?: fallbackManifestFor(seed)
+
         if (manifest == null) {
             return AddonEndpoint(
                 addonId = seed.addonIdHint,
@@ -312,7 +349,10 @@ private class AddonMetadataClient(
         }
 
         val addonId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
-        val addonIdPrefixes = parseManifestStringArray(manifest.optJSONArray("idPrefixes"))
+        val addonIdPrefixes =
+            parseManifestStringArray(manifest.optJSONArray("idPrefixes")).ifEmpty {
+                nonBlank(manifest.optString("idPrefix"))?.let(::listOf).orEmpty()
+            }
         val resources = manifest.optJSONArray("resources")
 
         val supportedTypes = mutableMapOf<AddonResourceKind, MutableSet<MetadataLabMediaType>>()
@@ -336,7 +376,10 @@ private class AddonMetadataClient(
                     is JSONObject -> {
                         val kind = toResourceKindOrNull(nonBlank(resource.optString("name"))) ?: continue
                         val types = parseManifestStringArray(resource.optJSONArray("types"))
-                        val prefixes = parseManifestStringArray(resource.optJSONArray("idPrefixes"))
+                        val prefixes =
+                            parseManifestStringArray(resource.optJSONArray("idPrefixes")).ifEmpty {
+                                nonBlank(resource.optString("idPrefix"))?.let(::listOf).orEmpty()
+                            }
                         val targets =
                             if (types.isEmpty()) {
                                 listOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
@@ -374,6 +417,60 @@ private class AddonMetadataClient(
         )
     }
 
+    private fun parseCachedManifest(raw: String?): JSONObject? {
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+        return runCatching { JSONObject(raw) }.getOrNull()
+    }
+
+    private fun fallbackManifestFor(seed: AddonManifestSeed): JSONObject? {
+        val looksLikeCinemeta =
+            seed.addonIdHint.contains("cinemeta", ignoreCase = true) ||
+                seed.manifestUrl.contains("cinemeta", ignoreCase = true)
+        if (looksLikeCinemeta) {
+            return JSONObject()
+                .put("id", "com.linvo.cinemeta")
+                .put("types", JSONArray().put("movie").put("series"))
+                .put(
+                    "resources",
+                    JSONArray()
+                        .put(
+                            JSONObject()
+                                .put("name", "catalog")
+                                .put("types", JSONArray().put("movie").put("series"))
+                                .put("idPrefixes", JSONArray().put("tt"))
+                        )
+                        .put(
+                            JSONObject()
+                                .put("name", "meta")
+                                .put("types", JSONArray().put("movie").put("series"))
+                                .put("idPrefixes", JSONArray().put("tt"))
+                        )
+                )
+        }
+
+        val looksLikeOpenSubtitles =
+            seed.addonIdHint.contains("opensubtitles", ignoreCase = true) ||
+                seed.manifestUrl.contains("opensubtitles", ignoreCase = true)
+        if (looksLikeOpenSubtitles) {
+            return JSONObject()
+                .put("id", "org.stremio.opensubtitlesv3")
+                .put("types", JSONArray().put("movie").put("series"))
+                .put(
+                    "resources",
+                    JSONArray().put(
+                        JSONObject()
+                            .put("name", "subtitles")
+                            .put("types", JSONArray().put("movie").put("series"))
+                            .put("idPrefixes", JSONArray().put("tt"))
+                    )
+                )
+        }
+
+        return null
+    }
+
     private fun orderedEndpoints(
         endpoints: List<AddonEndpoint>,
         preferredAddonId: String?
@@ -402,7 +499,11 @@ private class AddonMetadataClient(
         mediaType: MetadataLabMediaType,
         contentId: String
     ): Boolean {
-        if (endpoints.isEmpty() || contentId.isBlank()) {
+        if (contentId.isBlank()) {
+            return false
+        }
+
+        if (endpoints.isEmpty()) {
             return false
         }
 
@@ -411,7 +512,11 @@ private class AddonMetadataClient(
             return true
         }
 
-        return allPrefixes.any { contentId.startsWith(it) }
+        return formatIdForIdPrefixes(
+            input = contentId,
+            mediaType = mediaType.asIdKind(),
+            idPrefixes = allPrefixes
+        ) != null
     }
 
     private fun fetchAddonMeta(
@@ -915,43 +1020,6 @@ private class TmdbMetadataClient(
     }
 }
 
-private fun parseAddonEndpoints(raw: String): List<AddonManifestSeed> {
-    val defaultManifest = "https://v3-cinemeta.strem.io/manifest.json"
-    val values = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-    val manifestUrls = if (values.isEmpty()) listOf(defaultManifest) else values
-
-    return manifestUrls.map { manifestUrl ->
-        val uri = Uri.parse(manifestUrl)
-        val baseUrl =
-            Uri.Builder()
-                .scheme(uri.scheme ?: "https")
-                .encodedAuthority(uri.encodedAuthority ?: uri.host ?: "")
-                .apply {
-                    val segments = uri.pathSegments.toMutableList()
-                    if (segments.lastOrNull()?.equals("manifest.json", ignoreCase = true) == true) {
-                        segments.removeLastOrNull()
-                    }
-                    for (segment in segments) {
-                        appendPath(segment)
-                    }
-                }
-                .build()
-                .toString()
-                .trimEnd('/')
-
-        val addonId = when {
-            manifestUrl.contains("cinemeta", ignoreCase = true) -> "com.linvo.cinemeta"
-            else -> Uri.parse(manifestUrl).host?.ifBlank { null } ?: "addon.local"
-        }
-        AddonManifestSeed(
-            manifestUrl = manifestUrl,
-            addonIdHint = addonId,
-            baseUrl = baseUrl,
-            encodedQuery = uri.encodedQuery
-        )
-    }
-}
-
 private fun httpGetJson(url: String): JSONObject? {
     return runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -981,4 +1049,8 @@ private fun httpGetJson(url: String): JSONObject? {
 private fun nonBlank(value: String?): String? {
     val trimmed = value?.trim()
     return if (trimmed.isNullOrEmpty()) null else trimmed
+}
+
+private fun MetadataLabMediaType.asIdKind(): String {
+    return if (this == MetadataLabMediaType.SERIES) "series" else "movie"
 }

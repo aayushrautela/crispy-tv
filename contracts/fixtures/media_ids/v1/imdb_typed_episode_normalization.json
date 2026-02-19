@@ -1,0 +1,17 @@
+{
+  "contract_version": 1,
+  "suite": "media_ids",
+  "case_id": "imdb_typed_episode_normalization",
+  "input": {
+    "raw": "series:imdb:show:tt0944947:1:2"
+  },
+  "expected": {
+    "content_id": "tt0944947",
+    "video_id": "tt0944947:1:2",
+    "is_episode": true,
+    "season": 1,
+    "episode": 2,
+    "kind": "episode",
+    "addon_lookup_id": "tt0944947:1:2"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "contract_version": 1,
+  "suite": "search_ranking_and_dedup",
+  "case_id": "preferred_addon_then_cinemeta_then_others",
+  "input": {
+    "preferred_addon_id": "meta.preferred",
+    "addon_results": [
+      {
+        "addon_id": "meta.community",
+        "metas": [
+          {
+            "id": "tt0109830",
+            "title": "Forrest Gump (Community)"
+          },
+          {
+            "id": "tt0133093",
+            "title": "The Matrix (Community)"
+          }
+        ]
+      },
+      {
+        "addon_id": "com.linvo.cinemeta",
+        "metas": [
+          {
+            "id": "tt0133093",
+            "title": "The Matrix (Cinemeta)"
+          },
+          {
+            "id": "tt1375666",
+            "title": "Inception (Cinemeta)"
+          }
+        ]
+      },
+      {
+        "addon_id": "meta.preferred",
+        "metas": [
+          {
+            "id": "tt1375666",
+            "title": "Inception (Preferred)"
+          },
+          {
+            "id": "tt0816692",
+            "title": "Interstellar (Preferred)"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "merged": [
+      {
+        "id": "tt1375666",
+        "title": "Inception (Preferred)",
+        "addon_id": "meta.preferred"
+      },
+      {
+        "id": "tt0816692",
+        "title": "Interstellar (Preferred)",
+        "addon_id": "meta.preferred"
+      },
+      {
+        "id": "tt0133093",
+        "title": "The Matrix (Cinemeta)",
+        "addon_id": "com.linvo.cinemeta"
+      },
+      {
+        "id": "tt0109830",
+        "title": "Forrest Gump (Community)",
+        "addon_id": "meta.community"
+      }
+    ]
+  }
+}

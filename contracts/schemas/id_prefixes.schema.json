@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "id_prefixes fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "id_prefixes"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "raw",
+        "media_type",
+        "id_prefixes"
+      ],
+      "properties": {
+        "raw": {
+          "type": "string",
+          "minLength": 1
+        },
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "movie",
+            "series"
+          ]
+        },
+        "id_prefixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "formatted_id"
+      ],
+      "properties": {
+        "formatted_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

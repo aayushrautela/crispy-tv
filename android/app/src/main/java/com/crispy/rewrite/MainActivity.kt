@@ -67,16 +67,28 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppRoot() {
-    val metadataResolver = remember {
-        PlaybackLabDependencies.metadataResolverFactory()
+    val context = LocalContext.current
+    val appContext = remember(context) { context.applicationContext }
+
+    val metadataResolver = remember(appContext) {
+        PlaybackLabDependencies.metadataResolverFactory(appContext)
+    }
+    val catalogSearchService = remember(appContext) {
+        PlaybackLabDependencies.catalogSearchServiceFactory(appContext)
+    }
+    val watchHistoryService = remember(appContext) {
+        PlaybackLabDependencies.watchHistoryServiceFactory(appContext)
     }
     val viewModel: PlaybackLabViewModel = viewModel(
-        factory = remember(metadataResolver) {
-            PlaybackLabViewModel.factory(metadataResolver)
+        factory = remember(metadataResolver, catalogSearchService, watchHistoryService) {
+            PlaybackLabViewModel.factory(
+                metadataResolver = metadataResolver,
+                catalogSearchService = catalogSearchService,
+                watchHistoryService = watchHistoryService
+            )
         }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
@@ -380,6 +392,332 @@ private fun AppRoot() {
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Catalog + Search Lab", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Registry-ordered addon catalogs with Nuvio URL fallback strategy.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            modifier = Modifier.testTag("catalog_movie_button"),
+                            enabled = uiState.catalogMediaType != MetadataLabMediaType.MOVIE,
+                            onClick = {
+                                viewModel.onCatalogMediaTypeSelected(MetadataLabMediaType.MOVIE)
+                            }
+                        ) {
+                            Text("Movie")
+                        }
+
+                        Button(
+                            modifier = Modifier.testTag("catalog_series_button"),
+                            enabled = uiState.catalogMediaType != MetadataLabMediaType.SERIES,
+                            onClick = {
+                                viewModel.onCatalogMediaTypeSelected(MetadataLabMediaType.SERIES)
+                            }
+                        ) {
+                            Text("Series")
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = uiState.catalogInputId,
+                        onValueChange = viewModel::onCatalogIdChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("catalog_id_input"),
+                        label = { Text("Catalog ID") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.catalogSearchQuery,
+                        onValueChange = viewModel::onCatalogSearchQueryChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("catalog_search_input"),
+                        label = { Text("Search query") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.catalogPreferredAddonId,
+                        onValueChange = viewModel::onCatalogPreferredAddonChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("catalog_preferred_addon_input"),
+                        label = { Text("Preferred addon (optional)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            modifier = Modifier.testTag("catalog_load_button"),
+                            enabled = !uiState.isLoadingCatalog,
+                            onClick = {
+                                viewModel.onLoadCatalogRequested()
+                            }
+                        ) {
+                            Text(if (uiState.isLoadingCatalog) "Loading..." else "Load Catalog")
+                        }
+
+                        Button(
+                            modifier = Modifier.testTag("catalog_search_button"),
+                            enabled = !uiState.isLoadingCatalog,
+                            onClick = {
+                                viewModel.onSearchCatalogRequested()
+                            }
+                        ) {
+                            Text(if (uiState.isLoadingCatalog) "Searching..." else "Search")
+                        }
+                    }
+
+                    Text(
+                        modifier = Modifier.testTag("catalog_status_text"),
+                        text = uiState.catalogStatusMessage,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    val catalogsText =
+                        if (uiState.catalogAvailableCatalogs.isEmpty()) {
+                            "catalogs=none"
+                        } else {
+                            "catalogs=" + uiState.catalogAvailableCatalogs.take(6).joinToString { catalog ->
+                                "${catalog.addonId}:${catalog.catalogType}/${catalog.catalogId}"
+                            }
+                        }
+                    Text(
+                        modifier = Modifier.testTag("catalog_catalogs_text"),
+                        text = catalogsText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    val itemsText =
+                        if (uiState.catalogItems.isEmpty()) {
+                            "results=none"
+                        } else {
+                            "results=" + uiState.catalogItems.take(5).joinToString { item ->
+                                "${item.id}:${item.title}"
+                            }
+                        }
+                    Text(
+                        modifier = Modifier.testTag("catalog_results_text"),
+                        text = itemsText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    val attemptText =
+                        if (uiState.catalogAttemptedUrls.isEmpty()) {
+                            "attempts=none"
+                        } else {
+                            "attempts=" + uiState.catalogAttemptedUrls.takeLast(3).joinToString(separator = " | ")
+                        }
+                    Text(
+                        modifier = Modifier.testTag("catalog_attempts_text"),
+                        text = attemptText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Watch History + Sync", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Local watched ledger with optional Trakt/Simkl history sync.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            modifier = Modifier.testTag("watch_movie_button"),
+                            enabled = uiState.watchContentType != MetadataLabMediaType.MOVIE,
+                            onClick = {
+                                viewModel.onWatchContentTypeSelected(MetadataLabMediaType.MOVIE)
+                            }
+                        ) {
+                            Text("Movie")
+                        }
+
+                        Button(
+                            modifier = Modifier.testTag("watch_series_button"),
+                            enabled = uiState.watchContentType != MetadataLabMediaType.SERIES,
+                            onClick = {
+                                viewModel.onWatchContentTypeSelected(MetadataLabMediaType.SERIES)
+                            }
+                        ) {
+                            Text("Series")
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = uiState.watchContentId,
+                        onValueChange = viewModel::onWatchContentIdChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("watch_content_id_input"),
+                        label = { Text("Content ID") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.watchRemoteImdbId,
+                        onValueChange = viewModel::onWatchRemoteImdbIdChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("watch_remote_imdb_input"),
+                        label = { Text("Remote IMDb ID (optional)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.watchTitle,
+                        onValueChange = viewModel::onWatchTitleChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("watch_title_input"),
+                        label = { Text("Title (optional)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.watchSeasonInput,
+                        onValueChange = viewModel::onWatchSeasonChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("watch_season_input"),
+                        label = { Text("Season (series only)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.watchEpisodeInput,
+                        onValueChange = viewModel::onWatchEpisodeChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("watch_episode_input"),
+                        label = { Text("Episode (series only)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.watchTraktToken,
+                        onValueChange = viewModel::onWatchTraktTokenChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("watch_trakt_token_input"),
+                        label = { Text("Trakt access token") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.watchSimklToken,
+                        onValueChange = viewModel::onWatchSimklTokenChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("watch_simkl_token_input"),
+                        label = { Text("Simkl access token") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            modifier = Modifier.testTag("watch_save_tokens_button"),
+                            enabled = !uiState.isUpdatingWatchHistory,
+                            onClick = {
+                                viewModel.onSaveWatchTokensRequested()
+                            }
+                        ) {
+                            Text("Save Tokens")
+                        }
+
+                        Button(
+                            modifier = Modifier.testTag("watch_refresh_button"),
+                            enabled = !uiState.isUpdatingWatchHistory,
+                            onClick = {
+                                viewModel.onRefreshWatchHistoryRequested()
+                            }
+                        ) {
+                            Text(if (uiState.isUpdatingWatchHistory) "Working..." else "Refresh")
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            modifier = Modifier.testTag("watch_mark_button"),
+                            enabled = !uiState.isUpdatingWatchHistory,
+                            onClick = {
+                                viewModel.onMarkWatchedRequested()
+                            }
+                        ) {
+                            Text(if (uiState.isUpdatingWatchHistory) "Working..." else "Mark Watched")
+                        }
+
+                        Button(
+                            modifier = Modifier.testTag("watch_unmark_button"),
+                            enabled = !uiState.isUpdatingWatchHistory,
+                            onClick = {
+                                viewModel.onUnmarkWatchedRequested()
+                            }
+                        ) {
+                            Text(if (uiState.isUpdatingWatchHistory) "Working..." else "Unmark")
+                        }
+                    }
+
+                    Text(
+                        modifier = Modifier.testTag("watch_auth_text"),
+                        text =
+                            "trakt_auth=${uiState.watchAuthState.traktAuthenticated} | " +
+                                "simkl_auth=${uiState.watchAuthState.simklAuthenticated}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    Text(
+                        modifier = Modifier.testTag("watch_status_text"),
+                        text = uiState.watchStatusMessage,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    val historyText =
+                        if (uiState.watchEntries.isEmpty()) {
+                            "history=none"
+                        } else {
+                            "history=" + uiState.watchEntries.take(6).joinToString(separator = " | ") { entry ->
+                                val suffix =
+                                    if (entry.season != null && entry.episode != null) {
+                                        ":${entry.season}:${entry.episode}"
+                                    } else {
+                                        ""
+                                    }
+                                "${entry.contentId}$suffix"
+                            }
+                        }
+                    Text(
+                        modifier = Modifier.testTag("watch_history_text"),
+                        text = historyText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }

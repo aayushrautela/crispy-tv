@@ -15,10 +15,19 @@ import androidx.test.rule.GrantPermissionRule
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
 import com.crispy.rewrite.nativeengine.playback.PlaybackController
+import com.crispy.rewrite.player.CatalogLabResult
+import com.crispy.rewrite.player.CatalogPageRequest
+import com.crispy.rewrite.player.CatalogSearchLabService
+import com.crispy.rewrite.player.CatalogSearchRequest
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.MetadataLabRequest
 import com.crispy.rewrite.player.MetadataLabResolution
 import com.crispy.rewrite.player.MetadataLabResolver
+import com.crispy.rewrite.player.WatchHistoryEntry
+import com.crispy.rewrite.player.WatchHistoryLabResult
+import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryRequest
+import com.crispy.rewrite.player.WatchProviderAuthState
 import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.After
 import org.junit.Before
@@ -47,8 +56,14 @@ class PlaybackLabSmokeTest {
                 streamUrl = "http://127.0.0.1:8090/play/mockhash/0"
             )
         }
-        PlaybackLabDependencies.metadataResolverFactory = {
+        PlaybackLabDependencies.metadataResolverFactory = { _ ->
             TestMetadataResolver()
+        }
+        PlaybackLabDependencies.catalogSearchServiceFactory = { _ ->
+            TestCatalogSearchService()
+        }
+        PlaybackLabDependencies.watchHistoryServiceFactory = { _ ->
+            TestWatchHistoryService()
         }
     }
 
@@ -217,5 +232,46 @@ private class TestMetadataResolver : MetadataLabResolver {
         fun reset() {
             requests.clear()
         }
+    }
+}
+
+private class TestCatalogSearchService : CatalogSearchLabService {
+    override suspend fun fetchCatalogPage(request: CatalogPageRequest): CatalogLabResult {
+        return CatalogLabResult(statusMessage = "Catalog test stub")
+    }
+
+    override suspend fun search(request: CatalogSearchRequest): CatalogLabResult {
+        return CatalogLabResult(statusMessage = "Catalog test stub")
+    }
+}
+
+private class TestWatchHistoryService : WatchHistoryLabService {
+    override fun updateAuthTokens(traktAccessToken: String, simklAccessToken: String) {
+        // No-op for test fake.
+    }
+
+    override fun authState(): WatchProviderAuthState {
+        return WatchProviderAuthState()
+    }
+
+    override suspend fun listLocalHistory(limit: Int): WatchHistoryLabResult {
+        return WatchHistoryLabResult(
+            statusMessage = "Watch history test stub",
+            entries = emptyList()
+        )
+    }
+
+    override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+        return WatchHistoryLabResult(
+            statusMessage = "Watch history test stub",
+            entries = emptyList<WatchHistoryEntry>()
+        )
+    }
+
+    override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+        return WatchHistoryLabResult(
+            statusMessage = "Watch history test stub",
+            entries = emptyList<WatchHistoryEntry>()
+        )
     }
 }

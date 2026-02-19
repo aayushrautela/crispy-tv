@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog_url_building fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "catalog_url_building"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "base_url",
+        "media_type",
+        "catalog_id",
+        "page",
+        "page_size",
+        "filters",
+        "encoded_addon_query"
+      ],
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "movie",
+            "series"
+          ]
+        },
+        "catalog_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "value"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "encoded_addon_query": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "urls"
+      ],
+      "properties": {
+        "urls": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

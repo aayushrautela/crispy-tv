@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "id_prefixes",
+  "case_id": "series_wrapped_tmdb_typed_episode_to_tmdb_prefix",
+  "input": {
+    "raw": "series:tmdb:show:1399:2:4",
+    "media_type": "series",
+    "id_prefixes": [
+      "tmdb:"
+    ]
+  },
+  "expected": {
+    "formatted_id": "tmdb:1399:2:4"
+  }
+}

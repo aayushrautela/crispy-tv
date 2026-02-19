@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "id_prefixes",
+  "case_id": "imdb_typed_episode_to_tt_prefix",
+  "input": {
+    "raw": "imdb:show:tt0944947:1:2",
+    "media_type": "series",
+    "id_prefixes": [
+      "tt"
+    ]
+  },
+  "expected": {
+    "formatted_id": "tt0944947:1:2"
+  }
+}

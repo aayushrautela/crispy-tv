@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "id_prefixes",
+  "case_id": "unmatched_prefix_returns_null",
+  "input": {
+    "raw": "imdb:movie:tt1375666",
+    "media_type": "movie",
+    "id_prefixes": [
+      "tmdb:"
+    ]
+  },
+  "expected": {
+    "formatted_id": null
+  }
+}

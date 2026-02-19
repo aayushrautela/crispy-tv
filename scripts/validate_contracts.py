@@ -10,6 +10,9 @@ from jsonschema import Draft202012Validator
 SUITE_TO_SCHEMA = {
     "player_machine": "player_machine.schema.json",
     "media_ids": "media_ids.schema.json",
+    "id_prefixes": "id_prefixes.schema.json",
+    "catalog_url_building": "catalog_url_building.schema.json",
+    "search_ranking_and_dedup": "search_ranking_and_dedup.schema.json",
     "metadata_addon_primary": "metadata_addon_primary.schema.json",
     "metadata_tmdb_enhancer": "metadata_tmdb_enhancer.schema.json",
     "storage_v1": "storage_v1.schema.json",

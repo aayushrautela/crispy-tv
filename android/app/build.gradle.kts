@@ -8,11 +8,19 @@ val tmdbApiKey =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
-val metadataAddonUrls =
-    (providers.gradleProperty("METADATA_ADDON_URLS").orNull
-        ?: "https://v3-cinemeta.strem.io/manifest.json")
+val traktClientId =
+    (providers.gradleProperty("TRAKT_CLIENT_ID").orNull ?: "")
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
+
+val simklClientId =
+    (providers.gradleProperty("SIMKL_CLIENT_ID").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
+val metadataAddonUrls = "stremio://v3-cinemeta.strem.io/manifest.json"
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
 
 android {
     namespace = "com.crispy.rewrite"
@@ -26,6 +34,8 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
+        buildConfigField("String", "TRAKT_CLIENT_ID", "\"$traktClientId\"")
+        buildConfigField("String", "SIMKL_CLIENT_ID", "\"$simklClientId\"")
         buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
 

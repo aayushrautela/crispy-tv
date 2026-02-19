@@ -38,24 +38,62 @@ data class PlaybackLabUiState(
     val metadataMediaType: MetadataLabMediaType = MetadataLabMediaType.SERIES,
     val metadataStatusMessage: String = "Metadata idle. Resolve to apply Nuvio rules.",
     val isResolvingMetadata: Boolean = false,
-    val metadataResolution: MetadataLabResolution? = null
+    val metadataResolution: MetadataLabResolution? = null,
+    val catalogMediaType: MetadataLabMediaType = MetadataLabMediaType.SERIES,
+    val catalogInputId: String = "top",
+    val catalogSearchQuery: String = "game of thrones",
+    val catalogPreferredAddonId: String = "",
+    val catalogStatusMessage: String = "Catalog/search idle. Load a page or run query.",
+    val isLoadingCatalog: Boolean = false,
+    val catalogItems: List<CatalogLabItem> = emptyList(),
+    val catalogAvailableCatalogs: List<CatalogLabCatalog> = emptyList(),
+    val catalogAttemptedUrls: List<String> = emptyList(),
+    val watchContentType: MetadataLabMediaType = MetadataLabMediaType.SERIES,
+    val watchContentId: String = "tt0944947",
+    val watchRemoteImdbId: String = "tt0944947",
+    val watchTitle: String = "",
+    val watchSeasonInput: String = "1",
+    val watchEpisodeInput: String = "1",
+    val watchTraktToken: String = "",
+    val watchSimklToken: String = "",
+    val watchStatusMessage: String = "Watch history idle.",
+    val isUpdatingWatchHistory: Boolean = false,
+    val watchEntries: List<WatchHistoryEntry> = emptyList(),
+    val watchAuthState: WatchProviderAuthState = WatchProviderAuthState()
 )
 
 class PlaybackLabViewModel(
-    private val metadataResolver: MetadataLabResolver = DefaultMetadataLabResolver
+    private val metadataResolver: MetadataLabResolver = DefaultMetadataLabResolver,
+    private val catalogSearchService: CatalogSearchLabService = DefaultCatalogSearchLabService,
+    private val watchHistoryService: WatchHistoryLabService = DefaultWatchHistoryLabService
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PlaybackLabUiState())
     val uiState: StateFlow<PlaybackLabUiState> = _uiState.asStateFlow()
 
     companion object {
-        fun factory(metadataResolver: MetadataLabResolver): ViewModelProvider.Factory {
+        fun factory(
+            metadataResolver: MetadataLabResolver,
+            catalogSearchService: CatalogSearchLabService,
+            watchHistoryService: WatchHistoryLabService
+        ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return PlaybackLabViewModel(metadataResolver) as T
+                    return PlaybackLabViewModel(
+                        metadataResolver = metadataResolver,
+                        catalogSearchService = catalogSearchService,
+                        watchHistoryService = watchHistoryService
+                    ) as T
                 }
             }
         }
+    }
+
+    init {
+        _uiState.update {
+            it.copy(watchAuthState = watchHistoryService.authState())
+        }
+        onRefreshWatchHistoryRequested()
     }
 
     fun onPlaySampleRequested() {
@@ -270,6 +308,277 @@ class PlaybackLabViewModel(
         _uiState.update { it.copy(metadataMediaType = mediaType) }
     }
 
+    fun onCatalogMediaTypeSelected(mediaType: MetadataLabMediaType) {
+        _uiState.update { it.copy(catalogMediaType = mediaType) }
+    }
+
+    fun onCatalogIdChanged(value: String) {
+        _uiState.update { it.copy(catalogInputId = value) }
+    }
+
+    fun onCatalogSearchQueryChanged(value: String) {
+        _uiState.update { it.copy(catalogSearchQuery = value) }
+    }
+
+    fun onCatalogPreferredAddonChanged(value: String) {
+        _uiState.update { it.copy(catalogPreferredAddonId = value) }
+    }
+
+    fun onWatchContentTypeSelected(mediaType: MetadataLabMediaType) {
+        _uiState.update { it.copy(watchContentType = mediaType) }
+    }
+
+    fun onWatchContentIdChanged(value: String) {
+        _uiState.update { it.copy(watchContentId = value) }
+    }
+
+    fun onWatchRemoteImdbIdChanged(value: String) {
+        _uiState.update { it.copy(watchRemoteImdbId = value) }
+    }
+
+    fun onWatchTitleChanged(value: String) {
+        _uiState.update { it.copy(watchTitle = value) }
+    }
+
+    fun onWatchSeasonChanged(value: String) {
+        _uiState.update { it.copy(watchSeasonInput = value) }
+    }
+
+    fun onWatchEpisodeChanged(value: String) {
+        _uiState.update { it.copy(watchEpisodeInput = value) }
+    }
+
+    fun onWatchTraktTokenChanged(value: String) {
+        _uiState.update { it.copy(watchTraktToken = value) }
+    }
+
+    fun onWatchSimklTokenChanged(value: String) {
+        _uiState.update { it.copy(watchSimklToken = value) }
+    }
+
+    fun onSaveWatchTokensRequested() {
+        val snapshot = _uiState.value
+        watchHistoryService.updateAuthTokens(
+            traktAccessToken = snapshot.watchTraktToken,
+            simklAccessToken = snapshot.watchSimklToken
+        )
+        _uiState.update {
+            it.copy(
+                watchAuthState = watchHistoryService.authState(),
+                watchStatusMessage = "Saved Trakt/Simkl tokens for sync."
+            )
+        }
+    }
+
+    fun onRefreshWatchHistoryRequested() {
+        _uiState.update {
+            it.copy(
+                isUpdatingWatchHistory = true,
+                watchStatusMessage = "Loading local watch history..."
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                watchHistoryService.listLocalHistory()
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        isUpdatingWatchHistory = false,
+                        watchStatusMessage = result.statusMessage,
+                        watchEntries = result.entries,
+                        watchAuthState = result.authState
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isUpdatingWatchHistory = false,
+                        watchStatusMessage = "Failed to load watch history: ${error.message ?: "unknown error"}",
+                        watchEntries = emptyList(),
+                        watchAuthState = watchHistoryService.authState()
+                    )
+                }
+            }
+        }
+    }
+
+    fun onMarkWatchedRequested() {
+        val snapshot = _uiState.value
+        val request = buildWatchRequest(snapshot) ?: return
+
+        _uiState.update {
+            it.copy(
+                isUpdatingWatchHistory = true,
+                watchStatusMessage = "Marking watched and syncing providers..."
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                watchHistoryService.markWatched(request)
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        isUpdatingWatchHistory = false,
+                        watchStatusMessage = result.statusMessage,
+                        watchEntries = result.entries,
+                        watchAuthState = result.authState
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isUpdatingWatchHistory = false,
+                        watchStatusMessage = "Mark watched failed: ${error.message ?: "unknown error"}",
+                        watchAuthState = watchHistoryService.authState()
+                    )
+                }
+            }
+        }
+    }
+
+    fun onUnmarkWatchedRequested() {
+        val snapshot = _uiState.value
+        val request = buildWatchRequest(snapshot) ?: return
+
+        _uiState.update {
+            it.copy(
+                isUpdatingWatchHistory = true,
+                watchStatusMessage = "Removing watched state and syncing providers..."
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                watchHistoryService.unmarkWatched(request)
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        isUpdatingWatchHistory = false,
+                        watchStatusMessage = result.statusMessage,
+                        watchEntries = result.entries,
+                        watchAuthState = result.authState
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isUpdatingWatchHistory = false,
+                        watchStatusMessage = "Unmark watched failed: ${error.message ?: "unknown error"}",
+                        watchAuthState = watchHistoryService.authState()
+                    )
+                }
+            }
+        }
+    }
+
+    fun onLoadCatalogRequested() {
+        val snapshot = _uiState.value
+        val catalogId = snapshot.catalogInputId.trim()
+        if (catalogId.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    catalogStatusMessage = "Catalog ID is required.",
+                    isLoadingCatalog = false
+                )
+            }
+            return
+        }
+
+        val preferredAddonId = snapshot.catalogPreferredAddonId.trim().ifBlank { null }
+        _uiState.update {
+            it.copy(
+                isLoadingCatalog = true,
+                catalogStatusMessage = "Loading catalog page..."
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                catalogSearchService.fetchCatalogPage(
+                    CatalogPageRequest(
+                        mediaType = snapshot.catalogMediaType,
+                        catalogId = catalogId,
+                        preferredAddonId = preferredAddonId
+                    )
+                )
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        isLoadingCatalog = false,
+                        catalogStatusMessage = result.statusMessage,
+                        catalogItems = result.items,
+                        catalogAvailableCatalogs = result.catalogs,
+                        catalogAttemptedUrls = result.attemptedUrls
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isLoadingCatalog = false,
+                        catalogStatusMessage = "Catalog load failed: ${error.message ?: "unknown error"}",
+                        catalogItems = emptyList(),
+                        catalogAttemptedUrls = emptyList()
+                    )
+                }
+            }
+        }
+    }
+
+    fun onSearchCatalogRequested() {
+        val snapshot = _uiState.value
+        val query = snapshot.catalogSearchQuery.trim()
+        if (query.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    catalogStatusMessage = "Search query is required.",
+                    isLoadingCatalog = false
+                )
+            }
+            return
+        }
+
+        val preferredAddonId = snapshot.catalogPreferredAddonId.trim().ifBlank { null }
+        _uiState.update {
+            it.copy(
+                isLoadingCatalog = true,
+                catalogStatusMessage = "Searching addons..."
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                catalogSearchService.search(
+                    CatalogSearchRequest(
+                        mediaType = snapshot.catalogMediaType,
+                        query = query,
+                        preferredAddonId = preferredAddonId
+                    )
+                )
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        isLoadingCatalog = false,
+                        catalogStatusMessage = result.statusMessage,
+                        catalogItems = result.items,
+                        catalogAvailableCatalogs = result.catalogs,
+                        catalogAttemptedUrls = result.attemptedUrls
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isLoadingCatalog = false,
+                        catalogStatusMessage = "Search failed: ${error.message ?: "unknown error"}",
+                        catalogItems = emptyList(),
+                        catalogAttemptedUrls = emptyList()
+                    )
+                }
+            }
+        }
+    }
+
     fun onResolveMetadataRequested() {
         val snapshot = _uiState.value
         val preferredAddonId = snapshot.metadataPreferredAddonId.trim().ifBlank { null }
@@ -320,6 +629,42 @@ class PlaybackLabViewModel(
     }
 
     private fun nowMs(): Long = System.currentTimeMillis()
+
+    private fun buildWatchRequest(snapshot: PlaybackLabUiState): WatchHistoryRequest? {
+        val contentId = snapshot.watchContentId.trim()
+        if (contentId.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    isUpdatingWatchHistory = false,
+                    watchStatusMessage = "Watch content ID is required."
+                )
+            }
+            return null
+        }
+
+        val season = snapshot.watchSeasonInput.trim().toIntOrNull()
+        val episode = snapshot.watchEpisodeInput.trim().toIntOrNull()
+        if (snapshot.watchContentType == MetadataLabMediaType.SERIES) {
+            if (season == null || season <= 0 || episode == null || episode <= 0) {
+                _uiState.update {
+                    it.copy(
+                        isUpdatingWatchHistory = false,
+                        watchStatusMessage = "Series watch updates require positive season and episode numbers."
+                    )
+                }
+                return null
+            }
+        }
+
+        return WatchHistoryRequest(
+            contentId = contentId,
+            contentType = snapshot.watchContentType,
+            title = snapshot.watchTitle,
+            season = season,
+            episode = episode,
+            remoteImdbId = snapshot.watchRemoteImdbId.trim().ifBlank { null }
+        )
+    }
 }
 
 private fun String.toPlaybackEngine(): PlaybackEngine {

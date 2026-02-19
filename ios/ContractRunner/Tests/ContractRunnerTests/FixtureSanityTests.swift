@@ -6,6 +6,9 @@ final class FixtureSanityTests: XCTestCase {
         let suites = [
             "player_machine",
             "media_ids",
+            "id_prefixes",
+            "catalog_url_building",
+            "search_ranking_and_dedup",
             "metadata_addon_primary",
             "metadata_tmdb_enhancer",
             "storage_v1",

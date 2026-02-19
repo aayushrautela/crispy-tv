@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "id_prefixes",
+  "case_id": "bare_numeric_episode_infers_tmdb_from_prefix",
+  "input": {
+    "raw": "1399:1:2",
+    "media_type": "series",
+    "id_prefixes": [
+      "tmdb:"
+    ]
+  },
+  "expected": {
+    "formatted_id": "tmdb:1399:1:2"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "suite": "catalog_url_building",
+  "case_id": "second_page_with_filters_skips_simple",
+  "input": {
+    "base_url": "https://community.example/addon/",
+    "media_type": "movie",
+    "catalog_id": "trending",
+    "page": 2,
+    "page_size": 100,
+    "filters": [
+      {
+        "key": "search",
+        "value": "fight club"
+      },
+      {
+        "key": "genre",
+        "value": "drama"
+      }
+    ],
+    "encoded_addon_query": "token=abc123&lang=en"
+  },
+  "expected": {
+    "urls": [
+      "https://community.example/addon/catalog/movie/trending/skip=100&limit=100&search=fight%20club&genre=drama.json?token=abc123&lang=en",
+      "https://community.example/addon/catalog/movie/trending.json?skip=100&limit=100&token=abc123&lang=en&search=fight%20club&genre=drama"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "contract_version": 1,
+  "suite": "id_prefixes",
+  "case_id": "no_prefixes_best_effort_tmdb_typed_episode",
+  "input": {
+    "raw": "tmdb:show:1399:1:1",
+    "media_type": "series",
+    "id_prefixes": []
+  },
+  "expected": {
+    "formatted_id": "tmdb:1399:1:1"
+  }
+}

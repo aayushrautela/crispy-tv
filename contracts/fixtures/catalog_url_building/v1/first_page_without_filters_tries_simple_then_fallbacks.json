@@ -1,0 +1,21 @@
+{
+  "contract_version": 1,
+  "suite": "catalog_url_building",
+  "case_id": "first_page_without_filters_tries_simple_then_fallbacks",
+  "input": {
+    "base_url": "https://v3-cinemeta.strem.io",
+    "media_type": "series",
+    "catalog_id": "top",
+    "page": 1,
+    "page_size": 50,
+    "filters": [],
+    "encoded_addon_query": "cinemeta=true"
+  },
+  "expected": {
+    "urls": [
+      "https://v3-cinemeta.strem.io/catalog/series/top.json?cinemeta=true",
+      "https://v3-cinemeta.strem.io/catalog/series/top/skip=0&limit=50.json?cinemeta=true",
+      "https://v3-cinemeta.strem.io/catalog/series/top.json?skip=0&limit=50&cinemeta=true"
+    ]
+  }
+}

@@ -1,13 +1,17 @@
 package com.crispy.rewrite
 
 import android.content.Context
+import com.crispy.rewrite.metadata.RemoteCatalogSearchLabService
 import com.crispy.rewrite.metadata.RemoteMetadataLabDataSource
+import com.crispy.rewrite.metadata.RemoteWatchHistoryLabService
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackController
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
 import com.crispy.rewrite.nativeengine.playback.PlaybackController
 import com.crispy.rewrite.nativeengine.torrent.TorrentEngineClient
+import com.crispy.rewrite.player.CatalogSearchLabService
 import com.crispy.rewrite.player.CoreDomainMetadataLabResolver
 import com.crispy.rewrite.player.MetadataLabResolver
+import com.crispy.rewrite.player.WatchHistoryLabService
 
 interface TorrentResolver {
     suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String
@@ -31,12 +35,28 @@ private class NativeTorrentResolver(context: Context) : TorrentResolver {
     }
 }
 
-private fun newMetadataResolver(): MetadataLabResolver {
+private fun newMetadataResolver(context: Context): MetadataLabResolver {
     return CoreDomainMetadataLabResolver(
         RemoteMetadataLabDataSource(
+            context = context,
             addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
             tmdbApiKey = BuildConfig.TMDB_API_KEY
         )
+    )
+}
+
+private fun newCatalogSearchService(context: Context): CatalogSearchLabService {
+    return RemoteCatalogSearchLabService(
+        context = context,
+        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
+    )
+}
+
+private fun newWatchHistoryService(context: Context): WatchHistoryLabService {
+    return RemoteWatchHistoryLabService(
+        context = context,
+        traktClientId = BuildConfig.TRAKT_CLIENT_ID,
+        simklClientId = BuildConfig.SIMKL_CLIENT_ID
     )
 }
 
@@ -53,8 +73,18 @@ object PlaybackLabDependencies {
     }
 
     @Volatile
-    var metadataResolverFactory: () -> MetadataLabResolver = {
-        newMetadataResolver()
+    var metadataResolverFactory: (Context) -> MetadataLabResolver = { context ->
+        newMetadataResolver(context)
+    }
+
+    @Volatile
+    var catalogSearchServiceFactory: (Context) -> CatalogSearchLabService = { context ->
+        newCatalogSearchService(context)
+    }
+
+    @Volatile
+    var watchHistoryServiceFactory: (Context) -> WatchHistoryLabService = { context ->
+        newWatchHistoryService(context)
     }
 
     fun reset() {
@@ -62,8 +92,14 @@ object PlaybackLabDependencies {
             NativePlaybackController(context, callback)
         }
         torrentResolverFactory = { context -> NativeTorrentResolver(context) }
-        metadataResolverFactory = {
-            newMetadataResolver()
+        metadataResolverFactory = { context ->
+            newMetadataResolver(context)
+        }
+        catalogSearchServiceFactory = { context ->
+            newCatalogSearchService(context)
+        }
+        watchHistoryServiceFactory = { context ->
+            newWatchHistoryService(context)
         }
     }
 }
