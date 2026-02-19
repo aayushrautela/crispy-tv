@@ -82,7 +82,7 @@ class TorrentService : Service() {
 
     fun hasActiveTorrents(): Boolean = activeTorrents.isNotEmpty()
 
-    fun getDownloadDir(): File = downloadDir
+    fun getDownloadDir(): File = downloadsDir
 
     fun startLink(link: String, sessionId: String? = null): Boolean {
         val trimmed = link.trim()
@@ -345,7 +345,7 @@ class TorrentService : Service() {
 
     private fun ensureRuntimeDirectories() {
         runtimeRoot.mkdirs()
-        downloadDir.mkdirs()
+        downloadsDir.mkdirs()
         torrentsDir.mkdirs()
     }
 
@@ -367,7 +367,7 @@ class TorrentService : Service() {
         val command = listOf(
             binary.absolutePath,
             "--path",
-            downloadDir.absolutePath,
+            downloadsDir.absolutePath,
             "--torrents",
             torrentsDir.absolutePath,
             "--port",
@@ -457,7 +457,7 @@ class TorrentService : Service() {
     }
 
     private val runtimeRoot: File by lazy { File(filesDir, "torrent-engine") }
-    private val downloadDir: File by lazy { File(runtimeRoot, "data") }
+    private val downloadsDir: File by lazy { File(runtimeRoot, "data") }
     private val torrentsDir: File by lazy { File(runtimeRoot, "torrents") }
 
     companion object {
