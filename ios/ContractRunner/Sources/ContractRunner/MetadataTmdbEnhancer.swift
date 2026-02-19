@@ -134,7 +134,7 @@ public func withDerivedSeasons(_ meta: MetadataRecord, mediaType: MetadataMediaT
         bySeason[season] = bucket
     }
 
-    let seasons = bySeason.keys.sorted().compactMap { seasonNumber in
+    let seasons: [MetadataSeason] = bySeason.keys.sorted().compactMap { seasonNumber -> MetadataSeason? in
         guard let bucket = bySeason[seasonNumber] else {
             return nil
         }
@@ -207,7 +207,7 @@ private func normalizedEpisodeId(_ contentId: String, season: Int?, episode: Int
 }
 
 private func nonBlankOrNil(_ value: String?) -> String? {
-    guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+    guard let trimmed = value?.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines), !trimmed.isEmpty else {
         return nil
     }
     return trimmed

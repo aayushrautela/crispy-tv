@@ -38,6 +38,10 @@ interface WatchHistoryLabService {
 
     suspend fun listLocalHistory(limit: Int = 100): WatchHistoryLabResult
 
+    suspend fun exportLocalHistory(): List<WatchHistoryEntry>
+
+    suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult
+
     suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryLabResult
 
     suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryLabResult
@@ -53,6 +57,14 @@ object DefaultWatchHistoryLabService : WatchHistoryLabService {
     }
 
     override suspend fun listLocalHistory(limit: Int): WatchHistoryLabResult {
+        return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
+    }
+
+    override suspend fun exportLocalHistory(): List<WatchHistoryEntry> {
+        return emptyList()
+    }
+
+    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult {
         return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
     }
 

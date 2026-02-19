@@ -71,13 +71,13 @@ public struct RankedSearchMeta: Equatable {
 }
 
 public func buildCatalogRequestUrls(_ input: CatalogRequestInput) -> [String] {
-    let baseUrl = input.baseUrl.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    let baseUrl = input.baseUrl.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     precondition(!baseUrl.isEmpty, "baseUrl must not be blank")
 
-    let mediaType = input.mediaType.trimmingCharacters(in: .whitespacesAndNewlines)
+    let mediaType = input.mediaType.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     precondition(!mediaType.isEmpty, "mediaType must not be blank")
 
-    let catalogId = input.catalogId.trimmingCharacters(in: .whitespacesAndNewlines)
+    let catalogId = input.catalogId.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     precondition(!catalogId.isEmpty, "catalogId must not be blank")
 
     let page = max(1, input.page)
@@ -86,8 +86,8 @@ public func buildCatalogRequestUrls(_ input: CatalogRequestInput) -> [String] {
 
     let addonQueryParts = parseQueryParts(input.encodedAddonQuery)
     let normalizedFilters = input.filters.compactMap { filter -> (String, String)? in
-        let key = filter.key.trimmingCharacters(in: .whitespacesAndNewlines)
-        let value = filter.value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = filter.key.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let value = filter.value.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         if key.isEmpty || value.isEmpty {
             return nil
         }
@@ -122,7 +122,8 @@ public func mergeSearchResults(
     _ addonResults: [AddonSearchResult],
     preferredAddonId: String? = nil
 ) -> [RankedSearchMeta] {
-    let preferred = preferredAddonId?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let preferred = preferredAddonId
+        .map { $0.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }
         .flatMap { $0.isEmpty ? nil : $0 }
 
     let rankedAddons = addonResults.enumerated().sorted { lhs, rhs in
@@ -142,11 +143,11 @@ public func mergeSearchResults(
 
     for addon in rankedAddons {
         for meta in addon.metas {
-            let id = meta.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            let id = meta.id.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             if id.isEmpty || !seenIds.insert(id).inserted {
                 continue
             }
-            let title = meta.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = meta.title.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             merged.append(
                 RankedSearchMeta(
                     id: id,
@@ -173,7 +174,7 @@ private func sourceRank(_ addonId: String, preferredAddonId: String?) -> Int {
 }
 
 private func parseQueryParts(_ raw: String?) -> [(String, String)] {
-    guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+    guard let raw = raw?.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines), !raw.isEmpty else {
         return []
     }
 
@@ -181,12 +182,12 @@ private func parseQueryParts(_ raw: String?) -> [(String, String)] {
         let item = String(pair)
         let key = item.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).first
             .map(String.init)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) ?? ""
         if key.isEmpty {
             return nil
         }
         let value = item.contains("=")
-            ? String(item.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            ? String(item.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)[1]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             : ""
         return (encodeQueryComponent(key), encodeQueryComponent(value))
     }

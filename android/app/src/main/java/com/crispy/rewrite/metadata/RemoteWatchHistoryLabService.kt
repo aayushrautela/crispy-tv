@@ -70,6 +70,57 @@ class RemoteWatchHistoryLabService(
         )
     }
 
+    override suspend fun exportLocalHistory(): List<WatchHistoryEntry> {
+        return loadEntries()
+            .sortedByDescending { item -> item.watchedAtEpochMs }
+            .map { item -> item.toPublicEntry() }
+    }
+
+    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult {
+        if (entries.isEmpty()) {
+            val current = loadEntries().sortedByDescending { item -> item.watchedAtEpochMs }.map { it.toPublicEntry() }
+            return WatchHistoryLabResult(
+                statusMessage = "Remote watched history empty. Kept local history unchanged.",
+                entries = current,
+                authState = authState()
+            )
+        }
+
+        val normalized =
+            entries.mapNotNull { entry ->
+                val contentId = normalizeNuvioMediaId(entry.contentId).contentId.trim()
+                if (contentId.isEmpty()) {
+                    return@mapNotNull null
+                }
+
+                val season = entry.season?.takeIf { value -> value > 0 }
+                val episode = entry.episode?.takeIf { value -> value > 0 }
+                if (entry.contentType == MetadataLabMediaType.SERIES && (season == null || episode == null)) {
+                    return@mapNotNull null
+                }
+
+                LocalWatchedItem(
+                    contentId = contentId,
+                    contentType = entry.contentType,
+                    title = entry.title.trim().ifEmpty { contentId },
+                    season = season,
+                    episode = episode,
+                    watchedAtEpochMs = entry.watchedAtEpochMs.takeIf { value -> value > 0 } ?: System.currentTimeMillis()
+                )
+            }
+
+        val merged = dedupeEntries(normalized)
+        if (merged.isNotEmpty()) {
+            saveEntries(merged)
+        }
+
+        return WatchHistoryLabResult(
+            statusMessage = "Reconciled ${merged.size} remote watched entries to local history.",
+            entries = merged.sortedByDescending { item -> item.watchedAtEpochMs }.map { item -> item.toPublicEntry() },
+            authState = authState()
+        )
+    }
+
     override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
         val normalized = normalizeRequest(request)
         val existing = loadEntries()
@@ -193,6 +244,18 @@ class RemoteWatchHistoryLabService(
         val current = byKey[key]
         if (current == null || next.watchedAtEpochMs >= current.watchedAtEpochMs) {
             byKey[key] = next
+        }
+        return byKey.values.toList()
+    }
+
+    private fun dedupeEntries(items: List<LocalWatchedItem>): List<LocalWatchedItem> {
+        val byKey = linkedMapOf<String, LocalWatchedItem>()
+        items.forEach { item ->
+            val key = watchedKey(item.contentId, item.season, item.episode)
+            val current = byKey[key]
+            if (current == null || item.watchedAtEpochMs >= current.watchedAtEpochMs) {
+                byKey[key] = item
+            }
         }
         return byKey.values.toList()
     }
