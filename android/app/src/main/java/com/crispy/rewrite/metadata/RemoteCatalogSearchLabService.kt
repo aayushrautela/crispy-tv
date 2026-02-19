@@ -28,12 +28,9 @@ class RemoteCatalogSearchLabService(
     override suspend fun fetchCatalogPage(request: CatalogPageRequest): CatalogLabResult {
         val mediaType = request.mediaType.toCatalogType()
         val catalogId = request.catalogId.trim()
-        if (catalogId.isEmpty()) {
-            return CatalogLabResult(statusMessage = "Catalog ID is required.")
-        }
-
         val resolvedAddons = resolveAddons()
-        val allCatalogs = catalogEntries(resolvedAddons, mediaType).map { it.toPublicCatalog() }
+        val mediaCatalogEntries = catalogEntries(resolvedAddons, mediaType)
+        val allCatalogs = mediaCatalogEntries.map { it.toPublicCatalog() }
         if (resolvedAddons.isEmpty()) {
             return CatalogLabResult(
                 catalogs = allCatalogs,
@@ -41,16 +38,34 @@ class RemoteCatalogSearchLabService(
             )
         }
 
+        if (allCatalogs.isEmpty()) {
+            return CatalogLabResult(
+                catalogs = allCatalogs,
+                statusMessage = "No '$mediaType' catalogs found in installed addons."
+            )
+        }
+
+        if (catalogId.isEmpty()) {
+            return CatalogLabResult(
+                catalogs = allCatalogs,
+                statusMessage =
+                    "Discovered ${allCatalogs.size} addon catalogs. " +
+                        "Set Catalog ID from the list and tap Load Catalog."
+            )
+        }
+
         val preferredAddonId = request.preferredAddonId?.trim()?.takeIf { it.isNotEmpty() }
         val candidates =
-            catalogEntries(resolvedAddons, mediaType)
+            mediaCatalogEntries
                 .filter { entry -> entry.catalogId.equals(catalogId, ignoreCase = true) }
                 .sortedWith(compareBy<CatalogEntry>({ sourceRank(it.addonId, preferredAddonId) }, { it.addonOrderIndex }))
 
         if (candidates.isEmpty()) {
             return CatalogLabResult(
                 catalogs = allCatalogs,
-                statusMessage = "No addon catalog found for id '$catalogId' and type '$mediaType'."
+                statusMessage =
+                    "No addon catalog found for id '$catalogId' and type '$mediaType'. " +
+                        "Pick one from the listed addon catalogs."
             )
         }
 
@@ -103,11 +118,24 @@ class RemoteCatalogSearchLabService(
         }
 
         val resolvedAddons = resolveAddons()
-        val allCatalogs = catalogEntries(resolvedAddons, mediaType).map { it.toPublicCatalog() }
+        val mediaCatalogEntries = catalogEntries(resolvedAddons, mediaType)
+        val allCatalogs = mediaCatalogEntries.map { it.toPublicCatalog() }
         if (resolvedAddons.isEmpty()) {
             return CatalogLabResult(
                 catalogs = allCatalogs,
                 statusMessage = "No installed addons available."
+            )
+        }
+
+        val searchableCatalogsByAddon =
+            mediaCatalogEntries
+                .filter { entry -> entry.supportsSearch }
+                .groupBy { entry -> entry.addonOrderIndex }
+
+        if (searchableCatalogsByAddon.isEmpty()) {
+            return CatalogLabResult(
+                catalogs = allCatalogs,
+                statusMessage = "No searchable '$mediaType' catalogs found in installed addons."
             )
         }
 
@@ -125,35 +153,41 @@ class RemoteCatalogSearchLabService(
         val addonResults = mutableListOf<AddonSearchResult>()
 
         orderedAddons.forEach { addon ->
-            val searchCatalog =
-                catalogEntries(listOf(addon), mediaType)
-                    .firstOrNull { entry -> entry.supportsSearch }
-                ?: return@forEach
-
-            val urls =
-                buildCatalogRequestUrls(
-                    CatalogRequestInput(
-                        baseUrl = addon.seed.baseUrl,
-                        mediaType = mediaType,
-                        catalogId = searchCatalog.catalogId,
-                        page = request.page,
-                        pageSize = request.pageSize,
-                        filters = listOf(CatalogFilter(key = "search", value = query)),
-                        encodedAddonQuery = addon.seed.encodedQuery
-                    )
-                )
-
-            var addonMetas: List<SearchMetaInput>? = null
-            for (url in urls) {
-                attemptedUrls += url
-                val response = httpGetJson(url) ?: continue
-                val metas = parseSearchMetas(response.optJSONArray("metas"))
-                addonMetas = metas
-                break
+            val addonSearchCatalogs = searchableCatalogsByAddon[addon.orderIndex] ?: return@forEach
+            if (addonSearchCatalogs.isEmpty()) {
+                return@forEach
             }
 
-            addonMetas?.let { metas ->
-                addonResults += AddonSearchResult(addonId = addon.addonId, metas = metas)
+            val addonMetasById = linkedMapOf<String, SearchMetaInput>()
+            addonSearchCatalogs.forEach { searchCatalog ->
+                val urls =
+                    buildCatalogRequestUrls(
+                        CatalogRequestInput(
+                            baseUrl = addon.seed.baseUrl,
+                            mediaType = mediaType,
+                            catalogId = searchCatalog.catalogId,
+                            page = request.page,
+                            pageSize = request.pageSize,
+                            filters = listOf(CatalogFilter(key = "search", value = query)),
+                            encodedAddonQuery = addon.seed.encodedQuery
+                        )
+                    )
+
+                var catalogMetas: List<SearchMetaInput>? = null
+                for (url in urls) {
+                    attemptedUrls += url
+                    val response = httpGetJson(url) ?: continue
+                    catalogMetas = parseSearchMetas(response.optJSONArray("metas"))
+                    break
+                }
+
+                catalogMetas?.forEach { meta ->
+                    addonMetasById.putIfAbsent(meta.id, meta)
+                }
+            }
+
+            if (addonMetasById.isNotEmpty()) {
+                addonResults += AddonSearchResult(addonId = addon.addonId, metas = addonMetasById.values.toList())
             }
         }
 

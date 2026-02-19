@@ -406,7 +406,7 @@ private fun AppRoot() {
                 ) {
                     Text("Catalog + Search Lab", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Registry-ordered addon catalogs with Nuvio URL fallback strategy.",
+                        "Registry-ordered addon catalogs with Nuvio URL fallback; search uses searchable catalogs only.",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
@@ -438,9 +438,14 @@ private fun AppRoot() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("catalog_id_input"),
-                        label = { Text("Catalog ID") },
+                        label = { Text("Catalog ID (optional)") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    Text(
+                        "Tip: leave Catalog ID empty and tap Load Catalog to list available addon catalogs.",
+                        style = MaterialTheme.typography.bodySmall
                     )
 
                     OutlinedTextField(
@@ -498,7 +503,8 @@ private fun AppRoot() {
                             "catalogs=none"
                         } else {
                             "catalogs=" + uiState.catalogAvailableCatalogs.take(6).joinToString { catalog ->
-                                "${catalog.addonId}:${catalog.catalogType}/${catalog.catalogId}"
+                                val mode = if (catalog.supportsSearch) "search" else "browse"
+                                "${catalog.name} [${catalog.catalogType}/${catalog.catalogId}] @${catalog.addonId} ($mode)"
                             }
                         }
                     Text(

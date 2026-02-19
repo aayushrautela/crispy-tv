@@ -40,7 +40,7 @@ data class PlaybackLabUiState(
     val isResolvingMetadata: Boolean = false,
     val metadataResolution: MetadataLabResolution? = null,
     val catalogMediaType: MetadataLabMediaType = MetadataLabMediaType.SERIES,
-    val catalogInputId: String = "top",
+    val catalogInputId: String = "",
     val catalogSearchQuery: String = "game of thrones",
     val catalogPreferredAddonId: String = "",
     val catalogStatusMessage: String = "Catalog/search idle. Load a page or run query.",
@@ -604,21 +604,17 @@ class PlaybackLabViewModel(
     fun onLoadCatalogRequested() {
         val snapshot = _uiState.value
         val catalogId = snapshot.catalogInputId.trim()
-        if (catalogId.isEmpty()) {
-            _uiState.update {
-                it.copy(
-                    catalogStatusMessage = "Catalog ID is required.",
-                    isLoadingCatalog = false
-                )
-            }
-            return
-        }
 
         val preferredAddonId = snapshot.catalogPreferredAddonId.trim().ifBlank { null }
         _uiState.update {
             it.copy(
                 isLoadingCatalog = true,
-                catalogStatusMessage = "Loading catalog page..."
+                catalogStatusMessage =
+                    if (catalogId.isEmpty()) {
+                        "Loading addon catalog list..."
+                    } else {
+                        "Loading catalog page..."
+                    }
             )
         }
 
