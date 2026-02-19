@@ -3,7 +3,6 @@ package com.crispy.rewrite
 import android.Manifest
 import android.content.Context
 import android.view.SurfaceView
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -79,7 +78,6 @@ class PlaybackLabSmokeTest {
             }
 
             composeRule.onNodeWithTag("status_text")
-                .assertExists()
                 .assertTextContains("Playback ready")
         } finally {
             scenario.close()
