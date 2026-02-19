@@ -7,6 +7,12 @@ jobs:
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      ORG_GRADLE_PROJECT_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+      ORG_GRADLE_PROJECT_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+      ORG_GRADLE_PROJECT_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+      ORG_GRADLE_PROJECT_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      ORG_GRADLE_PROJECT_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
     steps:
       - name: Checkout
