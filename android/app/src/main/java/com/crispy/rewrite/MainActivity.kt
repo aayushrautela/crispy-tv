@@ -10,12 +10,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +28,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -45,6 +53,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.ui.PlayerView
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
 import com.crispy.rewrite.player.MetadataLabMediaType
@@ -58,8 +71,161 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             CrispyRewriteTheme {
+                AppShell()
+            }
+        }
+    }
+}
+
+private enum class TopLevelDestination(
+    val route: String,
+    val label: String,
+    val marker: String
+) {
+    Home(route = "home", label = "Home", marker = "H"),
+    Search(route = "search", label = "Search", marker = "S"),
+    Discover(route = "discover", label = "Discover", marker = "D"),
+    Library(route = "library", label = "Library", marker = "L"),
+    Settings(route = "settings", label = "Settings", marker = "Se")
+}
+
+@Composable
+private fun AppShell() {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                TopLevelDestination.entries.forEach { destination ->
+                    NavigationBarItem(
+                        selected = currentRoute == destination.route,
+                        onClick = {
+                            navController.navigate(destination.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Text(destination.marker) },
+                        label = { Text(destination.label) }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = TopLevelDestination.Home.route,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            composable(TopLevelDestination.Home.route) {
                 AppRoot()
             }
+            composable(TopLevelDestination.Search.route) { PlaceholderPage(title = "Search") }
+            composable(TopLevelDestination.Discover.route) { PlaceholderPage(title = "Discover") }
+            composable(TopLevelDestination.Library.route) { PlaceholderPage(title = "Library") }
+            composable(TopLevelDestination.Settings.route) { PlaceholderPage(title = "Settings") }
+        }
+    }
+}
+
+private data class HomeShelfItem(
+    val title: String,
+    val subtitle: String
+)
+
+@Composable
+private fun HomeHeaderRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Crispy",
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Card {
+            Text(
+                text = "Profile",
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeHeroCard() {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Featured tonight", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "Top picks and continue-watching shortcuts, inspired by crispy-native home.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {}) {
+                    Text("Play")
+                }
+                Button(onClick = {}) {
+                    Text("Details")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeShelfRow(
+    title: String,
+    items: List<HomeShelfItem>
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp)
+        ) {
+            items(items) { item ->
+                Card(modifier = Modifier.width(220.dp)) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(item.title, style = MaterialTheme.typography.titleSmall)
+                        Text(item.subtitle, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaceholderPage(title: String) {
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text(title) })
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "$title page")
         }
     }
 }
@@ -150,11 +316,7 @@ private fun AppRoot() {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Crispy Rewrite") })
-        }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -163,6 +325,33 @@ private fun AppRoot() {
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            HomeHeaderRow()
+            HomeHeroCard()
+            HomeShelfRow(
+                title = "Continue Watching",
+                items = listOf(
+                    HomeShelfItem(title = "Game of Thrones", subtitle = "S01E02"),
+                    HomeShelfItem(title = "The Last of Us", subtitle = "S01E05"),
+                    HomeShelfItem(title = "Interstellar", subtitle = "1h 04m left")
+                )
+            )
+            HomeShelfRow(
+                title = "Trending",
+                items = listOf(
+                    HomeShelfItem(title = "Dune: Part Two", subtitle = "Movie"),
+                    HomeShelfItem(title = "Severance", subtitle = "Series"),
+                    HomeShelfItem(title = "Shogun", subtitle = "Series")
+                )
+            )
+            HomeShelfRow(
+                title = "Top picks for you",
+                items = listOf(
+                    HomeShelfItem(title = "Arrival", subtitle = "Sci-fi"),
+                    HomeShelfItem(title = "The Batman", subtitle = "Action"),
+                    HomeShelfItem(title = "Dark", subtitle = "Mystery")
+                )
+            )
+
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Playback Lab", style = MaterialTheme.typography.titleMedium)
