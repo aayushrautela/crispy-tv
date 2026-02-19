@@ -7,14 +7,22 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.core.content.ContextCompat
 import java.io.Closeable
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.CompletableDeferred
 
 class TorrentEngineClient(context: Context) : Closeable {
+    private companion object {
+        const val LOCALHOST_POLL_INTERVAL_MS = 750L
+        const val LOCALHOST_POLL_TIMEOUT_MS = 180_000L
+    }
+
     private val appContext = context.applicationContext
     private val bindMutex = Mutex()
 
@@ -65,7 +73,9 @@ class TorrentEngineClient(context: Context) : Closeable {
         check(started) { "Torrent service did not accept start request" }
 
         val fileIdx = boundService.getLargestFileIndexFromLink(trimmed)
-        boundService.getStreamUrlForLink(trimmed, fileIdx)
+        val streamUrl = boundService.getStreamUrlForLink(trimmed, fileIdx)
+        awaitLocalStreamReady(streamUrl)
+        streamUrl
     }
 
     suspend fun stopAll(clearStorage: Boolean = true) {
@@ -89,6 +99,62 @@ class TorrentEngineClient(context: Context) : Closeable {
         isBound = false
         service = null
         pendingConnection = null
+    }
+
+    private suspend fun awaitLocalStreamReady(url: String, timeoutMs: Long = LOCALHOST_POLL_TIMEOUT_MS) {
+        val deadlineMs = System.currentTimeMillis() + timeoutMs
+        var lastStatusCode: Int? = null
+        var lastError: Throwable? = null
+
+        while (System.currentTimeMillis() < deadlineMs) {
+            val probeResult = runCatching { probeLocalStream(url) }
+            if (probeResult.isSuccess) {
+                val statusCode = probeResult.getOrThrow()
+                lastStatusCode = statusCode
+                when {
+                    statusCode == HttpURLConnection.HTTP_OK ||
+                        statusCode == HttpURLConnection.HTTP_PARTIAL -> return
+
+                    statusCode == HttpURLConnection.HTTP_NOT_FOUND -> {
+                        throw IllegalStateException("Localhost stream not found: HTTP 404 for url=$url")
+                    }
+
+                    statusCode >= 500 && statusCode != HttpURLConnection.HTTP_UNAVAILABLE -> {
+                        throw IllegalStateException("Localhost stream probe failed: HTTP $statusCode for url=$url")
+                    }
+                }
+            } else {
+                lastError = probeResult.exceptionOrNull()
+            }
+
+            delay(LOCALHOST_POLL_INTERVAL_MS)
+        }
+
+        throw IllegalStateException(
+            "Timed out waiting for local stream in ${timeoutMs}ms for url=$url (lastStatus=${lastStatusCode ?: -1}, lastError=${lastError?.message})",
+            lastError
+        )
+    }
+
+    private fun probeLocalStream(url: String): Int {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 2_000
+            readTimeout = 2_000
+            setRequestProperty("Range", "bytes=0-1")
+        }
+
+        return try {
+            val statusCode = connection.responseCode
+            if (statusCode in 200..299) {
+                connection.inputStream?.close()
+            } else {
+                connection.errorStream?.close()
+            }
+            statusCode
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private suspend fun ensureConnected(): TorrentService {
