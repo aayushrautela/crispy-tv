@@ -5,10 +5,24 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.VideoLibrary
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.crispy.rewrite.home.HomeHeroItem
+import com.crispy.rewrite.home.HomeViewModel
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +32,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -34,8 +45,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.maskClip
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,9 +57,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -58,7 +74,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
+
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.PlaybackEngine
@@ -80,13 +98,13 @@ class MainActivity : ComponentActivity() {
 private enum class TopLevelDestination(
     val route: String,
     val label: String,
-    val marker: String
+    val icon: ImageVector
 ) {
-    Home(route = "home", label = "Home", marker = "H"),
-    Search(route = "search", label = "Search", marker = "S"),
-    Discover(route = "discover", label = "Discover", marker = "D"),
-    Library(route = "library", label = "Library", marker = "L"),
-    Settings(route = "settings", label = "Settings", marker = "Se")
+    Home(route = "home", label = "Home", icon = Icons.Outlined.Home),
+    Search(route = "search", label = "Search", icon = Icons.Outlined.Search),
+    Discover(route = "discover", label = "Discover", icon = Icons.Outlined.Explore),
+    Library(route = "library", label = "Library", icon = Icons.Outlined.VideoLibrary),
+    Settings(route = "settings", label = "Settings", icon = Icons.Outlined.Settings)
 }
 
 @Composable
@@ -110,7 +128,12 @@ private fun AppShell() {
                                 restoreState = true
                             }
                         },
-                        icon = { Text(destination.marker) },
+                        icon = {
+                            Icon(
+                                imageVector = destination.icon,
+                                contentDescription = destination.label
+                            )
+                        },
                         label = { Text(destination.label) }
                     )
                 }
@@ -125,20 +148,207 @@ private fun AppShell() {
                 .padding(innerPadding)
         ) {
             composable(TopLevelDestination.Home.route) {
-                AppRoot()
+                HomePage()
             }
             composable(TopLevelDestination.Search.route) { PlaceholderPage(title = "Search") }
             composable(TopLevelDestination.Discover.route) { PlaceholderPage(title = "Discover") }
             composable(TopLevelDestination.Library.route) { PlaceholderPage(title = "Library") }
-            composable(TopLevelDestination.Settings.route) { PlaceholderPage(title = "Settings") }
+            composable(TopLevelDestination.Settings.route) { AppRoot() }
         }
     }
 }
 
-private data class HomeShelfItem(
-    val title: String,
-    val subtitle: String
-)
+@Composable
+private fun HomePage() {
+    val context = LocalContext.current
+    val appContext = remember(context) { context.applicationContext }
+    val viewModel: HomeViewModel = viewModel(
+        factory = remember(appContext) {
+            HomeViewModel.factory(appContext)
+        }
+    )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scrollState = rememberScrollState()
+
+    Scaffold { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            HomeHeaderRow()
+            when {
+                uiState.isLoading && uiState.heroItems.isEmpty() -> {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Loading featured content...")
+                        }
+                    }
+                }
+
+                uiState.heroItems.isEmpty() -> {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = uiState.statusMessage,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+
+                else -> {
+                    HomeHeroCarousel(
+                        items = uiState.heroItems,
+                        selectedHeroId = uiState.selectedHeroId,
+                        onSelect = viewModel::onHeroSelected
+                    )
+                }
+            }
+
+            uiState.selectedHero?.let { selected ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(selected.title, style = MaterialTheme.typography.titleLarge)
+                        selected.rating?.let { rating ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Star,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(rating, style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                        Text(
+                            text = selected.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            if (uiState.statusMessage.isNotBlank()) {
+                Text(
+                    text = uiState.statusMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeHeroCarousel(
+    items: List<HomeHeroItem>,
+    selectedHeroId: String?,
+    onSelect: (String) -> Unit
+) {
+    if (items.isEmpty()) {
+        return
+    }
+
+    val state = rememberCarouselState { items.size }
+
+    HorizontalUncontainedCarousel(
+        state = state,
+        itemWidth = 340.dp,
+        itemSpacing = 12.dp,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 2.dp)
+    ) { index ->
+        val item = items[index]
+        val isSelected = item.id == selectedHeroId
+
+        Card(
+            onClick = { onSelect(item.id) },
+            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+            modifier = Modifier
+                .height(220.dp)
+                .maskClip(MaterialTheme.shapes.extraLarge)
+        ) {
+            Box {
+                AsyncImage(
+                    model = item.backdropUrl,
+                    contentDescription = item.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.72f)
+                                )
+                            )
+                        )
+                )
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    item.rating?.let { rating ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
+                            Text(
+                                text = rating,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White
+                            )
+                        }
+                    }
+                    Text(
+                        text = item.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.92f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun HomeHeaderRow() {
@@ -153,60 +363,10 @@ private fun HomeHeaderRow() {
         )
         Card {
             Text(
-                text = "Profile",
+                text = "Home",
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelLarge
             )
-        }
-    }
-}
-
-@Composable
-private fun HomeHeroCard() {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("Featured tonight", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "Top picks and continue-watching shortcuts, inspired by crispy-native home.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {}) {
-                    Text("Play")
-                }
-                Button(onClick = {}) {
-                    Text("Details")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeShelfRow(
-    title: String,
-    items: List<HomeShelfItem>
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp)
-        ) {
-            items(items) { item ->
-                Card(modifier = Modifier.width(220.dp)) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(item.title, style = MaterialTheme.typography.titleSmall)
-                        Text(item.subtitle, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
         }
     }
 }
@@ -325,31 +485,9 @@ private fun AppRoot() {
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            HomeHeaderRow()
-            HomeHeroCard()
-            HomeShelfRow(
-                title = "Continue Watching",
-                items = listOf(
-                    HomeShelfItem(title = "Game of Thrones", subtitle = "S01E02"),
-                    HomeShelfItem(title = "The Last of Us", subtitle = "S01E05"),
-                    HomeShelfItem(title = "Interstellar", subtitle = "1h 04m left")
-                )
-            )
-            HomeShelfRow(
-                title = "Trending",
-                items = listOf(
-                    HomeShelfItem(title = "Dune: Part Two", subtitle = "Movie"),
-                    HomeShelfItem(title = "Severance", subtitle = "Series"),
-                    HomeShelfItem(title = "Shogun", subtitle = "Series")
-                )
-            )
-            HomeShelfRow(
-                title = "Top picks for you",
-                items = listOf(
-                    HomeShelfItem(title = "Arrival", subtitle = "Sci-fi"),
-                    HomeShelfItem(title = "The Batman", subtitle = "Action"),
-                    HomeShelfItem(title = "Dark", subtitle = "Mystery")
-                )
+            Text(
+                text = "Settings & Labs",
+                style = MaterialTheme.typography.headlineSmall
             )
 
             Card(modifier = Modifier.fillMaxWidth()) {
