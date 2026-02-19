@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.Process as AndroidProcess
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import java.io.BufferedReader
@@ -24,6 +25,7 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
+import java.util.zip.ZipFile
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -357,23 +359,27 @@ class TorrentService : Service() {
     }
 
     private fun startServerProcess() {
-        val binary = File(applicationInfo.nativeLibraryDir, TORRSERVER_BINARY_NAME)
+        ensureRuntimeDirectories()
+
+        val binary = resolveBundledTorrServerBinary()
         check(binary.exists()) {
-            "Missing TorrServer binary at ${binary.absolutePath}. Download binaries into jniLibs before runtime."
+            "Missing TorrServer binary after fallback lookup. sourceDir=${applicationInfo.sourceDir}, nativeLibraryDir=${applicationInfo.nativeLibraryDir}, supportedAbis=${Build.SUPPORTED_ABIS.joinToString()}"
         }
 
-        ensureRuntimeDirectories()
+        if (!binary.canExecute()) {
+            binary.setExecutable(true)
+        }
 
         val command = listOf(
             binary.absolutePath,
-            "--path",
-            downloadsDir.absolutePath,
-            "--torrents",
-            torrentsDir.absolutePath,
+            "--ip",
+            DEFAULT_HOST,
             "--port",
             PORT.toString(),
-            "--host",
-            DEFAULT_HOST
+            "--path",
+            downloadsDir.absolutePath,
+            "--torrentsdir",
+            torrentsDir.absolutePath
         )
 
         val processBuilder = ProcessBuilder(command)
@@ -381,12 +387,14 @@ class TorrentService : Service() {
             .redirectErrorStream(true)
 
         process = processBuilder.start().also { startedProcess ->
+            Log.i(TAG, "TorrServer process started with binary=${binary.absolutePath}")
             Thread {
                 AndroidProcess.setThreadPriority(AndroidProcess.THREAD_PRIORITY_BACKGROUND)
                 runCatching {
                     BufferedReader(InputStreamReader(startedProcess.inputStream)).use { reader ->
-                        while (reader.readLine() != null) {
-                            // Drain process output to avoid blocking.
+                        while (true) {
+                            val line = reader.readLine() ?: break
+                            Log.d(TAG, "[TorrServer] $line")
                         }
                     }
                 }
@@ -395,6 +403,61 @@ class TorrentService : Service() {
                 start()
             }
         }
+    }
+
+    private fun resolveBundledTorrServerBinary(): File {
+        val nativeLibDir = applicationInfo.nativeLibraryDir
+        if (!nativeLibDir.isNullOrBlank()) {
+            val fromNativeLibDir = File(nativeLibDir, TORRSERVER_BINARY_NAME)
+            if (fromNativeLibDir.exists() && fromNativeLibDir.isFile) {
+                return fromNativeLibDir
+            }
+        }
+
+        val extracted = extractBinaryFromInstalledApk()
+        if (extracted != null && extracted.exists()) {
+            return extracted
+        }
+
+        throw IllegalStateException(
+            "Unable to locate $TORRSERVER_BINARY_NAME in nativeLibraryDir=$nativeLibDir or installed APK libs"
+        )
+    }
+
+    private fun extractBinaryFromInstalledApk(): File? {
+        val sourceApk = applicationInfo.sourceDir ?: return null
+        val target = File(runtimeRoot, TORRSERVER_BINARY_NAME)
+
+        if (target.exists() && target.isFile) {
+            return target
+        }
+
+        return runCatching {
+            val extracted = ZipFile(sourceApk).use { zip ->
+                val entryName = Build.SUPPORTED_ABIS
+                    .asSequence()
+                    .map { "lib/$it/$TORRSERVER_BINARY_NAME" }
+                    .firstOrNull { zip.getEntry(it) != null }
+                    ?: return@use false
+
+                val entry = zip.getEntry(entryName) ?: return@use false
+                zip.getInputStream(entry).use { input ->
+                    target.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                true
+            }
+
+            if (!extracted) {
+                return@runCatching null
+            }
+
+            target.setExecutable(true)
+            target
+        }.onFailure { error ->
+            Log.e(TAG, "Failed extracting TorrServer binary from source APK", error)
+        }.getOrNull()
     }
 
     private fun stopServerProcess() {
@@ -461,6 +524,7 @@ class TorrentService : Service() {
     private val torrentsDir: File by lazy { File(runtimeRoot, "torrents") }
 
     companion object {
+        private const val TAG = "CrispyTorrentService"
         private const val CHANNEL_ID = "crispy_rewrite_torrent_service"
         private const val NOTIFICATION_ID = 9911
         private const val DEFAULT_HOST = "127.0.0.1"

@@ -148,6 +148,24 @@ private fun AppRoot(viewModel: PlaybackLabViewModel = viewModel()) {
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
+                            modifier = Modifier.testTag("engine_exo_button"),
+                            enabled = uiState.activeEngine != PlaybackEngine.EXO,
+                            onClick = { viewModel.onEngineSelected(PlaybackEngine.EXO) }
+                        ) {
+                            Text("Use Exo")
+                        }
+
+                        Button(
+                            modifier = Modifier.testTag("engine_vlc_button"),
+                            enabled = uiState.activeEngine != PlaybackEngine.VLC,
+                            onClick = { viewModel.onEngineSelected(PlaybackEngine.VLC) }
+                        ) {
+                            Text("Use VLC")
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
                             modifier = Modifier.testTag("play_sample_button"),
                             enabled = !uiState.isPreparingTorrentPlayback,
                             onClick = {

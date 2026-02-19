@@ -40,7 +40,7 @@ class PlaybackLabViewModel : ViewModel() {
         _uiState.update {
             val nextPlayerState = reducePlayerState(
                 state = it.playerState,
-                action = PlayerAction.OpenHttp(engine = "exo"),
+                action = PlayerAction.OpenHttp(engine = it.activeEngine.toReducerEngine()),
                 nowMs = nowMs()
             )
 
@@ -72,7 +72,7 @@ class PlaybackLabViewModel : ViewModel() {
         _uiState.update {
             val nextPlayerState = reducePlayerState(
                 state = it.playerState,
-                action = PlayerAction.OpenTorrent(engine = "exo"),
+                action = PlayerAction.OpenTorrent(engine = it.activeEngine.toReducerEngine()),
                 nowMs = nowMs()
             )
 
@@ -211,9 +211,41 @@ class PlaybackLabViewModel : ViewModel() {
         _uiState.update { it.copy(magnetInput = value) }
     }
 
+    fun onEngineSelected(engine: PlaybackEngine) {
+        _uiState.update {
+            val targetEngine = engine.toReducerEngine()
+            val alreadySelected = it.activeEngine == engine && it.playerState.engine.equals(targetEngine, ignoreCase = true)
+            if (alreadySelected) {
+                return@update it
+            }
+
+            val shouldReplayCurrent = it.playbackUrl != null
+            it.copy(
+                activeEngine = engine,
+                playerState = it.playerState.copy(
+                    engine = targetEngine,
+                    updatedAtMs = nowMs()
+                ),
+                playbackRequestVersion = if (shouldReplayCurrent) it.playbackRequestVersion + 1 else it.playbackRequestVersion,
+                statusMessage = if (shouldReplayCurrent) {
+                    "Switched engine to ${engine.name}. Restarting current stream."
+                } else {
+                    "Selected ${engine.name} engine."
+                }
+            )
+        }
+    }
+
     private fun nowMs(): Long = System.currentTimeMillis()
 }
 
 private fun String.toPlaybackEngine(): PlaybackEngine {
     return if (equals("vlc", ignoreCase = true)) PlaybackEngine.VLC else PlaybackEngine.EXO
+}
+
+private fun PlaybackEngine.toReducerEngine(): String {
+    return when (this) {
+        PlaybackEngine.EXO -> "exo"
+        PlaybackEngine.VLC -> "vlc"
+    }
 }
