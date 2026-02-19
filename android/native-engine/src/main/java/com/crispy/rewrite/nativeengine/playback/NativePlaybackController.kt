@@ -5,7 +5,9 @@ import android.view.SurfaceView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 
 class NativePlaybackController(
@@ -13,9 +15,16 @@ class NativePlaybackController(
     private val onEvent: (NativePlaybackEvent) -> Unit
 ) : PlaybackController {
     private val appContext = context.applicationContext
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(appContext).build().apply {
-        playWhenReady = true
-    }
+
+    private val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+        .setAllowCrossProtocolRedirects(true)
+
+    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(appContext)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
+        .build()
+        .apply {
+            playWhenReady = true
+        }
     private val vlcRuntime = VlcPlaybackRuntime(appContext, onEvent)
 
     private val exoListener = object : Player.Listener {
