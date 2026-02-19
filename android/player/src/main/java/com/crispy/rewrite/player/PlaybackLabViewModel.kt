@@ -59,13 +59,21 @@ data class PlaybackLabUiState(
     val watchStatusMessage: String = "Watch history idle.",
     val isUpdatingWatchHistory: Boolean = false,
     val watchEntries: List<WatchHistoryEntry> = emptyList(),
-    val watchAuthState: WatchProviderAuthState = WatchProviderAuthState()
+    val watchAuthState: WatchProviderAuthState = WatchProviderAuthState(),
+    val supabaseEmail: String = "",
+    val supabasePassword: String = "",
+    val supabasePin: String = "",
+    val supabaseSyncCode: String = "",
+    val supabaseStatusMessage: String = "Supabase sync idle.",
+    val isUpdatingSupabase: Boolean = false,
+    val supabaseAuthState: SupabaseSyncAuthState = SupabaseSyncAuthState()
 )
 
 class PlaybackLabViewModel(
     private val metadataResolver: MetadataLabResolver = DefaultMetadataLabResolver,
     private val catalogSearchService: CatalogSearchLabService = DefaultCatalogSearchLabService,
-    private val watchHistoryService: WatchHistoryLabService = DefaultWatchHistoryLabService
+    private val watchHistoryService: WatchHistoryLabService = DefaultWatchHistoryLabService,
+    private val supabaseSyncService: SupabaseSyncLabService = DefaultSupabaseSyncLabService
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PlaybackLabUiState())
     val uiState: StateFlow<PlaybackLabUiState> = _uiState.asStateFlow()
@@ -74,7 +82,8 @@ class PlaybackLabViewModel(
         fun factory(
             metadataResolver: MetadataLabResolver,
             catalogSearchService: CatalogSearchLabService,
-            watchHistoryService: WatchHistoryLabService
+            watchHistoryService: WatchHistoryLabService,
+            supabaseSyncService: SupabaseSyncLabService
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -82,7 +91,8 @@ class PlaybackLabViewModel(
                     return PlaybackLabViewModel(
                         metadataResolver = metadataResolver,
                         catalogSearchService = catalogSearchService,
-                        watchHistoryService = watchHistoryService
+                        watchHistoryService = watchHistoryService,
+                        supabaseSyncService = supabaseSyncService
                     ) as T
                 }
             }
@@ -91,9 +101,13 @@ class PlaybackLabViewModel(
 
     init {
         _uiState.update {
-            it.copy(watchAuthState = watchHistoryService.authState())
+            it.copy(
+                watchAuthState = watchHistoryService.authState(),
+                supabaseAuthState = supabaseSyncService.authState()
+            )
         }
         onRefreshWatchHistoryRequested()
+        onInitializeSupabaseRequested()
     }
 
     fun onPlaySampleRequested() {
@@ -473,6 +487,120 @@ class PlaybackLabViewModel(
         }
     }
 
+    fun onSupabaseEmailChanged(value: String) {
+        _uiState.update { it.copy(supabaseEmail = value) }
+    }
+
+    fun onSupabasePasswordChanged(value: String) {
+        _uiState.update { it.copy(supabasePassword = value) }
+    }
+
+    fun onSupabasePinChanged(value: String) {
+        _uiState.update { it.copy(supabasePin = value) }
+    }
+
+    fun onSupabaseSyncCodeChanged(value: String) {
+        _uiState.update { it.copy(supabaseSyncCode = value) }
+    }
+
+    fun onInitializeSupabaseRequested() {
+        runSupabaseAction(
+            workingMessage = "Initializing Supabase sync...",
+            refreshWatchHistory = true
+        ) {
+            supabaseSyncService.initialize()
+        }
+    }
+
+    fun onSupabaseSignUpRequested() {
+        val snapshot = _uiState.value
+        runSupabaseAction("Creating Supabase account...") {
+            supabaseSyncService.signUpWithEmail(
+                email = snapshot.supabaseEmail,
+                password = snapshot.supabasePassword
+            )
+        }
+    }
+
+    fun onSupabaseSignInRequested() {
+        val snapshot = _uiState.value
+        runSupabaseAction("Signing in to Supabase...") {
+            supabaseSyncService.signInWithEmail(
+                email = snapshot.supabaseEmail,
+                password = snapshot.supabasePassword
+            )
+        }
+    }
+
+    fun onSupabaseSignOutRequested() {
+        runSupabaseAction("Signing out from Supabase...") {
+            supabaseSyncService.signOut()
+        }
+    }
+
+    fun onSupabasePushRequested() {
+        runSupabaseAction("Pushing local data to Supabase...") {
+            supabaseSyncService.pushAllLocalData()
+        }
+    }
+
+    fun onSupabasePullRequested() {
+        runSupabaseAction(
+            workingMessage = "Pulling cloud data from Supabase...",
+            refreshWatchHistory = true
+        ) {
+            supabaseSyncService.pullAllToLocal()
+        }
+    }
+
+    fun onSupabaseSyncNowRequested() {
+        runSupabaseAction(
+            workingMessage = "Running Supabase sync now...",
+            refreshWatchHistory = true
+        ) {
+            supabaseSyncService.syncNow()
+        }
+    }
+
+    fun onSupabaseGenerateCodeRequested() {
+        val pin = _uiState.value.supabasePin.trim()
+        if (pin.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    supabaseStatusMessage = "PIN is required to generate a sync code.",
+                    isUpdatingSupabase = false
+                )
+            }
+            return
+        }
+
+        runSupabaseAction("Generating Supabase sync code...") {
+            supabaseSyncService.generateSyncCode(pin)
+        }
+    }
+
+    fun onSupabaseClaimCodeRequested() {
+        val snapshot = _uiState.value
+        val code = snapshot.supabaseSyncCode.trim()
+        val pin = snapshot.supabasePin.trim()
+        if (code.isEmpty() || pin.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    supabaseStatusMessage = "Sync code and PIN are required to claim.",
+                    isUpdatingSupabase = false
+                )
+            }
+            return
+        }
+
+        runSupabaseAction(
+            workingMessage = "Claiming Supabase sync code...",
+            refreshWatchHistory = true
+        ) {
+            supabaseSyncService.claimSyncCode(code = code, pin = pin)
+        }
+    }
+
     fun onLoadCatalogRequested() {
         val snapshot = _uiState.value
         val catalogId = snapshot.catalogInputId.trim()
@@ -629,6 +757,45 @@ class PlaybackLabViewModel(
     }
 
     private fun nowMs(): Long = System.currentTimeMillis()
+
+    private fun runSupabaseAction(
+        workingMessage: String,
+        refreshWatchHistory: Boolean = false,
+        action: suspend () -> SupabaseSyncLabResult
+    ) {
+        _uiState.update {
+            it.copy(
+                isUpdatingSupabase = true,
+                supabaseStatusMessage = workingMessage
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                action()
+            }.onSuccess { result ->
+                _uiState.update { current ->
+                    current.copy(
+                        isUpdatingSupabase = false,
+                        supabaseStatusMessage = result.statusMessage,
+                        supabaseAuthState = result.authState,
+                        supabaseSyncCode = result.syncCode ?: current.supabaseSyncCode
+                    )
+                }
+                if (refreshWatchHistory) {
+                    onRefreshWatchHistoryRequested()
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isUpdatingSupabase = false,
+                        supabaseStatusMessage = "Supabase action failed: ${error.message ?: "unknown error"}",
+                        supabaseAuthState = supabaseSyncService.authState()
+                    )
+                }
+            }
+        }
+    }
 
     private fun buildWatchRequest(snapshot: PlaybackLabUiState): WatchHistoryRequest? {
         val contentId = snapshot.watchContentId.trim()

@@ -18,6 +18,16 @@ val simklClientId =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
+val supabaseUrl =
+    (providers.gradleProperty("SUPABASE_URL").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
+val supabaseAnonKey =
+    (providers.gradleProperty("SUPABASE_ANON_KEY").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 val metadataAddonUrls = "stremio://v3-cinemeta.strem.io/manifest.json"
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
@@ -36,6 +46,8 @@ android {
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
         buildConfigField("String", "TRAKT_CLIENT_ID", "\"$traktClientId\"")
         buildConfigField("String", "SIMKL_CLIENT_ID", "\"$simklClientId\"")
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
 
@@ -82,6 +94,7 @@ android {
         }
 
         jniLibs {
+            useLegacyPackaging = true
             pickFirsts += setOf("**/libc++_shared.so")
         }
     }

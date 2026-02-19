@@ -23,6 +23,9 @@ import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.MetadataLabRequest
 import com.crispy.rewrite.player.MetadataLabResolution
 import com.crispy.rewrite.player.MetadataLabResolver
+import com.crispy.rewrite.player.SupabaseSyncAuthState
+import com.crispy.rewrite.player.SupabaseSyncLabResult
+import com.crispy.rewrite.player.SupabaseSyncLabService
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryLabResult
 import com.crispy.rewrite.player.WatchHistoryLabService
@@ -64,6 +67,9 @@ class PlaybackLabSmokeTest {
         }
         PlaybackLabDependencies.watchHistoryServiceFactory = { _ ->
             TestWatchHistoryService()
+        }
+        PlaybackLabDependencies.supabaseSyncServiceFactory = { _, _ ->
+            TestSupabaseSyncService()
         }
     }
 
@@ -268,10 +274,63 @@ private class TestWatchHistoryService : WatchHistoryLabService {
         )
     }
 
+    override suspend fun exportLocalHistory(): List<WatchHistoryEntry> {
+        return emptyList()
+    }
+
+    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult {
+        return WatchHistoryLabResult(
+            statusMessage = "Watch history test stub",
+            entries = entries
+        )
+    }
+
     override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
         return WatchHistoryLabResult(
             statusMessage = "Watch history test stub",
             entries = emptyList<WatchHistoryEntry>()
         )
+    }
+}
+
+private class TestSupabaseSyncService : SupabaseSyncLabService {
+    override suspend fun initialize(): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override suspend fun signUpWithEmail(email: String, password: String): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override suspend fun signInWithEmail(email: String, password: String): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override suspend fun signOut(): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override suspend fun pushAllLocalData(): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override suspend fun pullAllToLocal(): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override suspend fun syncNow(): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override suspend fun generateSyncCode(pin: String): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub", syncCode = "ABC123")
+    }
+
+    override suspend fun claimSyncCode(code: String, pin: String): SupabaseSyncLabResult {
+        return SupabaseSyncLabResult(statusMessage = "Supabase test stub")
+    }
+
+    override fun authState(): SupabaseSyncAuthState {
+        return SupabaseSyncAuthState(configured = true)
     }
 }

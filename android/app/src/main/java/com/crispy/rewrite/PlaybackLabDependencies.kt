@@ -3,6 +3,7 @@ package com.crispy.rewrite
 import android.content.Context
 import com.crispy.rewrite.metadata.RemoteCatalogSearchLabService
 import com.crispy.rewrite.metadata.RemoteMetadataLabDataSource
+import com.crispy.rewrite.metadata.RemoteSupabaseSyncLabService
 import com.crispy.rewrite.metadata.RemoteWatchHistoryLabService
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackController
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
@@ -11,6 +12,7 @@ import com.crispy.rewrite.nativeengine.torrent.TorrentEngineClient
 import com.crispy.rewrite.player.CatalogSearchLabService
 import com.crispy.rewrite.player.CoreDomainMetadataLabResolver
 import com.crispy.rewrite.player.MetadataLabResolver
+import com.crispy.rewrite.player.SupabaseSyncLabService
 import com.crispy.rewrite.player.WatchHistoryLabService
 
 interface TorrentResolver {
@@ -60,6 +62,19 @@ private fun newWatchHistoryService(context: Context): WatchHistoryLabService {
     )
 }
 
+private fun newSupabaseSyncService(
+    context: Context,
+    watchHistoryService: WatchHistoryLabService
+): SupabaseSyncLabService {
+    return RemoteSupabaseSyncLabService(
+        context = context,
+        supabaseUrl = BuildConfig.SUPABASE_URL,
+        supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
+        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+        watchHistoryService = watchHistoryService
+    )
+}
+
 object PlaybackLabDependencies {
     @Volatile
     var playbackControllerFactory: (Context, (NativePlaybackEvent) -> Unit) -> PlaybackController =
@@ -87,6 +102,14 @@ object PlaybackLabDependencies {
         newWatchHistoryService(context)
     }
 
+    @Volatile
+    var supabaseSyncServiceFactory: (Context, WatchHistoryLabService) -> SupabaseSyncLabService = { context, watchHistoryService ->
+        newSupabaseSyncService(
+            context = context,
+            watchHistoryService = watchHistoryService
+        )
+    }
+
     fun reset() {
         playbackControllerFactory = { context, callback ->
             NativePlaybackController(context, callback)
@@ -100,6 +123,12 @@ object PlaybackLabDependencies {
         }
         watchHistoryServiceFactory = { context ->
             newWatchHistoryService(context)
+        }
+        supabaseSyncServiceFactory = { context, watchHistoryService ->
+            newSupabaseSyncService(
+                context = context,
+                watchHistoryService = watchHistoryService
+            )
         }
     }
 }

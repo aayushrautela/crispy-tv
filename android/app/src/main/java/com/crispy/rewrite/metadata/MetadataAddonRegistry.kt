@@ -17,6 +17,11 @@ internal data class AddonManifestSeed(
     val cachedManifestJson: String?
 )
 
+internal data class CloudAddonRow(
+    val manifestUrl: String,
+    val sortOrder: Int
+)
+
 internal class MetadataAddonRegistry(
     context: Context,
     private val configuredManifestUrlsCsv: String
@@ -32,6 +37,101 @@ internal class MetadataAddonRegistry(
         return state.addonOrder.mapNotNull { installationId ->
             state.installedAddons[installationId]?.toManifestSeed()
         }
+    }
+
+    @Synchronized
+    fun exportCloudAddons(): List<CloudAddonRow> {
+        val state = ensureState()
+        return state.addonOrder.mapIndexedNotNull { index, installationId ->
+            val addon = state.installedAddons[installationId] ?: return@mapIndexedNotNull null
+            CloudAddonRow(
+                manifestUrl = addon.manifestUrl,
+                sortOrder = index
+            )
+        }
+    }
+
+    @Synchronized
+    fun reconcileCloudAddons(rows: List<CloudAddonRow>): Int {
+        if (rows.isEmpty()) {
+            return 0
+        }
+
+        val parsedRows =
+            rows
+                .sortedWith(compareBy<CloudAddonRow> { it.sortOrder }.thenBy { it.manifestUrl.lowercase() })
+                .mapNotNull { row ->
+                    parseManifestSeed(
+                        manifestUrl = row.manifestUrl,
+                        addonIdHintOverride = null
+                    )
+                }
+        if (parsedRows.isEmpty()) {
+            return 0
+        }
+
+        val state = ensureState()
+        val now = System.currentTimeMillis()
+        val installed = linkedMapOf<String, PersistedAddon>()
+        val orderedInstallations = mutableListOf<String>()
+        var includesCinemeta = false
+        var includesOpenSubtitles = false
+
+        parsedRows.forEach { seed ->
+            includesCinemeta =
+                includesCinemeta ||
+                    seed.addonIdHint.equals(DEFAULT_CINEMETA_ADDON_ID, ignoreCase = true) ||
+                    seed.manifestUrl.contains("cinemeta", ignoreCase = true)
+            includesOpenSubtitles =
+                includesOpenSubtitles ||
+                    seed.addonIdHint.equals(DEFAULT_OPENSUBTITLES_ADDON_ID, ignoreCase = true) ||
+                    seed.manifestUrl.contains("opensubtitles", ignoreCase = true)
+
+            val existing = state.installedAddons[seed.installationId]
+            installed[seed.installationId] =
+                if (existing == null) {
+                    PersistedAddon(
+                        installationId = seed.installationId,
+                        addonIdHint = seed.addonIdHint,
+                        manifestUrl = seed.manifestUrl,
+                        originalManifestUrl = seed.originalManifestUrl,
+                        baseUrl = seed.baseUrl,
+                        encodedQuery = seed.encodedQuery,
+                        addedAtEpochMs = now,
+                        cachedManifestJson = null,
+                        manifestAddonId = null,
+                        manifestVersion = null
+                    )
+                } else {
+                    existing.copy(
+                        addonIdHint = seed.addonIdHint,
+                        manifestUrl = seed.manifestUrl,
+                        originalManifestUrl = seed.originalManifestUrl,
+                        baseUrl = seed.baseUrl,
+                        encodedQuery = seed.encodedQuery
+                    )
+                }
+
+            if (seed.installationId !in orderedInstallations) {
+                orderedInstallations += seed.installationId
+            }
+        }
+
+        val nextRemovedIds =
+            state.userRemovedAddonIds.filterNot { removedId ->
+                (includesCinemeta && removedId.equals(DEFAULT_CINEMETA_ADDON_ID, ignoreCase = true)) ||
+                    (includesOpenSubtitles && removedId.equals(DEFAULT_OPENSUBTITLES_ADDON_ID, ignoreCase = true))
+            }.toSet()
+
+        persistState(
+            state.copy(
+                installedAddons = LinkedHashMap(installed),
+                addonOrder = orderedInstallations,
+                userRemovedAddonIds = nextRemovedIds
+            )
+        )
+
+        return orderedInstallations.size
     }
 
     @Synchronized
