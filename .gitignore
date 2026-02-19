@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android
+local.properties
+*.apk
+*.aab
+captures/
+android/native-engine/src/main/jniLibs/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Kotlin
+*.kotlin_module

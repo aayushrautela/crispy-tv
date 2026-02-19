@@ -1,0 +1,31 @@
+{
+  "contract_version": 1,
+  "suite": "player_machine",
+  "case_id": "codec_error_switch_to_vlc",
+  "now_ms": 1739923200000,
+  "steps": [
+    {
+      "t_ms": 0,
+      "event": {
+        "type": "OPEN_HTTP",
+        "engine": "exo"
+      },
+      "expect": {
+        "phase": "loading_media",
+        "intent": "play",
+        "engine": "exo"
+      }
+    },
+    {
+      "t_ms": 450,
+      "event": {
+        "type": "NATIVE_CODEC_ERROR"
+      },
+      "expect": {
+        "phase": "loading_media",
+        "intent": "play",
+        "engine": "vlc"
+      }
+    }
+  ]
+}

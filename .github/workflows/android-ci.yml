@@ -1,0 +1,108 @@
+name: Android CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install contract validation dependency
+        run: pip install jsonschema==4.23.0
+
+      - name: Validate contract fixtures
+        run: python scripts/validate_contracts.py
+
+      - name: Download TorrServer binaries
+        run: |
+          chmod +x .github/scripts/fetch-torrserver-binaries.sh
+          .github/scripts/fetch-torrserver-binaries.sh
+
+      - name: Run JVM contract tests
+        run: gradle :android:contract-tests:test
+
+      - name: Assemble Android app and TV placeholders
+        run: gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest :android:tv:assembleDebug
+
+      - name: Upload app APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispy-rewrite-app-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload TV APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispy-rewrite-tv-debug
+          path: android/tv/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  apple:
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Apple project
+        run: xcodegen generate --spec ios/project.yml --project ios/CrispyRewriteApple.xcodeproj
+
+      - name: Build iOS placeholder target
+        run: >-
+          xcodebuild
+          -project ios/CrispyRewriteApple.xcodeproj
+          -scheme CrispyRewriteiOS
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Build tvOS placeholder target
+        run: >-
+          xcodebuild
+          -project ios/CrispyRewriteApple.xcodeproj
+          -scheme CrispyRewritetvOS
+          -sdk appletvsimulator
+          -destination 'generic/platform=tvOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Run Swift contract tests
+        run: swift test --package-path ios/ContractRunner

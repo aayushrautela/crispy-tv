@@ -1,0 +1,12 @@
+{
+  "contract_version": 1,
+  "suite": "media_ids",
+  "case_id": "episode_normalization",
+  "input": {
+    "raw": "trakt:show:1399:season:1:episode:1"
+  },
+  "expected": {
+    "normalized": "trakt:show:1399/s1/e1",
+    "kind": "episode"
+  }
+}

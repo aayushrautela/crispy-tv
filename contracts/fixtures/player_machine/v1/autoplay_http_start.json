@@ -1,0 +1,28 @@
+{
+  "contract_version": 1,
+  "suite": "player_machine",
+  "case_id": "autoplay_http_start",
+  "now_ms": 1739923200000,
+  "steps": [
+    {
+      "t_ms": 0,
+      "event": {
+        "type": "OPEN_HTTP"
+      },
+      "expect": {
+        "phase": "loading_media",
+        "intent": "play"
+      }
+    },
+    {
+      "t_ms": 150,
+      "event": {
+        "type": "NATIVE_FIRST_FRAME"
+      },
+      "expect": {
+        "phase": "ready",
+        "intent": "play"
+      }
+    }
+  ]
+}

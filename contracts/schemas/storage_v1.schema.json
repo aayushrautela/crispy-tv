@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "storage_v1 fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "now_ms",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "storage_v1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "now_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "current_schema",
+        "namespace",
+        "writes"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "current_schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "writes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "value"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "should_clear_all",
+        "keys_written"
+      ],
+      "properties": {
+        "should_clear_all": {
+          "type": "boolean"
+        },
+        "keys_written": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

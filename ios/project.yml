@@ -1,0 +1,37 @@
+name: CrispyRewriteApple
+options:
+  bundleIdPrefix: com.crispy.rewrite
+targets:
+  CrispyRewriteiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Apps/iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.crispy.rewrite.ios
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.9
+        CODE_SIGNING_ALLOWED: NO
+  CrispyRewritetvOS:
+    type: application
+    platform: tvOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Apps/tvOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.crispy.rewrite.tvos
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.9
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  CrispyRewriteiOS:
+    build:
+      targets:
+        CrispyRewriteiOS: all
+  CrispyRewritetvOS:
+    build:
+      targets:
+        CrispyRewritetvOS: all
