@@ -248,51 +248,72 @@ class TorrentService : Service() {
     }
 
     private fun getLargestFileIndex(infoHash: String): Int {
-        repeat(20) { attempt ->
+        val normalizedHash = infoHash.lowercase(Locale.US)
+
+        repeat(20) {
             val response = torrentAction(
                 action = "get",
-                payload = JSONObject().put("hash", infoHash)
+                payload = JSONObject().put("hash", normalizedHash)
             )
 
-            val fileStats = response.optJSONArray("file_stats")
-                ?: response.optJSONArray("files")
-                ?: JSONArray()
-
-            val index = pickLargestPlayableIndex(fileStats)
-            if (index >= 0) {
-                return index
+            val fileStats = fileStatsFrom(response)
+            if (fileStats != null && fileStats.length() > 0) {
+                return pickLargestPlayableIndex(fileStats)
             }
 
-            if (attempt < 19) {
-                Thread.sleep(300)
+            Thread.sleep(150)
+        }
+
+        return 0
+    }
+
+    private fun fileStatsFrom(obj: JSONObject): JSONArray? {
+        if (obj.has("file_stats") && obj.opt("file_stats") is JSONArray) {
+            return obj.optJSONArray("file_stats")
+        }
+        if (obj.has("files") && obj.opt("files") is JSONArray) {
+            return obj.optJSONArray("files")
+        }
+
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val value = obj.opt(key)
+            if (value is JSONObject) {
+                val nested = fileStatsFrom(value)
+                if (nested != null) {
+                    return nested
+                }
             }
         }
 
-        throw IllegalStateException("Could not determine playable file index for hash=$infoHash")
+        return null
     }
 
     private fun pickLargestPlayableIndex(array: JSONArray): Int {
         var preferredIndex = -1
         var preferredSize = -1L
-        var fallbackIndex = -1
+        var fallbackIndex = 0
         var fallbackSize = -1L
 
         for (i in 0 until array.length()) {
             val item = array.optJSONObject(i) ?: continue
-            val path = item.optString("path", item.optString("name", ""))
-            val size = item.optLong("length", item.optLong("size", 0L))
-            if (size <= 0L) {
+            val candidateId = item.optInt("id", i)
+            if (candidateId < 0) {
                 continue
             }
 
+            val path = item.optString("path", item.optString("name", ""))
+            val size = item.optLong("length", item.optLong("size", -1L))
+
             if (size > fallbackSize) {
                 fallbackSize = size
-                fallbackIndex = i
+                fallbackIndex = candidateId
             }
 
             if (isPreferredVideoPath(path) && size > preferredSize) {
                 preferredSize = size
-                preferredIndex = i
+                preferredIndex = candidateId
             }
         }
 
