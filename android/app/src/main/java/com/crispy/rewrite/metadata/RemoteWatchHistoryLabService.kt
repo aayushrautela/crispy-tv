@@ -185,11 +185,12 @@ class RemoteWatchHistoryLabService(
             require(episode != null && episode > 0) { "Episode must be a positive number" }
         }
 
+        val requestRemoteImdbId = request.remoteImdbId?.trim()
         val remoteImdbId =
             when {
                 contentId.startsWith("tt", ignoreCase = true) -> contentId.lowercase()
-                request.remoteImdbId?.trim()?.startsWith("tt", ignoreCase = true) == true ->
-                    request.remoteImdbId.trim().lowercase()
+                requestRemoteImdbId?.startsWith("tt", ignoreCase = true) == true ->
+                    requestRemoteImdbId.lowercase()
                 else -> null
             }
 
@@ -582,7 +583,7 @@ private data class LocalWatchedItem(
     fun toJson(): JSONObject {
         return JSONObject()
             .put("content_id", contentId)
-            .put("content_type", contentType.value)
+            .put("content_type", contentType.name.lowercase())
             .put("title", title)
             .put("season", season)
             .put("episode", episode)

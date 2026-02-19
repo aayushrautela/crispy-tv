@@ -632,10 +632,11 @@ private class AddonMetadataClient(
                 seasonObj.optInt("episode_count", -1).takeIf { it > 0 }
                     ?: seasonObj.optInt("episodes", -1).takeIf { it > 0 }
             val derivedEpisodeCount =
-                videos.count {
-                    it.season == seasonNumber &&
-                        it.episode != null &&
-                        it.episode > 0
+                videos.count { video ->
+                    val episodeNumber = video.episode
+                    video.season == seasonNumber &&
+                        episodeNumber != null &&
+                        episodeNumber > 0
                 }
             val episodeCount = explicitEpisodeCount ?: derivedEpisodeCount
             if (episodeCount <= 0) {
