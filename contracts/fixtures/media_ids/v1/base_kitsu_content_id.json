@@ -1,0 +1,17 @@
+{
+  "contract_version": 1,
+  "suite": "media_ids",
+  "case_id": "base_kitsu_content_id",
+  "input": {
+    "raw": "kitsu:7442"
+  },
+  "expected": {
+    "content_id": "kitsu:7442",
+    "video_id": null,
+    "is_episode": false,
+    "season": null,
+    "episode": null,
+    "kind": "content",
+    "addon_lookup_id": "kitsu:7442"
+  }
+}

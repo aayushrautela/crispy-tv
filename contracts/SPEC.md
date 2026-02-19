@@ -17,9 +17,15 @@ This directory defines parity-critical behavior for the rewrite apps.
 - `player_machine`
   - Event-driven playback transitions and engine fallback behavior.
 - `media_ids`
-  - Canonical media ID normalization and type mapping.
+  - Nuvio-style ID normalization for `content_id` and episode `video_id`.
+  - Canonical episode form is `${content_id}:${season}:${episode}`.
+  - Internal `series:` wrappers are accepted but stripped during normalization.
 - `metadata_addon_primary`
-  - Addon-first metadata merge and source precedence.
+  - Addon-first metadata merge with deterministic precedence.
+  - Source ranking is `preferred_addon_id` first, then Cinemeta, then remaining addons.
+- `metadata_tmdb_enhancer`
+  - TMDB may only fill missing metadata fields; it must not override addon-provided values.
+  - `tmdb:*` IDs may be bridged to IMDb (`tt...`) for addon retries.
 - `storage_v1`
   - Logical storage namespace/versioning and schema mismatch behavior.
 

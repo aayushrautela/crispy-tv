@@ -1,6 +1,8 @@
 package com.crispy.rewrite.player
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.crispy.rewrite.domain.player.PlayerAction
 import com.crispy.rewrite.domain.player.PlayerIntent
 import com.crispy.rewrite.domain.player.PlayerState
@@ -10,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 enum class PlaybackEngine {
     EXO,
@@ -29,12 +32,31 @@ data class PlaybackLabUiState(
     ),
     val isPreparingSamplePlayback: Boolean = false,
     val isPreparingTorrentPlayback: Boolean = false,
-    val isBuffering: Boolean = false
+    val isBuffering: Boolean = false,
+    val metadataInputId: String = "tmdb:1399:1:2",
+    val metadataPreferredAddonId: String = "",
+    val metadataMediaType: MetadataLabMediaType = MetadataLabMediaType.SERIES,
+    val metadataStatusMessage: String = "Metadata idle. Resolve to apply Nuvio rules.",
+    val isResolvingMetadata: Boolean = false,
+    val metadataResolution: MetadataLabResolution? = null
 )
 
-class PlaybackLabViewModel : ViewModel() {
+class PlaybackLabViewModel(
+    private val metadataResolver: MetadataLabResolver = DefaultMetadataLabResolver
+) : ViewModel() {
     private val _uiState = MutableStateFlow(PlaybackLabUiState())
     val uiState: StateFlow<PlaybackLabUiState> = _uiState.asStateFlow()
+
+    companion object {
+        fun factory(metadataResolver: MetadataLabResolver): ViewModelProvider.Factory {
+            return object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return PlaybackLabViewModel(metadataResolver) as T
+                }
+            }
+        }
+    }
 
     fun onPlaySampleRequested() {
         _uiState.update {
@@ -233,6 +255,67 @@ class PlaybackLabViewModel : ViewModel() {
                     "Selected ${engine.name} engine."
                 }
             )
+        }
+    }
+
+    fun onMetadataInputChanged(value: String) {
+        _uiState.update { it.copy(metadataInputId = value) }
+    }
+
+    fun onMetadataPreferredAddonChanged(value: String) {
+        _uiState.update { it.copy(metadataPreferredAddonId = value) }
+    }
+
+    fun onMetadataMediaTypeSelected(mediaType: MetadataLabMediaType) {
+        _uiState.update { it.copy(metadataMediaType = mediaType) }
+    }
+
+    fun onResolveMetadataRequested() {
+        val snapshot = _uiState.value
+        val preferredAddonId = snapshot.metadataPreferredAddonId.trim().ifBlank { null }
+        val request = MetadataLabRequest(
+            rawId = snapshot.metadataInputId,
+            mediaType = snapshot.metadataMediaType,
+            preferredAddonId = preferredAddonId
+        )
+
+        if (request.rawId.trim().isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    metadataStatusMessage = "Metadata ID is required.",
+                    isResolvingMetadata = false
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isResolvingMetadata = true,
+                metadataStatusMessage = "Resolving addon-first metadata..."
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                metadataResolver.resolve(request)
+            }.onSuccess { resolution ->
+                _uiState.update {
+                    it.copy(
+                        metadataResolution = resolution,
+                        isResolvingMetadata = false,
+                        metadataStatusMessage =
+                            "Metadata resolved. Sources=${resolution.sources.joinToString()}"
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isResolvingMetadata = false,
+                        metadataStatusMessage = "Metadata resolution failed: ${error.message ?: "unknown error"}"
+                    )
+                }
+            }
         }
     }
 

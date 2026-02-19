@@ -1,0 +1,17 @@
+{
+  "contract_version": 1,
+  "suite": "media_ids",
+  "case_id": "series_prefixed_tmdb_episode",
+  "input": {
+    "raw": "series:tmdb:1399:2:4"
+  },
+  "expected": {
+    "content_id": "tmdb:1399",
+    "video_id": "tmdb:1399:2:4",
+    "is_episode": true,
+    "season": 2,
+    "episode": 4,
+    "kind": "episode",
+    "addon_lookup_id": "tmdb:1399:2:4"
+  }
+}

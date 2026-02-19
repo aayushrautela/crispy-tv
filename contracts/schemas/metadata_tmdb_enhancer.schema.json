@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "metadata_tmdb_enhancer fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
+  "$defs": {
+    "season_object": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "overview",
+        "season_number",
+        "episode_count",
+        "air_date"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overview": {
+          "type": "string"
+        },
+        "season_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "episode_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "air_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "video_object": {
+      "type": "object",
+      "required": [
+        "season",
+        "episode",
+        "released"
+      ],
+      "properties": {
+        "season": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "episode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "released": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "meta_object": {
+      "type": "object",
+      "required": [
+        "id",
+        "imdb_id",
+        "cast",
+        "director",
+        "cast_with_details",
+        "similar",
+        "collection_items",
+        "seasons",
+        "videos"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "imdb_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cast": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "director": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cast_with_details": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "similar": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "collection_items": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "seasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/season_object"
+          }
+        },
+        "videos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/video_object"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "metadata_tmdb_enhancer"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "media_type",
+        "content_id",
+        "season",
+        "episode",
+        "addon_meta",
+        "tmdb_meta"
+      ],
+      "properties": {
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "movie",
+            "series"
+          ]
+        },
+        "content_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "season": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "episode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "addon_meta": {
+          "$ref": "#/$defs/meta_object"
+        },
+        "tmdb_meta": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/meta_object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "needs_enrichment",
+        "merged",
+        "derived_season_numbers",
+        "derived_episode_counts",
+        "bridge_candidate_ids"
+      ],
+      "properties": {
+        "needs_enrichment": {
+          "type": "boolean"
+        },
+        "merged": {
+          "$ref": "#/$defs/meta_object"
+        },
+        "derived_season_numbers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "derived_episode_counts": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "bridge_candidate_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

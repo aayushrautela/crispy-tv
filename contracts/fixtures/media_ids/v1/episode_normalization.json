@@ -3,10 +3,15 @@
   "suite": "media_ids",
   "case_id": "episode_normalization",
   "input": {
-    "raw": "trakt:show:1399:season:1:episode:1"
+    "raw": "series:tt0944947:1:1"
   },
   "expected": {
-    "normalized": "trakt:show:1399/s1/e1",
-    "kind": "episode"
+    "content_id": "tt0944947",
+    "video_id": "tt0944947:1:1",
+    "is_episode": true,
+    "season": 1,
+    "episode": 1,
+    "kind": "episode",
+    "addon_lookup_id": "tt0944947:1:1"
   }
 }

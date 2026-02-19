@@ -15,6 +15,10 @@ import androidx.test.rule.GrantPermissionRule
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
 import com.crispy.rewrite.nativeengine.playback.PlaybackController
+import com.crispy.rewrite.player.MetadataLabMediaType
+import com.crispy.rewrite.player.MetadataLabRequest
+import com.crispy.rewrite.player.MetadataLabResolution
+import com.crispy.rewrite.player.MetadataLabResolver
 import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.After
 import org.junit.Before
@@ -33,6 +37,7 @@ class PlaybackLabSmokeTest {
     fun setUp() {
         TestPlaybackController.reset()
         TestTorrentResolver.reset()
+        TestMetadataResolver.reset()
 
         PlaybackLabDependencies.playbackControllerFactory = { _, callback ->
             TestPlaybackController(callback)
@@ -42,6 +47,9 @@ class PlaybackLabSmokeTest {
                 streamUrl = "http://127.0.0.1:8090/play/mockhash/0"
             )
         }
+        PlaybackLabDependencies.metadataResolverFactory = {
+            TestMetadataResolver()
+        }
     }
 
     @After
@@ -49,6 +57,7 @@ class PlaybackLabSmokeTest {
         PlaybackLabDependencies.reset()
         TestPlaybackController.reset()
         TestTorrentResolver.reset()
+        TestMetadataResolver.reset()
     }
 
     @Test
@@ -79,6 +88,21 @@ class PlaybackLabSmokeTest {
 
             composeRule.onNodeWithTag("status_text")
                 .assertTextContains("Playback ready")
+
+            composeRule.onNodeWithTag("metadata_id_input").performTextClearance()
+            composeRule.onNodeWithTag("metadata_id_input").performTextInput("tmdb:1399:1:2")
+            composeRule.onNodeWithTag("resolve_metadata_button").performClick()
+
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                TestMetadataResolver.requests.isNotEmpty()
+            }
+
+            composeRule.onNodeWithTag("metadata_primary_text")
+                .assertTextContains("Game of Thrones")
+            composeRule.onNodeWithTag("metadata_bridge_text")
+                .assertTextContains("tt0944947:1:2")
+            composeRule.onNodeWithTag("metadata_transport_text")
+                .assertTextContains("transport=")
         } finally {
             scenario.close()
         }
@@ -156,6 +180,42 @@ private class TestTorrentResolver(
             requests.clear()
             stopCallCount = 0
             closeCallCount = 0
+        }
+    }
+}
+
+private class TestMetadataResolver : MetadataLabResolver {
+    override suspend fun resolve(request: MetadataLabRequest): MetadataLabResolution {
+        requests += "${request.mediaType}|${request.rawId}"
+
+        val contentId = if (request.rawId.startsWith("tmdb:1399")) "tmdb:1399" else "tt1375666"
+        val hasEpisode = request.rawId.endsWith(":1:2")
+        val videoId = if (hasEpisode) "$contentId:1:2" else null
+        val bridgeCandidates = if (hasEpisode && contentId == "tmdb:1399") {
+            listOf("tmdb:1399:1:2", "tt0944947:1:2")
+        } else {
+            listOf(contentId)
+        }
+
+        return MetadataLabResolution(
+            contentId = contentId,
+            videoId = videoId,
+            addonLookupId = videoId ?: contentId,
+            primaryId = if (request.mediaType == MetadataLabMediaType.SERIES) "tt0944947" else "tt1375666",
+            primaryTitle = if (request.mediaType == MetadataLabMediaType.SERIES) "Game of Thrones" else "Inception",
+            sources = listOf("com.linvo.cinemeta", "meta.community"),
+            needsEnrichment = contentId.startsWith("tmdb:"),
+            bridgeCandidateIds = bridgeCandidates,
+            mergedImdbId = if (contentId == "tmdb:1399") "tt0944947" else "tt1375666",
+            mergedSeasonNumbers = if (request.mediaType == MetadataLabMediaType.SERIES) listOf(1, 2) else emptyList()
+        )
+    }
+
+    companion object {
+        val requests: MutableList<String> = CopyOnWriteArrayList()
+
+        fun reset() {
+            requests.clear()
         }
     }
 }

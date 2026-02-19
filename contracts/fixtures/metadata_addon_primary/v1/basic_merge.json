@@ -1,24 +1,24 @@
 {
   "contract_version": 1,
   "suite": "metadata_addon_primary",
-  "case_id": "basic_merge_prefers_addon_identity",
+  "case_id": "basic_merge_prefers_source_order",
   "now_ms": 1739923200000,
   "input": {
     "addon_results": [
       {
         "addon_id": "catalog.stremio",
-        "media_id": "addon:imdb:tt1375666",
+        "media_id": "tt1375666",
         "title": "Inception"
       },
       {
         "addon_id": "meta.community",
-        "media_id": "addon:imdb:tt1375666",
+        "media_id": "tt1375666",
         "title": "Inception (2010)"
       }
     ]
   },
   "expected": {
-    "primary_id": "addon:imdb:tt1375666",
+    "primary_id": "tt1375666",
     "title": "Inception",
     "sources": [
       "catalog.stremio",

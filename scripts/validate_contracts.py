@@ -11,6 +11,7 @@ SUITE_TO_SCHEMA = {
     "player_machine": "player_machine.schema.json",
     "media_ids": "media_ids.schema.json",
     "metadata_addon_primary": "metadata_addon_primary.schema.json",
+    "metadata_tmdb_enhancer": "metadata_tmdb_enhancer.schema.json",
     "storage_v1": "storage_v1.schema.json",
 }
 

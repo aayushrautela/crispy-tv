@@ -1,0 +1,17 @@
+{
+  "contract_version": 1,
+  "suite": "media_ids",
+  "case_id": "base_imdb_content_id",
+  "input": {
+    "raw": "tt1375666"
+  },
+  "expected": {
+    "content_id": "tt1375666",
+    "video_id": null,
+    "is_episode": false,
+    "season": null,
+    "episode": null,
+    "kind": "content",
+    "addon_lookup_id": "tt1375666"
+  }
+}

@@ -3,6 +3,17 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val tmdbApiKey =
+    (providers.gradleProperty("TMDB_API_KEY").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
+val metadataAddonUrls =
+    (providers.gradleProperty("METADATA_ADDON_URLS").orNull
+        ?: "https://v3-cinemeta.strem.io/manifest.json")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 android {
     namespace = "com.crispy.rewrite"
     compileSdk = 35
@@ -14,6 +25,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
+        buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
 
     splits {
@@ -46,6 +59,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {

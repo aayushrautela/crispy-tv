@@ -32,32 +32,61 @@
           "minLength": 1
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "expected": {
       "type": "object",
       "required": [
-        "normalized",
-        "kind"
+        "content_id",
+        "video_id",
+        "is_episode",
+        "season",
+        "episode",
+        "kind",
+        "addon_lookup_id"
       ],
       "properties": {
-        "normalized": {
+        "content_id": {
           "type": "string",
           "minLength": 1
+        },
+        "video_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "is_episode": {
+          "type": "boolean"
+        },
+        "season": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "episode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
         },
         "kind": {
           "type": "string",
           "enum": [
-            "movie",
-            "show",
-            "season",
             "episode",
-            "person",
-            "unknown"
+            "content"
           ]
+        },
+        "addon_lookup_id": {
+          "type": "string",
+          "minLength": 1
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

@@ -3,7 +3,13 @@ import XCTest
 
 final class FixtureSanityTests: XCTestCase {
     func testFixtureDirectoriesAndRequiredFields() throws {
-        let suites = ["player_machine", "media_ids", "metadata_addon_primary", "storage_v1"]
+        let suites = [
+            "player_machine",
+            "media_ids",
+            "metadata_addon_primary",
+            "metadata_tmdb_enhancer",
+            "storage_v1",
+        ]
 
         for suite in suites {
             let fixtures = try FixtureLoader.listFixtureFiles(in: suite)
