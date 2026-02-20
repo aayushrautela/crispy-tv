@@ -1,6 +1,9 @@
 package com.crispy.rewrite.home
 
 import android.content.Context
+import com.crispy.rewrite.catalog.CatalogItem
+import com.crispy.rewrite.catalog.CatalogPageResult
+import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.domain.catalog.CatalogRequestInput
 import com.crispy.rewrite.domain.catalog.buildCatalogRequestUrls
 import com.crispy.rewrite.metadata.AddonManifestSeed
@@ -150,6 +153,106 @@ class HomeCatalogService(
         )
     }
 
+    suspend fun listHomeCatalogSections(limit: Int = 15): Pair<List<CatalogSectionRef>, String> {
+        val targetCount = limit.coerceAtLeast(1)
+        val resolvedAddons = resolveAddons()
+        if (resolvedAddons.isEmpty()) {
+            return emptyList<CatalogSectionRef>() to "No installed addons available."
+        }
+
+        val sections = mutableListOf<CatalogSectionRef>()
+        val seenKeys = mutableSetOf<String>()
+
+        resolvedAddons.forEach { addon ->
+            val manifest = addon.manifest ?: return@forEach
+            val catalogs = manifest.optJSONArray("catalogs") ?: return@forEach
+            for (index in 0 until catalogs.length()) {
+                val catalog = catalogs.optJSONObject(index) ?: continue
+                val type = nonBlank(catalog.optString("type"))?.lowercase(Locale.US) ?: continue
+                if (type != "movie" && type != "series") {
+                    continue
+                }
+                val id = nonBlank(catalog.optString("id")) ?: continue
+                val key = "$type:$id"
+                if (!seenKeys.add(key)) {
+                    continue
+                }
+                val name = nonBlank(catalog.optString("name")) ?: id
+                sections +=
+                    CatalogSectionRef(
+                        title = name,
+                        catalogId = id,
+                        mediaType = type,
+                        addonId = addon.addonId,
+                        baseUrl = addon.seed.baseUrl,
+                        encodedAddonQuery = addon.seed.encodedQuery
+                    )
+                if (sections.size >= targetCount) {
+                    return sections to "Loaded ${sections.size} catalogs."
+                }
+            }
+        }
+
+        if (sections.isEmpty()) {
+            return emptyList<CatalogSectionRef>() to "No movie or series catalogs found in installed addons."
+        }
+
+        return sections to "Loaded ${sections.size} catalogs."
+    }
+
+    suspend fun fetchCatalogPage(
+        section: CatalogSectionRef,
+        page: Int,
+        pageSize: Int
+    ): CatalogPageResult {
+        val targetPage = page.coerceAtLeast(1)
+        val targetSize = pageSize.coerceAtLeast(1)
+        val attemptedUrls = mutableListOf<String>()
+
+        val urls =
+            runCatching {
+                buildCatalogRequestUrls(
+                    CatalogRequestInput(
+                        baseUrl = section.baseUrl,
+                        mediaType = section.mediaType,
+                        catalogId = section.catalogId,
+                        page = targetPage,
+                        pageSize = targetSize,
+                        filters = emptyList(),
+                        encodedAddonQuery = section.encodedAddonQuery
+                    )
+                )
+            }.getOrElse { error ->
+                return CatalogPageResult(
+                    items = emptyList(),
+                    statusMessage = error.message ?: "Failed to build catalog request.",
+                    attemptedUrls = emptyList()
+                )
+            }
+
+        urls.forEach { url ->
+            attemptedUrls += url
+            val response = httpGetJson(url) ?: return@forEach
+            val items =
+                parseCatalogItems(
+                    metas = response.optJSONArray("metas"),
+                    addonId = section.addonId,
+                    mediaType = section.mediaType
+                )
+            return CatalogPageResult(
+                items = items,
+                statusMessage = "Loaded ${items.size} items.",
+                attemptedUrls = attemptedUrls
+            )
+        }
+
+        return CatalogPageResult(
+            items = emptyList(),
+            statusMessage = "No catalog items available.",
+            attemptedUrls = attemptedUrls
+        )
+    }
+
     private fun resolveAddons(): List<ResolvedAddon> {
         val seeds = addonRegistry.orderedSeeds()
         if (seeds.isEmpty()) {
@@ -247,6 +350,35 @@ class HomeCatalogService(
                     title = title,
                     description = description,
                     rating = rating,
+                    backdropUrl = backdrop,
+                    addonId = addonId,
+                    type = type
+                )
+        }
+        return items
+    }
+
+    private fun parseCatalogItems(metas: JSONArray?, addonId: String, mediaType: String): List<CatalogItem> {
+        if (metas == null) {
+            return emptyList()
+        }
+
+        val items = mutableListOf<CatalogItem>()
+        for (index in 0 until metas.length()) {
+            val meta = metas.optJSONObject(index) ?: continue
+            val id = nonBlank(meta.optString("id")) ?: continue
+            val title =
+                nonBlank(meta.optString("name"))
+                    ?: nonBlank(meta.optString("title"))
+                    ?: continue
+            val poster = nonBlank(meta.optString("poster"))
+            val backdrop = nonBlank(meta.optString("background"))
+            val type = nonBlank(meta.optString("type")) ?: mediaType
+            items +=
+                CatalogItem(
+                    id = id,
+                    title = title,
+                    posterUrl = poster,
                     backdropUrl = backdrop,
                     addonId = addonId,
                     type = type

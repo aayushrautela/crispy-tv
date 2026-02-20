@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.crispy.rewrite.catalog.CatalogItem
+import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.PlaybackLabDependencies
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.player.MetadataLabMediaType
@@ -12,6 +14,7 @@ import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryRequest
 import com.crispy.rewrite.player.WatchHistoryLabService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,14 +27,23 @@ import java.util.Locale
 data class HomeUiState(
     val heroItems: List<HomeHeroItem> = emptyList(),
     val continueWatchingItems: List<ContinueWatchingItem> = emptyList(),
+    val catalogSections: List<HomeCatalogSectionUi> = emptyList(),
     val selectedHeroId: String? = null,
     val isLoading: Boolean = true,
     val statusMessage: String = "Loading featured content...",
-    val continueWatchingStatusMessage: String = ""
+    val continueWatchingStatusMessage: String = "",
+    val catalogsStatusMessage: String = ""
 ) {
     val selectedHero: HomeHeroItem?
         get() = heroItems.firstOrNull { it.id == selectedHeroId } ?: heroItems.firstOrNull()
 }
+
+data class HomeCatalogSectionUi(
+    val section: CatalogSectionRef,
+    val items: List<CatalogItem> = emptyList(),
+    val isLoading: Boolean = true,
+    val statusMessage: String = ""
+)
 
 class HomeViewModel(
     private val homeCatalogService: HomeCatalogService,
@@ -41,12 +53,14 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
     private val suppressedItemsByKey = suppressionStore.read()
+    private var catalogSectionsJob: Job? = null
 
     init {
         refresh()
     }
 
     fun refresh() {
+        catalogSectionsJob?.cancel()
         viewModelScope.launch {
             _uiState.update { state ->
                 state.copy(
@@ -83,6 +97,61 @@ class HomeViewModel(
                     isLoading = false,
                     statusMessage = baseResult.heroResult.statusMessage,
                     continueWatchingStatusMessage = continueWatchingResult.statusMessage
+                )
+            }
+
+            catalogSectionsJob = viewModelScope.launch {
+                loadCatalogSections()
+            }
+        }
+    }
+
+    private suspend fun loadCatalogSections() {
+        _uiState.update { current ->
+            current.copy(
+                catalogSections = emptyList(),
+                catalogsStatusMessage = "Loading catalogs..."
+            )
+        }
+
+        val sectionsResult = withContext(Dispatchers.IO) {
+            homeCatalogService.listHomeCatalogSections(limit = 15)
+        }
+        val sections = sectionsResult.first
+        val statusMessage = sectionsResult.second
+
+        _uiState.update { current ->
+            current.copy(
+                catalogSections = sections.map { section ->
+                    HomeCatalogSectionUi(section = section)
+                },
+                catalogsStatusMessage = statusMessage
+            )
+        }
+
+        sections.forEach { section ->
+            val pageResult =
+                withContext(Dispatchers.IO) {
+                    homeCatalogService.fetchCatalogPage(
+                        section = section,
+                        page = 1,
+                        pageSize = 12
+                    )
+                }
+            _uiState.update { current ->
+                current.copy(
+                    catalogSections =
+                        current.catalogSections.map { existing ->
+                            if (existing.section.key != section.key) {
+                                existing
+                            } else {
+                                existing.copy(
+                                    items = pageResult.items,
+                                    isLoading = false,
+                                    statusMessage = pageResult.statusMessage
+                                )
+                            }
+                        }
                 )
             }
         }

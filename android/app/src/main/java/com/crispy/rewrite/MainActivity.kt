@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.crispy.rewrite.home.HomeHeroItem
 import com.crispy.rewrite.home.HomeViewModel
+import com.crispy.rewrite.home.HomeCatalogSectionUi
 import com.crispy.rewrite.settings.SettingsScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,13 +39,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +59,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
@@ -82,11 +87,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import coil.compose.AsyncImage
+import com.crispy.rewrite.catalog.CatalogItem
+import com.crispy.rewrite.catalog.CatalogRoute
+import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.home.ContinueWatchingItem
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
 
@@ -125,7 +135,24 @@ private const val HomeDetailsRoute = "home/details"
 private const val HomeDetailsItemIdArg = "itemId"
 private const val LabsRoute = "labs"
 
+private const val CatalogListRoute = "catalog"
+private const val CatalogMediaTypeArg = "mediaType"
+private const val CatalogIdArg = "catalogId"
+private const val CatalogTitleArg = "title"
+private const val CatalogAddonIdArg = "addonId"
+private const val CatalogBaseUrlArg = "baseUrl"
+private const val CatalogQueryArg = "query"
+
 private fun homeDetailsRoute(itemId: String): String = "$HomeDetailsRoute/${Uri.encode(itemId)}"
+
+private fun catalogListRoute(section: CatalogSectionRef): String {
+    val query = section.encodedAddonQuery ?: ""
+    return "$CatalogListRoute/${Uri.encode(section.mediaType)}/${Uri.encode(section.catalogId)}" +
+        "?$CatalogTitleArg=${Uri.encode(section.title)}" +
+        "&$CatalogAddonIdArg=${Uri.encode(section.addonId)}" +
+        "&$CatalogBaseUrlArg=${Uri.encode(section.baseUrl)}" +
+        "&$CatalogQueryArg=${Uri.encode(query)}"
+}
 
 @Composable
 private fun AppShell() {
@@ -174,7 +201,47 @@ private fun AppShell() {
                     },
                     onContinueWatchingClick = { item ->
                         navController.navigate(homeDetailsRoute(item.contentId))
+                    },
+                    onCatalogItemClick = { catalogItem ->
+                        navController.navigate(homeDetailsRoute(catalogItem.id))
+                    },
+                    onCatalogSeeAllClick = { section ->
+                        navController.navigate(catalogListRoute(section))
                     }
+                )
+            }
+
+            composable(
+                route =
+                    "$CatalogListRoute/{$CatalogMediaTypeArg}/{$CatalogIdArg}" +
+                        "?$CatalogTitleArg={$CatalogTitleArg}" +
+                        "&$CatalogAddonIdArg={$CatalogAddonIdArg}" +
+                        "&$CatalogBaseUrlArg={$CatalogBaseUrlArg}" +
+                        "&$CatalogQueryArg={$CatalogQueryArg}",
+                arguments =
+                    listOf(
+                        navArgument(CatalogMediaTypeArg) { type = NavType.StringType },
+                        navArgument(CatalogIdArg) { type = NavType.StringType },
+                        navArgument(CatalogTitleArg) { type = NavType.StringType; defaultValue = "" },
+                        navArgument(CatalogAddonIdArg) { type = NavType.StringType; defaultValue = "" },
+                        navArgument(CatalogBaseUrlArg) { type = NavType.StringType; defaultValue = "" },
+                        navArgument(CatalogQueryArg) { type = NavType.StringType; defaultValue = "" }
+                    )
+            ) { entry ->
+                val args = entry.arguments
+                val section =
+                    CatalogSectionRef(
+                        title = args?.getString(CatalogTitleArg).orEmpty(),
+                        catalogId = args?.getString(CatalogIdArg).orEmpty(),
+                        mediaType = args?.getString(CatalogMediaTypeArg).orEmpty(),
+                        addonId = args?.getString(CatalogAddonIdArg).orEmpty(),
+                        baseUrl = args?.getString(CatalogBaseUrlArg).orEmpty(),
+                        encodedAddonQuery = args?.getString(CatalogQueryArg)?.takeIf { it.isNotBlank() }
+                    )
+                CatalogRoute(
+                    section = section,
+                    onBack = { navController.popBackStack() },
+                    onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) }
                 )
             }
             composable("$HomeDetailsRoute/{$HomeDetailsItemIdArg}") { PlaceholderPage(title = "Details") }
@@ -194,7 +261,9 @@ private fun AppShell() {
 @Composable
 private fun HomePage(
     onHeroClick: (HomeHeroItem) -> Unit,
-    onContinueWatchingClick: (ContinueWatchingItem) -> Unit
+    onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
+    onCatalogItemClick: (CatalogItem) -> Unit,
+    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -204,72 +273,112 @@ private fun HomePage(
         }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scrollState = rememberScrollState()
 
     Scaffold { innerPadding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .verticalScroll(scrollState),
+                .padding(innerPadding),
+            contentPadding = PaddingValues(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            HomeHeaderRow()
-            when {
-                uiState.isLoading && uiState.heroItems.isEmpty() -> {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Loading featured content...")
+            item {
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    HomeHeaderRow()
+                }
+            }
+
+            item {
+                when {
+                    uiState.isLoading && uiState.heroItems.isEmpty() -> {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Loading featured content...")
+                                }
+                            }
                         }
                     }
-                }
 
-                uiState.heroItems.isEmpty() -> {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = uiState.statusMessage,
-                            modifier = Modifier.padding(16.dp)
+                    uiState.heroItems.isEmpty() -> {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = uiState.statusMessage,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    else -> {
+                        HomeHeroCarousel(
+                            items = uiState.heroItems,
+                            onItemClick = onHeroClick
                         )
                     }
                 }
+            }
 
-                else -> {
-                    HomeHeroCarousel(
-                        items = uiState.heroItems,
-                        onItemClick = onHeroClick
+            item {
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    ContinueWatchingSection(
+                        items = uiState.continueWatchingItems,
+                        onItemClick = onContinueWatchingClick,
+                        onHideItem = viewModel::hideContinueWatchingItem,
+                        onRemoveItem = viewModel::removeContinueWatchingItem
                     )
                 }
             }
 
-            ContinueWatchingSection(
-                items = uiState.continueWatchingItems,
-                onItemClick = onContinueWatchingClick,
-                onHideItem = viewModel::hideContinueWatchingItem,
-                onRemoveItem = viewModel::removeContinueWatchingItem
-            )
-
-            if (uiState.continueWatchingStatusMessage.isNotBlank()) {
-                Text(
-                    text = uiState.continueWatchingStatusMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            if (uiState.catalogSections.isNotEmpty()) {
+                items(
+                    items = uiState.catalogSections,
+                    key = { it.section.key }
+                ) { sectionUi ->
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        HomeCatalogSectionRow(
+                            sectionUi = sectionUi,
+                            onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
+                            onItemClick = onCatalogItemClick
+                        )
+                    }
+                }
             }
 
-            if (uiState.statusMessage.isNotBlank()) {
-                Text(
-                    text = uiState.statusMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            item {
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (uiState.catalogsStatusMessage.isNotBlank()) {
+                            Text(
+                                text = uiState.catalogsStatusMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (uiState.continueWatchingStatusMessage.isNotBlank()) {
+                            Text(
+                                text = uiState.continueWatchingStatusMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (uiState.statusMessage.isNotBlank()) {
+                            Text(
+                                text = uiState.statusMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -296,7 +405,7 @@ private fun ContinueWatchingSection(
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp)
+            contentPadding = PaddingValues(0.dp)
         ) {
             items(items, key = { it.id }) { item ->
                 ContinueWatchingCard(
@@ -307,6 +416,95 @@ private fun ContinueWatchingSection(
                     onDetailsClick = { onItemClick(item) }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeCatalogSectionRow(
+    sectionUi: HomeCatalogSectionUi,
+    onSeeAllClick: () -> Unit,
+    onItemClick: (CatalogItem) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = sectionUi.section.title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            TextButton(onClick = onSeeAllClick) {
+                Text("See all")
+            }
+        }
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
+                items(10) {
+                    Card(
+                        modifier = Modifier
+                            .width(124.dp)
+                            .aspectRatio(2f / 3f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        )
+                    }
+                }
+            } else {
+                items(sectionUi.items, key = { it.id }) { item ->
+                    HomeCatalogPosterCard(
+                        item = item,
+                        onClick = { onItemClick(item) }
+                    )
+                }
+            }
+        }
+
+        if (sectionUi.statusMessage.isNotBlank() && sectionUi.items.isEmpty()) {
+            Text(
+                text = sectionUi.statusMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeCatalogPosterCard(
+    item: CatalogItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(124.dp)
+            .aspectRatio(2f / 3f)
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClick = onClick)
+    ) {
+        val imageUrl = item.posterUrl ?: item.backdropUrl
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
         }
     }
 }
@@ -325,7 +523,7 @@ private fun ContinueWatchingCard(
         modifier = Modifier
             .width(260.dp)
             .aspectRatio(16f / 9f)
-            .clip(MaterialTheme.shapes.large)
+            .clip(RoundedCornerShape(28.dp))
             .clickable(onClick = onClick)
     ) {
         if (!item.backdropUrl.isNullOrBlank()) {
@@ -469,89 +667,81 @@ private fun HomeHeroCarousel(
 
     val state = rememberCarouselState { items.size }
 
-    Box(
+    HorizontalMultiBrowseCarousel(
+        state = state,
+        preferredItemWidth = 320.dp,
+        itemSpacing = 16.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .height(340.dp)
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        HorizontalMultiBrowseCarousel(
-            state = state,
-            preferredItemWidth = 320.dp,
-            itemSpacing = 16.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-        ) { index ->
-            val item = items[index]
+            .height(320.dp)
+    ) { index ->
+        val item = items[index]
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .clickable { onItemClick(item) }
-            ) {
-                Box {
-                    AsyncImage(
-                        model = item.backdropUrl,
-                        contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
+        Card(
+            onClick = { onItemClick(item) },
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxSize(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = item.backdropUrl,
+                    contentDescription = item.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.72f)
-                                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.72f)
                                 )
                             )
-                    )
+                        )
+                )
 
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        item.rating?.let { rating ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Star,
-                                    contentDescription = null,
-                                    tint = Color.White
-                                )
-                                Text(
-                                    text = rating,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White
-                                )
-                            }
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    item.rating?.let { rating ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
+                            Text(
+                                text = rating,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White
+                            )
                         }
-                        Text(
-                            text = item.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.92f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
                     }
+                    Text(
+                        text = item.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.92f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
