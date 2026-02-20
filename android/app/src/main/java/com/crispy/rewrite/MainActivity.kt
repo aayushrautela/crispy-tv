@@ -486,27 +486,71 @@ private fun HomeCatalogPosterCard(
     item: CatalogItem,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .width(124.dp)
-            .aspectRatio(2f / 3f)
-            .clip(MaterialTheme.shapes.large)
-            .clickable(onClick = onClick)
+    Column(
+        modifier = Modifier.width(124.dp)
     ) {
-        val imageUrl = item.posterUrl ?: item.backdropUrl
-        if (!imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = item.title,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
+        Card(
+            modifier = Modifier
+                .aspectRatio(2f / 3f)
+                .clip(MaterialTheme.shapes.large)
+                .clickable(onClick = onClick)
+        ) {
+            val imageUrl = item.posterUrl ?: item.backdropUrl
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = item.title,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                }
+                
+                if (!item.rating.isNullOrBlank()) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp),
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color.Black.copy(alpha = 0.7f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = null,
+                                modifier = Modifier.height(12.dp),
+                                tint = Color(0xFFFFC107)
+                            )
+                            Text(
+                                text = item.rating,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
         }
+        
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .fillMaxWidth()
+        )
     }
 }
 
