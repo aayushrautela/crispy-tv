@@ -74,10 +74,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
-import androidx.compose.material3.searchBarScrollBehavior
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.material3.SearchBarScrollBehavior
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
@@ -429,6 +428,7 @@ private fun AppShell() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomePage(
     onHeroClick: (HomeHeroItem) -> Unit,
@@ -452,8 +452,7 @@ private fun HomePage(
         topBar = {
             SearchBar(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .searchBarScrollBehavior(scrollBehavior),
+                    .fillMaxWidth(),
                 inputField = {
                     SearchBarDefaults.InputField(
                         query = "",
@@ -1023,75 +1022,6 @@ private fun PlaceholderPage(title: String) {
                 .verticalScroll(rememberScrollState()),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "$title page")
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun LabsScreen() {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-
-    val metadataResolver = remember(appContext) {
-        PlaybackLabDependencies.metadataResolverFactory(appContext)
-    }
-    val catalogSearchService = remember(appContext) {
-        PlaybackLabDependencies.catalogSearchServiceFactory(appContext)
-    }
-    val watchHistoryService = remember(appContext) {
-        PlaybackLabDependencies.watchHistoryServiceFactory(appContext)
-    }
-    val supabaseSyncService = remember(appContext, watchHistoryService) {
-        PlaybackLabDependencies.supabaseSyncServiceFactory(appContext, watchHistoryService)
-    }
-    val viewModel: PlaybackLabViewModel = viewModel(
-        factory = remember(metadataResolver, catalogSearchService, watchHistoryService, supabaseSyncService) {
-            PlaybackLabViewModel.factory(
-                metadataResolver = metadataResolver,
-                catalogSearchService = catalogSearchService,
-                watchHistoryService = watchHistoryService,
-                supabaseSyncService = supabaseSyncService
-            )
-        }
-    )
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-    val scrollState = rememberScrollState()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val playbackSettingsRepository = remember(appContext) {
-        PlaybackSettingsRepositoryProvider.get(appContext)
-    }
-    val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
-    val introSkipService = remember(appContext) {
-        PlaybackLabDependencies.introSkipServiceFactory(appContext)
-    }
-
-    val playbackController = remember(context) {
-        PlaybackLabDependencies.playbackControllerFactory(context) { event ->
-            viewModel.onPlaybackEvent(event)
-        }
-    }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                title = { Text("Playback Labs") },
-                scrollBehavior = scrollBehavior
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-
             Text(text = "$title page")
         }
     }

@@ -48,7 +48,7 @@ data class HomeCatalogSectionUi(
     val statusMessage: String = ""
 )
 
-class HomeViewModel(
+class HomeViewModel internal constructor(
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryLabService,
     private val suppressionStore: ContinueWatchingSuppressionStore,

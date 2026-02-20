@@ -37,7 +37,7 @@ data class DetailsUiState(
         get() = selectedSeason ?: seasons.firstOrNull()
 }
 
-class DetailsViewModel(
+class DetailsViewModel internal constructor(
     private val itemId: String,
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryLabService,
