@@ -1,6 +1,7 @@
 package com.crispy.rewrite.settings
 
 import android.content.Context
+import com.crispy.rewrite.player.WatchProvider
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -8,6 +9,7 @@ internal data class HomeScreenSettingsPreferences(
     val showRatingBadges: Boolean = true,
     val continueWatchingEnabled: Boolean = true,
     val traktTopPicksEnabled: Boolean = false,
+    val watchDataSource: WatchProvider = WatchProvider.LOCAL,
     val disabledCatalogKeys: Set<String> = emptySet(),
     val heroCatalogKeys: Set<String> = emptySet()
 )
@@ -31,6 +33,7 @@ internal class HomeScreenSettingsStore(context: Context) {
             .put("show_rating_badges", state.showRatingBadges)
             .put("continue_watching_enabled", state.continueWatchingEnabled)
             .put("trakt_top_picks_enabled", state.traktTopPicksEnabled)
+            .put("watch_data_source", state.watchDataSource.name.lowercase())
             .put("disabled_catalog_keys", JSONArray(state.disabledCatalogKeys.sorted()))
             .put("hero_catalog_keys", JSONArray(state.heroCatalogKeys.sorted()))
     }
@@ -40,9 +43,17 @@ internal class HomeScreenSettingsStore(context: Context) {
             showRatingBadges = json.optBoolean("show_rating_badges", true),
             continueWatchingEnabled = json.optBoolean("continue_watching_enabled", true),
             traktTopPicksEnabled = json.optBoolean("trakt_top_picks_enabled", false),
+            watchDataSource = parseWatchProvider(json.optString("watch_data_source")),
             disabledCatalogKeys = readStringSet(json.optJSONArray("disabled_catalog_keys")),
             heroCatalogKeys = readStringSet(json.optJSONArray("hero_catalog_keys"))
         )
+    }
+
+    private fun parseWatchProvider(raw: String?): WatchProvider {
+        val normalized = raw?.trim().orEmpty()
+        return WatchProvider.values().firstOrNull { provider ->
+            provider.name.equals(normalized, ignoreCase = true)
+        } ?: WatchProvider.LOCAL
     }
 
     private fun readStringSet(array: JSONArray?): Set<String> {

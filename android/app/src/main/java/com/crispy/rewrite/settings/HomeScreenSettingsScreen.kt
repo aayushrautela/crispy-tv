@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.home.HomeCatalogService
+import com.crispy.rewrite.player.WatchProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -100,6 +102,12 @@ internal class HomeScreenSettingsViewModel(
     fun setTraktTopPicksEnabled(enabled: Boolean) {
         updatePreferences { preferences ->
             preferences.copy(traktTopPicksEnabled = enabled)
+        }
+    }
+
+    fun setWatchDataSource(source: WatchProvider) {
+        updatePreferences { preferences ->
+            preferences.copy(watchDataSource = source)
         }
     }
 
@@ -233,6 +241,7 @@ fun HomeScreenSettingsRoute(onBack: () -> Unit) {
         onShowRatingsChange = viewModel::setShowRatingBadges,
         onContinueWatchingChange = viewModel::setContinueWatchingEnabled,
         onTraktTopPicksChange = viewModel::setTraktTopPicksEnabled,
+        onWatchDataSourceChange = viewModel::setWatchDataSource,
         onToggleCatalogEnabled = viewModel::toggleCatalogEnabled,
         onToggleCatalogHero = viewModel::toggleCatalogHero
     )
@@ -247,6 +256,7 @@ private fun HomeScreenSettingsScreen(
     onShowRatingsChange: (Boolean) -> Unit,
     onContinueWatchingChange: (Boolean) -> Unit,
     onTraktTopPicksChange: (Boolean) -> Unit,
+    onWatchDataSourceChange: (WatchProvider) -> Unit,
     onToggleCatalogEnabled: (String) -> Unit,
     onToggleCatalogHero: (String) -> Unit
 ) {
@@ -303,6 +313,14 @@ private fun HomeScreenSettingsScreen(
             }
 
             SettingsSection(title = "PERSONALIZED CONTENT") {
+                WatchDataSourceRow(
+                    selectedSource = uiState.preferences.watchDataSource,
+                    onSourceSelected = onWatchDataSourceChange
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
                 ToggleSettingRow(
                     title = "Continue Watching",
                     description = "Show your in-progress episodes and movies",
@@ -444,6 +462,38 @@ private fun ToggleSettingRow(
 }
 
 @Composable
+private fun WatchDataSourceRow(
+    selectedSource: WatchProvider,
+    onSourceSelected: (WatchProvider) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Watch Data Source",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            text = "Choose one source for Library, Continue Watching, and watched tags.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WatchProvider.values().forEach { source ->
+                FilterChip(
+                    selected = source == selectedSource,
+                    onClick = { onSourceSelected(source) },
+                    label = { Text(source.displayName()) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CatalogPreferenceRow(
     catalog: HomeCatalogPreferenceUi,
     isDisabled: Boolean,
@@ -505,6 +555,10 @@ private fun CatalogPreferenceRow(
 
 private fun catalogPreferenceKey(section: CatalogSectionRef): String {
     return "${section.addonId.lowercase(Locale.US)}:${section.mediaType.lowercase(Locale.US)}:${section.catalogId.lowercase(Locale.US)}"
+}
+
+private fun WatchProvider.displayName(): String {
+    return name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }
 }
 
 private const val CATALOG_LIMIT = 80

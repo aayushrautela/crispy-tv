@@ -30,6 +30,7 @@ import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryLabResult
 import com.crispy.rewrite.player.WatchHistoryLabService
 import com.crispy.rewrite.player.WatchHistoryRequest
+import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
 import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.After
@@ -279,7 +280,10 @@ private class TestWatchHistoryService : WatchHistoryLabService {
         )
     }
 
-    override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+    override suspend fun markWatched(
+        request: WatchHistoryRequest,
+        source: WatchProvider?
+    ): WatchHistoryLabResult {
         return WatchHistoryLabResult(
             statusMessage = "Watch history test stub",
             entries = emptyList<WatchHistoryEntry>()
@@ -297,7 +301,10 @@ private class TestWatchHistoryService : WatchHistoryLabService {
         )
     }
 
-    override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+    override suspend fun unmarkWatched(
+        request: WatchHistoryRequest,
+        source: WatchProvider?
+    ): WatchHistoryLabResult {
         return WatchHistoryLabResult(
             statusMessage = "Watch history test stub",
             entries = emptyList<WatchHistoryEntry>()

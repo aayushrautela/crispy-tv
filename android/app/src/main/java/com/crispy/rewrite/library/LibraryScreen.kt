@@ -49,6 +49,7 @@ import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryLabService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
+import com.crispy.rewrite.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,9 +74,15 @@ data class LibraryUiState(
 )
 
 class LibraryViewModel(
-    private val watchHistoryService: WatchHistoryLabService
+    private val watchHistoryService: WatchHistoryLabService,
+    private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(LibraryUiState())
+    private val _uiState =
+        MutableStateFlow(
+            LibraryUiState(
+                selectedSource = settingsStore.load().watchDataSource.toLibrarySource()
+            )
+        )
     val uiState: StateFlow<LibraryUiState> = _uiState
 
     private var refreshJob: Job? = null
@@ -88,33 +95,87 @@ class LibraryViewModel(
         refreshJob?.cancel()
         refreshJob =
             viewModelScope.launch {
-                _uiState.update { it.copy(isRefreshing = true, statusMessage = "Loading library...") }
-                val localResult = runCatching { watchHistoryService.listLocalHistory(limit = 100) }.getOrNull()
-                val providerResult = runCatching { watchHistoryService.listProviderLibrary(limitPerFolder = 250) }.getOrNull()
+                val selectedSource = settingsStore.load().watchDataSource.toLibrarySource()
+                _uiState.update {
+                    it.copy(
+                        isRefreshing = true,
+                        statusMessage = "Loading library...",
+                        selectedSource = selectedSource
+                    )
+                }
+
                 val authState = watchHistoryService.authState()
+                val selectedProvider = selectedSource.toProvider()
+                val providerAuthenticated =
+                    when (selectedProvider) {
+                        WatchProvider.TRAKT -> authState.traktAuthenticated
+                        WatchProvider.SIMKL -> authState.simklAuthenticated
+                        null -> false
+                    }
+                val localResult =
+                    if (selectedSource == LibrarySource.LOCAL) {
+                        runCatching { watchHistoryService.listLocalHistory(limit = 100) }.getOrNull()
+                    } else {
+                        null
+                    }
+                val providerResult =
+                    if (selectedProvider != null && providerAuthenticated) {
+                        runCatching {
+                            watchHistoryService.listProviderLibrary(
+                                limitPerFolder = 250,
+                                source = selectedProvider
+                            )
+                        }.getOrNull()
+                    } else {
+                        null
+                    }
+                val statusMessage =
+                    when (selectedSource) {
+                        LibrarySource.LOCAL -> localResult?.statusMessage ?: "No local history yet."
+                        LibrarySource.TRAKT,
+                        LibrarySource.SIMKL -> {
+                            if (!providerAuthenticated) {
+                                "Connect ${selectedSource.displayName()} in Settings to load this provider."
+                            } else {
+                                providerResult?.statusMessage ?: "No provider library data available."
+                            }
+                        }
+                    }
 
                 _uiState.update { current ->
-                    val fallbackFolder = defaultFolderIdFor(current.selectedSource, providerResult?.folders.orEmpty())
+                    val fallbackFolder = defaultFolderIdFor(selectedSource, providerResult?.folders.orEmpty())
                     current.copy(
                         isRefreshing = false,
-                        statusMessage = listOfNotNull(localResult?.statusMessage, providerResult?.statusMessage).joinToString(" | "),
+                        statusMessage = statusMessage,
                         localEntries = localResult?.entries.orEmpty().sortedByDescending { it.watchedAtEpochMs },
                         providerFolders = providerResult?.folders.orEmpty(),
                         providerItems = providerResult?.items.orEmpty(),
                         authState = authState,
-                        selectedProviderFolderId = current.selectedProviderFolderId ?: fallbackFolder
+                        selectedSource = selectedSource,
+                        selectedProviderFolderId =
+                            current.selectedProviderFolderId
+                                ?.takeIf { selectedFolderId ->
+                                    providerResult?.folders.orEmpty().any { folder -> folder.id == selectedFolderId }
+                                }
+                                ?: fallbackFolder
                     )
                 }
             }
     }
 
     fun selectSource(source: LibrarySource) {
+        settingsStore.save(
+            settingsStore.load().copy(
+                watchDataSource = source.toWatchProvider()
+            )
+        )
         _uiState.update { current ->
             current.copy(
                 selectedSource = source,
                 selectedProviderFolderId = defaultFolderIdFor(source, current.providerFolders)
             )
         }
+        refresh()
     }
 
     fun selectProviderFolder(folderId: String) {
@@ -134,7 +195,8 @@ class LibraryViewModel(
                     if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
-                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext)
+                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
+                            settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -459,5 +521,29 @@ private fun LibrarySource.toProvider(): WatchProvider? {
         LibrarySource.LOCAL -> null
         LibrarySource.TRAKT -> WatchProvider.TRAKT
         LibrarySource.SIMKL -> WatchProvider.SIMKL
+    }
+}
+
+private fun LibrarySource.toWatchProvider(): WatchProvider {
+    return when (this) {
+        LibrarySource.LOCAL -> WatchProvider.LOCAL
+        LibrarySource.TRAKT -> WatchProvider.TRAKT
+        LibrarySource.SIMKL -> WatchProvider.SIMKL
+    }
+}
+
+private fun WatchProvider.toLibrarySource(): LibrarySource {
+    return when (this) {
+        WatchProvider.LOCAL -> LibrarySource.LOCAL
+        WatchProvider.TRAKT -> LibrarySource.TRAKT
+        WatchProvider.SIMKL -> LibrarySource.SIMKL
+    }
+}
+
+private fun LibrarySource.displayName(): String {
+    return when (this) {
+        LibrarySource.LOCAL -> "Local"
+        LibrarySource.TRAKT -> "Trakt"
+        LibrarySource.SIMKL -> "Simkl"
     }
 }

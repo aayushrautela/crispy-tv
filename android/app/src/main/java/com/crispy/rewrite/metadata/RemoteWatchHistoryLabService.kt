@@ -61,6 +61,8 @@ class RemoteWatchHistoryLabService(
         prefs.edit().apply {
             when (provider) {
                 WatchProvider.TRAKT -> {
+                    remove(KEY_SIMKL_TOKEN)
+                    remove(KEY_SIMKL_HANDLE)
                     putString(KEY_TRAKT_TOKEN, normalizedAccess)
                     putString(KEY_TRAKT_REFRESH_TOKEN, refreshToken?.trim()?.ifBlank { null })
                     if (expiresAtEpochMs != null && expiresAtEpochMs > 0L) {
@@ -72,6 +74,10 @@ class RemoteWatchHistoryLabService(
                 }
 
                 WatchProvider.SIMKL -> {
+                    remove(KEY_TRAKT_TOKEN)
+                    remove(KEY_TRAKT_REFRESH_TOKEN)
+                    remove(KEY_TRAKT_EXPIRES_AT)
+                    remove(KEY_TRAKT_HANDLE)
                     putString(KEY_SIMKL_TOKEN, normalizedAccess)
                     putString(KEY_SIMKL_HANDLE, userHandle?.trim()?.ifBlank { null })
                 }
@@ -448,20 +454,44 @@ class RemoteWatchHistoryLabService(
         )
     }
 
-    override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+    override suspend fun markWatched(
+        request: WatchHistoryRequest,
+        source: WatchProvider?
+    ): WatchHistoryLabResult {
         val normalized = normalizeRequest(request)
         val existing = loadEntries()
         val updated = upsertEntry(existing, normalized.toLocalWatchedItem())
         saveEntries(updated)
 
-        val syncedTrakt = syncTraktMark(normalized)
-        val syncedSimkl = syncSimklMark(normalized)
+        val syncedTrakt =
+            when (source) {
+                WatchProvider.TRAKT -> syncTraktMark(normalized)
+                WatchProvider.SIMKL, WatchProvider.LOCAL -> false
+                null -> syncTraktMark(normalized)
+            }
+        val syncedSimkl =
+            when (source) {
+                WatchProvider.SIMKL -> syncSimklMark(normalized)
+                WatchProvider.TRAKT, WatchProvider.LOCAL -> false
+                null -> syncSimklMark(normalized)
+            }
         val entries = updated.sortedByDescending { item -> item.watchedAtEpochMs }.map { item -> item.toPublicEntry() }
+        val statusMessage =
+            when (source) {
+                WatchProvider.TRAKT ->
+                    "Marked watched locally. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)}"
+
+                WatchProvider.SIMKL ->
+                    "Marked watched locally. simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+
+                WatchProvider.LOCAL -> "Marked watched locally."
+                null ->
+                    "Marked watched locally. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)} " +
+                        "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+            }
 
         return WatchHistoryLabResult(
-            statusMessage =
-                "Marked watched locally. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)} " +
-                    "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}",
+            statusMessage = statusMessage,
             entries = entries,
             authState = authState(),
             syncedToTrakt = syncedTrakt,
@@ -469,20 +499,44 @@ class RemoteWatchHistoryLabService(
         )
     }
 
-    override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+    override suspend fun unmarkWatched(
+        request: WatchHistoryRequest,
+        source: WatchProvider?
+    ): WatchHistoryLabResult {
         val normalized = normalizeRequest(request)
         val existing = loadEntries()
         val updated = removeEntry(existing, normalized)
         saveEntries(updated)
 
-        val syncedTrakt = syncTraktUnmark(normalized)
-        val syncedSimkl = syncSimklUnmark(normalized)
+        val syncedTrakt =
+            when (source) {
+                WatchProvider.TRAKT -> syncTraktUnmark(normalized)
+                WatchProvider.SIMKL, WatchProvider.LOCAL -> false
+                null -> syncTraktUnmark(normalized)
+            }
+        val syncedSimkl =
+            when (source) {
+                WatchProvider.SIMKL -> syncSimklUnmark(normalized)
+                WatchProvider.TRAKT, WatchProvider.LOCAL -> false
+                null -> syncSimklUnmark(normalized)
+            }
         val entries = updated.sortedByDescending { item -> item.watchedAtEpochMs }.map { item -> item.toPublicEntry() }
+        val statusMessage =
+            when (source) {
+                WatchProvider.TRAKT ->
+                    "Removed watched entry locally. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)}"
+
+                WatchProvider.SIMKL ->
+                    "Removed watched entry locally. simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+
+                WatchProvider.LOCAL -> "Removed watched entry locally."
+                null ->
+                    "Removed watched entry locally. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)} " +
+                        "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+            }
 
         return WatchHistoryLabResult(
-            statusMessage =
-                "Removed watched entry locally. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)} " +
-                    "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}",
+            statusMessage = statusMessage,
             entries = entries,
             authState = authState(),
             syncedToTrakt = syncedTrakt,
@@ -490,8 +544,72 @@ class RemoteWatchHistoryLabService(
         )
     }
 
-    override suspend fun listContinueWatching(limit: Int, nowMs: Long): ContinueWatchingLabResult {
+    override suspend fun listContinueWatching(
+        limit: Int,
+        nowMs: Long,
+        source: WatchProvider?
+    ): ContinueWatchingLabResult {
         val targetLimit = limit.coerceAtLeast(1)
+
+        if (source != null) {
+            val entries =
+                when (source) {
+                    WatchProvider.LOCAL -> localContinueWatchingFallback()
+                    WatchProvider.TRAKT -> {
+                        if (traktAccessToken().isNotEmpty() && traktClientId.isNotBlank()) {
+                            fetchTraktContinueWatching(nowMs)
+                        } else {
+                            emptyList()
+                        }
+                    }
+
+                    WatchProvider.SIMKL -> {
+                        if (simklAccessToken().isNotEmpty() && simklClientId.isNotBlank()) {
+                            fetchSimklContinueWatching(nowMs)
+                        } else {
+                            emptyList()
+                        }
+                    }
+                }
+
+            val normalized = normalizeContinueWatching(entries = entries, nowMs = nowMs, limit = targetLimit)
+            val status =
+                when (source) {
+                    WatchProvider.LOCAL -> {
+                        if (normalized.isNotEmpty()) {
+                            "Loaded ${normalized.size} local continue watching entries."
+                        } else {
+                            "No local continue watching entries yet."
+                        }
+                    }
+
+                    WatchProvider.TRAKT -> {
+                        if (traktAccessToken().isBlank() || traktClientId.isBlank()) {
+                            "Connect Trakt to load continue watching."
+                        } else if (normalized.isNotEmpty()) {
+                            "Loaded ${normalized.size} Trakt continue watching entries."
+                        } else {
+                            "No Trakt continue watching entries available."
+                        }
+                    }
+
+                    WatchProvider.SIMKL -> {
+                        if (simklAccessToken().isBlank() || simklClientId.isBlank()) {
+                            "Connect Simkl to load continue watching."
+                        } else if (normalized.isNotEmpty()) {
+                            "Loaded ${normalized.size} Simkl continue watching entries."
+                        } else {
+                            "No Simkl continue watching entries available."
+                        }
+                    }
+                }
+
+            return ContinueWatchingLabResult(
+                statusMessage = status,
+                entries = normalized
+            )
+        }
+
         val traktEntries = fetchTraktContinueWatching(nowMs)
         val simklEntries = if (traktEntries.isEmpty()) fetchSimklContinueWatching(nowMs) else emptyList()
         val localEntries = if (traktEntries.isEmpty() && simklEntries.isEmpty()) localContinueWatchingFallback() else emptyList()
@@ -516,7 +634,62 @@ class RemoteWatchHistoryLabService(
         )
     }
 
-    override suspend fun listProviderLibrary(limitPerFolder: Int): ProviderLibrarySnapshot {
+    override suspend fun listProviderLibrary(
+        limitPerFolder: Int,
+        source: WatchProvider?
+    ): ProviderLibrarySnapshot {
+        if (source != null) {
+            val selected =
+                when (source) {
+                    WatchProvider.LOCAL -> null
+                    WatchProvider.TRAKT -> {
+                        if (traktAccessToken().isNotEmpty() && traktClientId.isNotBlank()) {
+                            fetchTraktLibrary(limitPerFolder)
+                        } else {
+                            emptyList<ProviderLibraryFolder>() to emptyList()
+                        }
+                    }
+
+                    WatchProvider.SIMKL -> {
+                        if (simklAccessToken().isNotEmpty() && simklClientId.isNotBlank()) {
+                            fetchSimklLibrary(limitPerFolder)
+                        } else {
+                            emptyList<ProviderLibraryFolder>() to emptyList()
+                        }
+                    }
+                }
+
+            val status =
+                when (source) {
+                    WatchProvider.LOCAL -> "Local source selected. Provider library unavailable."
+                    WatchProvider.TRAKT -> {
+                        if (traktAccessToken().isBlank() || traktClientId.isBlank()) {
+                            "Connect Trakt to load provider library."
+                        } else if (selected != null && selected.first.isNotEmpty()) {
+                            "Loaded ${selected.first.size} Trakt folders."
+                        } else {
+                            "No Trakt library data available."
+                        }
+                    }
+
+                    WatchProvider.SIMKL -> {
+                        if (simklAccessToken().isBlank() || simklClientId.isBlank()) {
+                            "Connect Simkl to load provider library."
+                        } else if (selected != null && selected.first.isNotEmpty()) {
+                            "Loaded ${selected.first.size} Simkl folders."
+                        } else {
+                            "No Simkl library data available."
+                        }
+                    }
+                }
+
+            return ProviderLibrarySnapshot(
+                statusMessage = status,
+                folders = selected?.first.orEmpty().sortedBy { it.label.lowercase(Locale.US) },
+                items = selected?.second.orEmpty().sortedByDescending { it.addedAtEpochMs }
+            )
+        }
+
         val folders = mutableListOf<ProviderLibraryFolder>()
         val items = mutableListOf<ProviderLibraryItem>()
 

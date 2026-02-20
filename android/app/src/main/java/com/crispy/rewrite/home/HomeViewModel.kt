@@ -14,6 +14,8 @@ import com.crispy.rewrite.player.ContinueWatchingLabResult
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryRequest
 import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchProvider
+import com.crispy.rewrite.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +51,8 @@ data class HomeCatalogSectionUi(
 class HomeViewModel(
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryLabService,
-    private val suppressionStore: ContinueWatchingSuppressionStore
+    private val suppressionStore: ContinueWatchingSuppressionStore,
+    private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -71,28 +74,73 @@ class HomeViewModel(
             }
 
             val baseResult = withContext(Dispatchers.IO) {
+                val selectedSource = settingsStore.load().watchDataSource
+                val authState = watchHistoryService.authState()
                 val heroResult = homeCatalogService.loadHeroItems(limit = 10)
                 val watchHistoryResult = watchHistoryService.listLocalHistory(limit = 40)
-                val providerContinueWatchingResult = watchHistoryService.listContinueWatching(limit = 20)
+                val providerConnected =
+                    when (selectedSource) {
+                        WatchProvider.LOCAL -> true
+                        WatchProvider.TRAKT -> authState.traktAuthenticated
+                        WatchProvider.SIMKL -> authState.simklAuthenticated
+                    }
+                val providerContinueWatchingResult =
+                    when (selectedSource) {
+                        WatchProvider.LOCAL -> ContinueWatchingLabResult(statusMessage = "Local source selected.")
+                        WatchProvider.TRAKT,
+                        WatchProvider.SIMKL -> {
+                            if (providerConnected) {
+                                watchHistoryService.listContinueWatching(
+                                    limit = 20,
+                                    source = selectedSource
+                                )
+                            } else {
+                                ContinueWatchingLabResult(
+                                    statusMessage = "Connect ${selectedSource.displayName()} in Settings to load continue watching."
+                                )
+                            }
+                        }
+                    }
                 HomeFeedLoadResult(
                     heroResult = heroResult,
                     watchHistoryEntries = watchHistoryResult.entries,
-                    providerContinueWatchingResult = providerContinueWatchingResult
+                    providerContinueWatchingResult = providerContinueWatchingResult,
+                    selectedSource = selectedSource,
+                    providerConnected = providerConnected
                 )
             }
             val continueWatchingResult =
                 withContext(Dispatchers.IO) {
-                    if (baseResult.providerContinueWatchingResult.entries.isNotEmpty()) {
-                        homeCatalogService.loadContinueWatchingItemsFromProvider(
-                            entries = baseResult.providerContinueWatchingResult.entries,
-                            limit = 20
-                        )
-                    } else {
-                        val filteredEntries = applySuppressionFilter(baseResult.watchHistoryEntries)
-                        homeCatalogService.loadContinueWatchingItems(
-                            entries = filteredEntries,
-                            limit = 20
-                        )
+                    when (baseResult.selectedSource) {
+                        WatchProvider.LOCAL -> {
+                            val filteredEntries = applySuppressionFilter(baseResult.watchHistoryEntries)
+                            homeCatalogService.loadContinueWatchingItems(
+                                entries = filteredEntries,
+                                limit = 20
+                            )
+                        }
+
+                        WatchProvider.TRAKT,
+                        WatchProvider.SIMKL -> {
+                            if (baseResult.providerContinueWatchingResult.entries.isNotEmpty()) {
+                                homeCatalogService.loadContinueWatchingItemsFromProvider(
+                                    entries = baseResult.providerContinueWatchingResult.entries,
+                                    limit = 20
+                                )
+                            } else {
+                                ContinueWatchingLoadResult(
+                                    items = emptyList(),
+                                    statusMessage =
+                                        baseResult.providerContinueWatchingResult.statusMessage.ifBlank {
+                                            if (baseResult.providerConnected) {
+                                                "No continue watching entries available."
+                                            } else {
+                                                "Connect ${baseResult.selectedSource.displayName()} in Settings to load continue watching."
+                                            }
+                                        }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -189,7 +237,10 @@ class HomeViewModel(
         viewModelScope.launch {
             val removalResult =
                 withContext(Dispatchers.IO) {
-                    watchHistoryService.unmarkWatched(item.toUnmarkRequest())
+                    watchHistoryService.unmarkWatched(
+                        request = item.toUnmarkRequest(),
+                        source = item.provider
+                    )
                 }
             _uiState.update { current ->
                 current.copy(
@@ -257,7 +308,8 @@ class HomeViewModel(
                                     addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
                                 ),
                             watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
-                            suppressionStore = ContinueWatchingSuppressionStore(appContext)
+                            suppressionStore = ContinueWatchingSuppressionStore(appContext),
+                            settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -270,7 +322,9 @@ class HomeViewModel(
 private data class HomeFeedLoadResult(
     val heroResult: HomeHeroLoadResult,
     val watchHistoryEntries: List<WatchHistoryEntry>,
-    val providerContinueWatchingResult: ContinueWatchingLabResult
+    val providerContinueWatchingResult: ContinueWatchingLabResult,
+    val selectedSource: WatchProvider,
+    val providerConnected: Boolean
 )
 
 class ContinueWatchingSuppressionStore(context: Context) {
@@ -331,4 +385,8 @@ private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
     } else {
         MetadataLabMediaType.MOVIE
     }
+}
+
+private fun WatchProvider.displayName(): String {
+    return name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }
 }

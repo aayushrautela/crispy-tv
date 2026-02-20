@@ -167,15 +167,28 @@ interface WatchHistoryLabService {
 
     suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult
 
-    suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryLabResult
+    suspend fun markWatched(
+        request: WatchHistoryRequest,
+        source: WatchProvider? = null
+    ): WatchHistoryLabResult
 
-    suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryLabResult
+    suspend fun unmarkWatched(
+        request: WatchHistoryRequest,
+        source: WatchProvider? = null
+    ): WatchHistoryLabResult
 
-    suspend fun listContinueWatching(limit: Int = 20, nowMs: Long = System.currentTimeMillis()): ContinueWatchingLabResult {
+    suspend fun listContinueWatching(
+        limit: Int = 20,
+        nowMs: Long = System.currentTimeMillis(),
+        source: WatchProvider? = null
+    ): ContinueWatchingLabResult {
         return ContinueWatchingLabResult(statusMessage = "Continue watching unavailable.")
     }
 
-    suspend fun listProviderLibrary(limitPerFolder: Int = 200): ProviderLibrarySnapshot {
+    suspend fun listProviderLibrary(
+        limitPerFolder: Int = 200,
+        source: WatchProvider? = null
+    ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
     }
 
@@ -229,19 +242,26 @@ object DefaultWatchHistoryLabService : WatchHistoryLabService {
         return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+    override suspend fun markWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryLabResult {
         return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryLabResult {
+    override suspend fun unmarkWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryLabResult {
         return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun listContinueWatching(limit: Int, nowMs: Long): ContinueWatchingLabResult {
+    override suspend fun listContinueWatching(
+        limit: Int,
+        nowMs: Long,
+        source: WatchProvider?
+    ): ContinueWatchingLabResult {
         return ContinueWatchingLabResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun listProviderLibrary(limitPerFolder: Int): ProviderLibrarySnapshot {
+    override suspend fun listProviderLibrary(
+        limitPerFolder: Int,
+        source: WatchProvider?
+    ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Watch history service unavailable.")
     }
 

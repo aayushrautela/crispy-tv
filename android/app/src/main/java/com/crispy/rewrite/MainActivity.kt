@@ -28,6 +28,7 @@ import com.crispy.rewrite.home.HomeCatalogSectionUi
 import com.crispy.rewrite.details.DetailsRoute
 import com.crispy.rewrite.settings.AddonsSettingsRoute
 import com.crispy.rewrite.settings.HomeScreenSettingsRoute
+import com.crispy.rewrite.settings.HomeScreenSettingsStore
 import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.rewrite.settings.PlaybackSettingsScreen
 import com.crispy.rewrite.settings.ProviderAuthPortalRoute
@@ -124,6 +125,7 @@ import com.crispy.rewrite.library.LibraryRoute
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.PlaybackEngine
 import com.crispy.rewrite.player.PlaybackLabViewModel
+import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.ui.theme.CrispyRewriteTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -133,6 +135,9 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     private val oauthWatchHistoryService by lazy(LazyThreadSafetyMode.NONE) {
         PlaybackLabDependencies.watchHistoryServiceFactory(applicationContext)
+    }
+    private val homeScreenSettingsStore by lazy(LazyThreadSafetyMode.NONE) {
+        HomeScreenSettingsStore(applicationContext)
     }
 
     private var lastHandledOAuthCallback: String? = null
@@ -189,6 +194,18 @@ class MainActivity : ComponentActivity() {
                 Log.w(TAG, "Provider OAuth callback ignored (unrecognized path=$path)")
             } else {
                 Log.i(TAG, "Provider OAuth completion (success=${result.success} message=${result.statusMessage})")
+                if (result.success) {
+                    val provider =
+                        when {
+                            path.startsWith("/trakt") -> WatchProvider.TRAKT
+                            path.startsWith("/simkl") -> WatchProvider.SIMKL
+                            else -> null
+                        }
+                    if (provider != null) {
+                        val preferences = homeScreenSettingsStore.load()
+                        homeScreenSettingsStore.save(preferences.copy(watchDataSource = provider))
+                    }
+                }
             }
         }
     }

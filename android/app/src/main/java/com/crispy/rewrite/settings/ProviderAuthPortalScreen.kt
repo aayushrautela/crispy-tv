@@ -59,7 +59,8 @@ private data class ProviderPortalAction(
 )
 
 class ProviderPortalViewModel(
-    private val watchHistoryService: WatchHistoryLabService
+    private val watchHistoryService: WatchHistoryLabService,
+    private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProviderPortalUiState())
     val uiState: StateFlow<ProviderPortalUiState> = _uiState
@@ -104,6 +105,10 @@ class ProviderPortalViewModel(
 
     fun disconnectTrakt() {
         watchHistoryService.disconnectProvider(WatchProvider.TRAKT)
+        val preferences = settingsStore.load()
+        if (preferences.watchDataSource == WatchProvider.TRAKT) {
+            settingsStore.save(preferences.copy(watchDataSource = WatchProvider.LOCAL))
+        }
         refreshAuthState("Disconnected Trakt.")
     }
 
@@ -140,6 +145,10 @@ class ProviderPortalViewModel(
 
     fun disconnectSimkl() {
         watchHistoryService.disconnectProvider(WatchProvider.SIMKL)
+        val preferences = settingsStore.load()
+        if (preferences.watchDataSource == WatchProvider.SIMKL) {
+            settingsStore.save(preferences.copy(watchDataSource = WatchProvider.LOCAL))
+        }
         refreshAuthState("Disconnected Simkl.")
     }
 
@@ -162,7 +171,8 @@ class ProviderPortalViewModel(
                     if (modelClass.isAssignableFrom(ProviderPortalViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return ProviderPortalViewModel(
-                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext)
+                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
+                            settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

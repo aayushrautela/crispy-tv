@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
@@ -361,7 +362,7 @@ private fun DetailsBody(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        MetaChips(details = details)
+        MetaChips(details = details, isWatched = uiState.isWatched)
 
         if (details.genres.isNotEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
@@ -448,8 +449,26 @@ private fun DetailsBody(
 }
 
 @Composable
-private fun MetaChips(details: MediaDetails) {
+private fun MetaChips(
+    details: MediaDetails,
+    isWatched: Boolean
+) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (isWatched) {
+            item {
+                AssistChip(
+                    onClick = { },
+                    label = { Text("Watched") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Done,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                )
+            }
+        }
         details.year?.takeIf { it.isNotBlank() }?.let { year ->
             item { AssistChip(onClick = { }, label = { Text(year) }) }
         }
