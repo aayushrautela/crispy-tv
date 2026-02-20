@@ -25,10 +25,13 @@ struct TraktScrobblePolicyContractTests {
 
             let progress = try requireDouble(input, "progress_percent", fixture: fixture)
             let actual = decideTraktScrobble(stage: stage, progressPercent: progress)
+            let expectedEndpoint = try requireString(expected, "endpoint", fixture: fixture)
+            let expectedMarksWatched = try requireBool(expected, "marks_watched", fixture: fixture)
+            let expectedUpdatesPlaybackProgress = try requireBool(expected, "updates_playback_progress", fixture: fixture)
 
-            #expect(actual.endpoint == try requireString(expected, "endpoint", fixture: fixture))
-            #expect(actual.marksWatched == try requireBool(expected, "marks_watched", fixture: fixture))
-            #expect(actual.updatesPlaybackProgress == try requireBool(expected, "updates_playback_progress", fixture: fixture))
+            #expect(actual.endpoint == expectedEndpoint)
+            #expect(actual.marksWatched == expectedMarksWatched)
+            #expect(actual.updatesPlaybackProgress == expectedUpdatesPlaybackProgress)
         }
     }
 }
