@@ -23,6 +23,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.maskClip
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -57,7 +59,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -196,7 +197,7 @@ private fun HomePage(onHeroClick: (HomeHeroItem) -> Unit) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(220.dp)
+                            .height(300.dp)
                     ) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -247,80 +248,89 @@ private fun HomeHeroCarousel(
 
     val state = rememberCarouselState { items.size }
 
-    HorizontalMultiBrowseCarousel(
-        state = state,
-        preferredItemWidth = 320.dp,
-        itemSpacing = 12.dp,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 2.dp)
-    ) { index ->
-        val item = items[index]
-
-        Card(
-            onClick = { onItemClick(item) },
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(340.dp)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        HorizontalMultiBrowseCarousel(
+            state = state,
+            preferredItemWidth = 320.dp,
+            itemSpacing = 16.dp,
             modifier = Modifier
-                .height(220.dp)
-                .clip(MaterialTheme.shapes.extraLarge)
-        ) {
-            Box {
-                AsyncImage(
-                    model = item.backdropUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                .fillMaxWidth()
+                .height(320.dp)
+        ) { index ->
+            val item = items[index]
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.72f)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .maskClip(MaterialTheme.shapes.extraLarge)
+                    .clickable { onItemClick(item) }
+            ) {
+                Box {
+                    AsyncImage(
+                        model = item.backdropUrl,
+                        contentDescription = item.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.72f)
+                                    )
                                 )
                             )
-                        )
-                )
+                    )
 
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    item.rating?.let { rating ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Star,
-                                contentDescription = null,
-                                tint = Color.White
-                            )
-                            Text(
-                                text = rating,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White
-                            )
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        item.rating?.let { rating ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Star,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                                Text(
+                                    text = rating,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White
+                                )
+                            }
                         }
+                        Text(
+                            text = item.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.92f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.92f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         }

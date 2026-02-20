@@ -3,6 +3,8 @@ package com.crispy.rewrite.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.expressivetheme.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.expressivetheme.MaterialExpressiveTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
@@ -22,10 +24,11 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF1A1C20)
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CrispyRewriteTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (androidx.compose.foundation.isSystemInDarkTheme()) DarkColors else LightColors,
-        content = content
-    )
+    val colors = if (androidx.compose.foundation.isSystemInDarkTheme()) DarkColors else LightColors
+    MaterialExpressiveTheme(colorScheme = colors) {
+        MaterialTheme(colorScheme = colors, content = content)
+    }
 }
