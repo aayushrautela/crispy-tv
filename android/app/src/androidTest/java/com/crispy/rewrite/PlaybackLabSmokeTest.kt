@@ -138,13 +138,25 @@ private data class PlayCall(
 private class TestPlaybackController(
     private val callback: (NativePlaybackEvent) -> Unit
 ) : PlaybackController {
+    private var positionMs: Long = 0L
+
     override fun play(url: String, engine: NativePlaybackEngine) {
         playCalls += PlayCall(url = url, engine = engine)
+        positionMs = 0L
         callback(NativePlaybackEvent.Ready)
+    }
+
+    override fun seekTo(positionMs: Long) {
+        this.positionMs = positionMs
+    }
+
+    override fun currentPositionMs(): Long {
+        return positionMs
     }
 
     override fun stop() {
         stopCallCount += 1
+        positionMs = 0L
     }
 
     override fun release() {
