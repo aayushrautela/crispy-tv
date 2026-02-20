@@ -17,12 +17,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Addon
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
@@ -135,7 +135,7 @@ fun SettingsScreen(
                 SettingsItem(
                     label = "Addons",
                     description = "Manage streaming addons",
-                    icon = Icons.Outlined.Addon,
+                    icon = Icons.Outlined.Extension,
                     iconTint = MaterialTheme.colorScheme.tertiary
                 ),
                 SettingsItem(

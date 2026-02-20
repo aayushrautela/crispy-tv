@@ -5,10 +5,14 @@ import com.crispy.rewrite.domain.catalog.CatalogRequestInput
 import com.crispy.rewrite.domain.catalog.buildCatalogRequestUrls
 import com.crispy.rewrite.metadata.AddonManifestSeed
 import com.crispy.rewrite.metadata.MetadataAddonRegistry
+import com.crispy.rewrite.player.MetadataLabMediaType
+import com.crispy.rewrite.player.WatchHistoryEntry
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 
 data class HomeHeroItem(
@@ -26,11 +30,30 @@ data class HomeHeroLoadResult(
     val statusMessage: String = "Home is ready."
 )
 
+data class ContinueWatchingItem(
+    val id: String,
+    val contentId: String,
+    val title: String,
+    val season: Int?,
+    val episode: Int?,
+    val watchedAtEpochMs: Long,
+    val backdropUrl: String?,
+    val logoUrl: String?,
+    val addonId: String?,
+    val type: String
+)
+
+data class ContinueWatchingLoadResult(
+    val items: List<ContinueWatchingItem> = emptyList(),
+    val statusMessage: String = ""
+)
+
 class HomeCatalogService(
     context: Context,
     addonManifestUrlsCsv: String
 ) {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
+    private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
 
     suspend fun loadHeroItems(limit: Int = 10): HomeHeroLoadResult {
         val resolvedAddons = resolveAddons()
@@ -86,6 +109,45 @@ class HomeCatalogService(
         }
 
         return HomeHeroLoadResult(statusMessage = "No featured catalog items available from addons.")
+    }
+
+    suspend fun loadContinueWatchingItems(
+        entries: List<WatchHistoryEntry>,
+        limit: Int = 20
+    ): ContinueWatchingLoadResult {
+        val targetCount = limit.coerceAtLeast(1)
+        val dedupedEntries = entries
+            .sortedByDescending { it.watchedAtEpochMs }
+            .distinctBy { continueWatchingKey(it) }
+            .take(targetCount)
+
+        if (dedupedEntries.isEmpty()) {
+            return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
+        }
+
+        val resolvedAddons = resolveAddons()
+        val items = dedupedEntries.map { entry ->
+            val mediaType = entry.contentType.asCatalogMediaType()
+            val resolvedMeta = resolveContinueWatchingMeta(entry, mediaType, resolvedAddons)
+
+            ContinueWatchingItem(
+                id = continueWatchingKey(entry),
+                contentId = entry.contentId,
+                title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
+                season = entry.season,
+                episode = entry.episode,
+                watchedAtEpochMs = entry.watchedAtEpochMs,
+                backdropUrl = resolvedMeta?.backdropUrl,
+                logoUrl = resolvedMeta?.logoUrl,
+                addonId = resolvedMeta?.addonId,
+                type = mediaType
+            )
+        }
+
+        return ContinueWatchingLoadResult(
+            items = items,
+            statusMessage = "Loaded continue watching from watch history."
+        )
     }
 
     private fun resolveAddons(): List<ResolvedAddon> {
@@ -237,6 +299,128 @@ class HomeCatalogService(
             )
     }
 
+    private fun resolveContinueWatchingMeta(
+        entry: WatchHistoryEntry,
+        mediaType: String,
+        resolvedAddons: List<ResolvedAddon>
+    ): ContinueWatchingMeta? {
+        val lookupIds = lookupIdsForContinueWatching(entry.contentId)
+        if (lookupIds.isEmpty()) {
+            return null
+        }
+
+        lookupIds.forEach { lookupId ->
+            readCachedContinueWatchingMeta(cacheKey = continueWatchingCacheKey(mediaType, lookupId))?.let { cached ->
+                return cached
+            }
+        }
+
+        resolvedAddons.forEach { addon ->
+            lookupIds.forEach { lookupId ->
+                val response = fetchAddonMeta(
+                    seed = addon.seed,
+                    mediaType = mediaType,
+                    lookupId = lookupId
+                ) ?: return@forEach
+                val meta = response.optJSONObject("meta") ?: return@forEach
+                val resolved = ContinueWatchingMeta(
+                    title =
+                        nonBlank(meta.optString("name"))
+                            ?: nonBlank(meta.optString("title"))
+                            ?: nonBlank(entry.title),
+                    backdropUrl =
+                        nonBlank(meta.optString("background"))
+                            ?: nonBlank(meta.optString("poster")),
+                    logoUrl = nonBlank(meta.optString("logo")),
+                    addonId = addon.addonId
+                )
+                if (!resolved.hasDisplayData()) {
+                    return@forEach
+                }
+
+                lookupIds.forEach { candidateLookupId ->
+                    cacheContinueWatchingMeta(
+                        cacheKey = continueWatchingCacheKey(mediaType, candidateLookupId),
+                        value = resolved
+                    )
+                }
+                return resolved
+            }
+        }
+
+        return null
+    }
+
+    private fun fetchAddonMeta(seed: AddonManifestSeed, mediaType: String, lookupId: String): JSONObject? {
+        val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
+        val url = buildString {
+            append(seed.baseUrl.trimEnd('/'))
+            append("/meta/")
+            append(mediaType)
+            append('/')
+            append(encodedId)
+            append(".json")
+            if (!seed.encodedQuery.isNullOrBlank()) {
+                append('?')
+                append(seed.encodedQuery)
+            }
+        }
+        return httpGetJson(url)
+    }
+
+    private fun lookupIdsForContinueWatching(contentId: String): List<String> {
+        val normalized = contentId.trim()
+        if (normalized.isEmpty()) {
+            return emptyList()
+        }
+
+        val ids = mutableListOf(normalized)
+        val parsedEpisodeMatch = EPISODE_SUFFIX_REGEX.matchEntire(normalized)
+        if (parsedEpisodeMatch != null) {
+            ids += parsedEpisodeMatch.groupValues[1]
+        }
+        return ids.distinct()
+    }
+
+    private fun continueWatchingCacheKey(mediaType: String, contentId: String): String {
+        return "${mediaType.lowercase(Locale.US)}:${contentId.lowercase(Locale.US)}"
+    }
+
+    private fun readCachedContinueWatchingMeta(cacheKey: String): ContinueWatchingMeta? {
+        val cached = continueWatchingMetaCache[cacheKey] ?: return null
+        val ageMs = System.currentTimeMillis() - cached.cachedAtEpochMs
+        if (ageMs > CONTINUE_WATCHING_META_CACHE_TTL_MS) {
+            continueWatchingMetaCache.remove(cacheKey)
+            return null
+        }
+        return cached.meta
+    }
+
+    private fun cacheContinueWatchingMeta(cacheKey: String, value: ContinueWatchingMeta) {
+        continueWatchingMetaCache[cacheKey] =
+            CachedContinueWatchingMeta(
+                meta = value,
+                cachedAtEpochMs = System.currentTimeMillis()
+            )
+    }
+
+    private fun fallbackContinueWatchingTitle(entry: WatchHistoryEntry): String {
+        val normalizedTitle = nonBlank(entry.title)
+        if (normalizedTitle != null) {
+            return normalizedTitle
+        }
+        if (entry.season != null && entry.episode != null) {
+            return "${entry.contentId} S${entry.season} E${entry.episode}"
+        }
+        return entry.contentId
+    }
+
+    private fun continueWatchingKey(entry: WatchHistoryEntry): String {
+        val seasonPart = entry.season?.toString() ?: "-"
+        val episodePart = entry.episode?.toString() ?: "-"
+        return "${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:$seasonPart:$episodePart"
+    }
+
     private data class ResolvedAddon(
         val orderIndex: Int,
         val seed: AddonManifestSeed,
@@ -253,6 +437,27 @@ class HomeCatalogService(
         val name: String,
         val priority: Int
     )
+
+    private data class ContinueWatchingMeta(
+        val title: String?,
+        val backdropUrl: String?,
+        val logoUrl: String?,
+        val addonId: String?
+    ) {
+        fun hasDisplayData(): Boolean {
+            return !title.isNullOrBlank() || !backdropUrl.isNullOrBlank() || !logoUrl.isNullOrBlank()
+        }
+    }
+
+    private data class CachedContinueWatchingMeta(
+        val meta: ContinueWatchingMeta,
+        val cachedAtEpochMs: Long
+    )
+
+    companion object {
+        private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
+        private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
+    }
 }
 
 private fun httpGetJson(url: String): JSONObject? {
@@ -280,4 +485,8 @@ private fun httpGetJson(url: String): JSONObject? {
 private fun nonBlank(value: String?): String? {
     val trimmed = value?.trim()
     return if (trimmed.isNullOrEmpty()) null else trimmed
+}
+
+private fun WatchHistoryEntry.asCatalogMediaType(): String {
+    return if (contentType == MetadataLabMediaType.SERIES) "series" else "movie"
 }

@@ -5,10 +5,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.text.format.DateUtils
 import android.view.ViewGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
@@ -30,16 +32,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -48,7 +57,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.maskClip
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,6 +68,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -78,6 +87,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import com.crispy.rewrite.home.ContinueWatchingItem
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
 
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
@@ -86,6 +96,7 @@ import com.crispy.rewrite.player.PlaybackEngine
 import com.crispy.rewrite.player.PlaybackLabViewModel
 import com.crispy.rewrite.ui.theme.CrispyRewriteTheme
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -160,6 +171,9 @@ private fun AppShell() {
                 HomePage(
                     onHeroClick = { hero ->
                         navController.navigate(homeDetailsRoute(hero.id))
+                    },
+                    onContinueWatchingClick = { item ->
+                        navController.navigate(homeDetailsRoute(item.contentId))
                     }
                 )
             }
@@ -178,7 +192,10 @@ private fun AppShell() {
 }
 
 @Composable
-private fun HomePage(onHeroClick: (HomeHeroItem) -> Unit) {
+private fun HomePage(
+    onHeroClick: (HomeHeroItem) -> Unit,
+    onContinueWatchingClick: (ContinueWatchingItem) -> Unit
+) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val viewModel: HomeViewModel = viewModel(
@@ -232,6 +249,21 @@ private fun HomePage(onHeroClick: (HomeHeroItem) -> Unit) {
                 }
             }
 
+            ContinueWatchingSection(
+                items = uiState.continueWatchingItems,
+                onItemClick = onContinueWatchingClick,
+                onHideItem = viewModel::hideContinueWatchingItem,
+                onRemoveItem = viewModel::removeContinueWatchingItem
+            )
+
+            if (uiState.continueWatchingStatusMessage.isNotBlank()) {
+                Text(
+                    text = uiState.continueWatchingStatusMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             if (uiState.statusMessage.isNotBlank()) {
                 Text(
                     text = uiState.statusMessage,
@@ -241,6 +273,188 @@ private fun HomePage(onHeroClick: (HomeHeroItem) -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun ContinueWatchingSection(
+    items: List<ContinueWatchingItem>,
+    onItemClick: (ContinueWatchingItem) -> Unit,
+    onHideItem: (ContinueWatchingItem) -> Unit,
+    onRemoveItem: (ContinueWatchingItem) -> Unit
+) {
+    if (items.isEmpty()) {
+        return
+    }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Continue Watching",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp)
+        ) {
+            items(items, key = { it.id }) { item ->
+                ContinueWatchingCard(
+                    item = item,
+                    onClick = { onItemClick(item) },
+                    onHideClick = { onHideItem(item) },
+                    onRemoveClick = { onRemoveItem(item) },
+                    onDetailsClick = { onItemClick(item) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueWatchingCard(
+    item: ContinueWatchingItem,
+    onClick: () -> Unit,
+    onHideClick: () -> Unit,
+    onRemoveClick: () -> Unit,
+    onDetailsClick: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .width(260.dp)
+            .aspectRatio(16f / 9f)
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClick = onClick)
+    ) {
+        if (!item.backdropUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = item.backdropUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.64f)
+                        )
+                    )
+                )
+        )
+
+        if (!item.logoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = item.logoUrl,
+                contentDescription = "${item.title} logo",
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth(0.6f)
+                    .height(56.dp)
+                    .padding(top = 12.dp),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            Text(
+                text = item.title,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+        ) {
+            IconButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.small)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MoreVert,
+                    contentDescription = "Continue watching actions",
+                    tint = Color.White
+                )
+            }
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Details") },
+                    onClick = {
+                        menuExpanded = false
+                        onDetailsClick()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Remove") },
+                    onClick = {
+                        menuExpanded = false
+                        onRemoveClick()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Hide") },
+                    onClick = {
+                        menuExpanded = false
+                        onHideClick()
+                    }
+                )
+            }
+        }
+
+        Text(
+            text = continueWatchingSubtitle(item),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.95f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun continueWatchingSubtitle(item: ContinueWatchingItem): String {
+    val seasonEpisode =
+        if (
+            item.type.equals("series", ignoreCase = true) &&
+                item.season != null &&
+                item.episode != null
+        ) {
+            String.format(Locale.US, "S%02d:E%02d", item.season, item.episode)
+        } else {
+            null
+        }
+    val relativeWatched = DateUtils.getRelativeTimeSpanString(
+        item.watchedAtEpochMs,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS
+    ).toString()
+
+    return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -275,7 +489,7 @@ private fun HomeHeroCarousel(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .maskClip(MaterialTheme.shapes.extraLarge)
+                    .clip(MaterialTheme.shapes.extraLarge)
                     .clickable { onItemClick(item) }
             ) {
                 Box {
