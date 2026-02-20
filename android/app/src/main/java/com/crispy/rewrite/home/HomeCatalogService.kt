@@ -127,7 +127,7 @@ class HomeCatalogService(
 
         val resolvedAddons = resolveAddons()
         val items = dedupedEntries.map { entry ->
-            val mediaType = entry.contentType.asCatalogMediaType()
+            val mediaType = entry.asCatalogMediaType()
             val resolvedMeta = resolveContinueWatchingMeta(entry, mediaType, resolvedAddons)
 
             ContinueWatchingItem(

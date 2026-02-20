@@ -193,7 +193,7 @@ private data class HomeFeedLoadResult(
     val watchHistoryEntries: List<WatchHistoryEntry>
 )
 
-private class ContinueWatchingSuppressionStore(context: Context) {
+class ContinueWatchingSuppressionStore(context: Context) {
     private val preferences: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
