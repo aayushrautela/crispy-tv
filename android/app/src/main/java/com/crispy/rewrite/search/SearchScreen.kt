@@ -87,7 +87,7 @@ private data class SearchUiState(
     val statusMessage: String = ""
 )
 
-class SearchViewModel(
+private class SearchViewModel(
     private val appContext: Context,
     private val homeCatalogService: HomeCatalogService,
     private val catalogSearchService: CatalogSearchLabService
