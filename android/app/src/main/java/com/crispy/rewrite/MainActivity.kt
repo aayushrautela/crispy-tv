@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateUtils
+import android.util.Log
 import android.view.ViewGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
@@ -30,7 +31,6 @@ import com.crispy.rewrite.settings.HomeScreenSettingsRoute
 import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.rewrite.settings.PlaybackSettingsScreen
 import com.crispy.rewrite.settings.ProviderAuthPortalRoute
-import com.crispy.rewrite.settings.ProviderOAuthCallbackBus
 import com.crispy.rewrite.settings.SettingsScreen
 import com.crispy.rewrite.search.SearchRoute
 import androidx.activity.ComponentActivity
@@ -95,6 +95,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.ui.PlayerView
@@ -119,11 +120,18 @@ import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.PlaybackEngine
 import com.crispy.rewrite.player.PlaybackLabViewModel
 import com.crispy.rewrite.ui.theme.CrispyRewriteTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+    private val oauthWatchHistoryService by lazy(LazyThreadSafetyMode.NONE) {
+        PlaybackLabDependencies.watchHistoryServiceFactory(applicationContext)
+    }
+
+    private var lastHandledOAuthCallback: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         consumeOAuthCallback(intent)
@@ -152,7 +160,43 @@ class MainActivity : ComponentActivity() {
         if (!path.startsWith("/trakt") && !path.startsWith("/simkl")) {
             return
         }
-        ProviderOAuthCallbackBus.publish(data)
+
+        // Prevent accidental re-handling if this intent is reused.
+        runCatching { intent?.let { it.data = null } }
+
+        val callback = data.toString()
+        if (callback == lastHandledOAuthCallback) {
+            return
+        }
+        lastHandledOAuthCallback = callback
+
+        Log.d(TAG, "Received provider OAuth callback (${oauthUriSummaryForLog(data)})")
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result =
+                when {
+                    path.startsWith("/trakt") -> oauthWatchHistoryService.completeTraktOAuth(callback)
+                    path.startsWith("/simkl") -> oauthWatchHistoryService.completeSimklOAuth(callback)
+                    else -> null
+                }
+
+            if (result == null) {
+                Log.w(TAG, "Provider OAuth callback ignored (unrecognized path=$path)")
+            } else {
+                Log.i(TAG, "Provider OAuth completion (success=${result.success} message=${result.statusMessage})")
+            }
+        }
+    }
+
+    private fun oauthUriSummaryForLog(uri: Uri): String {
+        val statePresent = !uri.getQueryParameter("state").isNullOrBlank()
+        val codePresent = !uri.getQueryParameter("code").isNullOrBlank()
+        val errorPresent = !uri.getQueryParameter("error").isNullOrBlank()
+        return "scheme=${uri.scheme.orEmpty()}, host=${uri.host.orEmpty()}, path=${uri.path.orEmpty()}, statePresent=$statePresent, codePresent=$codePresent, errorPresent=$errorPresent"
+    }
+
+    companion object {
+        private const val TAG = "ProviderOAuth"
     }
 }
 
