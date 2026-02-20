@@ -89,15 +89,25 @@ private fun choosePreferred(
     current: ContinueWatchingCandidate,
     incoming: ContinueWatchingCandidate
 ): ContinueWatchingCandidate {
-    val sameEpisode = current.episodeKey == incoming.episodeKey
+    val sameEpisode =
+        current.contentType == "movie" ||
+            (current.episodeKey != null && current.episodeKey == incoming.episodeKey)
+
+    // Mirror Nuvio's behavior: for the same episode/movie, only let progress win when it is
+    // meaningfully ahead; otherwise, fall back to recency to avoid flip-flopping on tiny deltas.
     if (sameEpisode) {
-        return if (incoming.progressPercent >= current.progressPercent) incoming else current
+        val preferProgressDelta = 0.5
+        if (incoming.progressPercent > current.progressPercent + preferProgressDelta) {
+            return incoming
+        }
+        if (current.progressPercent > incoming.progressPercent + preferProgressDelta) {
+            return current
+        }
     }
-    if (incoming.lastUpdatedMs > current.lastUpdatedMs) {
-        return incoming
+
+    if (incoming.lastUpdatedMs != current.lastUpdatedMs) {
+        return if (incoming.lastUpdatedMs > current.lastUpdatedMs) incoming else current
     }
-    if (incoming.lastUpdatedMs < current.lastUpdatedMs) {
-        return current
-    }
-    return if (incoming.progressPercent >= current.progressPercent) incoming else current
+
+    return if (incoming.progressPercent > current.progressPercent) incoming else current
 }

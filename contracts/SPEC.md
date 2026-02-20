@@ -16,6 +16,11 @@ This directory defines parity-critical behavior for the rewrite apps.
 
 - `player_machine`
   - Event-driven playback transitions and engine fallback behavior.
+- `continue_watching`
+  - Continue Watching planning: filter, dedupe, and canonical ordering for in-progress items and placeholders.
+  - Dedupe: for the same episode/movie, prefer higher progress only if it is > 0.5 percentage points ahead; otherwise prefer newer `last_updated_ms`.
+- `trakt_scrobble_policy`
+  - Deterministic Trakt scrobble decisions (endpoint + watched/progress flags) based on stage and progress.
 - `media_ids`
   - Nuvio-style ID normalization for `content_id` and episode `video_id`.
   - Canonical episode form is `${content_id}:${season}:${episode}`.
