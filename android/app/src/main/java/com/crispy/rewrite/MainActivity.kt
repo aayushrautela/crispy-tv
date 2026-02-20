@@ -318,14 +318,16 @@ private fun HomePage(
                         }
                     }
 
-                    else -> {
-                        HomeHeroCarousel(
-                            items = uiState.heroItems,
-                            onItemClick = onHeroClick
-                        )
-                    }
-                }
-            }
+                     else -> {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            HomeHeroCarousel(
+                                items = uiState.heroItems,
+                                onItemClick = onHeroClick
+                            )
+                        }
+                     }
+                 }
+             }
 
             item {
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -667,81 +669,88 @@ private fun HomeHeroCarousel(
 
     val state = rememberCarouselState { items.size }
 
-    HorizontalMultiBrowseCarousel(
-        state = state,
-        preferredItemWidth = 320.dp,
-        itemSpacing = 16.dp,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(320.dp)
-    ) { index ->
-        val item = items[index]
+            .height(340.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        HorizontalMultiBrowseCarousel(
+            state = state,
+            preferredItemWidth = 320.dp,
+            itemSpacing = 16.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(320.dp)
+        ) { index ->
+            val item = items[index]
 
-        Card(
-            onClick = { onItemClick(item) },
-            shape = RoundedCornerShape(28.dp),
-            modifier = Modifier.fillMaxSize(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AsyncImage(
-                    model = item.backdropUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+            Card(
+                onClick = { onItemClick(item) },
+                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.fillMaxSize(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model = item.backdropUrl,
+                        contentDescription = item.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.72f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.72f)
+                                    )
                                 )
                             )
-                        )
-                )
+                    )
 
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    item.rating?.let { rating ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Star,
-                                contentDescription = null,
-                                tint = Color.White
-                            )
-                            Text(
-                                text = rating,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White
-                            )
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        item.rating?.let { rating ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Star,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                                Text(
+                                    text = rating,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White
+                                )
+                            }
                         }
+                        Text(
+                            text = item.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.92f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.92f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         }
