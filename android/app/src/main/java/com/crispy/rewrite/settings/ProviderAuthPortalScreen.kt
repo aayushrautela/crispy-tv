@@ -65,26 +65,19 @@ class ProviderPortalViewModel(
 
     init {
         viewModelScope.launch {
+            // Listen for OAuth callback URIs published on the app-wide bus.
+            // MainActivity performs the token exchange; the portal just refreshes UI state
+            // so the connected status updates when a callback arrives.
             ProviderOAuthCallbackBus.callbacks.collect { callbackUri ->
                 if (callbackUri.scheme != "crispy" || callbackUri.host != "auth") {
                     return@collect
                 }
-                val path = callbackUri.path.orEmpty()
-                val result =
-                    when {
-                        path.startsWith("/trakt") -> watchHistoryService.completeTraktOAuth(callbackUri.toString())
-                        path.startsWith("/simkl") -> watchHistoryService.completeSimklOAuth(callbackUri.toString())
-                        else -> null
-                    }
-                if (result != null) {
-                    _uiState.update {
-                        it.copy(
-                            authState = result.authState,
-                            statusMessage = result.statusMessage,
-                            pendingExternalUrl = null
-                        )
-                    }
+                // Clear any pending external URL and refresh the stored auth state so the
+                // UI reflects any provider connection that may have just completed.
+                _uiState.update {
+                    it.copy(pendingExternalUrl = null, statusMessage = "Processing provider callback...")
                 }
+                refreshAuthState("Processing provider callback...")
             }
         }
         refreshAuthState()
