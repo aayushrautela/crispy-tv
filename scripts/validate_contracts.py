@@ -17,6 +17,8 @@ SUITE_TO_SCHEMA = {
     "metadata_tmdb_enhancer": "metadata_tmdb_enhancer.schema.json",
     "sync_planner": "sync_planner.schema.json",
     "storage_v1": "storage_v1.schema.json",
+    "continue_watching": "continue_watching.schema.json",
+    "trakt_scrobble_policy": "trakt_scrobble_policy.schema.json",
 }
 
 
