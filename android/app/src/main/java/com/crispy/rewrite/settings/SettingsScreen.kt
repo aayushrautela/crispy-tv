@@ -42,7 +42,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,135 +75,12 @@ fun SettingsScreen(
     onNavigateToProviderPortal: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     val settingsGroups = listOf(
-        SettingsGroup(
-            title = "ACCOUNT",
-            items = listOf(
-                SettingsItem(
-                    label = "Profiles",
-                    description = "Manage user profiles and preferences",
-                    icon = Icons.Outlined.Person,
-                    iconTint = MaterialTheme.colorScheme.primary
-                ),
-                SettingsItem(
-                    label = "Trakt + Simkl",
-                    description = "Provider login portal",
-                    icon = Icons.Outlined.Cloud,
-                    iconTint = MaterialTheme.colorScheme.tertiary,
-                    onClick = onNavigateToProviderPortal
-                )
-            )
-        ),
-        SettingsGroup(
-            title = "GENERAL",
-            items = listOf(
-                SettingsItem(
-                    label = "Appearance",
-                    description = "Theme, colors, and display options",
-                    icon = Icons.Outlined.Brush,
-                    iconTint = MaterialTheme.colorScheme.secondary
-                ),
-                SettingsItem(
-                    label = "Language",
-                    description = "App language and region",
-                    icon = Icons.Outlined.Language,
-                    iconTint = MaterialTheme.colorScheme.primary
-                )
-            )
-        ),
-        SettingsGroup(
-            title = "PLAYER",
-            items = listOf(
-                SettingsItem(
-                    label = "Playback",
-                    description = "Quality, buffering, and intro skip settings",
-                    icon = Icons.Outlined.VideoSettings,
-                    iconTint = MaterialTheme.colorScheme.tertiary,
-                    onClick = onNavigateToPlaybackSettings
-                ),
-                SettingsItem(
-                    label = "Subtitles",
-                    description = "Subtitle appearance and language",
-                    icon = Icons.Outlined.ClosedCaption,
-                    iconTint = MaterialTheme.colorScheme.secondary
-                )
-            )
-        ),
-        SettingsGroup(
-            title = "CONTENT",
-            items = listOf(
-                SettingsItem(
-                    label = "Home Screen",
-                    description = "Customize your home feed",
-                    icon = Icons.Outlined.Home,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    onClick = onNavigateToHomeScreenSettings
-                ),
-                SettingsItem(
-                    label = "Addons",
-                    description = "Manage streaming addons",
-                    icon = Icons.Outlined.Extension,
-                    iconTint = MaterialTheme.colorScheme.tertiary,
-                    onClick = onNavigateToAddonsSettings
-                ),
-                SettingsItem(
-                    label = "Search",
-                    description = "Search providers and filters",
-                    icon = Icons.Outlined.Search,
-                    iconTint = MaterialTheme.colorScheme.secondary
-                )
-            )
-        ),
-        SettingsGroup(
-            title = "SERVICES",
-            items = listOf(
-                SettingsItem(
-                    label = "Metadata Providers",
-                    description = "TMDB, Cinemeta, and more",
-                    icon = Icons.Outlined.Storage,
-                    iconTint = MaterialTheme.colorScheme.primary
-                ),
-                SettingsItem(
-                    label = "AI Insights",
-                    description = "Smart recommendations",
-                    icon = Icons.Outlined.AutoAwesome,
-                    iconTint = MaterialTheme.colorScheme.tertiary
-                )
-            )
-        ),
-        SettingsGroup(
-            title = "LABS",
-            items = listOf(
-                SettingsItem(
-                    label = "Experimental Features",
-                    description = "Playback lab, metadata tools, and sync",
-                    icon = Icons.Outlined.Science,
-                    iconTint = MaterialTheme.colorScheme.error,
-                    onClick = onNavigateToLabs
-                )
-            )
-        ),
-        SettingsGroup(
-            title = "ABOUT",
-            items = listOf(
-                SettingsItem(
-                    label = "Version",
-                    description = "Crispy v0.1.0",
-                    icon = Icons.Outlined.Info,
-                    iconTint = MaterialTheme.colorScheme.secondary
-                ),
-                SettingsItem(
-                    label = "Open Source",
-                    description = "Licenses and acknowledgments",
-                    icon = Icons.Outlined.Code,
-                    iconTint = MaterialTheme.colorScheme.primary
-                )
-            )
-        )
-    )
-
+...
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = {
@@ -217,10 +95,12 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior
             )
         }
     ) { innerPadding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()

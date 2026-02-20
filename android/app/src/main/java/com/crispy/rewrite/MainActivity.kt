@@ -71,7 +71,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.searchBarScrollBehavior
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.SearchBarScrollBehavior
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
@@ -295,6 +300,9 @@ private fun AppShell() {
                     },
                     onCatalogSeeAllClick = { section ->
                         navController.navigate(catalogListRoute(section))
+                    },
+                    onSearchClick = {
+                        navController.navigate(TopLevelDestination.Search.route)
                     }
                 )
             }
@@ -409,7 +417,8 @@ private fun HomePage(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
-    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit
+    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
+    onSearchClick: () -> Unit
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -420,7 +429,44 @@ private fun HomePage(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold { innerPadding ->
+    val scrollBehavior = SearchBarDefaults.enterAlwaysSearchBarScrollBehavior()
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            SearchBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .searchBarScrollBehavior(scrollBehavior),
+                inputField = {
+                    SearchBarDefaults.InputField(
+                        query = "",
+                        onQueryChange = { },
+                        onSearch = { onSearchClick() },
+                        expanded = false,
+                        onExpandedChange = { onSearchClick() },
+                        placeholder = { Text("Search for movies, series...") },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = onSearchClick) {
+                                Card {
+                                    Text(
+                                        text = "Home",
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
+                        }
+                    )
+                },
+                expanded = false,
+                onExpandedChange = { onSearchClick() }
+            ) {
+            }
+        }
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -428,12 +474,6 @@ private fun HomePage(
             contentPadding = PaddingValues(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    HomeHeaderRow()
-                }
-            }
-
             item {
                 when {
                     uiState.isLoading && uiState.heroItems.isEmpty() -> {
@@ -946,41 +986,95 @@ private fun HomeHeroCarousel(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeHeaderRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Crispy",
-            style = MaterialTheme.typography.headlineMedium
-        )
-        Card {
-            Text(
-                text = "Home",
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.labelLarge
+private fun PlaceholderPage(title: String) {
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                scrollBehavior = scrollBehavior
             )
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState()),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "$title page")
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PlaceholderPage(title: String) {
+private fun LabsScreen() {
+    val context = LocalContext.current
+    val appContext = remember(context) { context.applicationContext }
+
+    val metadataResolver = remember(appContext) {
+        PlaybackLabDependencies.metadataResolverFactory(appContext)
+    }
+    val catalogSearchService = remember(appContext) {
+        PlaybackLabDependencies.catalogSearchServiceFactory(appContext)
+    }
+    val watchHistoryService = remember(appContext) {
+        PlaybackLabDependencies.watchHistoryServiceFactory(appContext)
+    }
+    val supabaseSyncService = remember(appContext, watchHistoryService) {
+        PlaybackLabDependencies.supabaseSyncServiceFactory(appContext, watchHistoryService)
+    }
+    val viewModel: PlaybackLabViewModel = viewModel(
+        factory = remember(metadataResolver, catalogSearchService, watchHistoryService, supabaseSyncService) {
+            PlaybackLabViewModel.factory(
+                metadataResolver = metadataResolver,
+                catalogSearchService = catalogSearchService,
+                watchHistoryService = watchHistoryService,
+                supabaseSyncService = supabaseSyncService
+            )
+        }
+    )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val playbackSettingsRepository = remember(appContext) {
+        PlaybackSettingsRepositoryProvider.get(appContext)
+    }
+    val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
+    val introSkipService = remember(appContext) {
+        PlaybackLabDependencies.introSkipServiceFactory(appContext)
+    }
+
+    val playbackController = remember(context) {
+        PlaybackLabDependencies.playbackControllerFactory(context) { event ->
+            viewModel.onPlaybackEvent(event)
+        }
+    }
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(title = { Text(title) })
+            TopAppBar(
+                title = { Text("Playback Labs") },
+                scrollBehavior = scrollBehavior
+            )
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
+                .padding(innerPadding)
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
             Text(text = "$title page")
         }
     }

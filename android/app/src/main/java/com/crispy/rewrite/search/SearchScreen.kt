@@ -30,7 +30,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.SearchBarScrollBehavior
+import androidx.compose.material3.searchBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -383,16 +386,49 @@ private fun SearchScreen(
     onRefreshCatalogs: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
+    val scrollBehavior = SearchBarDefaults.enterAlwaysSearchBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text("Search") },
-                actions = {
-                    IconButton(onClick = onRefreshCatalogs) {
-                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                    }
-                }
-            )
+            SearchBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .searchBarScrollBehavior(scrollBehavior),
+                inputField = {
+                    SearchBarDefaults.InputField(
+                        query = uiState.query,
+                        onQueryChange = onQueryChange,
+                        onSearch = { },
+                        expanded = false,
+                        onExpandedChange = { },
+                        placeholder = { Text("Search") },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (uiState.query.isNotBlank()) {
+                                    IconButton(onClick = onClearQuery) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Clear,
+                                            contentDescription = "Clear"
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = onRefreshCatalogs) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = "Refresh"
+                                    )
+                                }
+                            }
+                        }
+                    )
+                },
+                expanded = false,
+                onExpandedChange = { }
+            ) {
+            }
         }
     ) { innerPadding ->
         LazyVerticalGrid(
@@ -405,38 +441,6 @@ private fun SearchScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                SearchBar(
-                    modifier = Modifier.fillMaxWidth(),
-                    inputField = {
-                        SearchBarDefaults.InputField(
-                            query = uiState.query,
-                            onQueryChange = onQueryChange,
-                            onSearch = { },
-                            expanded = false,
-                            onExpandedChange = { },
-                            placeholder = { Text("Search") },
-                            leadingIcon = {
-                                Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
-                            },
-                            trailingIcon = {
-                                if (uiState.query.isNotBlank()) {
-                                    IconButton(onClick = onClearQuery) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Clear,
-                                            contentDescription = "Clear"
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    },
-                    expanded = false,
-                    onExpandedChange = { }
-                ) {
-                }
-            }
-
             item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
