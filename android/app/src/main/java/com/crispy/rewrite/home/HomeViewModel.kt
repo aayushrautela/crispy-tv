@@ -10,6 +10,7 @@ import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.PlaybackLabDependencies
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.player.MetadataLabMediaType
+import com.crispy.rewrite.player.ContinueWatchingLabResult
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryRequest
 import com.crispy.rewrite.player.WatchHistoryLabService
@@ -72,18 +73,27 @@ class HomeViewModel(
             val baseResult = withContext(Dispatchers.IO) {
                 val heroResult = homeCatalogService.loadHeroItems(limit = 10)
                 val watchHistoryResult = watchHistoryService.listLocalHistory(limit = 40)
+                val providerContinueWatchingResult = watchHistoryService.listContinueWatching(limit = 20)
                 HomeFeedLoadResult(
                     heroResult = heroResult,
-                    watchHistoryEntries = watchHistoryResult.entries
+                    watchHistoryEntries = watchHistoryResult.entries,
+                    providerContinueWatchingResult = providerContinueWatchingResult
                 )
             }
-            val filteredEntries = applySuppressionFilter(baseResult.watchHistoryEntries)
             val continueWatchingResult =
                 withContext(Dispatchers.IO) {
-                    homeCatalogService.loadContinueWatchingItems(
-                        entries = filteredEntries,
-                        limit = 20
-                    )
+                    if (baseResult.providerContinueWatchingResult.entries.isNotEmpty()) {
+                        homeCatalogService.loadContinueWatchingItemsFromProvider(
+                            entries = baseResult.providerContinueWatchingResult.entries,
+                            limit = 20
+                        )
+                    } else {
+                        val filteredEntries = applySuppressionFilter(baseResult.watchHistoryEntries)
+                        homeCatalogService.loadContinueWatchingItems(
+                            entries = filteredEntries,
+                            limit = 20
+                        )
+                    }
                 }
 
             _uiState.update { current ->
@@ -259,7 +269,8 @@ class HomeViewModel(
 
 private data class HomeFeedLoadResult(
     val heroResult: HomeHeroLoadResult,
-    val watchHistoryEntries: List<WatchHistoryEntry>
+    val watchHistoryEntries: List<WatchHistoryEntry>,
+    val providerContinueWatchingResult: ContinueWatchingLabResult
 )
 
 class ContinueWatchingSuppressionStore(context: Context) {

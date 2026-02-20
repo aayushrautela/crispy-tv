@@ -34,7 +34,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -430,9 +429,17 @@ private fun DetailsBody(
                         .take(50)
 
                 Spacer(modifier = Modifier.height(10.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    episodes.forEach { video ->
-                        EpisodeRow(video = video)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(
+                        items = episodes,
+                        key = { it.id }
+                    ) { video ->
+                        EpisodeCard(
+                            video = video,
+                            modifier = Modifier.width(280.dp)
+                        )
                     }
                 }
             }
@@ -497,39 +504,131 @@ private fun ExpandableDescription(text: String?) {
 }
 
 @Composable
-private fun EpisodeRow(video: MediaVideo) {
-    ElevatedCard(onClick = { /* TODO: show streams/play */ }) {
-        ListItem(
-            headlineContent = {
-                val prefix =
-                    when {
-                        video.season != null && video.episode != null -> "S${video.season}E${video.episode}"
-                        video.episode != null -> "E${video.episode}"
-                        else -> ""
+private fun EpisodeCard(
+    video: MediaVideo,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier,
+        onClick = { /* TODO: show streams/play */ }
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+            ) {
+                val thumbnail = video.thumbnailUrl?.trim().orEmpty()
+                if (thumbnail.isNotBlank()) {
+                    AsyncImage(
+                        model = thumbnail,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                )
+                            )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.55f)
+                            )
+                        )
+                )
+
+                val prefix = episodePrefix(video)
+                if (prefix != null) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(10.dp),
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+                    ) {
+                        Text(
+                            text = prefix,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(44.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = Color.Black.copy(alpha = 0.35f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Text(
-                    text = if (prefix.isBlank()) video.title else "$prefix • ${video.title}",
+                    text = video.title,
+                    style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            },
-            supportingContent = {
-                val supporting = video.overview ?: video.released
-                if (!supporting.isNullOrBlank()) {
+
+                video.released?.takeIf { it.isNotBlank() }?.let { released ->
                     Text(
-                        text = supporting,
-                        maxLines = 2,
+                        text = released,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-            },
-            trailingContent = {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = null
-                )
+
+                video.overview?.takeIf { it.isNotBlank() }?.let { overview ->
+                    Text(
+                        text = overview,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-        )
+        }
+    }
+}
+
+private fun episodePrefix(video: MediaVideo): String? {
+    val season = video.season
+    val episode = video.episode
+    return when {
+        season != null && episode != null -> "S${season}E${episode}"
+        episode != null -> "E${episode}"
+        else -> null
     }
 }
 

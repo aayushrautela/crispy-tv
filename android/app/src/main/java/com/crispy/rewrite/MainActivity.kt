@@ -29,6 +29,8 @@ import com.crispy.rewrite.settings.AddonsSettingsRoute
 import com.crispy.rewrite.settings.HomeScreenSettingsRoute
 import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.rewrite.settings.PlaybackSettingsScreen
+import com.crispy.rewrite.settings.ProviderAuthPortalRoute
+import com.crispy.rewrite.settings.ProviderOAuthCallbackBus
 import com.crispy.rewrite.settings.SettingsScreen
 import com.crispy.rewrite.search.SearchRoute
 import androidx.activity.ComponentActivity
@@ -124,11 +126,33 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        consumeOAuthCallback(intent)
         setContent {
             CrispyRewriteTheme {
                 AppShell()
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeOAuthCallback(intent)
+    }
+
+    private fun consumeOAuthCallback(intent: android.content.Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "crispy") {
+            return
+        }
+        if (data.host != "auth") {
+            return
+        }
+        val path = data.path.orEmpty()
+        if (!path.startsWith("/trakt") && !path.startsWith("/simkl")) {
+            return
+        }
+        ProviderOAuthCallbackBus.publish(data)
     }
 }
 
@@ -150,6 +174,7 @@ private const val LabsRoute = "labs"
 private const val PlaybackSettingsRoute = "settings/playback"
 private const val HomeScreenSettingsRoutePath = "settings/home"
 private const val AddonsSettingsRoutePath = "settings/addons"
+private const val ProviderPortalRoutePath = "settings/providers"
 
 private const val CatalogListRoute = "catalog"
 private const val CatalogMediaTypeArg = "mediaType"
@@ -299,6 +324,9 @@ private fun AppShell() {
                     },
                     onNavigateToLabs = {
                         navController.navigate(LabsRoute)
+                    },
+                    onNavigateToProviderPortal = {
+                        navController.navigate(ProviderPortalRoutePath)
                     }
                 )
             }
@@ -307,6 +335,9 @@ private fun AppShell() {
             }
             composable(AddonsSettingsRoutePath) {
                 AddonsSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(ProviderPortalRoutePath) {
+                ProviderAuthPortalRoute(onBack = { navController.popBackStack() })
             }
             composable(PlaybackSettingsRoute) {
                 val context = LocalContext.current

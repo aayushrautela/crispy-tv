@@ -1,0 +1,59 @@
+{
+  "contract_version": 1,
+  "suite": "continue_watching",
+  "case_id": "in_progress_before_placeholder",
+  "now_ms": 1739923200000,
+  "input": {
+    "max_items": 10,
+    "candidates": [
+      {
+        "content_type": "series",
+        "content_id": "tt030",
+        "episode_key": "s3e7",
+        "progress_percent": 0,
+        "last_updated_ms": 1739923199000,
+        "is_up_next_placeholder": true
+      },
+      {
+        "content_type": "movie",
+        "content_id": "tt031",
+        "progress_percent": 21,
+        "last_updated_ms": 1739923190000
+      },
+      {
+        "content_type": "series",
+        "content_id": "tt032",
+        "episode_key": "s1e1",
+        "progress_percent": 33,
+        "last_updated_ms": 1739923185000
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "content_type": "movie",
+        "content_id": "tt031",
+        "progress_percent": 21,
+        "last_updated_ms": 1739923190000,
+        "is_up_next_placeholder": false
+      },
+      {
+        "content_type": "series",
+        "content_id": "tt032",
+        "episode_key": "s1e1",
+        "progress_percent": 33,
+        "last_updated_ms": 1739923185000,
+        "is_up_next_placeholder": false
+      },
+      {
+        "content_type": "series",
+        "content_id": "tt030",
+        "episode_key": "s3e7",
+        "progress_percent": 0,
+        "last_updated_ms": 1739923199000,
+        "is_up_next_placeholder": true
+      }
+    ]
+  }
+}

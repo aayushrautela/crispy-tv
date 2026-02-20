@@ -60,7 +60,11 @@ private fun newWatchHistoryService(context: Context): WatchHistoryLabService {
     return RemoteWatchHistoryLabService(
         context = context,
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
-        simklClientId = BuildConfig.SIMKL_CLIENT_ID
+        simklClientId = BuildConfig.SIMKL_CLIENT_ID,
+        traktClientSecret = BuildConfig.TRAKT_CLIENT_SECRET,
+        traktRedirectUri = BuildConfig.TRAKT_REDIRECT_URI,
+        simklClientSecret = BuildConfig.SIMKL_CLIENT_SECRET,
+        simklRedirectUri = BuildConfig.SIMKL_REDIRECT_URI
     )
 }
 

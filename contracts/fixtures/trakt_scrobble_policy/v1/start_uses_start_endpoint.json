@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "trakt_scrobble_policy",
+  "case_id": "start_uses_start_endpoint",
+  "now_ms": 1739923200000,
+  "input": {
+    "stage": "start",
+    "progress_percent": 0
+  },
+  "expected": {
+    "endpoint": "/scrobble/start",
+    "marks_watched": false,
+    "updates_playback_progress": false
+  }
+}

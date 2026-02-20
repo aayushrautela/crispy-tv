@@ -11,7 +11,9 @@ import com.crispy.rewrite.domain.catalog.buildCatalogRequestUrls
 import com.crispy.rewrite.metadata.AddonManifestSeed
 import com.crispy.rewrite.metadata.MetadataAddonRegistry
 import com.crispy.rewrite.player.MetadataLabMediaType
+import com.crispy.rewrite.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
 import com.crispy.rewrite.player.WatchHistoryEntry
+import com.crispy.rewrite.player.WatchProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -42,6 +44,9 @@ data class ContinueWatchingItem(
     val season: Int?,
     val episode: Int?,
     val watchedAtEpochMs: Long,
+    val progressPercent: Double,
+    val provider: WatchProvider,
+    val providerPlaybackId: String?,
     val backdropUrl: String?,
     val logoUrl: String?,
     val addonId: String?,
@@ -178,6 +183,9 @@ class HomeCatalogService(
                 season = entry.season,
                 episode = entry.episode,
                 watchedAtEpochMs = entry.watchedAtEpochMs,
+                progressPercent = 100.0,
+                provider = WatchProvider.LOCAL,
+                providerPlaybackId = null,
                 backdropUrl = resolvedMeta?.backdropUrl,
                 logoUrl = resolvedMeta?.logoUrl,
                 addonId = resolvedMeta?.addonId,
@@ -188,6 +196,56 @@ class HomeCatalogService(
         return ContinueWatchingLoadResult(
             items = items,
             statusMessage = "Loaded continue watching from watch history."
+        )
+    }
+
+    suspend fun loadContinueWatchingItemsFromProvider(
+        entries: List<ProviderContinueWatchingEntry>,
+        limit: Int = 20
+    ): ContinueWatchingLoadResult {
+        val targetCount = limit.coerceAtLeast(1)
+        val dedupedEntries = entries
+            .sortedByDescending { it.lastUpdatedEpochMs }
+            .distinctBy { "${it.contentType.name}:${it.contentId}:${it.season ?: -1}:${it.episode ?: -1}" }
+            .take(targetCount)
+
+        if (dedupedEntries.isEmpty()) {
+            return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
+        }
+
+        val resolvedAddons = resolveAddons()
+        val items = dedupedEntries.map { entry ->
+            val fakeWatchEntry =
+                WatchHistoryEntry(
+                    contentId = entry.contentId,
+                    contentType = entry.contentType,
+                    title = entry.title,
+                    season = entry.season,
+                    episode = entry.episode,
+                    watchedAtEpochMs = entry.lastUpdatedEpochMs
+                )
+            val mediaType = fakeWatchEntry.asCatalogMediaType()
+            val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry, mediaType, resolvedAddons)
+            ContinueWatchingItem(
+                id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
+                contentId = entry.contentId,
+                title = resolvedMeta?.title ?: entry.title,
+                season = entry.season,
+                episode = entry.episode,
+                watchedAtEpochMs = entry.lastUpdatedEpochMs,
+                progressPercent = entry.progressPercent,
+                provider = entry.provider,
+                providerPlaybackId = entry.providerPlaybackId,
+                backdropUrl = resolvedMeta?.backdropUrl,
+                logoUrl = resolvedMeta?.logoUrl,
+                addonId = resolvedMeta?.addonId,
+                type = mediaType
+            )
+        }
+
+        return ContinueWatchingLoadResult(
+            items = items,
+            statusMessage = "Loaded continue watching from provider playback."
         )
     }
 

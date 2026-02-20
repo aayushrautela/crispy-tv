@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "trakt_scrobble_policy fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "now_ms",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "trakt_scrobble_policy"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "now_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "stage",
+        "progress_percent"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "start",
+            "stop"
+          ]
+        },
+        "progress_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "endpoint",
+        "marks_watched",
+        "updates_playback_progress"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "enum": [
+            "/scrobble/start",
+            "/scrobble/stop"
+          ]
+        },
+        "marks_watched": {
+          "type": "boolean"
+        },
+        "updates_playback_progress": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

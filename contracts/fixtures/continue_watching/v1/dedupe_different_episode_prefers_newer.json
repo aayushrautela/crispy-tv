@@ -1,0 +1,37 @@
+{
+  "contract_version": 1,
+  "suite": "continue_watching",
+  "case_id": "dedupe_different_episode_prefers_newer",
+  "now_ms": 1739923200000,
+  "input": {
+    "max_items": 10,
+    "candidates": [
+      {
+        "content_type": "series",
+        "content_id": "tt020",
+        "episode_key": "s1e2",
+        "progress_percent": 70,
+        "last_updated_ms": 1739923100000
+      },
+      {
+        "content_type": "series",
+        "content_id": "tt020",
+        "episode_key": "s1e3",
+        "progress_percent": 12,
+        "last_updated_ms": 1739923190000
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "content_type": "series",
+        "content_id": "tt020",
+        "episode_key": "s1e3",
+        "progress_percent": 12,
+        "last_updated_ms": 1739923190000,
+        "is_up_next_placeholder": false
+      }
+    ]
+  }
+}

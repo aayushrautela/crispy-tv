@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "continue_watching fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "now_ms",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "continue_watching"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "now_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "candidates"
+      ],
+      "properties": {
+        "max_items": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "content_type",
+              "content_id",
+              "progress_percent",
+              "last_updated_ms"
+            ],
+            "properties": {
+              "content_type": {
+                "type": "string",
+                "enum": [
+                  "movie",
+                  "series"
+                ]
+              },
+              "content_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "episode_key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "progress_percent": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "last_updated_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "is_up_next_placeholder": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "content_type",
+              "content_id",
+              "progress_percent",
+              "last_updated_ms"
+            ],
+            "properties": {
+              "content_type": {
+                "type": "string",
+                "enum": [
+                  "movie",
+                  "series"
+                ]
+              },
+              "content_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "episode_key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "progress_percent": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "last_updated_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "is_up_next_placeholder": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

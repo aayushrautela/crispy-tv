@@ -1,0 +1,48 @@
+{
+  "contract_version": 1,
+  "suite": "continue_watching",
+  "case_id": "filters_low_complete_and_stale",
+  "now_ms": 1739923200000,
+  "input": {
+    "max_items": 10,
+    "candidates": [
+      {
+        "content_type": "movie",
+        "content_id": "tt001",
+        "progress_percent": 1.5,
+        "last_updated_ms": 1739923100000
+      },
+      {
+        "content_type": "movie",
+        "content_id": "tt002",
+        "progress_percent": 90,
+        "last_updated_ms": 1739923000000
+      },
+      {
+        "content_type": "movie",
+        "content_id": "tt003",
+        "progress_percent": 40,
+        "last_updated_ms": 1737244800000
+      },
+      {
+        "content_type": "series",
+        "content_id": "tt004",
+        "episode_key": "s1e3",
+        "progress_percent": 55,
+        "last_updated_ms": 1739923199000
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "content_type": "series",
+        "content_id": "tt004",
+        "episode_key": "s1e3",
+        "progress_percent": 55,
+        "last_updated_ms": 1739923199000,
+        "is_up_next_placeholder": false
+      }
+    ]
+  }
+}

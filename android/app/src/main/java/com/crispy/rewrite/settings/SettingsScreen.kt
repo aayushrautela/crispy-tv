@@ -70,7 +70,8 @@ fun SettingsScreen(
     onNavigateToHomeScreenSettings: () -> Unit = {},
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
-    onNavigateToLabs: () -> Unit = {}
+    onNavigateToLabs: () -> Unit = {},
+    onNavigateToProviderPortal: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -85,10 +86,11 @@ fun SettingsScreen(
                     iconTint = MaterialTheme.colorScheme.primary
                 ),
                 SettingsItem(
-                    label = "Trakt.tv",
-                    description = "Connect to sync watch history",
+                    label = "Trakt + Simkl",
+                    description = "Provider login portal",
                     icon = Icons.Outlined.Cloud,
-                    iconTint = MaterialTheme.colorScheme.tertiary
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    onClick = onNavigateToProviderPortal
                 )
             )
         ),

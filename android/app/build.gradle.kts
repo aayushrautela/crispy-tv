@@ -13,8 +13,28 @@ val traktClientId =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
+val traktClientSecret =
+    (providers.gradleProperty("TRAKT_CLIENT_SECRET").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
+val traktRedirectUri =
+    (providers.gradleProperty("TRAKT_REDIRECT_URI").orNull ?: "crispy://auth/trakt")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 val simklClientId =
     (providers.gradleProperty("SIMKL_CLIENT_ID").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
+val simklClientSecret =
+    (providers.gradleProperty("SIMKL_CLIENT_SECRET").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
+val simklRedirectUri =
+    (providers.gradleProperty("SIMKL_REDIRECT_URI").orNull ?: "crispy://auth/simkl")
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
@@ -50,7 +70,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
         buildConfigField("String", "TRAKT_CLIENT_ID", "\"$traktClientId\"")
+        buildConfigField("String", "TRAKT_CLIENT_SECRET", "\"$traktClientSecret\"")
+        buildConfigField("String", "TRAKT_REDIRECT_URI", "\"$traktRedirectUri\"")
         buildConfigField("String", "SIMKL_CLIENT_ID", "\"$simklClientId\"")
+        buildConfigField("String", "SIMKL_CLIENT_SECRET", "\"$simklClientSecret\"")
+        buildConfigField("String", "SIMKL_REDIRECT_URI", "\"$simklRedirectUri\"")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "INTRODB_API_URL", "\"$introDbApiUrl\"")
