@@ -4,6 +4,8 @@ import android.content.Context
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogPageResult
 import com.crispy.rewrite.catalog.CatalogSectionRef
+import com.crispy.rewrite.catalog.DiscoverCatalogRef
+import com.crispy.rewrite.domain.catalog.CatalogFilter
 import com.crispy.rewrite.domain.catalog.CatalogRequestInput
 import com.crispy.rewrite.domain.catalog.buildCatalogRequestUrls
 import com.crispy.rewrite.metadata.AddonManifestSeed
@@ -200,10 +202,84 @@ class HomeCatalogService(
         return sections to "Loaded ${sections.size} catalogs."
     }
 
+    suspend fun listDiscoverCatalogs(
+        mediaType: String? = null,
+        limit: Int = 50
+    ): Pair<List<DiscoverCatalogRef>, String> {
+        val normalizedType =
+            mediaType
+                ?.trim()
+                ?.lowercase(Locale.US)
+                ?.takeIf { it.isNotBlank() }
+        if (normalizedType != null && normalizedType != "movie" && normalizedType != "series") {
+            return emptyList<DiscoverCatalogRef>() to "Unsupported media type: $mediaType"
+        }
+
+        val targetCount = limit.coerceAtLeast(1)
+        val resolvedAddons = resolveAddons()
+        if (resolvedAddons.isEmpty()) {
+            return emptyList<DiscoverCatalogRef>() to "No installed addons available."
+        }
+
+        val catalogs = mutableListOf<DiscoverCatalogRef>()
+        val seenKeys = mutableSetOf<String>()
+
+        resolvedAddons.forEach { addon ->
+            val manifest = addon.manifest ?: return@forEach
+            val addonName = nonBlank(manifest.optString("name")) ?: addon.addonId
+            val manifestCatalogs = manifest.optJSONArray("catalogs") ?: return@forEach
+
+            for (index in 0 until manifestCatalogs.length()) {
+                val catalog = manifestCatalogs.optJSONObject(index) ?: continue
+                val type = nonBlank(catalog.optString("type"))?.lowercase(Locale.US) ?: continue
+                if (type != "movie" && type != "series") {
+                    continue
+                }
+                if (normalizedType != null && type != normalizedType) {
+                    continue
+                }
+                val id = nonBlank(catalog.optString("id")) ?: continue
+                val key = "${addon.addonId.lowercase(Locale.US)}:$type:${id.lowercase(Locale.US)}"
+                if (!seenKeys.add(key)) {
+                    continue
+                }
+                val name = nonBlank(catalog.optString("name")) ?: id
+                val genres = parseGenreOptions(catalog)
+
+                catalogs +=
+                    DiscoverCatalogRef(
+                        section =
+                            CatalogSectionRef(
+                                title = name,
+                                catalogId = id,
+                                mediaType = type,
+                                addonId = addon.addonId,
+                                baseUrl = addon.seed.baseUrl,
+                                encodedAddonQuery = addon.seed.encodedQuery
+                            ),
+                        addonName = addonName,
+                        genres = genres
+                    )
+
+                if (catalogs.size >= targetCount) {
+                    return catalogs to "Loaded ${catalogs.size} discover catalogs."
+                }
+            }
+        }
+
+        if (catalogs.isEmpty()) {
+            val suffix = if (normalizedType == null) "" else " for $normalizedType"
+            return emptyList<DiscoverCatalogRef>() to "No discover catalogs found$suffix in installed addons."
+        }
+
+        return catalogs to "Loaded ${catalogs.size} discover catalogs."
+    }
+
     suspend fun fetchCatalogPage(
         section: CatalogSectionRef,
         page: Int,
-        pageSize: Int
+        pageSize: Int,
+        filters: List<CatalogFilter> = emptyList()
     ): CatalogPageResult {
         val targetPage = page.coerceAtLeast(1)
         val targetSize = pageSize.coerceAtLeast(1)
@@ -218,7 +294,7 @@ class HomeCatalogService(
                         catalogId = section.catalogId,
                         page = targetPage,
                         pageSize = targetSize,
-                        filters = emptyList(),
+                        filters = filters,
                         encodedAddonQuery = section.encodedAddonQuery
                     )
                 )
@@ -230,18 +306,23 @@ class HomeCatalogService(
                 )
             }
 
-        urls.forEach { url ->
+        urls.forEachIndexed { index, url ->
             attemptedUrls += url
-            val response = httpGetJson(url) ?: return@forEach
+            val response = httpGetJson(url) ?: return@forEachIndexed
             val items =
                 parseCatalogItems(
                     metas = response.optJSONArray("metas"),
                     addonId = section.addonId,
                     mediaType = section.mediaType
                 )
+
+            if (items.isEmpty() && index < urls.lastIndex) {
+                return@forEachIndexed
+            }
+
             return CatalogPageResult(
                 items = items,
-                statusMessage = "Loaded ${items.size} items.",
+                statusMessage = if (items.isEmpty()) "No catalog items available." else "Loaded ${items.size} items.",
                 attemptedUrls = attemptedUrls
             )
         }
@@ -251,6 +332,27 @@ class HomeCatalogService(
             statusMessage = "No catalog items available.",
             attemptedUrls = attemptedUrls
         )
+    }
+
+    private fun parseGenreOptions(catalog: JSONObject): List<String> {
+        val extras = catalog.optJSONArray("extra") ?: return emptyList()
+        val genres = LinkedHashSet<String>()
+
+        for (index in 0 until extras.length()) {
+            val extra = extras.optJSONObject(index) ?: continue
+            val extraName = nonBlank(extra.optString("name"))?.lowercase(Locale.US) ?: continue
+            if (extraName != "genre") {
+                continue
+            }
+
+            val options = extra.optJSONArray("options") ?: continue
+            for (optionIndex in 0 until options.length()) {
+                val option = nonBlank(options.optString(optionIndex)) ?: continue
+                genres += option
+            }
+        }
+
+        return genres.toList()
     }
 
     private fun resolveAddons(): List<ResolvedAddon> {
