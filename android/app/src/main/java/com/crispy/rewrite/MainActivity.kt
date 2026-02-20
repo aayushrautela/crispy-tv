@@ -22,6 +22,7 @@ import com.crispy.rewrite.home.HomeHeroItem
 import com.crispy.rewrite.home.HomeViewModel
 import com.crispy.rewrite.home.HomeCatalogSectionUi
 import com.crispy.rewrite.settings.SettingsScreen
+import com.crispy.rewrite.search.SearchRoute
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -247,7 +248,9 @@ private fun AppShell() {
                 )
             }
             composable("$HomeDetailsRoute/{$HomeDetailsItemIdArg}") { PlaceholderPage(title = "Details") }
-            composable(TopLevelDestination.Search.route) { PlaceholderPage(title = "Search") }
+            composable(TopLevelDestination.Search.route) {
+                SearchRoute(onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) })
+            }
             composable(TopLevelDestination.Discover.route) {
                 DiscoverRoute(
                     onNavigateToSearch = { navController.navigate(TopLevelDestination.Search.route) },
