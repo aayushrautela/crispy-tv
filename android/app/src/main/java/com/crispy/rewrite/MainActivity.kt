@@ -97,10 +97,12 @@ import coil.compose.AsyncImage
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogRoute
 import com.crispy.rewrite.catalog.CatalogSectionRef
+import com.crispy.rewrite.discover.DiscoverRoute
 import com.crispy.rewrite.home.ContinueWatchingItem
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
 
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
+import com.crispy.rewrite.library.LibraryRoute
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.PlaybackEngine
 import com.crispy.rewrite.player.PlaybackLabViewModel
@@ -246,8 +248,19 @@ private fun AppShell() {
             }
             composable("$HomeDetailsRoute/{$HomeDetailsItemIdArg}") { PlaceholderPage(title = "Details") }
             composable(TopLevelDestination.Search.route) { PlaceholderPage(title = "Search") }
-            composable(TopLevelDestination.Discover.route) { PlaceholderPage(title = "Discover") }
-            composable(TopLevelDestination.Library.route) { PlaceholderPage(title = "Library") }
+            composable(TopLevelDestination.Discover.route) {
+                DiscoverRoute(
+                    onNavigateToSearch = { navController.navigate(TopLevelDestination.Search.route) },
+                    onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) },
+                    onSeeAllClick = { section -> navController.navigate(catalogListRoute(section)) }
+                )
+            }
+            composable(TopLevelDestination.Library.route) {
+                LibraryRoute(
+                    onItemClick = { entry -> navController.navigate(homeDetailsRoute(entry.contentId)) },
+                    onNavigateToDiscover = { navController.navigate(TopLevelDestination.Discover.route) }
+                )
+            }
             composable(TopLevelDestination.Settings.route) {
                 SettingsScreen(onNavigateToLabs = { navController.navigate(LabsRoute) })
             }
@@ -551,6 +564,7 @@ private fun HomeCatalogPosterCard(
             modifier = Modifier
                 .padding(top = 4.dp)
                 .fillMaxWidth()
+                .height(36.dp)
         )
     }
 }
