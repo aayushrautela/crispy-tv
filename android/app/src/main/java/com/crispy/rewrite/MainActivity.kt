@@ -2,10 +2,10 @@ package com.crispy.rewrite
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
@@ -45,7 +45,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -108,6 +108,11 @@ private enum class TopLevelDestination(
     Settings(route = "settings", label = "Settings", icon = Icons.Outlined.Settings)
 }
 
+private const val HomeDetailsRoute = "home/details"
+private const val HomeDetailsItemIdArg = "itemId"
+
+private fun homeDetailsRoute(itemId: String): String = "$HomeDetailsRoute/${Uri.encode(itemId)}"
+
 @Composable
 private fun AppShell() {
     val navController = rememberNavController()
@@ -149,8 +154,13 @@ private fun AppShell() {
                 .padding(innerPadding)
         ) {
             composable(TopLevelDestination.Home.route) {
-                HomePage()
+                HomePage(
+                    onHeroClick = { hero ->
+                        navController.navigate(homeDetailsRoute(hero.id))
+                    }
+                )
             }
+            composable("$HomeDetailsRoute/{$HomeDetailsItemIdArg}") { PlaceholderPage(title = "Details") }
             composable(TopLevelDestination.Search.route) { PlaceholderPage(title = "Search") }
             composable(TopLevelDestination.Discover.route) { PlaceholderPage(title = "Discover") }
             composable(TopLevelDestination.Library.route) { PlaceholderPage(title = "Library") }
@@ -160,7 +170,7 @@ private fun AppShell() {
 }
 
 @Composable
-private fun HomePage() {
+private fun HomePage(onHeroClick: (HomeHeroItem) -> Unit) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val viewModel: HomeViewModel = viewModel(
@@ -209,39 +219,8 @@ private fun HomePage() {
                 else -> {
                     HomeHeroCarousel(
                         items = uiState.heroItems,
-                        selectedHeroId = uiState.selectedHeroId,
-                        onSelect = viewModel::onHeroSelected
+                        onItemClick = onHeroClick
                     )
-                }
-            }
-
-            uiState.selectedHero?.let { selected ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(selected.title, style = MaterialTheme.typography.titleLarge)
-                        selected.rating?.let { rating ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Star,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Text(rating, style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
-                        Text(
-                            text = selected.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                 }
             }
 
@@ -260,8 +239,7 @@ private fun HomePage() {
 @Composable
 private fun HomeHeroCarousel(
     items: List<HomeHeroItem>,
-    selectedHeroId: String?,
-    onSelect: (String) -> Unit
+    onItemClick: (HomeHeroItem) -> Unit
 ) {
     if (items.isEmpty()) {
         return
@@ -269,19 +247,17 @@ private fun HomeHeroCarousel(
 
     val state = rememberCarouselState { items.size }
 
-    HorizontalUncontainedCarousel(
+    HorizontalMultiBrowseCarousel(
         state = state,
-        itemWidth = 340.dp,
+        preferredItemWidth = 320.dp,
         itemSpacing = 12.dp,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 2.dp)
     ) { index ->
         val item = items[index]
-        val isSelected = item.id == selectedHeroId
 
         Card(
-            onClick = { onSelect(item.id) },
-            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+            onClick = { onItemClick(item) },
             modifier = Modifier
                 .height(220.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
