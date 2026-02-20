@@ -374,6 +374,7 @@ class HomeCatalogService(
             val poster = nonBlank(meta.optString("poster"))
             val backdrop = nonBlank(meta.optString("background"))
             val type = nonBlank(meta.optString("type")) ?: mediaType
+            val rating = parseRating(meta)
             items +=
                 CatalogItem(
                     id = id,
@@ -381,7 +382,8 @@ class HomeCatalogService(
                     posterUrl = poster,
                     backdropUrl = backdrop,
                     addonId = addonId,
-                    type = type
+                    type = type,
+                    rating = rating
                 )
         }
         return items

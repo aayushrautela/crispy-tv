@@ -18,7 +18,8 @@ data class CatalogItem(
     val posterUrl: String?,
     val backdropUrl: String?,
     val addonId: String,
-    val type: String
+    val type: String,
+    val rating: String? = null
 )
 
 data class CatalogPageResult(
