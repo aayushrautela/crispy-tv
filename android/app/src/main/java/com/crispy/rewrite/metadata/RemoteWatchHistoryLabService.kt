@@ -2,6 +2,7 @@ package com.crispy.rewrite.metadata
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.domain.metadata.normalizeNuvioMediaId
 import com.crispy.rewrite.player.ContinueWatchingEntry
@@ -117,9 +118,11 @@ class RemoteWatchHistoryLabService(
 
     override suspend fun beginTraktOAuth(): ProviderAuthStartResult? {
         if (traktClientId.isBlank()) {
+            Log.w(TAG, "Skipping Trakt OAuth start: missing client id")
             return null
         }
         if (traktRedirectUri.isBlank()) {
+            Log.w(TAG, "Skipping Trakt OAuth start: missing redirect uri")
             return null
         }
 
@@ -143,6 +146,8 @@ class RemoteWatchHistoryLabService(
                 .build()
                 .toString()
 
+        Log.d(TAG, "Prepared Trakt OAuth start (redirectUri=$traktRedirectUri)")
+
         return ProviderAuthStartResult(
             authorizationUrl = authorizationUrl,
             statusMessage = "Opening Trakt OAuth."
@@ -151,14 +156,21 @@ class RemoteWatchHistoryLabService(
 
     override suspend fun completeTraktOAuth(callbackUri: String): ProviderAuthActionResult {
         if (traktClientId.isBlank()) {
+            Log.w(TAG, "Trakt OAuth completion aborted: missing client id")
             return ProviderAuthActionResult(success = false, statusMessage = "Missing TRAKT_CLIENT_ID.")
         }
         if (traktClientSecret.isBlank()) {
+            Log.w(TAG, "Trakt OAuth completion aborted: missing client secret")
             return ProviderAuthActionResult(success = false, statusMessage = "Missing TRAKT_CLIENT_SECRET.")
         }
 
         val uri = runCatching { Uri.parse(callbackUri) }.getOrNull()
-            ?: return ProviderAuthActionResult(success = false, statusMessage = "Invalid Trakt callback URI.")
+            ?: run {
+                Log.w(TAG, "Trakt OAuth completion failed: invalid callback uri")
+                return ProviderAuthActionResult(success = false, statusMessage = "Invalid Trakt callback URI.")
+            }
+
+        Log.d(TAG, "Completing Trakt OAuth (${uriSummaryForLog(uri)})")
 
         val expectedState = prefs.getString(KEY_TRAKT_OAUTH_STATE, null)?.trim().orEmpty()
         val expectedVerifier = prefs.getString(KEY_TRAKT_OAUTH_CODE_VERIFIER, null)?.trim().orEmpty()
@@ -168,19 +180,28 @@ class RemoteWatchHistoryLabService(
 
         if (oauthError.isNotEmpty()) {
             clearPendingTraktOAuth()
+            Log.w(TAG, "Trakt OAuth rejected by provider: $oauthError")
             return ProviderAuthActionResult(success = false, statusMessage = "Trakt OAuth rejected: $oauthError")
         }
         if (authCode.isBlank()) {
+            Log.w(TAG, "Trakt OAuth completion failed: missing authorization code")
             return ProviderAuthActionResult(success = false, statusMessage = "Missing OAuth authorization code.")
         }
         if (expectedState.isBlank() || receivedState != expectedState) {
             clearPendingTraktOAuth()
+            Log.w(
+                TAG,
+                "Trakt OAuth completion failed: state mismatch (expectedPresent=${expectedState.isNotBlank()}, receivedPresent=${receivedState.isNotBlank()})"
+            )
             return ProviderAuthActionResult(success = false, statusMessage = "Trakt OAuth state mismatch.")
         }
         if (expectedVerifier.isBlank()) {
             clearPendingTraktOAuth()
+            Log.w(TAG, "Trakt OAuth completion failed: missing PKCE verifier")
             return ProviderAuthActionResult(success = false, statusMessage = "Missing PKCE verifier for Trakt OAuth.")
         }
+
+        Log.d(TAG, "Exchanging Trakt OAuth code for token")
 
         val tokenPayload = JSONObject()
             .put("code", authCode)
@@ -200,11 +221,13 @@ class RemoteWatchHistoryLabService(
         clearPendingTraktOAuth()
 
         if (tokenResponse == null) {
+            Log.w(TAG, "Trakt token exchange returned no JSON payload")
             return ProviderAuthActionResult(success = false, statusMessage = "Trakt token exchange failed.")
         }
 
         val accessToken = tokenResponse.optString("access_token").trim()
         if (accessToken.isBlank()) {
+            Log.w(TAG, "Trakt token response missing access token (keys=${jsonKeysForLog(tokenResponse)})")
             return ProviderAuthActionResult(success = false, statusMessage = "Trakt token response missing access token.")
         }
         val refreshToken = tokenResponse.optString("refresh_token").trim().ifBlank { null }
@@ -217,6 +240,10 @@ class RemoteWatchHistoryLabService(
             }
 
         val userHandle = fetchTraktUserHandle(accessToken)
+        Log.d(
+            TAG,
+            "Trakt token exchange succeeded (refreshToken=${refreshToken != null}, expiresAtEpochMs=${expiresAtEpochMs ?: -1L}, userHandlePresent=${!userHandle.isNullOrBlank()})"
+        )
         connectProvider(
             provider = WatchProvider.TRAKT,
             accessToken = accessToken,
@@ -234,9 +261,11 @@ class RemoteWatchHistoryLabService(
 
     override suspend fun beginSimklOAuth(): ProviderAuthStartResult? {
         if (simklClientId.isBlank()) {
+            Log.w(TAG, "Skipping Simkl OAuth start: missing client id")
             return null
         }
         if (simklRedirectUri.isBlank()) {
+            Log.w(TAG, "Skipping Simkl OAuth start: missing redirect uri")
             return null
         }
 
@@ -254,6 +283,8 @@ class RemoteWatchHistoryLabService(
                 .build()
                 .toString()
 
+        Log.d(TAG, "Prepared Simkl OAuth start (redirectUri=$simklRedirectUri)")
+
         return ProviderAuthStartResult(
             authorizationUrl = authorizationUrl,
             statusMessage = "Opening Simkl OAuth."
@@ -262,14 +293,21 @@ class RemoteWatchHistoryLabService(
 
     override suspend fun completeSimklOAuth(callbackUri: String): ProviderAuthActionResult {
         if (simklClientId.isBlank()) {
+            Log.w(TAG, "Simkl OAuth completion aborted: missing client id")
             return ProviderAuthActionResult(success = false, statusMessage = "Missing SIMKL_CLIENT_ID.")
         }
         if (simklClientSecret.isBlank()) {
+            Log.w(TAG, "Simkl OAuth completion aborted: missing client secret")
             return ProviderAuthActionResult(success = false, statusMessage = "Missing SIMKL_CLIENT_SECRET.")
         }
 
         val uri = runCatching { Uri.parse(callbackUri) }.getOrNull()
-            ?: return ProviderAuthActionResult(success = false, statusMessage = "Invalid Simkl callback URI.")
+            ?: run {
+                Log.w(TAG, "Simkl OAuth completion failed: invalid callback uri")
+                return ProviderAuthActionResult(success = false, statusMessage = "Invalid Simkl callback URI.")
+            }
+
+        Log.d(TAG, "Completing Simkl OAuth (${uriSummaryForLog(uri)})")
 
         val expectedState = prefs.getString(KEY_SIMKL_OAUTH_STATE, null)?.trim().orEmpty()
         val receivedState = uri.getQueryParameter("state")?.trim().orEmpty()
@@ -278,15 +316,23 @@ class RemoteWatchHistoryLabService(
 
         if (oauthError.isNotEmpty()) {
             clearPendingSimklOAuth()
+            Log.w(TAG, "Simkl OAuth rejected by provider: $oauthError")
             return ProviderAuthActionResult(success = false, statusMessage = "Simkl OAuth rejected: $oauthError")
         }
         if (authCode.isBlank()) {
+            Log.w(TAG, "Simkl OAuth completion failed: missing authorization code")
             return ProviderAuthActionResult(success = false, statusMessage = "Missing Simkl OAuth authorization code.")
         }
         if (expectedState.isBlank() || receivedState != expectedState) {
             clearPendingSimklOAuth()
+            Log.w(
+                TAG,
+                "Simkl OAuth completion failed: state mismatch (expectedPresent=${expectedState.isNotBlank()}, receivedPresent=${receivedState.isNotBlank()})"
+            )
             return ProviderAuthActionResult(success = false, statusMessage = "Simkl OAuth state mismatch.")
         }
+
+        Log.d(TAG, "Exchanging Simkl OAuth code for token")
 
         val tokenPayload = JSONObject()
             .put("code", authCode)
@@ -305,15 +351,18 @@ class RemoteWatchHistoryLabService(
         clearPendingSimklOAuth()
 
         if (tokenResponse == null) {
+            Log.w(TAG, "Simkl token exchange returned no JSON payload")
             return ProviderAuthActionResult(success = false, statusMessage = "Simkl token exchange failed.")
         }
 
         val accessToken = tokenResponse.optString("access_token").trim()
         if (accessToken.isBlank()) {
+            Log.w(TAG, "Simkl token response missing access token (keys=${jsonKeysForLog(tokenResponse)})")
             return ProviderAuthActionResult(success = false, statusMessage = "Simkl token response missing access token.")
         }
 
         val userHandle = fetchSimklUserHandle(accessToken)
+        Log.d(TAG, "Simkl token exchange succeeded (userHandlePresent=${!userHandle.isNullOrBlank()})")
         connectProvider(
             provider = WatchProvider.SIMKL,
             accessToken = accessToken,
@@ -1454,7 +1503,15 @@ class RemoteWatchHistoryLabService(
             connection.outputStream.bufferedWriter().use { writer ->
                 writer.write(payload.toString())
             }
-            connection.responseCode
+
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                Log.w(TAG, "HTTP POST $url failed with $responseCode body=${compactForLog(errorBody)}")
+            }
+            responseCode
+        }.onFailure { error ->
+            Log.w(TAG, "HTTP POST $url failed with exception", error)
         }.getOrNull().also {
             runCatching {
                 connection.inputStream?.close()
@@ -1480,19 +1537,30 @@ class RemoteWatchHistoryLabService(
                 writer.write(payload.toString())
             }
 
+            val responseCode = connection.responseCode
             val responseStream =
-                if (connection.responseCode in 200..299) {
+                if (responseCode in 200..299) {
                     connection.inputStream
                 } else {
                     connection.errorStream
                 }
 
             val body = responseStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (connection.responseCode !in 200..299 || body.isBlank()) {
+            if (responseCode !in 200..299) {
+                Log.w(TAG, "HTTP POST $url failed with $responseCode body=${compactForLog(body)}")
+                null
+            } else if (body.isBlank()) {
+                Log.w(TAG, "HTTP POST $url returned empty JSON body")
                 null
             } else {
-                JSONObject(body)
+                runCatching { JSONObject(body) }
+                    .onFailure { error ->
+                        Log.w(TAG, "HTTP POST $url returned malformed JSON body=${compactForLog(body)}", error)
+                    }
+                    .getOrNull()
             }
+        }.onFailure { error ->
+            Log.w(TAG, "HTTP POST $url failed with exception", error)
         }.getOrNull().also {
             runCatching {
                 connection.inputStream?.close()
@@ -1517,15 +1585,23 @@ class RemoteWatchHistoryLabService(
         }
 
         return runCatching {
-            val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+            val responseCode = connection.responseCode
+            val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (body.isBlank()) {
+
+            if (responseCode !in 200..299) {
+                Log.w(TAG, "HTTP GET $url failed with $responseCode body=${compactForLog(body)}")
+                null
+            } else if (body.isBlank()) {
+                Log.w(TAG, "HTTP GET $url returned empty body")
                 null
             } else if (body.trimStart().startsWith("[")) {
                 JSONArray(body)
             } else {
                 JSONObject(body)
             }
+        }.onFailure { error ->
+            Log.w(TAG, "HTTP GET $url failed with exception", error)
         }.getOrNull().also {
             runCatching {
                 connection.inputStream?.close()
@@ -1565,6 +1641,7 @@ class RemoteWatchHistoryLabService(
 
     private fun fetchTraktUserHandle(accessToken: String): String? {
         if (traktClientId.isBlank() || accessToken.isBlank()) {
+            Log.w(TAG, "Skipping Trakt profile lookup: missing auth inputs")
             return null
         }
 
@@ -1578,15 +1655,22 @@ class RemoteWatchHistoryLabService(
                         "trakt-api-key" to traktClientId,
                         "Accept" to "application/json"
                     )
-            ).toJsonObjectOrNull() ?: return null
+            ).toJsonObjectOrNull() ?: run {
+                Log.w(TAG, "Trakt profile lookup returned no payload")
+                return null
+            }
 
         val user = response.optJSONObject("user")
         val username = user?.optString("username")?.trim().orEmpty()
+        if (username.isBlank()) {
+            Log.w(TAG, "Trakt profile lookup succeeded but username missing")
+        }
         return username.ifBlank { null }
     }
 
     private fun fetchSimklUserHandle(accessToken: String): String? {
         if (simklClientId.isBlank() || accessToken.isBlank()) {
+            Log.w(TAG, "Skipping Simkl profile lookup: missing auth inputs")
             return null
         }
 
@@ -1601,7 +1685,10 @@ class RemoteWatchHistoryLabService(
                         "Accept" to "application/json"
                     ),
                 payload = JSONObject()
-            ) ?: return null
+            ) ?: run {
+                Log.w(TAG, "Simkl profile lookup returned no payload")
+                return null
+            }
 
         val user = response.optJSONObject("user")
         val name = user?.optString("name")?.trim().orEmpty()
@@ -1610,7 +1697,32 @@ class RemoteWatchHistoryLabService(
         }
         val account = response.optJSONObject("account")
         val accountId = account?.opt("id")?.toString()?.trim().orEmpty()
+        if (accountId.isBlank()) {
+            Log.w(TAG, "Simkl profile lookup succeeded but account identifier missing")
+        }
         return accountId.ifBlank { null }
+    }
+
+    private fun uriSummaryForLog(uri: Uri): String {
+        val statePresent = !uri.getQueryParameter("state").isNullOrBlank()
+        val codePresent = !uri.getQueryParameter("code").isNullOrBlank()
+        val errorPresent = !uri.getQueryParameter("error").isNullOrBlank()
+        return "scheme=${uri.scheme.orEmpty()}, host=${uri.host.orEmpty()}, path=${uri.path.orEmpty()}, statePresent=$statePresent, codePresent=$codePresent, errorPresent=$errorPresent"
+    }
+
+    private fun compactForLog(body: String, maxLength: Int = 240): String {
+        val compact = body.replace(Regex("\\s+"), " ").trim()
+        if (compact.isEmpty()) {
+            return "<empty>"
+        }
+        return if (compact.length <= maxLength) compact else compact.take(maxLength) + "..."
+    }
+
+    private fun jsonKeysForLog(jsonObject: JSONObject): String {
+        val names = jsonObject.names() ?: return "<none>"
+        return (0 until names.length()).joinToString(separator = ",") { index ->
+            names.optString(index)
+        }
     }
 
     private fun clearPendingTraktOAuth() {
@@ -1646,6 +1758,7 @@ class RemoteWatchHistoryLabService(
     }
 
     companion object {
+        private const val TAG = "RemoteWatchHistoryLab"
         private const val PREFS_NAME = "watch_history_lab"
         private const val KEY_LOCAL_WATCHED_ITEMS = "@user:local:watched_items"
         private const val KEY_TRAKT_TOKEN = "trakt_access_token"
