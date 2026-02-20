@@ -80,6 +80,17 @@ internal class VlcPlaybackRuntime(
         runCatching { mediaPlayer.stop() }
     }
 
+    fun seekTo(positionMs: Long) {
+        if (positionMs < 0L) {
+            return
+        }
+        runCatching { mediaPlayer.time = positionMs }
+    }
+
+    fun currentPositionMs(): Long {
+        return runCatching { mediaPlayer.time.coerceAtLeast(0L) }.getOrDefault(0L)
+    }
+
     fun release() {
         runCatching { mediaPlayer.stop() }
         detachViewsIfNeeded()

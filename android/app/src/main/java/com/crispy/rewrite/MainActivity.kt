@@ -18,9 +18,17 @@ import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.crispy.rewrite.introskip.IntroSkipButtonOverlay
+import com.crispy.rewrite.introskip.IntroSkipInterval
+import com.crispy.rewrite.introskip.IntroSkipRequest
 import com.crispy.rewrite.home.HomeHeroItem
 import com.crispy.rewrite.home.HomeViewModel
 import com.crispy.rewrite.home.HomeCatalogSectionUi
+import com.crispy.rewrite.details.DetailsRoute
+import com.crispy.rewrite.settings.AddonsSettingsRoute
+import com.crispy.rewrite.settings.HomeScreenSettingsRoute
+import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
+import com.crispy.rewrite.settings.PlaybackSettingsScreen
 import com.crispy.rewrite.settings.SettingsScreen
 import com.crispy.rewrite.search.SearchRoute
 import androidx.activity.ComponentActivity
@@ -71,6 +79,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,6 +117,7 @@ import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.PlaybackEngine
 import com.crispy.rewrite.player.PlaybackLabViewModel
 import com.crispy.rewrite.ui.theme.CrispyRewriteTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -137,6 +147,9 @@ private enum class TopLevelDestination(
 private const val HomeDetailsRoute = "home/details"
 private const val HomeDetailsItemIdArg = "itemId"
 private const val LabsRoute = "labs"
+private const val PlaybackSettingsRoute = "settings/playback"
+private const val HomeScreenSettingsRoutePath = "settings/home"
+private const val AddonsSettingsRoutePath = "settings/addons"
 
 private const val CatalogListRoute = "catalog"
 private const val CatalogMediaTypeArg = "mediaType"
@@ -162,30 +175,33 @@ private fun AppShell() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val showBottomBar = TopLevelDestination.entries.any { it.route == currentRoute }
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                TopLevelDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = currentRoute == destination.route,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            if (showBottomBar) {
+                NavigationBar {
+                    TopLevelDestination.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = currentRoute == destination.route,
+                            onClick = {
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = destination.icon,
-                                contentDescription = destination.label
-                            )
-                        },
-                        label = { Text(destination.label) }
-                    )
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = destination.icon,
+                                    contentDescription = destination.label
+                                )
+                            },
+                            label = { Text(destination.label) }
+                        )
+                    }
                 }
             }
         }
@@ -229,7 +245,7 @@ private fun AppShell() {
                         navArgument(CatalogAddonIdArg) { type = NavType.StringType; defaultValue = "" },
                         navArgument(CatalogBaseUrlArg) { type = NavType.StringType; defaultValue = "" },
                         navArgument(CatalogQueryArg) { type = NavType.StringType; defaultValue = "" }
-                    )
+                )
             ) { entry ->
                 val args = entry.arguments
                 val section =
@@ -247,7 +263,13 @@ private fun AppShell() {
                     onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) }
                 )
             }
-            composable("$HomeDetailsRoute/{$HomeDetailsItemIdArg}") { PlaceholderPage(title = "Details") }
+            composable(
+                route = "$HomeDetailsRoute/{$HomeDetailsItemIdArg}",
+                arguments = listOf(navArgument(HomeDetailsItemIdArg) { type = NavType.StringType })
+            ) { entry ->
+                val itemId = entry.arguments?.getString(HomeDetailsItemIdArg).orEmpty()
+                DetailsRoute(itemId = itemId, onBack = { navController.popBackStack() })
+            }
             composable(TopLevelDestination.Search.route) {
                 SearchRoute(onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) })
             }
@@ -265,7 +287,40 @@ private fun AppShell() {
                 )
             }
             composable(TopLevelDestination.Settings.route) {
-                SettingsScreen(onNavigateToLabs = { navController.navigate(LabsRoute) })
+                SettingsScreen(
+                    onNavigateToHomeScreenSettings = {
+                        navController.navigate(HomeScreenSettingsRoutePath)
+                    },
+                    onNavigateToAddonsSettings = {
+                        navController.navigate(AddonsSettingsRoutePath)
+                    },
+                    onNavigateToPlaybackSettings = {
+                        navController.navigate(PlaybackSettingsRoute)
+                    },
+                    onNavigateToLabs = {
+                        navController.navigate(LabsRoute)
+                    }
+                )
+            }
+            composable(HomeScreenSettingsRoutePath) {
+                HomeScreenSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(AddonsSettingsRoutePath) {
+                AddonsSettingsRoute(onBack = { navController.popBackStack() })
+            }
+            composable(PlaybackSettingsRoute) {
+                val context = LocalContext.current
+                val appContext = remember(context) { context.applicationContext }
+                val playbackSettingsRepository = remember(appContext) {
+                    PlaybackSettingsRepositoryProvider.get(appContext)
+                }
+                val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
+
+                PlaybackSettingsScreen(
+                    settings = playbackSettings,
+                    onSkipIntroChanged = playbackSettingsRepository::setSkipIntroEnabled,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(LabsRoute) {
                 LabsScreen()
@@ -887,6 +942,13 @@ private fun LabsScreen() {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val playbackSettingsRepository = remember(appContext) {
+        PlaybackSettingsRepositoryProvider.get(appContext)
+    }
+    val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
+    val introSkipService = remember(appContext) {
+        PlaybackLabDependencies.introSkipServiceFactory(appContext)
+    }
 
     val playbackController = remember(context) {
         PlaybackLabDependencies.playbackControllerFactory(context) { event ->
@@ -910,6 +972,41 @@ private fun LabsScreen() {
     }
 
     var playerVisible by remember { mutableStateOf(false) }
+    var introSkipImdbIdInput by rememberSaveable { mutableStateOf("") }
+    var introSkipSeasonInput by rememberSaveable { mutableStateOf("") }
+    var introSkipEpisodeInput by rememberSaveable { mutableStateOf("") }
+    var introSkipMalIdInput by rememberSaveable { mutableStateOf("") }
+    var introSkipKitsuIdInput by rememberSaveable { mutableStateOf("") }
+    var introSkipIntervals by remember { mutableStateOf(emptyList<IntroSkipInterval>()) }
+    var introSkipStatusMessage by remember { mutableStateOf("Provide episode identity to enable intro skip.") }
+    var introSkipLoading by remember { mutableStateOf(false) }
+    var playbackPositionMs by remember { mutableStateOf(0L) }
+
+    val mergedImdbId = uiState.metadataResolution?.mergedImdbId?.toImdbIdOrNull()
+    val effectiveIntroSkipImdbId = introSkipImdbIdInput.toImdbIdOrNull() ?: mergedImdbId
+    val introSkipSeason = introSkipSeasonInput.toPositiveIntOrNull()
+    val introSkipEpisode = introSkipEpisodeInput.toPositiveIntOrNull()
+    val introSkipMalId = introSkipMalIdInput.toPositiveIntOrNull()
+    val introSkipKitsuId = introSkipKitsuIdInput.toPositiveIntOrNull()
+
+    val introSkipRequest = remember(
+        effectiveIntroSkipImdbId,
+        introSkipSeason,
+        introSkipEpisode,
+        introSkipMalId,
+        introSkipKitsuId
+    ) {
+        val season = introSkipSeason ?: return@remember null
+        val episode = introSkipEpisode ?: return@remember null
+
+        IntroSkipRequest(
+            imdbId = effectiveIntroSkipImdbId,
+            season = season,
+            episode = episode,
+            malId = introSkipMalId,
+            kitsuId = introSkipKitsuId
+        )
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -940,6 +1037,55 @@ private fun LabsScreen() {
         }.onFailure { error ->
             viewModel.onPlaybackLaunchFailed(error.message ?: "unknown playback launch error")
         }
+    }
+
+    LaunchedEffect(playerVisible, uiState.activeEngine, uiState.playbackRequestVersion) {
+        if (!playerVisible) {
+            playbackPositionMs = 0L
+            return@LaunchedEffect
+        }
+
+        while (true) {
+            playbackPositionMs = playbackController.currentPositionMs()
+            delay(250L)
+        }
+    }
+
+    LaunchedEffect(playbackSettings.skipIntroEnabled, introSkipRequest, uiState.playbackRequestVersion) {
+        if (!playbackSettings.skipIntroEnabled) {
+            introSkipLoading = false
+            introSkipIntervals = emptyList()
+            introSkipStatusMessage = "Intro skip is disabled in Playback settings."
+            return@LaunchedEffect
+        }
+
+        val request = introSkipRequest
+        if (request == null) {
+            introSkipLoading = false
+            introSkipIntervals = emptyList()
+            introSkipStatusMessage = "Enter season and episode with at least one IMDb, MAL, or Kitsu ID."
+            return@LaunchedEffect
+        }
+
+        introSkipLoading = true
+        introSkipStatusMessage = "Loading intro skip segments..."
+
+        runCatching {
+            introSkipService.getSkipIntervals(request)
+        }.onSuccess { intervals ->
+            introSkipIntervals = intervals
+            introSkipStatusMessage =
+                if (intervals.isEmpty()) {
+                    "No skip segments found for this episode."
+                } else {
+                    "Loaded ${intervals.size} skip segment${if (intervals.size == 1) "" else "s"}."
+                }
+        }.onFailure { error ->
+            introSkipIntervals = emptyList()
+            introSkipStatusMessage = "Intro skip lookup failed: ${error.message ?: "unknown error"}"
+        }
+
+        introSkipLoading = false
     }
 
     Scaffold { innerPadding ->
@@ -1005,6 +1151,75 @@ private fun LabsScreen() {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
                     )
 
+                    Text(
+                        text = "Intro Skip Identity",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    OutlinedTextField(
+                        value = introSkipImdbIdInput,
+                        onValueChange = { introSkipImdbIdInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("IMDb ID (tt1234567)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
+
+                    if (introSkipImdbIdInput.isBlank() && mergedImdbId != null) {
+                        Text(
+                            text = "Using resolved IMDb ID from Metadata Lab: $mergedImdbId",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = introSkipSeasonInput,
+                        onValueChange = { introSkipSeasonInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Season") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    OutlinedTextField(
+                        value = introSkipEpisodeInput,
+                        onValueChange = { introSkipEpisodeInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Episode") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    OutlinedTextField(
+                        value = introSkipMalIdInput,
+                        onValueChange = { introSkipMalIdInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("MAL ID (optional)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    OutlinedTextField(
+                        value = introSkipKitsuIdInput,
+                        onValueChange = { introSkipKitsuIdInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Kitsu ID (optional)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    Text(
+                        text =
+                            if (introSkipLoading) {
+                                "Loading intro skip segments..."
+                            } else {
+                                introSkipStatusMessage
+                            },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("intro_skip_status_text")
+                    )
+
                     Button(
                         modifier = Modifier.testTag("start_torrent_button"),
                         enabled = !uiState.isPreparingTorrentPlayback,
@@ -1052,27 +1267,46 @@ private fun LabsScreen() {
                         text = uiState.statusMessage,
                         style = MaterialTheme.typography.bodySmall
                     )
+                    Text(
+                        text =
+                            "Intro skip: ${if (playbackSettings.skipIntroEnabled) "enabled" else "disabled"} " +
+                                "| segments=${introSkipIntervals.size} | position=${playbackPositionMs / 1000}s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     if (playerVisible) {
-                        when (uiState.activeEngine) {
-                            PlaybackEngine.EXO -> {
-                                ExoPlayerSurface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(240.dp),
-                                    bind = playbackController::bindExoPlayerView
-                                )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(240.dp)
+                        ) {
+                            when (uiState.activeEngine) {
+                                PlaybackEngine.EXO -> {
+                                    ExoPlayerSurface(
+                                        modifier = Modifier.fillMaxSize(),
+                                        bind = playbackController::bindExoPlayerView
+                                    )
+                                }
+
+                                PlaybackEngine.VLC -> {
+                                    VlcPlayerSurface(
+                                        modifier = Modifier.fillMaxSize(),
+                                        create = playbackController::createVlcSurfaceView,
+                                        attach = playbackController::attachVlcSurface
+                                    )
+                                }
                             }
 
-                            PlaybackEngine.VLC -> {
-                                VlcPlayerSurface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(240.dp),
-                                    create = playbackController::createVlcSurfaceView,
-                                    attach = playbackController::attachVlcSurface
-                                )
-                            }
+                            IntroSkipButtonOverlay(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(12.dp),
+                                enabled = playbackSettings.skipIntroEnabled,
+                                currentPositionMs = playbackPositionMs,
+                                intervals = introSkipIntervals,
+                                onSkipRequested = playbackController::seekTo
+                            )
                         }
                     }
                 }
@@ -1723,4 +1957,15 @@ private fun PlaybackEngine.toNativeEngine(): NativePlaybackEngine {
         PlaybackEngine.EXO -> NativePlaybackEngine.EXO
         PlaybackEngine.VLC -> NativePlaybackEngine.VLC
     }
+}
+
+private val imdbIdRegex = Regex("tt\\d+")
+
+private fun String.toImdbIdOrNull(): String? {
+    val normalized = trim()
+    return normalized.takeIf { it.matches(imdbIdRegex) }
+}
+
+private fun String.toPositiveIntOrNull(): Int? {
+    return trim().toIntOrNull()?.takeIf { it > 0 }
 }

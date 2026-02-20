@@ -67,6 +67,9 @@ data class SettingsGroup(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    onNavigateToHomeScreenSettings: () -> Unit = {},
+    onNavigateToAddonsSettings: () -> Unit = {},
+    onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToLabs: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
@@ -111,9 +114,10 @@ fun SettingsScreen(
             items = listOf(
                 SettingsItem(
                     label = "Playback",
-                    description = "Quality, buffering, and playback settings",
+                    description = "Quality, buffering, and intro skip settings",
                     icon = Icons.Outlined.VideoSettings,
-                    iconTint = MaterialTheme.colorScheme.tertiary
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    onClick = onNavigateToPlaybackSettings
                 ),
                 SettingsItem(
                     label = "Subtitles",
@@ -130,13 +134,15 @@ fun SettingsScreen(
                     label = "Home Screen",
                     description = "Customize your home feed",
                     icon = Icons.Outlined.Home,
-                    iconTint = MaterialTheme.colorScheme.primary
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onClick = onNavigateToHomeScreenSettings
                 ),
                 SettingsItem(
                     label = "Addons",
                     description = "Manage streaming addons",
                     icon = Icons.Outlined.Extension,
-                    iconTint = MaterialTheme.colorScheme.tertiary
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    onClick = onNavigateToAddonsSettings
                 ),
                 SettingsItem(
                     label = "Search",

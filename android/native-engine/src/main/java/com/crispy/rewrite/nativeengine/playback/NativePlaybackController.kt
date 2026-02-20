@@ -26,6 +26,7 @@ class NativePlaybackController(
             playWhenReady = true
         }
     private val vlcRuntime = VlcPlaybackRuntime(appContext, onEvent)
+    private var currentEngine: NativePlaybackEngine = NativePlaybackEngine.EXO
 
     private val exoListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -51,6 +52,7 @@ class NativePlaybackController(
     }
 
     override fun play(url: String, engine: NativePlaybackEngine) {
+        currentEngine = engine
         when (engine) {
             NativePlaybackEngine.EXO -> {
                 vlcRuntime.stop()
@@ -63,6 +65,21 @@ class NativePlaybackController(
                 exoPlayer.stop()
                 vlcRuntime.play(url)
             }
+        }
+    }
+
+    override fun seekTo(positionMs: Long) {
+        val clampedPositionMs = positionMs.coerceAtLeast(0L)
+        when (currentEngine) {
+            NativePlaybackEngine.EXO -> exoPlayer.seekTo(clampedPositionMs)
+            NativePlaybackEngine.VLC -> vlcRuntime.seekTo(clampedPositionMs)
+        }
+    }
+
+    override fun currentPositionMs(): Long {
+        return when (currentEngine) {
+            NativePlaybackEngine.EXO -> exoPlayer.currentPosition.coerceAtLeast(0L)
+            NativePlaybackEngine.VLC -> vlcRuntime.currentPositionMs()
         }
     }
 

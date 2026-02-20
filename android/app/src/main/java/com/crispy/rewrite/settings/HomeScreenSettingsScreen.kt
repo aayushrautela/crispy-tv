@@ -1,0 +1,506 @@
+package com.crispy.rewrite.settings
+
+import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crispy.rewrite.BuildConfig
+import com.crispy.rewrite.catalog.CatalogSectionRef
+import com.crispy.rewrite.home.HomeCatalogService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
+
+internal data class HomeCatalogPreferenceUi(
+    val key: String,
+    val title: String,
+    val subtitle: String
+)
+
+internal data class HomeScreenSettingsUiState(
+    val preferences: HomeScreenSettingsPreferences = HomeScreenSettingsPreferences(),
+    val catalogs: List<HomeCatalogPreferenceUi> = emptyList(),
+    val isLoadingCatalogs: Boolean = true,
+    val statusMessage: String = "Loading catalogs..."
+)
+
+internal class HomeScreenSettingsViewModel(
+    private val homeCatalogService: HomeCatalogService,
+    private val settingsStore: HomeScreenSettingsStore
+) : ViewModel() {
+
+    private val _uiState =
+        MutableStateFlow(
+            HomeScreenSettingsUiState(
+                preferences = settingsStore.load()
+            )
+        )
+    val uiState: StateFlow<HomeScreenSettingsUiState> = _uiState
+
+    init {
+        refreshCatalogs()
+    }
+
+    fun setShowRatingBadges(enabled: Boolean) {
+        updatePreferences { preferences ->
+            preferences.copy(showRatingBadges = enabled)
+        }
+    }
+
+    fun setContinueWatchingEnabled(enabled: Boolean) {
+        updatePreferences { preferences ->
+            preferences.copy(continueWatchingEnabled = enabled)
+        }
+    }
+
+    fun setTraktTopPicksEnabled(enabled: Boolean) {
+        updatePreferences { preferences ->
+            preferences.copy(traktTopPicksEnabled = enabled)
+        }
+    }
+
+    fun toggleCatalogEnabled(catalogKey: String) {
+        updatePreferences { preferences ->
+            val next = preferences.disabledCatalogKeys.toMutableSet()
+            if (!next.add(catalogKey)) {
+                next.remove(catalogKey)
+            }
+            preferences.copy(disabledCatalogKeys = next)
+        }
+    }
+
+    fun toggleCatalogHero(catalogKey: String) {
+        updatePreferences { preferences ->
+            val next = preferences.heroCatalogKeys.toMutableSet()
+            if (!next.add(catalogKey)) {
+                next.remove(catalogKey)
+            }
+            preferences.copy(heroCatalogKeys = next)
+        }
+    }
+
+    fun refreshCatalogs() {
+        viewModelScope.launch {
+            _uiState.update { state ->
+                state.copy(
+                    isLoadingCatalogs = true,
+                    statusMessage = "Loading catalogs..."
+                )
+            }
+
+            val result =
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        homeCatalogService.listHomeCatalogSections(limit = CATALOG_LIMIT)
+                    }
+                }
+
+            val loadedSections = result.getOrNull()?.first.orEmpty()
+            val statusMessage =
+                result.getOrNull()?.second
+                    ?: (result.exceptionOrNull()?.message ?: "Unable to load catalogs right now.")
+
+            val catalogs =
+                loadedSections.map { section ->
+                    HomeCatalogPreferenceUi(
+                        key = catalogPreferenceKey(section),
+                        title = section.title.ifBlank { section.catalogId },
+                        subtitle = "${section.addonId} - ${section.mediaType.replaceFirstChar { it.uppercase() }}"
+                    )
+                }
+
+            val knownKeys = catalogs.mapTo(mutableSetOf()) { item -> item.key }
+            val currentPreferences = _uiState.value.preferences
+            val cleanedPreferences =
+                currentPreferences.copy(
+                    disabledCatalogKeys =
+                        currentPreferences.disabledCatalogKeys
+                            .filterTo(linkedSetOf()) { key -> key in knownKeys },
+                    heroCatalogKeys =
+                        currentPreferences.heroCatalogKeys
+                            .filterTo(linkedSetOf()) { key -> key in knownKeys }
+                )
+            if (cleanedPreferences != currentPreferences) {
+                settingsStore.save(cleanedPreferences)
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    preferences = cleanedPreferences,
+                    catalogs = catalogs,
+                    isLoadingCatalogs = false,
+                    statusMessage = statusMessage
+                )
+            }
+        }
+    }
+
+    private fun updatePreferences(
+        mutate: (HomeScreenSettingsPreferences) -> HomeScreenSettingsPreferences
+    ) {
+        val current = _uiState.value.preferences
+        val updated = mutate(current)
+        if (updated == current) {
+            return
+        }
+        settingsStore.save(updated)
+        _uiState.update { state -> state.copy(preferences = updated) }
+    }
+
+    companion object {
+        fun factory(context: Context): ViewModelProvider.Factory {
+            val appContext = context.applicationContext
+            return object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    if (modelClass.isAssignableFrom(HomeScreenSettingsViewModel::class.java)) {
+                        @Suppress("UNCHECKED_CAST")
+                        return HomeScreenSettingsViewModel(
+                            homeCatalogService =
+                                HomeCatalogService(
+                                    context = appContext,
+                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
+                                ),
+                            settingsStore = HomeScreenSettingsStore(appContext)
+                        ) as T
+                    }
+                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeScreenSettingsRoute(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val appContext = remember(context) { context.applicationContext }
+    val viewModel: HomeScreenSettingsViewModel =
+        viewModel(
+            factory = remember(appContext) {
+                HomeScreenSettingsViewModel.factory(appContext)
+            }
+        )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    HomeScreenSettingsScreen(
+        uiState = uiState,
+        onBack = onBack,
+        onRefreshCatalogs = viewModel::refreshCatalogs,
+        onShowRatingsChange = viewModel::setShowRatingBadges,
+        onContinueWatchingChange = viewModel::setContinueWatchingEnabled,
+        onTraktTopPicksChange = viewModel::setTraktTopPicksEnabled,
+        onToggleCatalogEnabled = viewModel::toggleCatalogEnabled,
+        onToggleCatalogHero = viewModel::toggleCatalogHero
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeScreenSettingsScreen(
+    uiState: HomeScreenSettingsUiState,
+    onBack: () -> Unit,
+    onRefreshCatalogs: () -> Unit,
+    onShowRatingsChange: (Boolean) -> Unit,
+    onContinueWatchingChange: (Boolean) -> Unit,
+    onTraktTopPicksChange: (Boolean) -> Unit,
+    onToggleCatalogEnabled: (String) -> Unit,
+    onToggleCatalogHero: (String) -> Unit
+) {
+    val scrollState = rememberScrollState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Home Screen",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onRefreshCatalogs) {
+                        Icon(
+                            imageVector = Icons.Outlined.Refresh,
+                            contentDescription = "Refresh catalogs"
+                        )
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            SettingsSection(title = "DISPLAY") {
+                ToggleSettingRow(
+                    title = "Show Ratings",
+                    description = "Display rating badges on media posters",
+                    checked = uiState.preferences.showRatingBadges,
+                    onCheckedChange = onShowRatingsChange
+                )
+            }
+
+            SettingsSection(title = "PERSONALIZED CONTENT") {
+                ToggleSettingRow(
+                    title = "Continue Watching",
+                    description = "Show your in-progress episodes and movies",
+                    checked = uiState.preferences.continueWatchingEnabled,
+                    onCheckedChange = onContinueWatchingChange
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                ToggleSettingRow(
+                    title = "Trakt Top Picks",
+                    description = "Prioritize catalogs personalized from Trakt",
+                    checked = uiState.preferences.traktTopPicksEnabled,
+                    onCheckedChange = onTraktTopPicksChange
+                )
+            }
+
+            SettingsSection(title = "CATALOGS") {
+                when {
+                    uiState.isLoadingCatalogs -> {
+                        Text(
+                            text = "Loading catalog sources...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                        )
+                    }
+
+                    uiState.catalogs.isEmpty() -> {
+                        Text(
+                            text = "No catalogs available yet. Install an addon first.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                        )
+                    }
+
+                    else -> {
+                        uiState.catalogs.forEachIndexed { index, catalog ->
+                            val isDisabled = catalog.key in uiState.preferences.disabledCatalogKeys
+                            val isHero = catalog.key in uiState.preferences.heroCatalogKeys
+
+                            CatalogPreferenceRow(
+                                catalog = catalog,
+                                isDisabled = isDisabled,
+                                isHero = isHero,
+                                onToggleEnabled = { onToggleCatalogEnabled(catalog.key) },
+                                onToggleHero = { onToggleCatalogHero(catalog.key) }
+                            )
+
+                            if (index < uiState.catalogs.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = uiState.statusMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                content = content
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToggleSettingRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        },
+        supportingContent = {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        trailingContent = {
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
+        }
+    )
+}
+
+@Composable
+private fun CatalogPreferenceRow(
+    catalog: HomeCatalogPreferenceUi,
+    isDisabled: Boolean,
+    isHero: Boolean,
+    onToggleEnabled: () -> Unit,
+    onToggleHero: () -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = catalog.title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        supportingContent = {
+            Text(
+                text = catalog.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        trailingContent = {
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                IconButton(onClick = onToggleHero) {
+                    Icon(
+                        imageVector = Icons.Outlined.Star,
+                        contentDescription = "Toggle hero",
+                        tint =
+                            if (isHero) {
+                                MaterialTheme.colorScheme.tertiary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(onClick = onToggleEnabled) {
+                    Icon(
+                        imageVector = Icons.Outlined.PowerSettingsNew,
+                        contentDescription = "Toggle catalog",
+                        tint =
+                            if (isDisabled) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        },
+        modifier = Modifier.alpha(if (isDisabled) 0.5f else 1f)
+    )
+}
+
+private fun catalogPreferenceKey(section: CatalogSectionRef): String {
+    return "${section.addonId.lowercase(Locale.US)}:${section.mediaType.lowercase(Locale.US)}:${section.catalogId.lowercase(Locale.US)}"
+}
+
+private const val CATALOG_LIMIT = 80

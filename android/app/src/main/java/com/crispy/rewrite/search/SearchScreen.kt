@@ -1,22 +1,18 @@
 package com.crispy.rewrite.search
 
 import android.content.Context
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Refresh
@@ -26,10 +22,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -37,9 +35,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -47,7 +42,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.PlaybackLabDependencies
 import com.crispy.rewrite.catalog.CatalogItem
@@ -59,6 +53,7 @@ import com.crispy.rewrite.player.CatalogLabResult
 import com.crispy.rewrite.player.CatalogPageRequest
 import com.crispy.rewrite.player.CatalogSearchLabService
 import com.crispy.rewrite.player.MetadataLabMediaType
+import com.crispy.rewrite.ui.components.PosterCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -399,33 +394,49 @@ private fun SearchScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
+        LazyVerticalGrid(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
+            columns = GridCells.Adaptive(minSize = 124.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                OutlinedTextField(
-                    value = uiState.query,
-                    onValueChange = onQueryChange,
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                SearchBar(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("Search") },
-                    leadingIcon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (uiState.query.isNotBlank()) {
-                            IconButton(onClick = onClearQuery) {
-                                Icon(imageVector = Icons.Outlined.Clear, contentDescription = "Clear")
+                    inputField = {
+                        SearchBarDefaults.InputField(
+                            query = uiState.query,
+                            onQueryChange = onQueryChange,
+                            onSearch = { },
+                            expanded = false,
+                            onExpandedChange = { },
+                            placeholder = { Text("Search") },
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                            },
+                            trailingIcon = {
+                                if (uiState.query.isNotBlank()) {
+                                    IconButton(onClick = onClearQuery) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Clear,
+                                            contentDescription = "Clear"
+                                        )
+                                    }
+                                }
                             }
-                        }
-                    }
-                )
+                        )
+                    },
+                    expanded = false,
+                    onExpandedChange = { }
+                ) {
+                }
             }
 
-            item {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         FilterChip(
@@ -445,14 +456,14 @@ private fun SearchScreen(
             }
 
             if (uiState.catalogs.isNotEmpty()) {
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         text = "Catalogs",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(
                             items = uiState.catalogs,
@@ -475,13 +486,13 @@ private fun SearchScreen(
             }
 
             if (uiState.isLoadingCatalogs || uiState.isSearching) {
-                item {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SearchLoadingIndicator()
                 }
             }
 
             if (uiState.catalogsStatusMessage.isNotBlank()) {
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         text = uiState.catalogsStatusMessage,
                         style = MaterialTheme.typography.bodySmall,
@@ -491,7 +502,7 @@ private fun SearchScreen(
             }
 
             if (uiState.statusMessage.isNotBlank()) {
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         text = uiState.statusMessage,
                         style = MaterialTheme.typography.bodySmall,
@@ -500,15 +511,21 @@ private fun SearchScreen(
                 }
             }
 
-            items(
+            androidx.compose.foundation.lazy.grid.items(
                 items = uiState.results,
                 key = { "${it.type}:${it.id}:${it.addonId}" }
             ) { item ->
-                SearchResultRow(item = item, onClick = { onItemClick(item) })
+                PosterCard(
+                    title = item.title,
+                    posterUrl = item.posterUrl,
+                    backdropUrl = item.backdropUrl,
+                    rating = item.rating,
+                    onClick = { onItemClick(item) }
+                )
             }
 
             if (uiState.query.isBlank() && uiState.results.isEmpty()) {
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = "Type to search and use chips to filter catalogs.",
@@ -522,89 +539,15 @@ private fun SearchScreen(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SearchResultRow(
-    item: CatalogItem,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(92.dp)
-                .padding(vertical = 2.dp)
-                .background(Color.Transparent)
-                .clip(MaterialTheme.shapes.medium),
-        onClick = onClick
+private fun SearchLoadingIndicator() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            val posterUrl = item.posterUrl ?: item.backdropUrl
-            Box(
-                modifier =
-                    Modifier
-                        .size(width = 56.dp, height = 76.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!posterUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = posterUrl,
-                        contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Text(
-                        text = item.title.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val subtitle =
-                        buildString {
-                            append(item.type.ifBlank { "unknown" }.uppercase(Locale.US))
-                            if (item.addonId.isNotBlank()) {
-                                append(" • ")
-                                append(item.addonId)
-                            }
-                        }
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (!item.rating.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = item.rating,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
+        LoadingIndicator(modifier = Modifier.size(36.dp))
     }
 }

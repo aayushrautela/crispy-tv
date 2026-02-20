@@ -53,6 +53,42 @@ data class ContinueWatchingLoadResult(
     val statusMessage: String = ""
 )
 
+data class MediaDetailsLoadResult(
+    val details: MediaDetails? = null,
+    val statusMessage: String = "",
+    val attemptedUrls: List<String> = emptyList()
+)
+
+data class MediaDetails(
+    val id: String,
+    val mediaType: String,
+    val title: String,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+    val logoUrl: String?,
+    val description: String?,
+    val genres: List<String> = emptyList(),
+    val year: String?,
+    val runtime: String?,
+    val certification: String?,
+    val rating: String?,
+    val cast: List<String> = emptyList(),
+    val directors: List<String> = emptyList(),
+    val creators: List<String> = emptyList(),
+    val videos: List<MediaVideo> = emptyList(),
+    val addonId: String?
+)
+
+data class MediaVideo(
+    val id: String,
+    val title: String,
+    val season: Int?,
+    val episode: Int?,
+    val released: String?,
+    val overview: String?,
+    val thumbnailUrl: String?
+)
+
 class HomeCatalogService(
     context: Context,
     addonManifestUrlsCsv: String
@@ -273,6 +309,66 @@ class HomeCatalogService(
         }
 
         return catalogs to "Loaded ${catalogs.size} discover catalogs."
+    }
+
+    suspend fun loadMediaDetails(
+        rawId: String,
+        preferredAddonId: String? = null,
+        preferredMediaType: String? = null
+    ): MediaDetailsLoadResult {
+        val requestedId = rawId.trim()
+        if (requestedId.isBlank()) {
+            return MediaDetailsLoadResult(statusMessage = "Missing content id.")
+        }
+
+        val seeds = addonRegistry.orderedSeeds()
+        if (seeds.isEmpty()) {
+            return MediaDetailsLoadResult(statusMessage = "No installed addons available.")
+        }
+
+        val mediaTypesToTry = buildMediaTypesToTry(preferredMediaType)
+        val lookupIds = lookupIdsForContinueWatching(requestedId)
+        if (lookupIds.isEmpty()) {
+            return MediaDetailsLoadResult(statusMessage = "Missing content id.")
+        }
+
+        val orderedSeeds =
+            if (preferredAddonId.isNullOrBlank()) {
+                seeds
+            } else {
+                seeds.sortedBy { seed ->
+                    if (seed.addonIdHint.equals(preferredAddonId, ignoreCase = true)) 0 else 1
+                }
+            }
+
+        val attemptedUrls = mutableListOf<String>()
+        for (mediaType in mediaTypesToTry) {
+            for (seed in orderedSeeds) {
+                for (lookupId in lookupIds) {
+                    val url = buildMetaUrl(seed = seed, mediaType = mediaType, lookupId = lookupId)
+                    attemptedUrls += url
+                    val response = httpGetJson(url) ?: continue
+                    val meta = response.optJSONObject("meta") ?: continue
+                    val parsed =
+                        parseMediaDetails(
+                            meta = meta,
+                            fallbackId = lookupId,
+                            fallbackMediaType = mediaType,
+                            addonId = seed.addonIdHint
+                        ) ?: continue
+                    return MediaDetailsLoadResult(
+                        details = parsed,
+                        statusMessage = "Loaded details.",
+                        attemptedUrls = attemptedUrls
+                    )
+                }
+            }
+        }
+
+        return MediaDetailsLoadResult(
+            statusMessage = "No metadata found for $requestedId.",
+            attemptedUrls = attemptedUrls
+        )
     }
 
     suspend fun fetchCatalogPage(
@@ -588,8 +684,12 @@ class HomeCatalogService(
     }
 
     private fun fetchAddonMeta(seed: AddonManifestSeed, mediaType: String, lookupId: String): JSONObject? {
+        return httpGetJson(buildMetaUrl(seed = seed, mediaType = mediaType, lookupId = lookupId))
+    }
+
+    private fun buildMetaUrl(seed: AddonManifestSeed, mediaType: String, lookupId: String): String {
         val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
-        val url = buildString {
+        return buildString {
             append(seed.baseUrl.trimEnd('/'))
             append("/meta/")
             append(mediaType)
@@ -601,7 +701,147 @@ class HomeCatalogService(
                 append(seed.encodedQuery)
             }
         }
-        return httpGetJson(url)
+    }
+
+    private fun buildMediaTypesToTry(preferred: String?): List<String> {
+        val normalized = preferred?.trim()?.lowercase(Locale.US)
+        return when (normalized) {
+            "movie" -> listOf("movie", "series")
+            "series" -> listOf("series", "movie")
+            else -> listOf("movie", "series")
+        }
+    }
+
+    private fun parseMediaDetails(
+        meta: JSONObject,
+        fallbackId: String,
+        fallbackMediaType: String,
+        addonId: String
+    ): MediaDetails? {
+        val id = nonBlank(meta.optString("id")) ?: fallbackId
+        val mediaType =
+            nonBlank(meta.optString("type"))?.lowercase(Locale.US)
+                ?: fallbackMediaType.lowercase(Locale.US)
+        if (mediaType != "movie" && mediaType != "series") {
+            return null
+        }
+
+        val title = nonBlank(meta.optString("name")) ?: nonBlank(meta.optString("title")) ?: id
+        val posterUrl = nonBlank(meta.optString("poster"))
+        val backdropUrl = nonBlank(meta.optString("background")) ?: posterUrl
+        val logoUrl = nonBlank(meta.optString("logo"))
+        val description = nonBlank(meta.optString("description"))
+        val genres = readStringList(meta, "genres")
+        val runtime = nonBlank(meta.optString("runtime"))
+        val year = extractYear(meta)
+        val certification =
+            nonBlank(meta.optString("certification"))
+                ?: nonBlank(meta.optString("mpaaRating"))
+                ?: nonBlank(meta.optString("ageRating"))
+        val rating = parseMetaRating(meta)
+        val cast = readStringList(meta, "cast")
+        val directors = readStringList(meta, "director").ifEmpty { readStringList(meta, "directors") }
+        val creators = readStringList(meta, "creators").ifEmpty { readStringList(meta, "creator") }
+        val videos = parseVideos(meta)
+
+        return MediaDetails(
+            id = id,
+            mediaType = mediaType,
+            title = title,
+            posterUrl = posterUrl,
+            backdropUrl = backdropUrl,
+            logoUrl = logoUrl,
+            description = description,
+            genres = genres,
+            year = year,
+            runtime = runtime,
+            certification = certification,
+            rating = rating,
+            cast = cast,
+            directors = directors,
+            creators = creators,
+            videos = videos,
+            addonId = addonId
+        )
+    }
+
+    private fun parseMetaRating(meta: JSONObject): String? {
+        val value = meta.opt("imdbRating") ?: meta.opt("rating") ?: return null
+        return when (value) {
+            is Number -> String.format(Locale.US, "%.1f", value.toDouble())
+            else -> nonBlank(value.toString())
+        }
+    }
+
+    private fun extractYear(meta: JSONObject): String? {
+        val yearInt = meta.optInt("year", 0)
+        if (yearInt in 1800..2200) {
+            return yearInt.toString()
+        }
+
+        val candidates =
+            listOf(
+                nonBlank(meta.optString("releaseInfo")),
+                nonBlank(meta.optString("released")),
+                nonBlank(meta.optString("releaseDate"))
+            ).filterNotNull()
+
+        val regex = Regex("\\b(19\\d{2}|20\\d{2})\\b")
+        return candidates.firstNotNullOfOrNull { text ->
+            regex.find(text)?.value
+        }
+    }
+
+    private fun readStringList(meta: JSONObject, key: String): List<String> {
+        val value = meta.opt(key) ?: return emptyList()
+        return when (value) {
+            is JSONArray -> {
+                buildList {
+                    for (index in 0 until value.length()) {
+                        nonBlank(value.optString(index))?.let { add(it) }
+                    }
+                }
+            }
+
+            is String -> listOfNotNull(nonBlank(value))
+            else -> emptyList()
+        }
+    }
+
+    private fun parseVideos(meta: JSONObject): List<MediaVideo> {
+        val array = meta.optJSONArray("videos") ?: return emptyList()
+        val videos =
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val id = nonBlank(item.optString("id")) ?: continue
+                    val title = nonBlank(item.optString("title")) ?: nonBlank(item.optString("name")) ?: id
+                    val season = item.optInt("season", 0).takeIf { it > 0 }
+                    val episode = item.optInt("episode", 0).takeIf { it > 0 }
+                    val released = nonBlank(item.optString("released"))
+                    val overview = nonBlank(item.optString("overview"))
+                    val thumbnailUrl =
+                        nonBlank(item.optString("thumbnail"))
+                            ?: nonBlank(item.optString("poster"))
+                            ?: nonBlank(item.optString("background"))
+                    add(
+                        MediaVideo(
+                            id = id,
+                            title = title,
+                            season = season,
+                            episode = episode,
+                            released = released,
+                            overview = overview,
+                            thumbnailUrl = thumbnailUrl
+                        )
+                    )
+                }
+            }
+        return videos.sortedWith(
+            compareBy<MediaVideo> { it.season ?: Int.MAX_VALUE }
+                .thenBy { it.episode ?: Int.MAX_VALUE }
+                .thenBy { it.title.lowercase(Locale.US) }
+        )
     }
 
     private fun lookupIdsForContinueWatching(contentId: String): List<String> {

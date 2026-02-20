@@ -2,6 +2,8 @@ package com.crispy.rewrite
 
 import android.content.Context
 import com.crispy.rewrite.metadata.RemoteCatalogSearchLabService
+import com.crispy.rewrite.introskip.IntroSkipService
+import com.crispy.rewrite.introskip.RemoteIntroSkipService
 import com.crispy.rewrite.metadata.RemoteMetadataLabDataSource
 import com.crispy.rewrite.metadata.RemoteSupabaseSyncLabService
 import com.crispy.rewrite.metadata.RemoteWatchHistoryLabService
@@ -110,6 +112,11 @@ object PlaybackLabDependencies {
         )
     }
 
+    @Volatile
+    var introSkipServiceFactory: (Context) -> IntroSkipService = {
+        RemoteIntroSkipService(introDbBaseUrl = BuildConfig.INTRODB_API_URL)
+    }
+
     fun reset() {
         playbackControllerFactory = { context, callback ->
             NativePlaybackController(context, callback)
@@ -129,6 +136,9 @@ object PlaybackLabDependencies {
                 context = context,
                 watchHistoryService = watchHistoryService
             )
+        }
+        introSkipServiceFactory = {
+            RemoteIntroSkipService(introDbBaseUrl = BuildConfig.INTRODB_API_URL)
         }
     }
 }

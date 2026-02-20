@@ -28,6 +28,11 @@ val supabaseAnonKey =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
+val introDbApiUrl =
+    (providers.gradleProperty("INTRODB_API_URL").orNull ?: "https://api.introdb.app")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 val metadataAddonUrls = "stremio://v3-cinemeta.strem.io/manifest.json"
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
@@ -48,6 +53,7 @@ android {
         buildConfigField("String", "SIMKL_CLIENT_ID", "\"$simklClientId\"")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        buildConfigField("String", "INTRODB_API_URL", "\"$introDbApiUrl\"")
         buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
 
