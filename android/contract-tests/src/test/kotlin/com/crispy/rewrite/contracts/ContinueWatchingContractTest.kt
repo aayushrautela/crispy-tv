@@ -98,5 +98,3 @@ private fun JsonObject.optionalBoolean(key: String): Boolean? {
     val primitive = this[key] as? JsonPrimitive ?: return null
     return primitive.booleanOrNull
 }
-
-private fun java.nio.file.Path.toDisplayPath(): String = toString().replace('\\', '/')

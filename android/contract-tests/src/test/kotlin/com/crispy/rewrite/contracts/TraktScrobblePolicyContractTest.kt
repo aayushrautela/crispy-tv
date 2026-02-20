@@ -4,8 +4,6 @@ import com.crispy.rewrite.domain.watch.TraktScrobbleStage
 import com.crispy.rewrite.domain.watch.decideTraktScrobble
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,19 +46,3 @@ private fun JsonObject.requireDouble(key: String, path: java.nio.file.Path): Dou
     return primitive.doubleOrNull
         ?: error("${path.toDisplayPath()}: '$key' must be double")
 }
-
-private fun JsonObject.requireBoolean(key: String, path: java.nio.file.Path): Boolean {
-    val primitive = this[key] as? JsonPrimitive
-        ?: error("${path.toDisplayPath()}: missing boolean '$key'")
-    return primitive.booleanOrNull
-        ?: error("${path.toDisplayPath()}: '$key' must be boolean")
-}
-
-private fun JsonObject.requireString(key: String, path: java.nio.file.Path): String {
-    val primitive = this[key] as? JsonPrimitive
-        ?: error("${path.toDisplayPath()}: missing string '$key'")
-    return primitive.contentOrNull
-        ?: error("${path.toDisplayPath()}: '$key' must be string")
-}
-
-private fun java.nio.file.Path.toDisplayPath(): String = toString().replace('\\', '/')
