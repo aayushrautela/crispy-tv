@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.crispy.rewrite.home.HomeHeroItem
 import com.crispy.rewrite.home.HomeViewModel
+import com.crispy.rewrite.settings.SettingsScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -111,6 +112,7 @@ private enum class TopLevelDestination(
 
 private const val HomeDetailsRoute = "home/details"
 private const val HomeDetailsItemIdArg = "itemId"
+private const val LabsRoute = "labs"
 
 private fun homeDetailsRoute(itemId: String): String = "$HomeDetailsRoute/${Uri.encode(itemId)}"
 
@@ -165,7 +167,12 @@ private fun AppShell() {
             composable(TopLevelDestination.Search.route) { PlaceholderPage(title = "Search") }
             composable(TopLevelDestination.Discover.route) { PlaceholderPage(title = "Discover") }
             composable(TopLevelDestination.Library.route) { PlaceholderPage(title = "Library") }
-            composable(TopLevelDestination.Settings.route) { AppRoot() }
+            composable(TopLevelDestination.Settings.route) {
+                SettingsScreen(onNavigateToLabs = { navController.navigate(LabsRoute) })
+            }
+            composable(LabsRoute) {
+                LabsScreen()
+            }
         }
     }
 }
@@ -379,7 +386,7 @@ private fun PlaceholderPage(title: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppRoot() {
+private fun LabsScreen() {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
 
