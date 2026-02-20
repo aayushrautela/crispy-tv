@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
@@ -58,7 +59,7 @@ private data class ProviderPortalAction(
     val onClick: () -> Unit
 )
 
-class ProviderPortalViewModel(
+internal class ProviderPortalViewModel(
     private val watchHistoryService: WatchHistoryLabService,
     private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {

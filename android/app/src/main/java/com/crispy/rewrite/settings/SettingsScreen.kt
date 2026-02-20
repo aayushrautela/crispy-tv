@@ -42,6 +42,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
@@ -77,8 +78,117 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
-    val settingsGroups = listOf(
-...
+    val settingsGroups =
+        listOf(
+            SettingsGroup(
+                title = "PERSONALIZATION",
+                items =
+                    listOf(
+                        SettingsItem(
+                            label = "Home Screen",
+                            description = "Catalog rows, hero cards, and watch source",
+                            icon = Icons.Outlined.Home,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onClick = onNavigateToHomeScreenSettings
+                        ),
+                        SettingsItem(
+                            label = "Search",
+                            description = "Search filters and default behavior",
+                            icon = Icons.Outlined.Search,
+                            iconTint = MaterialTheme.colorScheme.tertiary
+                        ),
+                        SettingsItem(
+                            label = "Playback",
+                            description = "Player defaults and intro controls",
+                            icon = Icons.Outlined.VideoSettings,
+                            iconTint = MaterialTheme.colorScheme.secondary,
+                            onClick = onNavigateToPlaybackSettings
+                        ),
+                        SettingsItem(
+                            label = "Subtitles",
+                            description = "Caption styling and defaults",
+                            icon = Icons.Outlined.ClosedCaption,
+                            iconTint = MaterialTheme.colorScheme.secondary
+                        )
+                    )
+            ),
+            SettingsGroup(
+                title = "INTEGRATIONS",
+                items =
+                    listOf(
+                        SettingsItem(
+                            label = "Addons",
+                            description = "Install and remove addon manifests",
+                            icon = Icons.Outlined.Extension,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onClick = onNavigateToAddonsSettings
+                        ),
+                        SettingsItem(
+                            label = "Provider Login Portal",
+                            description = "Connect Trakt and Simkl accounts",
+                            icon = Icons.Outlined.Cloud,
+                            iconTint = MaterialTheme.colorScheme.tertiary,
+                            onClick = onNavigateToProviderPortal
+                        ),
+                        SettingsItem(
+                            label = "Language & Region",
+                            description = "Preferred content language",
+                            icon = Icons.Outlined.Language,
+                            iconTint = MaterialTheme.colorScheme.primary
+                        ),
+                        SettingsItem(
+                            label = "Storage",
+                            description = "Cache, downloads, and local data",
+                            icon = Icons.Outlined.Storage,
+                            iconTint = MaterialTheme.colorScheme.secondary
+                        )
+                    )
+            ),
+            SettingsGroup(
+                title = "SYSTEM",
+                items =
+                    listOf(
+                        SettingsItem(
+                            label = "Labs",
+                            description = "Try experimental features",
+                            icon = Icons.Outlined.Science,
+                            iconTint = MaterialTheme.colorScheme.tertiary,
+                            onClick = onNavigateToLabs
+                        ),
+                        SettingsItem(
+                            label = "Automation",
+                            description = "Smart recommendations and helpers",
+                            icon = Icons.Outlined.AutoAwesome,
+                            iconTint = MaterialTheme.colorScheme.primary
+                        ),
+                        SettingsItem(
+                            label = "Appearance",
+                            description = "Themes and visual accents",
+                            icon = Icons.Outlined.Brush,
+                            iconTint = MaterialTheme.colorScheme.secondary
+                        ),
+                        SettingsItem(
+                            label = "Developer",
+                            description = "Diagnostics and debug options",
+                            icon = Icons.Outlined.Code,
+                            iconTint = MaterialTheme.colorScheme.tertiary
+                        ),
+                        SettingsItem(
+                            label = "Account",
+                            description = "Profile and identity",
+                            icon = Icons.Outlined.Person,
+                            iconTint = MaterialTheme.colorScheme.primary
+                        ),
+                        SettingsItem(
+                            label = "About",
+                            description = "Version, licenses, and credits",
+                            icon = Icons.Outlined.Info,
+                            iconTint = MaterialTheme.colorScheme.secondary
+                        )
+                    )
+            )
+        )
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {

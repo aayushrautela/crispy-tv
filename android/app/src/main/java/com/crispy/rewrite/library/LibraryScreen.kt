@@ -109,6 +109,7 @@ class LibraryViewModel internal constructor(
                 val selectedProvider = selectedSource.toProvider()
                 val providerAuthenticated =
                     when (selectedProvider) {
+                        WatchProvider.LOCAL,
                         WatchProvider.TRAKT -> authState.traktAuthenticated
                         WatchProvider.SIMKL -> authState.simklAuthenticated
                         null -> false

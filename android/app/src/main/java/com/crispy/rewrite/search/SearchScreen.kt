@@ -30,10 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.material3.SearchBarScrollBehavior
-import androidx.compose.material3.searchBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -392,8 +389,7 @@ private fun SearchScreen(
         topBar = {
             SearchBar(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .searchBarScrollBehavior(scrollBehavior),
+                    .fillMaxWidth(),
                 inputField = {
                     SearchBarDefaults.InputField(
                         query = uiState.query,
