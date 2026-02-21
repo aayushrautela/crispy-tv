@@ -723,27 +723,6 @@ private fun HomePage(
                     }
                 }
             }
-
-            item {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (uiState.catalogsStatusMessage.isNotBlank()) {
-                            Text(
-                                text = uiState.catalogsStatusMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (uiState.statusMessage.isNotBlank()) {
-                            Text(
-                                text = uiState.statusMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -756,7 +735,7 @@ private fun ContinueWatchingSection(
     onHideItem: (ContinueWatchingItem) -> Unit,
     onRemoveItem: (ContinueWatchingItem) -> Unit
 ) {
-    if (items.isEmpty() && statusMessage.isBlank()) {
+    if (items.isEmpty()) {
         return
     }
 
@@ -807,7 +786,7 @@ private fun UpNextSection(
     onHideItem: (ContinueWatchingItem) -> Unit,
     onRemoveItem: (ContinueWatchingItem) -> Unit
 ) {
-    if (items.isEmpty() && statusMessage.isBlank()) {
+    if (items.isEmpty()) {
         return
     }
 
