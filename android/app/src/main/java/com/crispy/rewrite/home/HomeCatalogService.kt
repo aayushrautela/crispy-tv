@@ -11,14 +11,17 @@ import com.crispy.rewrite.domain.catalog.CatalogRequestInput
 import com.crispy.rewrite.domain.catalog.buildCatalogRequestUrls
 import com.crispy.rewrite.metadata.AddonManifestSeed
 import com.crispy.rewrite.metadata.MetadataAddonRegistry
+import com.crispy.rewrite.network.CrispyHttpClient
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
@@ -98,7 +101,8 @@ data class MediaVideo(
 
 class HomeCatalogService(
     context: Context,
-    addonManifestUrlsCsv: String
+    addonManifestUrlsCsv: String,
+    private val httpClient: CrispyHttpClient,
 ) {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
@@ -117,7 +121,7 @@ class HomeCatalogService(
         val deduped = linkedMapOf<String, HomeHeroItem>()
         val targetCount = limit.coerceAtLeast(1)
 
-        candidates.forEach { candidate ->
+        for (candidate in candidates) {
             val urls =
                 buildCatalogRequestUrls(
                     CatalogRequestInput(
@@ -131,8 +135,8 @@ class HomeCatalogService(
                     )
                 )
 
-            urls.forEach { url ->
-                val response = httpGetJson(url) ?: return@forEach
+            for (url in urls) {
+                val response = httpGetJson(url) ?: continue
                 parseHeroItems(
                     metas = response.optJSONArray("metas"),
                     addonId = candidate.addonId,
@@ -174,26 +178,28 @@ class HomeCatalogService(
         }
 
         val resolvedAddons = resolveAddons()
-        val items = dedupedEntries.map { entry ->
+        val items = mutableListOf<ContinueWatchingItem>()
+        for (entry in dedupedEntries) {
             val mediaType = entry.asCatalogMediaType()
             val resolvedMeta = resolveContinueWatchingMeta(entry, mediaType, resolvedAddons)
 
-            ContinueWatchingItem(
-                id = continueWatchingKey(entry),
-                contentId = entry.contentId,
-                title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
-                season = entry.season,
-                episode = entry.episode,
-                watchedAtEpochMs = entry.watchedAtEpochMs,
-                progressPercent = 100.0,
-                provider = WatchProvider.LOCAL,
-                providerPlaybackId = null,
-                isUpNextPlaceholder = false,
-                backdropUrl = resolvedMeta?.backdropUrl,
-                logoUrl = resolvedMeta?.logoUrl,
-                addonId = resolvedMeta?.addonId,
-                type = mediaType
-            )
+            items +=
+                ContinueWatchingItem(
+                    id = continueWatchingKey(entry),
+                    contentId = entry.contentId,
+                    title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
+                    season = entry.season,
+                    episode = entry.episode,
+                    watchedAtEpochMs = entry.watchedAtEpochMs,
+                    progressPercent = 100.0,
+                    provider = WatchProvider.LOCAL,
+                    providerPlaybackId = null,
+                    isUpNextPlaceholder = false,
+                    backdropUrl = resolvedMeta?.backdropUrl,
+                    logoUrl = resolvedMeta?.logoUrl,
+                    addonId = resolvedMeta?.addonId,
+                    type = mediaType
+                )
         }
 
         return ContinueWatchingLoadResult(
@@ -226,7 +232,8 @@ class HomeCatalogService(
 
         val resolvedAddons = resolveAddons()
         Log.d(TAG, "loadContinueWatchingItemsFromProvider: resolved ${resolvedAddons.size} addons")
-        val items = dedupedEntries.map { entry ->
+        val items = mutableListOf<ContinueWatchingItem>()
+        for (entry in dedupedEntries) {
             val fakeWatchEntry =
                 WatchHistoryEntry(
                     contentId = entry.contentId,
@@ -240,22 +247,23 @@ class HomeCatalogService(
             val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry, mediaType, resolvedAddons)
             Log.d(TAG, "  resolved entry ${entry.contentId}: meta=${resolvedMeta != null} " +
                 "backdrop=${resolvedMeta?.backdropUrl != null} logo=${resolvedMeta?.logoUrl != null}")
-            ContinueWatchingItem(
-                id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
-                contentId = entry.contentId,
-                title = resolvedMeta?.title ?: entry.title,
-                season = entry.season,
-                episode = entry.episode,
-                watchedAtEpochMs = entry.lastUpdatedEpochMs,
-                progressPercent = entry.progressPercent,
-                provider = entry.provider,
-                providerPlaybackId = entry.providerPlaybackId,
-                isUpNextPlaceholder = entry.isUpNextPlaceholder,
-                backdropUrl = resolvedMeta?.backdropUrl,
-                logoUrl = resolvedMeta?.logoUrl,
-                addonId = resolvedMeta?.addonId,
-                type = mediaType
-            )
+            items +=
+                ContinueWatchingItem(
+                    id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
+                    contentId = entry.contentId,
+                    title = resolvedMeta?.title ?: entry.title,
+                    season = entry.season,
+                    episode = entry.episode,
+                    watchedAtEpochMs = entry.lastUpdatedEpochMs,
+                    progressPercent = entry.progressPercent,
+                    provider = entry.provider,
+                    providerPlaybackId = entry.providerPlaybackId,
+                    isUpNextPlaceholder = entry.isUpNextPlaceholder,
+                    backdropUrl = resolvedMeta?.backdropUrl,
+                    logoUrl = resolvedMeta?.logoUrl,
+                    addonId = resolvedMeta?.addonId,
+                    type = mediaType
+                )
         }
         val inProgress = items.count { !it.isUpNextPlaceholder }
         val upNext = items.count { it.isUpNextPlaceholder }
@@ -478,9 +486,9 @@ class HomeCatalogService(
                 )
             }
 
-        urls.forEachIndexed { index, url ->
+        for ((index, url) in urls.withIndex()) {
             attemptedUrls += url
-            val response = httpGetJson(url) ?: return@forEachIndexed
+            val response = httpGetJson(url) ?: continue
             val items =
                 parseCatalogItems(
                     metas = response.optJSONArray("metas"),
@@ -489,7 +497,7 @@ class HomeCatalogService(
                 )
 
             if (items.isEmpty() && index < urls.lastIndex) {
-                return@forEachIndexed
+                continue
             }
 
             return CatalogPageResult(
@@ -527,13 +535,14 @@ class HomeCatalogService(
         return genres.toList()
     }
 
-    private fun resolveAddons(): List<ResolvedAddon> {
+    private suspend fun resolveAddons(): List<ResolvedAddon> {
         val seeds = addonRegistry.orderedSeeds()
         if (seeds.isEmpty()) {
             return emptyList()
         }
 
-        return seeds.mapIndexed { index, seed ->
+        val resolved = mutableListOf<ResolvedAddon>()
+        for ((index, seed) in seeds.withIndex()) {
             val networkManifest = httpGetJson(seed.manifestUrl)
             if (networkManifest != null) {
                 addonRegistry.cacheManifest(seed, networkManifest)
@@ -542,13 +551,15 @@ class HomeCatalogService(
             val manifest = networkManifest ?: parseCachedManifest(seed.cachedManifestJson) ?: fallbackManifestFor(seed)
             val addonId = nonBlank(manifest?.optString("id")) ?: seed.addonIdHint
 
-            ResolvedAddon(
-                orderIndex = index,
-                seed = seed,
-                addonId = addonId,
-                manifest = manifest
-            )
+            resolved +=
+                ResolvedAddon(
+                    orderIndex = index,
+                    seed = seed,
+                    addonId = addonId,
+                    manifest = manifest
+                )
         }
+        return resolved
     }
 
     private fun catalogCandidates(resolvedAddons: List<ResolvedAddon>): List<CatalogCandidate> {
@@ -707,7 +718,7 @@ class HomeCatalogService(
             )
     }
 
-    private fun resolveContinueWatchingMeta(
+    private suspend fun resolveContinueWatchingMeta(
         entry: WatchHistoryEntry,
         mediaType: String,
         resolvedAddons: List<ResolvedAddon>
@@ -717,36 +728,39 @@ class HomeCatalogService(
             return null
         }
 
-        lookupIds.forEach { lookupId ->
-            readCachedContinueWatchingMeta(cacheKey = continueWatchingCacheKey(mediaType, lookupId))?.let { cached ->
+        for (lookupId in lookupIds) {
+            val cached = readCachedContinueWatchingMeta(cacheKey = continueWatchingCacheKey(mediaType, lookupId))
+            if (cached != null) {
                 return cached
             }
         }
 
-        resolvedAddons.forEach { addon ->
-            lookupIds.forEach { lookupId ->
-                val response = fetchAddonMeta(
-                    seed = addon.seed,
-                    mediaType = mediaType,
-                    lookupId = lookupId
-                ) ?: return@forEach
-                val meta = response.optJSONObject("meta") ?: return@forEach
-                val resolved = ContinueWatchingMeta(
-                    title =
-                        nonBlank(meta.optString("name"))
-                            ?: nonBlank(meta.optString("title"))
-                            ?: nonBlank(entry.title),
-                    backdropUrl =
-                        nonBlank(meta.optString("background"))
-                            ?: nonBlank(meta.optString("poster")),
-                    logoUrl = nonBlank(meta.optString("logo")),
-                    addonId = addon.addonId
-                )
+        for (addon in resolvedAddons) {
+            for (lookupId in lookupIds) {
+                val response =
+                    fetchAddonMeta(
+                        seed = addon.seed,
+                        mediaType = mediaType,
+                        lookupId = lookupId
+                    ) ?: continue
+                val meta = response.optJSONObject("meta") ?: continue
+                val resolved =
+                    ContinueWatchingMeta(
+                        title =
+                            nonBlank(meta.optString("name"))
+                                ?: nonBlank(meta.optString("title"))
+                                ?: nonBlank(entry.title),
+                        backdropUrl =
+                            nonBlank(meta.optString("background"))
+                                ?: nonBlank(meta.optString("poster")),
+                        logoUrl = nonBlank(meta.optString("logo")),
+                        addonId = addon.addonId
+                    )
                 if (!resolved.hasDisplayData()) {
-                    return@forEach
+                    continue
                 }
 
-                lookupIds.forEach { candidateLookupId ->
+                for (candidateLookupId in lookupIds) {
                     cacheContinueWatchingMeta(
                         cacheKey = continueWatchingCacheKey(mediaType, candidateLookupId),
                         value = resolved
@@ -759,7 +773,7 @@ class HomeCatalogService(
         return null
     }
 
-    private fun fetchAddonMeta(seed: AddonManifestSeed, mediaType: String, lookupId: String): JSONObject? {
+    private suspend fun fetchAddonMeta(seed: AddonManifestSeed, mediaType: String, lookupId: String): JSONObject? {
         return httpGetJson(buildMetaUrl(seed = seed, mediaType = mediaType, lookupId = lookupId))
     }
 
@@ -1006,32 +1020,32 @@ class HomeCatalogService(
         val cachedAtEpochMs: Long
     )
 
+    private suspend fun httpGetJson(url: String): JSONObject? {
+        return withContext(Dispatchers.IO) {
+            val response =
+                runCatching {
+                    httpClient.get(
+                        url = url.toHttpUrl(),
+                        headers = Headers.headersOf("Accept", "application/json"),
+                        callTimeoutMs = 12_000L,
+                    )
+                }.getOrNull() ?: return@withContext null
+
+            if (response.code !in 200..299) {
+                return@withContext null
+            }
+            val body = response.body
+            if (body.isBlank()) {
+                return@withContext null
+            }
+            runCatching { JSONObject(body) }.getOrNull()
+        }
+    }
+
     companion object {
         private const val TAG = "HomeCatalogService"
         private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
         private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
-    }
-}
-
-private fun httpGetJson(url: String): JSONObject? {
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        connectTimeout = 10_000
-        readTimeout = 10_000
-        requestMethod = "GET"
-        setRequestProperty("Accept", "application/json")
-    }
-
-    return runCatching {
-        connection.inputStream.bufferedReader().use { reader ->
-            val payload = reader.readText()
-            if (payload.isBlank()) {
-                null
-            } else {
-                JSONObject(payload)
-            }
-        }
-    }.getOrNull().also {
-        connection.disconnect()
     }
 }
 

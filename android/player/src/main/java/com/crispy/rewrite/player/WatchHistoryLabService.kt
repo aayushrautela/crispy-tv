@@ -193,11 +193,26 @@ interface WatchHistoryLabService {
         return ContinueWatchingLabResult(statusMessage = "Continue watching unavailable.")
     }
 
+    suspend fun getCachedContinueWatching(
+        limit: Int = 20,
+        nowMs: Long = System.currentTimeMillis(),
+        source: WatchProvider? = null
+    ): ContinueWatchingLabResult {
+        return ContinueWatchingLabResult(statusMessage = "Cached continue watching unavailable.")
+    }
+
     suspend fun listProviderLibrary(
         limitPerFolder: Int = 200,
         source: WatchProvider? = null
     ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
+    }
+
+    suspend fun getCachedProviderLibrary(
+        limitPerFolder: Int = 200,
+        source: WatchProvider? = null
+    ): ProviderLibrarySnapshot {
+        return ProviderLibrarySnapshot(statusMessage = "Cached provider library unavailable.")
     }
 
     suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {

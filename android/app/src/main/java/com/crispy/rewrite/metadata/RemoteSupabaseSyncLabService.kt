@@ -1,6 +1,7 @@
 package com.crispy.rewrite.metadata
 
 import android.content.Context
+import com.crispy.rewrite.network.CrispyHttpClient
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.SupabaseSyncAuthState
 import com.crispy.rewrite.player.SupabaseSyncLabResult
@@ -9,15 +10,17 @@ import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryLabService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.util.Locale
 
 class RemoteSupabaseSyncLabService(
     context: Context,
+    private val httpClient: CrispyHttpClient,
     private val supabaseUrl: String,
     private val supabaseAnonKey: String,
     addonManifestUrlsCsv: String,
@@ -706,44 +709,39 @@ class RemoteSupabaseSyncLabService(
         url: String,
         headers: Map<String, String>,
         payload: JSONObject?
-    ): HttpResult = withContext(Dispatchers.IO) {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 10_000
-            readTimeout = 10_000
-            requestMethod = method
-            doInput = true
-            headers.forEach { (name, value) ->
-                setRequestProperty(name, value)
-            }
-            if (payload != null) {
-                doOutput = true
-            }
-        }
+    ): HttpResult {
+        val normalizedMethod = method.trim().uppercase(Locale.US)
+        val okHeaders = headers.toOkHttpHeaders()
+        val response =
+            when (normalizedMethod) {
+                "GET" ->
+                    httpClient.get(
+                        url = url.toHttpUrl(),
+                        headers = okHeaders,
+                        callTimeoutMs = 10_000L,
+                    )
 
-        runCatching {
-            if (payload != null) {
-                connection.outputStream.bufferedWriter(StandardCharsets.UTF_8).use { writer ->
-                    writer.write(payload.toString())
-                }
+                "POST" ->
+                    httpClient.postJson(
+                        url = url.toHttpUrl(),
+                        jsonBody = payload?.toString() ?: "{}",
+                        headers = okHeaders,
+                        callTimeoutMs = 10_000L,
+                    )
+
+                else -> throw IllegalArgumentException("Unsupported HTTP method for Supabase: $method")
             }
 
-            val code = connection.responseCode
-            val body =
-                runCatching {
-                    (if (code in 200..299) connection.inputStream else connection.errorStream)
-                        ?.bufferedReader(StandardCharsets.UTF_8)
-                        ?.use { it.readText() }
-                }.getOrNull().orEmpty()
-            HttpResult(code = code, body = body)
-        }.getOrElse { error ->
-            throw IllegalStateException(error.message ?: "Network request failed", error)
-        }.also {
-            runCatching {
-                connection.inputStream?.close()
-                connection.errorStream?.close()
-            }
-            connection.disconnect()
+        return HttpResult(code = response.code, body = response.body)
+    }
+
+    private fun Map<String, String>.toOkHttpHeaders(): Headers {
+        if (isEmpty()) return Headers.headersOf()
+        val builder = Headers.Builder()
+        forEach { (name, value) ->
+            builder.add(name, value)
         }
+        return builder.build()
     }
 
     companion object {

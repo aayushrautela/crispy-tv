@@ -9,6 +9,7 @@ import com.crispy.rewrite.PlaybackLabDependencies
 import com.crispy.rewrite.domain.metadata.normalizeNuvioMediaId
 import com.crispy.rewrite.home.HomeCatalogService
 import com.crispy.rewrite.home.MediaDetails
+import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.WatchHistoryLabService
 import com.crispy.rewrite.player.WatchProvider
@@ -109,7 +110,13 @@ class DetailsViewModel internal constructor(
                     return false
                 }
 
-                val snapshot = watchHistoryService.listProviderLibrary(limitPerFolder = 250, source = source)
+                val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 250, source = source)
+                val snapshot =
+                    if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) {
+                        cached
+                    } else {
+                        watchHistoryService.listProviderLibrary(limitPerFolder = 250, source = source)
+                    }
                 snapshot.items.any { item ->
                     item.provider == source &&
                         source.isWatchedFolder(item.folderId) &&
@@ -134,7 +141,12 @@ class DetailsViewModel internal constructor(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val homeCatalogService = HomeCatalogService(appContext, BuildConfig.METADATA_ADDON_URLS)
+                    val homeCatalogService =
+                        HomeCatalogService(
+                            context = appContext,
+                            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                            httpClient = AppHttp.client(appContext),
+                        )
                     return DetailsViewModel(
                         itemId = itemId,
                         homeCatalogService = homeCatalogService,

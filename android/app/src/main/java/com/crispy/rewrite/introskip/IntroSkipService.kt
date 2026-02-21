@@ -1,13 +1,14 @@
 package com.crispy.rewrite.introskip
 
 import android.util.Log
+import com.crispy.rewrite.network.CrispyHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
@@ -80,6 +81,7 @@ interface IntroSkipService {
 }
 
 class RemoteIntroSkipService(
+    private val httpClient: CrispyHttpClient,
     introDbBaseUrl: String = DEFAULT_INTRO_DB_BASE_URL,
     private val cacheTtlMs: Long = TimeUnit.MINUTES.toMillis(10)
 ) : IntroSkipService {
@@ -122,7 +124,7 @@ class RemoteIntroSkipService(
         return fetched
     }
 
-    private fun fetchIntervals(request: NormalizedIntroSkipRequest): List<IntroSkipInterval> {
+    private suspend fun fetchIntervals(request: NormalizedIntroSkipRequest): List<IntroSkipInterval> {
         request.imdbId?.let { imdbId ->
             val introDbIntervals = fetchFromIntroDb(imdbId, request.season, request.episode)
             if (introDbIntervals.isNotEmpty()) {
@@ -142,7 +144,7 @@ class RemoteIntroSkipService(
         return fetchFromAniSkip(malId, request.episode)
     }
 
-    private fun fetchFromIntroDb(
+    private suspend fun fetchFromIntroDb(
         imdbId: String,
         season: Int,
         episode: Int
@@ -159,7 +161,7 @@ class RemoteIntroSkipService(
             )
 
         val response = httpGet(url, INTRODB_TIMEOUT_MS) ?: return emptyList()
-        if (response.statusCode == HttpURLConnection.HTTP_NOT_FOUND) {
+        if (response.statusCode == 404) {
             return emptyList()
         }
         if (response.statusCode !in 200..299) {
@@ -201,11 +203,11 @@ class RemoteIntroSkipService(
         }
     }
 
-    private fun fetchFromAniSkip(malId: Int, episode: Int): List<IntroSkipInterval> {
+    private suspend fun fetchFromAniSkip(malId: Int, episode: Int): List<IntroSkipInterval> {
         val query = "types=op&types=ed&types=recap&types=mixed-op&types=mixed-ed&episodeLength=0"
         val url = "$ANI_SKIP_BASE_URL/skip-times/$malId/$episode?$query"
         val response = httpGet(url, ANISKIP_TIMEOUT_MS) ?: return emptyList()
-        if (response.statusCode == HttpURLConnection.HTTP_NOT_FOUND) {
+        if (response.statusCode == 404) {
             return emptyList()
         }
         if (response.statusCode !in 200..299) {
@@ -242,7 +244,7 @@ class RemoteIntroSkipService(
         return intervals
     }
 
-    private fun resolveMalIdFromKitsu(kitsuId: Int): Int? {
+    private suspend fun resolveMalIdFromKitsu(kitsuId: Int): Int? {
         val url = "$KITSU_API_BASE_URL/anime/$kitsuId/mappings"
         val response = httpGet(url, MAL_LOOKUP_TIMEOUT_MS) ?: return null
         if (response.statusCode !in 200..299) {
@@ -269,7 +271,7 @@ class RemoteIntroSkipService(
         return null
     }
 
-    private fun resolveMalIdFromArm(imdbId: String): Int? {
+    private suspend fun resolveMalIdFromArm(imdbId: String): Int? {
         val url = "$ARM_IMDB_BASE_URL/$imdbId?include=myanimelist"
         val response = httpGet(url, MAL_LOOKUP_TIMEOUT_MS) ?: return null
         if (response.statusCode !in 200..299) {
@@ -300,29 +302,15 @@ class RemoteIntroSkipService(
         }
     }
 
-    private fun httpGet(url: String, timeoutMs: Int): HttpResponse? {
+    private suspend fun httpGet(url: String, timeoutMs: Int): HttpResponse? {
         return runCatching {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = timeoutMs
-                readTimeout = timeoutMs
-                setRequestProperty("Accept", "application/json")
-            }
-
-            try {
-                val statusCode = connection.responseCode
-                val responseStream =
-                    if (statusCode in 200..299) {
-                        connection.inputStream
-                    } else {
-                        connection.errorStream
-                    }
-
-                val body = responseStream?.bufferedReader()?.use { it.readText() }
-                HttpResponse(statusCode = statusCode, body = body)
-            } finally {
-                connection.disconnect()
-            }
+            val response =
+                httpClient.get(
+                    url = url.toHttpUrl(),
+                    headers = Headers.headersOf("Accept", "application/json"),
+                    callTimeoutMs = timeoutMs.toLong(),
+                )
+            HttpResponse(statusCode = response.code, body = response.body)
         }.onFailure { error ->
             Log.w(TAG, "HTTP request failed for $url", error)
         }.getOrNull()

@@ -60,6 +60,7 @@ import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.DiscoverCatalogRef
 import com.crispy.rewrite.domain.catalog.CatalogFilter
 import com.crispy.rewrite.home.HomeCatalogService
+import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.ui.components.PosterCard
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -294,10 +295,11 @@ class DiscoverViewModel(
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
                             homeCatalogService =
-                                HomeCatalogService(
-                                    context = appContext,
-                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
-                                )
+                                 HomeCatalogService(
+                                     context = appContext,
+                                     addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                                     httpClient = AppHttp.client(appContext),
+                                 )
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

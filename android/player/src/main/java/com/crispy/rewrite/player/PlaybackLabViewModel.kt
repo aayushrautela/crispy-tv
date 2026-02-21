@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class PlaybackEngine {
     EXO,
@@ -430,7 +432,9 @@ class PlaybackLabViewModel(
 
         viewModelScope.launch {
             runCatching {
-                watchHistoryService.markWatched(request)
+                withContext(Dispatchers.IO) {
+                    watchHistoryService.markWatched(request)
+                }
             }.onSuccess { result ->
                 _uiState.update {
                     it.copy(
@@ -465,7 +469,9 @@ class PlaybackLabViewModel(
 
         viewModelScope.launch {
             runCatching {
-                watchHistoryService.unmarkWatched(request)
+                withContext(Dispatchers.IO) {
+                    watchHistoryService.unmarkWatched(request)
+                }
             }.onSuccess { result ->
                 _uiState.update {
                     it.copy(

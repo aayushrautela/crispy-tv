@@ -10,6 +10,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.home.HomeCatalogService
+import com.crispy.rewrite.network.AppHttp
 import kotlinx.coroutines.flow.Flow
 
 class CatalogViewModel(
@@ -40,7 +41,8 @@ class CatalogViewModel(
                         return CatalogViewModel(
                             homeCatalogService = HomeCatalogService(
                                 context = appContext,
-                                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
+                                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                                httpClient = AppHttp.client(appContext),
                             ),
                             section = section
                         ) as T

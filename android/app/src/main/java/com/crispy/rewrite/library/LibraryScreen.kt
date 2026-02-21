@@ -53,10 +53,12 @@ import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
 import com.crispy.rewrite.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class LibrarySource {
     LOCAL,
@@ -117,20 +119,59 @@ class LibraryViewModel internal constructor(
                     }
                 val localResult =
                     if (selectedSource == LibrarySource.LOCAL) {
-                        runCatching { watchHistoryService.listLocalHistory(limit = 100) }.getOrNull()
+                        withContext(Dispatchers.IO) {
+                            runCatching { watchHistoryService.listLocalHistory(limit = 100) }.getOrNull()
+                        }
                     } else {
                         null
                     }
-                val providerResult =
-                    if (selectedProvider != null) {
+                val cachedProviderResult =
+                    if (selectedProvider != null && providerAuthenticated) {
                         runCatching {
-                            watchHistoryService.listProviderLibrary(
+                            watchHistoryService.getCachedProviderLibrary(
                                 limitPerFolder = 250,
                                 source = selectedProvider
                             )
-                        }.getOrNull()
+                        }.getOrNull()?.takeIf { snapshot ->
+                            snapshot.folders.isNotEmpty() || snapshot.items.isNotEmpty()
+                        }
                     } else {
                         null
+                    }
+
+                if (cachedProviderResult != null) {
+                    _uiState.update { current ->
+                        val fallbackFolder = defaultFolderIdFor(selectedSource, cachedProviderResult.folders)
+                        current.copy(
+                            statusMessage = cachedProviderResult.statusMessage,
+                            providerFolders = cachedProviderResult.folders,
+                            providerItems = cachedProviderResult.items,
+                            authState = authState,
+                            selectedSource = selectedSource,
+                            selectedProviderFolderId =
+                                current.selectedProviderFolderId
+                                    ?.takeIf { selectedFolderId ->
+                                        cachedProviderResult.folders.any { folder -> folder.id == selectedFolderId }
+                                    }
+                                    ?: fallbackFolder
+                        )
+                    }
+                }
+
+                val providerResult =
+                    if (selectedProvider != null && providerAuthenticated) {
+                        val network =
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    watchHistoryService.listProviderLibrary(
+                                        limitPerFolder = 250,
+                                        source = selectedProvider
+                                    )
+                                }.getOrNull()
+                            }
+                        network ?: cachedProviderResult
+                    } else {
+                        cachedProviderResult
                     }
                 val statusMessage =
                     when (selectedSource) {

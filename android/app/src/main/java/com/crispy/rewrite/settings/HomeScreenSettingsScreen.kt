@@ -52,6 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.home.HomeCatalogService
+import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.WatchProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -216,10 +217,11 @@ internal class HomeScreenSettingsViewModel(
                         @Suppress("UNCHECKED_CAST")
                         return HomeScreenSettingsViewModel(
                             homeCatalogService =
-                                HomeCatalogService(
-                                    context = appContext,
-                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
-                                ),
+                             HomeCatalogService(
+                                 context = appContext,
+                                 addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                                 httpClient = AppHttp.client(appContext),
+                             ),
                             settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }

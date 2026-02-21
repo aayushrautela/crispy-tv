@@ -10,6 +10,7 @@ import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.PlaybackLabDependencies
 import com.crispy.rewrite.BuildConfig
+import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.ContinueWatchingEntry
 import com.crispy.rewrite.player.ContinueWatchingLabResult
@@ -71,7 +72,8 @@ class HomeViewModel internal constructor(
                             homeCatalogService =
                                 HomeCatalogService(
                                     context = appContext,
-                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
+                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                                    httpClient = AppHttp.client(appContext),
                                 ),
                             watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),

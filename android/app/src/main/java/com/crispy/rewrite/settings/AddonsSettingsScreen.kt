@@ -73,8 +73,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import com.crispy.rewrite.network.AppHttp
+import com.crispy.rewrite.network.CrispyHttpClient
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.util.Locale
 
 internal data class InstalledAddonUi(
@@ -114,7 +116,8 @@ internal data class AddonsSettingsUiState(
 )
 
 internal class AddonsSettingsViewModel(
-    private val addonRegistry: MetadataAddonRegistry
+    private val addonRegistry: MetadataAddonRegistry,
+    private val httpClient: CrispyHttpClient,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddonsSettingsUiState())
@@ -180,7 +183,7 @@ internal class AddonsSettingsViewModel(
 
             val manifest =
                 withContext(Dispatchers.IO) {
-                    httpGetJson(manifestUrl)
+                    httpGetJson(httpClient, manifestUrl)
                 }
             if (manifest == null) {
                 _uiState.update { state ->
@@ -389,7 +392,8 @@ internal class AddonsSettingsViewModel(
                                 MetadataAddonRegistry(
                                     context = appContext,
                                     configuredManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
-                                )
+                                ),
+                            httpClient = AppHttp.client(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -916,29 +920,24 @@ private fun manifestUrlsMatch(left: String, right: String): Boolean {
     return left.trim().equals(right.trim(), ignoreCase = true)
 }
 
-private fun httpGetJson(url: String): JSONObject? {
-    return runCatching {
-        val connection =
-            (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 12000
-                readTimeout = 12000
-                setRequestProperty("Accept", "application/json")
-            }
+private suspend fun httpGetJson(httpClient: CrispyHttpClient, url: String): JSONObject? {
+    val response =
+        runCatching {
+            httpClient.get(
+                url = url.toHttpUrl(),
+                headers = Headers.headersOf("Accept", "application/json"),
+                callTimeoutMs = 12_000L,
+            )
+        }.getOrNull() ?: return null
 
-        try {
-            connection.inputStream.bufferedReader().use { reader ->
-                val payload = reader.readText()
-                if (payload.isBlank()) {
-                    null
-                } else {
-                    JSONObject(payload)
-                }
-            }
-        } finally {
-            connection.disconnect()
-        }
-    }.getOrNull()
+    if (response.code !in 200..299) {
+        return null
+    }
+    val body = response.body
+    if (body.isBlank()) {
+        return null
+    }
+    return runCatching { JSONObject(body) }.getOrNull()
 }
 
 private fun nonBlank(value: String?): String? {

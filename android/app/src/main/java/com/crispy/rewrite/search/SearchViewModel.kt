@@ -11,6 +11,7 @@ import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.catalog.DiscoverCatalogRef
 import com.crispy.rewrite.domain.catalog.CatalogFilter
 import com.crispy.rewrite.home.HomeCatalogService
+import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.CatalogLabResult
 import com.crispy.rewrite.player.CatalogPageRequest
 import com.crispy.rewrite.player.CatalogSearchLabService
@@ -322,7 +323,12 @@ class SearchViewModel(
                         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                     }
 
-                    val homeCatalogService = HomeCatalogService(context, BuildConfig.METADATA_ADDON_URLS)
+                    val homeCatalogService =
+                        HomeCatalogService(
+                            context = context,
+                            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                            httpClient = AppHttp.client(context),
+                        )
                     val catalogSearchService = PlaybackLabDependencies.catalogSearchServiceFactory(context)
                     @Suppress("UNCHECKED_CAST")
                     return SearchViewModel(

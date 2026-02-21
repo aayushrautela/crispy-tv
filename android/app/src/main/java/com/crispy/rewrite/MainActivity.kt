@@ -62,6 +62,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -72,6 +73,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -146,6 +148,7 @@ import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.PlaybackEngine
 import com.crispy.rewrite.player.PlaybackLabViewModel
 import com.crispy.rewrite.player.WatchProvider
+import com.crispy.rewrite.sync.ProviderSyncScheduler
 import com.crispy.rewrite.ui.theme.CrispyRewriteTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -166,6 +169,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        ProviderSyncScheduler.ensureScheduled(applicationContext)
+        ProviderSyncScheduler.enqueueNow(applicationContext)
 
         consumeOAuthCallback(intent)
         setContent {
@@ -245,6 +251,7 @@ class MainActivity : ComponentActivity() {
                     if (provider != null) {
                         val preferences = homeScreenSettingsStore.load()
                         homeScreenSettingsStore.save(preferences.copy(watchDataSource = provider))
+                        ProviderSyncScheduler.enqueueNow(applicationContext)
                     }
                 }
             }

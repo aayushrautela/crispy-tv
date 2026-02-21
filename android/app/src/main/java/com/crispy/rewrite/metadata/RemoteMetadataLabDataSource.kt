@@ -7,28 +7,32 @@ import com.crispy.rewrite.domain.metadata.MetadataRecord
 import com.crispy.rewrite.domain.metadata.MetadataSeason
 import com.crispy.rewrite.domain.metadata.MetadataVideo
 import com.crispy.rewrite.domain.metadata.formatIdForIdPrefixes
+import com.crispy.rewrite.network.CrispyHttpClient
 import com.crispy.rewrite.player.MetadataLabDataSource
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.MetadataLabPayload
 import com.crispy.rewrite.player.MetadataLabRequest
 import com.crispy.rewrite.player.MetadataTransportStat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 class RemoteMetadataLabDataSource(
     context: Context,
     addonManifestUrlsCsv: String,
-    tmdbApiKey: String
+    tmdbApiKey: String,
+    private val httpClient: CrispyHttpClient,
 ) : MetadataLabDataSource {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
-    private val addonClient = AddonMetadataClient(addonRegistry)
-    private val tmdbClient = TmdbMetadataClient(tmdbApiKey)
+    private val addonClient = AddonMetadataClient(addonRegistry, httpClient)
+    private val tmdbClient = TmdbMetadataClient(tmdbApiKey, httpClient)
 
     override suspend fun load(
         request: MetadataLabRequest,
@@ -179,14 +183,15 @@ private data class AddonCandidate(
 )
 
 private class AddonMetadataClient(
-    private val addonRegistry: MetadataAddonRegistry
+    private val addonRegistry: MetadataAddonRegistry,
+    private val httpClient: CrispyHttpClient,
 ) {
     @Volatile
     private var resolvedEndpoints: List<AddonEndpoint>? = null
     @Volatile
     private var resolvedFingerprint: String? = null
 
-    fun fetchMeta(
+    suspend fun fetchMeta(
         mediaType: MetadataLabMediaType,
         contentId: String,
         preferredAddonId: String?
@@ -224,7 +229,7 @@ private class AddonMetadataClient(
         return candidates
     }
 
-    fun fetchTransportStats(
+    suspend fun fetchTransportStats(
         mediaType: MetadataLabMediaType,
         contentId: String,
         streamLookupId: String,
@@ -287,8 +292,7 @@ private class AddonMetadataClient(
         return stats
     }
 
-    @Synchronized
-    private fun resolveEndpoints(): List<AddonEndpoint> {
+    private suspend fun resolveEndpoints(): List<AddonEndpoint> {
         val seeds = addonRegistry.orderedSeeds()
         if (seeds.isEmpty()) {
             resolvedFingerprint = ""
@@ -313,16 +317,17 @@ private class AddonMetadataClient(
             }
         }
 
-        val resolved = seeds.map { seed ->
-            resolveEndpoint(seed = seed)
+        val resolved = mutableListOf<AddonEndpoint>()
+        for (seed in seeds) {
+            resolved += resolveEndpoint(seed = seed)
         }
         resolvedFingerprint = fingerprint
         resolvedEndpoints = resolved
         return resolved
     }
 
-    private fun resolveEndpoint(seed: AddonManifestSeed): AddonEndpoint {
-        val networkManifest = httpGetJson(seed.manifestUrl)
+    private suspend fun resolveEndpoint(seed: AddonManifestSeed): AddonEndpoint {
+        val networkManifest = httpClient.getJsonObject(seed.manifestUrl)
         if (networkManifest != null) {
             addonRegistry.cacheManifest(seed, networkManifest)
         }
@@ -519,7 +524,7 @@ private class AddonMetadataClient(
         ) != null
     }
 
-    private fun fetchAddonMeta(
+    private suspend fun fetchAddonMeta(
         endpoint: AddonEndpoint,
         mediaType: MetadataLabMediaType,
         contentId: String
@@ -532,7 +537,7 @@ private class AddonMetadataClient(
         )
     }
 
-    private fun fetchResourceCount(
+    private suspend fun fetchResourceCount(
         endpoint: AddonEndpoint,
         resourceKind: AddonResourceKind,
         mediaType: MetadataLabMediaType,
@@ -547,7 +552,7 @@ private class AddonMetadataClient(
         return response.optJSONArray(arrayKey)?.length() ?: 0
     }
 
-    private fun fetchResource(
+    private suspend fun fetchResource(
         endpoint: AddonEndpoint,
         resourceKind: AddonResourceKind,
         mediaType: MetadataLabMediaType,
@@ -569,7 +574,7 @@ private class AddonMetadataClient(
                 append(endpoint.encodedQuery)
             }
         }
-        return httpGetJson(url)
+        return httpClient.getJsonObject(url)
     }
 
     private fun parseAddonMetadata(meta: JSONObject, fallbackId: String): MetadataRecord {
@@ -784,22 +789,33 @@ private class AddonMetadataClient(
 }
 
 private class TmdbMetadataClient(
-    private val apiKey: String
+    private val apiKey: String,
+    private val httpClient: CrispyHttpClient,
 ) {
-    fun fetchMeta(mediaType: MetadataLabMediaType, contentId: String): MetadataRecord? {
+    suspend fun fetchMeta(mediaType: MetadataLabMediaType, contentId: String): MetadataRecord? {
         if (apiKey.isBlank()) {
             return null
         }
 
         val tmdbId = resolveTmdbId(mediaType, contentId) ?: return null
         val details = fetchDetails(mediaType, tmdbId) ?: return null
-        val credits = fetchCredits(mediaType, tmdbId)
-        val recommendations = fetchRecommendations(mediaType, tmdbId)
-        val externalIds = if (mediaType == MetadataLabMediaType.SERIES) {
-            fetchExternalIds(mediaType, tmdbId)
-        } else {
-            null
-        }
+        val (credits, recommendations, externalIds) =
+            coroutineScope {
+                val creditsDeferred = async { fetchCredits(mediaType, tmdbId) }
+                val recommendationsDeferred = async { fetchRecommendations(mediaType, tmdbId) }
+                val externalIdsDeferred =
+                    if (mediaType == MetadataLabMediaType.SERIES) {
+                        async { fetchExternalIds(mediaType, tmdbId) }
+                    } else {
+                        null
+                    }
+
+                Triple(
+                    creditsDeferred.await(),
+                    recommendationsDeferred.await(),
+                    externalIdsDeferred?.await(),
+                )
+            }
 
         val imdbId =
             nonBlank(details.optString("imdb_id"))
@@ -843,7 +859,7 @@ private class TmdbMetadataClient(
         )
     }
 
-    private fun resolveTmdbId(mediaType: MetadataLabMediaType, contentId: String): Int? {
+    private suspend fun resolveTmdbId(mediaType: MetadataLabMediaType, contentId: String): Int? {
         val normalized = contentId.trim()
         if (normalized.startsWith("tmdb:", ignoreCase = true)) {
             return normalized.substringAfter("tmdb:").substringBefore(':').toIntOrNull()
@@ -856,7 +872,7 @@ private class TmdbMetadataClient(
         return null
     }
 
-    private fun findTmdbIdByImdb(mediaType: MetadataLabMediaType, imdbId: String): Int? {
+    private suspend fun findTmdbIdByImdb(mediaType: MetadataLabMediaType, imdbId: String): Int? {
         val response = getJson(
             path = "find/$imdbId",
             query = mapOf(
@@ -884,7 +900,7 @@ private class TmdbMetadataClient(
         return null
     }
 
-    private fun fetchDetails(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
+    private suspend fun fetchDetails(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
         return getJson(
             path = "${mediaPath(mediaType)}/$tmdbId",
             query = mapOf(
@@ -894,7 +910,7 @@ private class TmdbMetadataClient(
         )
     }
 
-    private fun fetchCredits(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
+    private suspend fun fetchCredits(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
         return getJson(
             path = "${mediaPath(mediaType)}/$tmdbId/credits",
             query = mapOf(
@@ -904,7 +920,7 @@ private class TmdbMetadataClient(
         )
     }
 
-    private fun fetchRecommendations(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
+    private suspend fun fetchRecommendations(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
         return getJson(
             path = "${mediaPath(mediaType)}/$tmdbId/recommendations",
             query = mapOf(
@@ -915,7 +931,7 @@ private class TmdbMetadataClient(
         )
     }
 
-    private fun fetchExternalIds(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
+    private suspend fun fetchExternalIds(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
         return getJson(
             path = "${mediaPath(mediaType)}/$tmdbId/external_ids",
             query = mapOf("api_key" to apiKey)
@@ -1012,39 +1028,33 @@ private class TmdbMetadataClient(
         return if (mediaType == MetadataLabMediaType.SERIES) "tv" else "movie"
     }
 
-    private fun getJson(path: String, query: Map<String, String>): JSONObject? {
+    private suspend fun getJson(path: String, query: Map<String, String>): JSONObject? {
         val uriBuilder = Uri.parse("https://api.themoviedb.org/3/$path").buildUpon()
         query.forEach { (key, value) ->
             uriBuilder.appendQueryParameter(key, value)
         }
-        return httpGetJson(uriBuilder.build().toString())
+        return httpClient.getJsonObject(uriBuilder.build().toString(), callTimeoutMs = 12_000L)
     }
 }
 
-private fun httpGetJson(url: String): JSONObject? {
-    return runCatching {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 7_000
-            readTimeout = 12_000
-            requestMethod = "GET"
-            setRequestProperty("Accept", "application/json")
-        }
+private suspend fun CrispyHttpClient.getJsonObject(url: String, callTimeoutMs: Long = 12_000L): JSONObject? {
+    val response =
+        runCatching {
+            get(
+                url = url.toHttpUrl(),
+                headers = Headers.headersOf("Accept", "application/json"),
+                callTimeoutMs = callTimeoutMs,
+            )
+        }.getOrNull() ?: return null
 
-        try {
-            val statusCode = connection.responseCode
-            val body =
-                (if (statusCode in 200..299) connection.inputStream else connection.errorStream)
-                    ?.bufferedReader()
-                    ?.use { reader -> reader.readText() }
-                    .orEmpty()
-            if (statusCode !in 200..299 || body.isBlank()) {
-                return null
-            }
-            JSONObject(body)
-        } finally {
-            connection.disconnect()
-        }
-    }.getOrNull()
+    if (response.code !in 200..299) {
+        return null
+    }
+    val body = response.body
+    if (body.isBlank()) {
+        return null
+    }
+    return runCatching { JSONObject(body) }.getOrNull()
 }
 
 private fun nonBlank(value: String?): String? {

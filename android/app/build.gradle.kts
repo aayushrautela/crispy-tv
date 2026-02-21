@@ -126,6 +126,7 @@ dependencies {
     implementation(project(":android:core-domain"))
     implementation(project(":android:player"))
     implementation(project(":android:native-engine"))
+    implementation(project(":android:network"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
@@ -149,6 +150,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    implementation("androidx.work:work-runtime-ktx:2.10.2")
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

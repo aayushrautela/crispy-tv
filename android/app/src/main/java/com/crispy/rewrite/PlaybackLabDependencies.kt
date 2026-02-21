@@ -7,6 +7,7 @@ import com.crispy.rewrite.introskip.RemoteIntroSkipService
 import com.crispy.rewrite.metadata.RemoteMetadataLabDataSource
 import com.crispy.rewrite.metadata.RemoteSupabaseSyncLabService
 import com.crispy.rewrite.metadata.RemoteWatchHistoryLabService
+import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackController
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
 import com.crispy.rewrite.nativeengine.playback.PlaybackController
@@ -40,25 +41,31 @@ private class NativeTorrentResolver(context: Context) : TorrentResolver {
 }
 
 private fun newMetadataResolver(context: Context): MetadataLabResolver {
+    val appContext = context.applicationContext
     return CoreDomainMetadataLabResolver(
         RemoteMetadataLabDataSource(
-            context = context,
+            context = appContext,
             addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-            tmdbApiKey = BuildConfig.TMDB_API_KEY
+            tmdbApiKey = BuildConfig.TMDB_API_KEY,
+            httpClient = AppHttp.client(appContext),
         )
     )
 }
 
 private fun newCatalogSearchService(context: Context): CatalogSearchLabService {
+    val appContext = context.applicationContext
     return RemoteCatalogSearchLabService(
-        context = context,
-        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
+        context = appContext,
+        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+        httpClient = AppHttp.client(appContext),
     )
 }
 
 private fun newWatchHistoryService(context: Context): WatchHistoryLabService {
+    val appContext = context.applicationContext
     return RemoteWatchHistoryLabService(
-        context = context,
+        context = appContext,
+        httpClient = AppHttp.client(appContext),
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
         simklClientId = BuildConfig.SIMKL_CLIENT_ID,
         traktClientSecret = BuildConfig.TRAKT_CLIENT_SECRET,
@@ -72,8 +79,10 @@ private fun newSupabaseSyncService(
     context: Context,
     watchHistoryService: WatchHistoryLabService
 ): SupabaseSyncLabService {
+    val appContext = context.applicationContext
     return RemoteSupabaseSyncLabService(
-        context = context,
+        context = appContext,
+        httpClient = AppHttp.client(appContext),
         supabaseUrl = BuildConfig.SUPABASE_URL,
         supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
         addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
@@ -117,8 +126,12 @@ object PlaybackLabDependencies {
     }
 
     @Volatile
-    var introSkipServiceFactory: (Context) -> IntroSkipService = {
-        RemoteIntroSkipService(introDbBaseUrl = BuildConfig.INTRODB_API_URL)
+    var introSkipServiceFactory: (Context) -> IntroSkipService = { context ->
+        val appContext = context.applicationContext
+        RemoteIntroSkipService(
+            httpClient = AppHttp.client(appContext),
+            introDbBaseUrl = BuildConfig.INTRODB_API_URL,
+        )
     }
 
     fun reset() {
@@ -141,8 +154,12 @@ object PlaybackLabDependencies {
                 watchHistoryService = watchHistoryService
             )
         }
-        introSkipServiceFactory = {
-            RemoteIntroSkipService(introDbBaseUrl = BuildConfig.INTRODB_API_URL)
+        introSkipServiceFactory = { context ->
+            val appContext = context.applicationContext
+            RemoteIntroSkipService(
+                httpClient = AppHttp.client(appContext),
+                introDbBaseUrl = BuildConfig.INTRODB_API_URL,
+            )
         }
     }
 }

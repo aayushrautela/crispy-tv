@@ -18,14 +18,16 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import java.util.zip.ZipFile
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -59,6 +61,18 @@ class TorrentService : Service() {
     private var preferredHost: String = DEFAULT_HOST
 
     private val serviceLock = Any()
+
+    private val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .retryOnConnectionFailure(true)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     override fun onCreate() {
         super.onCreate()
@@ -224,26 +238,17 @@ class TorrentService : Service() {
     }
 
     private fun callEcho(host: String) {
-        val url = URL("http://$host:$PORT/echo")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 1000
-            readTimeout = 1000
-        }
+        val url = "http://$host:$PORT/echo"
+        val request = Request.Builder().url(url).get().build()
+        val call = okHttpClient.newCall(request)
+        call.timeout().timeout(1000, TimeUnit.MILLISECONDS)
 
-        try {
-            connection.inputStream.use {
-                BufferedReader(InputStreamReader(it)).use { reader ->
-                    while (reader.readLine() != null) {
-                        // consume stream
-                    }
-                }
+        call.execute().use { response ->
+            // Consume body to avoid leaking connections.
+            response.body?.close()
+            if (!response.isSuccessful) {
+                throw IOException("Echo endpoint failed with status ${response.code}")
             }
-            if (connection.responseCode !in 200..299) {
-                throw IOException("Echo endpoint failed with status ${connection.responseCode}")
-            }
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -331,38 +336,27 @@ class TorrentService : Service() {
     }
 
     private fun postJson(path: String, payload: JSONObject): JSONObject {
-        val url = URL("http://$preferredHost:$PORT$path")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 5000
-            readTimeout = 15000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
-        }
+        val url = "http://$preferredHost:$PORT$path"
+        val request =
+            Request.Builder()
+                .url(url)
+                .post(payload.toString().toRequestBody(jsonMediaType))
+                .header("Accept", "application/json")
+                .build()
 
-        try {
-            connection.outputStream.use { output ->
-                output.write(payload.toString().toByteArray(Charsets.UTF_8))
-                output.flush()
+        val call = okHttpClient.newCall(request)
+        call.timeout().timeout(20, TimeUnit.SECONDS)
+
+        call.execute().use { response ->
+            val responseText = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("HTTP ${response.code} for $path: $responseText")
             }
-
-            val responseCode = connection.responseCode
-            val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
-            val responseText = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-
-            if (responseCode !in 200..299) {
-                throw IOException("HTTP $responseCode for $path: $responseText")
-            }
-
             if (responseText.isBlank()) {
                 return JSONObject()
             }
-
             return runCatching { JSONObject(responseText) }
                 .getOrElse { JSONObject().put("raw", responseText) }
-        } finally {
-            connection.disconnect()
         }
     }
 

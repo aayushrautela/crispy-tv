@@ -14,14 +14,18 @@ import com.crispy.rewrite.player.CatalogPageRequest
 import com.crispy.rewrite.player.CatalogSearchLabService
 import com.crispy.rewrite.player.CatalogSearchRequest
 import com.crispy.rewrite.player.MetadataLabMediaType
+import com.crispy.rewrite.network.CrispyHttpClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 class RemoteCatalogSearchLabService(
     context: Context,
-    addonManifestUrlsCsv: String
+    addonManifestUrlsCsv: String,
+    private val httpClient: CrispyHttpClient,
 ) : CatalogSearchLabService {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
 
@@ -70,7 +74,7 @@ class RemoteCatalogSearchLabService(
         }
 
         val attemptedUrls = mutableListOf<String>()
-        candidates.forEach { entry ->
+        for (entry in candidates) {
             val urls =
                 buildCatalogRequestUrls(
                     CatalogRequestInput(
@@ -84,13 +88,13 @@ class RemoteCatalogSearchLabService(
                     )
                 )
 
-            urls.forEachIndexed { attemptIndex, url ->
+            for ((attemptIndex, url) in urls.withIndex()) {
                 attemptedUrls += url
-                val response = httpGetJson(url) ?: return@forEachIndexed
+                val response = httpGetJson(url) ?: continue
                 val items = parseCatalogItems(response.optJSONArray("metas"), entry.addonId, mediaType)
                 val isSimpleAttempt = request.page <= 1 && attemptIndex == 0
                 if (isSimpleAttempt && items.isEmpty() && urls.size > 1) {
-                    return@forEachIndexed
+                    continue
                 }
 
                 return CatalogLabResult(
@@ -152,14 +156,14 @@ class RemoteCatalogSearchLabService(
         val attemptedUrls = mutableListOf<String>()
         val addonResults = mutableListOf<AddonSearchResult>()
 
-        orderedAddons.forEach { addon ->
-            val addonSearchCatalogs = searchableCatalogsByAddon[addon.orderIndex] ?: return@forEach
+        for (addon in orderedAddons) {
+            val addonSearchCatalogs = searchableCatalogsByAddon[addon.orderIndex] ?: continue
             if (addonSearchCatalogs.isEmpty()) {
-                return@forEach
+                continue
             }
 
             val addonMetasById = linkedMapOf<String, SearchMetaInput>()
-            addonSearchCatalogs.forEach { searchCatalog ->
+            for (searchCatalog in addonSearchCatalogs) {
                 val urls =
                     buildCatalogRequestUrls(
                         CatalogRequestInput(
@@ -210,13 +214,14 @@ class RemoteCatalogSearchLabService(
         )
     }
 
-    private fun resolveAddons(): List<ResolvedAddon> {
+    private suspend fun resolveAddons(): List<ResolvedAddon> {
         val seeds = addonRegistry.orderedSeeds()
         if (seeds.isEmpty()) {
             return emptyList()
         }
 
-        return seeds.mapIndexed { index, seed ->
+        val resolved = mutableListOf<ResolvedAddon>()
+        for ((index, seed) in seeds.withIndex()) {
             val networkManifest = httpGetJson(seed.manifestUrl)
             if (networkManifest != null) {
                 addonRegistry.cacheManifest(seed, networkManifest)
@@ -227,13 +232,15 @@ class RemoteCatalogSearchLabService(
                 nonBlank(manifest?.optString("id"))
                     ?: seed.addonIdHint
 
-            ResolvedAddon(
-                orderIndex = index,
-                seed = seed,
-                addonId = addonId,
-                manifest = manifest
-            )
+            resolved +=
+                ResolvedAddon(
+                    orderIndex = index,
+                    seed = seed,
+                    addonId = addonId,
+                    manifest = manifest
+                )
         }
+        return resolved
     }
 
     private fun catalogEntries(resolvedAddons: List<ResolvedAddon>, mediaType: String): List<CatalogEntry> {
@@ -327,6 +334,28 @@ class RemoteCatalogSearchLabService(
         return runCatching { JSONObject(raw) }.getOrNull()
     }
 
+    private suspend fun httpGetJson(url: String): JSONObject? {
+        return withContext(Dispatchers.IO) {
+            val response =
+                runCatching {
+                    httpClient.get(
+                        url = url.toHttpUrl(),
+                        headers = Headers.headersOf("Accept", "application/json"),
+                        callTimeoutMs = 12_000L,
+                    )
+                }.getOrNull() ?: return@withContext null
+
+            if (response.code !in 200..299) {
+                return@withContext null
+            }
+            val body = response.body
+            if (body.isBlank()) {
+                return@withContext null
+            }
+            runCatching { JSONObject(body) }.getOrNull()
+        }
+    }
+
     private fun fallbackManifestFor(seed: AddonManifestSeed): JSONObject? {
         val looksLikeCinemeta =
             seed.addonIdHint.contains("cinemeta", ignoreCase = true) ||
@@ -404,28 +433,6 @@ private fun parseStringArray(value: JSONArray?): List<String> {
                 add(raw)
             }
         }
-    }
-}
-
-private fun httpGetJson(url: String): JSONObject? {
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        connectTimeout = 10_000
-        readTimeout = 10_000
-        requestMethod = "GET"
-        setRequestProperty("Accept", "application/json")
-    }
-
-    return runCatching {
-        connection.inputStream.bufferedReader().use { reader ->
-            val payload = reader.readText()
-            if (payload.isBlank()) {
-                null
-            } else {
-                JSONObject(payload)
-            }
-        }
-    }.getOrNull().also {
-        connection.disconnect()
     }
 }
 
