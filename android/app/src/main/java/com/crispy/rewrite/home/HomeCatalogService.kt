@@ -31,6 +31,8 @@ data class HomeHeroItem(
     val title: String,
     val description: String,
     val rating: String?,
+    val year: String? = null,
+    val genres: List<String> = emptyList(),
     val backdropUrl: String,
     val addonId: String,
     val type: String
@@ -628,6 +630,8 @@ class HomeCatalogService(
             val description = nonBlank(meta.optString("description")) ?: "No description provided."
             val rating = parseRating(meta)
             val type = nonBlank(meta.optString("type")) ?: mediaType
+            val year = extractYear(meta)
+            val genres = readStringList(meta, "genres")
 
             items +=
                 HomeHeroItem(
@@ -635,6 +639,8 @@ class HomeCatalogService(
                     title = title,
                     description = description,
                     rating = rating,
+                    year = year,
+                    genres = genres,
                     backdropUrl = backdrop,
                     addonId = addonId,
                     type = type
