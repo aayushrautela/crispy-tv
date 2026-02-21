@@ -60,6 +60,28 @@ class HomeViewModel internal constructor(
 ) : ViewModel() {
     companion object {
         private const val TAG = "HomeViewModel"
+
+        fun factory(context: Context): ViewModelProvider.Factory {
+            val appContext = context.applicationContext
+            return object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
+                        @Suppress("UNCHECKED_CAST")
+                        return HomeViewModel(
+                            homeCatalogService =
+                                HomeCatalogService(
+                                    context = appContext,
+                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
+                                ),
+                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
+                            suppressionStore = ContinueWatchingSuppressionStore(appContext),
+                            settingsStore = HomeScreenSettingsStore(appContext)
+                        ) as T
+                    }
+                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+                }
+            }
+        }
     }
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -396,29 +418,6 @@ class HomeViewModel internal constructor(
         suppressionStore.write(suppressedItemsByKey)
     }
 
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                        return HomeViewModel(
-                            homeCatalogService =
-                                HomeCatalogService(
-                                    context = appContext,
-                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
-                                ),
-                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
-                            suppressionStore = ContinueWatchingSuppressionStore(appContext),
-                            settingsStore = HomeScreenSettingsStore(appContext)
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
 }
 
 private data class HomeFeedLoadResult(

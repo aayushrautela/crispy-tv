@@ -649,7 +649,7 @@ class RemoteWatchHistoryLabService(
             for ((i, e) in entries.withIndex()) {
                 Log.d(TAG, "  raw[$i]: type=${e.contentType}, id=${e.contentId}, title=${e.title}, " +
                         "progress=${e.progressPercent}%, upNext=${e.isUpNextPlaceholder}, " +
-                        "S${e.seasonNumber}E${e.episodeNumber}")
+                        "S${e.season}E${e.episode}")
             }
 
             val normalized = normalizeContinueWatching(entries = entries, nowMs = nowMs, limit = targetLimit)
@@ -657,7 +657,7 @@ class RemoteWatchHistoryLabService(
             for ((i, e) in normalized.withIndex()) {
                 Log.d(TAG, "  norm[$i]: type=${e.contentType}, id=${e.contentId}, title=${e.title}, " +
                         "progress=${e.progressPercent}%, upNext=${e.isUpNextPlaceholder}, " +
-                        "S${e.seasonNumber}E${e.episodeNumber}")
+                        "S${e.season}E${e.episode}")
             }
 
             val status =
@@ -983,7 +983,7 @@ class RemoteWatchHistoryLabService(
 
         Log.d(TAG, "normalizeContinueWatching: final output: ${sorted.size} items")
         for ((i, e) in sorted.withIndex()) {
-            Log.d(TAG, "  final[$i]: ${e.title} (${e.contentId}), progress=${e.progressPercent}%, upNext=${e.isUpNextPlaceholder}, S${e.seasonNumber}E${e.episodeNumber}")
+            Log.d(TAG, "  final[$i]: ${e.title} (${e.contentId}), progress=${e.progressPercent}%, upNext=${e.isUpNextPlaceholder}, S${e.season}E${e.episode}")
         }
         return sorted
     }

@@ -874,7 +874,9 @@ private fun UpNextCard(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth(fraction = (item.progressPercent / 100f).coerceIn(0f, 1f))
+                        .fillMaxWidth(
+                            fraction = (item.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
+                        )
                         .background(MaterialTheme.colorScheme.primary)
                 )
             }
