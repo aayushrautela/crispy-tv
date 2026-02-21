@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -330,7 +331,6 @@ private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
 
 @Composable
 fun DiscoverRoute(
-    onNavigateToSearch: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -350,7 +350,6 @@ fun DiscoverRoute(
         onCatalogClick = viewModel::selectCatalog,
         onGenreClick = viewModel::selectGenre,
         onLoadMore = viewModel::loadMore,
-        onNavigateToSearch = onNavigateToSearch,
         onItemClick = onItemClick
     )
 }
@@ -370,7 +369,6 @@ private fun DiscoverScreen(
     onCatalogClick: (DiscoverCatalogRef) -> Unit,
     onGenreClick: (String?) -> Unit,
     onLoadMore: () -> Unit,
-    onNavigateToSearch: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
@@ -379,13 +377,11 @@ private fun DiscoverScreen(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text("Discover") },
                 actions = {
-                    IconButton(onClick = onNavigateToSearch) {
-                        Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search")
-                    }
                     IconButton(onClick = onRefresh) {
                         Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }

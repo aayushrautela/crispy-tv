@@ -33,11 +33,17 @@ import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.rewrite.settings.PlaybackSettingsScreen
 import com.crispy.rewrite.settings.ProviderAuthPortalRoute
 import com.crispy.rewrite.settings.SettingsScreen
-import com.crispy.rewrite.search.SearchRoute
+import com.crispy.rewrite.search.SearchResultsContent
+import com.crispy.rewrite.search.SearchViewModel
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,12 +51,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -100,6 +110,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -143,9 +154,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+
         consumeOAuthCallback(intent)
         setContent {
             CrispyRewriteTheme {
+                val isDark = isSystemInDarkTheme()
+                DisposableEffect(isDark) {
+                    val controller = WindowCompat.getInsetsController(window, window.decorView)
+                    controller.isAppearanceLightStatusBars = !isDark
+                    controller.isAppearanceLightNavigationBars = !isDark
+                    onDispose { }
+                }
                 AppShell()
             }
         }
@@ -224,10 +247,10 @@ class MainActivity : ComponentActivity() {
 private enum class TopLevelDestination(
     val route: String,
     val label: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val showInBottomBar: Boolean = true
 ) {
     Home(route = "home", label = "Home", icon = Icons.Outlined.Home),
-    Search(route = "search", label = "Search", icon = Icons.Outlined.Search),
     Discover(route = "discover", label = "Discover", icon = Icons.Outlined.Explore),
     Library(route = "library", label = "Library", icon = Icons.Outlined.VideoLibrary),
     Settings(route = "settings", label = "Settings", icon = Icons.Outlined.Settings)
@@ -265,13 +288,15 @@ private fun AppShell() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomBar = TopLevelDestination.entries.any { it.route == currentRoute }
+    val bottomBarDestinations = remember { TopLevelDestination.entries.filter { it.showInBottomBar } }
+    val showBottomBar = bottomBarDestinations.any { it.route == currentRoute }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {
-                    TopLevelDestination.entries.forEach { destination ->
+                    bottomBarDestinations.forEach { destination ->
                         NavigationBarItem(
                             selected = currentRoute == destination.route,
                             onClick = {
@@ -302,6 +327,7 @@ private fun AppShell() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
         ) {
             composable(TopLevelDestination.Home.route) {
                 HomePage(
@@ -316,9 +342,6 @@ private fun AppShell() {
                     },
                     onCatalogSeeAllClick = { section ->
                         navController.navigate(catalogListRoute(section))
-                    },
-                    onSearchClick = {
-                        navController.navigate(TopLevelDestination.Search.route)
                     }
                 )
             }
@@ -363,12 +386,8 @@ private fun AppShell() {
                 val itemId = entry.arguments?.getString(HomeDetailsItemIdArg).orEmpty()
                 DetailsRoute(itemId = itemId, onBack = { navController.popBackStack() })
             }
-            composable(TopLevelDestination.Search.route) {
-                SearchRoute(onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) })
-            }
             composable(TopLevelDestination.Discover.route) {
                 DiscoverRoute(
-                    onNavigateToSearch = { navController.navigate(TopLevelDestination.Search.route) },
                     onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) }
                 )
             }
@@ -433,8 +452,7 @@ private fun HomePage(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
-    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
-    onSearchClick: () -> Unit
+    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -445,29 +463,113 @@ private fun HomePage(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val searchViewModel: SearchViewModel = viewModel(
+        factory = remember(appContext) {
+            SearchViewModel.factory(appContext)
+        }
+    )
+    val searchUiState by searchViewModel.uiState.collectAsStateWithLifecycle()
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = searchExpanded) {
+        searchExpanded = false
+        searchViewModel.clearQuery()
+    }
+
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
-                title = { Text("Home") },
-                actions = {
-                    IconButton(onClick = onSearchClick) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = "Search"
+            Surface(color = MaterialTheme.colorScheme.surface) {
+                SearchBar(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    inputField = {
+                        SearchBarDefaults.InputField(
+                            query = searchUiState.query,
+                            onQueryChange = { query ->
+                                if (!searchExpanded) {
+                                    searchExpanded = true
+                                }
+                                searchViewModel.updateQuery(query)
+                            },
+                            onSearch = { },
+                            expanded = searchExpanded,
+                            onExpandedChange = { expanded ->
+                                searchExpanded = expanded
+                                if (!expanded) {
+                                    searchViewModel.clearQuery()
+                                }
+                            },
+                            placeholder = { Text("Search movies, series...") },
+                            leadingIcon = {
+                                if (searchExpanded) {
+                                    IconButton(
+                                        onClick = {
+                                            searchExpanded = false
+                                            searchViewModel.clearQuery()
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Back"
+                                        )
+                                    }
+                                } else {
+                                    Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                                }
+                            },
+                            trailingIcon = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (searchUiState.query.isNotBlank()) {
+                                        IconButton(onClick = searchViewModel::clearQuery) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Clear,
+                                                contentDescription = "Clear"
+                                            )
+                                        }
+                                    }
+                                    IconButton(onClick = searchViewModel::refreshCatalogs) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Refresh,
+                                            contentDescription = "Refresh"
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    },
+                    expanded = searchExpanded,
+                    onExpandedChange = { expanded ->
+                        searchExpanded = expanded
+                        if (!expanded) {
+                            searchViewModel.clearQuery()
+                        }
+                    }
+                ) {
+                    if (searchExpanded) {
+                        SearchResultsContent(
+                            uiState = searchUiState,
+                            onMediaTypeChange = searchViewModel::setMediaType,
+                            onCatalogToggle = searchViewModel::toggleCatalog,
+                            onItemClick = { item ->
+                                searchExpanded = false
+                                searchViewModel.clearQuery()
+                                onCatalogItemClick(item)
+                            },
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
-                },
-                scrollBehavior = scrollBehavior
-            )
+                }
+            }
         }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(vertical = 12.dp),
+            contentPadding = PaddingValues(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -993,6 +1095,7 @@ private fun PlaceholderPage(title: String) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(title) },
