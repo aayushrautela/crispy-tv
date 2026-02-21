@@ -4,13 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.calculateBottomPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
@@ -75,7 +76,6 @@ fun CatalogRoute(
             )
         }
     ) { innerPadding ->
-        val safeBottomPadding = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -83,11 +83,14 @@ fun CatalogRoute(
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 124.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     top = 12.dp,
                     end = 16.dp,
-                    bottom = 12.dp + safeBottomPadding
+                    bottom = 12.dp
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
