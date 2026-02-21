@@ -146,8 +146,9 @@ import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.discover.DiscoverRoute
 import com.crispy.rewrite.home.ContinueWatchingItem
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEngine
-
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import com.crispy.rewrite.library.LibraryRoute
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.PlaybackEngine
@@ -599,12 +600,13 @@ private fun HomePage(
         )
     }
 
+    val horizontalPadding = responsivePageHorizontalPadding()
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             AppBarWithSearch(
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = horizontalPadding),
                 state = searchBarState,
                 inputField = inputField,
                 colors = SearchBarDefaults.appBarWithSearchColors(
@@ -613,8 +615,7 @@ private fun HomePage(
                 ),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
-                scrollBehavior = scrollBehavior,
-                contentPadding = PaddingValues(0.dp)
+                scrollBehavior = scrollBehavior
             )
 
             ExpandedFullScreenSearchBar(
@@ -643,75 +644,67 @@ private fun HomePage(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
+                start = horizontalPadding,
+                end = horizontalPadding,
                 top = innerPadding.calculateTopPadding(),
-                bottom = 24.dp
+                bottom = Dimensions.PageBottomPadding
             ),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
             item(contentType = "hero") {
                 when {
                     heroState.isLoading && heroState.items.isEmpty() -> {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(300.dp)
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("Loading featured content...")
-                                }
+                                Text("Loading featured content...")
                             }
                         }
                     }
 
                     heroState.items.isEmpty() -> {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = heroState.statusMessage,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = heroState.statusMessage,
+                                modifier = Modifier.padding(Dimensions.CardInternalPadding)
+                            )
                         }
                     }
 
                      else -> {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            HomeHeroCarousel(
-                                items = heroState.items,
-                                selectedId = heroState.selectedId,
-                                onItemClick = onHeroClick
-                            )
-                        }
+                        HomeHeroCarousel(
+                            items = heroState.items,
+                            selectedId = heroState.selectedId,
+                            onItemClick = onHeroClick
+                        )
                      }
                  }
              }
 
             item(contentType = "continueWatching") {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    ContinueWatchingSection(
-                        items = continueWatchingState.items,
-                        statusMessage = continueWatchingState.statusMessage,
-                        onItemClick = onContinueWatchingClick,
-                        onHideItem = viewModel::hideContinueWatchingItem,
-                        onRemoveItem = viewModel::removeContinueWatchingItem
-                    )
-                }
+                ContinueWatchingSection(
+                    items = continueWatchingState.items,
+                    statusMessage = continueWatchingState.statusMessage,
+                    onItemClick = onContinueWatchingClick,
+                    onHideItem = viewModel::hideContinueWatchingItem,
+                    onRemoveItem = viewModel::removeContinueWatchingItem
+                )
             }
 
             item(contentType = "upNext") {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    UpNextSection(
-                        items = upNextState.items,
-                        statusMessage = upNextState.statusMessage,
-                        onItemClick = onContinueWatchingClick,
-                        onHideItem = viewModel::hideContinueWatchingItem,
-                        onRemoveItem = viewModel::removeContinueWatchingItem
-                    )
-                }
+                UpNextSection(
+                    items = upNextState.items,
+                    statusMessage = upNextState.statusMessage,
+                    onItemClick = onContinueWatchingClick,
+                    onHideItem = viewModel::hideContinueWatchingItem,
+                    onRemoveItem = viewModel::removeContinueWatchingItem
+                )
             }
 
             if (catalogSectionsState.sections.isNotEmpty()) {
@@ -720,13 +713,11 @@ private fun HomePage(
                     key = { it.section.key },
                     contentType = { "catalogSection" }
                 ) { sectionUi ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        HomeCatalogSectionRow(
-                            sectionUi = sectionUi,
-                            onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
-                            onItemClick = onCatalogItemClick
-                        )
-                    }
+                    HomeCatalogSectionRow(
+                        sectionUi = sectionUi,
+                        onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
+                        onItemClick = onCatalogItemClick
+                    )
                 }
             }
         }

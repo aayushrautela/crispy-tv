@@ -48,6 +48,8 @@ import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.ProviderLibraryFolder
 import com.crispy.rewrite.player.ProviderLibraryItem
 import com.crispy.rewrite.player.WatchHistoryEntry
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import com.crispy.rewrite.player.WatchHistoryLabService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
@@ -294,10 +296,10 @@ private fun LibraryScreen(
             .filter { item -> item.provider == selectedProvider }
             .filter { item -> selectedFolder == null || item.folderId == selectedFolder }
 
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(text = "Library") },
@@ -314,9 +316,9 @@ private fun LibraryScreen(
             modifier = Modifier
                 .fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 16.dp,
+                start = pageHorizontalPadding,
                 top = 12.dp + innerPadding.calculateTopPadding(),
-                end = 16.dp,
+                end = pageHorizontalPadding,
                 bottom = 12.dp + innerPadding.calculateBottomPadding()
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -356,7 +358,7 @@ private fun LibraryScreen(
                     if (uiState.localEntries.isEmpty()) {
                         item {
                             Card(modifier = Modifier.fillMaxWidth()) {
-                                Box(modifier = Modifier.padding(16.dp)) {
+                                Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                                     androidx.compose.foundation.layout.Column(
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
@@ -401,7 +403,7 @@ private fun LibraryScreen(
                     if (!authenticated) {
                         item {
                             Card(modifier = Modifier.fillMaxWidth()) {
-                                Box(modifier = Modifier.padding(16.dp)) {
+                                Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                                     Text(
                                         text = "Connect ${uiState.selectedSource.name.lowercase().replaceFirstChar { it.uppercase() }} in Settings to load this provider.",
                                         style = MaterialTheme.typography.bodyMedium
@@ -434,7 +436,7 @@ private fun LibraryScreen(
                                         "No items in $label yet."
                                     }
                                 Card(modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.padding(16.dp)) {
+                                    Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                                         Text(
                                             text = emptyMessage,
                                             style = MaterialTheme.typography.bodyMedium

@@ -63,6 +63,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.crispy.rewrite.BuildConfig
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import com.crispy.rewrite.metadata.CloudAddonRow
 import com.crispy.rewrite.metadata.MetadataAddonRegistry
 import kotlinx.coroutines.Dispatchers
@@ -440,10 +442,10 @@ private fun AddonsSettingsScreen(
     val scrollState = rememberScrollState()
     var pendingRemoval by remember { mutableStateOf<InstalledAddonUi?>(null) }
 
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -471,7 +473,7 @@ private fun AddonsSettingsScreen(
                     .padding(innerPadding)
                     .verticalScroll(scrollState)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -480,14 +482,14 @@ private fun AddonsSettingsScreen(
                     text = "Install addon manifests to add new streams and catalogs.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = 12.dp)
                 )
                 OutlinedTextField(
                     value = uiState.draftUrl,
                     onValueChange = onDraftChange,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = Dimensions.ListItemPadding),
                     singleLine = true,
                     label = { Text("Manifest URL") },
                     placeholder = { Text("https://example.com/manifest.json") }
@@ -496,7 +498,7 @@ private fun AddonsSettingsScreen(
                 FilledTonalButton(
                     onClick = onPrepareInstall,
                     enabled = !uiState.isCheckingAddon && !uiState.isInstallingAddon,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Add,

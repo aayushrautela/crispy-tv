@@ -69,6 +69,8 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.crispy.rewrite.home.MediaDetails
 import com.crispy.rewrite.home.MediaVideo
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 
 private const val SampleTrailerUrl =
     "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4"
@@ -320,19 +322,13 @@ private fun DetailsBody(
     onSeasonSelected: (Int) -> Unit
 ) {
     val details = uiState.details
-    val widthDp = LocalConfiguration.current.screenWidthDp
-    val horizontalPadding =
-        when {
-            widthDp >= 1024 -> 32.dp
-            widthDp >= 768 -> 24.dp
-            else -> 16.dp
-        }
+    val horizontalPadding = responsivePageHorizontalPadding()
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
-            .padding(bottom = 24.dp)
+            .padding(bottom = Dimensions.PageBottomPadding)
     ) {
         Spacer(modifier = Modifier.height(14.dp))
 

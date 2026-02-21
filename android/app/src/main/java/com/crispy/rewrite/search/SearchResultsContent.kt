@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.ui.components.PosterCard
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -38,10 +40,12 @@ fun SearchResultsContent(
     onItemClick: (CatalogItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
+    
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 124.dp),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(horizontal = pageHorizontalPadding, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {

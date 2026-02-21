@@ -54,6 +54,8 @@ import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.home.HomeCatalogService
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.WatchProvider
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -275,7 +277,6 @@ private fun HomeScreenSettingsScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -311,7 +312,7 @@ private fun HomeScreenSettingsScreen(
                     .padding(innerPadding)
                     .verticalScroll(scrollState)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -330,7 +331,7 @@ private fun HomeScreenSettingsScreen(
                     onSourceSelected = onWatchDataSourceChange
                 )
                 HorizontalDivider(
-                    modifier = Modifier.padding(start = 16.dp),
+                    modifier = Modifier.padding(start = Dimensions.ListItemPadding),
                     color = MaterialTheme.colorScheme.outlineVariant
                 )
                 ToggleSettingRow(
@@ -340,7 +341,7 @@ private fun HomeScreenSettingsScreen(
                     onCheckedChange = onContinueWatchingChange
                 )
                 HorizontalDivider(
-                    modifier = Modifier.padding(start = 16.dp),
+                    modifier = Modifier.padding(start = Dimensions.ListItemPadding),
                     color = MaterialTheme.colorScheme.outlineVariant
                 )
                 ToggleSettingRow(
@@ -358,7 +359,7 @@ private fun HomeScreenSettingsScreen(
                             text = "Loading catalog sources...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                            modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = 14.dp)
                         )
                     }
 
@@ -367,7 +368,7 @@ private fun HomeScreenSettingsScreen(
                             text = "No catalogs available yet. Install an addon first.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                            modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = 14.dp)
                         )
                     }
 
@@ -390,7 +391,7 @@ private fun HomeScreenSettingsScreen(
 
                             if (index < uiState.catalogs.lastIndex) {
                                 HorizontalDivider(
-                                    modifier = Modifier.padding(start = 16.dp),
+                                    modifier = Modifier.padding(start = Dimensions.ListItemPadding),
                                     color = MaterialTheme.colorScheme.outlineVariant
                                 )
                             }

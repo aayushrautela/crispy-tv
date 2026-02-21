@@ -53,6 +53,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 
 data class SettingsItem(
     val label: String,
@@ -190,9 +192,10 @@ fun SettingsScreen(
             )
         )
 
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
@@ -210,20 +213,20 @@ fun SettingsScreen(
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
             ) {
                 Text(
                     text = "Customize your experience",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = pageHorizontalPadding)
                 )
 
                 settingsGroups.forEach { group ->
                     SettingsGroupCard(group = group)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
             }
         }
     }
@@ -233,16 +236,18 @@ fun SettingsScreen(
 private fun SettingsGroupCard(
     group: SettingsGroup
 ) {
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
+    
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = pageHorizontalPadding)
     ) {
         Text(
             text = group.title,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = Dimensions.ListItemPadding, bottom = 8.dp)
         )
         
         Card(

@@ -62,6 +62,8 @@ import com.crispy.rewrite.domain.catalog.CatalogFilter
 import com.crispy.rewrite.home.HomeCatalogService
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.ui.components.PosterCard
+import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -375,11 +377,11 @@ private fun DiscoverScreen(
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
     val selectedCatalog = uiState.selectedCatalog
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text("Discover") },
@@ -399,10 +401,10 @@ private fun DiscoverScreen(
                     .fillMaxSize(),
 
             contentPadding = PaddingValues(
-                start = 16.dp,
-                top = 12.dp + innerPadding.calculateTopPadding(),
-                end = 16.dp,
-                bottom = 12.dp + innerPadding.calculateBottomPadding()
+                start = pageHorizontalPadding,
+                top = Dimensions.SmallSpacing + innerPadding.calculateTopPadding(),
+                end = pageHorizontalPadding,
+                bottom = Dimensions.SmallSpacing + innerPadding.calculateBottomPadding()
             ),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -545,7 +547,7 @@ private fun DiscoverScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 16.dp),
+                            .padding(vertical = Dimensions.ListItemPadding),
                         contentAlignment = Alignment.Center
                     ) {
                         LoadingIndicator(modifier = Modifier.size(20.dp))
@@ -575,13 +577,13 @@ private fun DiscoverScreen(
                     DiscoverSheet.Type -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(bottom = 24.dp)
+                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding)
                         ) {
                             item {
                                 Text(
                                     text = "Type",
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
                                 )
                             }
                             items(DiscoverTypeFilter.entries) { filter ->
@@ -613,13 +615,13 @@ private fun DiscoverScreen(
                     DiscoverSheet.Catalog -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(bottom = 24.dp)
+                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding)
                         ) {
                             item {
                                 Text(
                                     text = "Catalog",
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
                                 )
                             }
                             if (uiState.catalogs.isEmpty()) {
@@ -627,7 +629,7 @@ private fun DiscoverScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 24.dp),
+                                            .padding(vertical = Dimensions.PageBottomPadding),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
@@ -685,13 +687,13 @@ private fun DiscoverScreen(
                         val genres = selectedCatalog?.genres.orEmpty()
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(bottom = 24.dp)
+                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding)
                         ) {
                             item {
                                 Text(
                                     text = "Genre",
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
                                 )
                             }
                             item {
