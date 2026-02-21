@@ -9,6 +9,7 @@ import android.text.format.DateUtils
 import android.util.Log
 import android.view.ViewGroup
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Clear
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.crispy.rewrite.introskip.IntroSkipButtonOverlay
@@ -79,7 +81,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.AppBarWithSearch
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ExpandedDockedSearchBarWithGap
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.Surface
@@ -537,7 +538,7 @@ private fun HomePage(
                 }
             },
             placeholder = {
-                Text("Search movies, series...")
+                Text("Search your library")
             },
             leadingIcon = {
                 Icon(
@@ -546,16 +547,44 @@ private fun HomePage(
                 )
             },
             trailingIcon = {
-                if (queryText.isNotBlank()) {
-                    IconButton(
-                        onClick = {
-                            searchViewModel.clearQuery()
-                            textFieldState.setTextAndPlaceCursorAtEnd("")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (queryText.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                searchViewModel.clearQuery()
+                                textFieldState.setTextAndPlaceCursorAtEnd("")
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Clear,
+                                contentDescription = "Clear"
+                            )
                         }
+                    } else {
+                        IconButton(onClick = { /* AI Search */ }) {
+                            Icon(
+                                imageVector = Icons.Outlined.AutoAwesome,
+                                contentDescription = "AI Search"
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .clickable { onProfileClick() },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.Clear,
-                            contentDescription = "Clear"
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = "Profile",
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -570,26 +599,15 @@ private fun HomePage(
             AppBarWithSearch(
                 state = searchBarState,
                 inputField = inputField,
-                navigationIcon = {
-                    IconButton(
-                        onClick = onProfileClick,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Person,
-                            contentDescription = "Profile"
-                        )
-                    }
-                },
+                colors = SearchBarDefaults.appBarWithSearchColors(
+                    containerColor = Color.Transparent
+                ),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
                 scrollBehavior = scrollBehavior
             )
 
-            ExpandedDockedSearchBarWithGap(
+            ExpandedFullScreenSearchBar(
                 state = searchBarState,
                 inputField = inputField
             ) {
