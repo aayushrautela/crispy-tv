@@ -1095,7 +1095,6 @@ class RemoteWatchHistoryLabService(
             .map { it.contentId.lowercase(Locale.US) }
             .toSet()
 
-                   val title: String,
         val upNextFromWatchedShows = run {
             val watchedShows = traktGetArray("/sync/watched/shows") ?: return playbackEntries
             data class WatchedShowCandidate(
