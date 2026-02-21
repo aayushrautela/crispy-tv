@@ -493,7 +493,10 @@ private fun HomePage(
             HomeViewModel.factory(appContext)
         }
     )
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val heroState by viewModel.heroState.collectAsStateWithLifecycle()
+    val continueWatchingState by viewModel.continueWatchingState.collectAsStateWithLifecycle()
+    val upNextState by viewModel.upNextState.collectAsStateWithLifecycle()
+    val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
 
     val searchViewModel: SearchViewModel = viewModel(
         factory = remember(appContext) {
@@ -645,9 +648,9 @@ private fun HomePage(
             ),
             verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
-            item {
+            item(contentType = "hero") {
                 when {
-                    uiState.isLoading && uiState.heroItems.isEmpty() -> {
+                    heroState.isLoading && heroState.items.isEmpty() -> {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             Card(
                                 modifier = Modifier
@@ -664,11 +667,11 @@ private fun HomePage(
                         }
                     }
 
-                    uiState.heroItems.isEmpty() -> {
+                    heroState.items.isEmpty() -> {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = uiState.statusMessage,
+                                    text = heroState.statusMessage,
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
@@ -678,7 +681,8 @@ private fun HomePage(
                      else -> {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             HomeHeroCarousel(
-                                items = uiState.heroItems,
+                                items = heroState.items,
+                                selectedId = heroState.selectedId,
                                 onItemClick = onHeroClick
                             )
                         }
@@ -686,11 +690,11 @@ private fun HomePage(
                  }
              }
 
-            item {
+            item(contentType = "continueWatching") {
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                     ContinueWatchingSection(
-                        items = uiState.continueWatchingItems,
-                        statusMessage = uiState.continueWatchingStatusMessage,
+                        items = continueWatchingState.items,
+                        statusMessage = continueWatchingState.statusMessage,
                         onItemClick = onContinueWatchingClick,
                         onHideItem = viewModel::hideContinueWatchingItem,
                         onRemoveItem = viewModel::removeContinueWatchingItem
@@ -698,11 +702,11 @@ private fun HomePage(
                 }
             }
 
-            item {
+            item(contentType = "upNext") {
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                     UpNextSection(
-                        items = uiState.upNextItems,
-                        statusMessage = uiState.upNextStatusMessage,
+                        items = upNextState.items,
+                        statusMessage = upNextState.statusMessage,
                         onItemClick = onContinueWatchingClick,
                         onHideItem = viewModel::hideContinueWatchingItem,
                         onRemoveItem = viewModel::removeContinueWatchingItem
@@ -710,10 +714,11 @@ private fun HomePage(
                 }
             }
 
-            if (uiState.catalogSections.isNotEmpty()) {
+            if (catalogSectionsState.sections.isNotEmpty()) {
                 items(
-                    items = uiState.catalogSections,
-                    key = { it.section.key }
+                    items = catalogSectionsState.sections,
+                    key = { it.section.key },
+                    contentType = { "catalogSection" }
                 ) { sectionUi ->
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         HomeCatalogSectionRow(
@@ -1306,13 +1311,19 @@ private fun continueWatchingSubtitle(item: ContinueWatchingItem): String {
 @Composable
 private fun HomeHeroCarousel(
     items: List<HomeHeroItem>,
+    selectedId: String?,
     onItemClick: (HomeHeroItem) -> Unit
 ) {
     if (items.isEmpty()) {
         return
     }
 
-    val state = rememberCarouselState { items.size }
+    val initialIndex = remember(selectedId, items) {
+        selectedId?.let { id ->
+            items.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: 0
+        } ?: 0
+    }
+    val state = rememberCarouselState(initialItemIndex = initialIndex) { items.size }
 
     Box(
         modifier = Modifier

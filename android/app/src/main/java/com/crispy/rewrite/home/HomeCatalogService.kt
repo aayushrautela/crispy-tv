@@ -17,7 +17,11 @@ import com.crispy.rewrite.player.ContinueWatchingEntry as ProviderContinueWatchi
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
@@ -109,6 +113,22 @@ class HomeCatalogService(
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
 
+    @Volatile
+    private var resolvedAddonsCache: List<ResolvedAddon>? = null
+    @Volatile
+    private var resolvedAddonsCacheTimestamp: Long = 0
+    private val resolvedAddonsCacheLock = Any()
+
+    private val manifestFetchSemaphore = Semaphore(8)
+    private val metaResolveSemaphore = Semaphore(6)
+
+    fun invalidateAddonsCache() {
+        synchronized(resolvedAddonsCacheLock) {
+            resolvedAddonsCache = null
+            resolvedAddonsCacheTimestamp = 0
+        }
+    }
+
     suspend fun loadHeroItems(limit: Int = 10): HomeHeroLoadResult {
         val resolvedAddons = resolveAddons()
         if (resolvedAddons.isEmpty()) {
@@ -180,28 +200,34 @@ class HomeCatalogService(
         }
 
         val resolvedAddons = resolveAddons()
-        val items = mutableListOf<ContinueWatchingItem>()
-        for (entry in dedupedEntries) {
-            val mediaType = entry.asCatalogMediaType()
-            val resolvedMeta = resolveContinueWatchingMeta(entry, mediaType, resolvedAddons)
-
-            items +=
-                ContinueWatchingItem(
-                    id = continueWatchingKey(entry),
-                    contentId = entry.contentId,
-                    title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
-                    season = entry.season,
-                    episode = entry.episode,
-                    watchedAtEpochMs = entry.watchedAtEpochMs,
-                    progressPercent = 100.0,
-                    provider = WatchProvider.LOCAL,
-                    providerPlaybackId = null,
-                    isUpNextPlaceholder = false,
-                    backdropUrl = resolvedMeta?.backdropUrl,
-                    logoUrl = resolvedMeta?.logoUrl,
-                    addonId = resolvedMeta?.addonId,
-                    type = mediaType
-                )
+        val items = coroutineScope {
+            dedupedEntries.map { entry ->
+                async(Dispatchers.IO) {
+                    metaResolveSemaphore.acquire()
+                    try {
+                        val mediaType = entry.asCatalogMediaType()
+                        val resolvedMeta = resolveContinueWatchingMeta(entry, mediaType, resolvedAddons)
+                        ContinueWatchingItem(
+                            id = continueWatchingKey(entry),
+                            contentId = entry.contentId,
+                            title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
+                            season = entry.season,
+                            episode = entry.episode,
+                            watchedAtEpochMs = entry.watchedAtEpochMs,
+                            progressPercent = 100.0,
+                            provider = WatchProvider.LOCAL,
+                            providerPlaybackId = null,
+                            isUpNextPlaceholder = false,
+                            backdropUrl = resolvedMeta?.backdropUrl,
+                            logoUrl = resolvedMeta?.logoUrl,
+                            addonId = resolvedMeta?.addonId,
+                            type = mediaType
+                        )
+                    } finally {
+                        metaResolveSemaphore.release()
+                    }
+                }
+            }.awaitAll()
         }
 
         return ContinueWatchingLoadResult(
@@ -214,62 +240,54 @@ class HomeCatalogService(
         entries: List<ProviderContinueWatchingEntry>,
         limit: Int = 20
     ): ContinueWatchingLoadResult {
-        Log.d(TAG, "loadContinueWatchingItemsFromProvider: ${entries.size} entries, limit=$limit")
-        for ((i, e) in entries.withIndex()) {
-            Log.d(TAG, "  entry[$i]: id=${e.contentId} type=${e.contentType} title=${e.title} " +
-                "S${e.season}E${e.episode} progress=${e.progressPercent} upNext=${e.isUpNextPlaceholder} " +
-                "provider=${e.provider}")
-        }
         val targetCount = limit.coerceAtLeast(1)
         val dedupedEntries = entries
             .sortedByDescending { it.lastUpdatedEpochMs }
             .distinctBy { "${it.contentType.name}:${it.contentId}:${it.season ?: -1}:${it.episode ?: -1}" }
             .take(targetCount)
-        Log.d(TAG, "loadContinueWatchingItemsFromProvider: after dedup/limit: ${dedupedEntries.size}")
 
         if (dedupedEntries.isEmpty()) {
-            Log.d(TAG, "loadContinueWatchingItemsFromProvider: empty after dedup, returning")
             return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
         }
 
         val resolvedAddons = resolveAddons()
-        Log.d(TAG, "loadContinueWatchingItemsFromProvider: resolved ${resolvedAddons.size} addons")
-        val items = mutableListOf<ContinueWatchingItem>()
-        for (entry in dedupedEntries) {
-            val fakeWatchEntry =
-                WatchHistoryEntry(
-                    contentId = entry.contentId,
-                    contentType = entry.contentType,
-                    title = entry.title,
-                    season = entry.season,
-                    episode = entry.episode,
-                    watchedAtEpochMs = entry.lastUpdatedEpochMs
-                )
-            val mediaType = fakeWatchEntry.asCatalogMediaType()
-            val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry, mediaType, resolvedAddons)
-            Log.d(TAG, "  resolved entry ${entry.contentId}: meta=${resolvedMeta != null} " +
-                "backdrop=${resolvedMeta?.backdropUrl != null} logo=${resolvedMeta?.logoUrl != null}")
-            items +=
-                ContinueWatchingItem(
-                    id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
-                    contentId = entry.contentId,
-                    title = resolvedMeta?.title ?: entry.title,
-                    season = entry.season,
-                    episode = entry.episode,
-                    watchedAtEpochMs = entry.lastUpdatedEpochMs,
-                    progressPercent = entry.progressPercent,
-                    provider = entry.provider,
-                    providerPlaybackId = entry.providerPlaybackId,
-                    isUpNextPlaceholder = entry.isUpNextPlaceholder,
-                    backdropUrl = resolvedMeta?.backdropUrl,
-                    logoUrl = resolvedMeta?.logoUrl,
-                    addonId = resolvedMeta?.addonId,
-                    type = mediaType
-                )
+        val items = coroutineScope {
+            dedupedEntries.map { entry ->
+                async(Dispatchers.IO) {
+                    metaResolveSemaphore.acquire()
+                    try {
+                        val fakeWatchEntry = WatchHistoryEntry(
+                            contentId = entry.contentId,
+                            contentType = entry.contentType,
+                            title = entry.title,
+                            season = entry.season,
+                            episode = entry.episode,
+                            watchedAtEpochMs = entry.lastUpdatedEpochMs
+                        )
+                        val mediaType = fakeWatchEntry.asCatalogMediaType()
+                        val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry, mediaType, resolvedAddons)
+                        ContinueWatchingItem(
+                            id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
+                            contentId = entry.contentId,
+                            title = resolvedMeta?.title ?: entry.title,
+                            season = entry.season,
+                            episode = entry.episode,
+                            watchedAtEpochMs = entry.lastUpdatedEpochMs,
+                            progressPercent = entry.progressPercent,
+                            provider = entry.provider,
+                            providerPlaybackId = entry.providerPlaybackId,
+                            isUpNextPlaceholder = entry.isUpNextPlaceholder,
+                            backdropUrl = resolvedMeta?.backdropUrl,
+                            logoUrl = resolvedMeta?.logoUrl,
+                            addonId = resolvedMeta?.addonId,
+                            type = mediaType
+                        )
+                    } finally {
+                        metaResolveSemaphore.release()
+                    }
+                }
+            }.awaitAll()
         }
-        val inProgress = items.count { !it.isUpNextPlaceholder }
-        val upNext = items.count { it.isUpNextPlaceholder }
-        Log.d(TAG, "loadContinueWatchingItemsFromProvider: done. total=${items.size} inProgress=$inProgress upNext=$upNext")
 
         return ContinueWatchingLoadResult(
             items = items,
@@ -538,29 +556,48 @@ class HomeCatalogService(
     }
 
     private suspend fun resolveAddons(): List<ResolvedAddon> {
+        val now = System.currentTimeMillis()
+        synchronized(resolvedAddonsCacheLock) {
+            val cached = resolvedAddonsCache
+            if (cached != null && (now - resolvedAddonsCacheTimestamp) < RESOLVED_ADDONS_CACHE_TTL_MS) {
+                return cached
+            }
+        }
+
         val seeds = addonRegistry.orderedSeeds()
         if (seeds.isEmpty()) {
             return emptyList()
         }
 
-        val resolved = mutableListOf<ResolvedAddon>()
-        for ((index, seed) in seeds.withIndex()) {
-            val networkManifest = httpGetJson(seed.manifestUrl)
-            if (networkManifest != null) {
-                addonRegistry.cacheManifest(seed, networkManifest)
-            }
-
-            val manifest = networkManifest ?: parseCachedManifest(seed.cachedManifestJson) ?: fallbackManifestFor(seed)
-            val addonId = nonBlank(manifest?.optString("id")) ?: seed.addonIdHint
-
-            resolved +=
-                ResolvedAddon(
-                    orderIndex = index,
-                    seed = seed,
-                    addonId = addonId,
-                    manifest = manifest
-                )
+        val resolved = coroutineScope {
+            seeds.mapIndexed { index, seed ->
+                async(Dispatchers.IO) {
+                    manifestFetchSemaphore.acquire()
+                    try {
+                        val networkManifest = httpGetJson(seed.manifestUrl)
+                        if (networkManifest != null) {
+                            addonRegistry.cacheManifest(seed, networkManifest)
+                        }
+                        val manifest = networkManifest ?: parseCachedManifest(seed.cachedManifestJson) ?: fallbackManifestFor(seed)
+                        val addonId = nonBlank(manifest?.optString("id")) ?: seed.addonIdHint
+                        ResolvedAddon(
+                            orderIndex = index,
+                            seed = seed,
+                            addonId = addonId,
+                            manifest = manifest
+                        )
+                    } finally {
+                        manifestFetchSemaphore.release()
+                    }
+                }
+            }.awaitAll()
         }
+
+        synchronized(resolvedAddonsCacheLock) {
+            resolvedAddonsCache = resolved
+            resolvedAddonsCacheTimestamp = System.currentTimeMillis()
+        }
+
         return resolved
     }
 
@@ -1052,6 +1089,7 @@ class HomeCatalogService(
         private const val TAG = "HomeCatalogService"
         private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
         private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
+        private const val RESOLVED_ADDONS_CACHE_TTL_MS = 60_000L
     }
 }
 
