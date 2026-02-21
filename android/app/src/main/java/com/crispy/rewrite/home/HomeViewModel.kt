@@ -2,6 +2,7 @@ package com.crispy.rewrite.home
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -31,11 +32,13 @@ import java.util.Locale
 data class HomeUiState(
     val heroItems: List<HomeHeroItem> = emptyList(),
     val continueWatchingItems: List<ContinueWatchingItem> = emptyList(),
+    val upNextItems: List<ContinueWatchingItem> = emptyList(),
     val catalogSections: List<HomeCatalogSectionUi> = emptyList(),
     val selectedHeroId: String? = null,
     val isLoading: Boolean = true,
     val statusMessage: String = "Loading featured content...",
     val continueWatchingStatusMessage: String = "",
+    val upNextStatusMessage: String = "",
     val catalogsStatusMessage: String = ""
 ) {
     val selectedHero: HomeHeroItem?
@@ -55,6 +58,9 @@ class HomeViewModel internal constructor(
     private val suppressionStore: ContinueWatchingSuppressionStore,
     private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
+    companion object {
+        private const val TAG = "HomeViewModel"
+    }
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
     private val suppressedItemsByKey = suppressionStore.read()
@@ -141,17 +147,32 @@ class HomeViewModel internal constructor(
                     }
                 }
 
+            val inProgressItems = continueWatchingResult.items.filter { !it.isUpNextPlaceholder }
+            val upNextItems = continueWatchingResult.items.filter { it.isUpNextPlaceholder }
+            Log.d(TAG, "refresh: total=${continueWatchingResult.items.size} inProgress=${inProgressItems.size} upNext=${upNextItems.size} statusMessage=${continueWatchingResult.statusMessage}")
+            if (inProgressItems.isEmpty() && upNextItems.isEmpty()) {
+                Log.w(TAG, "refresh: no continue watching or up next items")
+            }
+            inProgressItems.forEachIndexed { i, item ->
+                Log.d(TAG, "  inProgress[$i]: id=${item.id} title=${item.title} s=${item.season} e=${item.episode} progress=${item.progressPercent}")
+            }
+            upNextItems.forEachIndexed { i, item ->
+                Log.d(TAG, "  upNext[$i]: id=${item.id} title=${item.title} s=${item.season} e=${item.episode} progress=${item.progressPercent}")
+            }
+
             _uiState.update { current ->
                 val selectedId =
                     current.selectedHeroId?.takeIf { id -> baseResult.heroResult.items.any { it.id == id } }
                         ?: baseResult.heroResult.items.firstOrNull()?.id
                 current.copy(
                     heroItems = baseResult.heroResult.items,
-                    continueWatchingItems = continueWatchingResult.items,
+                    continueWatchingItems = inProgressItems,
+                    upNextItems = upNextItems,
                     selectedHeroId = selectedId,
                     isLoading = false,
                     statusMessage = baseResult.heroResult.statusMessage,
-                    continueWatchingStatusMessage = continueWatchingResult.statusMessage
+                    continueWatchingStatusMessage = continueWatchingResult.statusMessage,
+                    upNextStatusMessage = if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) "" else continueWatchingResult.statusMessage
                 )
             }
 
@@ -220,7 +241,8 @@ class HomeViewModel internal constructor(
         _uiState.update { current ->
             current.copy(
                 continueWatchingItems = current.continueWatchingItems.filterNot { it.id == item.id },
-                continueWatchingStatusMessage = "Hidden ${item.title} from Continue Watching."
+                upNextItems = current.upNextItems.filterNot { it.id == item.id },
+                continueWatchingStatusMessage = "Hidden ${item.title}."
             )
         }
     }
@@ -233,7 +255,8 @@ class HomeViewModel internal constructor(
         _uiState.update { current ->
             current.copy(
                 continueWatchingItems = current.continueWatchingItems.filterNot { it.id == item.id },
-                continueWatchingStatusMessage = "Removing ${item.title} from Continue Watching..."
+                upNextItems = current.upNextItems.filterNot { it.id == item.id },
+                continueWatchingStatusMessage = "Removing ${item.title}..."
             )
         }
 

@@ -394,10 +394,14 @@ private fun DiscoverScreen(
             columns = GridCells.Adaptive(minSize = 124.dp),
             modifier =
                 Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                    .fillMaxSize(),
 
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 12.dp + innerPadding.calculateTopPadding(),
+                end = 16.dp,
+                bottom = 12.dp + innerPadding.calculateBottomPadding()
+            ),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

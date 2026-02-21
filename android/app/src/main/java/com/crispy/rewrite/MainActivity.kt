@@ -8,12 +8,12 @@ import android.os.Bundle
 import android.text.format.DateUtils
 import android.util.Log
 import android.view.ViewGroup
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.VideoLibrary
@@ -34,16 +34,12 @@ import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.rewrite.settings.PlaybackSettingsScreen
 import com.crispy.rewrite.settings.ProviderAuthPortalRoute
 import com.crispy.rewrite.settings.SettingsScreen
-import com.crispy.rewrite.search.SearchResultsContent
-import com.crispy.rewrite.search.SearchViewModel
+import com.crispy.rewrite.search.SearchRoute
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,12 +49,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,6 +70,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -86,8 +83,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -110,6 +105,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -168,12 +164,21 @@ class MainActivity : ComponentActivity() {
                 DisposableEffect(isDark) {
                     window.statusBarColor = android.graphics.Color.TRANSPARENT
                     window.navigationBarColor = android.graphics.Color.TRANSPARENT
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        window.isStatusBarContrastEnforced = false
+                        window.isNavigationBarContrastEnforced = false
+                    }
                     val controller = WindowCompat.getInsetsController(window, window.decorView)
                     controller.isAppearanceLightStatusBars = !isDark
                     controller.isAppearanceLightNavigationBars = !isDark
                     onDispose { }
                 }
-                AppShell()
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppShell()
+                }
             }
         }
     }
@@ -267,6 +272,7 @@ private const val PlaybackSettingsRoute = "settings/playback"
 private const val HomeScreenSettingsRoutePath = "settings/home"
 private const val AddonsSettingsRoutePath = "settings/addons"
 private const val ProviderPortalRoutePath = "settings/providers"
+private const val SearchRoutePath = "search"
 
 private const val CatalogListRoute = "catalog"
 private const val CatalogMediaTypeArg = "mediaType"
@@ -346,6 +352,18 @@ private fun AppShell() {
                     },
                     onCatalogSeeAllClick = { section ->
                         navController.navigate(catalogListRoute(section))
+                    },
+                    onSearchClick = {
+                        navController.navigate(SearchRoutePath)
+                    }
+                )
+            }
+
+            composable(SearchRoutePath) {
+                SearchRoute(
+                    onBack = { navController.popBackStack() },
+                    onItemClick = { item ->
+                        navController.navigate(homeDetailsRoute(item.id))
                     }
                 )
             }
@@ -456,7 +474,9 @@ private fun HomePage(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
-    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit
+    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
+    onSearchClick: () -> Unit,
+    onProfileClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -467,132 +487,46 @@ private fun HomePage(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val searchViewModel: SearchViewModel = viewModel(
-        factory = remember(appContext) {
-            SearchViewModel.factory(appContext)
-        }
-    )
-    val searchUiState by searchViewModel.uiState.collectAsStateWithLifecycle()
-    var searchExpanded by rememberSaveable { mutableStateOf(false) }
-    val searchOuterHorizontalPadding by animateDpAsState(
-        targetValue = if (searchExpanded) 0.dp else 16.dp,
-        label = "searchOuterHorizontalPadding"
-    )
-    val searchOuterVerticalPadding by animateDpAsState(
-        targetValue = if (searchExpanded) 0.dp else 8.dp,
-        label = "searchOuterVerticalPadding"
-    )
-
-    BackHandler(enabled = searchExpanded) {
-        searchExpanded = false
-        searchViewModel.clearQuery()
-    }
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            Surface(color = MaterialTheme.colorScheme.surface) {
-                SearchBar(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(
-                                WindowInsetsSides.Top + WindowInsetsSides.Horizontal
-                            )
-                        )
-                        .padding(
-                            horizontal = searchOuterHorizontalPadding,
-                            vertical = searchOuterVerticalPadding
-                        ),
-                    windowInsets = WindowInsets(0, 0, 0, 0),
-                    shape = if (searchExpanded) SearchBarDefaults.fullScreenShape else SearchBarDefaults.dockedShape,
-                    inputField = {
-                        SearchBarDefaults.InputField(
-                            query = searchUiState.query,
-                            onQueryChange = { query ->
-                                if (!searchExpanded) {
-                                    searchExpanded = true
-                                }
-                                searchViewModel.updateQuery(query)
-                            },
-                            onSearch = { },
-                            expanded = searchExpanded,
-                            onExpandedChange = { expanded ->
-                                searchExpanded = expanded
-                                if (!expanded) {
-                                    searchViewModel.clearQuery()
-                                }
-                            },
-                            placeholder = { Text("Search movies, series...") },
-                            leadingIcon = {
-                                if (searchExpanded) {
-                                    IconButton(
-                                        onClick = {
-                                            searchExpanded = false
-                                            searchViewModel.clearQuery()
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                            contentDescription = "Back"
-                                        )
-                                    }
-                                } else {
-                                    Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
-                                }
-                            },
-                            trailingIcon = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (searchUiState.query.isNotBlank()) {
-                                        IconButton(onClick = searchViewModel::clearQuery) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Clear,
-                                                contentDescription = "Clear"
-                                            )
-                                        }
-                                    }
-                                    IconButton(onClick = searchViewModel::refreshCatalogs) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Refresh,
-                                            contentDescription = "Refresh"
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    },
-                    expanded = searchExpanded,
-                    onExpandedChange = { expanded ->
-                        searchExpanded = expanded
-                        if (!expanded) {
-                            searchViewModel.clearQuery()
-                        }
-                    }
-                ) {
-                    if (searchExpanded) {
-                        SearchResultsContent(
-                            uiState = searchUiState,
-                            onMediaTypeChange = searchViewModel::setMediaType,
-                            onCatalogToggle = searchViewModel::toggleCatalog,
-                            onItemClick = { item ->
-                                searchExpanded = false
-                                searchViewModel.clearQuery()
-                                onCatalogItemClick(item)
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .imePadding()
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = "Crispy TV",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Search"
                         )
                     }
-                }
-            }
+                },
+                actions = {
+                    IconButton(onClick = onProfileClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.Person,
+                            contentDescription = "Profiles"
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior
+            )
         }
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 12.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding(),
+                bottom = 12.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -641,6 +575,18 @@ private fun HomePage(
                     ContinueWatchingSection(
                         items = uiState.continueWatchingItems,
                         statusMessage = uiState.continueWatchingStatusMessage,
+                        onItemClick = onContinueWatchingClick,
+                        onHideItem = viewModel::hideContinueWatchingItem,
+                        onRemoveItem = viewModel::removeContinueWatchingItem
+                    )
+                }
+            }
+
+            item {
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    UpNextSection(
+                        items = uiState.upNextItems,
+                        statusMessage = uiState.upNextStatusMessage,
                         onItemClick = onContinueWatchingClick,
                         onHideItem = viewModel::hideContinueWatchingItem,
                         onRemoveItem = viewModel::removeContinueWatchingItem
@@ -734,6 +680,226 @@ private fun ContinueWatchingSection(
             }
         }
     }
+}
+
+@Composable
+private fun UpNextSection(
+    items: List<ContinueWatchingItem>,
+    statusMessage: String,
+    onItemClick: (ContinueWatchingItem) -> Unit,
+    onHideItem: (ContinueWatchingItem) -> Unit,
+    onRemoveItem: (ContinueWatchingItem) -> Unit
+) {
+    if (items.isEmpty() && statusMessage.isBlank()) {
+        return
+    }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "Up Next",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            if (statusMessage.isNotBlank()) {
+                Text(
+                    text = statusMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (items.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                items(items, key = { it.id }) { item ->
+                    UpNextCard(
+                        item = item,
+                        onClick = { onItemClick(item) },
+                        onHideClick = { onHideItem(item) },
+                        onRemoveClick = { onRemoveItem(item) },
+                        onDetailsClick = { onItemClick(item) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpNextCard(
+    item: ContinueWatchingItem,
+    onClick: () -> Unit,
+    onHideClick: () -> Unit,
+    onRemoveClick: () -> Unit,
+    onDetailsClick: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .width(260.dp)
+            .aspectRatio(16f / 9f)
+            .clip(RoundedCornerShape(28.dp))
+            .clickable(onClick = onClick)
+    ) {
+        if (!item.backdropUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = item.backdropUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.64f)
+                        )
+                    )
+                )
+        )
+
+        // "UP NEXT" badge at top-left (like Nuvio)
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 12.dp, top = 10.dp),
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.primary
+        ) {
+            Text(
+                text = "UP NEXT",
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+
+        if (!item.logoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = item.logoUrl,
+                contentDescription = "${item.title} logo",
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth(0.6f)
+                    .height(56.dp)
+                    .padding(top = 12.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+        ) {
+            IconButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.small)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MoreVert,
+                    contentDescription = "Up next actions",
+                    tint = Color.White
+                )
+            }
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Details") },
+                    onClick = {
+                        menuExpanded = false
+                        onDetailsClick()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Remove") },
+                    onClick = {
+                        menuExpanded = false
+                        onRemoveClick()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Hide") },
+                    onClick = {
+                        menuExpanded = false
+                        onHideClick()
+                    }
+                )
+            }
+        }
+
+        // Subtitle at bottom-left showing episode info
+        Text(
+            text = upNextSubtitle(item),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.95f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Progress bar at the very bottom (like Nuvio)
+        if (item.progressPercent > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(Color.White.copy(alpha = 0.3f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction = (item.progressPercent / 100f).coerceIn(0f, 1f))
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+        }
+    }
+}
+
+private fun upNextSubtitle(item: ContinueWatchingItem): String {
+    val seasonEpisode =
+        if (
+            item.type.equals("series", ignoreCase = true) &&
+                item.season != null &&
+                item.episode != null
+        ) {
+            String.format(Locale.US, "S%02d:E%02d", item.season, item.episode)
+        } else {
+            null
+        }
+    val relativeWatched = DateUtils.getRelativeTimeSpanString(
+        item.watchedAtEpochMs,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS
+    ).toString()
+
+    return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
 }
 
 @Composable

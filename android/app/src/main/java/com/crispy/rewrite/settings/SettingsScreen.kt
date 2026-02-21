@@ -204,19 +204,26 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .verticalScroll(scrollState)
         ) {
-            Text(
-                text = "Customize your experience",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+            Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding()))
 
-            settingsGroups.forEach { group ->
-                SettingsGroupCard(group = group)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Text(
+                    text = "Customize your experience",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                settingsGroups.forEach { group ->
+                    SettingsGroupCard(group = group)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

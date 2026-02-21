@@ -79,7 +79,6 @@ fun CatalogRoute(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 124.dp),
@@ -88,9 +87,9 @@ fun CatalogRoute(
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
                 contentPadding = PaddingValues(
                     start = 16.dp,
-                    top = 12.dp,
+                    top = 12.dp + innerPadding.calculateTopPadding(),
                     end = 16.dp,
-                    bottom = 12.dp
+                    bottom = 12.dp + innerPadding.calculateBottomPadding()
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)

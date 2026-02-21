@@ -599,10 +599,12 @@ class RemoteWatchHistoryLabService(
         source: WatchProvider?
     ): ContinueWatchingLabResult {
         val targetLimit = limit.coerceAtLeast(1)
+        Log.d(TAG, "listContinueWatching: source=$source, limit=$targetLimit")
 
         if (source != null) {
             if (source == WatchProvider.LOCAL) {
                 val local = localContinueWatchingFallback().take(targetLimit)
+                Log.d(TAG, "listContinueWatching: LOCAL fallback returned ${local.size} entries")
                 val status = if (local.isNotEmpty()) {
                     "Loaded ${local.size} local continue watching entries."
                 } else {
@@ -617,17 +619,25 @@ class RemoteWatchHistoryLabService(
             val entries =
                 when (source) {
                     WatchProvider.TRAKT -> {
-                        if (traktAccessToken().isNotEmpty() && traktClientId.isNotBlank()) {
+                        val hasToken = traktAccessToken().isNotEmpty()
+                        val hasClientId = traktClientId.isNotBlank()
+                        Log.d(TAG, "listContinueWatching: TRAKT hasToken=$hasToken, hasClientId=$hasClientId")
+                        if (hasToken && hasClientId) {
                             fetchTraktContinueWatching(nowMs)
                         } else {
+                            Log.w(TAG, "listContinueWatching: TRAKT skipped — missing token or clientId")
                             emptyList()
                         }
                     }
 
                     WatchProvider.SIMKL -> {
-                        if (simklAccessToken().isNotEmpty() && simklClientId.isNotBlank()) {
+                        val hasToken = simklAccessToken().isNotEmpty()
+                        val hasClientId = simklClientId.isNotBlank()
+                        Log.d(TAG, "listContinueWatching: SIMKL hasToken=$hasToken, hasClientId=$hasClientId")
+                        if (hasToken && hasClientId) {
                             fetchSimklContinueWatching(nowMs)
                         } else {
+                            Log.w(TAG, "listContinueWatching: SIMKL skipped — missing token or clientId")
                             emptyList()
                         }
                     }
@@ -635,7 +645,21 @@ class RemoteWatchHistoryLabService(
                     WatchProvider.LOCAL -> emptyList()
                 }
 
+            Log.d(TAG, "listContinueWatching: raw entries from $source: ${entries.size}")
+            for ((i, e) in entries.withIndex()) {
+                Log.d(TAG, "  raw[$i]: type=${e.contentType}, id=${e.contentId}, title=${e.title}, " +
+                        "progress=${e.progressPercent}%, upNext=${e.isUpNextPlaceholder}, " +
+                        "S${e.seasonNumber}E${e.episodeNumber}")
+            }
+
             val normalized = normalizeContinueWatching(entries = entries, nowMs = nowMs, limit = targetLimit)
+            Log.d(TAG, "listContinueWatching: normalized entries: ${normalized.size}")
+            for ((i, e) in normalized.withIndex()) {
+                Log.d(TAG, "  norm[$i]: type=${e.contentType}, id=${e.contentId}, title=${e.title}, " +
+                        "progress=${e.progressPercent}%, upNext=${e.isUpNextPlaceholder}, " +
+                        "S${e.seasonNumber}E${e.episodeNumber}")
+            }
+
             val status =
                 when (source) {
                     WatchProvider.TRAKT -> {
@@ -664,6 +688,7 @@ class RemoteWatchHistoryLabService(
 
                     WatchProvider.LOCAL -> "Local source selected."
                 }
+            Log.d(TAG, "listContinueWatching: statusMessage=\"$status\"")
 
             return ContinueWatchingLabResult(
                 statusMessage = status,
@@ -671,10 +696,14 @@ class RemoteWatchHistoryLabService(
             )
         }
 
+        Log.d(TAG, "listContinueWatching: no source specified, trying Trakt then Simkl then Local")
         val traktEntries = fetchTraktContinueWatching(nowMs)
+        Log.d(TAG, "listContinueWatching: traktEntries=${traktEntries.size}")
         val simklEntries = if (traktEntries.isEmpty()) fetchSimklContinueWatching(nowMs) else emptyList()
+        Log.d(TAG, "listContinueWatching: simklEntries=${simklEntries.size}")
         if (traktEntries.isEmpty() && simklEntries.isEmpty()) {
             val local = localContinueWatchingFallback().take(targetLimit)
+            Log.d(TAG, "listContinueWatching: both empty, local fallback=${local.size}")
             val status = if (local.isNotEmpty()) {
                 "Loaded ${local.size} local continue watching entries."
             } else {
@@ -691,6 +720,7 @@ class RemoteWatchHistoryLabService(
             nowMs = nowMs,
             limit = targetLimit
         )
+        Log.d(TAG, "listContinueWatching: merged & normalized=${merged.size}")
 
         val status =
             when {
@@ -710,22 +740,34 @@ class RemoteWatchHistoryLabService(
         limitPerFolder: Int,
         source: WatchProvider?
     ): ProviderLibrarySnapshot {
+        Log.d(TAG, "listProviderLibrary: source=$source, limitPerFolder=$limitPerFolder")
         if (source != null) {
             val selected =
                 when (source) {
-                    WatchProvider.LOCAL -> null
+                    WatchProvider.LOCAL -> {
+                        Log.d(TAG, "listProviderLibrary: LOCAL source — no provider library")
+                        null
+                    }
                     WatchProvider.TRAKT -> {
-                        if (traktAccessToken().isNotEmpty() && traktClientId.isNotBlank()) {
+                        val hasToken = traktAccessToken().isNotEmpty()
+                        val hasClientId = traktClientId.isNotBlank()
+                        Log.d(TAG, "listProviderLibrary: TRAKT hasToken=$hasToken, hasClientId=$hasClientId")
+                        if (hasToken && hasClientId) {
                             fetchTraktLibrary(limitPerFolder)
                         } else {
+                            Log.w(TAG, "listProviderLibrary: TRAKT skipped — missing token or clientId")
                             emptyList<ProviderLibraryFolder>() to emptyList()
                         }
                     }
 
                     WatchProvider.SIMKL -> {
-                        if (simklAccessToken().isNotEmpty() && simklClientId.isNotBlank()) {
+                        val hasToken = simklAccessToken().isNotEmpty()
+                        val hasClientId = simklClientId.isNotBlank()
+                        Log.d(TAG, "listProviderLibrary: SIMKL hasToken=$hasToken, hasClientId=$hasClientId")
+                        if (hasToken && hasClientId) {
                             fetchSimklLibrary(limitPerFolder)
                         } else {
+                            Log.w(TAG, "listProviderLibrary: SIMKL skipped — missing token or clientId")
                             emptyList<ProviderLibraryFolder>() to emptyList()
                         }
                     }
@@ -758,6 +800,13 @@ class RemoteWatchHistoryLabService(
                         }
                     }
                 }
+
+            Log.d(TAG, "listProviderLibrary: status='$status', folders=${selected?.first?.size ?: 0}, items=${selected?.second?.size ?: 0}")
+            if (selected != null) {
+                for (f in selected.first) {
+                    Log.d(TAG, "  folder: id=${f.id}, label=${f.label}, count=${f.itemCount}")
+                }
+            }
 
             return ProviderLibrarySnapshot(
                 statusMessage = status,
@@ -879,7 +928,9 @@ class RemoteWatchHistoryLabService(
     }
 
     private fun normalizeContinueWatching(entries: List<ContinueWatchingEntry>, nowMs: Long, limit: Int): List<ContinueWatchingEntry> {
+        Log.d(TAG, "normalizeContinueWatching: input=${entries.size}, limit=$limit")
         if (entries.isEmpty()) {
+            Log.d(TAG, "normalizeContinueWatching: empty input, returning empty")
             return emptyList()
         }
 
@@ -892,17 +943,22 @@ class RemoteWatchHistoryLabService(
                     entry.copy(progressPercent = progress)
                 }
                 .filter { entry ->
-                    entry.lastUpdatedEpochMs >= staleCutoff
+                    val keep = entry.lastUpdatedEpochMs >= staleCutoff
+                    if (!keep) Log.d(TAG, "normalizeContinueWatching: STALE — ${entry.title} (${entry.contentId}), lastUpdated=${entry.lastUpdatedEpochMs}, cutoff=$staleCutoff")
+                    keep
                 }
                 .filter { entry ->
-                    if (entry.isUpNextPlaceholder) {
+                    val keep = if (entry.isUpNextPlaceholder) {
                         entry.progressPercent <= 0.0
                     } else {
                         entry.progressPercent >= CONTINUE_WATCHING_MIN_PROGRESS_PERCENT &&
                             entry.progressPercent < CONTINUE_WATCHING_COMPLETION_PERCENT
                     }
+                    if (!keep) Log.d(TAG, "normalizeContinueWatching: PROGRESS_FILTER — ${entry.title} (${entry.contentId}), progress=${entry.progressPercent}%, upNext=${entry.isUpNextPlaceholder}")
+                    keep
                 }
                 .toList()
+        Log.d(TAG, "normalizeContinueWatching: after stale+progress filter: ${candidates.size}")
 
         val byContent = linkedMapOf<String, ContinueWatchingEntry>()
         candidates.forEach { entry ->
@@ -912,16 +968,24 @@ class RemoteWatchHistoryLabService(
                 byContent[key] = entry
                 return@forEach
             }
-
+            Log.d(TAG, "normalizeContinueWatching: DEDUP key=$key — picking preferred between existing and new entry")
             byContent[key] = choosePreferredContinueWatching(current, entry)
         }
 
-        return byContent.values
+        Log.d(TAG, "normalizeContinueWatching: after dedup: ${byContent.size}")
+
+        val sorted = byContent.values
             .sortedWith(
                 compareByDescending<ContinueWatchingEntry> { it.progressPercent > 0.0 }
                     .thenByDescending { it.lastUpdatedEpochMs }
             )
             .take(limit)
+
+        Log.d(TAG, "normalizeContinueWatching: final output: ${sorted.size} items")
+        for ((i, e) in sorted.withIndex()) {
+            Log.d(TAG, "  final[$i]: ${e.title} (${e.contentId}), progress=${e.progressPercent}%, upNext=${e.isUpNextPlaceholder}, S${e.seasonNumber}E${e.episodeNumber}")
+        }
+        return sorted
     }
 
     private fun choosePreferredContinueWatching(current: ContinueWatchingEntry, incoming: ContinueWatchingEntry): ContinueWatchingEntry {
@@ -956,9 +1020,16 @@ class RemoteWatchHistoryLabService(
     )
 
     private fun fetchTraktContinueWatching(nowMs: Long): List<ContinueWatchingEntry> {
-        val payload = traktGetArray("/sync/playback") ?: return emptyList()
+        Log.d(TAG, "fetchTraktContinueWatching: starting, nowMs=$nowMs")
+        val payload = traktGetArray("/sync/playback")
+        if (payload == null) {
+            Log.w(TAG, "fetchTraktContinueWatching: /sync/playback returned null")
+            return emptyList()
+        }
+        Log.d(TAG, "fetchTraktContinueWatching: /sync/playback returned ${payload.length()} items")
 
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
+        Log.d(TAG, "fetchTraktContinueWatching: staleCutoff=${java.util.Date(staleCutoff)}")
         val nextEpisodeCache = mutableMapOf<String, TraktNextEpisode?>()
 
         fun normalizedImdbId(raw: String): String {
@@ -1002,25 +1073,45 @@ class RemoteWatchHistoryLabService(
             }
                 .sortedByDescending { (pausedAt, _) -> pausedAt }
                 .take(CONTINUE_WATCHING_PLAYBACK_LIMIT)
+        Log.d(TAG, "fetchTraktContinueWatching: playbackItems count=${playbackItems.size}")
 
         val playbackEntries =
             buildList {
                 for ((pausedAt, obj) in playbackItems) {
                     val type = obj.optString("type").trim().lowercase(Locale.US)
                     val progress = obj.optDouble("progress", -1.0)
-                    if (progress < 0) continue
-                    if (pausedAt < staleCutoff) continue
-                    if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
+                    val rawTitle = when (type) {
+                        "movie" -> obj.optJSONObject("movie")?.optString("title")
+                        "episode" -> obj.optJSONObject("show")?.optString("title")
+                        else -> null
+                    } ?: "?"
+                    if (progress < 0) {
+                        Log.d(TAG, "  playback skip: type=$type title=$rawTitle — invalid progress ($progress)")
+                        continue
+                    }
+                    if (pausedAt < staleCutoff) {
+                        Log.d(TAG, "  playback skip: type=$type title=$rawTitle — stale (paused ${java.util.Date(pausedAt)})")
+                        continue
+                    }
+                    if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) {
+                        Log.d(TAG, "  playback skip: type=$type title=$rawTitle — progress too low ($progress%)")
+                        continue
+                    }
 
                     if (type == "movie") {
                         if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+                            Log.d(TAG, "  playback skip: movie title=$rawTitle — completed ($progress%)")
                             continue
                         }
 
                         val movie = obj.optJSONObject("movie") ?: continue
                         val imdbId = normalizedImdbId(movie.optJSONObject("ids")?.optString("imdb")?.trim().orEmpty())
-                        if (imdbId.isEmpty()) continue
+                        if (imdbId.isEmpty()) {
+                            Log.d(TAG, "  playback skip: movie title=$rawTitle — no IMDB id")
+                            continue
+                        }
                         val title = movie.optString("title").trim().ifEmpty { imdbId }
+                        Log.d(TAG, "  playback ADD movie: id=$imdbId title=$title progress=$progress%")
                         add(
                             ContinueWatchingEntry(
                                 contentId = imdbId,
@@ -1043,7 +1134,10 @@ class RemoteWatchHistoryLabService(
                         val show = obj.optJSONObject("show") ?: continue
                         val ids = show.optJSONObject("ids")
                         val imdbId = normalizedImdbId(ids?.optString("imdb")?.trim().orEmpty())
-                        if (imdbId.isEmpty()) continue
+                        if (imdbId.isEmpty()) {
+                            Log.d(TAG, "  playback skip: episode show=$rawTitle — no IMDB id")
+                            continue
+                        }
 
                         val showTraktId = ids?.opt("trakt")?.toString()?.trim().orEmpty()
                         val episodeSeason = episode.optInt("season", 0).takeIf { it > 0 }
@@ -1053,7 +1147,13 @@ class RemoteWatchHistoryLabService(
                         val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
 
                         if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-                            val next = nextEpisodeForShow(showTraktId) ?: continue
+                            Log.d(TAG, "  playback episode completed: show=$showTitle traktId=$showTraktId S${episodeSeason}E${episodeNumber} ($progress%) — looking up next episode")
+                            val next = nextEpisodeForShow(showTraktId)
+                            if (next == null) {
+                                Log.d(TAG, "  playback skip: show=$showTitle — no next episode from Trakt progress API")
+                                continue
+                            }
+                            Log.d(TAG, "  playback ADD upNext: show=$showTitle S${next.season}E${next.episode} (next=${next.title})")
                             add(
                                 ContinueWatchingEntry(
                                     contentId = imdbId,
@@ -1071,6 +1171,7 @@ class RemoteWatchHistoryLabService(
                             continue
                         }
 
+                        Log.d(TAG, "  playback ADD episode in-progress: show=$showTitle S${episodeSeason}E${episodeNumber} progress=$progress%")
                         add(
                             ContinueWatchingEntry(
                                 contentId = imdbId,
@@ -1088,15 +1189,24 @@ class RemoteWatchHistoryLabService(
                     }
                 }
             }
+        Log.d(TAG, "fetchTraktContinueWatching: playbackEntries=${playbackEntries.size} (movies=${playbackEntries.count { it.contentType == MetadataLabMediaType.MOVIE }}, series=${playbackEntries.count { it.contentType == MetadataLabMediaType.SERIES }}, upNext=${playbackEntries.count { it.isUpNextPlaceholder }})")
 
         val existingSeriesIds = playbackEntries
             .asSequence()
             .filter { it.contentType == MetadataLabMediaType.SERIES }
             .map { it.contentId.lowercase(Locale.US) }
             .toSet()
+        Log.d(TAG, "fetchTraktContinueWatching: existingSeriesIds=$existingSeriesIds")
 
         val upNextFromWatchedShows = run {
-            val watchedShows = traktGetArray("/sync/watched/shows") ?: return playbackEntries
+            Log.d(TAG, "fetchTraktContinueWatching: fetching /sync/watched/shows for additional up-next")
+            val watchedShows = traktGetArray("/sync/watched/shows")
+            if (watchedShows == null) {
+                Log.w(TAG, "fetchTraktContinueWatching: /sync/watched/shows returned null")
+                return playbackEntries
+            }
+            Log.d(TAG, "fetchTraktContinueWatching: /sync/watched/shows returned ${watchedShows.length()} shows")
+
             data class WatchedShowCandidate(
                 val imdbId: String,
                 val traktId: String,
@@ -1109,18 +1219,24 @@ class RemoteWatchHistoryLabService(
                     for (index in 0 until watchedShows.length()) {
                         val obj = watchedShows.optJSONObject(index) ?: continue
                         val lastWatchedAt = parseIsoToEpochMs(obj.optString("last_watched_at")) ?: continue
-                        if (lastWatchedAt < staleCutoff) continue
+                        if (lastWatchedAt < staleCutoff) {
+                            continue
+                        }
 
                         val show = obj.optJSONObject("show") ?: continue
                         val ids = show.optJSONObject("ids") ?: continue
                         val imdbId = normalizedImdbId(ids.optString("imdb").trim())
                         if (imdbId.isEmpty()) continue
-                        if (imdbId.lowercase(Locale.US) in existingSeriesIds) continue
+                        if (imdbId.lowercase(Locale.US) in existingSeriesIds) {
+                            Log.d(TAG, "  watched-show skip: ${show.optString("title")} ($imdbId) — already in playback entries")
+                            continue
+                        }
 
                         val traktId = ids.opt("trakt")?.toString()?.trim().orEmpty()
                         if (traktId.isEmpty()) continue
                         val title = show.optString("title").trim().ifEmpty { imdbId }
 
+                        Log.d(TAG, "  watched-show candidate: title=$title imdb=$imdbId trakt=$traktId lastWatched=${java.util.Date(lastWatchedAt)}")
                         add(
                             WatchedShowCandidate(
                                 imdbId = imdbId,
@@ -1134,10 +1250,17 @@ class RemoteWatchHistoryLabService(
                     .sortedByDescending { it.lastWatchedAtMs }
                     .distinctBy { it.imdbId }
                     .take(CONTINUE_WATCHING_UPNEXT_SHOW_LIMIT)
+            Log.d(TAG, "fetchTraktContinueWatching: watched-show candidates=${candidates.size}")
 
             buildList {
                 candidates.forEach { candidate ->
-                    val next = nextEpisodeForShow(candidate.traktId) ?: return@forEach
+                    Log.d(TAG, "  watched-show nextEpisode lookup: title=${candidate.title} trakt=${candidate.traktId}")
+                    val next = nextEpisodeForShow(candidate.traktId)
+                    if (next == null) {
+                        Log.d(TAG, "  watched-show skip: ${candidate.title} — no next episode")
+                        return@forEach
+                    }
+                    Log.d(TAG, "  watched-show ADD upNext: ${candidate.title} S${next.season}E${next.episode} (${next.title})")
                     add(
                         ContinueWatchingEntry(
                             contentId = candidate.imdbId,
@@ -1155,6 +1278,8 @@ class RemoteWatchHistoryLabService(
                 }
             }
         }
+        Log.d(TAG, "fetchTraktContinueWatching: upNextFromWatchedShows=${upNextFromWatchedShows.size}")
+        Log.d(TAG, "fetchTraktContinueWatching: TOTAL returning ${playbackEntries.size + upNextFromWatchedShows.size} entries (playback=${playbackEntries.size}, upNext=${upNextFromWatchedShows.size})")
 
         return playbackEntries + upNextFromWatchedShows
     }
@@ -1228,9 +1353,12 @@ class RemoteWatchHistoryLabService(
     }
 
     private fun fetchTraktLibrary(limitPerFolder: Int): Pair<List<ProviderLibraryFolder>, List<ProviderLibraryItem>> {
+        Log.d(TAG, "fetchTraktLibrary: starting with limitPerFolder=$limitPerFolder")
         val folderItems = linkedMapOf<String, MutableList<ProviderLibraryItem>>()
 
-        addTraktFolder(folderItems, "continue-watching", fetchTraktContinueWatching(System.currentTimeMillis()).map {
+        val cwEntries = fetchTraktContinueWatching(System.currentTimeMillis())
+        Log.d(TAG, "fetchTraktLibrary: continue-watching entries from fetchTraktContinueWatching=${cwEntries.size}")
+        addTraktFolder(folderItems, "continue-watching", cwEntries.map {
             ProviderLibraryItem(
                 provider = WatchProvider.TRAKT,
                 folderId = "continue-watching",
@@ -1242,11 +1370,23 @@ class RemoteWatchHistoryLabService(
                 addedAtEpochMs = it.lastUpdatedEpochMs
             )
         }, limitPerFolder)
+        Log.d(TAG, "fetchTraktLibrary: continue-watching folder size=${folderItems["continue-watching"]?.size ?: 0}")
 
-        addTraktFolder(folderItems, "watched", traktHistoryItems(), limitPerFolder)
-        addTraktFolder(folderItems, "watchlist", traktWatchlistItems(), limitPerFolder)
-        addTraktFolder(folderItems, "collection", traktCollectionItems(), limitPerFolder)
-        addTraktFolder(folderItems, "ratings", traktRatingsItems(), limitPerFolder)
+        val watchedItems = traktHistoryItems()
+        Log.d(TAG, "fetchTraktLibrary: watched items from traktHistoryItems=${watchedItems.size}")
+        addTraktFolder(folderItems, "watched", watchedItems, limitPerFolder)
+
+        val watchlistItems = traktWatchlistItems()
+        Log.d(TAG, "fetchTraktLibrary: watchlist items from traktWatchlistItems=${watchlistItems.size}")
+        addTraktFolder(folderItems, "watchlist", watchlistItems, limitPerFolder)
+
+        val collectionItems = traktCollectionItems()
+        Log.d(TAG, "fetchTraktLibrary: collection items from traktCollectionItems=${collectionItems.size}")
+        addTraktFolder(folderItems, "collection", collectionItems, limitPerFolder)
+
+        val ratingsItems = traktRatingsItems()
+        Log.d(TAG, "fetchTraktLibrary: ratings items from traktRatingsItems=${ratingsItems.size}")
+        addTraktFolder(folderItems, "ratings", ratingsItems, limitPerFolder)
 
         val folders =
             folderItems.entries
@@ -1259,6 +1399,8 @@ class RemoteWatchHistoryLabService(
                         itemCount = values.size
                     )
                 }
+        Log.d(TAG, "fetchTraktLibrary: returning ${folders.size} non-empty folders, ${folderItems.values.flatten().size} total items")
+        folders.forEach { f -> Log.d(TAG, "fetchTraktLibrary:   folder=${f.id} count=${f.itemCount}") }
         return folders to folderItems.values.flatten()
     }
 
@@ -1311,10 +1453,14 @@ class RemoteWatchHistoryLabService(
         values: List<ProviderLibraryItem>,
         limit: Int
     ) {
-        if (values.isEmpty()) return
+        if (values.isEmpty()) {
+            Log.d(TAG, "addTraktFolder($id): skipped (empty values)")
+            return
+        }
         val capped = values.take(limit.coerceAtLeast(1))
         val folderId = id
         bucket.getOrPut(folderId) { mutableListOf() }.addAll(capped.map { it.copy(folderId = folderId) })
+        Log.d(TAG, "addTraktFolder($id): added ${capped.size}/${values.size} items (limit=$limit)")
     }
 
     private fun addSimklFolder(
@@ -1332,39 +1478,52 @@ class RemoteWatchHistoryLabService(
     private fun traktHistoryItems(): List<ProviderLibraryItem> {
         val movies = traktGetArray("/sync/watched/movies") ?: JSONArray()
         val shows = traktGetArray("/sync/watched/shows") ?: JSONArray()
-        return parseTraktItemsFromWatched(movies, MetadataLabMediaType.MOVIE, "watched") +
+        Log.d(TAG, "traktHistoryItems: movies=${movies.length()}, shows=${shows.length()}")
+        val result = parseTraktItemsFromWatched(movies, MetadataLabMediaType.MOVIE, "watched") +
             parseTraktItemsFromWatched(shows, MetadataLabMediaType.SERIES, "watched")
+        Log.d(TAG, "traktHistoryItems: parsed ${result.size} total items")
+        return result
     }
 
     private fun traktWatchlistItems(): List<ProviderLibraryItem> {
         val movies = traktGetArray("/sync/watchlist/movies") ?: JSONArray()
         val shows = traktGetArray("/sync/watchlist/shows") ?: JSONArray()
-        return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "watchlist") +
+        Log.d(TAG, "traktWatchlistItems: movies=${movies.length()}, shows=${shows.length()}")
+        val result = parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "watchlist") +
             parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "watchlist")
+        Log.d(TAG, "traktWatchlistItems: parsed ${result.size} total items")
+        return result
     }
 
     private fun traktCollectionItems(): List<ProviderLibraryItem> {
         val movies = traktGetArray("/sync/collection/movies") ?: JSONArray()
         val shows = traktGetArray("/sync/collection/shows") ?: JSONArray()
-        return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "collection") +
+        Log.d(TAG, "traktCollectionItems: movies=${movies.length()}, shows=${shows.length()}")
+        val result = parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "collection") +
             parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "collection")
+        Log.d(TAG, "traktCollectionItems: parsed ${result.size} total items")
+        return result
     }
 
     private fun traktRatingsItems(): List<ProviderLibraryItem> {
         val movies = traktGetArray("/sync/ratings/movies") ?: JSONArray()
         val shows = traktGetArray("/sync/ratings/shows") ?: JSONArray()
-        return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "ratings") +
+        Log.d(TAG, "traktRatingsItems: movies=${movies.length()}, shows=${shows.length()}")
+        val result = parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "ratings") +
             parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "ratings")
+        Log.d(TAG, "traktRatingsItems: parsed ${result.size} total items")
+        return result
     }
 
     private fun parseTraktItemsFromWatched(array: JSONArray, contentType: MetadataLabMediaType, folderId: String): List<ProviderLibraryItem> {
+        var skippedNoImdb = 0
         return buildList {
             for (index in 0 until array.length()) {
                 val obj = array.optJSONObject(index) ?: continue
                 val node = if (contentType == MetadataLabMediaType.MOVIE) obj.optJSONObject("movie") else obj.optJSONObject("show")
                 val ids = node?.optJSONObject("ids")
                 val imdbId = ids?.optString("imdb")?.trim().orEmpty()
-                if (imdbId.isEmpty()) continue
+                if (imdbId.isEmpty()) { skippedNoImdb++; continue }
                 val title = node?.optString("title")?.trim().orEmpty().ifBlank { imdbId }
                 val addedAt = parseIsoToEpochMs(obj.optString("last_watched_at")) ?: System.currentTimeMillis()
                 add(
@@ -1378,6 +1537,8 @@ class RemoteWatchHistoryLabService(
                     )
                 )
             }
+        }.also {
+            if (skippedNoImdb > 0) Log.d(TAG, "parseTraktItemsFromWatched($folderId, $contentType): skipped $skippedNoImdb items with no IMDB id")
         }
     }
 
@@ -1387,13 +1548,15 @@ class RemoteWatchHistoryLabService(
         contentType: MetadataLabMediaType,
         folderId: String
     ): List<ProviderLibraryItem> {
+        var skippedNoNode = 0
+        var skippedNoImdb = 0
         return buildList {
             for (index in 0 until array.length()) {
                 val obj = array.optJSONObject(index) ?: continue
-                val node = obj.optJSONObject(key) ?: continue
+                val node = obj.optJSONObject(key) ?: run { skippedNoNode++; continue }
                 val ids = node.optJSONObject("ids")
                 val imdbId = ids?.optString("imdb")?.trim().orEmpty()
-                if (imdbId.isEmpty()) continue
+                if (imdbId.isEmpty()) { skippedNoImdb++; continue }
                 val title = node.optString("title").trim().ifEmpty { imdbId }
                 val addedAt = parseIsoToEpochMs(obj.optString("listed_at"))
                     ?: parseIsoToEpochMs(obj.optString("rated_at"))
@@ -1409,6 +1572,10 @@ class RemoteWatchHistoryLabService(
                         addedAtEpochMs = addedAt
                     )
                 )
+            }
+        }.also {
+            if (skippedNoNode > 0 || skippedNoImdb > 0) {
+                Log.d(TAG, "parseTraktItemsFromList($folderId, $key): skipped noNode=$skippedNoNode, noImdb=$skippedNoImdb out of ${array.length()}")
             }
         }
     }
@@ -1539,9 +1706,11 @@ class RemoteWatchHistoryLabService(
     private fun traktGetArray(path: String): JSONArray? {
         val token = traktAccessToken()
         if (token.isEmpty() || traktClientId.isBlank()) {
+            Log.w(TAG, "traktGetArray($path) skipped: token=${if (token.isEmpty()) "EMPTY" else "ok"}, clientId=${if (traktClientId.isBlank()) "BLANK" else "ok"}")
             return null
         }
-        return getJsonArray(
+        Log.d(TAG, "traktGetArray($path) requesting…")
+        val result = getJsonArray(
             url = "https://api.trakt.tv$path",
             headers =
                 mapOf(
@@ -1551,14 +1720,18 @@ class RemoteWatchHistoryLabService(
                     "Accept" to "application/json"
                 )
         )
+        Log.d(TAG, "traktGetArray($path) → ${result?.length() ?: "null"} items")
+        return result
     }
 
     private fun traktGetObject(path: String): JSONObject? {
         val token = traktAccessToken()
         if (token.isEmpty() || traktClientId.isBlank()) {
+            Log.w(TAG, "traktGetObject($path) skipped: token=${if (token.isEmpty()) "EMPTY" else "ok"}, clientId=${if (traktClientId.isBlank()) "BLANK" else "ok"}")
             return null
         }
-        return getJsonAny(
+        Log.d(TAG, "traktGetObject($path) requesting…")
+        val result = getJsonAny(
             url = "https://api.trakt.tv$path",
             headers =
                 mapOf(
@@ -1568,6 +1741,8 @@ class RemoteWatchHistoryLabService(
                     "Accept" to "application/json"
                 )
         ).toJsonObjectOrNull()
+        Log.d(TAG, "traktGetObject($path) → ${if (result != null) "object" else "null"}")
+        return result
     }
 
     private fun simklGetAny(path: String): Any? {

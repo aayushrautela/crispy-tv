@@ -1,6 +1,7 @@
 package com.crispy.rewrite.home
 
 import android.content.Context
+import android.util.Log
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogPageResult
 import com.crispy.rewrite.catalog.CatalogSectionRef
@@ -205,17 +206,26 @@ class HomeCatalogService(
         entries: List<ProviderContinueWatchingEntry>,
         limit: Int = 20
     ): ContinueWatchingLoadResult {
+        Log.d(TAG, "loadContinueWatchingItemsFromProvider: ${entries.size} entries, limit=$limit")
+        for ((i, e) in entries.withIndex()) {
+            Log.d(TAG, "  entry[$i]: id=${e.contentId} type=${e.contentType} title=${e.title} " +
+                "S${e.season}E${e.episode} progress=${e.progressPercent} upNext=${e.isUpNextPlaceholder} " +
+                "provider=${e.provider}")
+        }
         val targetCount = limit.coerceAtLeast(1)
         val dedupedEntries = entries
             .sortedByDescending { it.lastUpdatedEpochMs }
             .distinctBy { "${it.contentType.name}:${it.contentId}:${it.season ?: -1}:${it.episode ?: -1}" }
             .take(targetCount)
+        Log.d(TAG, "loadContinueWatchingItemsFromProvider: after dedup/limit: ${dedupedEntries.size}")
 
         if (dedupedEntries.isEmpty()) {
+            Log.d(TAG, "loadContinueWatchingItemsFromProvider: empty after dedup, returning")
             return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
         }
 
         val resolvedAddons = resolveAddons()
+        Log.d(TAG, "loadContinueWatchingItemsFromProvider: resolved ${resolvedAddons.size} addons")
         val items = dedupedEntries.map { entry ->
             val fakeWatchEntry =
                 WatchHistoryEntry(
@@ -228,6 +238,8 @@ class HomeCatalogService(
                 )
             val mediaType = fakeWatchEntry.asCatalogMediaType()
             val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry, mediaType, resolvedAddons)
+            Log.d(TAG, "  resolved entry ${entry.contentId}: meta=${resolvedMeta != null} " +
+                "backdrop=${resolvedMeta?.backdropUrl != null} logo=${resolvedMeta?.logoUrl != null}")
             ContinueWatchingItem(
                 id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
                 contentId = entry.contentId,
@@ -245,6 +257,9 @@ class HomeCatalogService(
                 type = mediaType
             )
         }
+        val inProgress = items.count { !it.isUpNextPlaceholder }
+        val upNext = items.count { it.isUpNextPlaceholder }
+        Log.d(TAG, "loadContinueWatchingItemsFromProvider: done. total=${items.size} inProgress=$inProgress upNext=$upNext")
 
         return ContinueWatchingLoadResult(
             items = items,
@@ -992,6 +1007,7 @@ class HomeCatalogService(
     )
 
     companion object {
+        private const val TAG = "HomeCatalogService"
         private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
         private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
     }

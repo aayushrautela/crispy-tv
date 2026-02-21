@@ -271,9 +271,13 @@ private fun LibraryScreen(
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                .fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 12.dp + innerPadding.calculateTopPadding(),
+                end = 16.dp,
+                bottom = 12.dp + innerPadding.calculateBottomPadding()
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
