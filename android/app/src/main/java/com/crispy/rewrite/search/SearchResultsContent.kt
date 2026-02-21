@@ -33,7 +33,7 @@ import com.crispy.rewrite.ui.components.PosterCard
 @Composable
 fun SearchResultsContent(
     uiState: SearchUiState,
-    onMediaTypeChange: (MetadataLabMediaType) -> Unit,
+    onMediaTypeChange: (MetadataLabMediaType?) -> Unit,
     onCatalogToggle: (String) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     modifier: Modifier = Modifier
@@ -47,6 +47,13 @@ fun SearchResultsContent(
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    FilterChip(
+                        selected = uiState.mediaType == null,
+                        onClick = { onMediaTypeChange(null) },
+                        label = { Text("All") }
+                    )
+                }
                 item {
                     FilterChip(
                         selected = uiState.mediaType == MetadataLabMediaType.MOVIE,
@@ -66,14 +73,14 @@ fun SearchResultsContent(
 
         if (uiState.catalogs.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    text = "Catalogs",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = uiState.selectedCatalogKeys.size == uiState.catalogs.size,
+                            onClick = { onCatalogToggle("__all__") },
+                            label = { Text("All") }
+                        )
+                    }
                     items(items = uiState.catalogs, key = { it.key }) { option ->
                         FilterChip(
                             selected = uiState.selectedCatalogKeys.contains(option.key),
@@ -97,26 +104,6 @@ fun SearchResultsContent(
             }
         }
 
-        if (uiState.catalogsStatusMessage.isNotBlank()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    text = uiState.catalogsStatusMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        if (uiState.statusMessage.isNotBlank()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    text = uiState.statusMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         gridItems(
             items = uiState.results,
             key = { "${it.type}:${it.id}" }
@@ -128,18 +115,6 @@ fun SearchResultsContent(
                 rating = item.rating,
                 onClick = { onItemClick(item) }
             )
-        }
-
-        if (uiState.query.isBlank() && uiState.results.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Type to search and use chips to filter catalogs.",
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
         }
     }
 }

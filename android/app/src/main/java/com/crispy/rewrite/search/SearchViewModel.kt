@@ -31,19 +31,17 @@ import kotlinx.coroutines.withContext
 data class SearchCatalogOption(
     val key: String,
     val label: String,
-    val section: CatalogSectionRef
+    val sections: List<CatalogSectionRef>
 )
 
 data class SearchUiState(
     val query: String = "",
-    val mediaType: MetadataLabMediaType = MetadataLabMediaType.MOVIE,
+    val mediaType: MetadataLabMediaType? = null,
     val isLoadingCatalogs: Boolean = false,
-    val catalogsStatusMessage: String = "",
     val catalogs: List<SearchCatalogOption> = emptyList(),
     val selectedCatalogKeys: Set<String> = emptySet(),
     val isSearching: Boolean = false,
-    val results: List<CatalogItem> = emptyList(),
-    val statusMessage: String = ""
+    val results: List<CatalogItem> = emptyList()
 )
 
 class SearchViewModel(
@@ -63,7 +61,7 @@ class SearchViewModel(
         refreshCatalogs()
     }
 
-    fun setMediaType(mediaType: MetadataLabMediaType) {
+    fun setMediaType(mediaType: MetadataLabMediaType?) {
         if (_uiState.value.mediaType == mediaType) {
             return
         }
@@ -71,8 +69,6 @@ class SearchViewModel(
             _uiState.value.copy(
                 mediaType = mediaType,
                 results = emptyList(),
-                statusMessage = "",
-                catalogsStatusMessage = "",
                 catalogs = emptyList(),
                 selectedCatalogKeys = emptySet()
             )
@@ -86,55 +82,49 @@ class SearchViewModel(
                 _uiState.value =
                     _uiState.value.copy(
                         isLoadingCatalogs = true,
-                        catalogsStatusMessage = "Loading catalogs...",
                         catalogs = emptyList()
                     )
 
-                val typeString = _uiState.value.mediaType.toCatalogTypeString()
-                val (discoverCatalogs, discoverStatusMessage) =
-                    withContext(Dispatchers.IO) {
-                        homeCatalogService.listDiscoverCatalogs(mediaType = typeString, limit = 200)
-                    }
-                val labResult =
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            catalogSearchService.fetchCatalogPage(
-                                request =
-                                    CatalogPageRequest(
-                                        mediaType = _uiState.value.mediaType,
-                                        catalogId = ""
-                                    )
-                            )
-                        }.getOrElse { error ->
-                            CatalogLabResult(
-                                statusMessage = error.message ?: "Failed to load catalogs."
-                            )
+                val mediaTypes = when (val mt = _uiState.value.mediaType) {
+                    null -> listOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
+                    else -> listOf(mt)
+                }
+                val allOptions = LinkedHashMap<String, SearchCatalogOption>()
+                for (type in mediaTypes) {
+                    val typeString = type.toCatalogTypeString()
+                    val (discoverCatalogs, _) =
+                        withContext(Dispatchers.IO) {
+                            homeCatalogService.listDiscoverCatalogs(mediaType = typeString, limit = 200)
                         }
-                    }
+                    val labResult =
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                catalogSearchService.fetchCatalogPage(
+                                    request =
+                                        CatalogPageRequest(
+                                            mediaType = type,
+                                            catalogId = ""
+                                        )
+                                )
+                            }.getOrElse {
+                                CatalogLabResult()
+                            }
+                        }
+                    val options = buildOptions(discoverCatalogs, labResult)
+                    allOptions.putAll(options)
+                }
 
-                val optionByKey = buildOptions(discoverCatalogs, labResult)
-                val options = optionByKey.values.toList()
+                val options = allOptions.values.toList()
                 val previousSelection = _uiState.value.selectedCatalogKeys
                 val nextSelection =
                     previousSelection
-                        .filter { optionByKey.containsKey(it) }
+                        .filter { allOptions.containsKey(it) }
                         .toSet()
-                        .ifEmpty {
-                            options.firstOrNull()?.let { option -> setOf(option.key) }.orEmpty()
-                        }
-
-                val message =
-                    listOf(
-                        discoverStatusMessage.trim(),
-                        labResult.statusMessage.trim()
-                    ).filter { it.isNotBlank() }
-                        .distinct()
-                        .joinToString("\n")
+                        .ifEmpty { options.map { it.key }.toSet() }
 
                 _uiState.value =
                     _uiState.value.copy(
                         isLoadingCatalogs = false,
-                        catalogsStatusMessage = message,
                         catalogs = options,
                         selectedCatalogKeys = nextSelection
                     )
@@ -149,14 +139,13 @@ class SearchViewModel(
 
     fun toggleCatalog(key: String) {
         val current = _uiState.value.selectedCatalogKeys
+        val allKeys = _uiState.value.catalogs.map { it.key }.toSet()
         val next =
-            if (current.contains(key)) {
+            if (key == "__all__") {
+                if (current.size == allKeys.size) emptySet() else allKeys
+            } else if (current.contains(key)) {
                 val filtered = current - key
-                if (filtered.isEmpty()) {
-                    current
-                } else {
-                    filtered
-                }
+                if (filtered.isEmpty()) current else filtered
             } else {
                 current + key
             }
@@ -171,8 +160,7 @@ class SearchViewModel(
             _uiState.value.copy(
                 query = "",
                 isSearching = false,
-                results = emptyList(),
-                statusMessage = ""
+                results = emptyList()
             )
     }
 
@@ -192,8 +180,7 @@ class SearchViewModel(
             _uiState.value =
                 _uiState.value.copy(
                     isSearching = false,
-                    results = emptyList(),
-                    statusMessage = ""
+                    results = emptyList()
                 )
             return
         }
@@ -204,8 +191,7 @@ class SearchViewModel(
             _uiState.value =
                 _uiState.value.copy(
                     isSearching = false,
-                    results = emptyList(),
-                    statusMessage = "No catalogs selected."
+                    results = emptyList()
                 )
             return
         }
@@ -216,19 +202,19 @@ class SearchViewModel(
                 _uiState.value =
                     _uiState.value.copy(
                         isSearching = true,
-                        results = emptyList(),
-                        statusMessage = "Searching ${selected.size} catalogs..."
+                        results = emptyList()
                     )
 
                 val items =
                     withContext(Dispatchers.IO) {
                         coroutineScope {
                             selected
-                                .map { option ->
+                                .flatMap { it.sections }
+                                .map { section ->
                                     async {
                                         runCatching {
                                             homeCatalogService.fetchCatalogPage(
-                                                section = option.section,
+                                                section = section,
                                                 page = 1,
                                                 pageSize = 60,
                                                 filters = listOf(CatalogFilter(key = "search", value = query))
@@ -240,18 +226,11 @@ class SearchViewModel(
                         }
                     }
                 val merged = mergeItems(items)
-                val message =
-                    if (merged.isEmpty()) {
-                        "No results for '$query'."
-                    } else {
-                        "Found ${merged.size} results."
-                    }
 
                 _uiState.value =
                     _uiState.value.copy(
                         isSearching = false,
-                        results = merged,
-                        statusMessage = message
+                        results = merged
                     )
             }
     }
@@ -268,7 +247,8 @@ class SearchViewModel(
                     catalogId = it.section.catalogId
                 )
             }
-        val output = LinkedHashMap<String, SearchCatalogOption>()
+        val sectionsByAddonId = LinkedHashMap<String, MutableList<CatalogSectionRef>>()
+        val addonNameById = HashMap<String, String>()
         labResult.catalogs
             .filter { it.supportsSearch }
             .forEach { catalog ->
@@ -279,10 +259,18 @@ class SearchViewModel(
                         catalogId = catalog.catalogId
                     )
                 val discover = discoverByKey[key] ?: return@forEach
-                val title = discover.section.title.trim().ifEmpty { discover.section.catalogId }
-                val label = "${discover.addonName.trim()}: $title"
-                output[key] = SearchCatalogOption(key = key, label = label, section = discover.section)
+                val addonId = catalog.addonId
+                sectionsByAddonId.getOrPut(addonId) { mutableListOf() }.add(discover.section)
+                addonNameById[addonId] = discover.addonName.trim()
             }
+        val output = LinkedHashMap<String, SearchCatalogOption>()
+        sectionsByAddonId.forEach { (addonId, sections) ->
+            output[addonId] = SearchCatalogOption(
+                key = addonId,
+                label = addonNameById[addonId] ?: addonId,
+                sections = sections
+            )
+        }
         return output
     }
 
