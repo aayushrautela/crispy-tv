@@ -133,9 +133,12 @@ class RemoteIntroSkipService(
         }
 
         val malId =
-            request.malId
-                ?: request.kitsuId?.let(::resolveMalIdFromKitsu)
-                ?: request.imdbId?.let(::resolveMalIdFromArm)
+            when {
+                request.malId != null -> request.malId
+                request.kitsuId != null -> resolveMalIdFromKitsu(request.kitsuId)
+                request.imdbId != null -> resolveMalIdFromArm(request.imdbId)
+                else -> null
+            }
 
         if (malId == null) {
             return emptyList()

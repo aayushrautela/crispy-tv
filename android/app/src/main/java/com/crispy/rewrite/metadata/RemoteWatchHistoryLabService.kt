@@ -2424,12 +2424,13 @@ class RemoteWatchHistoryLabService(
 
         val url = "https://api.trakt.tv/sync/playback/$id"
 
-        fun doDelete(currentToken: String) =
-            runCatching {
+        suspend fun doDelete(currentToken: String) =
+            try {
                 httpClient.delete(url = url.toHttpUrl(), headers = traktHeaders(currentToken))
+            } catch (error: Throwable) {
+                Log.w(TAG, "Trakt DELETE failed: $url", error)
+                null
             }
-                .onFailure { error -> Log.w(TAG, "Trakt DELETE failed: $url", error) }
-                .getOrNull()
 
         var response = doDelete(token) ?: return false
         if (response.code == 401) {
@@ -2455,16 +2456,17 @@ class RemoteWatchHistoryLabService(
 
         val url = "https://api.trakt.tv$path"
 
-        fun doPost(currentToken: String) =
-            runCatching {
+        suspend fun doPost(currentToken: String) =
+            try {
                 httpClient.postJson(
                     url = url.toHttpUrl(),
                     jsonBody = payload.toString(),
                     headers = traktHeaders(currentToken).newBuilder().add("Content-Type", "application/json").build(),
                 )
+            } catch (error: Throwable) {
+                Log.w(TAG, "Trakt POST failed: $url", error)
+                null
             }
-                .onFailure { error -> Log.w(TAG, "Trakt POST failed: $url", error) }
-                .getOrNull()
 
         var response = doPost(token) ?: return false
         if (response.code == 401) {
