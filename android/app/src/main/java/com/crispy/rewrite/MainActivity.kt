@@ -1323,7 +1323,7 @@ private fun HomeHeroCarousel(
             items.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: 0
         } ?: 0
     }
-    val state = rememberCarouselState(initialItemIndex = initialIndex) { items.size }
+    val state = rememberCarouselState(initialItem = initialIndex) { items.size }
 
     Box(
         modifier = Modifier
