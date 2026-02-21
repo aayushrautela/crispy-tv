@@ -89,16 +89,10 @@ class HomeViewModel internal constructor(
                         WatchProvider.LOCAL -> ContinueWatchingLabResult(statusMessage = "Local source selected.")
                         WatchProvider.TRAKT,
                         WatchProvider.SIMKL -> {
-                            if (providerConnected) {
-                                watchHistoryService.listContinueWatching(
-                                    limit = 20,
-                                    source = selectedSource
-                                )
-                            } else {
-                                ContinueWatchingLabResult(
-                                    statusMessage = "Connect ${selectedSource.displayName()} in Settings to load continue watching."
-                                )
-                            }
+                            watchHistoryService.listContinueWatching(
+                                limit = 20,
+                                source = selectedSource
+                            )
                         }
                     }
                 HomeFeedLoadResult(

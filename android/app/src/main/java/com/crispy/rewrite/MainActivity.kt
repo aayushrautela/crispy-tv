@@ -171,7 +171,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // Prevent accidental re-handling if this intent is reused.
-        runCatching { intent?.let { it.data = null } }
+        runCatching { intent.data = null }
 
         val callback = data.toString()
         if (callback == lastHandledOAuthCallback) {
@@ -369,8 +369,7 @@ private fun AppShell() {
             composable(TopLevelDestination.Discover.route) {
                 DiscoverRoute(
                     onNavigateToSearch = { navController.navigate(TopLevelDestination.Search.route) },
-                    onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) },
-                    onSeeAllClick = { section -> navController.navigate(catalogListRoute(section)) }
+                    onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) }
                 )
             }
             composable(TopLevelDestination.Library.route) {
@@ -446,41 +445,22 @@ private fun HomePage(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val scrollBehavior = SearchBarDefaults.enterAlwaysSearchBarScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            SearchBar(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                inputField = {
-                    SearchBarDefaults.InputField(
-                        query = "",
-                        onQueryChange = { },
-                        onSearch = { onSearchClick() },
-                        expanded = false,
-                        onExpandedChange = { onSearchClick() },
-                        placeholder = { Text("Search for movies, series...") },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = onSearchClick) {
-                                Card {
-                                    Text(
-                                        text = "Home",
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
-                            }
-                        }
-                    )
+            TopAppBar(
+                title = { Text("Home") },
+                actions = {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Search"
+                        )
+                    }
                 },
-                expanded = false,
-                onExpandedChange = { onSearchClick() }
-            ) {
-            }
+                scrollBehavior = scrollBehavior
+            )
         }
     ) { innerPadding ->
         LazyColumn(
@@ -535,6 +515,7 @@ private fun HomePage(
                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                     ContinueWatchingSection(
                         items = uiState.continueWatchingItems,
+                        statusMessage = uiState.continueWatchingStatusMessage,
                         onItemClick = onContinueWatchingClick,
                         onHideItem = viewModel::hideContinueWatchingItem,
                         onRemoveItem = viewModel::removeContinueWatchingItem
@@ -567,13 +548,6 @@ private fun HomePage(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (uiState.continueWatchingStatusMessage.isNotBlank()) {
-                            Text(
-                                text = uiState.continueWatchingStatusMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                         if (uiState.statusMessage.isNotBlank()) {
                             Text(
                                 text = uiState.statusMessage,
@@ -591,11 +565,12 @@ private fun HomePage(
 @Composable
 private fun ContinueWatchingSection(
     items: List<ContinueWatchingItem>,
+    statusMessage: String,
     onItemClick: (ContinueWatchingItem) -> Unit,
     onHideItem: (ContinueWatchingItem) -> Unit,
     onRemoveItem: (ContinueWatchingItem) -> Unit
 ) {
-    if (items.isEmpty()) {
+    if (items.isEmpty() && statusMessage.isBlank()) {
         return
     }
 
@@ -607,18 +582,28 @@ private fun ContinueWatchingSection(
             style = MaterialTheme.typography.titleMedium
         )
 
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            items(items, key = { it.id }) { item ->
-                ContinueWatchingCard(
-                    item = item,
-                    onClick = { onItemClick(item) },
-                    onHideClick = { onHideItem(item) },
-                    onRemoveClick = { onRemoveItem(item) },
-                    onDetailsClick = { onItemClick(item) }
-                )
+        if (statusMessage.isNotBlank()) {
+            Text(
+                text = statusMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (items.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                items(items, key = { it.id }) { item ->
+                    ContinueWatchingCard(
+                        item = item,
+                        onClick = { onItemClick(item) },
+                        onHideClick = { onHideItem(item) },
+                        onRemoveClick = { onRemoveItem(item) },
+                        onDetailsClick = { onItemClick(item) }
+                    )
+                }
             }
         }
     }

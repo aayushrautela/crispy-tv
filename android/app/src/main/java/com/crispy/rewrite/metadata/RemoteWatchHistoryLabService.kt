@@ -584,7 +584,9 @@ class RemoteWatchHistoryLabService(
                     }
 
                     WatchProvider.TRAKT -> {
-                        if (traktAccessToken().isBlank() || traktClientId.isBlank()) {
+                        if (traktClientId.isBlank()) {
+                            "Trakt client ID missing. Set TRAKT_CLIENT_ID in gradle.properties."
+                        } else if (traktAccessToken().isBlank()) {
                             "Connect Trakt to load continue watching."
                         } else if (normalized.isNotEmpty()) {
                             "Loaded ${normalized.size} Trakt continue watching entries."
@@ -594,7 +596,9 @@ class RemoteWatchHistoryLabService(
                     }
 
                     WatchProvider.SIMKL -> {
-                        if (simklAccessToken().isBlank() || simklClientId.isBlank()) {
+                        if (simklClientId.isBlank()) {
+                            "Simkl client ID missing. Set SIMKL_CLIENT_ID in gradle.properties."
+                        } else if (simklAccessToken().isBlank()) {
                             "Connect Simkl to load continue watching."
                         } else if (normalized.isNotEmpty()) {
                             "Loaded ${normalized.size} Simkl continue watching entries."
@@ -663,7 +667,9 @@ class RemoteWatchHistoryLabService(
                 when (source) {
                     WatchProvider.LOCAL -> "Local source selected. Provider library unavailable."
                     WatchProvider.TRAKT -> {
-                        if (traktAccessToken().isBlank() || traktClientId.isBlank()) {
+                        if (traktClientId.isBlank()) {
+                            "Trakt client ID missing. Set TRAKT_CLIENT_ID in gradle.properties."
+                        } else if (traktAccessToken().isBlank()) {
                             "Connect Trakt to load provider library."
                         } else if (selected != null && selected.first.isNotEmpty()) {
                             "Loaded ${selected.first.size} Trakt folders."
@@ -673,7 +679,9 @@ class RemoteWatchHistoryLabService(
                     }
 
                     WatchProvider.SIMKL -> {
-                        if (simklAccessToken().isBlank() || simklClientId.isBlank()) {
+                        if (simklClientId.isBlank()) {
+                            "Simkl client ID missing. Set SIMKL_CLIENT_ID in gradle.properties."
+                        } else if (simklAccessToken().isBlank()) {
                             "Connect Simkl to load provider library."
                         } else if (selected != null && selected.first.isNotEmpty()) {
                             "Loaded ${selected.first.size} Simkl folders."
@@ -810,7 +818,7 @@ class RemoteWatchHistoryLabService(
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
         val candidates = entries.filter { entry ->
             val progress = entry.progressPercent
-            progress >= 2.0 && progress < 85.0 && entry.lastUpdatedEpochMs >= staleCutoff
+            progress > 0.0 && progress < 95.0 && entry.lastUpdatedEpochMs >= staleCutoff
         }
 
         val byContent = linkedMapOf<String, ContinueWatchingEntry>()

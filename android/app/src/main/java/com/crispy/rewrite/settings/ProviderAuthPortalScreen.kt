@@ -234,7 +234,23 @@ private fun ProviderAuthPortalScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text("Provider Login Portal") },
+                title = { Text("Providers") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onRefresh) {
+                        Icon(
+                            imageVector = Icons.Outlined.Refresh,
+                            contentDescription = "Refresh"
+                        )
+                    }
+                },
                 scrollBehavior = scrollBehavior
             )
         }
@@ -296,16 +312,6 @@ private fun ProviderAuthPortalScreen(
                 )
             }
 
-            item {
-                Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                    Text("Refresh Status")
-                }
-            }
-            item {
-                Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                    Text("Back")
-                }
-            }
         }
     }
 }

@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
@@ -35,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -55,7 +56,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.catalog.CatalogItem
-import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.catalog.DiscoverCatalogRef
 import com.crispy.rewrite.domain.catalog.CatalogFilter
 import com.crispy.rewrite.home.HomeCatalogService
@@ -331,8 +331,7 @@ private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
 @Composable
 fun DiscoverRoute(
     onNavigateToSearch: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
-    onSeeAllClick: (CatalogSectionRef) -> Unit
+    onItemClick: (CatalogItem) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -352,8 +351,7 @@ fun DiscoverRoute(
         onGenreClick = viewModel::selectGenre,
         onLoadMore = viewModel::loadMore,
         onNavigateToSearch = onNavigateToSearch,
-        onItemClick = onItemClick,
-        onSeeAllClick = onSeeAllClick
+        onItemClick = onItemClick
     )
 }
 
@@ -373,8 +371,7 @@ private fun DiscoverScreen(
     onGenreClick: (String?) -> Unit,
     onLoadMore: () -> Unit,
     onNavigateToSearch: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
-    onSeeAllClick: (CatalogSectionRef) -> Unit
+    onItemClick: (CatalogItem) -> Unit
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
     val selectedCatalog = uiState.selectedCatalog
@@ -386,6 +383,9 @@ private fun DiscoverScreen(
             TopAppBar(
                 title = { Text("Discover") },
                 actions = {
+                    IconButton(onClick = onNavigateToSearch) {
+                        Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search")
+                    }
                     IconButton(onClick = onRefresh) {
                         Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }
@@ -406,41 +406,7 @@ private fun DiscoverScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onNavigateToSearch
-                ) {
-                    ListItem(
-                        headlineContent = { Text("Search") },
-                        supportingContent = { Text("Find movies and series") },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = null
-                            )
-                        }
-                    )
-                }
-            }
-
-            item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Discover",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (selectedCatalog != null) {
-                            TextButton(onClick = { onSeeAllClick(selectedCatalog.section) }) {
-                                Text("See all")
-                            }
-                        }
-                    }
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -605,13 +571,18 @@ private fun DiscoverScreen(
             ) {
                 when (activeSheet) {
                     DiscoverSheet.Type -> {
-                        Column(modifier = Modifier.padding(bottom = 24.dp)) {
-                            Text(
-                                text = "Type",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                            )
-                            DiscoverTypeFilter.entries.forEach { filter ->
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(bottom = 24.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = "Type",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                )
+                            }
+                            items(DiscoverTypeFilter.entries) { filter ->
                                 ListItem(
                                     headlineContent = { Text(filter.label) },
                                     trailingContent =
@@ -638,27 +609,37 @@ private fun DiscoverScreen(
                     }
 
                     DiscoverSheet.Catalog -> {
-                        Column(modifier = Modifier.padding(bottom = 24.dp)) {
-                            Text(
-                                text = "Catalog",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                            )
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(bottom = 24.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = "Catalog",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                )
+                            }
                             if (uiState.catalogs.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "No catalogs available",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No catalogs available",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             } else {
-                                uiState.catalogs.forEach { catalog ->
+                                items(
+                                    items = uiState.catalogs,
+                                    key = { it.key }
+                                ) { catalog ->
                                     ListItem(
                                         headlineContent = {
                                             Text(
@@ -682,9 +663,9 @@ private fun DiscoverScreen(
                                                         contentDescription = null
                                                     )
                                                 }
-                                        } else {
-                                            null
-                                        },
+                                            } else {
+                                                null
+                                            },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
@@ -700,35 +681,40 @@ private fun DiscoverScreen(
 
                     DiscoverSheet.Genre -> {
                         val genres = selectedCatalog?.genres.orEmpty()
-                        Column(modifier = Modifier.padding(bottom = 24.dp)) {
-                            Text(
-                                text = "Genre",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                            )
-
-                            ListItem(
-                                headlineContent = { Text("All genres") },
-                                trailingContent =
-                                    if (uiState.selectedGenre == null) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Check,
-                                                contentDescription = null
-                                            )
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(bottom = 24.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = "Genre",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                )
+                            }
+                            item {
+                                ListItem(
+                                    headlineContent = { Text("All genres") },
+                                    trailingContent =
+                                        if (uiState.selectedGenre == null) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Check,
+                                                    contentDescription = null
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onGenreClick(null)
+                                            activeSheet = null
                                         }
-                                    } else {
-                                        null
-                                    },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        onGenreClick(null)
-                                        activeSheet = null
-                                    }
-                            )
-
-                            genres.forEach { genre ->
+                                )
+                            }
+                            items(genres) { genre ->
                                 ListItem(
                                     headlineContent = { Text(genre) },
                                     trailingContent =

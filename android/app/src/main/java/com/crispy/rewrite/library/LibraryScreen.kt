@@ -121,7 +121,7 @@ class LibraryViewModel internal constructor(
                         null
                     }
                 val providerResult =
-                    if (selectedProvider != null && providerAuthenticated) {
+                    if (selectedProvider != null) {
                         runCatching {
                             watchHistoryService.listProviderLibrary(
                                 limitPerFolder = 250,
@@ -136,11 +136,12 @@ class LibraryViewModel internal constructor(
                         LibrarySource.LOCAL -> localResult?.statusMessage ?: "No local history yet."
                         LibrarySource.TRAKT,
                         LibrarySource.SIMKL -> {
-                            if (!providerAuthenticated) {
-                                "Connect ${selectedSource.displayName()} in Settings to load this provider."
-                            } else {
-                                providerResult?.statusMessage ?: "No provider library data available."
-                            }
+                            providerResult?.statusMessage
+                                ?: if (!providerAuthenticated) {
+                                    "Connect ${selectedSource.displayName()} in Settings to load this provider."
+                                } else {
+                                    "No provider library data available."
+                                }
                         }
                     }
 
@@ -378,10 +379,17 @@ private fun LibraryScreen(
 
                         if (providerItems.isEmpty()) {
                             item {
+                                val emptyMessage =
+                                    if (providerFolders.isEmpty()) {
+                                        "No provider library data available."
+                                    } else {
+                                        val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
+                                        "No items in $label yet."
+                                    }
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Box(modifier = Modifier.padding(16.dp)) {
                                         Text(
-                                            text = "No items in this provider folder yet.",
+                                            text = emptyMessage,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }

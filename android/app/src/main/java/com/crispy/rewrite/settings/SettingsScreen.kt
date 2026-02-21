@@ -193,19 +193,7 @@ fun SettingsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Settings",
-                            style = MaterialTheme.typography.headlineSmall
-                        )
-                        Text(
-                            text = "Customize your experience",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
+                title = { Text("Settings") },
                 scrollBehavior = scrollBehavior
             )
         }
@@ -218,13 +206,16 @@ fun SettingsScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Spacer(Modifier.height(8.dp))
-            
+            Text(
+                text = "Customize your experience",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
             settingsGroups.forEach { group ->
                 SettingsGroupCard(group = group)
             }
-            
-            Spacer(Modifier.height(16.dp))
         }
     }
 }
