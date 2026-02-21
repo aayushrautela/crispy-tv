@@ -122,10 +122,10 @@ fun SearchResultsContent(
             key = { "${it.type}:${it.id}" }
         ) { item ->
             PosterCard(
-                title = item.name,
+                title = item.title,
                 posterUrl = item.posterUrl,
-                backdropUrl = item.backgroundUrl,
-                rating = item.rating?.toFloat(),
+                backdropUrl = item.backdropUrl,
+                rating = item.rating,
                 onClick = { onItemClick(item) }
             )
         }

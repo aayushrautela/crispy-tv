@@ -90,7 +90,7 @@ class SearchViewModel(
                     )
 
                 val typeString = _uiState.value.mediaType.toCatalogTypeString()
-                val discoverResult =
+                val (discoverCatalogs, discoverStatusMessage) =
                     withContext(Dispatchers.IO) {
                         homeCatalogService.listDiscoverCatalogs(mediaType = typeString, limit = 200)
                     }
@@ -111,7 +111,7 @@ class SearchViewModel(
                         }
                     }
 
-                val optionByKey = buildOptions(discoverResult.catalogs, labResult)
+                val optionByKey = buildOptions(discoverCatalogs, labResult)
                 val options = optionByKey.values.toList()
                 val previousSelection = _uiState.value.selectedCatalogKeys
                 val nextSelection =
@@ -124,7 +124,7 @@ class SearchViewModel(
 
                 val message =
                     listOf(
-                        discoverResult.statusMessage.trim(),
+                        discoverStatusMessage.trim(),
                         labResult.statusMessage.trim()
                     ).filter { it.isNotBlank() }
                         .distinct()
@@ -316,14 +316,21 @@ class SearchViewModel(
 
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext
-            return ViewModelProvider.Factory {
-                val homeCatalogService = HomeCatalogService(context, BuildConfig.METADATA_ADDON_URLS)
-                val catalogSearchService = PlaybackLabDependencies.catalogSearchServiceFactory(context)
-                SearchViewModel(
-                    appContext = context,
-                    homeCatalogService = homeCatalogService,
-                    catalogSearchService = catalogSearchService
-                )
+            return object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    if (modelClass.isAssignableFrom(SearchViewModel::class.java).not()) {
+                        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+                    }
+
+                    val homeCatalogService = HomeCatalogService(context, BuildConfig.METADATA_ADDON_URLS)
+                    val catalogSearchService = PlaybackLabDependencies.catalogSearchServiceFactory(context)
+                    @Suppress("UNCHECKED_CAST")
+                    return SearchViewModel(
+                        appContext = context,
+                        homeCatalogService = homeCatalogService,
+                        catalogSearchService = catalogSearchService
+                    ) as T
+                }
             }
         }
     }
