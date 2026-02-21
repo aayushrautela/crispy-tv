@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Person
@@ -34,8 +35,10 @@ import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.rewrite.settings.PlaybackSettingsScreen
 import com.crispy.rewrite.settings.ProviderAuthPortalRoute
 import com.crispy.rewrite.settings.SettingsScreen
-import com.crispy.rewrite.search.SearchRoute
+import com.crispy.rewrite.search.SearchResultsContent
+import com.crispy.rewrite.search.SearchViewModel
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,12 +68,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.AppBarWithSearch
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ExpandedDockedSearchBarWithGap
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -85,6 +94,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
@@ -272,7 +282,6 @@ private const val PlaybackSettingsRoute = "settings/playback"
 private const val HomeScreenSettingsRoutePath = "settings/home"
 private const val AddonsSettingsRoutePath = "settings/addons"
 private const val ProviderPortalRoutePath = "settings/providers"
-private const val SearchRoutePath = "search"
 
 private const val CatalogListRoute = "catalog"
 private const val CatalogMediaTypeArg = "mediaType"
@@ -352,18 +361,6 @@ private fun AppShell() {
                     },
                     onCatalogSeeAllClick = { section ->
                         navController.navigate(catalogListRoute(section))
-                    },
-                    onSearchClick = {
-                        navController.navigate(SearchRoutePath)
-                    }
-                )
-            }
-
-            composable(SearchRoutePath) {
-                SearchRoute(
-                    onBack = { navController.popBackStack() },
-                    onItemClick = { item ->
-                        navController.navigate(homeDetailsRoute(item.id))
                     }
                 )
             }
@@ -468,14 +465,13 @@ private fun AppShell() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HomePage(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
-    onSearchClick: () -> Unit,
     onProfileClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -487,38 +483,126 @@ private fun HomePage(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val searchViewModel: SearchViewModel = viewModel(
+        factory = remember(appContext) {
+            SearchViewModel.factory(appContext)
+        }
+    )
+    val searchUiState by searchViewModel.uiState.collectAsStateWithLifecycle()
+
+    val scope = rememberCoroutineScope()
+    val searchBarState = rememberSearchBarState()
+    val textFieldState = rememberTextFieldState()
+    val queryText = textFieldState.text.toString()
+
+    LaunchedEffect(queryText) {
+        if (queryText != searchUiState.query) {
+            searchViewModel.updateQuery(queryText)
+        }
+    }
+
+    LaunchedEffect(searchBarState.currentValue) {
+        if (searchBarState.currentValue == SearchBarValue.Collapsed) {
+            if (searchUiState.query.isNotBlank()) {
+                searchViewModel.clearQuery()
+            }
+            if (queryText.isNotBlank()) {
+                textFieldState.setTextAndPlaceCursorAtEnd("")
+            }
+        }
+    }
+
+    BackHandler(enabled = searchBarState.currentValue == SearchBarValue.Expanded) {
+        scope.launch {
+            searchBarState.animateToCollapsed()
+        }
+    }
+
+    val scrollBehavior = SearchBarDefaults.enterAlwaysSearchBarScrollBehavior()
+
+    val inputField: @Composable () -> Unit = {
+        SearchBarDefaults.InputField(
+            searchBarState = searchBarState,
+            textFieldState = textFieldState,
+            onSearch = {
+                scope.launch {
+                    searchBarState.animateToCollapsed()
+                }
+            },
+            placeholder = {
+                Text("Search movies, series...")
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null
+                )
+            },
+            trailingIcon = {
+                if (queryText.isNotBlank()) {
+                    IconButton(
+                        onClick = {
+                            searchViewModel.clearQuery()
+                            textFieldState.setTextAndPlaceCursorAtEnd("")
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Clear,
+                            contentDescription = "Clear"
+                        )
+                    }
+                }
+            }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "Crispy TV",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
+            AppBarWithSearch(
+                state = searchBarState,
+                inputField = inputField,
                 navigationIcon = {
-                    IconButton(onClick = onSearchClick) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = "Search"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onProfileClick) {
+                    IconButton(
+                        onClick = onProfileClick,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ) {
                         Icon(
                             imageVector = Icons.Outlined.Person,
-                            contentDescription = "Profiles"
+                            contentDescription = "Profile"
                         )
                     }
                 },
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
                 scrollBehavior = scrollBehavior
             )
+
+            ExpandedDockedSearchBarWithGap(
+                state = searchBarState,
+                inputField = inputField
+            ) {
+                SearchResultsContent(
+                    uiState = searchUiState,
+                    onMediaTypeChange = searchViewModel::setMediaType,
+                    onCatalogToggle = searchViewModel::toggleCatalog,
+                    onItemClick = { item ->
+                        onCatalogItemClick(item)
+                        scope.launch {
+                            searchBarState.animateToCollapsed()
+                        }
+                        searchViewModel.clearQuery()
+                        textFieldState.setTextAndPlaceCursorAtEnd("")
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .imePadding()
+                )
+            }
         }
     ) { innerPadding ->
         LazyColumn(
