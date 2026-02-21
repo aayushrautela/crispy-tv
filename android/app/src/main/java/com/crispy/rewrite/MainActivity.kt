@@ -600,7 +600,8 @@ private fun HomePage(
                 state = searchBarState,
                 inputField = inputField,
                 colors = SearchBarDefaults.appBarWithSearchColors(
-                    containerColor = Color.Transparent
+                    appBarContainerColor = Color.Transparent,
+                    scrolledAppBarContainerColor = Color.Transparent
                 ),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
