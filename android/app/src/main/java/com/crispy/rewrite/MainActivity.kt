@@ -538,7 +538,7 @@ private fun HomePage(
                 }
             },
             placeholder = {
-                Text("Search your library")
+                Text("Find your next watch")
             },
             leadingIcon = {
                 Icon(
@@ -549,7 +549,8 @@ private fun HomePage(
             trailingIcon = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(end = 16.dp)
                 ) {
                     if (queryText.isNotBlank()) {
                         IconButton(
@@ -574,8 +575,7 @@ private fun HomePage(
 
                     Box(
                         modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(32.dp)
+                            .size(30.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                             .clickable { onProfileClick() },
@@ -597,6 +597,7 @@ private fun HomePage(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             AppBarWithSearch(
+                modifier = Modifier.padding(horizontal = 16.dp),
                 state = searchBarState,
                 inputField = inputField,
                 colors = SearchBarDefaults.appBarWithSearchColors(
