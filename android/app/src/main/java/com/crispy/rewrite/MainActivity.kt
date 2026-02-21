@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.text.format.DateUtils
 import android.util.Log
 import android.view.ViewGroup
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
@@ -52,13 +53,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -162,6 +166,8 @@ class MainActivity : ComponentActivity() {
             CrispyRewriteTheme {
                 val isDark = isSystemInDarkTheme()
                 DisposableEffect(isDark) {
+                    window.statusBarColor = android.graphics.Color.TRANSPARENT
+                    window.navigationBarColor = android.graphics.Color.TRANSPARENT
                     val controller = WindowCompat.getInsetsController(window, window.decorView)
                     controller.isAppearanceLightStatusBars = !isDark
                     controller.isAppearanceLightNavigationBars = !isDark
@@ -468,6 +474,14 @@ private fun HomePage(
     )
     val searchUiState by searchViewModel.uiState.collectAsStateWithLifecycle()
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    val searchOuterHorizontalPadding by animateDpAsState(
+        targetValue = if (searchExpanded) 0.dp else 16.dp,
+        label = "searchOuterHorizontalPadding"
+    )
+    val searchOuterVerticalPadding by animateDpAsState(
+        targetValue = if (searchExpanded) 0.dp else 8.dp,
+        label = "searchOuterVerticalPadding"
+    )
 
     BackHandler(enabled = searchExpanded) {
         searchExpanded = false
@@ -481,8 +495,17 @@ private fun HomePage(
                 SearchBar(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(
+                                WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                            )
+                        )
+                        .padding(
+                            horizontal = searchOuterHorizontalPadding,
+                            vertical = searchOuterVerticalPadding
+                        ),
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    shape = if (searchExpanded) SearchBarDefaults.fullScreenShape else SearchBarDefaults.dockedShape,
                     inputField = {
                         SearchBarDefaults.InputField(
                             query = searchUiState.query,
@@ -556,7 +579,9 @@ private fun HomePage(
                                 searchViewModel.clearQuery()
                                 onCatalogItemClick(item)
                             },
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .imePadding()
                         )
                     }
                 }
@@ -677,17 +702,19 @@ private fun ContinueWatchingSection(
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = "Continue Watching",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        if (statusMessage.isNotBlank()) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = statusMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "Continue Watching",
+                style = MaterialTheme.typography.titleMedium
             )
+
+            if (statusMessage.isNotBlank()) {
+                Text(
+                    text = statusMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         if (items.isNotEmpty()) {
@@ -732,6 +759,14 @@ private fun HomeCatalogSectionRow(
             }
         }
 
+        if (sectionUi.statusMessage.isNotBlank() && sectionUi.items.isEmpty()) {
+            Text(
+                text = sectionUi.statusMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -759,13 +794,6 @@ private fun HomeCatalogSectionRow(
             }
         }
 
-        if (sectionUi.statusMessage.isNotBlank() && sectionUi.items.isEmpty()) {
-            Text(
-                text = sectionUi.statusMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
 
