@@ -610,7 +610,8 @@ private fun HomePage(
                 ),
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
+                contentPadding = PaddingValues(0.dp)
             )
 
             ExpandedFullScreenSearchBar(
