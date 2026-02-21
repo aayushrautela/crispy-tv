@@ -970,6 +970,7 @@ private fun ContinueWatchingCard(
 }
 
 private fun continueWatchingSubtitle(item: ContinueWatchingItem): String {
+    val upNext = if (item.isUpNextPlaceholder) "Up Next" else null
     val seasonEpisode =
         if (
             item.type.equals("series", ignoreCase = true) &&
@@ -986,7 +987,7 @@ private fun continueWatchingSubtitle(item: ContinueWatchingItem): String {
         DateUtils.MINUTE_IN_MILLIS
     ).toString()
 
-    return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
+    return listOfNotNull(upNext, seasonEpisode, relativeWatched).joinToString(separator = " • ")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

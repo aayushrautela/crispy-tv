@@ -544,6 +544,55 @@ class RemoteWatchHistoryLabService(
         )
     }
 
+    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryLabResult {
+        val id = playbackId.trim()
+        val existing = loadEntries()
+        val entries = existing.sortedByDescending { item -> item.watchedAtEpochMs }.map { item -> item.toPublicEntry() }
+
+        if (id.isEmpty()) {
+            return WatchHistoryLabResult(
+                statusMessage = "Playback id missing.",
+                entries = entries,
+                authState = authState()
+            )
+        }
+
+        val syncedTrakt =
+            when (source) {
+                WatchProvider.TRAKT -> syncTraktRemovePlayback(id)
+                WatchProvider.SIMKL, WatchProvider.LOCAL -> false
+                null -> syncTraktRemovePlayback(id)
+            }
+        val syncedSimkl =
+            when (source) {
+                WatchProvider.SIMKL -> syncSimklRemovePlayback(id)
+                WatchProvider.TRAKT, WatchProvider.LOCAL -> false
+                null -> syncSimklRemovePlayback(id)
+            }
+
+        val statusMessage =
+            when (source) {
+                WatchProvider.TRAKT ->
+                    "Removed from continue watching. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)}"
+
+                WatchProvider.SIMKL ->
+                    "Removed from continue watching. simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+
+                WatchProvider.LOCAL -> "Removed from continue watching."
+                null ->
+                    "Removed from continue watching. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)} " +
+                        "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+            }
+
+        return WatchHistoryLabResult(
+            statusMessage = statusMessage,
+            entries = entries,
+            authState = authState(),
+            syncedToTrakt = syncedTrakt,
+            syncedToSimkl = syncedSimkl
+        )
+    }
+
     override suspend fun listContinueWatching(
         limit: Int,
         nowMs: Long,
@@ -552,9 +601,21 @@ class RemoteWatchHistoryLabService(
         val targetLimit = limit.coerceAtLeast(1)
 
         if (source != null) {
+            if (source == WatchProvider.LOCAL) {
+                val local = localContinueWatchingFallback().take(targetLimit)
+                val status = if (local.isNotEmpty()) {
+                    "Loaded ${local.size} local continue watching entries."
+                } else {
+                    "No local continue watching entries yet."
+                }
+                return ContinueWatchingLabResult(
+                    statusMessage = status,
+                    entries = local
+                )
+            }
+
             val entries =
                 when (source) {
-                    WatchProvider.LOCAL -> localContinueWatchingFallback()
                     WatchProvider.TRAKT -> {
                         if (traktAccessToken().isNotEmpty() && traktClientId.isNotBlank()) {
                             fetchTraktContinueWatching(nowMs)
@@ -570,19 +631,13 @@ class RemoteWatchHistoryLabService(
                             emptyList()
                         }
                     }
+
+                    WatchProvider.LOCAL -> emptyList()
                 }
 
             val normalized = normalizeContinueWatching(entries = entries, nowMs = nowMs, limit = targetLimit)
             val status =
                 when (source) {
-                    WatchProvider.LOCAL -> {
-                        if (normalized.isNotEmpty()) {
-                            "Loaded ${normalized.size} local continue watching entries."
-                        } else {
-                            "No local continue watching entries yet."
-                        }
-                    }
-
                     WatchProvider.TRAKT -> {
                         if (traktClientId.isBlank()) {
                             "Trakt client ID missing. Set TRAKT_CLIENT_ID in gradle.properties."
@@ -606,6 +661,8 @@ class RemoteWatchHistoryLabService(
                             "No Simkl continue watching entries available."
                         }
                     }
+
+                    WatchProvider.LOCAL -> "Local source selected."
                 }
 
             return ContinueWatchingLabResult(
@@ -616,10 +673,21 @@ class RemoteWatchHistoryLabService(
 
         val traktEntries = fetchTraktContinueWatching(nowMs)
         val simklEntries = if (traktEntries.isEmpty()) fetchSimklContinueWatching(nowMs) else emptyList()
-        val localEntries = if (traktEntries.isEmpty() && simklEntries.isEmpty()) localContinueWatchingFallback() else emptyList()
+        if (traktEntries.isEmpty() && simklEntries.isEmpty()) {
+            val local = localContinueWatchingFallback().take(targetLimit)
+            val status = if (local.isNotEmpty()) {
+                "Loaded ${local.size} local continue watching entries."
+            } else {
+                "No continue watching entries yet."
+            }
+            return ContinueWatchingLabResult(
+                statusMessage = status,
+                entries = local
+            )
+        }
 
         val merged = normalizeContinueWatching(
-            entries = traktEntries + simklEntries + localEntries,
+            entries = traktEntries + simklEntries,
             nowMs = nowMs,
             limit = targetLimit
         )
@@ -816,10 +884,25 @@ class RemoteWatchHistoryLabService(
         }
 
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
-        val candidates = entries.filter { entry ->
-            val progress = entry.progressPercent
-            progress > 0.0 && progress < 95.0 && entry.lastUpdatedEpochMs >= staleCutoff
-        }
+        val candidates =
+            entries
+                .asSequence()
+                .map { entry ->
+                    val progress = entry.progressPercent.coerceIn(0.0, 100.0)
+                    entry.copy(progressPercent = progress)
+                }
+                .filter { entry ->
+                    entry.lastUpdatedEpochMs >= staleCutoff
+                }
+                .filter { entry ->
+                    if (entry.isUpNextPlaceholder) {
+                        entry.progressPercent <= 0.0
+                    } else {
+                        entry.progressPercent >= CONTINUE_WATCHING_MIN_PROGRESS_PERCENT &&
+                            entry.progressPercent < CONTINUE_WATCHING_COMPLETION_PERCENT
+                    }
+                }
+                .toList()
 
         val byContent = linkedMapOf<String, ContinueWatchingEntry>()
         candidates.forEach { entry ->
@@ -830,80 +913,251 @@ class RemoteWatchHistoryLabService(
                 return@forEach
             }
 
-            val sameEpisode = current.season == entry.season && current.episode == entry.episode
-            val replacement =
-                when {
-                    sameEpisode -> if (entry.progressPercent >= current.progressPercent) entry else current
-                    entry.lastUpdatedEpochMs > current.lastUpdatedEpochMs -> entry
-                    entry.lastUpdatedEpochMs < current.lastUpdatedEpochMs -> current
-                    else -> if (entry.progressPercent >= current.progressPercent) entry else current
-                }
-            byContent[key] = replacement
+            byContent[key] = choosePreferredContinueWatching(current, entry)
         }
 
         return byContent.values
-            .sortedByDescending { it.lastUpdatedEpochMs }
+            .sortedWith(
+                compareByDescending<ContinueWatchingEntry> { it.progressPercent > 0.0 }
+                    .thenByDescending { it.lastUpdatedEpochMs }
+            )
             .take(limit)
     }
 
+    private fun choosePreferredContinueWatching(current: ContinueWatchingEntry, incoming: ContinueWatchingEntry): ContinueWatchingEntry {
+        val sameEpisode =
+            current.contentType == MetadataLabMediaType.MOVIE ||
+                (current.season == incoming.season &&
+                    current.episode == incoming.episode &&
+                    current.isUpNextPlaceholder == incoming.isUpNextPlaceholder)
+
+        if (sameEpisode) {
+            val delta = 0.5
+            return when {
+                incoming.progressPercent > current.progressPercent + delta -> incoming
+                current.progressPercent > incoming.progressPercent + delta -> current
+                incoming.lastUpdatedEpochMs >= current.lastUpdatedEpochMs -> incoming
+                else -> current
+            }
+        }
+
+        return when {
+            incoming.lastUpdatedEpochMs > current.lastUpdatedEpochMs -> incoming
+            incoming.lastUpdatedEpochMs < current.lastUpdatedEpochMs -> current
+            incoming.progressPercent > current.progressPercent -> incoming
+            else -> current
+        }
+    }
+
+    private data class TraktNextEpisode(
+        val season: Int,
+        val episode: Int,
+        val title: String?
+    )
+
     private fun fetchTraktContinueWatching(nowMs: Long): List<ContinueWatchingEntry> {
         val payload = traktGetArray("/sync/playback") ?: return emptyList()
-        return buildList {
-            for (index in 0 until payload.length()) {
-                val obj = payload.optJSONObject(index) ?: continue
-                val type = obj.optString("type").trim().lowercase(Locale.US)
-                val progress = obj.optDouble("progress", -1.0)
-                if (progress < 0) continue
 
-                if (type == "movie") {
-                    val movie = obj.optJSONObject("movie") ?: continue
-                    val imdbId = movie.optJSONObject("ids")?.optString("imdb")?.trim().orEmpty()
-                    if (imdbId.isEmpty()) continue
-                    val title = movie.optString("title").trim().ifEmpty { imdbId }
-                    val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
-                    add(
-                        ContinueWatchingEntry(
-                            contentId = imdbId,
-                            contentType = MetadataLabMediaType.MOVIE,
-                            title = title,
-                            season = null,
-                            episode = null,
-                            progressPercent = progress,
-                            lastUpdatedEpochMs = pausedAt,
-                            provider = WatchProvider.TRAKT,
-                            providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null }
-                        )
-                    )
-                    continue
+        val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
+        val nextEpisodeCache = mutableMapOf<String, TraktNextEpisode?>()
+
+        fun normalizedImdbId(raw: String): String {
+            val id = raw.trim()
+            if (id.isEmpty()) {
+                return ""
+            }
+            val normalized = if (id.startsWith("tt", ignoreCase = true)) id else "tt$id"
+            return normalized.lowercase(Locale.US)
+        }
+
+        fun nextEpisodeForShow(showTraktId: String): TraktNextEpisode? {
+            val id = showTraktId.trim()
+            if (id.isEmpty()) {
+                return null
+            }
+            return nextEpisodeCache.getOrPut(id) {
+                val endpoint = "/shows/$id/progress/watched?hidden=true&specials=false&count_specials=false"
+                val obj = traktGetObject(endpoint) ?: return@getOrPut null
+                val next = obj.optJSONObject("next_episode") ?: return@getOrPut null
+                val season = next.optInt("season", 0)
+                val number = next.optInt("number", 0)
+                if (season <= 0 || number <= 0) {
+                    return@getOrPut null
                 }
+                TraktNextEpisode(
+                    season = season,
+                    episode = number,
+                    title = next.optString("title").trim().ifEmpty { null }
+                )
+            }
+        }
 
-                if (type == "episode") {
-                    val episode = obj.optJSONObject("episode") ?: continue
-                    val show = obj.optJSONObject("show") ?: continue
-                    val imdbId = show.optJSONObject("ids")?.optString("imdb")?.trim().orEmpty()
-                    if (imdbId.isEmpty()) continue
-                    val season = episode.optInt("season", 0).takeIf { it > 0 }
-                    val number = episode.optInt("number", 0).takeIf { it > 0 }
-                    val showTitle = show.optString("title").trim().ifEmpty { imdbId }
-                    val episodeTitle = episode.optString("title").trim()
-                    val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
+        val playbackItems =
+            buildList<Pair<Long, JSONObject>> {
+                for (index in 0 until payload.length()) {
+                    val obj = payload.optJSONObject(index) ?: continue
                     val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
+                    add(pausedAt to obj)
+                }
+            }
+                .sortedByDescending { (pausedAt, _) -> pausedAt }
+                .take(CONTINUE_WATCHING_PLAYBACK_LIMIT)
+
+        val playbackEntries =
+            buildList {
+                for ((pausedAt, obj) in playbackItems) {
+                    val type = obj.optString("type").trim().lowercase(Locale.US)
+                    val progress = obj.optDouble("progress", -1.0)
+                    if (progress < 0) continue
+                    if (pausedAt < staleCutoff) continue
+                    if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
+
+                    if (type == "movie") {
+                        if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+                            continue
+                        }
+
+                        val movie = obj.optJSONObject("movie") ?: continue
+                        val imdbId = normalizedImdbId(movie.optJSONObject("ids")?.optString("imdb")?.trim().orEmpty())
+                        if (imdbId.isEmpty()) continue
+                        val title = movie.optString("title").trim().ifEmpty { imdbId }
+                        add(
+                            ContinueWatchingEntry(
+                                contentId = imdbId,
+                                contentType = MetadataLabMediaType.MOVIE,
+                                title = title,
+                                season = null,
+                                episode = null,
+                                progressPercent = progress,
+                                lastUpdatedEpochMs = pausedAt,
+                                provider = WatchProvider.TRAKT,
+                                providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                                isUpNextPlaceholder = false
+                            )
+                        )
+                        continue
+                    }
+
+                    if (type == "episode") {
+                        val episode = obj.optJSONObject("episode") ?: continue
+                        val show = obj.optJSONObject("show") ?: continue
+                        val ids = show.optJSONObject("ids")
+                        val imdbId = normalizedImdbId(ids?.optString("imdb")?.trim().orEmpty())
+                        if (imdbId.isEmpty()) continue
+
+                        val showTraktId = ids?.opt("trakt")?.toString()?.trim().orEmpty()
+                        val episodeSeason = episode.optInt("season", 0).takeIf { it > 0 }
+                        val episodeNumber = episode.optInt("number", 0).takeIf { it > 0 }
+                        val showTitle = show.optString("title").trim().ifEmpty { imdbId }
+                        val episodeTitle = episode.optString("title").trim()
+                        val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
+
+                        if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+                            val next = nextEpisodeForShow(showTraktId) ?: continue
+                            add(
+                                ContinueWatchingEntry(
+                                    contentId = imdbId,
+                                    contentType = MetadataLabMediaType.SERIES,
+                                    title = showTitle,
+                                    season = next.season,
+                                    episode = next.episode,
+                                    progressPercent = 0.0,
+                                    lastUpdatedEpochMs = pausedAt,
+                                    provider = WatchProvider.TRAKT,
+                                    providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                                    isUpNextPlaceholder = true
+                                )
+                            )
+                            continue
+                        }
+
+                        add(
+                            ContinueWatchingEntry(
+                                contentId = imdbId,
+                                contentType = MetadataLabMediaType.SERIES,
+                                title = title,
+                                season = episodeSeason,
+                                episode = episodeNumber,
+                                progressPercent = progress,
+                                lastUpdatedEpochMs = pausedAt,
+                                provider = WatchProvider.TRAKT,
+                                providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                                isUpNextPlaceholder = false
+                            )
+                        )
+                    }
+                }
+            }
+
+        val existingSeriesIds = playbackEntries
+            .asSequence()
+            .filter { it.contentType == MetadataLabMediaType.SERIES }
+            .map { it.contentId.lowercase(Locale.US) }
+            .toSet()
+
+                   val title: String,
+        val upNextFromWatchedShows = run {
+            val watchedShows = traktGetArray("/sync/watched/shows") ?: return playbackEntries
+            data class WatchedShowCandidate(
+                val imdbId: String,
+                val traktId: String,
+                val title: String,
+                val lastWatchedAtMs: Long
+            )
+
+            val candidates =
+                buildList {
+                    for (index in 0 until watchedShows.length()) {
+                        val obj = watchedShows.optJSONObject(index) ?: continue
+                        val lastWatchedAt = parseIsoToEpochMs(obj.optString("last_watched_at")) ?: continue
+                        if (lastWatchedAt < staleCutoff) continue
+
+                        val show = obj.optJSONObject("show") ?: continue
+                        val ids = show.optJSONObject("ids") ?: continue
+                        val imdbId = normalizedImdbId(ids.optString("imdb").trim())
+                        if (imdbId.isEmpty()) continue
+                        if (imdbId.lowercase(Locale.US) in existingSeriesIds) continue
+
+                        val traktId = ids.opt("trakt")?.toString()?.trim().orEmpty()
+                        if (traktId.isEmpty()) continue
+                        val title = show.optString("title").trim().ifEmpty { imdbId }
+
+                        add(
+                            WatchedShowCandidate(
+                                imdbId = imdbId,
+                                traktId = traktId,
+                                title = title,
+                                lastWatchedAtMs = lastWatchedAt
+                            )
+                        )
+                    }
+                }
+                    .sortedByDescending { it.lastWatchedAtMs }
+                    .distinctBy { it.imdbId }
+                    .take(CONTINUE_WATCHING_UPNEXT_SHOW_LIMIT)
+
+            buildList {
+                candidates.forEach { candidate ->
+                    val next = nextEpisodeForShow(candidate.traktId) ?: return@forEach
                     add(
                         ContinueWatchingEntry(
-                            contentId = imdbId,
+                            contentId = candidate.imdbId,
                             contentType = MetadataLabMediaType.SERIES,
-                            title = title,
-                            season = season,
-                            episode = number,
-                            progressPercent = progress,
-                            lastUpdatedEpochMs = pausedAt,
+                            title = candidate.title,
+                            season = next.season,
+                            episode = next.episode,
+                            progressPercent = 0.0,
+                            lastUpdatedEpochMs = candidate.lastWatchedAtMs,
                             provider = WatchProvider.TRAKT,
-                            providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null }
+                            providerPlaybackId = null,
+                            isUpNextPlaceholder = true
                         )
                     )
                 }
             }
         }
+
+        return playbackEntries + upNextFromWatchedShows
     }
 
     private fun fetchSimklContinueWatching(nowMs: Long): List<ContinueWatchingEntry> {
@@ -1300,6 +1554,23 @@ class RemoteWatchHistoryLabService(
         )
     }
 
+    private fun traktGetObject(path: String): JSONObject? {
+        val token = traktAccessToken()
+        if (token.isEmpty() || traktClientId.isBlank()) {
+            return null
+        }
+        return getJsonAny(
+            url = "https://api.trakt.tv$path",
+            headers =
+                mapOf(
+                    "Authorization" to "Bearer $token",
+                    "trakt-api-version" to "2",
+                    "trakt-api-key" to traktClientId,
+                    "Accept" to "application/json"
+                )
+        ).toJsonObjectOrNull()
+    }
+
     private fun simklGetAny(path: String): Any? {
         val token = simklAccessToken()
         if (token.isEmpty() || simklClientId.isBlank()) {
@@ -1533,6 +1804,32 @@ class RemoteWatchHistoryLabService(
         return traktPost("/sync/history/remove", body)
     }
 
+    private fun syncTraktRemovePlayback(playbackId: String): Boolean {
+        val token = traktAccessToken()
+        val id = playbackId.trim()
+        if (token.isEmpty() || traktClientId.isEmpty() || id.isEmpty()) {
+            return false
+        }
+
+        val responseCode =
+            deleteRequest(
+                url = "https://api.trakt.tv/sync/playback/$id",
+                headers =
+                    mapOf(
+                        "Authorization" to "Bearer $token",
+                        "trakt-api-version" to "2",
+                        "trakt-api-key" to traktClientId,
+                        "Accept" to "application/json"
+                    )
+            )
+
+        return responseCode in 200..299 || responseCode == 404
+    }
+
+    private fun syncSimklRemovePlayback(playbackId: String): Boolean {
+        return false
+    }
+
     private fun traktPost(path: String, payload: JSONObject): Boolean {
         val token = traktAccessToken()
         if (token.isEmpty() || traktClientId.isEmpty()) {
@@ -1693,6 +1990,34 @@ class RemoteWatchHistoryLabService(
             responseCode
         }.onFailure { error ->
             Log.w(TAG, "HTTP POST $url failed with exception", error)
+        }.getOrNull().also {
+            runCatching {
+                connection.inputStream?.close()
+                connection.errorStream?.close()
+            }
+            connection.disconnect()
+        }
+    }
+
+    private fun deleteRequest(url: String, headers: Map<String, String>): Int? {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            requestMethod = "DELETE"
+            headers.forEach { (key, value) ->
+                setRequestProperty(key, value)
+            }
+        }
+
+        return runCatching {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299 && responseCode != 404) {
+                val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                Log.w(TAG, "HTTP DELETE $url failed with $responseCode body=${compactForLog(errorBody)}")
+            }
+            responseCode
+        }.onFailure { error ->
+            Log.w(TAG, "HTTP DELETE $url failed with exception", error)
         }.getOrNull().also {
             runCatching {
                 connection.inputStream?.close()
@@ -1952,6 +2277,10 @@ class RemoteWatchHistoryLabService(
         private const val KEY_SIMKL_HANDLE = "simkl_user_handle"
         private const val KEY_SIMKL_OAUTH_STATE = "simkl_oauth_state"
         private const val STALE_PLAYBACK_WINDOW_MS = 30L * 24L * 60L * 60L * 1000L
+        private const val CONTINUE_WATCHING_MIN_PROGRESS_PERCENT = 2.0
+        private const val CONTINUE_WATCHING_COMPLETION_PERCENT = 85.0
+        private const val CONTINUE_WATCHING_PLAYBACK_LIMIT = 30
+        private const val CONTINUE_WATCHING_UPNEXT_SHOW_LIMIT = 30
         private const val TRAKT_AUTHORIZE_BASE = "https://trakt.tv/oauth/authorize"
         private const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/token"
         private const val SIMKL_AUTHORIZE_BASE = "https://simkl.com/oauth/authorize"

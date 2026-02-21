@@ -11,14 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,12 +31,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -113,20 +111,24 @@ internal class HomeScreenSettingsViewModel(
         }
     }
 
-    fun toggleCatalogEnabled(catalogKey: String) {
+    fun setCatalogEnabled(catalogKey: String, isEnabled: Boolean) {
         updatePreferences { preferences ->
             val next = preferences.disabledCatalogKeys.toMutableSet()
-            if (!next.add(catalogKey)) {
+            if (isEnabled) {
                 next.remove(catalogKey)
+            } else {
+                next.add(catalogKey)
             }
             preferences.copy(disabledCatalogKeys = next)
         }
     }
 
-    fun toggleCatalogHero(catalogKey: String) {
+    fun setCatalogHero(catalogKey: String, isHero: Boolean) {
         updatePreferences { preferences ->
             val next = preferences.heroCatalogKeys.toMutableSet()
-            if (!next.add(catalogKey)) {
+            if (isHero) {
+                next.add(catalogKey)
+            } else {
                 next.remove(catalogKey)
             }
             preferences.copy(heroCatalogKeys = next)
@@ -244,8 +246,8 @@ fun HomeScreenSettingsRoute(onBack: () -> Unit) {
         onContinueWatchingChange = viewModel::setContinueWatchingEnabled,
         onTraktTopPicksChange = viewModel::setTraktTopPicksEnabled,
         onWatchDataSourceChange = viewModel::setWatchDataSource,
-        onToggleCatalogEnabled = viewModel::toggleCatalogEnabled,
-        onToggleCatalogHero = viewModel::toggleCatalogHero
+        onCatalogEnabledChange = viewModel::setCatalogEnabled,
+        onCatalogHeroChange = viewModel::setCatalogHero
     )
 }
 
@@ -259,8 +261,8 @@ private fun HomeScreenSettingsScreen(
     onContinueWatchingChange: (Boolean) -> Unit,
     onTraktTopPicksChange: (Boolean) -> Unit,
     onWatchDataSourceChange: (WatchProvider) -> Unit,
-    onToggleCatalogEnabled: (String) -> Unit,
-    onToggleCatalogHero: (String) -> Unit
+    onCatalogEnabledChange: (String, Boolean) -> Unit,
+    onCatalogHeroChange: (String, Boolean) -> Unit
 ) {
     val scrollState = rememberScrollState()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -364,15 +366,19 @@ private fun HomeScreenSettingsScreen(
 
                     else -> {
                         uiState.catalogs.forEachIndexed { index, catalog ->
-                            val isDisabled = catalog.key in uiState.preferences.disabledCatalogKeys
+                            val isEnabled = catalog.key !in uiState.preferences.disabledCatalogKeys
                             val isHero = catalog.key in uiState.preferences.heroCatalogKeys
 
                             CatalogPreferenceRow(
                                 catalog = catalog,
-                                isDisabled = isDisabled,
+                                isEnabled = isEnabled,
                                 isHero = isHero,
-                                onToggleEnabled = { onToggleCatalogEnabled(catalog.key) },
-                                onToggleHero = { onToggleCatalogHero(catalog.key) }
+                                onEnabledChange = { enabled ->
+                                    onCatalogEnabledChange(catalog.key, enabled)
+                                },
+                                onHeroChange = { hero ->
+                                    onCatalogHeroChange(catalog.key, hero)
+                                }
                             )
 
                             if (index < uiState.catalogs.lastIndex) {
@@ -499,10 +505,10 @@ private fun WatchDataSourceRow(
 @Composable
 private fun CatalogPreferenceRow(
     catalog: HomeCatalogPreferenceUi,
-    isDisabled: Boolean,
+    isEnabled: Boolean,
     isHero: Boolean,
-    onToggleEnabled: () -> Unit,
-    onToggleHero: () -> Unit
+    onEnabledChange: (Boolean) -> Unit,
+    onHeroChange: (Boolean) -> Unit
 ) {
     ListItem(
         headlineContent = {
@@ -523,36 +529,51 @@ private fun CatalogPreferenceRow(
             )
         },
         trailingContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                IconButton(onClick = onToggleHero) {
-                    Icon(
-                        imageVector = Icons.Outlined.Star,
-                        contentDescription = "Toggle hero",
-                        tint =
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Hero",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Switch(
+                        checked = isHero,
+                        onCheckedChange = onHeroChange,
+                        thumbContent =
                             if (isHero) {
-                                MaterialTheme.colorScheme.tertiary
+                                {
+                                    Icon(
+                                        imageVector = Icons.Filled.Star,
+                                        contentDescription = null
+                                    )
+                                }
                             } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        modifier = Modifier.size(20.dp)
+                                null
+                            }
                     )
                 }
-                IconButton(onClick = onToggleEnabled) {
-                    Icon(
-                        imageVector = Icons.Outlined.PowerSettingsNew,
-                        contentDescription = "Toggle catalog",
-                        tint =
-                            if (isDisabled) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                        modifier = Modifier.size(20.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Enabled",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = onEnabledChange
                     )
                 }
             }
-        },
-        modifier = Modifier.alpha(if (isDisabled) 0.5f else 1f)
+        }
     )
 }
 

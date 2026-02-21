@@ -10,6 +10,7 @@ import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.PlaybackLabDependencies
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.player.MetadataLabMediaType
+import com.crispy.rewrite.player.ContinueWatchingEntry
 import com.crispy.rewrite.player.ContinueWatchingLabResult
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryRequest
@@ -116,9 +117,11 @@ class HomeViewModel internal constructor(
 
                         WatchProvider.TRAKT,
                         WatchProvider.SIMKL -> {
-                            if (baseResult.providerContinueWatchingResult.entries.isNotEmpty()) {
+                            val filteredProviderEntries =
+                                applyProviderSuppressionFilter(baseResult.providerContinueWatchingResult.entries)
+                            if (filteredProviderEntries.isNotEmpty()) {
                                 homeCatalogService.loadContinueWatchingItemsFromProvider(
-                                    entries = baseResult.providerContinueWatchingResult.entries,
+                                    entries = filteredProviderEntries,
                                     limit = 20
                                 )
                             } else {
@@ -210,7 +213,10 @@ class HomeViewModel internal constructor(
     }
 
     fun hideContinueWatchingItem(item: ContinueWatchingItem) {
-        suppressItem(item.id)
+        suppressKeys(
+            item.id,
+            continueWatchingContentKey(type = item.type, contentId = item.contentId)
+        )
         _uiState.update { current ->
             current.copy(
                 continueWatchingItems = current.continueWatchingItems.filterNot { it.id == item.id },
@@ -220,7 +226,10 @@ class HomeViewModel internal constructor(
     }
 
     fun removeContinueWatchingItem(item: ContinueWatchingItem) {
-        suppressItem(item.id)
+        suppressKeys(
+            item.id,
+            continueWatchingContentKey(type = item.type, contentId = item.contentId)
+        )
         _uiState.update { current ->
             current.copy(
                 continueWatchingItems = current.continueWatchingItems.filterNot { it.id == item.id },
@@ -231,10 +240,33 @@ class HomeViewModel internal constructor(
         viewModelScope.launch {
             val removalResult =
                 withContext(Dispatchers.IO) {
-                    watchHistoryService.unmarkWatched(
-                        request = item.toUnmarkRequest(),
-                        source = item.provider
-                    )
+                    when {
+                        item.isUpNextPlaceholder -> {
+                            com.crispy.rewrite.player.WatchHistoryLabResult(
+                                statusMessage = "Removed ${item.title} from Continue Watching."
+                            )
+                        }
+
+                        item.provider == WatchProvider.LOCAL -> {
+                            watchHistoryService.unmarkWatched(
+                                request = item.toUnmarkRequest(),
+                                source = item.provider
+                            )
+                        }
+
+                        !item.providerPlaybackId.isNullOrBlank() -> {
+                            watchHistoryService.removeFromPlayback(
+                                playbackId = item.providerPlaybackId,
+                                source = item.provider
+                            )
+                        }
+
+                        else -> {
+                            com.crispy.rewrite.player.WatchHistoryLabResult(
+                                statusMessage = "Removed ${item.title} from Continue Watching."
+                            )
+                        }
+                    }
                 }
             _uiState.update { current ->
                 current.copy(
@@ -262,14 +294,60 @@ class HomeViewModel internal constructor(
         var updated = false
         val filtered = mutableListOf<WatchHistoryEntry>()
         entries.forEach { entry ->
-            val key = continueWatchingKey(entry)
-            val suppressedAt = suppressedItemsByKey[key]
+            val episodeKey = continueWatchingKey(entry)
+            val contentKey = continueWatchingContentKey(entry)
+
+            val episodeSuppressedAt = suppressedItemsByKey[episodeKey]
+            val contentSuppressedAt = suppressedItemsByKey[contentKey]
+
+            val suppressedAt =
+                when {
+                    episodeSuppressedAt == null -> contentSuppressedAt
+                    contentSuppressedAt == null -> episodeSuppressedAt
+                    else -> maxOf(episodeSuppressedAt, contentSuppressedAt)
+                }
+
             if (suppressedAt == null) {
                 filtered += entry
                 return@forEach
             }
 
             if (entry.watchedAtEpochMs > suppressedAt) {
+                if (episodeSuppressedAt != null && entry.watchedAtEpochMs > episodeSuppressedAt) {
+                    suppressedItemsByKey.remove(episodeKey)
+                    updated = true
+                }
+                if (contentSuppressedAt != null && entry.watchedAtEpochMs > contentSuppressedAt) {
+                    suppressedItemsByKey.remove(contentKey)
+                    updated = true
+                }
+                filtered += entry
+            }
+        }
+
+        if (updated) {
+            suppressionStore.write(suppressedItemsByKey)
+        }
+
+        return filtered
+    }
+
+    private fun applyProviderSuppressionFilter(entries: List<ContinueWatchingEntry>): List<ContinueWatchingEntry> {
+        if (entries.isEmpty()) {
+            return emptyList()
+        }
+
+        var updated = false
+        val filtered = mutableListOf<ContinueWatchingEntry>()
+        entries.forEach { entry ->
+            val key = continueWatchingContentKey(entry)
+            val suppressedAt = suppressedItemsByKey[key]
+            if (suppressedAt == null) {
+                filtered += entry
+                return@forEach
+            }
+
+            if (entry.lastUpdatedEpochMs > suppressedAt) {
                 suppressedItemsByKey.remove(key)
                 updated = true
                 filtered += entry
@@ -283,8 +361,15 @@ class HomeViewModel internal constructor(
         return filtered
     }
 
-    private fun suppressItem(itemId: String) {
-        suppressedItemsByKey[itemId] = System.currentTimeMillis()
+    private fun suppressKeys(vararg keys: String) {
+        val now = System.currentTimeMillis()
+        keys
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .forEach { key ->
+                suppressedItemsByKey[key] = now
+            }
         suppressionStore.write(suppressedItemsByKey)
     }
 
@@ -361,6 +446,20 @@ private fun continueWatchingKey(entry: WatchHistoryEntry): String {
     val seasonPart = entry.season?.toString() ?: "-"
     val episodePart = entry.episode?.toString() ?: "-"
     return "${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:$seasonPart:$episodePart"
+}
+
+private fun continueWatchingContentKey(entry: WatchHistoryEntry): String {
+    val type = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+    return "$type:${entry.contentId.lowercase(Locale.US)}"
+}
+
+private fun continueWatchingContentKey(entry: ContinueWatchingEntry): String {
+    val type = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+    return "$type:${entry.contentId.lowercase(Locale.US)}"
+}
+
+private fun continueWatchingContentKey(type: String, contentId: String): String {
+    return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
 }
 
 private fun ContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {

@@ -56,7 +56,8 @@ data class ContinueWatchingEntry(
     val progressPercent: Double,
     val lastUpdatedEpochMs: Long,
     val provider: WatchProvider,
-    val providerPlaybackId: String? = null
+    val providerPlaybackId: String? = null,
+    val isUpNextPlaceholder: Boolean = false
 )
 
 data class ContinueWatchingLabResult(
@@ -177,6 +178,13 @@ interface WatchHistoryLabService {
         source: WatchProvider? = null
     ): WatchHistoryLabResult
 
+    suspend fun removeFromPlayback(
+        playbackId: String,
+        source: WatchProvider? = null
+    ): WatchHistoryLabResult {
+        return WatchHistoryLabResult(statusMessage = "Playback removal unavailable.")
+    }
+
     suspend fun listContinueWatching(
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
@@ -247,6 +255,10 @@ object DefaultWatchHistoryLabService : WatchHistoryLabService {
     }
 
     override suspend fun unmarkWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryLabResult {
+        return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
+    }
+
+    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryLabResult {
         return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
     }
 
