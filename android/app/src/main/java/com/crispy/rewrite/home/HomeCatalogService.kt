@@ -77,6 +77,7 @@ data class MediaDetailsLoadResult(
 
 data class MediaDetails(
     val id: String,
+    val imdbId: String?,
     val mediaType: String,
     val title: String,
     val posterUrl: String?,
@@ -852,6 +853,12 @@ class HomeCatalogService(
         addonId: String
     ): MediaDetails? {
         val id = nonBlank(meta.optString("id")) ?: fallbackId
+        val imdbId =
+            normalizeImdbId(
+                nonBlank(meta.optString("imdbId"))
+                    ?: nonBlank(meta.optString("imdb_id"))
+                    ?: nonBlank(meta.optString("imdb"))
+            )
         val mediaType =
             nonBlank(meta.optString("type"))?.lowercase(Locale.US)
                 ?: fallbackMediaType.lowercase(Locale.US)
@@ -879,6 +886,7 @@ class HomeCatalogService(
 
         return MediaDetails(
             id = id,
+            imdbId = imdbId,
             mediaType = mediaType,
             title = title,
             posterUrl = posterUrl,
@@ -1096,6 +1104,12 @@ class HomeCatalogService(
 private fun nonBlank(value: String?): String? {
     val trimmed = value?.trim()
     return if (trimmed.isNullOrEmpty()) null else trimmed
+}
+
+private fun normalizeImdbId(value: String?): String? {
+    val trimmed = nonBlank(value) ?: return null
+    val normalized = trimmed.lowercase(Locale.US)
+    return if (normalized.startsWith("tt") && normalized.length >= 4) normalized else null
 }
 
 private fun WatchHistoryEntry.asCatalogMediaType(): String {

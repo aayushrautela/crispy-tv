@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogSectionRef
+import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
@@ -54,6 +55,7 @@ internal fun HomeScreen(
     val heroState by viewModel.heroState.collectAsStateWithLifecycle()
     val continueWatchingState by viewModel.continueWatchingState.collectAsStateWithLifecycle()
     val upNextState by viewModel.upNextState.collectAsStateWithLifecycle()
+    val forYouState by viewModel.forYouState.collectAsStateWithLifecycle()
     val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
 
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -141,6 +143,22 @@ internal fun HomeScreen(
                     onRemoveItem = viewModel::removeContinueWatchingItem,
                     badgeLabel = "UP NEXT",
                     showProgressBar = true
+                )
+            }
+
+            item(contentType = "forYou") {
+                HomeRailSection(
+                    title = "For You",
+                    items = forYouState.items,
+                    statusMessage = forYouState.statusMessage,
+                    actionMenuContentDescription = "For You actions",
+                    subtitleFor = {
+                        if (it.provider == WatchProvider.SIMKL) "Simkl recommendation" else "Trakt recommendation"
+                    },
+                    onItemClick = onContinueWatchingClick,
+                    onHideItem = null,
+                    onRemoveItem = null,
+                    showTitleFallbackWhenNoLogo = true
                 )
             }
 

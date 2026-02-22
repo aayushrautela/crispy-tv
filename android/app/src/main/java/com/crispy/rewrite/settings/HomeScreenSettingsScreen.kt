@@ -340,8 +340,8 @@ private fun HomeScreenSettingsScreen(
                     color = MaterialTheme.colorScheme.outlineVariant
                 )
                 ToggleSettingRow(
-                    title = "Trakt Top Picks",
-                    description = "Prioritize catalogs personalized from Trakt",
+                    title = "For You",
+                    description = "Show personalized Trakt or Simkl recommendations on Home",
                     checked = uiState.preferences.traktTopPicksEnabled,
                     onCheckedChange = onTraktTopPicksChange
                 )

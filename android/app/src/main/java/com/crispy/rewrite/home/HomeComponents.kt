@@ -73,8 +73,8 @@ internal fun HomeRailSection(
     actionMenuContentDescription: String,
     subtitleFor: (ContinueWatchingItem) -> String,
     onItemClick: (ContinueWatchingItem) -> Unit,
-    onHideItem: (ContinueWatchingItem) -> Unit,
-    onRemoveItem: (ContinueWatchingItem) -> Unit,
+    onHideItem: ((ContinueWatchingItem) -> Unit)? = null,
+    onRemoveItem: ((ContinueWatchingItem) -> Unit)? = null,
     badgeLabel: String? = null,
     showProgressBar: Boolean = false,
     showTitleFallbackWhenNoLogo: Boolean = false,
@@ -100,8 +100,8 @@ internal fun HomeRailSection(
                     subtitle = subtitleFor(item),
                     actionMenuContentDescription = actionMenuContentDescription,
                     onClick = { onItemClick(item) },
-                    onHideClick = { onHideItem(item) },
-                    onRemoveClick = { onRemoveItem(item) },
+                    onHideClick = onHideItem?.let { { it(item) } },
+                    onRemoveClick = onRemoveItem?.let { { it(item) } },
                     onDetailsClick = { onItemClick(item) },
                     badgeLabel = badgeLabel,
                     showProgressBar = showProgressBar,
@@ -143,8 +143,8 @@ internal fun HomeRailCard(
     subtitle: String,
     actionMenuContentDescription: String,
     onClick: () -> Unit,
-    onHideClick: () -> Unit,
-    onRemoveClick: () -> Unit,
+    onHideClick: (() -> Unit)? = null,
+    onRemoveClick: (() -> Unit)? = null,
     onDetailsClick: () -> Unit,
     badgeLabel: String? = null,
     showProgressBar: Boolean = false,
@@ -153,8 +153,9 @@ internal fun HomeRailCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var bottomSheetVisible by remember { mutableStateOf(false) }
+    val hasItemActions = onHideClick != null || onRemoveClick != null
 
-    val cardInteractionModifier = if (useBottomSheetActions) {
+    val cardInteractionModifier = if (useBottomSheetActions && hasItemActions) {
         Modifier.combinedClickable(
             onClick = onClick,
             onLongClickLabel = actionMenuContentDescription,
@@ -241,7 +242,7 @@ internal fun HomeRailCard(
             )
         }
 
-        if (!useBottomSheetActions) {
+        if (!useBottomSheetActions && hasItemActions) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -269,20 +270,24 @@ internal fun HomeRailCard(
                             onDetailsClick()
                         }
                     )
-                    DropdownMenuItem(
-                        text = { Text("Remove") },
-                        onClick = {
-                            menuExpanded = false
-                            onRemoveClick()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Hide") },
-                        onClick = {
-                            menuExpanded = false
-                            onHideClick()
-                        }
-                    )
+                    onRemoveClick?.let { removeAction ->
+                        DropdownMenuItem(
+                            text = { Text("Remove") },
+                            onClick = {
+                                menuExpanded = false
+                                removeAction()
+                            }
+                        )
+                    }
+                    onHideClick?.let { hideAction ->
+                        DropdownMenuItem(
+                            text = { Text("Hide") },
+                            onClick = {
+                                menuExpanded = false
+                                hideAction()
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -318,7 +323,7 @@ internal fun HomeRailCard(
         }
     }
 
-    if (useBottomSheetActions && bottomSheetVisible) {
+    if (useBottomSheetActions && hasItemActions && bottomSheetVisible) {
         HomeRailActionBottomSheet(
             title = item.title,
             subtitle = subtitle,
@@ -327,13 +332,17 @@ internal fun HomeRailCard(
                 bottomSheetVisible = false
                 onDetailsClick()
             },
-            onRemoveClick = {
-                bottomSheetVisible = false
-                onRemoveClick()
+            onRemoveClick = onRemoveClick?.let {
+                {
+                    bottomSheetVisible = false
+                    it()
+                }
             },
-            onHideClick = {
-                bottomSheetVisible = false
-                onHideClick()
+            onHideClick = onHideClick?.let {
+                {
+                    bottomSheetVisible = false
+                    it()
+                }
             }
         )
     }
@@ -345,8 +354,8 @@ private fun HomeRailActionBottomSheet(
     subtitle: String,
     onDismiss: () -> Unit,
     onDetailsClick: () -> Unit,
-    onRemoveClick: () -> Unit,
-    onHideClick: () -> Unit
+    onRemoveClick: (() -> Unit)? = null,
+    onHideClick: (() -> Unit)? = null
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         ListItem(
@@ -359,16 +368,20 @@ private fun HomeRailActionBottomSheet(
             icon = Icons.Outlined.Info,
             onClick = onDetailsClick
         )
-        HomeRailActionBottomSheetItem(
-            label = "Remove",
-            icon = Icons.Outlined.DeleteOutline,
-            onClick = onRemoveClick
-        )
-        HomeRailActionBottomSheetItem(
-            label = "Hide",
-            icon = Icons.Outlined.VisibilityOff,
-            onClick = onHideClick
-        )
+        onRemoveClick?.let {
+            HomeRailActionBottomSheetItem(
+                label = "Remove",
+                icon = Icons.Outlined.DeleteOutline,
+                onClick = it
+            )
+        }
+        onHideClick?.let {
+            HomeRailActionBottomSheetItem(
+                label = "Hide",
+                icon = Icons.Outlined.VisibilityOff,
+                onClick = it
+            )
+        }
     }
 }
 

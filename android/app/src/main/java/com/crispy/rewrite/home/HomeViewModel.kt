@@ -14,6 +14,8 @@ import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.ContinueWatchingEntry
 import com.crispy.rewrite.player.ContinueWatchingLabResult
+import com.crispy.rewrite.player.ProviderLibraryItem
+import com.crispy.rewrite.player.ProviderRecommendationsResult
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryRequest
 import com.crispy.rewrite.player.WatchHistoryLabService
@@ -51,6 +53,11 @@ data class ContinueWatchingState(
 )
 
 data class UpNextState(
+    val items: List<ContinueWatchingItem> = emptyList(),
+    val statusMessage: String = ""
+)
+
+data class ForYouState(
     val items: List<ContinueWatchingItem> = emptyList(),
     val statusMessage: String = ""
 )
@@ -110,6 +117,9 @@ class HomeViewModel internal constructor(
     private val _upNextState = MutableStateFlow(UpNextState())
     val upNextState: StateFlow<UpNextState> = _upNextState.asStateFlow()
 
+    private val _forYouState = MutableStateFlow(ForYouState())
+    val forYouState: StateFlow<ForYouState> = _forYouState.asStateFlow()
+
     private val _catalogSectionsState = MutableStateFlow(CatalogSectionsState())
     val catalogSectionsState: StateFlow<CatalogSectionsState> = _catalogSectionsState.asStateFlow()
 
@@ -158,10 +168,33 @@ class HomeViewModel internal constructor(
                         }
                     }
 
+                    val providerRecommendationsDeferred = async {
+                        val recommendationSource = preferredRecommendationSource(
+                            selectedSource = selectedSource,
+                            traktAuthenticated = authState.traktAuthenticated,
+                            simklAuthenticated = authState.simklAuthenticated
+                        )
+                        when {
+                            !settings.traktTopPicksEnabled -> {
+                                ProviderRecommendationsResult(statusMessage = "")
+                            }
+                            recommendationSource == null -> {
+                                ProviderRecommendationsResult(statusMessage = "Connect Trakt or Simkl in Settings to load For You.")
+                            }
+                            else -> {
+                                watchHistoryService.listProviderRecommendations(
+                                    limit = 20,
+                                    source = recommendationSource
+                                )
+                            }
+                        }
+                    }
+
                     HomeFeedLoadResult(
                         heroResult = heroDeferred.await(),
                         watchHistoryEntries = watchHistoryDeferred.await().entries,
                         providerContinueWatchingResult = providerContinueWatchingDeferred.await(),
+                        providerRecommendationsResult = providerRecommendationsDeferred.await(),
                         selectedSource = selectedSource,
                         providerConnected = providerConnected
                     )
@@ -235,6 +268,35 @@ class HomeViewModel internal constructor(
                 UpNextState(
                     items = upNextItems,
                     statusMessage = if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) "" else continueWatchingResult.statusMessage
+                )
+            }
+
+            val forYouResult = withContext(Dispatchers.IO) {
+                val filteredEntries = applyProviderLibrarySuppressionFilter(baseResult.providerRecommendationsResult.items)
+                if (filteredEntries.isEmpty()) {
+                    ContinueWatchingLoadResult(
+                        items = emptyList(),
+                        statusMessage = baseResult.providerRecommendationsResult.statusMessage
+                    )
+                } else {
+                    val loaded = homeCatalogService.loadContinueWatchingItemsFromProvider(
+                        entries = filteredEntries.map { it.toProviderContinueWatchingEntry() },
+                        limit = 20
+                    )
+                    val statusMessage =
+                        if (loaded.items.isNotEmpty()) {
+                            ""
+                        } else {
+                            baseResult.providerRecommendationsResult.statusMessage.ifBlank { loaded.statusMessage }
+                        }
+                    loaded.copy(statusMessage = statusMessage)
+                }
+            }
+
+            _forYouState.update {
+                ForYouState(
+                    items = forYouResult.items,
+                    statusMessage = forYouResult.statusMessage
                 )
             }
 
@@ -453,6 +515,34 @@ class HomeViewModel internal constructor(
         return filtered
     }
 
+    private fun applyProviderLibrarySuppressionFilter(entries: List<ProviderLibraryItem>): List<ProviderLibraryItem> {
+        if (entries.isEmpty()) return emptyList()
+        val suppressionMap = suppressedItemsByKey ?: return entries
+
+        var updated = false
+        val filtered = mutableListOf<ProviderLibraryItem>()
+        entries.forEach { entry ->
+            val key = continueWatchingContentKey(entry.contentType, entry.contentId)
+            val suppressedAt = suppressionMap[key]
+            if (suppressedAt == null) {
+                filtered += entry
+                return@forEach
+            }
+
+            if (entry.addedAtEpochMs > suppressedAt) {
+                suppressionMap.remove(key)
+                updated = true
+                filtered += entry
+            }
+        }
+
+        if (updated) {
+            suppressionStore.write(suppressionMap)
+        }
+
+        return filtered
+    }
+
     private fun suppressKeys(vararg keys: String) {
         val suppressionMap = suppressedItemsByKey ?: mutableMapOf<String, Long>().also { suppressedItemsByKey = it }
         val now = System.currentTimeMillis()
@@ -468,6 +558,7 @@ private data class HomeFeedLoadResult(
     val heroResult: HomeHeroLoadResult,
     val watchHistoryEntries: List<WatchHistoryEntry>,
     val providerContinueWatchingResult: ContinueWatchingLabResult,
+    val providerRecommendationsResult: ProviderRecommendationsResult,
     val selectedSource: WatchProvider,
     val providerConnected: Boolean
 )
@@ -528,6 +619,11 @@ private fun continueWatchingContentKey(type: String, contentId: String): String 
     return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
 }
 
+private fun continueWatchingContentKey(contentType: MetadataLabMediaType, contentId: String): String {
+    val type = if (contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+    return continueWatchingContentKey(type = type, contentId = contentId)
+}
+
 private fun ContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
     return WatchHistoryRequest(
         contentId = contentId,
@@ -546,6 +642,35 @@ private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
     }
 }
 
+private fun ProviderLibraryItem.toProviderContinueWatchingEntry(): ContinueWatchingEntry {
+    return ContinueWatchingEntry(
+        contentId = contentId,
+        contentType = contentType,
+        title = title,
+        season = season,
+        episode = episode,
+        progressPercent = 0.0,
+        lastUpdatedEpochMs = addedAtEpochMs,
+        provider = provider,
+        providerPlaybackId = null,
+        isUpNextPlaceholder = false
+    )
+}
+
 private fun WatchProvider.displayName(): String {
     return name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }
+}
+
+private fun preferredRecommendationSource(
+    selectedSource: WatchProvider,
+    traktAuthenticated: Boolean,
+    simklAuthenticated: Boolean
+): WatchProvider? {
+    return when {
+        selectedSource == WatchProvider.SIMKL && simklAuthenticated -> WatchProvider.SIMKL
+        selectedSource == WatchProvider.TRAKT && traktAuthenticated -> WatchProvider.TRAKT
+        traktAuthenticated -> WatchProvider.TRAKT
+        simklAuthenticated -> WatchProvider.SIMKL
+        else -> null
+    }
 }

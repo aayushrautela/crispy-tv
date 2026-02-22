@@ -4,8 +4,10 @@ package com.crispy.rewrite.details
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,16 +25,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +46,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,25 +60,45 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.crispy.rewrite.home.MediaDetails
 import com.crispy.rewrite.home.MediaVideo
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val SampleTrailerUrl =
     "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4"
+
+@Stable
+private data class DetailsPaletteColors(
+    val pageBackground: Color,
+    val onPageBackground: Color,
+    val accent: Color,
+    val onAccent: Color,
+    val pillBackground: Color,
+    val onPillBackground: Color
+)
 
 @Composable
 fun DetailsRoute(
@@ -92,7 +117,8 @@ fun DetailsRoute(
         uiState = uiState,
         onBack = onBack,
         onRetry = viewModel::reload,
-        onSeasonSelected = viewModel::onSeasonSelected
+        onSeasonSelected = viewModel::onSeasonSelected,
+        onToggleWatchlist = viewModel::toggleWatchlist
     )
 }
 
@@ -101,10 +127,27 @@ private fun DetailsScreen(
     uiState: DetailsUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
-    onSeasonSelected: (Int) -> Unit
+    onSeasonSelected: (Int) -> Unit,
+    onToggleWatchlist: () -> Unit
 ) {
     val details = uiState.details
     val listState = rememberLazyListState()
+    val palette = rememberDetailsPaletteColors(imageUrl = details?.backdropUrl ?: details?.posterUrl)
+
+    val baseScheme = MaterialTheme.colorScheme
+    val detailsScheme =
+        remember(palette, baseScheme) {
+            baseScheme.copy(
+                primary = palette.accent,
+                onPrimary = palette.onAccent,
+                background = palette.pageBackground,
+                onBackground = palette.onPageBackground,
+                surface = lerp(palette.pageBackground, palette.onPageBackground, 0.08f),
+                onSurface = palette.onPageBackground,
+                surfaceVariant = lerp(palette.pageBackground, palette.onPageBackground, 0.12f),
+                onSurfaceVariant = palette.onPageBackground.copy(alpha = 0.78f)
+            )
+        }
     val topBarAlpha by remember {
         derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) {
@@ -115,84 +158,100 @@ private fun DetailsScreen(
         }
     }
 
-    val containerColor = MaterialTheme.colorScheme.surface.copy(alpha = topBarAlpha)
-    val contentColor = lerp(Color.White, MaterialTheme.colorScheme.onSurface, topBarAlpha)
+    val containerColor = palette.pageBackground.copy(alpha = topBarAlpha)
+    val contentColor = lerp(Color.White, palette.onPageBackground, topBarAlpha)
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .navigationBarsPadding(),
-            state = listState
-        ) {
-            item {
-                HeroSection(details = details)
-            }
+    MaterialTheme(colorScheme = detailsScheme) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .navigationBarsPadding(),
+                state = listState
+            ) {
+                item {
+                    HeroSection(details = details, palette = palette)
+                }
 
             item {
-                DetailsBody(
-                    uiState = uiState,
-                    onRetry = onRetry,
-                    onSeasonSelected = onSeasonSelected
+                HeaderInfoSection(
+                    details = details,
+                    isWatched = uiState.isWatched,
+                    isInWatchlist = uiState.isInWatchlist,
+                    isMutating = uiState.isMutating,
+                    palette = palette,
+                    onToggleWatchlist = onToggleWatchlist
                 )
             }
-        }
 
-        TopAppBar(
-            windowInsets = TopAppBarDefaults.windowInsets,
-            title = {
-                Text(
-                    text = if (topBarAlpha > 0.65f) details?.title ?: "Details" else "",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = contentColor
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = contentColor
+                item {
+                    DetailsBody(
+                        uiState = uiState,
+                        onRetry = onRetry,
+                        onSeasonSelected = onSeasonSelected
                     )
                 }
-            },
-            colors =
-                TopAppBarDefaults.topAppBarColors(
-                    containerColor = containerColor,
-                    titleContentColor = contentColor,
-                    navigationIconContentColor = contentColor,
-                    actionIconContentColor = contentColor
-                )
-        )
+            }
+
+            TopAppBar(
+                windowInsets = TopAppBarDefaults.windowInsets,
+                title = {
+                    Text(
+                        text = if (topBarAlpha > 0.65f) details?.title ?: "Details" else "",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = contentColor
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = contentColor
+                        )
+                    }
+                },
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = containerColor,
+                        titleContentColor = contentColor,
+                        navigationIconContentColor = contentColor,
+                        actionIconContentColor = contentColor
+                    )
+            )
+        }
     }
 }
 
 @Composable
-private fun HeroSection(details: MediaDetails?) {
-    val shape = MaterialTheme.shapes.extraLarge
-    val heroHeight = 16f / 9f
-
+private fun HeroSection(
+    details: MediaDetails?,
+    palette: DetailsPaletteColors
+) {
+    val configuration = LocalConfiguration.current
+    val horizontalPadding = responsivePageHorizontalPadding()
+    val heroHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(340.dp, 520.dp)
     var isTrailerPlaying by rememberSaveable(details?.id) { mutableStateOf(false) }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(heroHeight)
-            .padding(12.dp)
-            .clip(shape)
+            .height(heroHeight)
     ) {
+        val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+
         if (details == null) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                color = palette.pillBackground
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = palette.onPillBackground)
                 }
             }
-            return
+            return@BoxWithConstraints
         }
 
         if (isTrailerPlaying) {
@@ -212,53 +271,311 @@ private fun HeroSection(details: MediaDetails?) {
             } else {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    color = palette.pillBackground
                 ) {}
             }
 
+            // Top scrim for app bar/buttons readability.
             Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors =
-                                    listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.55f)
-                                    )
-                            )
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.55f),
+                            0.38f to Color.Transparent
                         )
+                    )
             )
+
+            // Bottom fade to merge hero into the page background.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops =
+                                arrayOf(
+                                    0f to Color.Transparent,
+                                    0.58f to Color.Transparent,
+                                    1f to palette.pageBackground
+                                ),
+                            startY = 0f,
+                            endY = heightPx
+                        )
+                    )
+            )
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .clickable { isTrailerPlaying = true },
+                color = Color.Black.copy(alpha = 0.34f),
+                contentColor = Color.White
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text("Trailer", style = MaterialTheme.typography.labelLarge)
+                }
+            }
 
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(horizontal = horizontalPadding)
+                    .padding(bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val logoUrl = details.logoUrl?.trim().orEmpty()
+                if (logoUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = details.title,
+                        modifier = Modifier
+                            .fillMaxWidth(0.84f)
+                            .height(110.dp),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart
+                    )
+                } else {
+                    Text(
+                        text = details.title,
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderInfoSection(
+    details: MediaDetails?,
+    isWatched: Boolean,
+    isInWatchlist: Boolean,
+    isMutating: Boolean,
+    palette: DetailsPaletteColors,
+    onToggleWatchlist: () -> Unit,
+) {
+    if (details == null) return
+
+    val horizontalPadding = responsivePageHorizontalPadding()
+    val genre = details.genres.firstOrNull()?.trim().orEmpty()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding)
+            .padding(top = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (genre.isNotBlank()) {
+            Text(
+                text = genre,
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.onPageBackground.copy(alpha = 0.86f)
+            )
+        }
+
+        HeaderMetaRow(details = details, isWatched = isWatched, palette = palette)
+
+        ExpandableDescription(
+            text = details.description,
+            textAlign = TextAlign.Center,
+            textColor = palette.onPageBackground.copy(alpha = 0.9f),
+            placeholderColor = palette.onPageBackground.copy(alpha = 0.7f)
+        )
+
+        Button(
+            onClick = { /* TODO: hook up playback */ },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = palette.accent,
+                    contentColor = palette.onAccent
+                )
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Watch now", style = MaterialTheme.typography.titleMedium)
+            }
+        }
+
+        DetailsQuickActionsRow(
+            palette = palette,
+            enabled = !isMutating,
+            isInWatchlist = isInWatchlist,
+            onToggleWatchlist = onToggleWatchlist
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+    }
+}
+
+@Composable
+private fun DetailsQuickActionsRow(
+    palette: DetailsPaletteColors,
+    enabled: Boolean,
+    isInWatchlist: Boolean,
+    onToggleWatchlist: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DetailsQuickAction(
+            label = "Watchlist",
+            selected = isInWatchlist,
+            enabled = enabled,
+            palette = palette,
+            icon = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+            onClick = onToggleWatchlist
+        )
+    }
+}
+
+@Composable
+private fun DetailsQuickAction(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    palette: DetailsPaletteColors,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    val container = if (selected) lerp(palette.pillBackground, palette.accent, 0.28f) else palette.pillBackground
+    val iconTint = if (selected) palette.accent else palette.onPillBackground.copy(alpha = 0.92f)
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(vertical = 6.dp)
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .clickable(enabled = enabled) { onClick() },
+            color = container,
+            contentColor = palette.onPillBackground
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = iconTint,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = palette.onPageBackground.copy(alpha = if (enabled) 0.9f else 0.55f)
+        )
+    }
+}
+
+
+@Composable
+private fun HeaderMetaRow(
+    details: MediaDetails,
+    isWatched: Boolean,
+    palette: DetailsPaletteColors
+) {
+    val rating = details.rating?.trim().takeIf { !it.isNullOrBlank() }
+    val certification = details.certification?.trim().takeIf { !it.isNullOrBlank() }
+    val year = details.year?.trim().takeIf { !it.isNullOrBlank() }
+    val runtime = formatRuntimeForHeader(details.runtime)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (rating != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Color(0xFFFFD54F)
+                )
+                Text(
+                    text = rating,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = palette.onPageBackground
+                )
+            }
+        }
+
+        if (certification != null) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = palette.pillBackground,
+                contentColor = palette.onPillBackground
             ) {
                 Text(
-                    text = details.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    text = certification,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelMedium
                 )
+            }
+        }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = { /* TODO: hook up playback */ }) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Watch")
-                    }
+        if (year != null) {
+            Text(
+                text = year,
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.onPageBackground.copy(alpha = 0.86f)
+            )
+        }
 
-                    FilledTonalButton(onClick = { isTrailerPlaying = true }) {
-                        Text("Trailer")
-                    }
-                }
+        if (runtime != null) {
+            Text(
+                text = runtime,
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.onPageBackground.copy(alpha = 0.86f)
+            )
+        }
+
+        if (isWatched) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = palette.pillBackground,
+                contentColor = palette.onPillBackground
+            ) {
+                Text(
+                    text = "Watched",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
         }
     }
@@ -330,7 +647,7 @@ private fun DetailsBody(
             .padding(horizontal = horizontalPadding)
             .padding(bottom = Dimensions.PageBottomPadding)
     ) {
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         if (details == null) {
             if (uiState.isLoading) {
@@ -348,30 +665,6 @@ private fun DetailsBody(
             }
             return
         }
-
-        Text(
-            text = details.title,
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        MetaChips(details = details, isWatched = uiState.isWatched)
-
-        if (details.genres.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(details.genres) { genre ->
-                    AssistChip(onClick = { }, label = { Text(genre) })
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        ExpandableDescription(text = details.description)
 
         if (details.directors.isNotEmpty() || details.creators.isNotEmpty()) {
             Spacer(modifier = Modifier.height(14.dp))
@@ -445,62 +738,20 @@ private fun DetailsBody(
 }
 
 @Composable
-private fun MetaChips(
-    details: MediaDetails,
-    isWatched: Boolean
+private fun ExpandableDescription(
+    text: String?,
+    textAlign: TextAlign = TextAlign.Start,
+    textColor: Color = MaterialTheme.colorScheme.onBackground,
+    placeholderColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (isWatched) {
-            item {
-                AssistChip(
-                    onClick = { },
-                    label = { Text("Watched") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Done,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                )
-            }
-        }
-        details.year?.takeIf { it.isNotBlank() }?.let { year ->
-            item { AssistChip(onClick = { }, label = { Text(year) }) }
-        }
-        formatRuntime(details.runtime)?.let { runtime ->
-            item { AssistChip(onClick = { }, label = { Text(runtime) }) }
-        }
-        details.certification?.takeIf { it.isNotBlank() }?.let { rating ->
-            item { AssistChip(onClick = { }, label = { Text(rating) }) }
-        }
-        details.rating?.takeIf { it.isNotBlank() }?.let { rating ->
-            item {
-                AssistChip(
-                    onClick = { },
-                    label = { Text(rating) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExpandableDescription(text: String?) {
     var expanded by rememberSaveable(text) { mutableStateOf(false) }
     val content = text?.trim().orEmpty()
     if (content.isBlank()) {
         Text(
             text = "No description available.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = placeholderColor,
+            textAlign = textAlign
         )
         return
     }
@@ -509,10 +760,15 @@ private fun ExpandableDescription(text: String?) {
         Text(
             text = content,
             style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            textAlign = textAlign,
             maxLines = if (expanded) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis
         )
-        TextButton(onClick = { expanded = !expanded }) {
+        TextButton(
+            onClick = { expanded = !expanded },
+            colors = ButtonDefaults.textButtonColors(contentColor = textColor.copy(alpha = 0.92f))
+        ) {
             Text(if (expanded) "Show less" else "Show more")
         }
     }
@@ -674,4 +930,116 @@ private fun formatRuntime(runtime: String?): String? {
     }
 
     return input.uppercase()
+}
+
+private fun formatRuntimeForHeader(runtime: String?): String? {
+    val input = runtime?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val hourMatch = Regex("(\\d+)\\s*h").find(input)
+    val minMatch = Regex("(\\d+)\\s*min").find(input)
+
+    fun human(hours: Int, minutes: Int): String? {
+        if (hours <= 0 && minutes <= 0) return null
+        return buildString {
+            if (hours > 0) append("${hours} hr")
+            if (hours > 0 && minutes > 0) append(" ")
+            if (minutes > 0) append("${minutes} min")
+        }
+    }
+
+    if (hourMatch != null || minMatch != null) {
+        val hours = hourMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        val minutes = minMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        return human(hours, minutes) ?: input
+    }
+
+    val numericMinutes = input.toIntOrNull()
+    if (numericMinutes != null && numericMinutes > 0) {
+        val hours = numericMinutes / 60
+        val minutes = numericMinutes % 60
+        return human(hours, minutes)
+    }
+
+    return input
+}
+
+@Composable
+private fun rememberDetailsPaletteColors(imageUrl: String?): DetailsPaletteColors {
+    val scheme = MaterialTheme.colorScheme
+    val fallbackPage = scheme.background
+    val fallbackAccent = scheme.primary
+
+    var colors by remember(fallbackPage, fallbackAccent) {
+        mutableStateOf(
+            DetailsPaletteColors(
+                pageBackground = fallbackPage,
+                onPageBackground = scheme.onBackground,
+                accent = fallbackAccent,
+                onAccent = scheme.onPrimary,
+                pillBackground = scheme.surface.copy(alpha = 0.72f),
+                onPillBackground = scheme.onSurface
+            )
+        )
+    }
+
+    val context = LocalContext.current
+    val imageLoader = context.imageLoader
+
+    LaunchedEffect(imageUrl, fallbackPage, fallbackAccent) {
+        if (imageUrl.isNullOrBlank()) return@LaunchedEffect
+
+        val request =
+            ImageRequest.Builder(context)
+                .data(imageUrl)
+                .allowHardware(false)
+                .build()
+
+        val result = imageLoader.execute(request)
+        val drawable = (result as? SuccessResult)?.drawable ?: return@LaunchedEffect
+        val bitmap = drawable.toBitmap()
+
+        val palette =
+            withContext(Dispatchers.Default) {
+                Palette.from(bitmap)
+                    .clearFilters()
+                    .generate()
+            }
+
+        val bgArgb =
+            palette.darkMutedSwatch?.rgb
+                ?: palette.darkVibrantSwatch?.rgb
+                ?: palette.mutedSwatch?.rgb
+                ?: palette.vibrantSwatch?.rgb
+
+        val accentArgb =
+            palette.vibrantSwatch?.rgb
+                ?: palette.lightVibrantSwatch?.rgb
+                ?: palette.mutedSwatch?.rgb
+                ?: palette.lightMutedSwatch?.rgb
+
+        val extractedBg = bgArgb?.let { Color(it) }
+        val extractedAccent = accentArgb?.let { Color(it) }
+
+        val pageBackground = if (extractedBg != null) lerp(fallbackPage, extractedBg, 0.88f) else fallbackPage
+        val accent = if (extractedAccent != null) lerp(fallbackAccent, extractedAccent, 0.9f) else fallbackAccent
+        val onPage = contrastColor(pageBackground)
+        val onAccent = contrastColor(accent)
+        val pillBackground = lerp(pageBackground, onPage, 0.14f).copy(alpha = 0.72f)
+
+        colors =
+            DetailsPaletteColors(
+                pageBackground = pageBackground,
+                onPageBackground = onPage,
+                accent = accent,
+                onAccent = onAccent,
+                pillBackground = pillBackground,
+                onPillBackground = onPage
+            )
+    }
+
+    return colors
+}
+
+private fun contrastColor(background: Color): Color {
+    // 0.52 chosen to keep mid-tones leaning white.
+    return if (background.luminance() > 0.52f) Color.Black else Color.White
 }

@@ -18,6 +18,7 @@ import com.crispy.rewrite.player.ProviderCommentScope
 import com.crispy.rewrite.player.ProviderLibraryFolder
 import com.crispy.rewrite.player.ProviderLibraryItem
 import com.crispy.rewrite.player.ProviderLibrarySnapshot
+import com.crispy.rewrite.player.ProviderRecommendationsResult
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryLabResult
 import com.crispy.rewrite.player.WatchHistoryLabService
@@ -297,6 +298,8 @@ class RemoteWatchHistoryLabService(
                 .appendQueryParameter("client_id", simklClientId)
                 .appendQueryParameter("redirect_uri", simklRedirectUri)
                 .appendQueryParameter("state", state)
+                .appendQueryParameter("app-name", SIMKL_APP_NAME)
+                .appendQueryParameter("app-version", simklAppVersion())
                 .build()
                 .toString()
 
@@ -360,8 +363,12 @@ class RemoteWatchHistoryLabService(
 
         val tokenResponse =
             postJsonForObject(
-                url = SIMKL_TOKEN_URL,
-                headers = mapOf("Content-Type" to "application/json", "Accept" to "application/json"),
+                url = simklUrlWithRequiredParams(SIMKL_TOKEN_URL),
+                headers = mapOf(
+                    "Content-Type" to "application/json",
+                    "Accept" to "application/json",
+                    "User-Agent" to simklUserAgent()
+                ),
                 payload = tokenPayload
             )
 
@@ -555,6 +562,103 @@ class RemoteWatchHistoryLabService(
         )
     }
 
+    override suspend fun setInWatchlist(
+        request: WatchHistoryRequest,
+        inWatchlist: Boolean,
+        source: WatchProvider?
+    ): WatchHistoryLabResult {
+        if (source == WatchProvider.LOCAL) {
+            return WatchHistoryLabResult(statusMessage = "Watchlist is unavailable for local watch history.")
+        }
+
+        val normalized = normalizeContentRequest(request)
+        val syncedTrakt =
+            when (source) {
+                WatchProvider.TRAKT -> syncTraktWatchlist(normalized, inWatchlist)
+                WatchProvider.SIMKL, WatchProvider.LOCAL -> false
+                null -> syncTraktWatchlist(normalized, inWatchlist)
+            }
+        val syncedSimkl =
+            when (source) {
+                WatchProvider.SIMKL -> syncSimklWatchlist(normalized, inWatchlist)
+                WatchProvider.TRAKT, WatchProvider.LOCAL -> false
+                null -> syncSimklWatchlist(normalized, inWatchlist)
+            }
+        if (syncedTrakt) invalidateProviderLibraryCache(WatchProvider.TRAKT)
+        if (syncedSimkl) invalidateProviderLibraryCache(WatchProvider.SIMKL)
+
+        val verb = if (inWatchlist) "Saved" else "Removed"
+        val statusMessage =
+            when (source) {
+                WatchProvider.TRAKT ->
+                    "$verb. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)}"
+
+                WatchProvider.SIMKL ->
+                    "$verb. simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+
+                WatchProvider.LOCAL -> "$verb."
+                null ->
+                    "$verb. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)} " +
+                        "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+            }
+
+        return WatchHistoryLabResult(
+            statusMessage = statusMessage,
+            authState = authState(),
+            syncedToTrakt = syncedTrakt,
+            syncedToSimkl = syncedSimkl
+        )
+    }
+
+    override suspend fun setRating(
+        request: WatchHistoryRequest,
+        rating: Int?,
+        source: WatchProvider?
+    ): WatchHistoryLabResult {
+        if (source == WatchProvider.LOCAL) {
+            return WatchHistoryLabResult(statusMessage = "Rating is unavailable for local watch history.")
+        }
+
+        val normalized = normalizeContentRequest(request)
+        val ratingValue = rating?.coerceIn(1, 10)
+        val syncedTrakt =
+            when (source) {
+                WatchProvider.TRAKT -> syncTraktRating(normalized, ratingValue)
+                WatchProvider.SIMKL, WatchProvider.LOCAL -> false
+                null -> syncTraktRating(normalized, ratingValue)
+            }
+        val syncedSimkl =
+            when (source) {
+                WatchProvider.SIMKL -> syncSimklRating(normalized, ratingValue)
+                WatchProvider.TRAKT, WatchProvider.LOCAL -> false
+                null -> syncSimklRating(normalized, ratingValue)
+            }
+        if (syncedTrakt) invalidateProviderLibraryCache(WatchProvider.TRAKT)
+        if (syncedSimkl) invalidateProviderLibraryCache(WatchProvider.SIMKL)
+
+        val verb = if (ratingValue == null) "Removed rating" else "Rated $ratingValue/10"
+        val statusMessage =
+            when (source) {
+                WatchProvider.TRAKT ->
+                    "$verb. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)}"
+
+                WatchProvider.SIMKL ->
+                    "$verb. simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+
+                WatchProvider.LOCAL -> "$verb."
+                null ->
+                    "$verb. trakt=${syncStatusLabel(syncedTrakt, traktAccessToken(), traktClientId)} " +
+                        "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
+            }
+
+        return WatchHistoryLabResult(
+            statusMessage = statusMessage,
+            authState = authState(),
+            syncedToTrakt = syncedTrakt,
+            syncedToSimkl = syncedSimkl
+        )
+    }
+
     override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryLabResult {
         val id = playbackId.trim()
         val existing = loadEntries()
@@ -602,6 +706,130 @@ class RemoteWatchHistoryLabService(
             syncedToTrakt = syncedTrakt,
             syncedToSimkl = syncedSimkl
         )
+    }
+
+    private data class NormalizedContentRequest(
+        val contentId: String,
+        val contentType: MetadataLabMediaType,
+        val title: String,
+        val remoteImdbId: String?
+    )
+
+    private fun normalizeContentRequest(request: WatchHistoryRequest): NormalizedContentRequest {
+        val normalizedId = normalizeNuvioMediaId(request.contentId)
+        val contentId = normalizedId.contentId.trim()
+        require(contentId.isNotEmpty()) { "Content ID is required" }
+
+        val requestRemoteImdbId = request.remoteImdbId?.trim()
+        val remoteImdbId =
+            when {
+                contentId.startsWith("tt", ignoreCase = true) -> contentId.lowercase()
+                requestRemoteImdbId?.startsWith("tt", ignoreCase = true) == true -> requestRemoteImdbId.lowercase()
+                else -> null
+            }
+
+        val title =
+            request.title
+                ?.trim()
+                ?.takeIf { value -> value.isNotEmpty() }
+                ?: contentId
+
+        return NormalizedContentRequest(
+            contentId = contentId,
+            contentType = request.contentType,
+            title = title,
+            remoteImdbId = remoteImdbId
+        )
+    }
+
+    private fun traktIdsForContent(contentId: String, remoteImdbId: String?): JSONObject? {
+        val ids = JSONObject()
+        if (!remoteImdbId.isNullOrBlank()) {
+            ids.put("imdb", remoteImdbId)
+        }
+
+        val tmdbId =
+            Regex("""\\btmdb:(?:movie:|show:)?(\\d+)""", RegexOption.IGNORE_CASE)
+                .find(contentId)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
+                ?: 0
+        if (tmdbId > 0) {
+            ids.put("tmdb", tmdbId)
+        }
+
+        return if (ids.length() > 0) ids else null
+    }
+
+    private suspend fun syncTraktWatchlist(request: NormalizedContentRequest, inWatchlist: Boolean): Boolean {
+        val ids = traktIdsForContent(request.contentId, request.remoteImdbId) ?: return false
+        val payload = JSONObject()
+        if (request.contentType == MetadataLabMediaType.MOVIE) {
+            payload.put("movies", JSONArray().put(JSONObject().put("ids", ids)))
+        } else {
+            payload.put("shows", JSONArray().put(JSONObject().put("ids", ids)))
+        }
+        val path = if (inWatchlist) "/sync/watchlist" else "/sync/watchlist/remove"
+        return traktPost(path, payload)
+    }
+
+    private suspend fun syncTraktRating(request: NormalizedContentRequest, rating: Int?): Boolean {
+        val ids = traktIdsForContent(request.contentId, request.remoteImdbId) ?: return false
+        val payload = JSONObject()
+        val item = JSONObject().put("ids", ids)
+        if (rating != null) {
+            item.put("rating", rating)
+        }
+
+        if (request.contentType == MetadataLabMediaType.MOVIE) {
+            payload.put("movies", JSONArray().put(item))
+        } else {
+            payload.put("shows", JSONArray().put(item))
+        }
+
+        val path = if (rating == null) "/sync/ratings/remove" else "/sync/ratings"
+        return traktPost(path, payload)
+    }
+
+    private suspend fun syncSimklWatchlist(request: NormalizedContentRequest, inWatchlist: Boolean): Boolean {
+        val imdbId = request.remoteImdbId ?: return false
+        if (simklClientId.isBlank()) return false
+        if (simklAccessToken().isEmpty()) return false
+
+        val key = if (request.contentType == MetadataLabMediaType.MOVIE) "movies" else "shows"
+        val payload = JSONObject()
+        val item = JSONObject().put("ids", JSONObject().put("imdb", imdbId))
+        if (inWatchlist) {
+            item.put("to", "plantowatch")
+            payload.put(key, JSONArray().put(item))
+            return simklPost("/sync/add-to-list", payload)
+        }
+
+        payload.put(key, JSONArray().put(item))
+        return simklPost("/sync/remove-from-list", payload)
+    }
+
+    private suspend fun syncSimklRating(request: NormalizedContentRequest, rating: Int?): Boolean {
+        val value = rating ?: return false
+        val imdbId = request.remoteImdbId ?: return false
+        if (simklClientId.isBlank()) return false
+        if (simklAccessToken().isEmpty()) return false
+
+        val key = if (request.contentType == MetadataLabMediaType.MOVIE) "movies" else "shows"
+        val payload = JSONObject()
+        val item =
+            JSONObject()
+                .put("ids", JSONObject().put("imdb", imdbId))
+                .put("rating", value.coerceIn(1, 10))
+        payload.put(key, JSONArray().put(item))
+        return simklPost("/sync/ratings", payload)
+    }
+
+    private suspend fun invalidateProviderLibraryCache(provider: WatchProvider) {
+        withContext(Dispatchers.IO) {
+            runCatching { providerLibraryCacheFile(provider).delete() }
+        }
     }
 
     override suspend fun listContinueWatching(
@@ -918,6 +1146,86 @@ class RemoteWatchHistoryLabService(
             folders = folders.sortedBy { it.label.lowercase(Locale.US) },
             items = items.sortedByDescending { it.addedAtEpochMs }
         )
+    }
+
+    override suspend fun listProviderRecommendations(
+        limit: Int,
+        source: WatchProvider?
+    ): ProviderRecommendationsResult {
+        val targetLimit = limit.coerceAtLeast(1)
+        if (source == WatchProvider.LOCAL) {
+            return ProviderRecommendationsResult(statusMessage = "Local source selected. Recommendations unavailable.")
+        }
+
+        return when (source) {
+            WatchProvider.TRAKT -> loadTraktRecommendations(limit = targetLimit)
+            WatchProvider.SIMKL -> loadSimklRecommendations(limit = targetLimit)
+            null -> {
+                val traktResult = loadTraktRecommendations(limit = targetLimit)
+                if (traktResult.items.isNotEmpty()) {
+                    traktResult
+                } else {
+                    val simklResult = loadSimklRecommendations(limit = targetLimit)
+                    if (simklResult.items.isNotEmpty()) {
+                        simklResult
+                    } else {
+                        ProviderRecommendationsResult(
+                            statusMessage = when {
+                                traktResult.statusMessage.contains("Connect", ignoreCase = true) &&
+                                    simklResult.statusMessage.contains("Connect", ignoreCase = true) -> {
+                                    "Connect Trakt or Simkl to load For You recommendations."
+                                }
+
+                                simklResult.statusMessage.isNotBlank() -> simklResult.statusMessage
+                                else -> traktResult.statusMessage
+                            }
+                        )
+                    }
+                }
+            }
+
+            else -> ProviderRecommendationsResult(statusMessage = "Recommendations unavailable.")
+        }
+    }
+
+    private suspend fun loadTraktRecommendations(limit: Int): ProviderRecommendationsResult {
+        if (traktClientId.isBlank()) {
+            return ProviderRecommendationsResult(statusMessage = "Trakt client ID missing. Set TRAKT_CLIENT_ID in gradle.properties.")
+        }
+        if (traktAccessToken().isBlank()) {
+            return ProviderRecommendationsResult(statusMessage = "Connect Trakt to load For You recommendations.")
+        }
+
+        return try {
+            val items = fetchTraktRecommendationsMixed(limit = limit)
+            ProviderRecommendationsResult(
+                statusMessage = if (items.isEmpty()) "No Trakt recommendations available." else "Loaded ${items.size} Trakt recommendations.",
+                items = items
+            )
+        } catch (error: Throwable) {
+            Log.w(TAG, "listProviderRecommendations: Trakt fetch failed", error)
+            ProviderRecommendationsResult(statusMessage = "Trakt recommendations are temporarily unavailable.")
+        }
+    }
+
+    private suspend fun loadSimklRecommendations(limit: Int): ProviderRecommendationsResult {
+        if (simklClientId.isBlank()) {
+            return ProviderRecommendationsResult(statusMessage = "Simkl client ID missing. Set SIMKL_CLIENT_ID in gradle.properties.")
+        }
+        if (simklAccessToken().isBlank()) {
+            return ProviderRecommendationsResult(statusMessage = "Connect Simkl to load For You recommendations.")
+        }
+
+        return try {
+            val items = fetchSimklRecommendationsMixed(limit = limit)
+            ProviderRecommendationsResult(
+                statusMessage = if (items.isEmpty()) "No Simkl recommendations available." else "Loaded ${items.size} Simkl recommendations.",
+                items = items
+            )
+        } catch (error: Throwable) {
+            Log.w(TAG, "listProviderRecommendations: Simkl fetch failed", error)
+            ProviderRecommendationsResult(statusMessage = "Simkl recommendations are temporarily unavailable.")
+        }
     }
 
     override suspend fun getCachedContinueWatching(
@@ -1756,6 +2064,178 @@ class RemoteWatchHistoryLabService(
         return result
     }
 
+    private suspend fun fetchTraktRecommendationsMixed(limit: Int): List<ProviderLibraryItem> {
+        val movies = traktGetArray("/recommendations/movies?limit=$limit&extended=images") ?: JSONArray()
+        val shows = traktGetArray("/recommendations/shows?limit=$limit&extended=images") ?: JSONArray()
+
+        val movieItems = parseTraktRecommendationsArray(movies, MetadataLabMediaType.MOVIE)
+        val showItems = parseTraktRecommendationsArray(shows, MetadataLabMediaType.SERIES)
+
+        val merged = mutableListOf<ProviderLibraryItem>()
+        val maxSize = maxOf(movieItems.size, showItems.size)
+        for (index in 0 until maxSize) {
+            movieItems.getOrNull(index)?.let { merged += it }
+            if (merged.size >= limit) break
+            showItems.getOrNull(index)?.let { merged += it }
+            if (merged.size >= limit) break
+        }
+        return merged.take(limit)
+    }
+
+    private suspend fun fetchSimklRecommendationsMixed(limit: Int): List<ProviderLibraryItem> {
+        val perType = (limit.coerceAtLeast(1) + 1) / 2
+        val movieRefs = fetchSimklRandomRefs(type = "movie", limit = perType)
+        val showRefs = fetchSimklRandomRefs(type = "tv", limit = perType)
+
+        val movieItems = movieRefs.mapIndexed { index, ref ->
+            resolveSimklRecommendationRef(ref = ref, contentType = MetadataLabMediaType.MOVIE, rank = index)
+        }
+        val showItems = showRefs.mapIndexed { index, ref ->
+            resolveSimklRecommendationRef(ref = ref, contentType = MetadataLabMediaType.SERIES, rank = index)
+        }
+
+        val merged = mutableListOf<ProviderLibraryItem>()
+        val maxSize = maxOf(movieItems.size, showItems.size)
+        for (index in 0 until maxSize) {
+            movieItems.getOrNull(index)?.let { merged += it }
+            if (merged.size >= limit) break
+            showItems.getOrNull(index)?.let { merged += it }
+            if (merged.size >= limit) break
+        }
+
+        return merged.take(limit)
+    }
+
+    private suspend fun fetchSimklRandomRefs(type: String, limit: Int): List<SimklRandomRef> {
+        val payload =
+            simklGetAny(
+                "/search/random/?service=simkl&type=$type&limit=${limit.coerceAtLeast(1)}"
+            ) ?: return emptyList()
+        return extractSimklRandomRefs(payload = payload, expectedType = type)
+            .distinctBy { it.id }
+            .take(limit.coerceAtLeast(1))
+    }
+
+    private suspend fun resolveSimklRecommendationRef(
+        ref: SimklRandomRef,
+        contentType: MetadataLabMediaType,
+        rank: Int
+    ): ProviderLibraryItem {
+        val endpoint = when (ref.type) {
+            "movie", "movies" -> "/movies/${ref.id}?extended=full"
+            "anime" -> "/anime/${ref.id}?extended=full"
+            else -> "/tv/${ref.id}?extended=full"
+        }
+        val details = simklGetAny(endpoint).toJsonObjectOrNull()
+
+        val ids = details?.optJSONObject("ids")
+        val resolvedContentId = normalizedContentIdFromIds(ids)
+        val contentId = resolvedContentId.ifEmpty { "simkl:${ref.id}" }
+        val title = details?.optString("title")?.trim().orEmpty().ifBlank { ref.title }
+        val addedAt =
+            parseIsoToEpochMs(details?.optString("released"))
+                ?: parseIsoToEpochMs(details?.optString("release_date"))
+                ?: (System.currentTimeMillis() - rank)
+
+        return ProviderLibraryItem(
+            provider = WatchProvider.SIMKL,
+            folderId = "for-you",
+            contentId = contentId,
+            contentType = contentType,
+            title = title,
+            addedAtEpochMs = addedAt
+        )
+    }
+
+    private fun extractSimklRandomRefs(payload: Any, expectedType: String): List<SimklRandomRef> {
+        val values = mutableListOf<SimklRandomRef>()
+
+        fun fromJsonObject(obj: JSONObject): SimklRandomRef? {
+            val idFromField = obj.optInt("id", 0).takeIf { it > 0 }
+            val url = obj.optString("url").trim()
+            val parsedFromUrl = parseSimklRefFromUrl(url)
+            val id = idFromField ?: parsedFromUrl?.id ?: return null
+            val type = parsedFromUrl?.type ?: expectedType
+            val title = parsedFromUrl?.title ?: "Simkl #$id"
+            return SimklRandomRef(id = id, type = type, title = title)
+        }
+
+        when (payload) {
+            is JSONObject -> {
+                fromJsonObject(payload)?.let(values::add)
+            }
+
+            is JSONArray -> {
+                for (index in 0 until payload.length()) {
+                    val node = payload.opt(index)
+                    when (node) {
+                        is JSONObject -> fromJsonObject(node)?.let(values::add)
+                        is JSONArray -> {
+                            for (inner in 0 until node.length()) {
+                                val entry = node.optJSONObject(inner) ?: continue
+                                fromJsonObject(entry)?.let(values::add)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return values
+    }
+
+    private fun parseSimklRefFromUrl(rawUrl: String): SimklRandomRef? {
+        val pattern = Regex("""/([a-zA-Z]+)/([0-9]+)(?:/([a-zA-Z0-9\-]+))?""")
+        val match = pattern.find(rawUrl) ?: return null
+        val type = match.groupValues.getOrNull(1)?.trim()?.lowercase(Locale.US).orEmpty()
+        val id = match.groupValues.getOrNull(2)?.toIntOrNull() ?: return null
+        val titleSlug = match.groupValues.getOrNull(3)?.trim().orEmpty()
+        val title = titleSlug.replace('-', ' ').trim().ifEmpty { "Simkl #$id" }
+        return SimklRandomRef(id = id, type = type, title = title)
+    }
+
+    private data class SimklRandomRef(
+        val id: Int,
+        val type: String,
+        val title: String
+    )
+
+    private fun parseTraktRecommendationsArray(
+        array: JSONArray,
+        contentType: MetadataLabMediaType
+    ): List<ProviderLibraryItem> {
+        return buildList {
+            for (index in 0 until array.length()) {
+                val node = array.optJSONObject(index) ?: continue
+                val media = node.optJSONObject("movie")
+                    ?: node.optJSONObject("show")
+                    ?: node
+                val contentId = normalizedContentIdFromIds(media.optJSONObject("ids"))
+                if (contentId.isEmpty()) {
+                    continue
+                }
+                val title = media.optString("title").trim().ifEmpty { contentId }
+                val rankedAt = parseIsoToEpochMs(node.optString("listed_at"))
+                    ?: parseIsoToEpochMs(node.optString("updated_at"))
+                    ?: parseIsoToEpochMs(media.optString("listed_at"))
+                    ?: parseIsoToEpochMs(media.optString("updated_at"))
+                    ?: parseIsoToEpochMs(node.optString("released"))
+                    ?: parseIsoToEpochMs(media.optString("released"))
+                    ?: (System.currentTimeMillis() - index)
+                add(
+                    ProviderLibraryItem(
+                        provider = WatchProvider.TRAKT,
+                        folderId = "for-you",
+                        contentId = contentId,
+                        contentType = contentType,
+                        title = title,
+                        addedAtEpochMs = rankedAt
+                    )
+                )
+            }
+        }
+    }
+
     private fun normalizedImdbIdForContent(raw: String): String {
         val cleaned = raw.trim().lowercase(Locale.US)
         if (cleaned.isEmpty()) return ""
@@ -2169,12 +2649,13 @@ class RemoteWatchHistoryLabService(
             return null
         }
         return getJsonAny(
-            url = "https://api.simkl.com$path",
+            url = simklApiUrl(path),
             headers =
                 mapOf(
                     "Authorization" to "Bearer $token",
                     "simkl-api-key" to simklClientId,
-                    "Accept" to "application/json"
+                    "Accept" to "application/json",
+                    "User-Agent" to simklUserAgent()
                 )
         )
     }
@@ -2583,13 +3064,14 @@ class RemoteWatchHistoryLabService(
 
         val responseCode =
             postJson(
-                url = "https://api.simkl.com$path",
+                url = simklApiUrl(path),
                 headers =
                     mapOf(
                         "Authorization" to "Bearer $token",
                         "simkl-api-key" to simklClientId,
                         "Content-Type" to "application/json",
-                        "Accept" to "application/json"
+                        "Accept" to "application/json",
+                        "User-Agent" to simklUserAgent()
                     ),
                 payload = payload
             )
@@ -3009,13 +3491,14 @@ class RemoteWatchHistoryLabService(
 
         val response =
             postJsonForObject(
-                url = "$SIMKL_API_BASE/users/settings",
+                url = simklApiUrl("/users/settings"),
                 headers =
                     mapOf(
                         "Authorization" to "Bearer $accessToken",
                         "simkl-api-key" to simklClientId,
                         "Content-Type" to "application/json",
-                        "Accept" to "application/json"
+                        "Accept" to "application/json",
+                        "User-Agent" to simklUserAgent()
                     ),
                 payload = JSONObject()
             ) ?: run {
@@ -3049,6 +3532,34 @@ class RemoteWatchHistoryLabService(
             return "<empty>"
         }
         return if (compact.length <= maxLength) compact else compact.take(maxLength) + "..."
+    }
+
+    private fun simklApiUrl(path: String): String {
+        val normalizedPath = if (path.startsWith('/')) path else "/$path"
+        return simklUrlWithRequiredParams("$SIMKL_API_BASE$normalizedPath")
+    }
+
+    private fun simklUrlWithRequiredParams(url: String): String {
+        val uri = Uri.parse(url)
+        val builder = uri.buildUpon()
+        if (uri.getQueryParameter("client_id").isNullOrBlank() && simklClientId.isNotBlank()) {
+            builder.appendQueryParameter("client_id", simklClientId)
+        }
+        if (uri.getQueryParameter("app-name").isNullOrBlank()) {
+            builder.appendQueryParameter("app-name", SIMKL_APP_NAME)
+        }
+        if (uri.getQueryParameter("app-version").isNullOrBlank()) {
+            builder.appendQueryParameter("app-version", simklAppVersion())
+        }
+        return builder.build().toString()
+    }
+
+    private fun simklAppVersion(): String {
+        return BuildConfig.VERSION_NAME.trim().ifEmpty { "dev" }
+    }
+
+    private fun simklUserAgent(): String {
+        return "$SIMKL_APP_NAME/${simklAppVersion()}"
     }
 
     private fun jsonKeysForLog(jsonObject: JSONObject): String {
@@ -3113,6 +3624,7 @@ class RemoteWatchHistoryLabService(
         private const val SIMKL_AUTHORIZE_BASE = "https://simkl.com/oauth/authorize"
         private const val SIMKL_TOKEN_URL = "https://api.simkl.com/oauth/token"
         private const val SIMKL_API_BASE = "https://api.simkl.com"
+        private const val SIMKL_APP_NAME = "crispytv"
         private val secureRandom = SecureRandom()
         private val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
     }

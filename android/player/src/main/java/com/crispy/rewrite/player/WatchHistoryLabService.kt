@@ -89,6 +89,11 @@ data class ProviderLibrarySnapshot(
     val items: List<ProviderLibraryItem> = emptyList()
 )
 
+data class ProviderRecommendationsResult(
+    val statusMessage: String,
+    val items: List<ProviderLibraryItem> = emptyList()
+)
+
 enum class ProviderCommentScope {
     MOVIE,
     SHOW,
@@ -178,6 +183,22 @@ interface WatchHistoryLabService {
         source: WatchProvider? = null
     ): WatchHistoryLabResult
 
+    suspend fun setInWatchlist(
+        request: WatchHistoryRequest,
+        inWatchlist: Boolean,
+        source: WatchProvider? = null
+    ): WatchHistoryLabResult {
+        return WatchHistoryLabResult(statusMessage = "Watchlist unavailable.")
+    }
+
+    suspend fun setRating(
+        request: WatchHistoryRequest,
+        rating: Int?,
+        source: WatchProvider? = null
+    ): WatchHistoryLabResult {
+        return WatchHistoryLabResult(statusMessage = "Rating unavailable.")
+    }
+
     suspend fun removeFromPlayback(
         playbackId: String,
         source: WatchProvider? = null
@@ -206,6 +227,13 @@ interface WatchHistoryLabService {
         source: WatchProvider? = null
     ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
+    }
+
+    suspend fun listProviderRecommendations(
+        limit: Int = 20,
+        source: WatchProvider? = null
+    ): ProviderRecommendationsResult {
+        return ProviderRecommendationsResult(statusMessage = "Provider recommendations unavailable.")
     }
 
     suspend fun getCachedProviderLibrary(
@@ -290,6 +318,13 @@ object DefaultWatchHistoryLabService : WatchHistoryLabService {
         source: WatchProvider?
     ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Watch history service unavailable.")
+    }
+
+    override suspend fun listProviderRecommendations(
+        limit: Int,
+        source: WatchProvider?
+    ): ProviderRecommendationsResult {
+        return ProviderRecommendationsResult(statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {

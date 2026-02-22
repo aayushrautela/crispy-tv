@@ -9,6 +9,7 @@ import com.crispy.rewrite.PlaybackLabDependencies
 import com.crispy.rewrite.domain.metadata.normalizeNuvioMediaId
 import com.crispy.rewrite.home.HomeCatalogService
 import com.crispy.rewrite.home.MediaDetails
+import com.crispy.rewrite.metadata.TmdbImdbIdResolver
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.WatchHistoryLabService
@@ -29,6 +30,10 @@ data class DetailsUiState(
     val details: MediaDetails? = null,
     val statusMessage: String = "",
     val isWatched: Boolean = false,
+    val isInWatchlist: Boolean = false,
+    val isRated: Boolean = false,
+    val userRating: Int? = null,
+    val isMutating: Boolean = false,
     val selectedSeason: Int? = null
 ) {
     val seasons: List<Int>
@@ -42,7 +47,8 @@ class DetailsViewModel internal constructor(
     private val itemId: String,
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryLabService,
-    private val settingsStore: HomeScreenSettingsStore
+    private val settingsStore: HomeScreenSettingsStore,
+    private val tmdbImdbIdResolver: TmdbImdbIdResolver
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
@@ -60,19 +66,27 @@ class DetailsViewModel internal constructor(
                 withContext(Dispatchers.IO) {
                     homeCatalogService.loadMediaDetails(rawId = itemId)
                 }
-            val watched =
+
+            val enrichedDetails =
                 withContext(Dispatchers.IO) {
-                    resolveWatchedState(result.details)
+                    result.details?.let { ensureImdbId(it) }
+                }
+            val providerState =
+                withContext(Dispatchers.IO) {
+                    resolveProviderState(enrichedDetails)
                 }
 
             _uiState.update { state ->
-                val details = result.details
+                val details = enrichedDetails
                 val firstSeason = details?.videos?.mapNotNull { it.season }?.distinct()?.minOrNull()
                 state.copy(
                     isLoading = false,
                     details = details,
                     statusMessage = result.statusMessage,
-                    isWatched = watched,
+                    isWatched = providerState.isWatched,
+                    isInWatchlist = providerState.isInWatchlist,
+                    isRated = providerState.isRated,
+                    userRating = providerState.userRating,
                     selectedSeason = state.selectedSeason ?: firstSeason
                 )
             }
@@ -83,18 +97,232 @@ class DetailsViewModel internal constructor(
         _uiState.update { it.copy(selectedSeason = season) }
     }
 
-    private suspend fun resolveWatchedState(details: MediaDetails?): Boolean {
+    fun toggleWatchlist() {
+        val details = uiState.value.details ?: return
+        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        val source = settingsStore.load().watchDataSource
+        if (source == WatchProvider.LOCAL) {
+            _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to use watchlist.") }
+            return
+        }
+
+        viewModelScope.launch {
+            val desired = !_uiState.value.isInWatchlist
+            _uiState.update { it.copy(isMutating = true) }
+
+            val enriched =
+                withContext(Dispatchers.IO) {
+                    ensureImdbId(details)
+                }
+            if (enriched.imdbId != details.imdbId) {
+                _uiState.update { it.copy(details = enriched) }
+            }
+            if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
+                _uiState.update {
+                    it.copy(
+                        isMutating = false,
+                        statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl)."
+                    )
+                }
+                return@launch
+            }
+
+            val request =
+                com.crispy.rewrite.player.WatchHistoryRequest(
+                    contentId = enriched.id,
+                    contentType = mediaType,
+                    title = enriched.title,
+                    remoteImdbId = enriched.imdbId
+                )
+            val result =
+                withContext(Dispatchers.IO) {
+                    watchHistoryService.setInWatchlist(request, desired, source)
+                }
+            val success =
+                when (source) {
+                    WatchProvider.TRAKT -> result.syncedToTrakt
+                    WatchProvider.SIMKL -> result.syncedToSimkl
+                    WatchProvider.LOCAL -> false
+                }
+            _uiState.update {
+                it.copy(
+                    isMutating = false,
+                    statusMessage = result.statusMessage,
+                    isInWatchlist = if (success) desired else it.isInWatchlist
+                )
+            }
+        }
+    }
+
+    fun toggleWatched() {
+        val details = uiState.value.details ?: return
+        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        if (mediaType == MetadataLabMediaType.SERIES) {
+            _uiState.update { it.copy(statusMessage = "Marking an entire series as watched isn't supported yet. Mark episodes from the episode list.") }
+            return
+        }
+        val source = settingsStore.load().watchDataSource
+
+        viewModelScope.launch {
+            val desired = !_uiState.value.isWatched
+            _uiState.update { it.copy(isMutating = true) }
+
+            val enriched =
+                withContext(Dispatchers.IO) {
+                    ensureImdbId(details)
+                }
+            if (enriched.imdbId != details.imdbId) {
+                _uiState.update { it.copy(details = enriched) }
+            }
+            if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
+                _uiState.update {
+                    it.copy(
+                        isMutating = false,
+                        statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl)."
+                    )
+                }
+                return@launch
+            }
+
+            val request =
+                com.crispy.rewrite.player.WatchHistoryRequest(
+                    contentId = enriched.id,
+                    contentType = mediaType,
+                    title = enriched.title,
+                    remoteImdbId = enriched.imdbId
+                )
+            val result =
+                withContext(Dispatchers.IO) {
+                    if (desired) {
+                        watchHistoryService.markWatched(request, source)
+                    } else {
+                        watchHistoryService.unmarkWatched(request, source)
+                    }
+                }
+            val success =
+                when (source) {
+                    WatchProvider.TRAKT -> result.syncedToTrakt
+                    WatchProvider.SIMKL -> result.syncedToSimkl
+                    WatchProvider.LOCAL -> true
+                }
+            _uiState.update {
+                it.copy(
+                    isMutating = false,
+                    statusMessage = result.statusMessage,
+                    isWatched = if (success) desired else it.isWatched
+                )
+            }
+        }
+    }
+
+    fun setRating(rating: Int?) {
+        val details = uiState.value.details ?: return
+        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        val source = settingsStore.load().watchDataSource
+        if (source == WatchProvider.LOCAL) {
+            _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to rate.") }
+            return
+        }
+        if (source == WatchProvider.SIMKL && rating == null) {
+            _uiState.update { it.copy(statusMessage = "Removing ratings is not supported for Simkl yet.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isMutating = true) }
+
+            val enriched =
+                withContext(Dispatchers.IO) {
+                    ensureImdbId(details)
+                }
+            if (enriched.imdbId != details.imdbId) {
+                _uiState.update { it.copy(details = enriched) }
+            }
+            if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
+                _uiState.update {
+                    it.copy(
+                        isMutating = false,
+                        statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl)."
+                    )
+                }
+                return@launch
+            }
+
+            val request =
+                com.crispy.rewrite.player.WatchHistoryRequest(
+                    contentId = enriched.id,
+                    contentType = mediaType,
+                    title = enriched.title,
+                    remoteImdbId = enriched.imdbId
+                )
+            val result =
+                withContext(Dispatchers.IO) {
+                    watchHistoryService.setRating(request, rating, source)
+                }
+            val success =
+                when (source) {
+                    WatchProvider.TRAKT -> result.syncedToTrakt
+                    WatchProvider.SIMKL -> result.syncedToSimkl
+                    WatchProvider.LOCAL -> false
+                }
+            _uiState.update {
+                it.copy(
+                    isMutating = false,
+                    statusMessage = result.statusMessage,
+                    isRated = if (success) rating != null else it.isRated,
+                    userRating = if (success) rating else it.userRating
+                )
+            }
+        }
+    }
+
+    private suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
+        val fromId = details.id.trim().takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
+        val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
+        val existing = fromId ?: fromField
+        if (existing != null) {
+            return if (fromField == existing) details else details.copy(imdbId = existing)
+        }
+
+        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: return details
+        val resolved = tmdbImdbIdResolver.resolveImdbId(details.id, mediaType) ?: return details
+        return details.copy(imdbId = resolved)
+    }
+
+    private data class ProviderState(
+        val isWatched: Boolean,
+        val isInWatchlist: Boolean,
+        val isRated: Boolean,
+        val userRating: Int?
+    )
+
+    private suspend fun resolveProviderState(details: MediaDetails?): ProviderState {
         val source = settingsStore.load().watchDataSource
         val normalizedTargetId = normalizeNuvioMediaId(details?.id ?: itemId).contentId.lowercase(Locale.US)
+        val normalizedImdbId =
+            details?.imdbId?.let { imdb ->
+                normalizeNuvioMediaId(imdb).contentId.lowercase(Locale.US)
+            }
         val expectedType = details?.mediaType.toMetadataLabMediaTypeOrNull()
+
+        fun matchesItemContent(itemContentId: String): Boolean {
+            return matchesContentId(itemContentId, normalizedTargetId) ||
+                (normalizedImdbId != null && matchesContentId(itemContentId, normalizedImdbId))
+        }
 
         return when (source) {
             WatchProvider.LOCAL -> {
                 val local = watchHistoryService.listLocalHistory(limit = 250)
-                local.entries.any { entry ->
-                    matchesContentId(entry.contentId, normalizedTargetId) &&
-                        matchesMediaType(expectedType, entry.contentType)
-                }
+                val watched =
+                    local.entries.any { entry ->
+                        matchesItemContent(entry.contentId) && matchesMediaType(expectedType, entry.contentType)
+                    }
+                ProviderState(
+                    isWatched = watched,
+                    isInWatchlist = false,
+                    isRated = false,
+                    userRating = null
+                )
             }
 
             WatchProvider.TRAKT,
@@ -107,7 +335,7 @@ class DetailsViewModel internal constructor(
                         WatchProvider.LOCAL -> false
                     }
                 if (!connected) {
-                    return false
+                    return ProviderState(false, false, false, null)
                 }
 
                 val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 250, source = source)
@@ -117,15 +345,48 @@ class DetailsViewModel internal constructor(
                     } else {
                         watchHistoryService.listProviderLibrary(limitPerFolder = 250, source = source)
                     }
-                snapshot.items.any { item ->
-                    item.provider == source &&
-                        source.isWatchedFolder(item.folderId) &&
-                        matchesContentId(item.contentId, normalizedTargetId) &&
-                        matchesMediaType(expectedType, item.contentType)
-                }
+
+                val watched =
+                    snapshot.items.any { item ->
+                        item.provider == source &&
+                            source.isWatchedFolder(item.folderId) &&
+                            matchesItemContent(item.contentId) &&
+                            matchesMediaType(expectedType, item.contentType)
+                    }
+
+                val watchlistFolderId =
+                    when (source) {
+                        WatchProvider.TRAKT -> "watchlist"
+                        WatchProvider.SIMKL -> "plantowatch"
+                        WatchProvider.LOCAL -> ""
+                    }
+                val inWatchlist =
+                    snapshot.items.any { item ->
+                        item.provider == source &&
+                            item.folderId == watchlistFolderId &&
+                            matchesItemContent(item.contentId) &&
+                            matchesMediaType(expectedType, item.contentType)
+                    }
+
+                val isRated =
+                    snapshot.items.any { item ->
+                        item.provider == source &&
+                            item.folderId == "ratings" &&
+                            matchesItemContent(item.contentId) &&
+                            matchesMediaType(expectedType, item.contentType)
+                    }
+
+                ProviderState(
+                    isWatched = watched,
+                    isInWatchlist = inWatchlist,
+                    isRated = isRated,
+                    userRating = null
+                )
             }
         }
     }
+
+    // resolveWatchedState removed in favor of resolveProviderState.
 
     private fun matchesMediaType(expected: MetadataLabMediaType?, actual: MetadataLabMediaType): Boolean {
         return expected == null || expected == actual
@@ -141,17 +402,24 @@ class DetailsViewModel internal constructor(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val httpClient = AppHttp.client(appContext)
                     val homeCatalogService =
                         HomeCatalogService(
                             context = appContext,
                             addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                            httpClient = AppHttp.client(appContext),
+                            httpClient = httpClient,
+                        )
+                    val tmdbImdbIdResolver =
+                        TmdbImdbIdResolver(
+                            apiKey = BuildConfig.TMDB_API_KEY,
+                            httpClient = httpClient
                         )
                     return DetailsViewModel(
                         itemId = itemId,
                         homeCatalogService = homeCatalogService,
                         watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
-                        settingsStore = HomeScreenSettingsStore(appContext)
+                        settingsStore = HomeScreenSettingsStore(appContext),
+                        tmdbImdbIdResolver = tmdbImdbIdResolver
                     ) as T
                 }
             }

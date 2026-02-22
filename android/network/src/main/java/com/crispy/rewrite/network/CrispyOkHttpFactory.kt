@@ -19,11 +19,17 @@ object CrispyOkHttpFactory {
 
         val userAgentInterceptor =
             Interceptor { chain ->
+                val original = chain.request()
+                val existing = original.header("User-Agent").orEmpty().trim()
                 val request =
-                    chain.request()
-                        .newBuilder()
-                        .header("User-Agent", userAgent)
-                        .build()
+                    if (existing.isNotEmpty()) {
+                        original
+                    } else {
+                        original
+                            .newBuilder()
+                            .header("User-Agent", userAgent)
+                            .build()
+                    }
                 chain.proceed(request)
             }
 
