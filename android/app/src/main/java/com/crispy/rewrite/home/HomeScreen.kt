@@ -4,10 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -18,8 +20,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -32,13 +34,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.player.WatchProvider
+import com.crispy.rewrite.ui.brand.CrispyWordmark
 import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
@@ -67,30 +70,16 @@ internal fun HomeScreen(
     val horizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            StandardTopAppBar(
-                title = "Crispy TV",
-                actions = {
-                    HomeProfileSelector()
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
-    ) { innerPadding ->
-        val density = LocalDensity.current
-        val heightOffsetDp = with(density) { scrollBehavior.state.heightOffset.toDp() }
-        val topContentPadding = (innerPadding.calculateTopPadding() + heightOffsetDp).coerceAtLeast(0.dp)
+    val topContentPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp
 
+    Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
                 start = horizontalPadding,
                 end = horizontalPadding,
                 top = topContentPadding,
-                bottom = innerPadding.calculateBottomPadding() + Dimensions.PageBottomPadding
+                bottom = Dimensions.PageBottomPadding
             ),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
@@ -190,6 +179,16 @@ internal fun HomeScreen(
                 }
             }
         }
+
+        StandardTopAppBar(
+            title = { CrispyWordmark(Modifier.height(28.dp)) },
+            actions = { HomeProfileSelector() },
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = MaterialTheme.colorScheme.surface
+            )
+        )
     }
 }
 
