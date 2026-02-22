@@ -181,7 +181,7 @@ internal fun HomeScreen(
         }
 
         StandardTopAppBar(
-            title = { CrispyWordmark(Modifier.height(28.dp)) },
+            title = { CrispyWordmark(Modifier.height(36.dp)) },
             actions = { HomeProfileSelector() },
             scrollBehavior = scrollBehavior,
             colors = TopAppBarDefaults.topAppBarColors(
