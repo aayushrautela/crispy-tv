@@ -124,7 +124,8 @@ internal fun HomeScreen(
                     onItemClick = onContinueWatchingClick,
                     onHideItem = viewModel::hideContinueWatchingItem,
                     onRemoveItem = viewModel::removeContinueWatchingItem,
-                    showTitleFallbackWhenNoLogo = true
+                    showTitleFallbackWhenNoLogo = true,
+                    useBottomSheetActions = true
                 )
             }
 

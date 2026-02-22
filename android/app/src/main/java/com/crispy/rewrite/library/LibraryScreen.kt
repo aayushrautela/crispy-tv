@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
@@ -50,6 +54,7 @@ import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import com.crispy.rewrite.ui.components.StandardTopAppBar
+import com.crispy.rewrite.ui.components.PosterCard
 import com.crispy.rewrite.player.WatchHistoryLabService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
@@ -312,7 +317,8 @@ private fun LibraryScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 124.dp),
             modifier = Modifier
                 .fillMaxSize(),
             contentPadding = PaddingValues(
@@ -321,30 +327,37 @@ private fun LibraryScreen(
                 end = pageHorizontalPadding,
                 bottom = 12.dp + innerPadding.calculateBottomPadding()
             ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = uiState.selectedSource == LibrarySource.LOCAL,
-                        onClick = { onSelectSource(LibrarySource.LOCAL) },
-                        label = { Text("Local") }
-                    )
-                    FilterChip(
-                        selected = uiState.selectedSource == LibrarySource.TRAKT,
-                        onClick = { onSelectSource(LibrarySource.TRAKT) },
-                        label = { Text("Trakt") }
-                    )
-                    FilterChip(
-                        selected = uiState.selectedSource == LibrarySource.SIMKL,
-                        onClick = { onSelectSource(LibrarySource.SIMKL) },
-                        label = { Text("Simkl") }
-                    )
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = uiState.selectedSource == LibrarySource.LOCAL,
+                            onClick = { onSelectSource(LibrarySource.LOCAL) },
+                            label = { Text("Local") }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = uiState.selectedSource == LibrarySource.TRAKT,
+                            onClick = { onSelectSource(LibrarySource.TRAKT) },
+                            label = { Text("Trakt") }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = uiState.selectedSource == LibrarySource.SIMKL,
+                            onClick = { onSelectSource(LibrarySource.SIMKL) },
+                            label = { Text("Simkl") }
+                        )
+                    }
                 }
             }
 
             if (uiState.statusMessage.isNotBlank()) {
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         text = uiState.statusMessage,
                         style = MaterialTheme.typography.bodySmall,
@@ -356,7 +369,7 @@ private fun LibraryScreen(
             when (uiState.selectedSource) {
                 LibrarySource.LOCAL -> {
                     if (uiState.localEntries.isEmpty()) {
-                        item {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                                     androidx.compose.foundation.layout.Column(
@@ -379,14 +392,21 @@ private fun LibraryScreen(
                             }
                         }
                     } else {
-                        item {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(text = "Recently watched", style = MaterialTheme.typography.titleMedium)
                         }
-                        items(
+                        gridItems(
                             items = uiState.localEntries,
                             key = { entry -> "local:${entry.contentId}:${entry.watchedAtEpochMs}" }
                         ) { entry ->
-                            LocalHistoryCard(entry = entry, onItemClick = onItemClick)
+                            PosterCard(
+                                title = entry.title.ifBlank { entry.contentId },
+                                posterUrl = null,
+                                backdropUrl = null,
+                                rating = null,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { onItemClick(entry) }
+                            )
                         }
                     }
                 }
@@ -401,7 +421,7 @@ private fun LibraryScreen(
                         }
 
                     if (!authenticated) {
-                        item {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                                     Text(
@@ -413,7 +433,7 @@ private fun LibraryScreen(
                         }
                     } else {
                         if (providerFolders.isNotEmpty()) {
-                            item {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     items(providerFolders, key = { it.id }) { folder ->
                                         FilterChip(
@@ -427,7 +447,7 @@ private fun LibraryScreen(
                         }
 
                         if (providerItems.isEmpty()) {
-                            item {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 val emptyMessage =
                                     if (providerFolders.isEmpty()) {
                                         "No provider library data available."
@@ -445,13 +465,26 @@ private fun LibraryScreen(
                                 }
                             }
                         } else {
-                            items(
+                            gridItems(
                                 items = providerItems,
                                 key = { item -> "${item.provider.name}:${item.folderId}:${item.contentId}:${item.addedAtEpochMs}" }
                             ) { item ->
-                                ProviderHistoryCard(
-                                    item = item,
-                                    onItemClick = onItemClick
+                                val mapped =
+                                    WatchHistoryEntry(
+                                        contentId = item.contentId,
+                                        contentType = item.contentType,
+                                        title = item.title,
+                                        season = item.season,
+                                        episode = item.episode,
+                                        watchedAtEpochMs = item.addedAtEpochMs
+                                    )
+                                PosterCard(
+                                    title = item.title.ifBlank { item.contentId },
+                                    posterUrl = null,
+                                    backdropUrl = null,
+                                    rating = null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { onItemClick(mapped) }
                                 )
                             }
                         }

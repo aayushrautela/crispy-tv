@@ -1,8 +1,10 @@
 package com.crispy.rewrite.home
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,18 +24,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
@@ -48,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,7 +77,8 @@ internal fun HomeRailSection(
     onRemoveItem: (ContinueWatchingItem) -> Unit,
     badgeLabel: String? = null,
     showProgressBar: Boolean = false,
-    showTitleFallbackWhenNoLogo: Boolean = false
+    showTitleFallbackWhenNoLogo: Boolean = false,
+    useBottomSheetActions: Boolean = false
 ) {
     if (items.isEmpty()) {
         return
@@ -95,7 +105,8 @@ internal fun HomeRailSection(
                     onDetailsClick = { onItemClick(item) },
                     badgeLabel = badgeLabel,
                     showProgressBar = showProgressBar,
-                    showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo
+                    showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo,
+                    useBottomSheetActions = useBottomSheetActions
                 )
             }
         }
@@ -126,6 +137,7 @@ internal fun HomeRailHeader(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 internal fun HomeRailCard(
     item: ContinueWatchingItem,
     subtitle: String,
@@ -136,16 +148,28 @@ internal fun HomeRailCard(
     onDetailsClick: () -> Unit,
     badgeLabel: String? = null,
     showProgressBar: Boolean = false,
-    showTitleFallbackWhenNoLogo: Boolean = false
+    showTitleFallbackWhenNoLogo: Boolean = false,
+    useBottomSheetActions: Boolean = false
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var bottomSheetVisible by remember { mutableStateOf(false) }
+
+    val cardInteractionModifier = if (useBottomSheetActions) {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClickLabel = actionMenuContentDescription,
+            onLongClick = { bottomSheetVisible = true }
+        )
+    } else {
+        Modifier.clickable(onClick = onClick)
+    }
 
     Box(
         modifier = Modifier
             .width(260.dp)
             .aspectRatio(16f / 9f)
             .clip(RoundedCornerShape(28.dp))
-            .clickable(onClick = onClick)
+            .then(cardInteractionModifier)
     ) {
         if (!item.backdropUrl.isNullOrBlank()) {
             AsyncImage(
@@ -217,47 +241,49 @@ internal fun HomeRailCard(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-        ) {
-            IconButton(
-                onClick = { menuExpanded = true },
-                modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.small)
+        if (!useBottomSheetActions) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.MoreVert,
-                    contentDescription = actionMenuContentDescription,
-                    tint = Color.White
-                )
-            }
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.small)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.MoreVert,
+                        contentDescription = actionMenuContentDescription,
+                        tint = Color.White
+                    )
+                }
 
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Details") },
-                    onClick = {
-                        menuExpanded = false
-                        onDetailsClick()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Remove") },
-                    onClick = {
-                        menuExpanded = false
-                        onRemoveClick()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Hide") },
-                    onClick = {
-                        menuExpanded = false
-                        onHideClick()
-                    }
-                )
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Details") },
+                        onClick = {
+                            menuExpanded = false
+                            onDetailsClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Remove") },
+                        onClick = {
+                            menuExpanded = false
+                            onRemoveClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Hide") },
+                        onClick = {
+                            menuExpanded = false
+                            onHideClick()
+                        }
+                    )
+                }
             }
         }
 
@@ -291,6 +317,77 @@ internal fun HomeRailCard(
             }
         }
     }
+
+    if (useBottomSheetActions && bottomSheetVisible) {
+        HomeRailActionBottomSheet(
+            title = item.title,
+            subtitle = subtitle,
+            onDismiss = { bottomSheetVisible = false },
+            onDetailsClick = {
+                bottomSheetVisible = false
+                onDetailsClick()
+            },
+            onRemoveClick = {
+                bottomSheetVisible = false
+                onRemoveClick()
+            },
+            onHideClick = {
+                bottomSheetVisible = false
+                onHideClick()
+            }
+        )
+    }
+}
+
+@Composable
+private fun HomeRailActionBottomSheet(
+    title: String,
+    subtitle: String,
+    onDismiss: () -> Unit,
+    onDetailsClick: () -> Unit,
+    onRemoveClick: () -> Unit,
+    onHideClick: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        ListItem(
+            headlineContent = { Text(title) },
+            supportingContent = { Text(subtitle) }
+        )
+        HorizontalDivider()
+        HomeRailActionBottomSheetItem(
+            label = "Details",
+            icon = Icons.Outlined.Info,
+            onClick = onDetailsClick
+        )
+        HomeRailActionBottomSheetItem(
+            label = "Remove",
+            icon = Icons.Outlined.DeleteOutline,
+            onClick = onRemoveClick
+        )
+        HomeRailActionBottomSheetItem(
+            label = "Hide",
+            icon = Icons.Outlined.VisibilityOff,
+            onClick = onHideClick
+        )
+    }
+}
+
+@Composable
+private fun HomeRailActionBottomSheetItem(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(label) },
+        leadingContent = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null
+            )
+        },
+        modifier = Modifier.clickable(onClick = onClick)
+    )
 }
 
 internal fun upNextSubtitle(item: ContinueWatchingItem): String {
