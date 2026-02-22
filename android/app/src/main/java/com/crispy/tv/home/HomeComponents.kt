@@ -506,9 +506,7 @@ internal fun HomeCatalogPosterCard(
     item: CatalogItem,
     onClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.width(124.dp)
-    ) {
+    Column(modifier = Modifier.width(124.dp)) {
         Card(
             modifier = Modifier
                 .aspectRatio(2f / 3f)
@@ -555,10 +553,11 @@ internal fun HomeCatalogPosterCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White
                             )
+                        }
+                    }
                 }
             }
         }
-    }
 
         Text(
             text = item.title,
