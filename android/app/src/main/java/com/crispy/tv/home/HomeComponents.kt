@@ -135,6 +135,7 @@ internal fun HomeRailHeader(
             )
         }
     }
+
 }
 
 @Composable
@@ -500,6 +501,7 @@ internal fun HomeCatalogSectionRow(
             }
         }
     }
+
 }
 
 @Composable
@@ -689,4 +691,3 @@ internal fun HomeHeroCarousel(
             }
         }
     }
-}
