@@ -21,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.components.StandardTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,8 +42,8 @@ fun PlaybackSettingsScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text("Playback") },
+            StandardTopAppBar(
+                title = "Playback",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

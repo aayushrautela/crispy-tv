@@ -20,7 +20,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +35,7 @@ import com.crispy.rewrite.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.rewrite.settings.PlaybackSettingsScreen
 import com.crispy.rewrite.settings.ProviderAuthPortalRoute
 import com.crispy.rewrite.settings.SettingsScreen
+import com.crispy.rewrite.search.SearchRoute
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -274,6 +274,7 @@ private enum class TopLevelDestination(
     val showInBottomBar: Boolean = true
 ) {
     Home(route = "home", label = "Home", icon = Icons.Outlined.Home),
+    Search(route = "search", label = "Search", icon = Icons.Outlined.Search),
     Discover(route = "discover", label = "Discover", icon = Icons.Outlined.Explore),
     Library(route = "library", label = "Library", icon = Icons.Outlined.VideoLibrary),
     Settings(route = "settings", label = "Settings", icon = Icons.Outlined.Settings)
@@ -365,6 +366,12 @@ private fun AppShell() {
                     onCatalogSeeAllClick = { section ->
                         navController.navigate(catalogListRoute(section))
                     }
+                )
+            }
+
+            composable(TopLevelDestination.Search.route) {
+                SearchRoute(
+                    onItemClick = { item -> navController.navigate(homeDetailsRoute(item.id)) }
                 )
             }
 

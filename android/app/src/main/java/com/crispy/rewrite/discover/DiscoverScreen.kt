@@ -38,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
@@ -64,6 +63,7 @@ import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.ui.components.PosterCard
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
+import com.crispy.rewrite.ui.components.StandardTopAppBar
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -383,8 +383,8 @@ private fun DiscoverScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text("Discover") },
+            StandardTopAppBar(
+                title = "Discover",
                 actions = {
                     IconButton(onClick = onRefresh) {
                         Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")

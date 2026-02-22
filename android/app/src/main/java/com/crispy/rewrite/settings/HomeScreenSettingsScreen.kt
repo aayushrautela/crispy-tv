@@ -33,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -55,6 +54,7 @@ import com.crispy.rewrite.home.HomeCatalogService
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.ui.theme.Dimensions
+import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -278,13 +278,8 @@ private fun HomeScreenSettingsScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Home Screen",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                },
+            StandardTopAppBar(
+                title = "Home Screen",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

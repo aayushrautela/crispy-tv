@@ -7,14 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,7 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
@@ -50,6 +44,8 @@ import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.player.WatchHistoryLabService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
+import com.crispy.rewrite.ui.components.StandardTopAppBar
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
@@ -240,12 +236,12 @@ private fun ProviderAuthPortalScreen(
     onBack: () -> Unit
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
-                title = { Text("Providers") },
+            StandardTopAppBar(
+                title = "Providers",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -269,12 +265,11 @@ private fun ProviderAuthPortalScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+                .padding(innerPadding),
             contentPadding = PaddingValues(
-                start = 16.dp,
+                start = pageHorizontalPadding,
                 top = 12.dp,
-                end = 16.dp,
+                end = pageHorizontalPadding,
                 bottom = 12.dp
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)

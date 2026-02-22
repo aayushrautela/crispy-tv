@@ -40,7 +40,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -65,6 +64,7 @@ import coil.compose.AsyncImage
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
+import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.metadata.CloudAddonRow
 import com.crispy.rewrite.metadata.MetadataAddonRegistry
 import kotlinx.coroutines.Dispatchers
@@ -447,13 +447,8 @@ private fun AddonsSettingsScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Addons",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                },
+            StandardTopAppBar(
+                title = "Addons",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

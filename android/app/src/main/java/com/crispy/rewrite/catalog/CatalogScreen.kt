@@ -3,15 +3,10 @@ package com.crispy.rewrite.catalog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material.icons.Icons
@@ -24,20 +19,20 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.ui.components.PosterCard
+import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -51,19 +46,13 @@ fun CatalogRoute(
     )
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = section.title,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
+            StandardTopAppBar(
+                title = section.title,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -83,12 +72,11 @@ fun CatalogRoute(
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 124.dp),
                 modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+                    .fillMaxSize(),
                 contentPadding = PaddingValues(
-                    start = 16.dp,
+                    start = pageHorizontalPadding,
                     top = 12.dp + innerPadding.calculateTopPadding(),
-                    end = 16.dp,
+                    end = pageHorizontalPadding,
                     bottom = 12.dp + innerPadding.calculateBottomPadding()
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

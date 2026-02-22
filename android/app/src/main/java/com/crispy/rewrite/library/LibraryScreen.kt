@@ -27,7 +27,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
@@ -50,6 +49,7 @@ import com.crispy.rewrite.player.ProviderLibraryItem
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
+import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.player.WatchHistoryLabService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
@@ -301,8 +301,8 @@ private fun LibraryScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text(text = "Library") },
+            StandardTopAppBar(
+                title = "Library",
                 actions = {
                     IconButton(onClick = onRefresh) {
                         Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
