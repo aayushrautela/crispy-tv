@@ -36,7 +36,9 @@ internal fun DetailsScreen(
 ) {
     val details = uiState.details
     val listState = rememberLazyListState()
-    val palette = rememberDetailsPaletteColors(imageUrl = details?.backdropUrl ?: details?.posterUrl)
+    val theming = rememberDetailsTheming(imageUrl = details?.backdropUrl ?: details?.posterUrl)
+    val palette = theming.palette
+    val detailsScheme = theming.colorScheme
 
     val trailerUrl =
         uiState.tmdbEnrichment
@@ -52,20 +54,6 @@ internal fun DetailsScreen(
                 ?.firstOrNull { it.watchUrl?.isNotBlank() == true }
                 ?.watchUrl
 
-    val baseScheme = MaterialTheme.colorScheme
-    val detailsScheme =
-        remember(palette, baseScheme) {
-            baseScheme.copy(
-                primary = palette.accent,
-                onPrimary = palette.onAccent,
-                background = palette.pageBackground,
-                onBackground = palette.onPageBackground,
-                surface = lerp(palette.pageBackground, palette.onPageBackground, 0.08f),
-                onSurface = palette.onPageBackground,
-                surfaceVariant = lerp(palette.pageBackground, palette.onPageBackground, 0.12f),
-                onSurfaceVariant = palette.onPageBackground.copy(alpha = 0.78f)
-            )
-        }
     val topBarAlpha by remember {
         derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) {

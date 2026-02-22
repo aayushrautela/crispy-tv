@@ -1,5 +1,7 @@
 package com.crispy.tv.details
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -8,14 +10,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
-import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamiccolor.ColorSpec
+import com.materialkolor.ktx.themeColor
+import com.materialkolor.rememberDynamicColorScheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -29,84 +33,65 @@ internal data class DetailsPaletteColors(
     val onPillBackground: Color
 )
 
-@Composable
-internal fun rememberDetailsPaletteColors(imageUrl: String?): DetailsPaletteColors {
-    val scheme = androidx.compose.material3.MaterialTheme.colorScheme
-    val fallbackPage = scheme.background
-    val fallbackAccent = scheme.primary
+@Stable
+internal data class DetailsTheming(
+    val colorScheme: ColorScheme,
+    val palette: DetailsPaletteColors,
+    val seedColor: Color,
+)
 
-    var colors by remember(fallbackPage, fallbackAccent) {
-        mutableStateOf(
-            DetailsPaletteColors(
-                pageBackground = fallbackPage,
-                onPageBackground = scheme.onBackground,
-                accent = fallbackAccent,
-                onAccent = scheme.onPrimary,
-                pillBackground = scheme.surface.copy(alpha = 0.72f),
-                onPillBackground = scheme.onSurface
-            )
-        )
-    }
+@Composable
+internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
+    val baseScheme = MaterialTheme.colorScheme
+    val fallbackSeed = baseScheme.primary
+
+    var seedColor by remember(fallbackSeed) { mutableStateOf(fallbackSeed) }
 
     val context = LocalContext.current
     val imageLoader = context.imageLoader
 
-    LaunchedEffect(imageUrl, fallbackPage, fallbackAccent) {
+    LaunchedEffect(imageUrl, fallbackSeed) {
+        seedColor = fallbackSeed
         if (imageUrl.isNullOrBlank()) return@LaunchedEffect
 
         val request =
             ImageRequest.Builder(context)
                 .data(imageUrl)
+                // Keep this small: quantization + scoring is proportional to pixel count.
+                .size(128)
                 .allowHardware(false)
                 .build()
 
         val result = imageLoader.execute(request)
         val drawable = (result as? SuccessResult)?.drawable ?: return@LaunchedEffect
         val bitmap = drawable.toBitmap()
+        val imageBitmap = bitmap.asImageBitmap()
 
-        val palette =
+        seedColor =
             withContext(Dispatchers.Default) {
-                Palette.from(bitmap)
-                    .clearFilters()
-                    .generate()
+                imageBitmap.themeColor(fallback = fallbackSeed, filter = true, maxColors = 128)
             }
-
-        val bgArgb =
-            palette.darkMutedSwatch?.rgb
-                ?: palette.darkVibrantSwatch?.rgb
-                ?: palette.mutedSwatch?.rgb
-                ?: palette.vibrantSwatch?.rgb
-
-        val accentArgb =
-            palette.vibrantSwatch?.rgb
-                ?: palette.lightVibrantSwatch?.rgb
-                ?: palette.mutedSwatch?.rgb
-                ?: palette.lightMutedSwatch?.rgb
-
-        val extractedBg = bgArgb?.let { Color(it) }
-        val extractedAccent = accentArgb?.let { Color(it) }
-
-        val pageBackground = if (extractedBg != null) lerp(fallbackPage, extractedBg, 0.88f) else fallbackPage
-        val accent = if (extractedAccent != null) lerp(fallbackAccent, extractedAccent, 0.9f) else fallbackAccent
-        val onPage = contrastColor(pageBackground)
-        val onAccent = contrastColor(accent)
-        val pillBackground = lerp(pageBackground, onPage, 0.14f).copy(alpha = 0.72f)
-
-        colors =
-            DetailsPaletteColors(
-                pageBackground = pageBackground,
-                onPageBackground = onPage,
-                accent = accent,
-                onAccent = onAccent,
-                pillBackground = pillBackground,
-                onPillBackground = onPage
-            )
     }
 
-    return colors
-}
+    val detailsScheme =
+        rememberDynamicColorScheme(
+            seedColor = seedColor,
+            isDark = true,
+            specVersion = ColorSpec.SpecVersion.SPEC_2025,
+            style = PaletteStyle.TonalSpot,
+        )
 
-private fun contrastColor(background: Color): Color {
-    // 0.52 chosen to keep mid-tones leaning white.
-    return if (background.luminance() > 0.52f) Color.Black else Color.White
+    val palette =
+        remember(detailsScheme) {
+            DetailsPaletteColors(
+                pageBackground = detailsScheme.background,
+                onPageBackground = detailsScheme.onBackground,
+                accent = detailsScheme.primary,
+                onAccent = detailsScheme.onPrimary,
+                pillBackground = detailsScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+                onPillBackground = detailsScheme.onSurface,
+            )
+        }
+
+    return DetailsTheming(colorScheme = detailsScheme, palette = palette, seedColor = seedColor)
 }
