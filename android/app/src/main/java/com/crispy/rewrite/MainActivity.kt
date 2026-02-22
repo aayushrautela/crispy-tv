@@ -150,7 +150,7 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val oauthWatchHistoryService by lazy(LazyThreadSafetyMode.NONE) {
-        PlaybackLabDependencies.watchHistoryServiceFactory(applicationContext)
+        PlaybackDependencies.watchHistoryServiceFactory(applicationContext)
     }
     private val homeScreenSettingsStore by lazy(LazyThreadSafetyMode.NONE) {
         HomeScreenSettingsStore(applicationContext)
@@ -478,16 +478,16 @@ private fun LabsScreen() {
     val appContext = remember(context) { context.applicationContext }
 
     val metadataResolver = remember(appContext) {
-        PlaybackLabDependencies.metadataResolverFactory(appContext)
+        PlaybackDependencies.metadataResolverFactory(appContext)
     }
     val catalogSearchService = remember(appContext) {
-        PlaybackLabDependencies.catalogSearchServiceFactory(appContext)
+        PlaybackDependencies.catalogSearchServiceFactory(appContext)
     }
     val watchHistoryService = remember(appContext) {
-        PlaybackLabDependencies.watchHistoryServiceFactory(appContext)
+        PlaybackDependencies.watchHistoryServiceFactory(appContext)
     }
     val supabaseSyncService = remember(appContext, watchHistoryService) {
-        PlaybackLabDependencies.supabaseSyncServiceFactory(appContext, watchHistoryService)
+        PlaybackDependencies.supabaseSyncServiceFactory(appContext, watchHistoryService)
     }
     val viewModel: PlaybackLabViewModel = viewModel(
         factory = remember(metadataResolver, catalogSearchService, watchHistoryService, supabaseSyncService) {
@@ -507,11 +507,11 @@ private fun LabsScreen() {
     }
     val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
     val introSkipService = remember(appContext) {
-        PlaybackLabDependencies.introSkipServiceFactory(appContext)
+        PlaybackDependencies.introSkipServiceFactory(appContext)
     }
 
     val playbackController = remember(context) {
-        PlaybackLabDependencies.playbackControllerFactory(context) { event ->
+        PlaybackDependencies.playbackControllerFactory(context) { event ->
             when (event) {
                 NativePlaybackEvent.Buffering -> viewModel.onNativeBuffering()
                 NativePlaybackEvent.Ready -> viewModel.onNativeReady()
@@ -528,7 +528,7 @@ private fun LabsScreen() {
     }
 
     val torrentResolver = remember(context) {
-        PlaybackLabDependencies.torrentResolverFactory(context)
+        PlaybackDependencies.torrentResolverFactory(context)
     }
 
     var playerVisible by remember { mutableStateOf(false) }

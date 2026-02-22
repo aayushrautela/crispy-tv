@@ -8,17 +8,17 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogSectionRef
-import com.crispy.rewrite.PlaybackLabDependencies
+import com.crispy.rewrite.PlaybackDependencies
 import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.ContinueWatchingEntry
-import com.crispy.rewrite.player.ContinueWatchingLabResult
+import com.crispy.rewrite.player.ContinueWatchingResult
 import com.crispy.rewrite.player.ProviderLibraryItem
 import com.crispy.rewrite.player.ProviderRecommendationsResult
 import com.crispy.rewrite.player.WatchHistoryEntry
 import com.crispy.rewrite.player.WatchHistoryRequest
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +76,7 @@ data class HomeCatalogSectionUi(
 
 class HomeViewModel internal constructor(
     private val homeCatalogService: HomeCatalogService,
-    private val watchHistoryService: WatchHistoryLabService,
+    private val watchHistoryService: WatchHistoryService,
     private val suppressionStore: ContinueWatchingSuppressionStore,
     private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
@@ -97,7 +97,7 @@ class HomeViewModel internal constructor(
                                     addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                                     httpClient = AppHttp.client(appContext),
                                 ),
-                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
+                            watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
                             settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
@@ -158,7 +158,7 @@ class HomeViewModel internal constructor(
                     
                     val providerContinueWatchingDeferred = async {
                         when (selectedSource) {
-                            WatchProvider.LOCAL -> ContinueWatchingLabResult(statusMessage = "Local source selected.")
+                            WatchProvider.LOCAL -> ContinueWatchingResult(statusMessage = "Local source selected.")
                             WatchProvider.TRAKT, WatchProvider.SIMKL -> {
                                 watchHistoryService.listContinueWatching(
                                     limit = 20,
@@ -404,7 +404,7 @@ class HomeViewModel internal constructor(
             val removalResult = withContext(Dispatchers.IO) {
                 when {
                     item.isUpNextPlaceholder -> {
-                        com.crispy.rewrite.player.WatchHistoryLabResult(
+                        com.crispy.rewrite.player.WatchHistoryResult(
                             statusMessage = "Removed ${item.title} from Continue Watching."
                         )
                     }
@@ -421,7 +421,7 @@ class HomeViewModel internal constructor(
                         )
                     }
                     else -> {
-                        com.crispy.rewrite.player.WatchHistoryLabResult(
+                        com.crispy.rewrite.player.WatchHistoryResult(
                             statusMessage = "Removed ${item.title} from Continue Watching."
                         )
                     }
@@ -557,7 +557,7 @@ class HomeViewModel internal constructor(
 private data class HomeFeedLoadResult(
     val heroResult: HomeHeroLoadResult,
     val watchHistoryEntries: List<WatchHistoryEntry>,
-    val providerContinueWatchingResult: ContinueWatchingLabResult,
+    val providerContinueWatchingResult: ContinueWatchingResult,
     val providerRecommendationsResult: ProviderRecommendationsResult,
     val selectedSource: WatchProvider,
     val providerConnected: Boolean

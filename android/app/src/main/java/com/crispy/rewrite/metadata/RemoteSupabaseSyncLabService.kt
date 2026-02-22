@@ -7,7 +7,7 @@ import com.crispy.rewrite.player.SupabaseSyncAuthState
 import com.crispy.rewrite.player.SupabaseSyncLabResult
 import com.crispy.rewrite.player.SupabaseSyncLabService
 import com.crispy.rewrite.player.WatchHistoryEntry
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Headers
@@ -24,7 +24,7 @@ class RemoteSupabaseSyncLabService(
     private val supabaseUrl: String,
     private val supabaseAnonKey: String,
     addonManifestUrlsCsv: String,
-    private val watchHistoryService: WatchHistoryLabService
+    private val watchHistoryService: WatchHistoryService
 ) : SupabaseSyncLabService {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)

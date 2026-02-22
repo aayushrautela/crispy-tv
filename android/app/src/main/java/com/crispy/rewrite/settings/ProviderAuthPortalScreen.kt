@@ -39,9 +39,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.rewrite.PlaybackLabDependencies
+import com.crispy.rewrite.PlaybackDependencies
 import com.crispy.rewrite.BuildConfig
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
 import com.crispy.rewrite.ui.components.StandardTopAppBar
@@ -66,7 +66,7 @@ private data class ProviderPortalAction(
 )
 
 internal class ProviderPortalViewModel(
-    private val watchHistoryService: WatchHistoryLabService,
+    private val watchHistoryService: WatchHistoryService,
     private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProviderPortalUiState())
@@ -178,7 +178,7 @@ internal class ProviderPortalViewModel(
                     if (modelClass.isAssignableFrom(ProviderPortalViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return ProviderPortalViewModel(
-                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
+                            watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                             settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }

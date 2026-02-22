@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.rewrite.BuildConfig
-import com.crispy.rewrite.PlaybackLabDependencies
+import com.crispy.rewrite.PlaybackDependencies
 import com.crispy.rewrite.catalog.CatalogItem
 import com.crispy.rewrite.catalog.CatalogSectionRef
 import com.crispy.rewrite.catalog.DiscoverCatalogRef
@@ -317,7 +317,7 @@ class SearchViewModel(
                             addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                             httpClient = AppHttp.client(context),
                         )
-                    val catalogSearchService = PlaybackLabDependencies.catalogSearchServiceFactory(context)
+                    val catalogSearchService = PlaybackDependencies.catalogSearchServiceFactory(context)
                     @Suppress("UNCHECKED_CAST")
                     return SearchViewModel(
                         appContext = context,

@@ -6,7 +6,7 @@ import com.crispy.rewrite.introskip.IntroSkipService
 import com.crispy.rewrite.introskip.RemoteIntroSkipService
 import com.crispy.rewrite.metadata.RemoteMetadataLabDataSource
 import com.crispy.rewrite.metadata.RemoteSupabaseSyncLabService
-import com.crispy.rewrite.metadata.RemoteWatchHistoryLabService
+import com.crispy.rewrite.watchhistory.RemoteWatchHistoryService
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackController
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
@@ -16,7 +16,7 @@ import com.crispy.rewrite.player.CatalogSearchLabService
 import com.crispy.rewrite.player.CoreDomainMetadataLabResolver
 import com.crispy.rewrite.player.MetadataLabResolver
 import com.crispy.rewrite.player.SupabaseSyncLabService
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryService
 
 interface TorrentResolver {
     suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String
@@ -61,9 +61,9 @@ private fun newCatalogSearchService(context: Context): CatalogSearchLabService {
     )
 }
 
-private fun newWatchHistoryService(context: Context): WatchHistoryLabService {
+private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
-    return RemoteWatchHistoryLabService(
+    return RemoteWatchHistoryService(
         context = appContext,
         httpClient = AppHttp.client(appContext),
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
@@ -77,7 +77,7 @@ private fun newWatchHistoryService(context: Context): WatchHistoryLabService {
 
 private fun newSupabaseSyncService(
     context: Context,
-    watchHistoryService: WatchHistoryLabService
+    watchHistoryService: WatchHistoryService
 ): SupabaseSyncLabService {
     val appContext = context.applicationContext
     return RemoteSupabaseSyncLabService(
@@ -90,7 +90,7 @@ private fun newSupabaseSyncService(
     )
 }
 
-object PlaybackLabDependencies {
+object PlaybackDependencies {
     @Volatile
     var playbackControllerFactory: (Context, (NativePlaybackEvent) -> Unit) -> PlaybackController =
         { context, callback ->
@@ -113,12 +113,12 @@ object PlaybackLabDependencies {
     }
 
     @Volatile
-    var watchHistoryServiceFactory: (Context) -> WatchHistoryLabService = { context ->
+    var watchHistoryServiceFactory: (Context) -> WatchHistoryService = { context ->
         newWatchHistoryService(context)
     }
 
     @Volatile
-    var supabaseSyncServiceFactory: (Context, WatchHistoryLabService) -> SupabaseSyncLabService = { context, watchHistoryService ->
+    var supabaseSyncServiceFactory: (Context, WatchHistoryService) -> SupabaseSyncLabService = { context, watchHistoryService ->
         newSupabaseSyncService(
             context = context,
             watchHistoryService = watchHistoryService

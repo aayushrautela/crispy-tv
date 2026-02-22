@@ -74,7 +74,7 @@ data class PlaybackLabUiState(
 class PlaybackLabViewModel(
     private val metadataResolver: MetadataLabResolver = DefaultMetadataLabResolver,
     private val catalogSearchService: CatalogSearchLabService = DefaultCatalogSearchLabService,
-    private val watchHistoryService: WatchHistoryLabService = DefaultWatchHistoryLabService,
+    private val watchHistoryService: WatchHistoryService = UnavailableWatchHistoryService,
     private val supabaseSyncService: SupabaseSyncLabService = DefaultSupabaseSyncLabService
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PlaybackLabUiState())
@@ -84,7 +84,7 @@ class PlaybackLabViewModel(
         fun factory(
             metadataResolver: MetadataLabResolver,
             catalogSearchService: CatalogSearchLabService,
-            watchHistoryService: WatchHistoryLabService,
+            watchHistoryService: WatchHistoryService,
             supabaseSyncService: SupabaseSyncLabService
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {

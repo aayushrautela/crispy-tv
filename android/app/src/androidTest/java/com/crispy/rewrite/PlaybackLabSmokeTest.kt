@@ -27,8 +27,8 @@ import com.crispy.rewrite.player.SupabaseSyncAuthState
 import com.crispy.rewrite.player.SupabaseSyncLabResult
 import com.crispy.rewrite.player.SupabaseSyncLabService
 import com.crispy.rewrite.player.WatchHistoryEntry
-import com.crispy.rewrite.player.WatchHistoryLabResult
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryResult
+import com.crispy.rewrite.player.WatchHistoryService
 import com.crispy.rewrite.player.WatchHistoryRequest
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
@@ -52,31 +52,31 @@ class PlaybackLabSmokeTest {
         TestTorrentResolver.reset()
         TestMetadataResolver.reset()
 
-        PlaybackLabDependencies.playbackControllerFactory = { _, callback ->
+        PlaybackDependencies.playbackControllerFactory = { _, callback ->
             TestPlaybackController(callback)
         }
-        PlaybackLabDependencies.torrentResolverFactory = { _ ->
+        PlaybackDependencies.torrentResolverFactory = { _ ->
             TestTorrentResolver(
                 streamUrl = "http://127.0.0.1:8090/play/mockhash/0"
             )
         }
-        PlaybackLabDependencies.metadataResolverFactory = { _ ->
+        PlaybackDependencies.metadataResolverFactory = { _ ->
             TestMetadataResolver()
         }
-        PlaybackLabDependencies.catalogSearchServiceFactory = { _ ->
+        PlaybackDependencies.catalogSearchServiceFactory = { _ ->
             TestCatalogSearchService()
         }
-        PlaybackLabDependencies.watchHistoryServiceFactory = { _ ->
+        PlaybackDependencies.watchHistoryServiceFactory = { _ ->
             TestWatchHistoryService()
         }
-        PlaybackLabDependencies.supabaseSyncServiceFactory = { _, _ ->
+        PlaybackDependencies.supabaseSyncServiceFactory = { _, _ ->
             TestSupabaseSyncService()
         }
     }
 
     @After
     fun tearDown() {
-        PlaybackLabDependencies.reset()
+        PlaybackDependencies.reset()
         TestPlaybackController.reset()
         TestTorrentResolver.reset()
         TestMetadataResolver.reset()
@@ -264,7 +264,7 @@ private class TestCatalogSearchService : CatalogSearchLabService {
     }
 }
 
-private class TestWatchHistoryService : WatchHistoryLabService {
+private class TestWatchHistoryService : WatchHistoryService {
     override fun updateAuthTokens(traktAccessToken: String, simklAccessToken: String) {
         // No-op for test fake.
     }
@@ -273,8 +273,8 @@ private class TestWatchHistoryService : WatchHistoryLabService {
         return WatchProviderAuthState()
     }
 
-    override suspend fun listLocalHistory(limit: Int): WatchHistoryLabResult {
-        return WatchHistoryLabResult(
+    override suspend fun listLocalHistory(limit: Int): WatchHistoryResult {
+        return WatchHistoryResult(
             statusMessage = "Watch history test stub",
             entries = emptyList()
         )
@@ -283,8 +283,8 @@ private class TestWatchHistoryService : WatchHistoryLabService {
     override suspend fun markWatched(
         request: WatchHistoryRequest,
         source: WatchProvider?
-    ): WatchHistoryLabResult {
-        return WatchHistoryLabResult(
+    ): WatchHistoryResult {
+        return WatchHistoryResult(
             statusMessage = "Watch history test stub",
             entries = emptyList<WatchHistoryEntry>()
         )
@@ -294,8 +294,8 @@ private class TestWatchHistoryService : WatchHistoryLabService {
         return emptyList()
     }
 
-    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult {
-        return WatchHistoryLabResult(
+    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryResult {
+        return WatchHistoryResult(
             statusMessage = "Watch history test stub",
             entries = entries
         )
@@ -304,8 +304,8 @@ private class TestWatchHistoryService : WatchHistoryLabService {
     override suspend fun unmarkWatched(
         request: WatchHistoryRequest,
         source: WatchProvider?
-    ): WatchHistoryLabResult {
-        return WatchHistoryLabResult(
+    ): WatchHistoryResult {
+        return WatchHistoryResult(
             statusMessage = "Watch history test stub",
             entries = emptyList<WatchHistoryEntry>()
         )

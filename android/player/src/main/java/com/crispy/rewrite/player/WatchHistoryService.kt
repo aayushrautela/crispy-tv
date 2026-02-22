@@ -39,7 +39,7 @@ data class WatchHistoryRequest(
     val remoteImdbId: String? = null
 )
 
-data class WatchHistoryLabResult(
+data class WatchHistoryResult(
     val statusMessage: String,
     val entries: List<WatchHistoryEntry> = emptyList(),
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
@@ -60,7 +60,7 @@ data class ContinueWatchingEntry(
     val isUpNextPlaceholder: Boolean = false
 )
 
-data class ContinueWatchingLabResult(
+data class ContinueWatchingResult(
     val statusMessage: String,
     val entries: List<ContinueWatchingEntry> = emptyList()
 )
@@ -136,7 +136,7 @@ data class ProviderAuthActionResult(
     val authState: WatchProviderAuthState = WatchProviderAuthState()
 )
 
-interface WatchHistoryLabService {
+interface WatchHistoryService {
     fun connectProvider(
         provider: WatchProvider,
         accessToken: String,
@@ -167,59 +167,59 @@ interface WatchHistoryLabService {
 
     fun authState(): WatchProviderAuthState
 
-    suspend fun listLocalHistory(limit: Int = 100): WatchHistoryLabResult
+    suspend fun listLocalHistory(limit: Int = 100): WatchHistoryResult
 
     suspend fun exportLocalHistory(): List<WatchHistoryEntry>
 
-    suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult
+    suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryResult
 
     suspend fun markWatched(
         request: WatchHistoryRequest,
         source: WatchProvider? = null
-    ): WatchHistoryLabResult
+    ): WatchHistoryResult
 
     suspend fun unmarkWatched(
         request: WatchHistoryRequest,
         source: WatchProvider? = null
-    ): WatchHistoryLabResult
+    ): WatchHistoryResult
 
     suspend fun setInWatchlist(
         request: WatchHistoryRequest,
         inWatchlist: Boolean,
         source: WatchProvider? = null
-    ): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Watchlist unavailable.")
+    ): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watchlist unavailable.")
     }
 
     suspend fun setRating(
         request: WatchHistoryRequest,
         rating: Int?,
         source: WatchProvider? = null
-    ): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Rating unavailable.")
+    ): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Rating unavailable.")
     }
 
     suspend fun removeFromPlayback(
         playbackId: String,
         source: WatchProvider? = null
-    ): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Playback removal unavailable.")
+    ): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Playback removal unavailable.")
     }
 
     suspend fun listContinueWatching(
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
         source: WatchProvider? = null
-    ): ContinueWatchingLabResult {
-        return ContinueWatchingLabResult(statusMessage = "Continue watching unavailable.")
+    ): ContinueWatchingResult {
+        return ContinueWatchingResult(statusMessage = "Continue watching unavailable.")
     }
 
     suspend fun getCachedContinueWatching(
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
         source: WatchProvider? = null
-    ): ContinueWatchingLabResult {
-        return ContinueWatchingLabResult(statusMessage = "Cached continue watching unavailable.")
+    ): ContinueWatchingResult {
+        return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.")
     }
 
     suspend fun listProviderLibrary(
@@ -264,7 +264,7 @@ interface WatchHistoryLabService {
     }
 }
 
-object DefaultWatchHistoryLabService : WatchHistoryLabService {
+object UnavailableWatchHistoryService : WatchHistoryService {
     override fun connectProvider(
         provider: WatchProvider,
         accessToken: String,
@@ -281,36 +281,36 @@ object DefaultWatchHistoryLabService : WatchHistoryLabService {
         return WatchProviderAuthState()
     }
 
-    override suspend fun listLocalHistory(limit: Int): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
+    override suspend fun listLocalHistory(limit: Int): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun exportLocalHistory(): List<WatchHistoryEntry> {
         return emptyList()
     }
 
-    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
+    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun markWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
+    override suspend fun markWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun unmarkWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
+    override suspend fun unmarkWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryLabResult {
-        return WatchHistoryLabResult(statusMessage = "Watch history service unavailable.")
+    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun listContinueWatching(
         limit: Int,
         nowMs: Long,
         source: WatchProvider?
-    ): ContinueWatchingLabResult {
-        return ContinueWatchingLabResult(statusMessage = "Watch history service unavailable.")
+    ): ContinueWatchingResult {
+        return ContinueWatchingResult(statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun listProviderLibrary(

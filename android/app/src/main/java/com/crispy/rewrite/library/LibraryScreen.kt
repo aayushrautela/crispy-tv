@@ -46,7 +46,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.rewrite.PlaybackLabDependencies
+import com.crispy.rewrite.PlaybackDependencies
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.ProviderLibraryFolder
 import com.crispy.rewrite.player.ProviderLibraryItem
@@ -55,7 +55,7 @@ import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.ui.components.PosterCard
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchProviderAuthState
 import com.crispy.rewrite.settings.HomeScreenSettingsStore
@@ -85,7 +85,7 @@ data class LibraryUiState(
 )
 
 class LibraryViewModel internal constructor(
-    private val watchHistoryService: WatchHistoryLabService,
+    private val watchHistoryService: WatchHistoryService,
     private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
     private val _uiState =
@@ -247,7 +247,7 @@ class LibraryViewModel internal constructor(
                     if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
-                            watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
+                            watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                             settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }

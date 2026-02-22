@@ -46,7 +46,13 @@ object AppHttp {
             runCatching {
                 context.packageManager.getPackageInfo(context.packageName, 0).versionName
             }.getOrNull().orEmpty()
-        val appPart = if (versionName.isNotBlank()) "Crispy/$versionName" else "Crispy"
-        return "$appPart (Android ${Build.VERSION.SDK_INT})"
+
+        val resolvedVersion =
+            versionName
+                .trim()
+                .ifBlank { BuildConfig.VERSION_NAME.trim() }
+                .ifBlank { "dev" }
+
+        return "crispytv/$resolvedVersion"
     }
 }

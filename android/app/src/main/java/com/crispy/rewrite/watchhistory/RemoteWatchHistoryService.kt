@@ -1,4 +1,4 @@
-package com.crispy.rewrite.metadata
+package com.crispy.rewrite.watchhistory
 
 import android.content.Context
 import android.net.Uri
@@ -7,7 +7,7 @@ import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.domain.metadata.normalizeNuvioMediaId
 import com.crispy.rewrite.network.CrispyHttpClient
 import com.crispy.rewrite.player.ContinueWatchingEntry
-import com.crispy.rewrite.player.ContinueWatchingLabResult
+import com.crispy.rewrite.player.ContinueWatchingResult
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.ProviderAuthActionResult
 import com.crispy.rewrite.player.ProviderAuthStartResult
@@ -20,15 +20,16 @@ import com.crispy.rewrite.player.ProviderLibraryItem
 import com.crispy.rewrite.player.ProviderLibrarySnapshot
 import com.crispy.rewrite.player.ProviderRecommendationsResult
 import com.crispy.rewrite.player.WatchHistoryEntry
-import com.crispy.rewrite.player.WatchHistoryLabResult
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryResult
+import com.crispy.rewrite.player.WatchHistoryService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.player.WatchHistoryRequest
 import com.crispy.rewrite.player.WatchProviderAuthState
 import com.crispy.rewrite.player.WatchProviderSession
+import com.crispy.rewrite.security.KeystoreSecretStore
+import com.crispy.rewrite.watchhistory.simkl.SimklApi
+import com.crispy.rewrite.watchhistory.trakt.TraktApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -41,7 +42,7 @@ import java.util.Base64
 import java.time.Instant
 import java.util.Locale
 
-class RemoteWatchHistoryLabService(
+class RemoteWatchHistoryService(
     context: Context,
     private val httpClient: CrispyHttpClient,
     private val traktClientId: String,
@@ -50,12 +51,39 @@ class RemoteWatchHistoryLabService(
     private val traktRedirectUri: String = BuildConfig.TRAKT_REDIRECT_URI,
     private val simklClientSecret: String = BuildConfig.SIMKL_CLIENT_SECRET,
     private val simklRedirectUri: String = BuildConfig.SIMKL_REDIRECT_URI
-) : WatchHistoryLabService {
+) : WatchHistoryService {
     private val appContext = context.applicationContext
-    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs =
+        run {
+            migrateLegacyWatchHistoryPrefsIfNeeded(appContext)
+            appContext.getSharedPreferences(WATCH_HISTORY_PREFS_NAME, Context.MODE_PRIVATE)
+        }
     private val providerCacheDir = File(appContext.filesDir, "watch_provider_cache").apply { mkdirs() }
 
-    private val traktRefreshMutex = Mutex()
+    private val secureRandom = SecureRandom()
+    private val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
+
+    private val http = WatchHistoryHttp(httpClient, TAG)
+    private val simklApi =
+        SimklApi(
+            http = http,
+            simklClientId = simklClientId,
+            simklClientSecret = simklClientSecret,
+            simklRedirectUri = simklRedirectUri,
+            logTag = TAG
+        )
+
+    private val traktApi =
+        TraktApi(
+            http = http,
+            prefs = prefs,
+            traktClientId = traktClientId,
+            traktClientSecret = traktClientSecret,
+            traktRedirectUri = traktRedirectUri,
+            readSecret = ::readSecret,
+            writeEncrypted = ::writeEncryptedSecret,
+            logTag = TAG
+        )
 
     override fun connectProvider(
         provider: WatchProvider,
@@ -70,13 +98,28 @@ class RemoteWatchHistoryLabService(
             return
         }
 
+        // Providers are mutually exclusive in this app.
+        when (provider) {
+            WatchProvider.TRAKT -> clearProviderCaches(WatchProvider.SIMKL)
+            WatchProvider.SIMKL -> clearProviderCaches(WatchProvider.TRAKT)
+            WatchProvider.LOCAL -> Unit
+        }
+
         prefs.edit().apply {
             when (provider) {
                 WatchProvider.TRAKT -> {
                     remove(KEY_SIMKL_TOKEN)
                     remove(KEY_SIMKL_HANDLE)
-                    putString(KEY_TRAKT_TOKEN, normalizedAccess)
-                    putString(KEY_TRAKT_REFRESH_TOKEN, refreshToken?.trim()?.ifBlank { null })
+                    remove(KEY_SIMKL_OAUTH_STATE)
+                    
+                    putString(KEY_TRAKT_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedAccess))
+
+                    val normalizedRefresh = refreshToken?.trim()?.ifBlank { null }
+                    if (normalizedRefresh == null) {
+                        remove(KEY_TRAKT_REFRESH_TOKEN)
+                    } else {
+                        putString(KEY_TRAKT_REFRESH_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedRefresh))
+                    }
                     if (expiresAtEpochMs != null && expiresAtEpochMs > 0L) {
                         putLong(KEY_TRAKT_EXPIRES_AT, expiresAtEpochMs)
                     } else {
@@ -90,7 +133,10 @@ class RemoteWatchHistoryLabService(
                     remove(KEY_TRAKT_REFRESH_TOKEN)
                     remove(KEY_TRAKT_EXPIRES_AT)
                     remove(KEY_TRAKT_HANDLE)
-                    putString(KEY_SIMKL_TOKEN, normalizedAccess)
+                    remove(KEY_TRAKT_OAUTH_STATE)
+                    remove(KEY_TRAKT_OAUTH_CODE_VERIFIER)
+
+                    putString(KEY_SIMKL_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedAccess))
                     putString(KEY_SIMKL_HANDLE, userHandle?.trim()?.ifBlank { null })
                 }
 
@@ -107,16 +153,21 @@ class RemoteWatchHistoryLabService(
                     remove(KEY_TRAKT_REFRESH_TOKEN)
                     remove(KEY_TRAKT_EXPIRES_AT)
                     remove(KEY_TRAKT_HANDLE)
+                    remove(KEY_TRAKT_OAUTH_STATE)
+                    remove(KEY_TRAKT_OAUTH_CODE_VERIFIER)
                 }
 
                 WatchProvider.SIMKL -> {
                     remove(KEY_SIMKL_TOKEN)
                     remove(KEY_SIMKL_HANDLE)
+                    remove(KEY_SIMKL_OAUTH_STATE)
                 }
 
                 WatchProvider.LOCAL -> Unit
             }
         }.apply()
+
+        clearProviderCaches(provider)
     }
 
     override fun updateAuthTokens(traktAccessToken: String, simklAccessToken: String) {
@@ -292,16 +343,7 @@ class RemoteWatchHistoryLabService(
             putString(KEY_SIMKL_OAUTH_STATE, state)
         }.apply()
 
-        val authorizationUrl =
-            Uri.parse(SIMKL_AUTHORIZE_BASE).buildUpon()
-                .appendQueryParameter("response_type", "code")
-                .appendQueryParameter("client_id", simklClientId)
-                .appendQueryParameter("redirect_uri", simklRedirectUri)
-                .appendQueryParameter("state", state)
-                .appendQueryParameter("app-name", SIMKL_APP_NAME)
-                .appendQueryParameter("app-version", simklAppVersion())
-                .build()
-                .toString()
+        val authorizationUrl = simklApi.authorizeUrl(state)
 
         Log.d(TAG, "Prepared Simkl OAuth start (redirectUri=$simklRedirectUri)")
 
@@ -354,23 +396,7 @@ class RemoteWatchHistoryLabService(
 
         Log.d(TAG, "Exchanging Simkl OAuth code for token")
 
-        val tokenPayload = JSONObject()
-            .put("code", authCode)
-            .put("client_id", simklClientId)
-            .put("client_secret", simklClientSecret)
-            .put("redirect_uri", simklRedirectUri)
-            .put("grant_type", "authorization_code")
-
-        val tokenResponse =
-            postJsonForObject(
-                url = simklUrlWithRequiredParams(SIMKL_TOKEN_URL),
-                headers = mapOf(
-                    "Content-Type" to "application/json",
-                    "Accept" to "application/json",
-                    "User-Agent" to simklUserAgent()
-                ),
-                payload = tokenPayload
-            )
+        val tokenResponse = simklApi.exchangeToken(authCode)
 
         clearPendingSimklOAuth()
 
@@ -385,7 +411,7 @@ class RemoteWatchHistoryLabService(
             return ProviderAuthActionResult(success = false, statusMessage = "Simkl token response missing access token.")
         }
 
-        val userHandle = fetchSimklUserHandle(accessToken)
+        val userHandle = simklApi.fetchUserHandle(accessToken)
         Log.d(TAG, "Simkl token exchange succeeded (userHandlePresent=${!userHandle.isNullOrBlank()})")
         connectProvider(
             provider = WatchProvider.SIMKL,
@@ -400,7 +426,7 @@ class RemoteWatchHistoryLabService(
         )
     }
 
-    override suspend fun listLocalHistory(limit: Int): WatchHistoryLabResult {
+    override suspend fun listLocalHistory(limit: Int): WatchHistoryResult {
         val entries =
             loadEntries()
                 .sortedByDescending { item -> item.watchedAtEpochMs }
@@ -414,7 +440,7 @@ class RemoteWatchHistoryLabService(
                 "Loaded ${entries.size} local watched entries."
             }
 
-        return WatchHistoryLabResult(
+        return WatchHistoryResult(
             statusMessage = status,
             entries = entries,
             authState = authState()
@@ -427,10 +453,10 @@ class RemoteWatchHistoryLabService(
             .map { item -> item.toPublicEntry() }
     }
 
-    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryLabResult {
+    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryResult {
         if (entries.isEmpty()) {
             val current = loadEntries().sortedByDescending { item -> item.watchedAtEpochMs }.map { it.toPublicEntry() }
-            return WatchHistoryLabResult(
+            return WatchHistoryResult(
                 statusMessage = "Remote watched history empty. Kept local history unchanged.",
                 entries = current,
                 authState = authState()
@@ -465,7 +491,7 @@ class RemoteWatchHistoryLabService(
             saveEntries(merged)
         }
 
-        return WatchHistoryLabResult(
+        return WatchHistoryResult(
             statusMessage = "Reconciled ${merged.size} remote watched entries to local history.",
             entries = merged.sortedByDescending { item -> item.watchedAtEpochMs }.map { item -> item.toPublicEntry() },
             authState = authState()
@@ -475,7 +501,7 @@ class RemoteWatchHistoryLabService(
     override suspend fun markWatched(
         request: WatchHistoryRequest,
         source: WatchProvider?
-    ): WatchHistoryLabResult {
+    ): WatchHistoryResult {
         val normalized = normalizeRequest(request)
         val existing = loadEntries()
         val updated = upsertEntry(existing, normalized.toLocalWatchedItem())
@@ -508,7 +534,7 @@ class RemoteWatchHistoryLabService(
                         "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
             }
 
-        return WatchHistoryLabResult(
+        return WatchHistoryResult(
             statusMessage = statusMessage,
             entries = entries,
             authState = authState(),
@@ -520,7 +546,7 @@ class RemoteWatchHistoryLabService(
     override suspend fun unmarkWatched(
         request: WatchHistoryRequest,
         source: WatchProvider?
-    ): WatchHistoryLabResult {
+    ): WatchHistoryResult {
         val normalized = normalizeRequest(request)
         val existing = loadEntries()
         val updated = removeEntry(existing, normalized)
@@ -553,7 +579,7 @@ class RemoteWatchHistoryLabService(
                         "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
             }
 
-        return WatchHistoryLabResult(
+        return WatchHistoryResult(
             statusMessage = statusMessage,
             entries = entries,
             authState = authState(),
@@ -566,9 +592,9 @@ class RemoteWatchHistoryLabService(
         request: WatchHistoryRequest,
         inWatchlist: Boolean,
         source: WatchProvider?
-    ): WatchHistoryLabResult {
+    ): WatchHistoryResult {
         if (source == WatchProvider.LOCAL) {
-            return WatchHistoryLabResult(statusMessage = "Watchlist is unavailable for local watch history.")
+            return WatchHistoryResult(statusMessage = "Watchlist is unavailable for local watch history.")
         }
 
         val normalized = normalizeContentRequest(request)
@@ -602,7 +628,7 @@ class RemoteWatchHistoryLabService(
                         "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
             }
 
-        return WatchHistoryLabResult(
+        return WatchHistoryResult(
             statusMessage = statusMessage,
             authState = authState(),
             syncedToTrakt = syncedTrakt,
@@ -614,9 +640,9 @@ class RemoteWatchHistoryLabService(
         request: WatchHistoryRequest,
         rating: Int?,
         source: WatchProvider?
-    ): WatchHistoryLabResult {
+    ): WatchHistoryResult {
         if (source == WatchProvider.LOCAL) {
-            return WatchHistoryLabResult(statusMessage = "Rating is unavailable for local watch history.")
+            return WatchHistoryResult(statusMessage = "Rating is unavailable for local watch history.")
         }
 
         val normalized = normalizeContentRequest(request)
@@ -651,7 +677,7 @@ class RemoteWatchHistoryLabService(
                         "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
             }
 
-        return WatchHistoryLabResult(
+        return WatchHistoryResult(
             statusMessage = statusMessage,
             authState = authState(),
             syncedToTrakt = syncedTrakt,
@@ -659,13 +685,13 @@ class RemoteWatchHistoryLabService(
         )
     }
 
-    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryLabResult {
+    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryResult {
         val id = playbackId.trim()
         val existing = loadEntries()
         val entries = existing.sortedByDescending { item -> item.watchedAtEpochMs }.map { item -> item.toPublicEntry() }
 
         if (id.isEmpty()) {
-            return WatchHistoryLabResult(
+            return WatchHistoryResult(
                 statusMessage = "Playback id missing.",
                 entries = entries,
                 authState = authState()
@@ -699,7 +725,7 @@ class RemoteWatchHistoryLabService(
                         "simkl=${syncStatusLabel(syncedSimkl, simklAccessToken(), simklClientId)}"
             }
 
-        return WatchHistoryLabResult(
+        return WatchHistoryResult(
             statusMessage = statusMessage,
             entries = entries,
             authState = authState(),
@@ -836,7 +862,7 @@ class RemoteWatchHistoryLabService(
         limit: Int,
         nowMs: Long,
         source: WatchProvider?
-    ): ContinueWatchingLabResult {
+    ): ContinueWatchingResult {
         val targetLimit = limit.coerceAtLeast(1)
         Log.d(TAG, "listContinueWatching: source=$source, limit=$targetLimit")
 
@@ -849,7 +875,7 @@ class RemoteWatchHistoryLabService(
                 } else {
                     "No local continue watching entries yet."
                 }
-                return ContinueWatchingLabResult(
+                return ContinueWatchingResult(
                     statusMessage = status,
                     entries = local
                 )
@@ -941,7 +967,7 @@ class RemoteWatchHistoryLabService(
                 }
             Log.d(TAG, "listContinueWatching: statusMessage=\"$status\"")
 
-            val result = ContinueWatchingLabResult(
+            val result = ContinueWatchingResult(
                 statusMessage = status,
                 entries = normalized
             )
@@ -982,7 +1008,7 @@ class RemoteWatchHistoryLabService(
             } else {
                 "No continue watching entries yet."
             }
-            return ContinueWatchingLabResult(
+            return ContinueWatchingResult(
                 statusMessage = status,
                 entries = local
             )
@@ -1003,7 +1029,7 @@ class RemoteWatchHistoryLabService(
                 else -> "No continue watching entries yet."
             }
 
-        return ContinueWatchingLabResult(
+        return ContinueWatchingResult(
             statusMessage = status,
             entries = merged
         )
@@ -1232,13 +1258,13 @@ class RemoteWatchHistoryLabService(
         limit: Int,
         nowMs: Long,
         source: WatchProvider?
-    ): ContinueWatchingLabResult {
+    ): ContinueWatchingResult {
         val targetLimit = limit.coerceAtLeast(1)
 
         if (source == WatchProvider.LOCAL) {
             val local = localContinueWatchingFallback().take(targetLimit)
             val status = if (local.isNotEmpty()) "Loaded ${local.size} local continue watching entries." else "No continue watching entries yet."
-            return ContinueWatchingLabResult(statusMessage = status, entries = local)
+            return ContinueWatchingResult(statusMessage = status, entries = local)
         }
 
         val providers =
@@ -1266,12 +1292,12 @@ class RemoteWatchHistoryLabService(
                     WatchProvider.SIMKL -> "Simkl"
                     else -> "provider"
                 }
-            return ContinueWatchingLabResult(statusMessage = "No cached $label continue watching entries.")
+            return ContinueWatchingResult(statusMessage = "No cached $label continue watching entries.")
         }
 
         val normalized = normalizeContinueWatching(entries = mergedEntries, nowMs = nowMs, limit = targetLimit)
         val status = "Loaded cached continue watching (${statusParts.joinToString(", ")})."
-        return ContinueWatchingLabResult(statusMessage = status, entries = normalized)
+        return ContinueWatchingResult(statusMessage = status, entries = normalized)
     }
 
     override suspend fun getCachedProviderLibrary(
@@ -2428,21 +2454,21 @@ class RemoteWatchHistoryLabService(
         return node.optJSONObject("ids")?.opt("trakt")?.toString()?.trim()?.ifEmpty { null }
     }
 
-    private fun traktHeaders(accessToken: String?): Headers {
-        val builder = Headers.Builder()
-            .add("trakt-api-version", "2")
-            .add("trakt-api-key", traktClientId)
-            .add("Accept", "application/json")
-        if (!accessToken.isNullOrBlank()) {
-            builder.add("Authorization", "Bearer $accessToken")
-        }
-        return builder.build()
-    }
-
     private fun updateTraktTokens(accessToken: String, refreshToken: String?, expiresAtEpochMs: Long?) {
         prefs.edit().apply {
-            putString(KEY_TRAKT_TOKEN, accessToken.trim())
-            putString(KEY_TRAKT_REFRESH_TOKEN, refreshToken?.trim()?.ifBlank { null })
+            val normalizedAccess = accessToken.trim()
+            if (normalizedAccess.isBlank()) {
+                remove(KEY_TRAKT_TOKEN)
+            } else {
+                putString(KEY_TRAKT_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedAccess))
+            }
+
+            val normalizedRefresh = refreshToken?.trim()?.ifBlank { null }
+            if (normalizedRefresh == null) {
+                remove(KEY_TRAKT_REFRESH_TOKEN)
+            } else {
+                putString(KEY_TRAKT_REFRESH_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedRefresh))
+            }
             if (expiresAtEpochMs != null && expiresAtEpochMs > 0L) {
                 putLong(KEY_TRAKT_EXPIRES_AT, expiresAtEpochMs)
             } else {
@@ -2451,213 +2477,23 @@ class RemoteWatchHistoryLabService(
         }.apply()
     }
 
-    private suspend fun refreshTraktToken(refreshToken: String): String? {
-        if (traktClientId.isBlank() || traktClientSecret.isBlank() || traktRedirectUri.isBlank()) {
-            Log.w(TAG, "Skipping Trakt token refresh: missing client credentials")
-            return null
-        }
-
-        val response =
-            postJsonForObject(
-                url = TRAKT_TOKEN_URL,
-                headers =
-                    mapOf(
-                        "Content-Type" to "application/json",
-                        "Accept" to "application/json",
-                    ),
-                payload =
-                    JSONObject()
-                        .put("refresh_token", refreshToken)
-                        .put("client_id", traktClientId)
-                        .put("client_secret", traktClientSecret)
-                        .put("redirect_uri", traktRedirectUri)
-                        .put("grant_type", "refresh_token"),
-            ) ?: return null
-
-        val accessToken = response.optString("access_token").trim()
-        if (accessToken.isBlank()) {
-            Log.w(TAG, "Trakt token refresh succeeded but access_token missing keys=${jsonKeysForLog(response)}")
-            return null
-        }
-        val newRefreshToken = response.optString("refresh_token").trim().ifEmpty { refreshToken }
-        val expiresInSeconds = response.optLong("expires_in", -1L).takeIf { it > 0L }
-        val expiresAtMs = expiresInSeconds?.let { System.currentTimeMillis() + it * 1000L }
-        updateTraktTokens(accessToken = accessToken, refreshToken = newRefreshToken, expiresAtEpochMs = expiresAtMs)
-        return accessToken
-    }
-
-    private suspend fun ensureTraktAccessToken(forceRefresh: Boolean = false): String? {
-        val token = traktAccessToken().trim()
-        if (token.isBlank() || traktClientId.isBlank()) {
-            return null
-        }
-
-        val refreshToken = prefs.getString(KEY_TRAKT_REFRESH_TOKEN, null)?.trim()?.ifBlank { null }
-        val expiresAt = prefs.getLong(KEY_TRAKT_EXPIRES_AT, -1L).takeIf { it > 0L }
-        val nowMs = System.currentTimeMillis()
-        val shouldRefresh =
-            forceRefresh ||
-                (expiresAt != null && refreshToken != null && nowMs >= (expiresAt - 60_000L))
-        if (!shouldRefresh || refreshToken == null) {
-            return token
-        }
-
-        return traktRefreshMutex.withLock {
-            val currentToken = traktAccessToken().trim()
-            if (currentToken.isBlank()) return@withLock null
-            val currentRefresh = prefs.getString(KEY_TRAKT_REFRESH_TOKEN, null)?.trim()?.ifBlank { null }
-                ?: return@withLock currentToken
-            val currentExpiresAt = prefs.getLong(KEY_TRAKT_EXPIRES_AT, -1L).takeIf { it > 0L }
-            val refreshNow =
-                forceRefresh ||
-                    (currentExpiresAt != null && nowMs >= (currentExpiresAt - 60_000L))
-            if (!refreshNow) {
-                return@withLock currentToken
-            }
-
-            refreshTraktToken(currentRefresh) ?: currentToken
-        }
-    }
-
     private suspend fun traktSearchGetArray(traktType: String, idType: String, id: String): JSONArray? {
         val safeType = if (traktType == "movie") "movie" else "show"
-        val endpoint = "/search/$safeType?id_type=$idType&id=$id"
-        if (traktClientId.isBlank()) return null
-
-        val token = ensureTraktAccessToken(forceRefresh = false)
-        val url = "https://api.trakt.tv$endpoint"
-        val response =
-            runCatching { httpClient.get(url = url.toHttpUrl(), headers = traktHeaders(token)) }
-                .onFailure { error ->
-                    Log.w(TAG, "Trakt search GET failed: $url", error)
-                }
-                .getOrNull()
-                ?: return null
-
-        val body = response.body
-        if (response.code !in 200..299) {
-            Log.w(TAG, "Trakt search GET $url failed with ${response.code} body=${compactForLog(body)}")
-            return null
-        }
-        if (body.isBlank()) {
-            return null
-        }
-        return runCatching { JSONArray(body) }
-            .onFailure { error ->
-                Log.w(TAG, "Trakt search GET $url returned malformed JSON body=${compactForLog(body)}", error)
-            }
-            .getOrNull()
+        return traktApi.searchGetArray(traktType = safeType, idType = idType, id = id)
     }
 
     private suspend fun traktGetArray(path: String): JSONArray? {
-        var token = ensureTraktAccessToken(forceRefresh = false)
-        if (token.isNullOrBlank()) {
-            Log.w(TAG, "traktGetArray($path) skipped: missing token/clientId")
-            return null
-        }
-
-        val url = "https://api.trakt.tv$path"
-        Log.d(TAG, "traktGetArray($path) requesting…")
-
-        fun parse(body: String): JSONArray? {
-            if (body.isBlank()) return null
-            return runCatching { JSONArray(body) }
-                .onFailure { error ->
-                    Log.w(TAG, "traktGetArray($path) malformed JSON body=${compactForLog(body)}", error)
-                }
-                .getOrNull()
-        }
-
-        var response =
-            runCatching { httpClient.get(url = url.toHttpUrl(), headers = traktHeaders(token)) }
-                .onFailure { error -> Log.w(TAG, "traktGetArray($path) GET failed", error) }
-                .getOrNull()
-                ?: return null
-
-        if (response.code == 401) {
-            val refreshed = ensureTraktAccessToken(forceRefresh = true)
-            if (!refreshed.isNullOrBlank() && refreshed != token) {
-                token = refreshed
-                response =
-                    runCatching { httpClient.get(url = url.toHttpUrl(), headers = traktHeaders(token)) }
-                        .onFailure { error -> Log.w(TAG, "traktGetArray($path) retry GET failed", error) }
-                        .getOrNull()
-                        ?: return null
-            }
-        }
-
-        if (response.code !in 200..299) {
-            Log.w(TAG, "traktGetArray($path) failed with ${response.code} body=${compactForLog(response.body)}")
-            return null
-        }
-
-        val parsed = parse(response.body)
-        Log.d(TAG, "traktGetArray($path) → ${parsed?.length() ?: "null"} items")
-        return parsed
+        return traktApi.getArray(path)
     }
 
     private suspend fun traktGetObject(path: String): JSONObject? {
-        var token = ensureTraktAccessToken(forceRefresh = false)
-        if (token.isNullOrBlank()) {
-            Log.w(TAG, "traktGetObject($path) skipped: missing token/clientId")
-            return null
-        }
-
-        val url = "https://api.trakt.tv$path"
-        Log.d(TAG, "traktGetObject($path) requesting…")
-
-        fun parse(body: String): JSONObject? {
-            if (body.isBlank()) return null
-            return runCatching { JSONObject(body) }
-                .onFailure { error ->
-                    Log.w(TAG, "traktGetObject($path) malformed JSON body=${compactForLog(body)}", error)
-                }
-                .getOrNull()
-        }
-
-        var response =
-            runCatching { httpClient.get(url = url.toHttpUrl(), headers = traktHeaders(token)) }
-                .onFailure { error -> Log.w(TAG, "traktGetObject($path) GET failed", error) }
-                .getOrNull()
-                ?: return null
-
-        if (response.code == 401) {
-            val refreshed = ensureTraktAccessToken(forceRefresh = true)
-            if (!refreshed.isNullOrBlank() && refreshed != token) {
-                token = refreshed
-                response =
-                    runCatching { httpClient.get(url = url.toHttpUrl(), headers = traktHeaders(token)) }
-                        .onFailure { error -> Log.w(TAG, "traktGetObject($path) retry GET failed", error) }
-                        .getOrNull()
-                        ?: return null
-            }
-        }
-
-        if (response.code !in 200..299) {
-            Log.w(TAG, "traktGetObject($path) failed with ${response.code} body=${compactForLog(response.body)}")
-            return null
-        }
-
-        val parsed = parse(response.body)
-        Log.d(TAG, "traktGetObject($path) → ${if (parsed != null) "object" else "null"}")
-        return parsed
+        return traktApi.getObject(path)
     }
 
     private suspend fun simklGetAny(path: String): Any? {
         val token = simklAccessToken()
-        if (token.isEmpty() || simklClientId.isBlank()) {
-            return null
-        }
-        return getJsonAny(
-            url = simklApiUrl(path),
-            headers =
-                mapOf(
-                    "Authorization" to "Bearer $token",
-                    "simkl-api-key" to simklClientId,
-                    "Accept" to "application/json",
-                    "User-Agent" to simklUserAgent()
-                )
-        )
+        if (token.isBlank()) return null
+        return simklApi.getAny(path = path, accessToken = token)
     }
 
     private fun parseIsoToEpochMs(value: String?): Long? {
@@ -2897,32 +2733,9 @@ class RemoteWatchHistoryLabService(
     }
 
     private suspend fun syncTraktRemovePlayback(playbackId: String): Boolean {
-        var token = ensureTraktAccessToken(forceRefresh = false)
         val id = playbackId.trim()
-        if (token.isNullOrBlank() || traktClientId.isBlank() || id.isEmpty()) {
-            return false
-        }
-
-        val url = "https://api.trakt.tv/sync/playback/$id"
-
-        suspend fun doDelete(currentToken: String) =
-            try {
-                httpClient.delete(url = url.toHttpUrl(), headers = traktHeaders(currentToken))
-            } catch (error: Throwable) {
-                Log.w(TAG, "Trakt DELETE failed: $url", error)
-                null
-            }
-
-        var response = doDelete(token) ?: return false
-        if (response.code == 401) {
-            val refreshed = ensureTraktAccessToken(forceRefresh = true)
-            if (!refreshed.isNullOrBlank() && refreshed != token) {
-                token = refreshed
-                response = doDelete(token) ?: return false
-            }
-        }
-
-        return response.code in 200..299 || response.code == 404
+        if (id.isEmpty()) return false
+        return traktApi.delete("/sync/playback/$id")
     }
 
     private fun syncSimklRemovePlayback(playbackId: String): Boolean {
@@ -2930,39 +2743,7 @@ class RemoteWatchHistoryLabService(
     }
 
     private suspend fun traktPost(path: String, payload: JSONObject): Boolean {
-        var token = ensureTraktAccessToken(forceRefresh = false)
-        if (token.isNullOrBlank() || traktClientId.isBlank()) {
-            return false
-        }
-
-        val url = "https://api.trakt.tv$path"
-
-        suspend fun doPost(currentToken: String) =
-            try {
-                httpClient.postJson(
-                    url = url.toHttpUrl(),
-                    jsonBody = payload.toString(),
-                    headers = traktHeaders(currentToken).newBuilder().add("Content-Type", "application/json").build(),
-                )
-            } catch (error: Throwable) {
-                Log.w(TAG, "Trakt POST failed: $url", error)
-                null
-            }
-
-        var response = doPost(token) ?: return false
-        if (response.code == 401) {
-            val refreshed = ensureTraktAccessToken(forceRefresh = true)
-            if (!refreshed.isNullOrBlank() && refreshed != token) {
-                token = refreshed
-                response = doPost(token) ?: return false
-            }
-        }
-
-        if (response.code !in 200..299 && response.code != 409) {
-            Log.w(TAG, "Trakt POST $url failed with ${response.code} body=${compactForLog(response.body)}")
-        }
-
-        return response.code in 200..299 || response.code == 409
+        return traktApi.post(path = path, payload = payload)
     }
 
     private suspend fun syncSimklMark(request: NormalizedWatchRequest): Boolean {
@@ -3058,25 +2839,8 @@ class RemoteWatchHistoryLabService(
 
     private suspend fun simklPost(path: String, payload: JSONObject): Boolean {
         val token = simklAccessToken()
-        if (token.isEmpty() || simklClientId.isEmpty()) {
-            return false
-        }
-
-        val responseCode =
-            postJson(
-                url = simklApiUrl(path),
-                headers =
-                    mapOf(
-                        "Authorization" to "Bearer $token",
-                        "simkl-api-key" to simklClientId,
-                        "Content-Type" to "application/json",
-                        "Accept" to "application/json",
-                        "User-Agent" to simklUserAgent()
-                    ),
-                payload = payload
-            )
-
-        return responseCode in 200..299 || responseCode == 409
+        if (token.isBlank()) return false
+        return simklApi.post(path = path, accessToken = token, payload = payload)
     }
 
     private data class CachedSnapshot<T>(
@@ -3124,7 +2888,7 @@ class RemoteWatchHistoryLabService(
         }
     }
 
-    private suspend fun writeContinueWatchingCache(provider: WatchProvider, result: ContinueWatchingLabResult) {
+    private suspend fun writeContinueWatchingCache(provider: WatchProvider, result: ContinueWatchingResult) {
         if (provider == WatchProvider.LOCAL) return
 
         val updatedAt = System.currentTimeMillis()
@@ -3154,7 +2918,7 @@ class RemoteWatchHistoryLabService(
         writeFileAtomic(continueWatchingCacheFile(provider), json.toString())
     }
 
-    private suspend fun readContinueWatchingCache(provider: WatchProvider): CachedSnapshot<ContinueWatchingLabResult>? {
+    private suspend fun readContinueWatchingCache(provider: WatchProvider): CachedSnapshot<ContinueWatchingResult>? {
         if (provider == WatchProvider.LOCAL) return null
 
         val file = continueWatchingCacheFile(provider)
@@ -3206,7 +2970,7 @@ class RemoteWatchHistoryLabService(
         val statusMessage = root.optString("statusMessage").trim().ifEmpty { "Cached continue watching." }
         return CachedSnapshot(
             updatedAtEpochMs = updatedAt,
-            value = ContinueWatchingLabResult(statusMessage = statusMessage, entries = entries),
+            value = ContinueWatchingResult(statusMessage = statusMessage, entries = entries),
         )
     }
 
@@ -3483,42 +3247,6 @@ class RemoteWatchHistoryLabService(
         return username.ifBlank { null }
     }
 
-    private suspend fun fetchSimklUserHandle(accessToken: String): String? {
-        if (simklClientId.isBlank() || accessToken.isBlank()) {
-            Log.w(TAG, "Skipping Simkl profile lookup: missing auth inputs")
-            return null
-        }
-
-        val response =
-            postJsonForObject(
-                url = simklApiUrl("/users/settings"),
-                headers =
-                    mapOf(
-                        "Authorization" to "Bearer $accessToken",
-                        "simkl-api-key" to simklClientId,
-                        "Content-Type" to "application/json",
-                        "Accept" to "application/json",
-                        "User-Agent" to simklUserAgent()
-                    ),
-                payload = JSONObject()
-            ) ?: run {
-                Log.w(TAG, "Simkl profile lookup returned no payload")
-                return null
-            }
-
-        val user = response.optJSONObject("user")
-        val name = user?.optString("name")?.trim().orEmpty()
-        if (name.isNotBlank()) {
-            return name
-        }
-        val account = response.optJSONObject("account")
-        val accountId = account?.opt("id")?.toString()?.trim().orEmpty()
-        if (accountId.isBlank()) {
-            Log.w(TAG, "Simkl profile lookup succeeded but account identifier missing")
-        }
-        return accountId.ifBlank { null }
-    }
-
     private fun uriSummaryForLog(uri: Uri): String {
         val statePresent = !uri.getQueryParameter("state").isNullOrBlank()
         val codePresent = !uri.getQueryParameter("code").isNullOrBlank()
@@ -3532,34 +3260,6 @@ class RemoteWatchHistoryLabService(
             return "<empty>"
         }
         return if (compact.length <= maxLength) compact else compact.take(maxLength) + "..."
-    }
-
-    private fun simklApiUrl(path: String): String {
-        val normalizedPath = if (path.startsWith('/')) path else "/$path"
-        return simklUrlWithRequiredParams("$SIMKL_API_BASE$normalizedPath")
-    }
-
-    private fun simklUrlWithRequiredParams(url: String): String {
-        val uri = Uri.parse(url)
-        val builder = uri.buildUpon()
-        if (uri.getQueryParameter("client_id").isNullOrBlank() && simklClientId.isNotBlank()) {
-            builder.appendQueryParameter("client_id", simklClientId)
-        }
-        if (uri.getQueryParameter("app-name").isNullOrBlank()) {
-            builder.appendQueryParameter("app-name", SIMKL_APP_NAME)
-        }
-        if (uri.getQueryParameter("app-version").isNullOrBlank()) {
-            builder.appendQueryParameter("app-version", simklAppVersion())
-        }
-        return builder.build().toString()
-    }
-
-    private fun simklAppVersion(): String {
-        return BuildConfig.VERSION_NAME.trim().ifEmpty { "dev" }
-    }
-
-    private fun simklUserAgent(): String {
-        return "$SIMKL_APP_NAME/${simklAppVersion()}"
     }
 
     private fun jsonKeysForLog(jsonObject: JSONObject): String {
@@ -3593,40 +3293,53 @@ class RemoteWatchHistoryLabService(
         return base64UrlEncoder.encodeToString(digest)
     }
 
+    private fun readSecret(key: String): String {
+        val stored = prefs.getString(key, null)?.trim().orEmpty()
+        if (stored.isBlank()) return ""
+        if (KeystoreSecretStore.isEncryptedPrefsValue(stored)) {
+            val decrypted = KeystoreSecretStore.decryptFromPrefs(stored)
+            if (decrypted == null) {
+                // Keystore entry or ciphertext became invalid; treat as disconnected.
+                runCatching { prefs.edit().remove(key).apply() }
+                return ""
+            }
+            return decrypted
+        }
+
+        // Migration: plaintext -> encrypted.
+        runCatching {
+            prefs.edit().putString(key, KeystoreSecretStore.encryptForPrefs(stored)).apply()
+        }
+        return stored
+    }
+
+    private fun writeEncryptedSecret(key: String, plaintext: String?) {
+        val normalized = plaintext?.trim()?.ifBlank { null }
+        prefs.edit().apply {
+            if (normalized == null) {
+                remove(key)
+            } else {
+                putString(key, KeystoreSecretStore.encryptForPrefs(normalized))
+            }
+        }.apply()
+    }
+
+    private fun clearProviderCaches(provider: WatchProvider) {
+        if (provider == WatchProvider.LOCAL) return
+        runCatching { continueWatchingCacheFile(provider).delete() }
+        runCatching { providerLibraryCacheFile(provider).delete() }
+    }
+
     private fun traktAccessToken(): String {
-        return prefs.getString(KEY_TRAKT_TOKEN, null)?.trim().orEmpty()
+        return readSecret(KEY_TRAKT_TOKEN).trim()
     }
 
     private fun simklAccessToken(): String {
-        return prefs.getString(KEY_SIMKL_TOKEN, null)?.trim().orEmpty()
+        return readSecret(KEY_SIMKL_TOKEN).trim()
     }
 
-    companion object {
-        private const val TAG = "RemoteWatchHistoryLab"
-        private const val PREFS_NAME = "watch_history_lab"
-        private const val KEY_LOCAL_WATCHED_ITEMS = "@user:local:watched_items"
-        private const val KEY_TRAKT_TOKEN = "trakt_access_token"
-        private const val KEY_TRAKT_REFRESH_TOKEN = "trakt_refresh_token"
-        private const val KEY_TRAKT_EXPIRES_AT = "trakt_expires_at"
-        private const val KEY_TRAKT_HANDLE = "trakt_user_handle"
-        private const val KEY_TRAKT_OAUTH_STATE = "trakt_oauth_state"
-        private const val KEY_TRAKT_OAUTH_CODE_VERIFIER = "trakt_oauth_code_verifier"
-        private const val KEY_SIMKL_TOKEN = "simkl_access_token"
-        private const val KEY_SIMKL_HANDLE = "simkl_user_handle"
-        private const val KEY_SIMKL_OAUTH_STATE = "simkl_oauth_state"
-        private const val STALE_PLAYBACK_WINDOW_MS = 30L * 24L * 60L * 60L * 1000L
-        private const val CONTINUE_WATCHING_MIN_PROGRESS_PERCENT = 2.0
-        private const val CONTINUE_WATCHING_COMPLETION_PERCENT = 85.0
-        private const val CONTINUE_WATCHING_PLAYBACK_LIMIT = 30
-        private const val CONTINUE_WATCHING_UPNEXT_SHOW_LIMIT = 30
-        private const val TRAKT_AUTHORIZE_BASE = "https://trakt.tv/oauth/authorize"
-        private const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/token"
-        private const val SIMKL_AUTHORIZE_BASE = "https://simkl.com/oauth/authorize"
-        private const val SIMKL_TOKEN_URL = "https://api.simkl.com/oauth/token"
-        private const val SIMKL_API_BASE = "https://api.simkl.com"
-        private const val SIMKL_APP_NAME = "crispytv"
-        private val secureRandom = SecureRandom()
-        private val base64UrlEncoder = Base64.getUrlEncoder().withoutPadding()
+    private companion object {
+        private const val TAG = "RemoteWatchHistory"
     }
 }
 

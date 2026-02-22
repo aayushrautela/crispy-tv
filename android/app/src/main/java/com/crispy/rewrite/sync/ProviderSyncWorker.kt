@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.crispy.rewrite.PlaybackLabDependencies
+import com.crispy.rewrite.PlaybackDependencies
 import com.crispy.rewrite.player.WatchProvider
 
 class ProviderSyncWorker(
@@ -13,7 +13,7 @@ class ProviderSyncWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val watchHistory = PlaybackLabDependencies.watchHistoryServiceFactory(applicationContext)
+        val watchHistory = PlaybackDependencies.watchHistoryServiceFactory(applicationContext)
 
         val auth = runCatching { watchHistory.authState() }
             .onFailure { Log.w(TAG, "Provider sync: authState failed", it) }

@@ -5,14 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.rewrite.BuildConfig
-import com.crispy.rewrite.PlaybackLabDependencies
+import com.crispy.rewrite.PlaybackDependencies
 import com.crispy.rewrite.domain.metadata.normalizeNuvioMediaId
 import com.crispy.rewrite.home.HomeCatalogService
 import com.crispy.rewrite.home.MediaDetails
 import com.crispy.rewrite.metadata.TmdbImdbIdResolver
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.MetadataLabMediaType
-import com.crispy.rewrite.player.WatchHistoryLabService
+import com.crispy.rewrite.player.WatchHistoryService
 import com.crispy.rewrite.player.WatchProvider
 import com.crispy.rewrite.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +46,7 @@ data class DetailsUiState(
 class DetailsViewModel internal constructor(
     private val itemId: String,
     private val homeCatalogService: HomeCatalogService,
-    private val watchHistoryService: WatchHistoryLabService,
+    private val watchHistoryService: WatchHistoryService,
     private val settingsStore: HomeScreenSettingsStore,
     private val tmdbImdbIdResolver: TmdbImdbIdResolver
 ) : ViewModel() {
@@ -417,7 +417,7 @@ class DetailsViewModel internal constructor(
                     return DetailsViewModel(
                         itemId = itemId,
                         homeCatalogService = homeCatalogService,
-                        watchHistoryService = PlaybackLabDependencies.watchHistoryServiceFactory(appContext),
+                        watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                         settingsStore = HomeScreenSettingsStore(appContext),
                         tmdbImdbIdResolver = tmdbImdbIdResolver
                     ) as T
