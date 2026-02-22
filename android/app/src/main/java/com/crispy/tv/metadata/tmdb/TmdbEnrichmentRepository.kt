@@ -432,7 +432,8 @@ private fun JSONArray.toJsonObjectList(): List<JSONObject> {
 }
 
 private fun JSONObject.optStringNonBlank(key: String): String? {
-    val value = optString(key, null) ?: return null
+    if (!has(key) || isNull(key)) return null
+    val value = optString(key)
     val trimmed = value.trim()
     return trimmed.takeIf { it.isNotBlank() }
 }

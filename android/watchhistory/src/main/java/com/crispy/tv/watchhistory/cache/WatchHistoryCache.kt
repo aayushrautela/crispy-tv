@@ -42,7 +42,6 @@ internal class WatchHistoryCache(
                 WatchProvider.TRAKT -> listOf(WatchProvider.TRAKT)
                 WatchProvider.SIMKL -> listOf(WatchProvider.SIMKL)
                 null -> listOf(WatchProvider.TRAKT, WatchProvider.SIMKL)
-                else -> emptyList()
             }
 
         val mergedEntries = mutableListOf<ContinueWatchingEntry>()
@@ -97,7 +96,6 @@ internal class WatchHistoryCache(
                 WatchProvider.TRAKT -> listOf(WatchProvider.TRAKT)
                 WatchProvider.SIMKL -> listOf(WatchProvider.SIMKL)
                 null -> listOf(WatchProvider.TRAKT, WatchProvider.SIMKL)
-                else -> emptyList()
             }
 
         val mergedFolders = mutableListOf<ProviderLibraryFolder>()

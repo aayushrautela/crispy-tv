@@ -32,8 +32,6 @@ internal fun tmdbFacts(
             titleDetails.episodeRunTimeMinutes.firstOrNull()?.takeIf { it > 0 }?.let { out.add("Ep: ${it}m") }
             titleDetails.type?.takeIf { it.isNotBlank() }?.let { out.add("Type: $it") }
         }
-
-        else -> Unit
     }
 
     titleDetails.originalLanguage?.takeIf { it.isNotBlank() }?.let { out.add("Lang: ${it}") }

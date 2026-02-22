@@ -62,11 +62,13 @@ class MainActivity : ComponentActivity() {
         applySystemBarIconAppearance(isDark)
     }
 
+    @Suppress("DEPRECATION")
     private fun clearSystemBarBackgrounds() {
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
     }
 
+    @Suppress("DEPRECATION")
     private fun disableSystemBarContrast() {
         if (Build.VERSION.SDK_INT < 29) {
             return

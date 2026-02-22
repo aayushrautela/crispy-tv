@@ -44,8 +44,6 @@ internal class RecommendationResolver(
                     }
                 }
             }
-
-            else -> ProviderRecommendationsResult(statusMessage = "Recommendations unavailable.")
         }
     }
 
