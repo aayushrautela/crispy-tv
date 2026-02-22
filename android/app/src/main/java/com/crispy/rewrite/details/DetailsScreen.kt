@@ -1126,7 +1126,7 @@ private fun ExpandableDescription(
                 }
             }
         } else if (layout != null && layout.hasVisualOverflow) {
-            val lineEnd = layout.getLineEnd(2, visibleOnly = true)
+            val lineEnd = layout.getLineEnd(2, true)
             buildAnnotatedString {
                 append(content.substring(0, lineEnd).dropLast(12).trim())
                 append("... ")
