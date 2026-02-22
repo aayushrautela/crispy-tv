@@ -111,7 +111,6 @@ internal fun HomeRailSection(
             }
         }
     }
-}
 
 @Composable
 internal fun HomeRailHeader(
