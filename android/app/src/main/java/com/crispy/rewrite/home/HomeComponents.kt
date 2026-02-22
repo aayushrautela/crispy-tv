@@ -349,6 +349,7 @@ internal fun HomeRailCard(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun HomeRailActionBottomSheet(
     title: String,
     subtitle: String,

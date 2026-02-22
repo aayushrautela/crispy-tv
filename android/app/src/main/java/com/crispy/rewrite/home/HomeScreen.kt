@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
@@ -38,6 +39,7 @@ import com.crispy.rewrite.ui.components.StandardTopAppBar
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeScreen(
     onHeroClick: (HomeHeroItem) -> Unit,
