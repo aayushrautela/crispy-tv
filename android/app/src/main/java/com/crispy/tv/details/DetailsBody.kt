@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,8 +18,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
@@ -26,7 +30,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -40,6 +49,7 @@ import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.tmdb.TmdbCastMember
 import com.crispy.tv.metadata.tmdb.TmdbProductionEntity
+import com.crispy.tv.metadata.tmdb.TmdbReview
 import com.crispy.tv.metadata.tmdb.TmdbTrailer
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -54,11 +64,40 @@ internal fun DetailsBody(
     val details = uiState.details
     val tmdb = uiState.tmdbEnrichment
     val horizontalPadding = responsivePageHorizontalPadding()
+    val contentPadding = PaddingValues(horizontal = horizontalPadding)
+
+    var expandedReview by remember { mutableStateOf<TmdbReview?>(null) }
+    expandedReview?.let { review ->
+        AlertDialog(
+            onDismissRequest = { expandedReview = null },
+            title = { Text(review.author) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    review.rating?.let {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD54F)
+                            )
+                            Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                    Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { expandedReview = null }) { Text("Close") }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = horizontalPadding)
             .padding(bottom = Dimensions.PageBottomPadding)
     ) {
         Spacer(modifier = Modifier.height(18.dp))
@@ -66,6 +105,7 @@ internal fun DetailsBody(
         if (details == null) {
             if (uiState.isLoading) {
                 Row(
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -73,9 +113,17 @@ internal fun DetailsBody(
                     Text(uiState.statusMessage.ifBlank { "Loading..." })
                 }
             } else {
-                Text(uiState.statusMessage.ifBlank { "Unable to load details." })
+                Text(
+                    text = uiState.statusMessage.ifBlank { "Unable to load details." },
+                    modifier = Modifier.padding(horizontal = horizontalPadding)
+                )
                 Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = onRetry) { Text("Retry") }
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.padding(horizontal = horizontalPadding)
+                ) {
+                    Text("Retry")
+                }
             }
             return
         }
@@ -85,14 +133,16 @@ internal fun DetailsBody(
             if (details.directors.isNotEmpty()) {
                 Text(
                     text = "Director: ${details.directors.joinToString()}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = horizontalPadding)
                 )
             }
             if (details.creators.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Creator: ${details.creators.joinToString()}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = horizontalPadding)
                 )
             }
         }
@@ -100,6 +150,7 @@ internal fun DetailsBody(
         if (uiState.tmdbIsLoading) {
             Spacer(modifier = Modifier.height(18.dp))
             Row(
+                modifier = Modifier.padding(horizontal = horizontalPadding),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -111,18 +162,32 @@ internal fun DetailsBody(
         val tmdbCast = tmdb?.cast.orEmpty()
         if (tmdbCast.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
-            Text("Cast", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Cast",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
             Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(items = tmdbCast, key = { it.id }) { member ->
                     TmdbCastCard(member = member)
                 }
             }
         } else if (details.cast.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
-            Text("Cast", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Cast",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
             Spacer(modifier = Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(details.cast.take(24)) { name ->
                     AssistChip(onClick = { }, label = { Text(name) })
                 }
@@ -132,11 +197,41 @@ internal fun DetailsBody(
         val trailers = tmdb?.trailers.orEmpty()
         if (trailers.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
-            Text("Trailers", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Trailers",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
             Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(items = trailers, key = { it.id }) { trailer ->
                     TmdbTrailerCard(trailer = trailer, modifier = Modifier.width(280.dp))
+                }
+            }
+        }
+
+        val reviews = tmdb?.reviews.orEmpty()
+        if (reviews.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text(
+                text = "Reviews",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(items = reviews, key = { it.id }) { review ->
+                    TmdbReviewCard(
+                        review = review,
+                        modifier = Modifier.width(280.dp),
+                        onClick = { expandedReview = review }
+                    )
                 }
             }
         }
@@ -144,9 +239,16 @@ internal fun DetailsBody(
         val production = tmdb?.production.orEmpty()
         if (production.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
-            Text("Production", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Production",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
             Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(items = production, key = { it.id }) { entity ->
                     TmdbProductionCard(entity = entity)
                 }
@@ -157,20 +259,28 @@ internal fun DetailsBody(
         val facts = if (tmdb != null && titleDetails != null) tmdbFacts(tmdb, titleDetails) else emptyList()
         if (facts.isNotEmpty() || titleDetails?.tagline?.isNotBlank() == true) {
             Spacer(modifier = Modifier.height(18.dp))
-            Text("Details", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Details",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
 
             titleDetails?.tagline?.takeIf { it.isNotBlank() }?.let { tagline ->
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = tagline,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = horizontalPadding)
                 )
             }
 
             if (facts.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(facts) { fact ->
                         AssistChip(onClick = { }, label = { Text(fact) })
                     }
@@ -180,17 +290,25 @@ internal fun DetailsBody(
 
         tmdb?.collection?.takeIf { it.parts.isNotEmpty() }?.let { collection ->
             Spacer(modifier = Modifier.height(18.dp))
-            Text("Collection", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Collection",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = collection.name,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = horizontalPadding),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(items = collection.parts, key = { it.id }) { item ->
                     HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id) })
                 }
@@ -200,9 +318,16 @@ internal fun DetailsBody(
         val similar = tmdb?.similar.orEmpty()
         if (similar.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
-            Text("Similar", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Similar",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
             Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(items = similar, key = { it.id }) { item ->
                     HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id) })
                 }
@@ -211,13 +336,20 @@ internal fun DetailsBody(
 
         if (details.mediaType == "series" && details.videos.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
-            Text("Episodes", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Episodes",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
 
             val seasons = uiState.seasons
             val selectedSeason = uiState.selectedSeasonOrFirst
             if (seasons.isNotEmpty() && selectedSeason != null) {
                 Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(seasons) { season ->
                         FilterChip(
                             selected = season == selectedSeason,
@@ -234,7 +366,10 @@ internal fun DetailsBody(
                         .take(50)
 
                 Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     items(items = episodes, key = { it.id }) { video ->
                         EpisodeCard(
                             video = video,
@@ -434,11 +569,85 @@ private fun TmdbProductionCard(
 }
 
 @Composable
+private fun TmdbReviewCard(
+    review: TmdbReview,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = modifier,
+        onClick = onClick,
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = review.author,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                review.rating?.let {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD54F),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "${it.toInt()}/10",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = review.content.replace("\n", " ").trim(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            review.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
+                Text(
+                    text = createdAt.take(10),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun EpisodeCard(
     video: MediaVideo,
     modifier: Modifier = Modifier
 ) {
-    ElevatedCard(modifier = modifier) {
+    ElevatedCard(
+        modifier = modifier,
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+    ) {
         Column {
             Box(
                 modifier = Modifier

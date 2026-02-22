@@ -27,6 +27,8 @@ fun DetailsRoute(
         onItemClick = onItemClick,
         onRetry = viewModel::reload,
         onSeasonSelected = viewModel::onSeasonSelected,
-        onToggleWatchlist = viewModel::toggleWatchlist
+        onToggleWatchlist = viewModel::toggleWatchlist,
+        onToggleWatched = viewModel::toggleWatched,
+        onSetRating = viewModel::setRating
     )
 }

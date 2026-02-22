@@ -12,12 +12,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
@@ -39,19 +49,79 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import kotlin.math.roundToInt
 
 @Composable
 internal fun HeaderInfoSection(
     details: MediaDetails?,
+    trailerUrl: String?,
     isInWatchlist: Boolean,
+    isWatched: Boolean,
+    isRated: Boolean,
+    userRating: Int?,
     isMutating: Boolean,
     palette: DetailsPaletteColors,
     onToggleWatchlist: () -> Unit,
+    onToggleWatched: () -> Unit,
+    onSetRating: (Int?) -> Unit,
 ) {
     if (details == null) return
 
     val horizontalPadding = responsivePageHorizontalPadding()
     val genre = details.genres.firstOrNull()?.trim().orEmpty()
+    val uriHandler = LocalUriHandler.current
+
+    var showRatingDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingRating by rememberSaveable { mutableStateOf(0f) }
+
+    if (showRatingDialog) {
+        AlertDialog(
+            onDismissRequest = { showRatingDialog = false },
+            title = { Text("Rate") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = if (pendingRating.roundToInt() == 0) "No rating" else "${pendingRating.roundToInt()}/10",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Slider(
+                        value = pendingRating,
+                        onValueChange = { pendingRating = it },
+                        valueRange = 0f..10f,
+                        steps = 9
+                    )
+
+                    TextButton(
+                        onClick = {
+                            onSetRating(null)
+                            showRatingDialog = false
+                        },
+                        enabled = pendingRating.roundToInt() != 0
+                    ) {
+                        Text("Clear")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val ratingInt = pendingRating.roundToInt().coerceIn(0, 10)
+                        onSetRating(if (ratingInt == 0) null else ratingInt)
+                        showRatingDialog = false
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showRatingDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -78,11 +148,43 @@ internal fun HeaderInfoSection(
             placeholderColor = palette.onPageBackground.copy(alpha = 0.7f)
         )
 
+        if (!trailerUrl.isNullOrBlank()) {
+            FilledTonalButton(
+                onClick = { uriHandler.openUri(trailerUrl) },
+                enabled = !isMutating,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = palette.pillBackground,
+                        contentColor = palette.onPillBackground
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.size(10.dp))
+                Text("Watch trailer")
+            }
+        }
+
         DetailsQuickActionsRow(
             palette = palette,
             enabled = !isMutating,
             isInWatchlist = isInWatchlist,
-            onToggleWatchlist = onToggleWatchlist
+            isWatched = isWatched,
+            showWatched = details.mediaType != "series",
+            isRated = isRated,
+            userRating = userRating,
+            onToggleWatchlist = onToggleWatchlist,
+            onToggleWatched = onToggleWatched,
+            onRate = {
+                pendingRating = (userRating ?: 0).toFloat()
+                showRatingDialog = true
+            }
         )
 
         Spacer(modifier = Modifier.height(2.dp))
@@ -94,7 +196,13 @@ private fun DetailsQuickActionsRow(
     palette: DetailsPaletteColors,
     enabled: Boolean,
     isInWatchlist: Boolean,
+    isWatched: Boolean,
+    showWatched: Boolean,
+    isRated: Boolean,
+    userRating: Int?,
     onToggleWatchlist: () -> Unit,
+    onToggleWatched: () -> Unit,
+    onRate: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -111,6 +219,28 @@ private fun DetailsQuickActionsRow(
             icon = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
             onClick = onToggleWatchlist
         )
+
+        if (showWatched) {
+            DetailsQuickAction(
+                label = "Watched",
+                selected = isWatched,
+                enabled = enabled,
+                palette = palette,
+                icon = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                onClick = onToggleWatched
+            )
+        }
+
+        val gold = Color(0xFFFFD700)
+        DetailsQuickAction(
+            label = if (isRated) (userRating?.let { "Rated $it" } ?: "Rated") else "Rate",
+            selected = isRated,
+            enabled = enabled,
+            palette = palette,
+            selectedAccent = gold,
+            icon = if (isRated) Icons.Filled.Star else Icons.Outlined.StarBorder,
+            onClick = onRate
+        )
     }
 }
 
@@ -120,11 +250,13 @@ private fun DetailsQuickAction(
     selected: Boolean,
     enabled: Boolean,
     palette: DetailsPaletteColors,
+    selectedAccent: Color? = null,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    val container = if (selected) lerp(palette.pillBackground, palette.accent, 0.28f) else palette.pillBackground
-    val iconTint = if (selected) palette.accent else palette.onPillBackground.copy(alpha = 0.92f)
+    val accent = selectedAccent ?: palette.accent
+    val container = if (selected) lerp(palette.pillBackground, accent, 0.28f) else palette.pillBackground
+    val iconTint = if (selected) accent else palette.onPillBackground.copy(alpha = 0.92f)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -133,7 +265,7 @@ private fun DetailsQuickAction(
     ) {
         Surface(
             modifier = Modifier
-                .size(52.dp)
+                .size(48.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
                 .clickable(enabled = enabled) { onClick() },
             color = container,

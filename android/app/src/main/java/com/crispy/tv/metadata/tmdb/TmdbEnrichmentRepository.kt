@@ -41,6 +41,7 @@ class TmdbEnrichmentRepository(
 
         val creditsJson = detailsJson.optJSONObject("credits")
         val videosJson = detailsJson.optJSONObject("videos")
+        val reviewsJson = detailsJson.optJSONObject("reviews")
 
         val collectionId =
             if (mediaType == MetadataLabMediaType.MOVIE) {
@@ -59,6 +60,7 @@ class TmdbEnrichmentRepository(
         val cast = parseCast(creditsJson)
         val production = parseProduction(detailsJson, mediaType)
         val trailers = parseTrailers(videosJson)
+        val reviews = parseReviews(reviewsJson)
 
         val (similar, collection) =
             coroutineScope {
@@ -87,6 +89,7 @@ class TmdbEnrichmentRepository(
                 cast = cast,
                 production = production,
                 trailers = trailers,
+                reviews = reviews,
                 similar = similar,
                 collection = collection,
                 titleDetails = titleDetails
@@ -108,8 +111,8 @@ class TmdbEnrichmentRepository(
         val path = "${mediaType.pathSegment()}/$tmdbId"
         val append =
             when (mediaType) {
-                MetadataLabMediaType.MOVIE -> "credits,videos"
-                MetadataLabMediaType.SERIES -> "credits,videos,external_ids"
+                MetadataLabMediaType.MOVIE -> "credits,videos,reviews"
+                MetadataLabMediaType.SERIES -> "credits,videos,reviews,external_ids"
             }
         return client.getJson(
             path = path,
@@ -153,6 +156,27 @@ class TmdbEnrichmentRepository(
                 rating = item.optDoubleOrNull("vote_average")?.formatVoteAverage()
             )
         }
+    }
+
+    private fun parseReviews(reviews: JSONObject?): List<TmdbReview> {
+        val results = reviews?.optJSONArray("results") ?: return emptyList()
+        return results
+            .toJsonObjectList()
+            .mapNotNull { item ->
+                val id = item.optStringNonBlank("id") ?: return@mapNotNull null
+                val author = item.optStringNonBlank("author") ?: "Unknown"
+                val rating = item.optJSONObject("author_details")?.optDoubleOrNull("rating")
+                val content = item.optStringNonBlank("content") ?: return@mapNotNull null
+                val createdAt = item.optStringNonBlank("created_at")
+                TmdbReview(
+                    id = id,
+                    author = author,
+                    rating = rating,
+                    content = content,
+                    createdAt = createdAt
+                )
+            }
+            .take(12)
     }
 
     private suspend fun fetchCollection(

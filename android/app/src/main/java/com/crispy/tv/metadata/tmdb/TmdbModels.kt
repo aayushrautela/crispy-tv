@@ -27,6 +27,14 @@ data class TmdbTrailer(
     val watchUrl: String?
 )
 
+data class TmdbReview(
+    val id: String,
+    val author: String,
+    val rating: Double?,
+    val content: String,
+    val createdAt: String?
+)
+
 sealed interface TmdbTitleDetails {
     val status: String?
     val originalLanguage: String?
@@ -73,6 +81,7 @@ data class TmdbEnrichment(
     val cast: List<TmdbCastMember>,
     val production: List<TmdbProductionEntity>,
     val trailers: List<TmdbTrailer>,
+    val reviews: List<TmdbReview> = emptyList(),
     val similar: List<CatalogItem>,
     val collection: TmdbCollection?,
     val titleDetails: TmdbTitleDetails?
