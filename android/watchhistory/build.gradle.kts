@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.crispy.rewrite.watchhistory"
+    namespace = "com.crispy.tv.watchhistory"
     compileSdk = 35
 
     defaultConfig {

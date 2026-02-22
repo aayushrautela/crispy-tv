@@ -58,11 +58,11 @@ val metadataAddonUrls = "stremio://v3-cinemeta.strem.io/manifest.json"
     .replace("\"", "\\\"")
 
 android {
-    namespace = "com.crispy.rewrite"
+    namespace = "com.crispy.tv"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.crispy.rewrite"
+        applicationId = "com.crispy.tv"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

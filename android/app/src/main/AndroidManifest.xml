@@ -11,12 +11,14 @@
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config"
         android:usesCleartextTraffic="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.CrispyRewrite">
         <activity
-            android:name=".MainActivity"
+            android:name="com.crispy.tv.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

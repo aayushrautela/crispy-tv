@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.crispy.rewrite.tv"
+    namespace = "com.crispy.tv.tv"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.crispy.rewrite.tv"
+        applicationId = "com.crispy.tv.tv"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

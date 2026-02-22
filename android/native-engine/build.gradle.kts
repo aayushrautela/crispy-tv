@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.crispy.rewrite.nativeengine"
+    namespace = "com.crispy.tv.nativeengine"
     compileSdk = 35
 
     defaultConfig {

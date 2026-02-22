@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.crispy.rewrite.network"
+    namespace = "com.crispy.tv.network"
     compileSdk = 35
 
     defaultConfig {
