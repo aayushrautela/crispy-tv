@@ -17,6 +17,10 @@ jobs:
       ORG_GRADLE_PROJECT_SIMKL_REDIRECT_URI: ${{ secrets.SIMKL_REDIRECT_URI != '' && secrets.SIMKL_REDIRECT_URI || 'crispy://auth/simkl' }}
       ORG_GRADLE_PROJECT_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       ORG_GRADLE_PROJECT_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/.keystores/crispy-debug-key.jks
+      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+      ORG_GRADLE_PROJECT_DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+      ORG_GRADLE_PROJECT_DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -56,6 +60,15 @@ jobs:
         run: |
           chmod +x .github/scripts/fetch-torrserver-binaries.sh
           .github/scripts/fetch-torrserver-binaries.sh
+
+      - name: Decode Android debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.keystores"
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/.keystores/crispy-debug-key.jks"
+          fi
 
       - name: Run JVM contract tests
         run: gradle :android:contract-tests:test
