@@ -2,7 +2,6 @@ package com.crispy.rewrite.watchhistory.simkl
 
 import android.net.Uri
 import android.util.Log
-import com.crispy.rewrite.BuildConfig
 import com.crispy.rewrite.watchhistory.SIMKL_API_BASE
 import com.crispy.rewrite.watchhistory.SIMKL_APP_NAME
 import com.crispy.rewrite.watchhistory.SIMKL_AUTHORIZE_BASE
@@ -16,7 +15,7 @@ internal class SimklApi(
     private val simklClientSecret: String,
     private val simklRedirectUri: String,
     private val appName: String = SIMKL_APP_NAME,
-    private val appVersion: String = BuildConfig.VERSION_NAME.trim().ifEmpty { "dev" },
+    private val appVersion: String = "dev",
     private val logTag: String = "SimklApi"
 ) {
     fun userAgent(): String = "$appName/$appVersion"

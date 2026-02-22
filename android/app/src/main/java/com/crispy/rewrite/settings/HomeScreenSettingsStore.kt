@@ -28,6 +28,14 @@ internal class HomeScreenSettingsStore(context: Context) {
         prefs.edit().putString(KEY_STATE, toJson(state).toString()).apply()
     }
 
+    fun setWatchDataSource(provider: WatchProvider) {
+        val current = load()
+        if (current.watchDataSource == provider) {
+            return
+        }
+        save(current.copy(watchDataSource = provider))
+    }
+
     private fun toJson(state: HomeScreenSettingsPreferences): JSONObject {
         return JSONObject()
             .put("show_rating_badges", state.showRatingBadges)

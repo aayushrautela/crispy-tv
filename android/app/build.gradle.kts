@@ -127,6 +127,7 @@ dependencies {
     implementation(project(":android:player"))
     implementation(project(":android:native-engine"))
     implementation(project(":android:network"))
+    implementation(project(":android:watchhistory"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")

@@ -7,6 +7,7 @@ import com.crispy.rewrite.introskip.RemoteIntroSkipService
 import com.crispy.rewrite.metadata.RemoteMetadataLabDataSource
 import com.crispy.rewrite.metadata.RemoteSupabaseSyncLabService
 import com.crispy.rewrite.watchhistory.RemoteWatchHistoryService
+import com.crispy.rewrite.watchhistory.WatchHistoryConfig
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackController
 import com.crispy.rewrite.nativeengine.playback.NativePlaybackEvent
@@ -68,10 +69,14 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
         httpClient = AppHttp.client(appContext),
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
         simklClientId = BuildConfig.SIMKL_CLIENT_ID,
-        traktClientSecret = BuildConfig.TRAKT_CLIENT_SECRET,
-        traktRedirectUri = BuildConfig.TRAKT_REDIRECT_URI,
-        simklClientSecret = BuildConfig.SIMKL_CLIENT_SECRET,
-        simklRedirectUri = BuildConfig.SIMKL_REDIRECT_URI
+        config =
+            WatchHistoryConfig(
+                traktClientSecret = BuildConfig.TRAKT_CLIENT_SECRET,
+                traktRedirectUri = BuildConfig.TRAKT_REDIRECT_URI,
+                simklClientSecret = BuildConfig.SIMKL_CLIENT_SECRET,
+                simklRedirectUri = BuildConfig.SIMKL_REDIRECT_URI,
+                appVersion = BuildConfig.VERSION_NAME,
+            )
     )
 }
 
