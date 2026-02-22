@@ -5,6 +5,7 @@ struct CrispyRewriteiOSApp: App {
     var body: some Scene {
         WindowGroup {
             CrispyRewriteiOSHomeView()
+                .preferredColorScheme(.dark)
         }
     }
 }

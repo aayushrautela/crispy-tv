@@ -5,12 +5,12 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.WindowCompat
 import com.crispy.tv.oauth.OAuthCallbackHandler
 import com.crispy.tv.startup.AppStartup
@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         super.onCreate(savedInstanceState)
 
         configureEdgeToEdge()
@@ -31,9 +32,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CrispyRewriteTheme {
-                val isDark = isSystemInDarkTheme()
-                DisposableEffect(isDark) {
-                    configureSystemBars(isDark)
+                DisposableEffect(Unit) {
+                    configureSystemBars(isDark = true)
                     onDispose { }
                 }
                 Surface(
