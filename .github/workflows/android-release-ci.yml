@@ -17,11 +17,11 @@ jobs:
       ORG_GRADLE_PROJECT_SIMKL_REDIRECT_URI: ${{ secrets.SIMKL_REDIRECT_URI != '' && secrets.SIMKL_REDIRECT_URI || 'crispy://auth/simkl' }}
       ORG_GRADLE_PROJECT_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       ORG_GRADLE_PROJECT_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      ORG_GRADLE_PROJECT_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/crispy-release-key.jks
+      ORG_GRADLE_PROJECT_RELEASE_KEYSTORE_PATH: ${{ github.workspace }}/.keystores/crispy-release-key.jks
       ORG_GRADLE_PROJECT_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
       ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
       ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PATH: ${{ runner.temp }}/crispy-debug-key.jks
+      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/.keystores/crispy-debug-key.jks
       ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
       ORG_GRADLE_PROJECT_DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
       ORG_GRADLE_PROJECT_DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
@@ -70,11 +70,12 @@ jobs:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         run: |
+          mkdir -p "$GITHUB_WORKSPACE/.keystores"
           if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/crispy-release-key.jks"
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/.keystores/crispy-release-key.jks"
           fi
           if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
-            printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/crispy-debug-key.jks"
+            printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/.keystores/crispy-debug-key.jks"
           fi
 
       - name: Run JVM contract tests
