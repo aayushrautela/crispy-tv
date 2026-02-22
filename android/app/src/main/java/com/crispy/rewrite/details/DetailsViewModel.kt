@@ -10,6 +10,8 @@ import com.crispy.rewrite.domain.metadata.normalizeNuvioMediaId
 import com.crispy.rewrite.home.HomeCatalogService
 import com.crispy.rewrite.home.MediaDetails
 import com.crispy.rewrite.metadata.TmdbImdbIdResolver
+import com.crispy.rewrite.metadata.tmdb.TmdbEnrichment
+import com.crispy.rewrite.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.rewrite.network.AppHttp
 import com.crispy.rewrite.player.MetadataLabMediaType
 import com.crispy.rewrite.player.WatchHistoryService
@@ -28,6 +30,8 @@ data class DetailsUiState(
     val itemId: String,
     val isLoading: Boolean = true,
     val details: MediaDetails? = null,
+    val tmdbIsLoading: Boolean = false,
+    val tmdbEnrichment: TmdbEnrichment? = null,
     val statusMessage: String = "",
     val isWatched: Boolean = false,
     val isInWatchlist: Boolean = false,
@@ -48,7 +52,8 @@ class DetailsViewModel internal constructor(
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryService,
     private val settingsStore: HomeScreenSettingsStore,
-    private val tmdbImdbIdResolver: TmdbImdbIdResolver
+    private val tmdbImdbIdResolver: TmdbImdbIdResolver,
+    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
@@ -58,19 +63,105 @@ class DetailsViewModel internal constructor(
         reload()
     }
 
+    private fun mergeDetails(
+        addon: MediaDetails,
+        tmdbFallback: MediaDetails,
+        tmdb: TmdbEnrichment?
+    ): MediaDetails {
+        fun String?.nullIfBlank(): String? = this?.trim()?.takeIf { it.isNotBlank() }
+
+        var out = addon
+        val tmdbCastNames = tmdb?.cast?.map { it.name }?.distinct().orEmpty()
+
+        if (out.imdbId.nullIfBlank() == null) {
+            out = out.copy(imdbId = tmdbFallback.imdbId ?: tmdb?.imdbId)
+        }
+        if (out.posterUrl.nullIfBlank() == null) {
+            out = out.copy(posterUrl = tmdbFallback.posterUrl)
+        }
+        if (out.backdropUrl.nullIfBlank() == null) {
+            out = out.copy(backdropUrl = tmdbFallback.backdropUrl)
+        }
+        if (out.description.nullIfBlank() == null) {
+            out = out.copy(description = tmdbFallback.description)
+        }
+        if (out.genres.isEmpty() && tmdbFallback.genres.isNotEmpty()) {
+            out = out.copy(genres = tmdbFallback.genres)
+        }
+        if (out.year.nullIfBlank() == null) {
+            out = out.copy(year = tmdbFallback.year)
+        }
+        if (out.runtime.nullIfBlank() == null) {
+            out = out.copy(runtime = tmdbFallback.runtime)
+        }
+        if (out.rating.nullIfBlank() == null) {
+            out = out.copy(rating = tmdbFallback.rating)
+        }
+        if (out.cast.isEmpty()) {
+            out =
+                when {
+                    tmdbCastNames.isNotEmpty() -> out.copy(cast = tmdbCastNames.take(24))
+                    tmdbFallback.cast.isNotEmpty() -> out.copy(cast = tmdbFallback.cast)
+                    else -> out
+                }
+        }
+        if (out.directors.isEmpty() && tmdbFallback.directors.isNotEmpty()) {
+            out = out.copy(directors = tmdbFallback.directors)
+        }
+        if (out.creators.isEmpty() && tmdbFallback.creators.isNotEmpty()) {
+            out = out.copy(creators = tmdbFallback.creators)
+        }
+
+        return out
+    }
+
     fun reload() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, statusMessage = "Loading...") }
+            _uiState.update { it.copy(isLoading = true, tmdbIsLoading = true, statusMessage = "Loading...") }
 
-            val result =
+            val addonResult =
                 withContext(Dispatchers.IO) {
                     homeCatalogService.loadMediaDetails(rawId = itemId)
                 }
 
+            val addonDetails = addonResult.details
+            val mediaTypeHint = addonDetails?.mediaType?.toMetadataLabMediaTypeOrNull()
+
+            val tmdbResult =
+                withContext(Dispatchers.IO) {
+                    tmdbEnrichmentRepository.load(rawId = itemId, mediaTypeHint = mediaTypeHint)
+                }
+
+            val tmdbEnrichment = tmdbResult?.enrichment
+            val tmdbFallbackDetails = tmdbResult?.fallbackDetails
+
+            var mergedDetails: MediaDetails? =
+                when {
+                    addonDetails != null && tmdbFallbackDetails != null ->
+                        mergeDetails(addonDetails, tmdbFallbackDetails, tmdbEnrichment)
+                    addonDetails != null -> addonDetails
+                    tmdbFallbackDetails != null -> tmdbFallbackDetails
+                    else -> null
+                }
+
+            mergedDetails =
+                withContext(Dispatchers.IO) {
+                    mergedDetails?.let { details ->
+                        if (details.imdbId == null && tmdbEnrichment?.imdbId != null) {
+                            details.copy(imdbId = tmdbEnrichment.imdbId)
+                        } else {
+                            details
+                        }
+                    }
+                }
+
             val enrichedDetails =
                 withContext(Dispatchers.IO) {
-                    result.details?.let { ensureImdbId(it) }
+                    mergedDetails?.let { details ->
+                        if (details.imdbId == null) ensureImdbId(details) else details
+                    }
                 }
+
             val providerState =
                 withContext(Dispatchers.IO) {
                     resolveProviderState(enrichedDetails)
@@ -79,10 +170,18 @@ class DetailsViewModel internal constructor(
             _uiState.update { state ->
                 val details = enrichedDetails
                 val firstSeason = details?.videos?.mapNotNull { it.season }?.distinct()?.minOrNull()
+                val statusMessage =
+                    when {
+                        addonResult.details != null -> addonResult.statusMessage
+                        details != null && tmdbResult != null -> "Loaded from TMDB."
+                        else -> addonResult.statusMessage
+                    }
                 state.copy(
                     isLoading = false,
+                    tmdbIsLoading = false,
                     details = details,
-                    statusMessage = result.statusMessage,
+                    tmdbEnrichment = tmdbEnrichment,
+                    statusMessage = statusMessage,
                     isWatched = providerState.isWatched,
                     isInWatchlist = providerState.isInWatchlist,
                     isRated = providerState.isRated,
@@ -414,12 +513,18 @@ class DetailsViewModel internal constructor(
                             apiKey = BuildConfig.TMDB_API_KEY,
                             httpClient = httpClient
                         )
+                    val tmdbEnrichmentRepository =
+                        TmdbEnrichmentRepository(
+                            apiKey = BuildConfig.TMDB_API_KEY,
+                            httpClient = httpClient
+                        )
                     return DetailsViewModel(
                         itemId = itemId,
                         homeCatalogService = homeCatalogService,
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                         settingsStore = HomeScreenSettingsStore(appContext),
-                        tmdbImdbIdResolver = tmdbImdbIdResolver
+                        tmdbImdbIdResolver = tmdbImdbIdResolver,
+                        tmdbEnrichmentRepository = tmdbEnrichmentRepository
                     ) as T
                 }
             }

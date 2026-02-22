@@ -66,6 +66,10 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         arguments = listOf(navArgument(AppRoutes.HomeDetailsItemIdArg) { type = NavType.StringType })
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
-        DetailsRoute(itemId = itemId, onBack = { navController.popBackStack() })
+        DetailsRoute(
+            itemId = itemId,
+            onBack = { navController.popBackStack() },
+            onItemClick = { nextId -> navController.navigate(AppRoutes.homeDetailsRoute(nextId)) }
+        )
     }
 }

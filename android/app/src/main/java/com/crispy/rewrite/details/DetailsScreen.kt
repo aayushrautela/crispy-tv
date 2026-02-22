@@ -41,7 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -65,8 +64,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.drawable.toBitmap
@@ -80,12 +85,21 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import com.crispy.rewrite.home.HomeCatalogPosterCard
 import com.crispy.rewrite.home.MediaDetails
 import com.crispy.rewrite.home.MediaVideo
+import com.crispy.rewrite.metadata.tmdb.TmdbCastMember
+import com.crispy.rewrite.metadata.tmdb.TmdbEnrichment
+import com.crispy.rewrite.metadata.tmdb.TmdbMovieDetails
+import com.crispy.rewrite.metadata.tmdb.TmdbProductionEntity
+import com.crispy.rewrite.metadata.tmdb.TmdbTitleDetails
+import com.crispy.rewrite.metadata.tmdb.TmdbTvDetails
+import com.crispy.rewrite.metadata.tmdb.TmdbTrailer
 import com.crispy.rewrite.ui.theme.Dimensions
 import com.crispy.rewrite.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 private const val SampleTrailerUrl =
     "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4"
@@ -103,7 +117,8 @@ private data class DetailsPaletteColors(
 @Composable
 fun DetailsRoute(
     itemId: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onItemClick: (String) -> Unit = {}
 ) {
     val appContext = LocalContext.current.applicationContext
     val viewModel: DetailsViewModel =
@@ -116,6 +131,7 @@ fun DetailsRoute(
     DetailsScreen(
         uiState = uiState,
         onBack = onBack,
+        onItemClick = onItemClick,
         onRetry = viewModel::reload,
         onSeasonSelected = viewModel::onSeasonSelected,
         onToggleWatchlist = viewModel::toggleWatchlist
@@ -126,6 +142,7 @@ fun DetailsRoute(
 private fun DetailsScreen(
     uiState: DetailsUiState,
     onBack: () -> Unit,
+    onItemClick: (String) -> Unit,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onToggleWatchlist: () -> Unit
@@ -189,7 +206,8 @@ private fun DetailsScreen(
                     DetailsBody(
                         uiState = uiState,
                         onRetry = onRetry,
-                        onSeasonSelected = onSeasonSelected
+                        onSeasonSelected = onSeasonSelected,
+                        onItemClick = onItemClick
                     )
                 }
             }
@@ -307,7 +325,8 @@ private fun HeroSection(
 
             Surface(
                 modifier = Modifier
-                    .align(Alignment.Center)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 160.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
                     .clickable { isTrailerPlaying = true },
                 color = Color.Black.copy(alpha = 0.34f),
@@ -329,10 +348,11 @@ private fun HeroSection(
 
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
+                    .align(Alignment.BottomCenter)
                     .padding(horizontal = horizontalPadding)
-                    .padding(bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val logoUrl = details.logoUrl?.trim().orEmpty()
                 if (logoUrl.isNotBlank()) {
@@ -343,7 +363,7 @@ private fun HeroSection(
                             .fillMaxWidth(0.84f)
                             .height(110.dp),
                         contentScale = ContentScale.Fit,
-                        alignment = Alignment.CenterStart
+                        alignment = Alignment.Center
                     )
                 } else {
                     Text(
@@ -351,7 +371,8 @@ private fun HeroSection(
                         style = MaterialTheme.typography.headlineLarge,
                         color = Color.White,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -564,20 +585,6 @@ private fun HeaderMetaRow(
                 color = palette.onPageBackground.copy(alpha = 0.86f)
             )
         }
-
-        if (isWatched) {
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = palette.pillBackground,
-                contentColor = palette.onPillBackground
-            ) {
-                Text(
-                    text = "Watched",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-        }
     }
 }
 
@@ -636,9 +643,11 @@ private fun TrailerPlayer(
 private fun DetailsBody(
     uiState: DetailsUiState,
     onRetry: () -> Unit,
-    onSeasonSelected: (Int) -> Unit
+    onSeasonSelected: (Int) -> Unit,
+    onItemClick: (String) -> Unit
 ) {
     val details = uiState.details
+    val tmdb = uiState.tmdbEnrichment
     val horizontalPadding = responsivePageHorizontalPadding()
 
     Column(
@@ -683,13 +692,114 @@ private fun DetailsBody(
             }
         }
 
-        if (details.cast.isNotEmpty()) {
+        if (uiState.tmdbIsLoading) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text("Loading extras...", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+
+        val tmdbCast = tmdb?.cast.orEmpty()
+        if (tmdbCast.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text("Cast", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(items = tmdbCast, key = { it.id }) { member ->
+                    TmdbCastCard(member = member)
+                }
+            }
+        } else if (details.cast.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text("Cast", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(details.cast.take(24)) { name ->
                     AssistChip(onClick = { }, label = { Text(name) })
+                }
+            }
+        }
+
+        val trailers = tmdb?.trailers.orEmpty()
+        if (trailers.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text("Trailers", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(items = trailers, key = { it.id }) { trailer ->
+                    TmdbTrailerCard(trailer = trailer, modifier = Modifier.width(280.dp))
+                }
+            }
+        }
+
+        val production = tmdb?.production.orEmpty()
+        if (production.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text("Production", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(items = production, key = { it.id }) { entity ->
+                    TmdbProductionCard(entity = entity)
+                }
+            }
+        }
+
+        val titleDetails = tmdb?.titleDetails
+        val facts = if (tmdb != null && titleDetails != null) tmdbFacts(tmdb, titleDetails) else emptyList()
+        if (facts.isNotEmpty() || titleDetails?.tagline?.isNotBlank() == true) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text("Details", style = MaterialTheme.typography.titleMedium)
+
+            titleDetails?.tagline?.takeIf { it.isNotBlank() }?.let { tagline ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = tagline,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (facts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(facts) { fact ->
+                        AssistChip(onClick = { }, label = { Text(fact) })
+                    }
+                }
+            }
+        }
+
+        tmdb?.collection?.takeIf { it.parts.isNotEmpty() }?.let { collection ->
+            Spacer(modifier = Modifier.height(18.dp))
+            Text("Collection", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = collection.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(items = collection.parts, key = { it.id }) { item ->
+                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id) })
+                }
+            }
+        }
+
+        val similar = tmdb?.similar.orEmpty()
+        if (similar.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text("Similar", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(items = similar, key = { it.id }) { item ->
+                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id) })
                 }
             }
         }
@@ -738,6 +848,254 @@ private fun DetailsBody(
 }
 
 @Composable
+private fun TmdbCastCard(
+    member: TmdbCastMember,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier.width(124.dp),
+        onClick = { }
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+            ) {
+                val profileUrl = member.profileUrl?.trim().orEmpty()
+                if (profileUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = profileUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.55f)
+                            )
+                        )
+                )
+            }
+
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = member.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                member.character?.takeIf { it.isNotBlank() }?.let { character ->
+                    Text(
+                        text = character,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TmdbTrailerCard(
+    trailer: TmdbTrailer,
+    modifier: Modifier = Modifier
+) {
+    val uriHandler = LocalUriHandler.current
+    ElevatedCard(
+        modifier = modifier,
+        onClick = { trailer.watchUrl?.let(uriHandler::openUri) }
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+            ) {
+                val thumbnail = trailer.thumbnailUrl?.trim().orEmpty()
+                if (thumbnail.isNotBlank()) {
+                    AsyncImage(
+                        model = thumbnail,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                )
+                            )
+                    )
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(44.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = Color.Black.copy(alpha = 0.35f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = trailer.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = trailer.type,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TmdbProductionCard(
+    entity: TmdbProductionEntity,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(
+        modifier = modifier.width(160.dp),
+        onClick = { }
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val logo = entity.logoUrl?.trim().orEmpty()
+                if (logo.isNotBlank()) {
+                    AsyncImage(
+                        model = logo,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.Center
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                }
+            }
+
+            Text(
+                text = entity.name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+private fun tmdbFacts(
+    tmdb: TmdbEnrichment,
+    titleDetails: TmdbTitleDetails
+): List<String> {
+    val out = ArrayList<String>(12)
+
+    tmdb.imdbId?.takeIf { it.isNotBlank() }?.let { out.add("IMDb: ${it.lowercase(Locale.US)}") }
+    titleDetails.status?.takeIf { it.isNotBlank() }?.let { out.add("Status: $it") }
+
+    when (titleDetails) {
+        is TmdbMovieDetails -> {
+            titleDetails.releaseDate?.takeIf { it.isNotBlank() }?.let { out.add("Release: $it") }
+            titleDetails.runtimeMinutes?.takeIf { it > 0 }?.let { out.add("Runtime: ${it}m") }
+            titleDetails.budget?.let { formatMoneyShort(it) }?.let { out.add("Budget: $it") }
+            titleDetails.revenue?.let { formatMoneyShort(it) }?.let { out.add("Revenue: $it") }
+        }
+
+        is TmdbTvDetails -> {
+            titleDetails.firstAirDate?.takeIf { it.isNotBlank() }?.let { out.add("First air: $it") }
+            titleDetails.lastAirDate?.takeIf { it.isNotBlank() }?.let { out.add("Last air: $it") }
+            titleDetails.numberOfSeasons?.takeIf { it > 0 }?.let { out.add("Seasons: $it") }
+            titleDetails.numberOfEpisodes?.takeIf { it > 0 }?.let { out.add("Episodes: $it") }
+            titleDetails.episodeRunTimeMinutes.firstOrNull()?.takeIf { it > 0 }?.let { out.add("Ep: ${it}m") }
+            titleDetails.type?.takeIf { it.isNotBlank() }?.let { out.add("Type: $it") }
+        }
+
+        else -> Unit
+    }
+
+    titleDetails.originalLanguage?.takeIf { it.isNotBlank() }?.let { out.add("Lang: ${it}") }
+    if (titleDetails.originCountries.isNotEmpty()) {
+        out.add("Country: ${titleDetails.originCountries.take(3).joinToString()}")
+    }
+
+    return out
+}
+
+private fun formatMoneyShort(amount: Long): String? {
+    if (amount <= 0L) return null
+    val abs = amount.toDouble()
+    val (value, suffix) =
+        when {
+            abs >= 1_000_000_000 -> abs / 1_000_000_000 to "B"
+            abs >= 1_000_000 -> abs / 1_000_000 to "M"
+            abs >= 1_000 -> abs / 1_000 to "K"
+            else -> abs to ""
+        }
+    val formatted =
+        if (value >= 10 || suffix.isEmpty()) {
+            String.format(Locale.US, "%.0f", value)
+        } else {
+            String.format(Locale.US, "%.1f", value).removeSuffix(".0")
+        }
+    return "$$formatted$suffix"
+}
+
+@Composable
 private fun ExpandableDescription(
     text: String?,
     textAlign: TextAlign = TextAlign.Start,
@@ -756,21 +1114,46 @@ private fun ExpandableDescription(
         return
     }
 
-    Column(modifier = Modifier.animateContentSize()) {
+    var textLayoutResult by remember(content) { mutableStateOf<TextLayoutResult?>(null) }
+    val displayContent = remember(content, expanded, textLayoutResult) {
+        val layout = textLayoutResult
+        if (expanded) {
+            buildAnnotatedString {
+                append(content)
+                append(" ")
+                withStyle(SpanStyle(color = textColor.copy(alpha = 0.64f), fontWeight = FontWeight.Bold)) {
+                    append("Show less")
+                }
+            }
+        } else if (layout != null && layout.hasVisualOverflow) {
+            val lineEnd = layout.getLineEnd(2, visibleOnly = true)
+            buildAnnotatedString {
+                append(content.substring(0, lineEnd).dropLast(12).trim())
+                append("... ")
+                withStyle(SpanStyle(color = textColor.copy(alpha = 0.9f), fontWeight = FontWeight.Bold)) {
+                    append("Show more")
+                }
+            }
+        } else {
+            buildAnnotatedString { append(content) }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .clickable { expanded = !expanded }
+    ) {
         Text(
-            text = content,
+            text = displayContent,
             style = MaterialTheme.typography.bodyMedium,
             color = textColor,
             textAlign = textAlign,
             maxLines = if (expanded) Int.MAX_VALUE else 3,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { if (textLayoutResult == null) textLayoutResult = it }
         )
-        TextButton(
-            onClick = { expanded = !expanded },
-            colors = ButtonDefaults.textButtonColors(contentColor = textColor.copy(alpha = 0.92f))
-        ) {
-            Text(if (expanded) "Show less" else "Show more")
-        }
     }
 }
 
