@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -395,6 +396,10 @@ private fun DiscoverScreen(
             )
         }
     ) { innerPadding ->
+        val density = LocalDensity.current
+        val heightOffsetDp = with(density) { scrollBehavior.state.heightOffset.toDp() }
+        val topContentPadding = (innerPadding.calculateTopPadding() + heightOffsetDp).coerceAtLeast(0.dp)
+
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 124.dp),
             modifier =
@@ -403,7 +408,7 @@ private fun DiscoverScreen(
 
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
-                top = Dimensions.SmallSpacing + innerPadding.calculateTopPadding(),
+                top = topContentPadding,
                 end = pageHorizontalPadding,
                 bottom = Dimensions.SmallSpacing + innerPadding.calculateBottomPadding()
             ),
@@ -411,7 +416,10 @@ private fun DiscoverScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.padding(top = Dimensions.SmallSpacing),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

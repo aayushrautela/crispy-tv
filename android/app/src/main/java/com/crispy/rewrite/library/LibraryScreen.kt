@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -318,13 +319,17 @@ private fun LibraryScreen(
             )
         }
     ) { innerPadding ->
+        val density = LocalDensity.current
+        val heightOffsetDp = with(density) { scrollBehavior.state.heightOffset.toDp() }
+        val topContentPadding = (innerPadding.calculateTopPadding() + heightOffsetDp).coerceAtLeast(0.dp)
+
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 124.dp),
             modifier = Modifier
                 .fillMaxSize(),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
-                top = 12.dp + innerPadding.calculateTopPadding(),
+                top = topContentPadding,
                 end = pageHorizontalPadding,
                 bottom = 12.dp + innerPadding.calculateBottomPadding()
             ),
@@ -332,7 +337,10 @@ private fun LibraryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    modifier = Modifier.padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     item {
                         FilterChip(
                             selected = uiState.selectedSource == LibrarySource.LOCAL,

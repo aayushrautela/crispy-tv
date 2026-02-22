@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -79,12 +80,16 @@ internal fun HomeScreen(
             )
         }
     ) { innerPadding ->
+        val density = LocalDensity.current
+        val heightOffsetDp = with(density) { scrollBehavior.state.heightOffset.toDp() }
+        val topContentPadding = (innerPadding.calculateTopPadding() + heightOffsetDp).coerceAtLeast(0.dp)
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = horizontalPadding,
                 end = horizontalPadding,
-                top = innerPadding.calculateTopPadding(),
+                top = topContentPadding,
                 bottom = innerPadding.calculateBottomPadding() + Dimensions.PageBottomPadding
             ),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
