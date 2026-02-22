@@ -1,0 +1,159 @@
+name: Android Release CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ORG_GRADLE_PROJECT_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+      ORG_GRADLE_PROJECT_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+      ORG_GRADLE_PROJECT_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+      ORG_GRADLE_PROJECT_TRAKT_REDIRECT_URI: ${{ secrets.TRAKT_REDIRECT_URI != '' && secrets.TRAKT_REDIRECT_URI || 'crispy://auth/trakt' }}
+      ORG_GRADLE_PROJECT_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+      ORG_GRADLE_PROJECT_SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
+      ORG_GRADLE_PROJECT_SIMKL_REDIRECT_URI: ${{ secrets.SIMKL_REDIRECT_URI != '' && secrets.SIMKL_REDIRECT_URI || 'crispy://auth/simkl' }}
+      ORG_GRADLE_PROJECT_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      ORG_GRADLE_PROJECT_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      ORG_GRADLE_PROJECT_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/crispy-release-key.jks
+      ORG_GRADLE_PROJECT_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PATH: ${{ runner.temp }}/crispy-debug-key.jks
+      ORG_GRADLE_PROJECT_DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+      ORG_GRADLE_PROJECT_DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+      ORG_GRADLE_PROJECT_DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install contract validation dependency
+        run: pip install jsonschema==4.23.0
+
+      - name: Validate contract fixtures
+        run: python scripts/validate_contracts.py
+
+      - name: Download TorrServer binaries
+        run: |
+          chmod +x .github/scripts/fetch-torrserver-binaries.sh
+          .github/scripts/fetch-torrserver-binaries.sh
+
+      - name: Decode Android signing keystores
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/crispy-release-key.jks"
+          fi
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/crispy-debug-key.jks"
+          fi
+
+      - name: Run JVM contract tests
+        run: gradle :android:contract-tests:test
+
+      - name: Assemble Android app and TV placeholders
+        run: gradle :android:app:assembleRelease :android:tv:assembleRelease
+
+      - name: Upload app APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispy-rewrite-app-release-universal
+          path: android/app/build/outputs/apk/release/*-universal-*.apk
+          if-no-files-found: warn
+
+      - name: Upload arm64-v8a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispy-rewrite-app-release-arm64-v8a
+          path: android/app/build/outputs/apk/release/*-arm64-v8a-*.apk
+          if-no-files-found: warn
+
+      - name: Upload armeabi-v7a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispy-rewrite-app-release-armeabi-v7a
+          path: android/app/build/outputs/apk/release/*-armeabi-v7a-*.apk
+          if-no-files-found: warn
+
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispy-rewrite-app-release-x86_64
+          path: android/app/build/outputs/apk/release/*-x86_64-*.apk
+          if-no-files-found: warn
+
+      - name: Upload TV APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispy-rewrite-tv-release
+          path: android/tv/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  apple:
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Apple project
+        run: |
+          rm -rf ios/CrispyRewriteApple.xcodeproj
+          cd ios
+          xcodegen generate --spec project.yml
+
+      - name: Build iOS placeholder target
+        run: >-
+          xcodebuild
+          -project ios/CrispyRewriteApple.xcodeproj
+          -scheme CrispyRewriteiOS
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Build tvOS placeholder target
+        run: >-
+          xcodebuild
+          -project ios/CrispyRewriteApple.xcodeproj
+          -scheme CrispyRewritetvOS
+          -sdk appletvsimulator
+          -destination 'generic/platform=tvOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Run Swift contract tests
+        run: swift test --package-path ios/ContractRunner
