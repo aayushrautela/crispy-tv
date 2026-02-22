@@ -472,7 +472,8 @@ internal fun HomeCatalogSectionRow(
         }
 
         LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(0.dp)
         ) {
             if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
                 items(10) {
@@ -554,11 +555,10 @@ internal fun HomeCatalogPosterCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White
                             )
-                        }
-                    }
                 }
             }
         }
+    }
 
         Text(
             text = item.title,
@@ -614,20 +614,14 @@ internal fun HomeHeroCarousel(
     }
     val state = rememberCarouselState(initialItem = initialIndex) { items.size }
 
-    Box(
+    HorizontalMultiBrowseCarousel(
+        state = state,
+        preferredItemWidth = 320.dp,
+        itemSpacing = 16.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .height(340.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        HorizontalMultiBrowseCarousel(
-            state = state,
-            preferredItemWidth = 320.dp,
-            itemSpacing = 16.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-        ) { index ->
+            .height(320.dp)
+    ) { index ->
             val item = items[index]
 
             Box(
