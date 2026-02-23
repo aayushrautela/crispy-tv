@@ -1,17 +1,17 @@
 package com.crispy.tv.details
 
-internal enum class WatchCtaKind {
+enum class WatchCtaKind {
     WATCH,
     CONTINUE,
     REWATCH,
 }
 
-internal enum class WatchCtaIcon {
+enum class WatchCtaIcon {
     PLAY,
     REPLAY,
 }
 
-internal data class WatchCta(
+data class WatchCta(
     val kind: WatchCtaKind = WatchCtaKind.WATCH,
     val label: String = "Watch now",
     val icon: WatchCtaIcon = WatchCtaIcon.PLAY,
