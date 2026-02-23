@@ -29,6 +29,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import com.crispy.tv.metadata.TmdbImdbIdResolver
 import java.util.Locale
 
 @Immutable
@@ -116,6 +117,7 @@ class HomeCatalogService(
     context: Context,
     addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,
+    private val tmdbImdbIdResolver: TmdbImdbIdResolver? = null,
 ) {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
@@ -440,7 +442,7 @@ class HomeCatalogService(
         }
 
         val mediaTypesToTry = buildMediaTypesToTry(preferredMediaType)
-        val lookupIds = lookupIdsForContinueWatching(requestedId)
+        val lookupIds = lookupIdsForContinueWatching(requestedId, preferredMediaType)
         if (lookupIds.isEmpty()) {
             return MediaDetailsLoadResult(statusMessage = "Missing content id.")
         }
@@ -795,7 +797,7 @@ class HomeCatalogService(
         mediaType: String,
         resolvedAddons: List<ResolvedAddon>
     ): ContinueWatchingMeta? {
-        val lookupIds = lookupIdsForContinueWatching(entry.contentId)
+        val lookupIds = lookupIdsForContinueWatching(entry.contentId, mediaType)
         if (lookupIds.isEmpty()) {
             return null
         }
@@ -1012,17 +1014,56 @@ class HomeCatalogService(
         )
     }
 
-    private fun lookupIdsForContinueWatching(contentId: String): List<String> {
+    private suspend fun lookupIdsForContinueWatching(contentId: String, mediaTypeHint: String? = null): List<String> {
         val normalized = contentId.trim()
         if (normalized.isEmpty()) {
             return emptyList()
         }
 
-        val ids = mutableListOf(normalized)
-        val parsedEpisodeMatch = EPISODE_SUFFIX_REGEX.matchEntire(normalized)
-        if (parsedEpisodeMatch != null) {
-            ids += parsedEpisodeMatch.groupValues[1]
+        // Strip episode suffix to get base content ID (e.g. "tt1234567:1:3" → "tt1234567")
+        val episodeMatch = EPISODE_SUFFIX_REGEX.matchEntire(normalized)
+        val base = episodeMatch?.groupValues?.get(1) ?: normalized
+
+        val ids = mutableListOf<String>()
+        val lowered = base.lowercase(Locale.US)
+
+        if (lowered.startsWith("tt") && lowered.length >= 4) {
+            // IMDb ID — addons prefer IMDb, put it first. Optionally add TMDB variant.
+            ids += base
+            val tmdbResult = tmdbImdbIdResolver?.resolveTmdbFromImdb(base)
+            if (tmdbResult != null) {
+                ids += "tmdb:${tmdbResult.tmdbId}"
+            }
+        } else if (lowered.startsWith("tmdb:")) {
+            // TMDB ID — resolve to IMDb first (addon priority), keep TMDB as fallback.
+            val hintLabType = when (mediaTypeHint?.trim()?.lowercase(Locale.US)) {
+                "movie" -> MetadataLabMediaType.MOVIE
+                "series", "show", "tv" -> MetadataLabMediaType.SERIES
+                else -> null
+            }
+            // Try to resolve IMDb (series first — that's the main bug area)
+            val typesToTry = when (hintLabType) {
+                MetadataLabMediaType.SERIES -> listOf(MetadataLabMediaType.SERIES)
+                MetadataLabMediaType.MOVIE -> listOf(MetadataLabMediaType.MOVIE)
+                null -> listOf(MetadataLabMediaType.SERIES, MetadataLabMediaType.MOVIE)
+            }
+            for (type in typesToTry) {
+                val imdb = tmdbImdbIdResolver?.resolveImdbId(base, type)
+                if (imdb != null) {
+                    ids += imdb
+                    break
+                }
+            }
+            ids += base
+        } else {
+            ids += base
         }
+
+        // If original had episode suffix, prepend the full episode-specific ID
+        if (base != normalized && normalized !in ids) {
+            ids.add(0, normalized)
+        }
+
         return ids.distinct()
     }
 

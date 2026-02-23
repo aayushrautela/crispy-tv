@@ -194,13 +194,25 @@ class DetailsViewModel internal constructor(
                 )
             }
 
+            // Phase 1d: resolve tmdb:X → IMDb BEFORE addon fetch (matching Nuvio).
+            // This ensures addons receive an IMDb ID they can look up for series.
+            val resolvedForAddon =
+                withContext(Dispatchers.IO) {
+                    resolveItemIdForAddonFetch(itemId)
+                }
+
             val addonResult =
                 withContext(Dispatchers.IO) {
-                    homeCatalogService.loadMediaDetails(rawId = itemId)
+                    homeCatalogService.loadMediaDetails(
+                        rawId = resolvedForAddon.id,
+                        preferredMediaType = resolvedForAddon.mediaTypeHint,
+                    )
                 }
 
             val addonDetails = addonResult.details
-            val mediaTypeHint = addonDetails?.mediaType?.toMetadataLabMediaTypeOrNull()
+            val mediaTypeHint =
+                addonDetails?.mediaType?.toMetadataLabMediaTypeOrNull()
+                    ?: resolvedForAddon.resolvedMediaType
 
             val tmdbResult =
                 withContext(Dispatchers.IO) {
@@ -845,6 +857,46 @@ class DetailsViewModel internal constructor(
         }
     }
 
+    /**
+     * Resolves a raw content ID to an addon-friendly format BEFORE fetching.
+     * For tmdb:X IDs, resolves to IMDb (series first, then movie) so addons
+     * can look up the content properly. Matches Nuvio behavior where IMDb
+     * is always the canonical content ID for addon fetches.
+     */
+    private suspend fun resolveItemIdForAddonFetch(rawId: String): ResolvedItemId {
+        val trimmed = rawId.trim()
+        if (trimmed.isEmpty()) return ResolvedItemId(trimmed, null, null)
+
+        val lowered = trimmed.lowercase(Locale.US)
+
+        // Already IMDb — use directly
+        if (lowered.startsWith("tt") && lowered.length >= 4) {
+            return ResolvedItemId(trimmed, null, null)
+        }
+
+        // tmdb:X — resolve to IMDb before addon fetch
+        if (lowered.startsWith("tmdb:")) {
+            for (type in listOf(MetadataLabMediaType.SERIES, MetadataLabMediaType.MOVIE)) {
+                val imdb = tmdbImdbIdResolver.resolveImdbId(trimmed, type)
+                if (imdb != null) {
+                    val mediaTypeStr = when (type) {
+                        MetadataLabMediaType.MOVIE -> "movie"
+                        MetadataLabMediaType.SERIES -> "series"
+                    }
+                    return ResolvedItemId(imdb, mediaTypeStr, type)
+                }
+            }
+        }
+
+        return ResolvedItemId(trimmed, null, null)
+    }
+
+    private data class ResolvedItemId(
+        val id: String,
+        val mediaTypeHint: String?,
+        val resolvedMediaType: MetadataLabMediaType?,
+    )
+
     private suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
         val fromId = details.id.trim().takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
         val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
@@ -1111,16 +1163,17 @@ class DetailsViewModel internal constructor(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val httpClient = AppHttp.client(appContext)
+                    val tmdbImdbIdResolver =
+                        TmdbImdbIdResolver(
+                            apiKey = BuildConfig.TMDB_API_KEY,
+                            httpClient = httpClient
+                        )
                     val homeCatalogService =
                         HomeCatalogService(
                             context = appContext,
                             addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                             httpClient = httpClient,
-                        )
-                    val tmdbImdbIdResolver =
-                        TmdbImdbIdResolver(
-                            apiKey = BuildConfig.TMDB_API_KEY,
-                            httpClient = httpClient
+                            tmdbImdbIdResolver = tmdbImdbIdResolver,
                         )
                     val tmdbEnrichmentRepository =
                         TmdbEnrichmentRepository(

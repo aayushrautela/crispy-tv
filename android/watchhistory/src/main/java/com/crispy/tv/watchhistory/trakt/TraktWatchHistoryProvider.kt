@@ -142,6 +142,49 @@ internal class TraktWatchHistoryProvider(
         val title: String?,
     )
 
+    /**
+     * Resolves a Trakt ids JSON object to an IMDb-based content ID.
+     * Fast path: extracts IMDb directly if present.
+     * Slow path: when only TMDB ID is available, uses Trakt search API to
+     * look up the IMDb ID (matching Nuvio behavior of always using IMDb).
+     * Falls back to tmdb:X only if Trakt search also fails.
+     */
+    private suspend fun resolveImdbIdFromTraktIds(
+        ids: JSONObject?,
+        typeHint: String = "",
+    ): String {
+        val directImdb = normalizedImdbIdForContent(ids?.optString("imdb")?.trim().orEmpty())
+        if (directImdb.isNotEmpty()) return directImdb
+
+        val tmdbId = extractTmdbIdFromIds(ids)
+        if (tmdbId > 0) {
+            val searchType = if (typeHint == "movie") "movie" else "show"
+            val search = traktSearchGetArray(searchType, "tmdb", tmdbId.toString())
+            if (search != null) {
+                for (i in 0 until search.length()) {
+                    val result = search.optJSONObject(i) ?: continue
+                    val node = result.optJSONObject(searchType) ?: continue
+                    val resultImdb = normalizedImdbIdForContent(
+                        node.optJSONObject("ids")?.optString("imdb")?.trim().orEmpty()
+                    )
+                    if (resultImdb.isNotEmpty()) return resultImdb
+                }
+            }
+            return "tmdb:$tmdbId"
+        }
+
+        return ""
+    }
+
+    private fun extractTmdbIdFromIds(ids: JSONObject?): Int {
+        val tmdbAny = ids?.opt("tmdb")
+        return when (tmdbAny) {
+            is Number -> tmdbAny.toInt()
+            is String -> tmdbAny.toIntOrNull() ?: 0
+            else -> 0
+        }
+    }
+
     private suspend fun fetchTraktContinueWatching(nowMs: Long): List<ContinueWatchingEntry> {
         val payload = traktGetArray("/sync/playback")
             ?: throw IllegalStateException("Trakt /sync/playback returned null")
@@ -183,6 +226,17 @@ internal class TraktWatchHistoryProvider(
             }.sortedByDescending { (pausedAt, _) -> pausedAt }
                 .take(CONTINUE_WATCHING_PLAYBACK_LIMIT)
 
+        // Cache IMDb resolutions within this CW fetch to avoid repeated Trakt search calls.
+        val imdbResolutionCache = mutableMapOf<String, String>()
+
+        suspend fun resolveAndCacheImdb(ids: JSONObject?, typeHint: String): String {
+            val cacheKey = ids?.toString().orEmpty()
+            imdbResolutionCache[cacheKey]?.let { return it }
+            val resolved = resolveImdbIdFromTraktIds(ids, typeHint)
+            if (resolved.isNotEmpty()) imdbResolutionCache[cacheKey] = resolved
+            return resolved
+        }
+
         val existingSeriesTraktIds = mutableSetOf<String>()
         val playbackEntries = mutableListOf<ContinueWatchingEntry>()
 
@@ -197,7 +251,7 @@ internal class TraktWatchHistoryProvider(
                 if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
 
                 val movie = obj.optJSONObject("movie") ?: continue
-                val contentId = normalizedContentIdFromIds(movie.optJSONObject("ids"))
+                val contentId = resolveAndCacheImdb(movie.optJSONObject("ids"), "movie")
                 if (contentId.isEmpty()) continue
                 val title = movie.optString("title").trim().ifEmpty { contentId }
                 playbackEntries.add(
@@ -221,7 +275,7 @@ internal class TraktWatchHistoryProvider(
                 val episode = obj.optJSONObject("episode") ?: continue
                 val show = obj.optJSONObject("show") ?: continue
                 val ids = show.optJSONObject("ids")
-                val contentId = normalizedContentIdFromIds(ids)
+                val contentId = resolveAndCacheImdb(ids, "show")
                 if (contentId.isEmpty()) continue
 
                 val showTraktId = ids?.opt("trakt")?.toString()?.trim().orEmpty()
@@ -296,7 +350,7 @@ internal class TraktWatchHistoryProvider(
 
             val show = obj.optJSONObject("show") ?: continue
             val ids = show.optJSONObject("ids")
-            val contentId = normalizedContentIdFromIds(ids)
+            val contentId = resolveAndCacheImdb(ids, "show")
             if (contentId.isEmpty()) continue
             if (contentId.lowercase(Locale.US) in existingSeriesIds) continue
 

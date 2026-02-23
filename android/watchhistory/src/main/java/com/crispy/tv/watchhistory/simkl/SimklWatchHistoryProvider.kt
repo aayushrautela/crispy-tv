@@ -63,9 +63,58 @@ internal class SimklWatchHistoryProvider(
         return fetchSimklRecommendationsMixed(limit)
     }
 
+    /**
+     * Resolves a Simkl ids JSON object to an IMDb-based content ID.
+     * Fast path: extracts IMDb directly if present.
+     * Slow path: when only TMDB ID is available, uses Simkl /search/id
+     * endpoint to look up the IMDb ID (matching Nuvio: IMDb is canonical).
+     * Falls back to tmdb:X only if Simkl search also fails.
+     */
+    private suspend fun resolveImdbIdFromSimklIds(ids: JSONObject?): String {
+        val directImdb = normalizedImdbIdForContent(ids?.optString("imdb")?.trim().orEmpty())
+        if (directImdb.isNotEmpty()) return directImdb
+
+        val tmdbId = extractTmdbIdFromIds(ids)
+        if (tmdbId > 0) {
+            val searchResult = simklGetAny("/search/id?tmdb=$tmdbId")
+            val searchArray = searchResult.toJsonArrayOrNull()
+            if (searchArray != null && searchArray.length() > 0) {
+                val first = searchArray.optJSONObject(0)
+                val resolvedIds = first?.optJSONObject("ids")
+                val resolvedImdb = normalizedImdbIdForContent(
+                    resolvedIds?.optString("imdb")?.trim().orEmpty()
+                )
+                if (resolvedImdb.isNotEmpty()) return resolvedImdb
+            }
+            return "tmdb:$tmdbId"
+        }
+
+        return ""
+    }
+
+    private fun extractTmdbIdFromIds(ids: JSONObject?): Int {
+        val tmdbAny = ids?.opt("tmdb")
+        return when (tmdbAny) {
+            is Number -> tmdbAny.toInt()
+            is String -> tmdbAny.toIntOrNull() ?: 0
+            else -> 0
+        }
+    }
+
     private suspend fun fetchSimklContinueWatching(nowMs: Long): List<ContinueWatchingEntry> {
         val payload = simklGetAny("/sync/playback") ?: throw IllegalStateException("Simkl /sync/playback returned null")
         val array = payload.toJsonArrayOrNull() ?: throw IllegalStateException("Simkl /sync/playback returned non-array")
+
+        // Cache IMDb resolutions within this CW fetch to avoid repeated Simkl search calls.
+        val imdbResolutionCache = mutableMapOf<String, String>()
+
+        suspend fun resolveAndCacheImdb(ids: JSONObject?): String {
+            val cacheKey = ids?.toString().orEmpty()
+            imdbResolutionCache[cacheKey]?.let { return it }
+            val resolved = resolveImdbIdFromSimklIds(ids)
+            if (resolved.isNotEmpty()) imdbResolutionCache[cacheKey] = resolved
+            return resolved
+        }
 
         return buildList {
             for (index in 0 until array.length()) {
@@ -77,7 +126,7 @@ internal class SimklWatchHistoryProvider(
                 if (type == "movie") {
                     val movie = obj.optJSONObject("movie") ?: continue
                     val ids = movie.optJSONObject("ids")
-                    val contentId = normalizedContentIdFromIds(ids)
+                    val contentId = resolveAndCacheImdb(ids)
                     if (contentId.isEmpty()) continue
                     val title = movie.optString("title").trim().ifEmpty { contentId }
                     val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
@@ -102,7 +151,7 @@ internal class SimklWatchHistoryProvider(
                 if (show == null && episode == null) continue
 
                 val ids = show?.optJSONObject("ids") ?: episode?.optJSONObject("show")
-                val contentId = normalizedContentIdFromIds(ids)
+                val contentId = resolveAndCacheImdb(ids)
                 if (contentId.isEmpty()) continue
 
                 val showTitle = show?.optString("title")?.trim().orEmpty().ifBlank { contentId }
