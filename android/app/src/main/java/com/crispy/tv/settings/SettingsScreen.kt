@@ -75,6 +75,7 @@ fun SettingsScreen(
     onNavigateToHomeScreenSettings: () -> Unit = {},
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
+    onNavigateToAiInsightsSettings: () -> Unit = {},
     onNavigateToLabs: () -> Unit = {},
     onNavigateToProviderPortal: () -> Unit = {}
 ) {
@@ -159,10 +160,11 @@ fun SettingsScreen(
                             onClick = onNavigateToLabs
                         ),
                         SettingsItem(
-                            label = "Automation",
-                            description = "Smart recommendations and helpers",
+                            label = "AI Insights",
+                            description = "Model, key, and sync",
                             icon = Icons.Outlined.AutoAwesome,
-                            iconTint = MaterialTheme.colorScheme.primary
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onClick = onNavigateToAiInsightsSettings
                         ),
                         SettingsItem(
                             label = "Appearance",

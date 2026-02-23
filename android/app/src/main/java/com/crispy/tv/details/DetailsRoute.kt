@@ -29,6 +29,8 @@ fun DetailsRoute(
         onSeasonSelected = viewModel::onSeasonSelected,
         onToggleWatchlist = viewModel::toggleWatchlist,
         onToggleWatched = viewModel::toggleWatched,
-        onSetRating = viewModel::setRating
+        onSetRating = viewModel::setRating,
+        onAiInsightsClick = viewModel::onAiInsightsClick,
+        onDismissAiInsights = viewModel::dismissAiInsightsStory,
     )
 }

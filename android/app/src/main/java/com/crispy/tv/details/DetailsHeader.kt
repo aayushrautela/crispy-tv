@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +62,10 @@ internal fun HeaderInfoSection(
     userRating: Int?,
     isMutating: Boolean,
     palette: DetailsPaletteColors,
+    showAiInsights: Boolean,
+    aiInsightsEnabled: Boolean,
+    aiInsightsIsLoading: Boolean,
+    onAiInsightsClick: () -> Unit,
     onWatchNow: () -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
@@ -148,27 +153,38 @@ internal fun HeaderInfoSection(
             placeholderColor = palette.onPageBackground.copy(alpha = 0.7f)
         )
 
-        FilledTonalButton(
-            onClick = {},
-            enabled = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors =
-                ButtonDefaults.filledTonalButtonColors(
-                    containerColor = palette.pillBackground,
-                    contentColor = palette.onPillBackground,
-                    disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
-                    disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
-                )
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.size(10.dp))
-            Text("AI insights")
+        if (showAiInsights) {
+            FilledTonalButton(
+                onClick = onAiInsightsClick,
+                enabled = !aiInsightsIsLoading,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = palette.pillBackground,
+                        contentColor = palette.onPillBackground,
+                        disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
+                        disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
+                    )
+            ) {
+                if (aiInsightsIsLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = palette.onPillBackground,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = null
+                    )
+                }
+                Spacer(modifier = Modifier.size(10.dp))
+                Text(if (aiInsightsEnabled) "AI insights" else "Set up AI insights")
+            }
         }
 
         Button(

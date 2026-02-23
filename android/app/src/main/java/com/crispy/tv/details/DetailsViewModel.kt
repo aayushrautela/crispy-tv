@@ -6,6 +6,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.ai.AiInsightsCacheStore
+import com.crispy.tv.ai.AiInsightsRepository
+import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.ai.OpenRouterClient
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.home.MediaDetails
@@ -16,8 +20,11 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.settings.AiInsightsMode
+import com.crispy.tv.settings.AiInsightsSettingsStore
 import com.crispy.tv.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +40,11 @@ data class DetailsUiState(
     val tmdbIsLoading: Boolean = false,
     val tmdbEnrichment: TmdbEnrichment? = null,
     val statusMessage: String = "",
+    val aiMode: AiInsightsMode = AiInsightsMode.ON_DEMAND,
+    val aiConfigured: Boolean = false,
+    val aiIsLoading: Boolean = false,
+    val aiInsights: AiInsightsResult? = null,
+    val aiStoryVisible: Boolean = false,
     val isWatched: Boolean = false,
     val isInWatchlist: Boolean = false,
     val isRated: Boolean = false,
@@ -53,11 +65,15 @@ class DetailsViewModel internal constructor(
     private val watchHistoryService: WatchHistoryService,
     private val settingsStore: HomeScreenSettingsStore,
     private val tmdbImdbIdResolver: TmdbImdbIdResolver,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository
+    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
+    private val aiSettingsStore: AiInsightsSettingsStore,
+    private val aiRepository: AiInsightsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
+
+    private var aiJob: Job? = null
 
     init {
         reload()
@@ -117,7 +133,19 @@ class DetailsViewModel internal constructor(
 
     fun reload() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, tmdbIsLoading = true, statusMessage = "Loading...") }
+            val aiSnapshot = aiSettingsStore.loadSnapshot()
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    tmdbIsLoading = true,
+                    statusMessage = "Loading...",
+                    aiMode = aiSnapshot.settings.mode,
+                    aiConfigured = aiSnapshot.openRouterKey.isNotBlank(),
+                    aiIsLoading = false,
+                    aiInsights = null,
+                    aiStoryVisible = false,
+                )
+            }
 
             val addonResult =
                 withContext(Dispatchers.IO) {
@@ -189,7 +217,106 @@ class DetailsViewModel internal constructor(
                     selectedSeason = state.selectedSeason ?: firstSeason
                 )
             }
+
+            val tmdbId = tmdbEnrichment?.tmdbId
+            val detailsForAi = enrichedDetails
+            val aiMode = aiSnapshot.settings.mode
+            val aiConfigured = aiSnapshot.openRouterKey.isNotBlank()
+
+            if (tmdbId != null && detailsForAi != null && aiMode != AiInsightsMode.OFF) {
+                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId) }
+                if (cached != null) {
+                    _uiState.update { it.copy(aiInsights = cached) }
+                } else if (aiMode == AiInsightsMode.ALWAYS && aiConfigured) {
+                    startAiGeneration(
+                        tmdbId = tmdbId,
+                        details = detailsForAi,
+                        reviews = tmdbEnrichment?.reviews.orEmpty(),
+                        showStory = false,
+                        announce = false,
+                    )
+                }
+            }
         }
+    }
+
+    fun onAiInsightsClick() {
+        val state = uiState.value
+        if (state.aiMode == AiInsightsMode.OFF) {
+            _uiState.update { it.copy(statusMessage = "AI insights are off. Enable them in Settings > AI Insights.") }
+            return
+        }
+        if (!state.aiConfigured) {
+            _uiState.update { it.copy(statusMessage = "Add an OpenRouter key in Settings > AI Insights.") }
+            return
+        }
+
+        val details = state.details
+        val tmdbId = state.tmdbEnrichment?.tmdbId
+        if (details == null || tmdbId == null) {
+            _uiState.update { it.copy(statusMessage = "TMDB data isn't ready yet. Try again in a moment.") }
+            return
+        }
+
+        val cachedOrLoaded = state.aiInsights
+        if (cachedOrLoaded != null) {
+            _uiState.update { it.copy(aiStoryVisible = true) }
+            return
+        }
+
+        if (state.aiIsLoading) return
+
+        startAiGeneration(
+            tmdbId = tmdbId,
+            details = details,
+            reviews = state.tmdbEnrichment?.reviews.orEmpty(),
+            showStory = true,
+            announce = true,
+        )
+    }
+
+    fun dismissAiInsightsStory() {
+        _uiState.update { it.copy(aiStoryVisible = false) }
+    }
+
+    private fun startAiGeneration(
+        tmdbId: Int,
+        details: MediaDetails,
+        reviews: List<com.crispy.tv.metadata.tmdb.TmdbReview>,
+        showStory: Boolean,
+        announce: Boolean,
+    ) {
+        aiJob?.cancel()
+        aiJob =
+            viewModelScope.launch {
+                if (announce) {
+                    _uiState.update { it.copy(aiIsLoading = true, statusMessage = "Generating AI insights...") }
+                } else {
+                    _uiState.update { it.copy(aiIsLoading = true) }
+                }
+
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        aiRepository.generate(tmdbId = tmdbId, details = details, reviews = reviews)
+                    }
+                }.onSuccess { result ->
+                    _uiState.update {
+                        it.copy(
+                            aiIsLoading = false,
+                            aiInsights = result,
+                            aiStoryVisible = showStory,
+                            statusMessage = if (announce) "" else it.statusMessage,
+                        )
+                    }
+                }.onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            aiIsLoading = false,
+                            statusMessage = e.message ?: "AI insights are unavailable right now.",
+                        )
+                    }
+                }
+            }
     }
 
     fun onSeasonSelected(season: Int) {
@@ -518,13 +645,23 @@ class DetailsViewModel internal constructor(
                             apiKey = BuildConfig.TMDB_API_KEY,
                             httpClient = httpClient
                         )
+
+                    val aiSettingsStore = AiInsightsSettingsStore(appContext)
+                    val aiRepository =
+                        AiInsightsRepository(
+                            openRouterClient = OpenRouterClient(httpClient = httpClient, xTitle = "Crispy Rewrite Android"),
+                            settingsStore = aiSettingsStore,
+                            cacheStore = AiInsightsCacheStore(appContext),
+                        )
                     return DetailsViewModel(
                         itemId = itemId,
                         homeCatalogService = homeCatalogService,
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                         settingsStore = HomeScreenSettingsStore(appContext),
                         tmdbImdbIdResolver = tmdbImdbIdResolver,
-                        tmdbEnrichmentRepository = tmdbEnrichmentRepository
+                        tmdbEnrichmentRepository = tmdbEnrichmentRepository,
+                        aiSettingsStore = aiSettingsStore,
+                        aiRepository = aiRepository,
                     ) as T
                 }
             }

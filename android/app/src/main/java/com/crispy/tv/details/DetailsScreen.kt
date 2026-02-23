@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.settings.AiInsightsMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -46,7 +47,9 @@ internal fun DetailsScreen(
     onSeasonSelected: (Int) -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
-    onSetRating: (Int?) -> Unit
+    onSetRating: (Int?) -> Unit,
+    onAiInsightsClick: () -> Unit,
+    onDismissAiInsights: () -> Unit,
 ) {
     val details = uiState.details
     val listState = rememberLazyListState()
@@ -164,6 +167,10 @@ internal fun DetailsScreen(
                         userRating = uiState.userRating,
                         isMutating = uiState.isMutating,
                         palette = palette,
+                        showAiInsights = uiState.aiMode != AiInsightsMode.OFF,
+                        aiInsightsEnabled = uiState.aiConfigured,
+                        aiInsightsIsLoading = uiState.aiIsLoading,
+                        onAiInsightsClick = onAiInsightsClick,
                         onWatchNow = {
                             if (!trailerKey.isNullOrBlank()) {
                                 showTrailer = true
@@ -228,6 +235,14 @@ internal fun DetailsScreen(
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             )
+
+            if (uiState.aiStoryVisible && uiState.aiInsights != null) {
+                AiInsightsStoryOverlay(
+                    result = uiState.aiInsights,
+                    imageUrl = details?.backdropUrl ?: details?.posterUrl,
+                    onDismiss = onDismissAiInsights,
+                )
+            }
         }
     }
 }

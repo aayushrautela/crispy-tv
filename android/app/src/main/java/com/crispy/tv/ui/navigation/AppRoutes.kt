@@ -17,6 +17,7 @@ object AppRoutes {
     const val PlaybackSettingsRoute = "settings/playback"
     const val HomeScreenSettingsRoute = "settings/home"
     const val AddonsSettingsRoute = "settings/addons"
+    const val AiInsightsSettingsRoute = "settings/ai"
     const val ProviderPortalRoute = "settings/providers"
 
     const val CatalogListRoute = "catalog"
