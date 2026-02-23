@@ -36,6 +36,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +49,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
+import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
@@ -267,6 +271,15 @@ fun LibraryRoute(
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
+
+    val httpClient = remember(appContext) { AppHttp.client(appContext) }
+    val tmdbEnrichmentRepository =
+        remember(httpClient) {
+            TmdbEnrichmentRepository(
+                apiKey = BuildConfig.TMDB_API_KEY,
+                httpClient = httpClient
+            )
+        }
     val viewModel: LibraryViewModel =
         viewModel(
             factory = remember(appContext) {
@@ -277,6 +290,7 @@ fun LibraryRoute(
 
     LibraryScreen(
         uiState = uiState,
+        tmdbEnrichmentRepository = tmdbEnrichmentRepository,
         onRefresh = viewModel::refresh,
         onItemClick = onItemClick,
         onNavigateToDiscover = onNavigateToDiscover,
@@ -289,6 +303,7 @@ fun LibraryRoute(
 @Composable
 private fun LibraryScreen(
     uiState: LibraryUiState,
+    tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     onRefresh: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
@@ -392,10 +407,29 @@ private fun LibraryScreen(
                             items = uiState.localEntries,
                             key = { entry -> "local:${entry.contentId}:${entry.watchedAtEpochMs}" }
                         ) { entry ->
+                            val tmdbArtwork by
+                                produceState(initialValue = null to null, key1 = entry.contentId, key2 = entry.contentType) {
+                                    val rawId = entry.contentId.trim()
+                                    val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
+                                    if (!canResolve) {
+                                        value = null to null
+                                        return@produceState
+                                    }
+
+                                    val details =
+                                        runCatching {
+                                            tmdbEnrichmentRepository.loadArtwork(
+                                                rawId = rawId,
+                                                mediaTypeHint = entry.contentType
+                                            )
+                                        }.getOrNull()
+                                    value = details?.posterUrl to details?.backdropUrl
+                                }
+
                             PosterCard(
                                 title = entry.title.ifBlank { entry.contentId },
-                                posterUrl = null,
-                                backdropUrl = null,
+                                posterUrl = tmdbArtwork.first,
+                                backdropUrl = tmdbArtwork.second,
                                 rating = null,
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = { onItemClick(entry) }
@@ -471,10 +505,47 @@ private fun LibraryScreen(
                                         episode = item.episode,
                                         watchedAtEpochMs = item.addedAtEpochMs
                                     )
+
+                                val providerPoster = item.posterUrl?.trim().takeIf { !it.isNullOrBlank() }
+                                val providerBackdrop = item.backdropUrl?.trim().takeIf { !it.isNullOrBlank() }
+
+                                val artwork by
+                                    produceState(
+                                        initialValue = providerPoster to providerBackdrop,
+                                        key1 = item.contentId,
+                                        key2 = item.contentType,
+                                        key3 = providerPoster,
+                                        key4 = providerBackdrop
+                                    ) {
+                                        if (!providerPoster.isNullOrBlank() && !providerBackdrop.isNullOrBlank()) {
+                                            value = providerPoster to providerBackdrop
+                                            return@produceState
+                                        }
+
+                                        val rawId = item.contentId.trim()
+                                        val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
+                                        if (!canResolve) {
+                                            value = providerPoster to providerBackdrop
+                                            return@produceState
+                                        }
+
+                                        val details =
+                                            runCatching {
+                                                tmdbEnrichmentRepository.loadArtwork(
+                                                    rawId = rawId,
+                                                    mediaTypeHint = item.contentType
+                                                )
+                                            }.getOrNull()
+
+                                        val poster = providerPoster ?: details?.posterUrl
+                                        val backdrop = providerBackdrop ?: details?.backdropUrl
+                                        value = poster to backdrop
+                                    }
+
                                 PosterCard(
                                     title = item.title.ifBlank { item.contentId },
-                                    posterUrl = null,
-                                    backdropUrl = null,
+                                    posterUrl = artwork.first,
+                                    backdropUrl = artwork.second,
                                     rating = null,
                                     modifier = Modifier.fillMaxWidth(),
                                     onClick = { onItemClick(mapped) }

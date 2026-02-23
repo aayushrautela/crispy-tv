@@ -103,6 +103,47 @@ class TmdbEnrichmentRepository(
         )
     }
 
+    suspend fun loadArtwork(
+        rawId: String,
+        mediaTypeHint: MetadataLabMediaType? = null,
+        locale: Locale = Locale.getDefault()
+    ): MediaDetails? {
+        val normalizedContentId = normalizeNuvioMediaId(rawId).contentId
+        val imdbId = extractImdbId(normalizedContentId)
+
+        val language = locale.toTmdbLanguageTag()
+
+        val resolved = resolveTmdbIdAndType(normalizedContentId, imdbId, mediaTypeHint, language) ?: return null
+        val tmdbId = resolved.tmdbId
+        val mediaType = resolved.mediaType
+
+        val detailsJson = fetchArtworkDetails(mediaType = mediaType, tmdbId = tmdbId, language = language) ?: return null
+
+        val imdbFromDetails =
+            when (mediaType) {
+                MetadataLabMediaType.MOVIE -> detailsJson.optStringNonBlank("imdb_id")
+                MetadataLabMediaType.SERIES -> detailsJson.optJSONObject("external_ids")?.optStringNonBlank("imdb_id")
+            }
+
+        return detailsJson.toFallbackMediaDetails(normalizedContentId, mediaType, imdbFromDetails ?: imdbId)
+    }
+
+    private suspend fun fetchArtworkDetails(
+        mediaType: MetadataLabMediaType,
+        tmdbId: Int,
+        language: String
+    ): JSONObject? {
+        val path = "${mediaType.pathSegment()}/$tmdbId"
+        val query =
+            buildMap {
+                put("language", language)
+                if (mediaType == MetadataLabMediaType.SERIES) {
+                    put("append_to_response", "external_ids")
+                }
+            }
+        return client.getJson(path = path, query = query)
+    }
+
     private suspend fun fetchDetails(
         mediaType: MetadataLabMediaType,
         tmdbId: Int,

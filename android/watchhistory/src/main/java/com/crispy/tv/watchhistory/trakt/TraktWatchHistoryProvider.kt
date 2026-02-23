@@ -396,29 +396,29 @@ internal class TraktWatchHistoryProvider(
     }
 
     private suspend fun traktHistoryItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/watched/movies") ?: JSONArray()
-        val shows = traktGetArray("/sync/watched/shows") ?: JSONArray()
+        val movies = traktGetArray("/sync/watched/movies?extended=images") ?: JSONArray()
+        val shows = traktGetArray("/sync/watched/shows?extended=images") ?: JSONArray()
         return parseTraktItemsFromWatched(movies, MetadataLabMediaType.MOVIE, "watched") +
             parseTraktItemsFromWatched(shows, MetadataLabMediaType.SERIES, "watched")
     }
 
     private suspend fun traktWatchlistItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/watchlist/movies") ?: JSONArray()
-        val shows = traktGetArray("/sync/watchlist/shows") ?: JSONArray()
+        val movies = traktGetArray("/sync/watchlist/movies?extended=images") ?: JSONArray()
+        val shows = traktGetArray("/sync/watchlist/shows?extended=images") ?: JSONArray()
         return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "watchlist") +
             parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "watchlist")
     }
 
     private suspend fun traktCollectionItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/collection/movies") ?: JSONArray()
-        val shows = traktGetArray("/sync/collection/shows") ?: JSONArray()
+        val movies = traktGetArray("/sync/collection/movies?extended=images") ?: JSONArray()
+        val shows = traktGetArray("/sync/collection/shows?extended=images") ?: JSONArray()
         return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "collection") +
             parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "collection")
     }
 
     private suspend fun traktRatingsItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/ratings/movies") ?: JSONArray()
-        val shows = traktGetArray("/sync/ratings/shows") ?: JSONArray()
+        val movies = traktGetArray("/sync/ratings/movies?extended=images") ?: JSONArray()
+        val shows = traktGetArray("/sync/ratings/shows?extended=images") ?: JSONArray()
         return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "ratings") +
             parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "ratings")
     }
@@ -451,6 +451,9 @@ internal class TraktWatchHistoryProvider(
                 val contentId = normalizedContentIdFromIds(media.optJSONObject("ids"))
                 if (contentId.isEmpty()) continue
                 val title = media.optString("title").trim().ifEmpty { contentId }
+                val images = media.optJSONObject("images")
+                val posterUrl = traktPosterUrl(images)
+                val backdropUrl = traktBackdropUrl(images)
                 val rankedAt =
                     parseIsoToEpochMs(node.optString("listed_at"))
                         ?: parseIsoToEpochMs(node.optString("updated_at"))
@@ -467,10 +470,59 @@ internal class TraktWatchHistoryProvider(
                         contentId = contentId,
                         contentType = contentType,
                         title = title,
+                        posterUrl = posterUrl,
+                        backdropUrl = backdropUrl,
                         addedAtEpochMs = rankedAt,
                     )
                 )
             }
+        }
+    }
+
+    private fun traktPosterUrl(images: JSONObject?): String? {
+        return traktExtractImageUrl(images, "poster")
+            ?: traktExtractImageUrl(images, "thumb")
+    }
+
+    private fun traktBackdropUrl(images: JSONObject?): String? {
+        return traktExtractImageUrl(images, "fanart")
+            ?: traktExtractImageUrl(images, "background")
+            ?: traktExtractImageUrl(images, "banner")
+    }
+
+    private fun traktExtractImageUrl(images: JSONObject?, key: String): String? {
+        val array = images?.optJSONArray(key) ?: return null
+        for (i in 0 until array.length()) {
+            val raw = array.opt(i)
+            val candidate =
+                when (raw) {
+                    is String -> raw
+                    is JSONObject -> {
+                        raw.optString("full").ifBlank {
+                            raw.optString("medium").ifBlank {
+                                raw.optString("thumb")
+                            }
+                        }
+                    }
+
+                    else -> null
+                }
+                    ?.trim()
+                    .orEmpty()
+
+            if (candidate.isBlank() || candidate.equals("null", ignoreCase = true)) continue
+            return normalizeTraktImageUrl(candidate)
+        }
+        return null
+    }
+
+    private fun normalizeTraktImageUrl(url: String): String {
+        val trimmed = url.trim()
+        return when {
+            trimmed.startsWith("https://") -> trimmed
+            trimmed.startsWith("http://") -> "https://" + trimmed.removePrefix("http://")
+            trimmed.startsWith("//") -> "https:$trimmed"
+            else -> trimmed
         }
     }
 
@@ -490,6 +542,9 @@ internal class TraktWatchHistoryProvider(
                     continue
                 }
                 val title = node?.optString("title")?.trim().orEmpty().ifBlank { contentId }
+                val images = node?.optJSONObject("images")
+                val posterUrl = traktPosterUrl(images)
+                val backdropUrl = traktBackdropUrl(images)
                 val addedAt = parseIsoToEpochMs(obj.optString("last_watched_at")) ?: System.currentTimeMillis()
                 add(
                     ProviderLibraryItem(
@@ -498,6 +553,8 @@ internal class TraktWatchHistoryProvider(
                         contentId = contentId,
                         contentType = contentType,
                         title = title,
+                        posterUrl = posterUrl,
+                        backdropUrl = backdropUrl,
                         addedAtEpochMs = addedAt,
                     )
                 )
@@ -530,6 +587,9 @@ internal class TraktWatchHistoryProvider(
                     continue
                 }
                 val title = node.optString("title").trim().ifEmpty { contentId }
+                val images = node.optJSONObject("images")
+                val posterUrl = traktPosterUrl(images)
+                val backdropUrl = traktBackdropUrl(images)
                 val addedAt =
                     parseIsoToEpochMs(obj.optString("listed_at"))
                         ?: parseIsoToEpochMs(obj.optString("rated_at"))
@@ -542,6 +602,8 @@ internal class TraktWatchHistoryProvider(
                         contentId = contentId,
                         contentType = contentType,
                         title = title,
+                        posterUrl = posterUrl,
+                        backdropUrl = backdropUrl,
                         addedAtEpochMs = addedAt,
                     )
                 )

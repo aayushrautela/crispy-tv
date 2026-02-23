@@ -189,6 +189,8 @@ internal class WatchHistoryCache(
                     .put("contentId", item.contentId)
                     .put("contentType", item.contentType.name)
                     .put("title", item.title)
+                    .put("posterUrl", item.posterUrl)
+                    .put("backdropUrl", item.backdropUrl)
                     .put("season", item.season)
                     .put("episode", item.episode)
                     .put("addedAtEpochMs", item.addedAtEpochMs)
@@ -357,6 +359,8 @@ internal class WatchHistoryCache(
             if (folderId.isBlank() || contentId.isBlank()) continue
             val contentType = runCatching { MetadataLabMediaType.valueOf(obj.optString("contentType").trim()) }.getOrNull() ?: continue
             val title = obj.optString("title").trim().ifEmpty { contentId }
+            val posterUrl = obj.optString("posterUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val backdropUrl = obj.optString("backdropUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val season = obj.optInt("season", 0).takeIf { it > 0 }
             val episode = obj.optInt("episode", 0).takeIf { it > 0 }
             val addedAtEpochMs = obj.optLong("addedAtEpochMs", updatedAt)
@@ -369,6 +373,8 @@ internal class WatchHistoryCache(
                     contentId = contentId,
                     contentType = contentType,
                     title = title,
+                    posterUrl = posterUrl,
+                    backdropUrl = backdropUrl,
                     season = season,
                     episode = episode,
                     addedAtEpochMs = addedAtEpochMs,

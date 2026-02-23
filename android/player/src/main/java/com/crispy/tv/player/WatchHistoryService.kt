@@ -78,6 +78,8 @@ data class ProviderLibraryItem(
     val contentId: String,
     val contentType: MetadataLabMediaType,
     val title: String,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
     val season: Int? = null,
     val episode: Int? = null,
     val addedAtEpochMs: Long = System.currentTimeMillis()
