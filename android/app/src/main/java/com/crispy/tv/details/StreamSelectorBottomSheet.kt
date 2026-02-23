@@ -284,6 +284,17 @@ private fun StreamRow(
     providerName: String,
     onClick: () -> Unit,
 ) {
+    val detailsText =
+        remember(stream.title, stream.description) {
+            val title = stream.title?.trim()?.takeIf { it.isNotBlank() }
+            val description = stream.description?.trim()?.takeIf { it.isNotBlank() }
+            if (description != null && description.contains('\n') && description.length > (title?.length ?: 0)) {
+                description
+            } else {
+                title ?: description
+            }
+        }
+
     ElevatedCard(
         onClick = onClick,
         modifier = Modifier.testTag("stream_row_${stream.stableKey}"),
@@ -298,9 +309,9 @@ private fun StreamRow(
             },
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    stream.title?.let { rawTitle ->
+                    detailsText?.let { text ->
                         Text(
-                            text = rawTitle,
+                            text = text,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
                         )

@@ -28,6 +28,7 @@ data class AddonStream(
     val providerName: String,
     val name: String?,
     val title: String?,
+    val description: String?,
     val url: String?,
     val externalUrl: String?,
     val cached: Boolean,
@@ -321,6 +322,7 @@ class AddonStreamsService(
             val streamObject = array.optJSONObject(index) ?: continue
             val name = nonBlank(streamObject.optString("name"))
             val title = nonBlank(streamObject.optString("title"))
+            val description = nonBlank(streamObject.optString("description"))
             val url = nonBlank(streamObject.optString("url"))
             val externalUrl = nonBlank(streamObject.optString("externalUrl"))
             if (url == null && externalUrl == null) continue
@@ -337,6 +339,7 @@ class AddonStreamsService(
                     providerName = providerName,
                     name = name,
                     title = title,
+                    description = description,
                     url = url,
                     externalUrl = externalUrl,
                     cached = cached,
