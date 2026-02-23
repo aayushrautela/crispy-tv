@@ -10,8 +10,6 @@ class AiInsightsSettingsStore(context: Context) {
     private val prefs: SharedPreferences =
         appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val secretStore: KeystoreSecretStore by lazy { KeystoreSecretStore(appContext) }
-
     fun loadSettings(): AiInsightsSettings {
         val raw = prefs.getString(KEY_STATE_JSON, null)
         val json = runCatching { JSONObject(raw ?: "{}") }.getOrNull() ?: JSONObject()
@@ -36,15 +34,15 @@ class AiInsightsSettingsStore(context: Context) {
         val stored = prefs.getString(KEY_OPENROUTER_KEY, null)?.trim().orEmpty()
         if (stored.isEmpty()) return ""
 
-        if (!secretStore.isEncryptedPrefsValue(stored)) {
+        if (!KeystoreSecretStore.isEncryptedPrefsValue(stored)) {
             // Best-effort upgrade.
             runCatching {
-                prefs.edit().putString(KEY_OPENROUTER_KEY, secretStore.encryptForPrefs(stored)).apply()
+                prefs.edit().putString(KEY_OPENROUTER_KEY, KeystoreSecretStore.encryptForPrefs(stored)).apply()
             }
             return stored
         }
 
-        return secretStore.decryptFromPrefs(stored) ?: ""
+        return KeystoreSecretStore.decryptFromPrefs(stored) ?: ""
     }
 
     fun saveOpenRouterKey(rawKey: String) {
@@ -54,7 +52,7 @@ class AiInsightsSettingsStore(context: Context) {
             return
         }
 
-        prefs.edit().putString(KEY_OPENROUTER_KEY, secretStore.encryptForPrefs(trimmed)).apply()
+        prefs.edit().putString(KEY_OPENROUTER_KEY, KeystoreSecretStore.encryptForPrefs(trimmed)).apply()
     }
 
     fun loadSnapshot(): AiInsightsSettingsSnapshot {

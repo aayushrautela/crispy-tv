@@ -40,7 +40,7 @@ class AiInsightsRepository(
     private fun buildPrompt(details: MediaDetails, reviews: List<TmdbReview>): String {
         val title = details.title
         val year = details.year
-        val plot = details.description.ifBlank { "N/A" }
+        val plot = details.description?.trim().orEmpty().ifBlank { "N/A" }
         val rating = details.rating?.trim().orEmpty().ifBlank { "N/A" }
         val genres = details.genres.joinToString(", ").ifBlank { "N/A" }
 
