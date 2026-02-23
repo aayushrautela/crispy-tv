@@ -25,13 +25,17 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun DetailsScreen(
@@ -50,19 +54,48 @@ internal fun DetailsScreen(
     val palette = theming.palette
     val detailsScheme = theming.colorScheme
 
-    val trailerUrl =
+    val selectedTrailer =
         uiState.tmdbEnrichment
             ?.trailers
-            ?.firstOrNull { it.watchUrl?.isNotBlank() == true && it.official && it.type.equals("Trailer", true) }
-            ?.watchUrl
+            ?.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }
             ?: uiState.tmdbEnrichment
                 ?.trailers
-                ?.firstOrNull { it.watchUrl?.isNotBlank() == true && it.type.equals("Trailer", true) }
-                ?.watchUrl
+                ?.firstOrNull { it.key.isNotBlank() && it.type.equals("Trailer", true) }
             ?: uiState.tmdbEnrichment
                 ?.trailers
-                ?.firstOrNull { it.watchUrl?.isNotBlank() == true }
-                ?.watchUrl
+                ?.firstOrNull { it.key.isNotBlank() }
+
+    val trailerKey = selectedTrailer?.key?.trim().takeIf { !it.isNullOrBlank() }
+    val trailerWatchUrl = selectedTrailer?.watchUrl?.trim().takeIf { !it.isNullOrBlank() }
+
+    val configuration = LocalConfiguration.current
+    val heroHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(340.dp, 520.dp)
+    val heroHeightPx = with(LocalDensity.current) { heroHeight.roundToPx() }
+
+    val heroIsVisible by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= heroHeightPx
+        }
+    }
+
+    var showTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
+    var revealTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
+    var userPausedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
+
+    LaunchedEffect(trailerKey) {
+        showTrailer = false
+        revealTrailer = false
+        userPausedTrailer = false
+
+        if (trailerKey.isNullOrBlank()) return@LaunchedEffect
+
+        delay(2000)
+        showTrailer = true
+        delay(2000)
+        revealTrailer = true
+    }
+
+    val isTrailerPlaying = showTrailer && revealTrailer && heroIsVisible && !userPausedTrailer
 
     val topBarAlpha by remember {
         derivedStateOf {
@@ -99,13 +132,31 @@ internal fun DetailsScreen(
                 state = listState
             ) {
                 item {
-                    HeroSection(details = details, palette = palette, trailerUrl = trailerUrl)
+                    HeroSection(
+                        details = details,
+                        palette = palette,
+                        trailerKey = trailerKey,
+                        trailerWatchUrl = trailerWatchUrl,
+                        showTrailer = showTrailer,
+                        revealTrailer = revealTrailer,
+                        isTrailerPlaying = isTrailerPlaying,
+                        onToggleTrailer = {
+                            if (!trailerKey.isNullOrBlank()) {
+                                if (!showTrailer) {
+                                    showTrailer = true
+                                    revealTrailer = true
+                                    userPausedTrailer = false
+                                } else {
+                                    userPausedTrailer = !userPausedTrailer
+                                }
+                            }
+                        }
+                    )
                 }
 
                 item {
                     HeaderInfoSection(
                         details = details,
-                        trailerUrl = trailerUrl,
                         isInWatchlist = uiState.isInWatchlist,
                         isWatched = uiState.isWatched,
                         isRated = uiState.isRated,

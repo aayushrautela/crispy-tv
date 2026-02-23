@@ -1,5 +1,11 @@
 package com.crispy.tv.details
 
+import android.annotation.SuppressLint
+import android.view.View
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,18 +19,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -32,6 +49,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -40,7 +58,12 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 internal fun HeroSection(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
-    trailerUrl: String?
+    trailerKey: String?,
+    trailerWatchUrl: String?,
+    showTrailer: Boolean,
+    revealTrailer: Boolean,
+    isTrailerPlaying: Boolean,
+    onToggleTrailer: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -81,6 +104,18 @@ internal fun HeroSection(
             ) {}
         }
 
+        var trailerFailed by remember(trailerKey) { mutableStateOf(false) }
+        if (showTrailer && !trailerKey.isNullOrBlank()) {
+            HeroYouTubeTrailerLayer(
+                modifier = Modifier.fillMaxSize(),
+                trailerKey = trailerKey,
+                reveal = revealTrailer,
+                isPlaying = isTrailerPlaying,
+                isMuted = true,
+                onError = { trailerFailed = true }
+            )
+        }
+
         // Top scrim for app bar/buttons readability.
         Box(
             modifier = Modifier
@@ -111,14 +146,23 @@ internal fun HeroSection(
                 )
         )
 
-        val resolvedTrailerUrl = trailerUrl?.trim().takeIf { !it.isNullOrBlank() }
-        if (resolvedTrailerUrl != null) {
+        val resolvedTrailerWatchUrl = trailerWatchUrl?.trim().takeIf { !it.isNullOrBlank() }
+        if (!trailerKey.isNullOrBlank()) {
+            val isPlaying = isTrailerPlaying
+            val icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
+            val label = if (trailerFailed && resolvedTrailerWatchUrl != null) "Open trailer" else if (isPlaying) "Pause" else "Trailer"
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 160.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
-                    .clickable { uriHandler.openUri(resolvedTrailerUrl) },
+                    .clickable {
+                        if (trailerFailed && resolvedTrailerWatchUrl != null) {
+                            uriHandler.openUri(resolvedTrailerWatchUrl)
+                        } else {
+                            onToggleTrailer()
+                        }
+                    },
                 color = Color.Black.copy(alpha = 0.34f),
                 contentColor = Color.White
             ) {
@@ -128,11 +172,11 @@ internal fun HeroSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.PlayArrow,
+                        imageVector = icon,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
-                    Text("Trailer", style = MaterialTheme.typography.labelLarge)
+                    Text(label, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -168,4 +212,134 @@ internal fun HeroSection(
             }
         }
     }
+}
+
+@Composable
+private fun HeroYouTubeTrailerLayer(
+    modifier: Modifier,
+    trailerKey: String,
+    reveal: Boolean,
+    isPlaying: Boolean,
+    isMuted: Boolean,
+    onError: () -> Unit,
+) {
+    val embedUrl = remember(trailerKey) { buildYoutubeEmbedUrl(trailerKey) }
+    val headers = remember { mapOf("Referer" to "http://localhost") }
+    val latestOnError by rememberUpdatedState(onError)
+    val latestMuted by rememberUpdatedState(isMuted)
+    val latestPlaying by rememberUpdatedState(isPlaying)
+
+    val alpha by animateFloatAsState(
+        targetValue = if (reveal) 1f else 0f,
+        label = "hero_trailer_alpha"
+    )
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val webView = remember(trailerKey) {
+        WebView(context).apply {
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isClickable = false
+            isLongClickable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+
+            @SuppressLint("SetJavaScriptEnabled")
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            settings.loadWithOverviewMode = true
+            settings.useWideViewPort = true
+
+            // Treat as background video layer.
+            setOnTouchListener { _, _ -> true }
+
+            webViewClient =
+                object : WebViewClient() {
+                    override fun onReceivedError(
+                        view: WebView,
+                        request: WebResourceRequest,
+                        error: WebResourceError,
+                    ) {
+                        latestOnError()
+                    }
+
+                    override fun onPageFinished(view: WebView, url: String) {
+                        // Best effort: apply current state after load.
+                        applyMute(view, latestMuted)
+                        applyPlayPause(view, latestPlaying)
+                    }
+                }
+        }
+    }
+
+    DisposableEffect(webView) {
+        onDispose {
+            runCatching { webView.stopLoading() }
+            runCatching { webView.loadUrl("about:blank") }
+            runCatching { webView.destroy() }
+        }
+    }
+
+    LaunchedEffect(webView, embedUrl) {
+        runCatching {
+            webView.loadUrl(embedUrl, headers)
+        }.onFailure {
+            latestOnError()
+        }
+    }
+
+    LaunchedEffect(webView, isMuted) {
+        applyMute(webView, isMuted)
+    }
+
+    LaunchedEffect(webView, isPlaying) {
+        applyPlayPause(webView, isPlaying)
+    }
+
+    Box(modifier = modifier.clipToBounds()) {
+        AndroidView(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(alpha = alpha)
+                    .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
+            factory = { webView },
+            update = {}
+        )
+    }
+}
+
+private fun buildYoutubeEmbedUrl(videoId: String): String {
+    val id = videoId.trim()
+    // origin+referer set to localhost to reduce embed restrictions (mirrors old app behavior).
+    return "https://www.youtube.com/embed/$id" +
+        "?autoplay=1" +
+        "&controls=0" +
+        "&showinfo=0" +
+        "&rel=0" +
+        "&loop=1" +
+        "&playlist=$id" +
+        "&modestbranding=1" +
+        "&playsinline=1" +
+        "&mute=1" +
+        "&enablejsapi=1" +
+        "&origin=http://localhost"
+}
+
+private fun applyMute(webView: WebView, muted: Boolean) {
+    val m = if (muted) "true" else "false"
+    webView.evaluateJavascript(
+        "(function(){var v=document.querySelector('video'); if(v){v.muted=$m; if($m){v.volume=0;} }})();",
+        null
+    )
+}
+
+private fun applyPlayPause(webView: WebView, playing: Boolean) {
+    val p = if (playing) "true" else "false"
+    webView.evaluateJavascript(
+        "(function(){var v=document.querySelector('video'); if(v){ if($p){v.play();} else {v.pause();} }})();",
+        null
+    )
 }

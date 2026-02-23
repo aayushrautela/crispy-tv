@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircleOutline
@@ -39,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
@@ -55,7 +53,6 @@ import kotlin.math.roundToInt
 @Composable
 internal fun HeaderInfoSection(
     details: MediaDetails?,
-    trailerUrl: String?,
     isInWatchlist: Boolean,
     isWatched: Boolean,
     isRated: Boolean,
@@ -70,7 +67,6 @@ internal fun HeaderInfoSection(
 
     val horizontalPadding = responsivePageHorizontalPadding()
     val genre = details.genres.firstOrNull()?.trim().orEmpty()
-    val uriHandler = LocalUriHandler.current
 
     var showRatingDialog by rememberSaveable { mutableStateOf(false) }
     var pendingRating by rememberSaveable { mutableStateOf(0f) }
@@ -170,29 +166,6 @@ internal fun HeaderInfoSection(
             )
             Spacer(modifier = Modifier.size(10.dp))
             Text("AI insights")
-        }
-
-        if (!trailerUrl.isNullOrBlank()) {
-            FilledTonalButton(
-                onClick = { uriHandler.openUri(trailerUrl) },
-                enabled = !isMutating,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors =
-                    ButtonDefaults.filledTonalButtonColors(
-                        containerColor = palette.pillBackground,
-                        contentColor = palette.onPillBackground
-                    )
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = null
-                )
-                Spacer(modifier = Modifier.size(10.dp))
-                Text("Watch trailer")
-            }
         }
 
         DetailsQuickActionsRow(

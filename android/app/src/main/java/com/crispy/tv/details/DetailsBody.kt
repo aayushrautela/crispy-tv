@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -43,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,7 +55,6 @@ import com.crispy.tv.metadata.tmdb.TmdbCastMember
 import com.crispy.tv.metadata.tmdb.TmdbMovieDetails
 import com.crispy.tv.metadata.tmdb.TmdbProductionEntity
 import com.crispy.tv.metadata.tmdb.TmdbReview
-import com.crispy.tv.metadata.tmdb.TmdbTrailer
 import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.metadata.tmdb.TmdbTitleDetails
 import com.crispy.tv.ui.theme.Dimensions
@@ -203,25 +200,6 @@ internal fun DetailsBody(
             ) {
                 items(details.cast.take(24)) { name ->
                     SimpleCastItem(name = name)
-                }
-            }
-        }
-
-        val trailers = tmdb?.trailers.orEmpty()
-        if (trailers.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "Trailers",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(items = trailers, key = { it.id }) { trailer ->
-                    TmdbTrailerCard(trailer = trailer, modifier = Modifier.width(280.dp))
                 }
             }
         }
@@ -614,84 +592,6 @@ private fun formatRuntimeMinutes(minutes: Int?): String? {
         h > 0 && m > 0 -> "$h hr $m min"
         h > 0 -> "$h hr"
         else -> "$m min"
-    }
-}
-
-@Composable
-private fun TmdbTrailerCard(
-    trailer: TmdbTrailer,
-    modifier: Modifier = Modifier
-) {
-    val uriHandler = LocalUriHandler.current
-    ElevatedCard(
-        modifier = modifier,
-        onClick = { trailer.watchUrl?.let(uriHandler::openUri) }
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-            ) {
-                val thumbnail = trailer.thumbnailUrl?.trim().orEmpty()
-                if (thumbnail.isNotBlank()) {
-                    AsyncImage(
-                        model = thumbnail,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        MaterialTheme.colorScheme.secondaryContainer
-                                    )
-                                )
-                            )
-                    )
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(44.dp),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = Color.Black.copy(alpha = 0.35f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = trailer.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = trailer.type,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
     }
 }
 
