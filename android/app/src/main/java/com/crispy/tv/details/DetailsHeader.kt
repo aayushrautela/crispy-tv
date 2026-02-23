@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.StarBorder
@@ -147,6 +148,29 @@ internal fun HeaderInfoSection(
             textColor = palette.onPageBackground.copy(alpha = 0.9f),
             placeholderColor = palette.onPageBackground.copy(alpha = 0.7f)
         )
+
+        FilledTonalButton(
+            onClick = {},
+            enabled = false,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors =
+                ButtonDefaults.filledTonalButtonColors(
+                    containerColor = palette.pillBackground,
+                    contentColor = palette.onPillBackground,
+                    disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
+                    disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null
+            )
+            Spacer(modifier = Modifier.size(10.dp))
+            Text("AI insights")
+        }
 
         if (!trailerUrl.isNullOrBlank()) {
             FilledTonalButton(
