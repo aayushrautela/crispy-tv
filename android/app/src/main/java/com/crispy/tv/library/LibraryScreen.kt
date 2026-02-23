@@ -408,7 +408,11 @@ private fun LibraryScreen(
                             key = { entry -> "local:${entry.contentId}:${entry.watchedAtEpochMs}" }
                         ) { entry ->
                             val tmdbArtwork by
-                                produceState(initialValue = null to null, key1 = entry.contentId, key2 = entry.contentType) {
+                                produceState(
+                                    initialValue = Pair<String?, String?>(null, null),
+                                    key1 = entry.contentId,
+                                    key2 = entry.contentType
+                                ) {
                                     val rawId = entry.contentId.trim()
                                     val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
                                     if (!canResolve) {
@@ -511,11 +515,11 @@ private fun LibraryScreen(
 
                                 val artwork by
                                     produceState(
-                                        initialValue = providerPoster to providerBackdrop,
-                                        key1 = item.contentId,
-                                        key2 = item.contentType,
-                                        key3 = providerPoster,
-                                        key4 = providerBackdrop
+                                        providerPoster to providerBackdrop,
+                                        item.contentId,
+                                        item.contentType,
+                                        providerPoster,
+                                        providerBackdrop
                                     ) {
                                         if (!providerPoster.isNullOrBlank() && !providerBackdrop.isNullOrBlank()) {
                                             value = providerPoster to providerBackdrop
