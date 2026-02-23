@@ -242,7 +242,7 @@ class DetailsViewModel internal constructor(
                     startAiGeneration(
                         tmdbId = tmdbId,
                         details = detailsForAi,
-                        reviews = tmdbEnrichment?.reviews.orEmpty(),
+                        reviews = tmdbEnrichment.reviews.orEmpty(),
                         showStory = false,
                         announce = false,
                     )
@@ -280,7 +280,7 @@ class DetailsViewModel internal constructor(
         startAiGeneration(
             tmdbId = tmdbId,
             details = details,
-            reviews = state.tmdbEnrichment?.reviews.orEmpty(),
+            reviews = state.tmdbEnrichment.reviews.orEmpty(),
             showStory = true,
             announce = true,
         )
@@ -578,15 +578,15 @@ class DetailsViewModel internal constructor(
         if (canContinue) {
             val label =
                 if (isSeries) {
-                    val season = continueEntry?.season
-                    val episode = continueEntry?.episode
+                    val season = continueEntry.season
+                    val episode = continueEntry.episode
                     if (season != null && episode != null) {
                         "Continue (S$season E$episode)"
                     } else {
                         "Continue"
                     }
                 } else {
-                    val progress = continueEntry?.progressPercent
+                    val progress = continueEntry.progressPercent
                     if (progress != null) {
                         "Resume from ${progress.roundToInt()}%"
                     } else {
@@ -596,7 +596,7 @@ class DetailsViewModel internal constructor(
 
             val remainingMinutes =
                 parseRuntimeMinutes(details.runtime)?.let { runtimeMinutes ->
-                    val progress = continueEntry?.progressPercent ?: 0.0
+                    val progress = continueEntry.progressPercent ?: 0.0
                     val remaining = runtimeMinutes.toDouble() * (1.0 - (progress / 100.0))
                     remaining.roundToInt().coerceAtLeast(0)
                 }

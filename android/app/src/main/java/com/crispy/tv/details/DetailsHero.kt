@@ -26,10 +26,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.CircularProgressIndicator
@@ -140,7 +140,7 @@ internal fun HeroSection(
         if (showTrailer && hasTrailer) {
             HeroYouTubeTrailerLayer(
                 modifier = Modifier.fillMaxSize(),
-                trailerKey = trailerKey!!,
+                trailerKey = trailerKey,
                 shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
                 onPlaybackState = { state, _ ->
@@ -219,7 +219,7 @@ internal fun HeroSection(
                 contentColor = Color.White
             ) {
                 Icon(
-                    imageVector = if (isTrailerMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    imageVector = if (isTrailerMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                     contentDescription = if (isTrailerMuted) "Unmute trailer" else "Mute trailer",
                     modifier = Modifier.padding(10.dp)
                 )

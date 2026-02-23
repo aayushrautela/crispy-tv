@@ -1,5 +1,8 @@
 package com.crispy.tv.catalog
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class CatalogSectionRef(
     val title: String,
     val catalogId: String,
@@ -12,6 +15,7 @@ data class CatalogSectionRef(
         get() = "${mediaType.lowercase()}:$catalogId"
 }
 
+@Immutable
 data class CatalogItem(
     val id: String,
     val title: String,
@@ -24,12 +28,14 @@ data class CatalogItem(
     val genre: String? = null
 )
 
+@Immutable
 data class CatalogPageResult(
     val items: List<CatalogItem> = emptyList(),
     val statusMessage: String = "",
     val attemptedUrls: List<String> = emptyList()
 )
 
+@Immutable
 data class DiscoverCatalogRef(
     val section: CatalogSectionRef,
     val addonName: String,

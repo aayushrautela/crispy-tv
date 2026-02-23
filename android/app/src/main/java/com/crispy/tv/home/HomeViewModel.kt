@@ -2,7 +2,7 @@ package com.crispy.tv.home
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -37,6 +37,7 @@ import java.util.Locale
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
+@Immutable
 data class HeroState(
     val items: List<HomeHeroItem> = emptyList(),
     val selectedId: String? = null,
@@ -47,26 +48,31 @@ data class HeroState(
         get() = items.firstOrNull { it.id == selectedId } ?: items.firstOrNull()
 }
 
+@Immutable
 data class ContinueWatchingState(
     val items: List<ContinueWatchingItem> = emptyList(),
     val statusMessage: String = ""
 )
 
+@Immutable
 data class UpNextState(
     val items: List<ContinueWatchingItem> = emptyList(),
     val statusMessage: String = ""
 )
 
+@Immutable
 data class ForYouState(
     val items: List<ContinueWatchingItem> = emptyList(),
     val statusMessage: String = ""
 )
 
+@Immutable
 data class CatalogSectionsState(
     val sections: List<HomeCatalogSectionUi> = emptyList(),
     val statusMessage: String = ""
 )
 
+@Immutable
 data class HomeCatalogSectionUi(
     val section: CatalogSectionRef,
     val items: List<CatalogItem> = emptyList(),
@@ -81,7 +87,6 @@ class HomeViewModel internal constructor(
     private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
     companion object {
-        private const val TAG = "HomeViewModel"
         private const val CATALOG_CONCURRENCY_LIMIT = 6
 
         fun factory(context: Context): ViewModelProvider.Factory {
@@ -132,7 +137,6 @@ class HomeViewModel internal constructor(
 
     fun refresh() {
         catalogSectionsJob?.cancel()
-        homeCatalogService.invalidateAddonsCache()
         viewModelScope.launch {
             _heroState.update { it.copy(isLoading = true, statusMessage = "Loading featured content...") }
 
@@ -212,96 +216,87 @@ class HomeViewModel internal constructor(
                 )
             }
 
-            val continueWatchingResult = withContext(Dispatchers.IO) {
-                when (baseResult.selectedSource) {
-                    WatchProvider.LOCAL -> {
-                        val filteredEntries = applySuppressionFilter(baseResult.watchHistoryEntries)
-                        homeCatalogService.loadContinueWatchingItems(
-                            entries = filteredEntries,
-                            limit = 20
-                        )
+            // Run continue-watching enrichment, for-you enrichment, and catalog loading in parallel
+            coroutineScope {
+                launch {
+                    val continueWatchingResult = withContext(Dispatchers.IO) {
+                        when (baseResult.selectedSource) {
+                            WatchProvider.LOCAL -> {
+                                val filteredEntries = applySuppressionFilter(baseResult.watchHistoryEntries)
+                                homeCatalogService.loadContinueWatchingItems(
+                                    entries = filteredEntries,
+                                    limit = 20
+                                )
+                            }
+                            WatchProvider.TRAKT, WatchProvider.SIMKL -> {
+                                val filteredProviderEntries = applyProviderSuppressionFilter(baseResult.providerContinueWatchingResult.entries)
+                                if (filteredProviderEntries.isNotEmpty()) {
+                                    homeCatalogService.loadContinueWatchingItemsFromProvider(
+                                        entries = filteredProviderEntries,
+                                        limit = 20
+                                    )
+                                } else {
+                                    ContinueWatchingLoadResult(
+                                        items = emptyList(),
+                                        statusMessage = baseResult.providerContinueWatchingResult.statusMessage.ifBlank {
+                                            if (baseResult.providerConnected) {
+                                                "No continue watching entries available."
+                                            } else {
+                                                "Connect ${baseResult.selectedSource.displayName()} in Settings to load continue watching."
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
-                    WatchProvider.TRAKT, WatchProvider.SIMKL -> {
-                        val filteredProviderEntries = applyProviderSuppressionFilter(baseResult.providerContinueWatchingResult.entries)
-                        if (filteredProviderEntries.isNotEmpty()) {
-                            homeCatalogService.loadContinueWatchingItemsFromProvider(
-                                entries = filteredProviderEntries,
-                                limit = 20
-                            )
-                        } else {
+
+                    val inProgressItems = continueWatchingResult.items.filter { !it.isUpNextPlaceholder }
+                    val upNextItems = continueWatchingResult.items.filter { it.isUpNextPlaceholder }
+
+                    // Batch both emissions together to reduce recomposition count
+                    _continueWatchingState.value = ContinueWatchingState(
+                        items = inProgressItems,
+                        statusMessage = continueWatchingResult.statusMessage
+                    )
+                    _upNextState.value = UpNextState(
+                        items = upNextItems,
+                        statusMessage = if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) "" else continueWatchingResult.statusMessage
+                    )
+                }
+
+                launch {
+                    val forYouResult = withContext(Dispatchers.IO) {
+                        val filteredEntries = applyProviderLibrarySuppressionFilter(baseResult.providerRecommendationsResult.items)
+                        if (filteredEntries.isEmpty()) {
                             ContinueWatchingLoadResult(
                                 items = emptyList(),
-                                statusMessage = baseResult.providerContinueWatchingResult.statusMessage.ifBlank {
-                                    if (baseResult.providerConnected) {
-                                        "No continue watching entries available."
-                                    } else {
-                                        "Connect ${baseResult.selectedSource.displayName()} in Settings to load continue watching."
-                                    }
-                                }
+                                statusMessage = baseResult.providerRecommendationsResult.statusMessage
                             )
+                        } else {
+                            val loaded = homeCatalogService.loadContinueWatchingItemsFromProvider(
+                                entries = filteredEntries.map { it.toProviderContinueWatchingEntry() },
+                                limit = 20
+                            )
+                            val statusMessage =
+                                if (loaded.items.isNotEmpty()) {
+                                    ""
+                                } else {
+                                    baseResult.providerRecommendationsResult.statusMessage.ifBlank { loaded.statusMessage }
+                                }
+                            loaded.copy(statusMessage = statusMessage)
                         }
                     }
-                }
-            }
 
-            val inProgressItems = continueWatchingResult.items.filter { !it.isUpNextPlaceholder }
-            val upNextItems = continueWatchingResult.items.filter { it.isUpNextPlaceholder }
-            Log.d(TAG, "refresh: total=${continueWatchingResult.items.size} inProgress=${inProgressItems.size} upNext=${upNextItems.size} statusMessage=${continueWatchingResult.statusMessage}")
-            if (inProgressItems.isEmpty() && upNextItems.isEmpty()) {
-                Log.w(TAG, "refresh: no continue watching or up next items")
-            }
-            inProgressItems.forEachIndexed { i, item ->
-                Log.d(TAG, "  inProgress[$i]: id=${item.id} title=${item.title} s=${item.season} e=${item.episode} progress=${item.progressPercent}")
-            }
-            upNextItems.forEachIndexed { i, item ->
-                Log.d(TAG, "  upNext[$i]: id=${item.id} title=${item.title} s=${item.season} e=${item.episode} progress=${item.progressPercent}")
-            }
-
-            _continueWatchingState.update { current ->
-                ContinueWatchingState(
-                    items = inProgressItems,
-                    statusMessage = continueWatchingResult.statusMessage
-                )
-            }
-
-            _upNextState.update { current ->
-                UpNextState(
-                    items = upNextItems,
-                    statusMessage = if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) "" else continueWatchingResult.statusMessage
-                )
-            }
-
-            val forYouResult = withContext(Dispatchers.IO) {
-                val filteredEntries = applyProviderLibrarySuppressionFilter(baseResult.providerRecommendationsResult.items)
-                if (filteredEntries.isEmpty()) {
-                    ContinueWatchingLoadResult(
-                        items = emptyList(),
-                        statusMessage = baseResult.providerRecommendationsResult.statusMessage
+                    _forYouState.value = ForYouState(
+                        items = forYouResult.items,
+                        statusMessage = forYouResult.statusMessage
                     )
-                } else {
-                    val loaded = homeCatalogService.loadContinueWatchingItemsFromProvider(
-                        entries = filteredEntries.map { it.toProviderContinueWatchingEntry() },
-                        limit = 20
-                    )
-                    val statusMessage =
-                        if (loaded.items.isNotEmpty()) {
-                            ""
-                        } else {
-                            baseResult.providerRecommendationsResult.statusMessage.ifBlank { loaded.statusMessage }
-                        }
-                    loaded.copy(statusMessage = statusMessage)
                 }
-            }
 
-            _forYouState.update {
-                ForYouState(
-                    items = forYouResult.items,
-                    statusMessage = forYouResult.statusMessage
-                )
-            }
-
-            catalogSectionsJob = viewModelScope.launch {
-                loadCatalogSections()
+                catalogSectionsJob = launch {
+                    loadCatalogSections()
+                }
             }
         }
     }

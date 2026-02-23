@@ -2,6 +2,7 @@ package com.crispy.tv.home
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -30,6 +31,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
+@Immutable
 data class HomeHeroItem(
     val id: String,
     val title: String,
@@ -42,11 +44,13 @@ data class HomeHeroItem(
     val type: String
 )
 
+@Immutable
 data class HomeHeroLoadResult(
     val items: List<HomeHeroItem> = emptyList(),
     val statusMessage: String = "Home is ready."
 )
 
+@Immutable
 data class ContinueWatchingItem(
     val id: String,
     val contentId: String,
@@ -65,6 +69,7 @@ data class ContinueWatchingItem(
     val type: String
 )
 
+@Immutable
 data class ContinueWatchingLoadResult(
     val items: List<ContinueWatchingItem> = emptyList(),
     val statusMessage: String = ""

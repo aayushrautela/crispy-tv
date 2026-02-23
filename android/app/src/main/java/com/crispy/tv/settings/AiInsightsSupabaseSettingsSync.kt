@@ -27,8 +27,8 @@ class AiInsightsSupabaseSettingsSync(
         return AiInsightsSettingsSnapshot(
             settings =
                 AiInsightsSettings(
-                    mode = AiInsightsMode.fromRaw(ai.optString("mode", null)),
-                    modelType = AiInsightsModelType.fromRaw(ai.optString("model_type", null)),
+                    mode = AiInsightsMode.fromRaw(ai.optString("mode").takeIf { it.isNotBlank() }),
+                    modelType = AiInsightsModelType.fromRaw(ai.optString("model_type").takeIf { it.isNotBlank() }),
                     customModelName = ai.optString("custom_model_name", "").trim(),
                 ),
             openRouterKey = ai.optString("openrouter_key", "").trim(),
