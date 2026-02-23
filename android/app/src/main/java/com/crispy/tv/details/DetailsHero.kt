@@ -1,13 +1,18 @@
 package com.crispy.tv.details
 
 import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
 import android.view.View
+import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +31,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +64,7 @@ import coil.compose.AsyncImage
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun HeroSection(
@@ -66,7 +73,6 @@ internal fun HeroSection(
     trailerKey: String?,
     trailerWatchUrl: String?,
     showTrailer: Boolean,
-    revealTrailer: Boolean,
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
     onToggleTrailer: () -> Unit,
@@ -111,16 +117,65 @@ internal fun HeroSection(
             ) {}
         }
 
+        val hasTrailer = !trailerKey.isNullOrBlank()
         var trailerFailed by remember(trailerKey) { mutableStateOf(false) }
-        if (showTrailer && !trailerKey.isNullOrBlank()) {
+        var trailerPlaybackConfirmed by remember(trailerKey) { mutableStateOf(false) }
+
+        val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying && !trailerFailed
+        val latestShouldAttemptPlayback by rememberUpdatedState(shouldAttemptPlayback)
+
+        LaunchedEffect(trailerKey, shouldAttemptPlayback) {
+            if (!shouldAttemptPlayback) {
+                trailerPlaybackConfirmed = false
+                return@LaunchedEffect
+            }
+
+            trailerPlaybackConfirmed = false
+            delay(8000)
+            if (!trailerPlaybackConfirmed) {
+                trailerFailed = true
+            }
+        }
+
+        if (showTrailer && hasTrailer) {
             HeroYouTubeTrailerLayer(
                 modifier = Modifier.fillMaxSize(),
-                trailerKey = trailerKey,
-                reveal = revealTrailer,
-                isPlaying = isTrailerPlaying,
+                trailerKey = trailerKey!!,
+                shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
+                onPlaybackState = { state, _ ->
+                    if (state == 1 && latestShouldAttemptPlayback) {
+                        trailerPlaybackConfirmed = true
+                    }
+                },
                 onError = { trailerFailed = true }
             )
+        }
+
+        val coverAlpha by animateFloatAsState(
+            targetValue = if (shouldAttemptPlayback && trailerPlaybackConfirmed) 0f else 1f,
+            animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+            label = "hero_trailer_cover_alpha",
+        )
+
+        if (showTrailer && hasTrailer && coverAlpha > 0.001f) {
+            if (!imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(alpha = coverAlpha),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(alpha = coverAlpha),
+                    color = palette.pillBackground,
+                ) {}
+            }
         }
 
         // Top scrim for app bar/buttons readability.
@@ -153,8 +208,7 @@ internal fun HeroSection(
                 )
         )
 
-        val hasTrailer = !trailerKey.isNullOrBlank()
-        if (hasTrailer) {
+        if (showTrailer && hasTrailer && !trailerFailed) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -174,9 +228,9 @@ internal fun HeroSection(
 
         val resolvedTrailerWatchUrl = trailerWatchUrl?.trim().takeIf { !it.isNullOrBlank() }
         if (hasTrailer) {
-            val isPlaying = isTrailerPlaying
-            val icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
-            val label = if (trailerFailed && resolvedTrailerWatchUrl != null) "Open trailer" else if (isPlaying) "Pause" else "Trailer"
+            val isActuallyPlaying = isTrailerPlaying && trailerPlaybackConfirmed && !trailerFailed
+            val icon = if (isActuallyPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
+            val label = if (trailerFailed && resolvedTrailerWatchUrl != null) "Open trailer" else if (isActuallyPlaying) "Pause" else "Trailer"
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -244,22 +298,18 @@ internal fun HeroSection(
 private fun HeroYouTubeTrailerLayer(
     modifier: Modifier,
     trailerKey: String,
-    reveal: Boolean,
-    isPlaying: Boolean,
+    shouldPlay: Boolean,
     isMuted: Boolean,
+    onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
     onError: () -> Unit,
 ) {
-    val clientIdentityUrl = remember { "https://${BuildConfig.APPLICATION_ID}" }
-    val embedUrl = remember(trailerKey, clientIdentityUrl) { buildYoutubeEmbedUrl(trailerKey, clientIdentityUrl) }
-    val headers = remember(clientIdentityUrl) { mapOf("Referer" to clientIdentityUrl) }
+    val clientIdentityOrigin = remember { "https://${BuildConfig.APPLICATION_ID}" }
+    val baseUrl = remember(clientIdentityOrigin) { "$clientIdentityOrigin/" }
+    val playerHtml = remember(trailerKey, clientIdentityOrigin) { buildYoutubeTrailerHtml(trailerKey, clientIdentityOrigin) }
     val latestOnError by rememberUpdatedState(onError)
+    val latestOnPlaybackState by rememberUpdatedState(onPlaybackState)
     val latestMuted by rememberUpdatedState(isMuted)
-    val latestPlaying by rememberUpdatedState(isPlaying)
-
-    val revealMaskAlpha by animateFloatAsState(
-        targetValue = if (reveal) 0f else 1f,
-        label = "hero_trailer_reveal_mask"
-    )
+    val latestShouldPlay by rememberUpdatedState(shouldPlay)
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val webView = remember(trailerKey) {
@@ -270,6 +320,9 @@ private fun HeroYouTubeTrailerLayer(
             isClickable = false
             isLongClickable = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
 
             @SuppressLint("SetJavaScriptEnabled")
             settings.javaScriptEnabled = true
@@ -278,8 +331,39 @@ private fun HeroYouTubeTrailerLayer(
             settings.loadWithOverviewMode = true
             settings.useWideViewPort = true
 
+            CookieManager.getInstance().setAcceptCookie(true)
+            runCatching { CookieManager.getInstance().setAcceptThirdPartyCookies(this, true) }
+
             // Treat as background video layer.
             setOnTouchListener { _, _ -> true }
+
+            val mainHandler = Handler(Looper.getMainLooper())
+            addJavascriptInterface(
+                object {
+                    @JavascriptInterface
+                    fun onReady() {
+                        mainHandler.post {
+                            applyMute(this@apply, latestMuted)
+                            applyPlayPause(this@apply, latestShouldPlay)
+                        }
+                    }
+
+                    @JavascriptInterface
+                    fun onState(state: Int, timeSeconds: Double) {
+                        mainHandler.post {
+                            latestOnPlaybackState(state, timeSeconds)
+                        }
+                    }
+
+                    @JavascriptInterface
+                    fun onError(code: Int) {
+                        mainHandler.post {
+                            latestOnError()
+                        }
+                    }
+                },
+                "CrispyBridge",
+            )
 
             webViewClient =
                 object : WebViewClient() {
@@ -314,7 +398,7 @@ private fun HeroYouTubeTrailerLayer(
                     override fun onPageFinished(view: WebView, url: String) {
                         // Best effort: apply current state after load.
                         applyMute(view, latestMuted)
-                        applyPlayPause(view, latestPlaying)
+                        applyPlayPause(view, latestShouldPlay)
                     }
                 }
         }
@@ -328,9 +412,15 @@ private fun HeroYouTubeTrailerLayer(
         }
     }
 
-    LaunchedEffect(webView, embedUrl) {
+    LaunchedEffect(webView, baseUrl, playerHtml) {
         runCatching {
-            webView.loadUrl(embedUrl, headers)
+            webView.loadDataWithBaseURL(
+                baseUrl,
+                playerHtml,
+                "text/html",
+                "utf-8",
+                null
+            )
         }.onFailure {
             latestOnError()
         }
@@ -340,8 +430,8 @@ private fun HeroYouTubeTrailerLayer(
         applyMute(webView, isMuted)
     }
 
-    LaunchedEffect(webView, isPlaying) {
-        applyPlayPause(webView, isPlaying)
+    LaunchedEffect(webView, shouldPlay) {
+        applyPlayPause(webView, shouldPlay)
     }
 
     Box(modifier = modifier.clipToBounds()) {
@@ -353,39 +443,80 @@ private fun HeroYouTubeTrailerLayer(
             factory = { webView },
             update = {}
         )
-
-        if (revealMaskAlpha > 0.001f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = revealMaskAlpha))
-            )
-        }
     }
 }
 
-private fun buildYoutubeEmbedUrl(videoId: String, clientIdentityUrl: String): String {
-    val id = videoId.trim()
-    // YouTube requires a client identity (Referer/origin). For WebView, Google recommends using
-    // an HTTPS URL whose domain is your app ID (package name).
-    return "https://www.youtube.com/embed/$id" +
-        "?autoplay=1" +
-        "&controls=0" +
-        "&showinfo=0" +
-        "&rel=0" +
-        "&loop=1" +
-        "&playlist=$id" +
-        "&modestbranding=1" +
-        "&playsinline=1" +
-        "&mute=1" +
-        "&enablejsapi=1" +
-        "&origin=$clientIdentityUrl"
+private fun buildYoutubeTrailerHtml(videoId: String, origin: String): String {
+    val id = escapeJsString(videoId.trim())
+    val o = escapeJsString(origin.trim())
+    return (
+        "<!DOCTYPE html>" +
+            "<html>" +
+            "<head>" +
+            "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'/>" +
+            "<style>" +
+            "html,body{margin:0;padding:0;background:#000;overflow:hidden;}" +
+            "#player{position:absolute;top:0;left:0;width:100%;height:100%;}" +
+            "</style>" +
+            "</head>" +
+            "<body>" +
+            "<div id='player'></div>" +
+            "<script>" +
+            "(function(){" +
+            "var VIDEO_ID='$id';" +
+            "var ORIGIN='$o';" +
+            "var desiredMuted=true;" +
+            "var desiredPlaying=false;" +
+            "var player=null;" +
+            "function safeCall(fn){try{fn();}catch(e){}}" +
+            "function notifyReady(){safeCall(function(){CrispyBridge.onReady();});}" +
+            "function notifyState(state){" +
+            "  var t=0;" +
+            "  safeCall(function(){ if(player&&player.getCurrentTime){ t=player.getCurrentTime(); } });" +
+            "  safeCall(function(){ CrispyBridge.onState(state,t); });" +
+            "}" +
+            "function notifyError(code){safeCall(function(){CrispyBridge.onError(code);});}" +
+            "window.__crispyTrailer={" +
+            "  setMuted:function(m){ desiredMuted=!!m; if(!player){return;} safeCall(function(){ if(desiredMuted){ player.mute(); player.setVolume(0);} else { player.setVolume(100); player.unMute(); } }); }," +
+            "  setPlaying:function(p){ desiredPlaying=!!p; if(!player){return;} safeCall(function(){ if(desiredPlaying){ player.playVideo(); } else { player.pauseVideo(); } }); }" +
+            "};" +
+            "window.onYouTubeIframeAPIReady=function(){" +
+            "  player=new YT.Player('player',{" +
+            "    width:'100%',height:'100%',videoId:VIDEO_ID," +
+            "    playerVars:{autoplay:0,controls:0,rel:0,modestbranding:1,playsinline:1,mute:1,loop:1,playlist:VIDEO_ID,enablejsapi:1,origin:ORIGIN}," +
+            "    events:{" +
+            "      onReady:function(){" +
+            "        safeCall(function(){ if(desiredMuted){ player.mute(); player.setVolume(0);} else { player.setVolume(100); player.unMute(); } });" +
+            "        safeCall(function(){ if(desiredPlaying){ player.playVideo(); } });" +
+            "        notifyReady();" +
+            "      }," +
+            "      onStateChange:function(e){ notifyState(e.data); }," +
+            "      onError:function(e){ notifyError(e.data); }" +
+            "    }" +
+            "  });" +
+            "};" +
+            "var tag=document.createElement('script');" +
+            "tag.src='https://www.youtube.com/iframe_api';" +
+            "document.head.appendChild(tag);" +
+            "})();" +
+            "</script>" +
+            "</body>" +
+            "</html>"
+    )
+}
+
+private fun escapeJsString(value: String): String {
+    return value
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
 }
 
 private fun applyMute(webView: WebView, muted: Boolean) {
     val m = if (muted) "true" else "false"
     webView.evaluateJavascript(
-        "(function(){var v=document.querySelector('video'); if(v){v.muted=$m; if($m){v.volume=0;} }})();",
+        "try{window.__crispyTrailer && window.__crispyTrailer.setMuted($m);}catch(e){}",
         null
     )
 }
@@ -393,7 +524,7 @@ private fun applyMute(webView: WebView, muted: Boolean) {
 private fun applyPlayPause(webView: WebView, playing: Boolean) {
     val p = if (playing) "true" else "false"
     webView.evaluateJavascript(
-        "(function(){var v=document.querySelector('video'); if(v){ if($p){v.play();} else {v.pause();} }})();",
+        "try{window.__crispyTrailer && window.__crispyTrailer.setPlaying($p);}catch(e){}",
         null
     )
 }

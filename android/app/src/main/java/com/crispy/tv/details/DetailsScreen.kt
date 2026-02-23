@@ -32,8 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -71,24 +69,18 @@ internal fun DetailsScreen(
     val trailerKey = selectedTrailer?.key?.trim().takeIf { !it.isNullOrBlank() }
     val trailerWatchUrl = selectedTrailer?.watchUrl?.trim().takeIf { !it.isNullOrBlank() }
 
-    val configuration = LocalConfiguration.current
-    val heroHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(340.dp, 520.dp)
-    val heroHeightPx = with(LocalDensity.current) { heroHeight.roundToPx() }
-
-    val heroIsVisible by remember {
+    val heroIsPinned by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= heroHeightPx
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 2
         }
     }
 
     var showTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
-    var revealTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
     var userPausedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
     var userMutedTrailer by rememberSaveable(trailerKey) { mutableStateOf(true) }
 
     LaunchedEffect(trailerKey) {
         showTrailer = false
-        revealTrailer = false
         userPausedTrailer = false
         userMutedTrailer = true
 
@@ -96,11 +88,13 @@ internal fun DetailsScreen(
 
         delay(2000)
         showTrailer = true
-        delay(2000)
-        revealTrailer = true
     }
 
-    val isTrailerPlaying = showTrailer && revealTrailer && heroIsVisible && !userPausedTrailer
+    val isTrailerPlaying =
+        showTrailer &&
+            heroIsPinned &&
+            !listState.isScrollInProgress &&
+            !userPausedTrailer
 
     val topBarAlpha by remember {
         derivedStateOf {
@@ -143,14 +137,12 @@ internal fun DetailsScreen(
                         trailerKey = trailerKey,
                         trailerWatchUrl = trailerWatchUrl,
                         showTrailer = showTrailer,
-                        revealTrailer = revealTrailer,
                         isTrailerPlaying = isTrailerPlaying,
                         isTrailerMuted = userMutedTrailer,
                         onToggleTrailer = {
                             if (!trailerKey.isNullOrBlank()) {
                                 if (!showTrailer) {
                                     showTrailer = true
-                                    revealTrailer = true
                                     userPausedTrailer = false
                                 } else {
                                     userPausedTrailer = !userPausedTrailer
@@ -175,7 +167,6 @@ internal fun DetailsScreen(
                         onWatchNow = {
                             if (!trailerKey.isNullOrBlank()) {
                                 showTrailer = true
-                                revealTrailer = true
                                 userPausedTrailer = false
                                 coroutineScope.launch {
                                     listState.animateScrollToItem(0)
