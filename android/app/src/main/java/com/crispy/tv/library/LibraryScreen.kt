@@ -221,8 +221,6 @@ class LibraryViewModel internal constructor(
      }
 }
 
-/** Material 3 standard TopAppBar height (TopAppBarSmallTokens.ContainerHeight). */
-private val TopAppBarHeight = 64.dp
     fun selectSource(source: LibrarySource) {
         settingsStore.save(
             settingsStore.load().copy(
@@ -265,6 +263,9 @@ private val TopAppBarHeight = 64.dp
         }
     }
 }
+
+/** Material 3 standard TopAppBar height (TopAppBarSmallTokens.ContainerHeight). */
+private val TopAppBarHeight = 64.dp
 
 @Composable
 fun LibraryRoute(
