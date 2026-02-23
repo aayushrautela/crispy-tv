@@ -84,11 +84,13 @@ internal fun DetailsScreen(
     var showTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
     var revealTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
     var userPausedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
+    var userMutedTrailer by rememberSaveable(trailerKey) { mutableStateOf(true) }
 
     LaunchedEffect(trailerKey) {
         showTrailer = false
         revealTrailer = false
         userPausedTrailer = false
+        userMutedTrailer = true
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
 
@@ -143,6 +145,7 @@ internal fun DetailsScreen(
                         showTrailer = showTrailer,
                         revealTrailer = revealTrailer,
                         isTrailerPlaying = isTrailerPlaying,
+                        isTrailerMuted = userMutedTrailer,
                         onToggleTrailer = {
                             if (!trailerKey.isNullOrBlank()) {
                                 if (!showTrailer) {
@@ -153,6 +156,9 @@ internal fun DetailsScreen(
                                     userPausedTrailer = !userPausedTrailer
                                 }
                             }
+                        },
+                        onToggleTrailerMute = {
+                            userMutedTrailer = !userMutedTrailer
                         }
                     )
                 }

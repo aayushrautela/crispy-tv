@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.view.View
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -21,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -64,7 +68,9 @@ internal fun HeroSection(
     showTrailer: Boolean,
     revealTrailer: Boolean,
     isTrailerPlaying: Boolean,
+    isTrailerMuted: Boolean,
     onToggleTrailer: () -> Unit,
+    onToggleTrailerMute: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -112,7 +118,7 @@ internal fun HeroSection(
                 trailerKey = trailerKey,
                 reveal = revealTrailer,
                 isPlaying = isTrailerPlaying,
-                isMuted = true,
+                isMuted = isTrailerMuted,
                 onError = { trailerFailed = true }
             )
         }
@@ -147,8 +153,27 @@ internal fun HeroSection(
                 )
         )
 
+        val hasTrailer = !trailerKey.isNullOrBlank()
+        if (hasTrailer) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 20.dp, end = 16.dp)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .clickable { onToggleTrailerMute() },
+                color = Color.Black.copy(alpha = 0.34f),
+                contentColor = Color.White
+            ) {
+                Icon(
+                    imageVector = if (isTrailerMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    contentDescription = if (isTrailerMuted) "Unmute trailer" else "Mute trailer",
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+        }
+
         val resolvedTrailerWatchUrl = trailerWatchUrl?.trim().takeIf { !it.isNullOrBlank() }
-        if (!trailerKey.isNullOrBlank()) {
+        if (hasTrailer) {
             val isPlaying = isTrailerPlaying
             val icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
             val label = if (trailerFailed && resolvedTrailerWatchUrl != null) "Open trailer" else if (isPlaying) "Pause" else "Trailer"
@@ -231,16 +256,15 @@ private fun HeroYouTubeTrailerLayer(
     val latestMuted by rememberUpdatedState(isMuted)
     val latestPlaying by rememberUpdatedState(isPlaying)
 
-    val alpha by animateFloatAsState(
-        targetValue = if (reveal) 1f else 0f,
-        label = "hero_trailer_alpha"
+    val revealMaskAlpha by animateFloatAsState(
+        targetValue = if (reveal) 0f else 1f,
+        label = "hero_trailer_reveal_mask"
     )
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val webView = remember(trailerKey) {
         WebView(context).apply {
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            setBackgroundColor(android.graphics.Color.BLACK)
             isFocusable = false
             isFocusableInTouchMode = false
             isClickable = false
@@ -264,7 +288,27 @@ private fun HeroYouTubeTrailerLayer(
                         request: WebResourceRequest,
                         error: WebResourceError,
                     ) {
+                        if (request.isForMainFrame) {
+                            latestOnError()
+                        }
+                    }
+
+                    override fun onReceivedHttpError(
+                        view: WebView,
+                        request: WebResourceRequest,
+                        errorResponse: WebResourceResponse,
+                    ) {
+                        if (request.isForMainFrame && errorResponse.statusCode >= 400) {
+                            latestOnError()
+                        }
+                    }
+
+                    override fun onRenderProcessGone(
+                        view: WebView,
+                        detail: RenderProcessGoneDetail,
+                    ): Boolean {
                         latestOnError()
+                        return true
                     }
 
                     override fun onPageFinished(view: WebView, url: String) {
@@ -305,11 +349,18 @@ private fun HeroYouTubeTrailerLayer(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer(alpha = alpha)
                     .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
             factory = { webView },
             update = {}
         )
+
+        if (revealMaskAlpha > 0.001f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = revealMaskAlpha))
+            )
+        }
     }
 }
 
