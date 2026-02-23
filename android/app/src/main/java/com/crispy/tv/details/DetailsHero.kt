@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 
@@ -223,8 +224,9 @@ private fun HeroYouTubeTrailerLayer(
     isMuted: Boolean,
     onError: () -> Unit,
 ) {
-    val embedUrl = remember(trailerKey) { buildYoutubeEmbedUrl(trailerKey) }
-    val headers = remember { mapOf("Referer" to "http://localhost") }
+    val clientIdentityUrl = remember { "https://${BuildConfig.APPLICATION_ID}" }
+    val embedUrl = remember(trailerKey, clientIdentityUrl) { buildYoutubeEmbedUrl(trailerKey, clientIdentityUrl) }
+    val headers = remember(clientIdentityUrl) { mapOf("Referer" to clientIdentityUrl) }
     val latestOnError by rememberUpdatedState(onError)
     val latestMuted by rememberUpdatedState(isMuted)
     val latestPlaying by rememberUpdatedState(isPlaying)
@@ -311,9 +313,10 @@ private fun HeroYouTubeTrailerLayer(
     }
 }
 
-private fun buildYoutubeEmbedUrl(videoId: String): String {
+private fun buildYoutubeEmbedUrl(videoId: String, clientIdentityUrl: String): String {
     val id = videoId.trim()
-    // origin+referer set to localhost to reduce embed restrictions (mirrors old app behavior).
+    // YouTube requires a client identity (Referer/origin). For WebView, Google recommends using
+    // an HTTPS URL whose domain is your app ID (package name).
     return "https://www.youtube.com/embed/$id" +
         "?autoplay=1" +
         "&controls=0" +
@@ -325,7 +328,7 @@ private fun buildYoutubeEmbedUrl(videoId: String): String {
         "&playsinline=1" +
         "&mute=1" +
         "&enablejsapi=1" +
-        "&origin=http://localhost"
+        "&origin=$clientIdentityUrl"
 }
 
 private fun applyMute(webView: WebView, muted: Boolean) {
