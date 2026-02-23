@@ -12,6 +12,9 @@ object AppRoutes {
 
     const val HomeDetailsRoute = "home/details"
     const val HomeDetailsItemIdArg = "itemId"
+    const val PlayerRoute = "player"
+    const val PlayerUrlArg = "url"
+    const val PlayerTitleArg = "title"
 
     const val LabsRoute = "labs"
     const val PlaybackSettingsRoute = "settings/playback"
@@ -29,6 +32,8 @@ object AppRoutes {
     const val CatalogQueryArg = "query"
 
     val HomeDetailsRoutePattern: String = "$HomeDetailsRoute/{$HomeDetailsItemIdArg}"
+    val PlayerRoutePattern: String =
+        "$PlayerRoute?$PlayerUrlArg={$PlayerUrlArg}&$PlayerTitleArg={$PlayerTitleArg}"
     val CatalogListRoutePattern: String =
         "$CatalogListRoute/{$CatalogMediaTypeArg}/{$CatalogIdArg}" +
             "?$CatalogTitleArg={$CatalogTitleArg}" +
@@ -37,6 +42,10 @@ object AppRoutes {
             "&$CatalogQueryArg={$CatalogQueryArg}"
 
     fun homeDetailsRoute(itemId: String): String = "$HomeDetailsRoute/${Uri.encode(itemId)}"
+
+    fun playerRoute(url: String, title: String): String {
+        return "$PlayerRoute?$PlayerUrlArg=${Uri.encode(url)}&$PlayerTitleArg=${Uri.encode(title)}"
+    }
 
     fun catalogListRoute(section: CatalogSectionRef): String {
         val query = section.encodedAddonQuery ?: ""

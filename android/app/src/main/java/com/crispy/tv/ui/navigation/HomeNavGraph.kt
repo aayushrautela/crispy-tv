@@ -9,6 +9,7 @@ import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.details.DetailsRoute
 import com.crispy.tv.home.HomeScreen
+import com.crispy.tv.playerui.PlayerRoute
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) {
@@ -69,7 +70,37 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         DetailsRoute(
             itemId = itemId,
             onBack = { navController.popBackStack() },
-            onItemClick = { nextId -> navController.navigate(AppRoutes.homeDetailsRoute(nextId)) }
+            onItemClick = { nextId -> navController.navigate(AppRoutes.homeDetailsRoute(nextId)) },
+            onOpenPlayer = { playbackUrl, title ->
+                navController.navigate(AppRoutes.playerRoute(playbackUrl, title))
+            },
+        )
+    }
+
+    composable(
+        route = AppRoutes.PlayerRoutePattern,
+        arguments =
+            listOf(
+                navArgument(AppRoutes.PlayerUrlArg) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(AppRoutes.PlayerTitleArg) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+    ) { entry ->
+        val playbackUrl = entry.arguments?.getString(AppRoutes.PlayerUrlArg).orEmpty()
+        if (playbackUrl.isBlank()) {
+            navController.popBackStack()
+            return@composable
+        }
+
+        PlayerRoute(
+            playbackUrl = playbackUrl,
+            title = entry.arguments?.getString(AppRoutes.PlayerTitleArg).orEmpty(),
+            onBack = { navController.popBackStack() },
         )
     }
 }

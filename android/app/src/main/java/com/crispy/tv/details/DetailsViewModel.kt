@@ -24,10 +24,17 @@ import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.settings.AiInsightsSettingsStore
 import com.crispy.tv.settings.HomeScreenSettingsStore
+import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.AddonStreamsService
+import com.crispy.tv.streams.ProviderStreamsResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -53,13 +60,42 @@ data class DetailsUiState(
     val userRating: Int? = null,
     val isMutating: Boolean = false,
     val watchCta: WatchCta = WatchCta(),
-    val selectedSeason: Int? = null
+    val selectedSeason: Int? = null,
+    val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
 ) {
     val seasons: List<Int>
         get() = details?.videos?.mapNotNull { it.season }?.distinct()?.sorted() ?: emptyList()
 
     val selectedSeasonOrFirst: Int?
         get() = selectedSeason ?: seasons.firstOrNull()
+}
+
+data class StreamProviderUiState(
+    val providerId: String,
+    val providerName: String,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    val streams: List<AddonStream> = emptyList(),
+    val attemptedUrl: String? = null,
+)
+
+data class StreamSelectorUiState(
+    val visible: Boolean = false,
+    val mediaType: MetadataLabMediaType? = null,
+    val lookupId: String? = null,
+    val selectedProviderId: String? = null,
+    val providers: List<StreamProviderUiState> = emptyList(),
+    val isLoading: Boolean = false,
+) {
+    val totalStreamCount: Int
+        get() = providers.sumOf { provider -> provider.streams.size }
+}
+
+sealed interface DetailsNavigationEvent {
+    data class OpenPlayer(
+        val playbackUrl: String,
+        val title: String,
+    ) : DetailsNavigationEvent
 }
 
 class DetailsViewModel internal constructor(
@@ -71,12 +107,16 @@ class DetailsViewModel internal constructor(
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     private val aiSettingsStore: AiInsightsSettingsStore,
     private val aiRepository: AiInsightsRepository,
+    private val addonStreamsService: AddonStreamsService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
+    private val _navigationEvents = MutableSharedFlow<DetailsNavigationEvent>(extraBufferCapacity = 1)
+    val navigationEvents: SharedFlow<DetailsNavigationEvent> = _navigationEvents.asSharedFlow()
 
     private var aiJob: Job? = null
+    private var streamLoadJob: Job? = null
 
     init {
         reload()
@@ -149,6 +189,7 @@ class DetailsViewModel internal constructor(
                     aiInsights = null,
                     aiStoryVisible = false,
                     watchCta = WatchCta(),
+                    streamSelector = StreamSelectorUiState(),
                 )
             }
 
@@ -332,6 +373,236 @@ class DetailsViewModel internal constructor(
 
     fun onSeasonSelected(season: Int) {
         _uiState.update { it.copy(selectedSeason = season) }
+    }
+
+    fun onOpenStreamSelector() {
+        val state = _uiState.value
+        val details = state.details
+        if (details == null) {
+            _uiState.update { it.copy(statusMessage = "Details are still loading.") }
+            return
+        }
+
+        val target = resolveStreamLookupTarget(details, state.selectedSeasonOrFirst)
+        if (target.lookupId.isBlank()) {
+            _uiState.update { it.copy(statusMessage = "Unable to resolve stream lookup id for this title.") }
+            return
+        }
+
+        val current = state.streamSelector
+        if (
+            current.lookupId == target.lookupId &&
+            current.mediaType == target.mediaType &&
+            current.providers.isNotEmpty()
+        ) {
+            _uiState.update {
+                it.copy(
+                    streamSelector = current.copy(visible = true),
+                    statusMessage = "",
+                )
+            }
+            return
+        }
+
+        streamLoadJob?.cancel()
+        _uiState.update {
+            it.copy(
+                streamSelector =
+                    StreamSelectorUiState(
+                        visible = true,
+                        mediaType = target.mediaType,
+                        lookupId = target.lookupId,
+                        isLoading = true,
+                    ),
+                statusMessage = "Fetching streams...",
+            )
+        }
+
+        streamLoadJob =
+            viewModelScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        addonStreamsService.loadStreams(
+                            mediaType = target.mediaType,
+                            lookupId = target.lookupId,
+                        )
+                    }
+                }.onSuccess { results ->
+                    val providerStates = results.map { result -> result.toUiState() }
+                    val totalStreams = providerStates.sumOf { provider -> provider.streams.size }
+                    val partialFailure = providerStates.any { provider -> provider.errorMessage != null }
+
+                    _uiState.update { previous ->
+                        previous.copy(
+                            streamSelector =
+                                previous.streamSelector.copy(
+                                    visible = true,
+                                    mediaType = target.mediaType,
+                                    lookupId = target.lookupId,
+                                    selectedProviderId = null,
+                                    providers = providerStates,
+                                    isLoading = false,
+                                ),
+                            statusMessage =
+                                when {
+                                    totalStreams > 0 -> "Found $totalStreams stream${if (totalStreams == 1) "" else "s"}."
+                                    partialFailure -> "No streams found. Some providers failed to load."
+                                    else -> "No streams found for this title."
+                                },
+                        )
+                    }
+                }.onFailure { error ->
+                    if (error is CancellationException) return@onFailure
+                    _uiState.update { previous ->
+                        previous.copy(
+                            streamSelector = previous.streamSelector.copy(isLoading = false),
+                            statusMessage = error.message ?: "Failed to fetch streams.",
+                        )
+                    }
+                }
+            }
+    }
+
+    fun onDismissStreamSelector() {
+        _uiState.update { state ->
+            state.copy(
+                streamSelector = state.streamSelector.copy(visible = false),
+                statusMessage = "",
+            )
+        }
+    }
+
+    fun onProviderSelected(providerId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                streamSelector =
+                    state.streamSelector.copy(
+                        selectedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() },
+                    )
+            )
+        }
+    }
+
+    fun onRetryProvider(providerId: String) {
+        val normalizedProviderId = providerId.trim()
+        if (normalizedProviderId.isBlank()) return
+
+        val selectorState = _uiState.value.streamSelector
+        val mediaType = selectorState.mediaType ?: return
+        val lookupId = selectorState.lookupId ?: return
+
+        _uiState.update { state ->
+            val providers =
+                state.streamSelector.providers.map { provider ->
+                    if (provider.providerId.equals(normalizedProviderId, ignoreCase = true)) {
+                        provider.copy(
+                            isLoading = true,
+                            errorMessage = null,
+                        )
+                    } else {
+                        provider
+                    }
+                }
+            state.copy(
+                streamSelector = state.streamSelector.copy(providers = providers),
+                statusMessage = "Retrying ${providers.firstOrNull { it.providerId.equals(normalizedProviderId, true) }?.providerName ?: "provider"}...",
+            )
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    addonStreamsService.loadProviderStreams(
+                        mediaType = mediaType,
+                        lookupId = lookupId,
+                        providerId = normalizedProviderId,
+                    )
+                }
+            }.onSuccess { result ->
+                _uiState.update { state ->
+                    val providers =
+                        state.streamSelector.providers.map { provider ->
+                            if (provider.providerId.equals(normalizedProviderId, ignoreCase = true)) {
+                                val updated = result?.toUiState()
+                                if (updated != null) {
+                                    updated
+                                } else {
+                                    provider.copy(
+                                        isLoading = false,
+                                        errorMessage = "Provider no longer available.",
+                                        streams = emptyList(),
+                                        attemptedUrl = null,
+                                    )
+                                }
+                            } else {
+                                provider
+                            }
+                        }
+
+                    val updatedProvider =
+                        providers.firstOrNull { provider ->
+                            provider.providerId.equals(normalizedProviderId, ignoreCase = true)
+                        }
+                    state.copy(
+                        streamSelector = state.streamSelector.copy(providers = providers),
+                        statusMessage =
+                            when {
+                                updatedProvider == null -> "Provider no longer available."
+                                updatedProvider.errorMessage != null -> updatedProvider.errorMessage
+                                updatedProvider.streams.isEmpty() -> "No streams returned from ${updatedProvider.providerName}."
+                                else -> "Updated ${updatedProvider.providerName}."
+                            },
+                    )
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) return@onFailure
+                _uiState.update { state ->
+                    val providers =
+                        state.streamSelector.providers.map { provider ->
+                            if (provider.providerId.equals(normalizedProviderId, ignoreCase = true)) {
+                                provider.copy(
+                                    isLoading = false,
+                                    errorMessage = error.message ?: "Failed to reload provider.",
+                                )
+                            } else {
+                                provider
+                            }
+                        }
+                    state.copy(
+                        streamSelector = state.streamSelector.copy(providers = providers),
+                        statusMessage = error.message ?: "Failed to reload provider.",
+                    )
+                }
+            }
+        }
+    }
+
+    fun onStreamSelected(stream: AddonStream) {
+        val playbackUrl = stream.playbackUrl
+        if (playbackUrl.isNullOrBlank()) {
+            _uiState.update { it.copy(statusMessage = "Selected stream has no playable URL.") }
+            return
+        }
+
+        val title =
+            stream.name
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: _uiState.value.details?.title
+                ?: "Player"
+
+        _uiState.update { state ->
+            state.copy(
+                streamSelector = state.streamSelector.copy(visible = false),
+                statusMessage = "",
+            )
+        }
+        _navigationEvents.tryEmit(
+            DetailsNavigationEvent.OpenPlayer(
+                playbackUrl = playbackUrl,
+                title = title,
+            )
+        )
     }
 
     fun toggleWatchlist() {
@@ -817,6 +1088,12 @@ class DetailsViewModel internal constructor(
                             apiKey = BuildConfig.TMDB_API_KEY,
                             httpClient = httpClient
                         )
+                    val addonStreamsService =
+                        AddonStreamsService(
+                            context = appContext,
+                            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                            httpClient = httpClient,
+                        )
 
                     val aiSettingsStore = AiInsightsSettingsStore(appContext)
                     val aiRepository =
@@ -834,11 +1111,59 @@ class DetailsViewModel internal constructor(
                         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                         aiSettingsStore = aiSettingsStore,
                         aiRepository = aiRepository,
+                        addonStreamsService = addonStreamsService,
                     ) as T
                 }
             }
         }
     }
+}
+
+private data class StreamLookupTarget(
+    val mediaType: MetadataLabMediaType,
+    val lookupId: String,
+)
+
+private fun resolveStreamLookupTarget(
+    details: MediaDetails,
+    selectedSeason: Int?,
+): StreamLookupTarget {
+    val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+    val lookupId =
+        when (mediaType) {
+            MetadataLabMediaType.MOVIE -> details.id.trim()
+            MetadataLabMediaType.SERIES -> {
+                val seasonalEpisodes =
+                    details.videos
+                        .asSequence()
+                        .filter { video ->
+                            val id = video.id.trim()
+                            id.isNotBlank() && (selectedSeason == null || video.season == selectedSeason)
+                        }.sortedWith(compareBy({ it.episode ?: Int.MAX_VALUE }, { it.title.lowercase(Locale.US) }))
+                        .toList()
+
+                val fallbackEpisode =
+                    details.videos
+                        .firstOrNull { video -> video.id.trim().isNotBlank() }
+
+                (seasonalEpisodes.firstOrNull() ?: fallbackEpisode)?.id?.trim().orEmpty().ifBlank {
+                    details.id.trim()
+                }
+            }
+        }
+
+    return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
+}
+
+private fun ProviderStreamsResult.toUiState(): StreamProviderUiState {
+    return StreamProviderUiState(
+        providerId = providerId,
+        providerName = providerName,
+        isLoading = false,
+        errorMessage = errorMessage,
+        streams = streams,
+        attemptedUrl = attemptedUrl,
+    )
 }
 
 private fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {

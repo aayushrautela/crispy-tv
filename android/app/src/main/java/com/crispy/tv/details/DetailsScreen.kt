@@ -24,7 +24,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -35,8 +34,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.settings.AiInsightsMode
+import com.crispy.tv.streams.AddonStream
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @Composable
 internal fun DetailsScreen(
@@ -45,6 +44,11 @@ internal fun DetailsScreen(
     onItemClick: (String) -> Unit,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
+    onOpenStreamSelector: () -> Unit,
+    onDismissStreamSelector: () -> Unit,
+    onProviderSelected: (String?) -> Unit,
+    onRetryProvider: (String) -> Unit,
+    onStreamSelected: (AddonStream) -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onSetRating: (Int?) -> Unit,
@@ -53,7 +57,6 @@ internal fun DetailsScreen(
 ) {
     val details = uiState.details
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
     val theming = rememberDetailsTheming(imageUrl = details?.backdropUrl ?: details?.posterUrl)
     val palette = theming.palette
     val detailsScheme = theming.colorScheme
@@ -172,19 +175,7 @@ internal fun DetailsScreen(
                         aiInsightsEnabled = uiState.aiConfigured,
                         aiInsightsIsLoading = uiState.aiIsLoading,
                         onAiInsightsClick = onAiInsightsClick,
-                        onWatchNow = {
-                            if (!trailerKey.isNullOrBlank()) {
-                                showTrailer = true
-                                userPausedTrailer = false
-                                coroutineScope.launch {
-                                    listState.animateScrollToItem(0)
-                                }
-                            } else {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("No trailer available.")
-                                }
-                            }
-                        },
+                        onWatchNow = onOpenStreamSelector,
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
                         onSetRating = onSetRating
@@ -235,6 +226,15 @@ internal fun DetailsScreen(
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+
+            StreamSelectorBottomSheet(
+                details = details,
+                state = uiState.streamSelector,
+                onDismiss = onDismissStreamSelector,
+                onProviderSelected = onProviderSelected,
+                onRetryProvider = onRetryProvider,
+                onStreamSelected = onStreamSelected,
             )
 
             if (uiState.aiStoryVisible && uiState.aiInsights != null) {
