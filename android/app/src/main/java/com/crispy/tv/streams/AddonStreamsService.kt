@@ -9,7 +9,9 @@ import com.crispy.tv.player.MetadataLabMediaType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -43,6 +45,11 @@ data class ProviderStreamsResult(
     val attemptedUrl: String? = null,
 )
 
+data class StreamProviderDescriptor(
+    val providerId: String,
+    val providerName: String,
+)
+
 class AddonStreamsService(
     context: Context,
     addonManifestUrlsCsv: String,
@@ -59,6 +66,8 @@ class AddonStreamsService(
         mediaType: MetadataLabMediaType,
         lookupId: String,
         preferredProviderId: String? = null,
+        onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)? = null,
+        onProviderResult: ((ProviderStreamsResult) -> Unit)? = null,
     ): List<ProviderStreamsResult> {
         val normalizedLookupId = lookupId.trim()
         if (normalizedLookupId.isBlank()) return emptyList()
@@ -66,16 +75,34 @@ class AddonStreamsService(
         val candidates =
             orderedEndpoints(resolveEndpoints(), preferredProviderId)
                 .filter { endpoint -> endpoint.supports(mediaType) }
+        onProvidersResolved?.invoke(
+            candidates.map { endpoint ->
+                StreamProviderDescriptor(
+                    providerId = endpoint.providerId,
+                    providerName = endpoint.providerName,
+                )
+            }
+        )
         if (candidates.isEmpty()) return emptyList()
 
         return withContext(Dispatchers.IO) {
             coroutineScope {
-                candidates
-                    .mapIndexed { index, endpoint ->
-                        async {
-                            index to fetchProviderStreams(endpoint, mediaType, normalizedLookupId)
-                        }
-                    }.awaitAll()
+                val channel = Channel<Pair<Int, ProviderStreamsResult>>(capacity = candidates.size)
+                candidates.forEachIndexed { index, endpoint ->
+                    launch {
+                        channel.send(index to fetchProviderStreams(endpoint, mediaType, normalizedLookupId))
+                    }
+                }
+
+                val completed = ArrayList<Pair<Int, ProviderStreamsResult>>(candidates.size)
+                repeat(candidates.size) {
+                    val indexedResult = channel.receive()
+                    completed += indexedResult
+                    onProviderResult?.invoke(indexedResult.second)
+                }
+                channel.close()
+
+                completed
                     .sortedBy { it.first }
                     .map { it.second }
             }
@@ -159,7 +186,7 @@ class AddonStreamsService(
             providerId = providerId,
             providerName = providerName,
             baseUrl = seed.baseUrl,
-            encodedQuery = seed.encodedQuery,
+            encodedQuery = seed.encodedQuery.orEmpty(),
             supportedTypes = streamSupport.types,
             addonIdPrefixes = addonIdPrefixes,
             streamIdPrefixes = streamSupport.idPrefixes,

@@ -27,6 +27,7 @@ import com.crispy.tv.settings.HomeScreenSettingsStore
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
+import com.crispy.tv.streams.StreamProviderDescriptor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -421,41 +422,79 @@ class DetailsViewModel internal constructor(
         streamLoadJob =
             viewModelScope.launch {
                 runCatching {
-                    withContext(Dispatchers.IO) {
-                        addonStreamsService.loadStreams(
-                            mediaType = target.mediaType,
-                            lookupId = target.lookupId,
-                        )
-                    }
-                }.onSuccess { results ->
-                    val providerStates = results.map { result -> result.toUiState() }
-                    val totalStreams = providerStates.sumOf { provider -> provider.streams.size }
-                    val partialFailure = providerStates.any { provider -> provider.errorMessage != null }
+                    addonStreamsService.loadStreams(
+                        mediaType = target.mediaType,
+                        lookupId = target.lookupId,
+                        onProvidersResolved = { providers ->
+                            _uiState.update { previous ->
+                                if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                                previous.copy(
+                                    streamSelector =
+                                        previous.streamSelector.copy(
+                                            visible = true,
+                                            mediaType = target.mediaType,
+                                            lookupId = target.lookupId,
+                                            providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
+                                            isLoading = providers.isNotEmpty(),
+                                        ),
+                                    statusMessage =
+                                        if (providers.isEmpty()) {
+                                            "No stream providers are available for this title."
+                                        } else {
+                                            "Fetching streams..."
+                                        },
+                                )
+                            }
+                        },
+                        onProviderResult = { result ->
+                            _uiState.update { previous ->
+                                if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                                val updatedProviders = previous.streamSelector.providers.applyProviderResult(result)
+                                val stillLoading = updatedProviders.any { provider -> provider.isLoading }
 
+                                previous.copy(
+                                    streamSelector =
+                                        previous.streamSelector.copy(
+                                            providers = updatedProviders,
+                                            isLoading = stillLoading,
+                                        ),
+                                    statusMessage = buildStreamStatusMessage(updatedProviders, isLoading = stillLoading),
+                                )
+                            }
+                        },
+                    )
+                }.onSuccess { results ->
                     _uiState.update { previous ->
+                        if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                        val finalizedProviders =
+                            previous.streamSelector.providers
+                                .finalizeFrom(results)
+                                .ifEmpty { results.map { result -> result.toUiState() } }
+
                         previous.copy(
                             streamSelector =
                                 previous.streamSelector.copy(
                                     visible = true,
                                     mediaType = target.mediaType,
                                     lookupId = target.lookupId,
-                                    selectedProviderId = null,
-                                    providers = providerStates,
+                                    providers = finalizedProviders,
                                     isLoading = false,
                                 ),
-                            statusMessage =
-                                when {
-                                    totalStreams > 0 -> "Found $totalStreams stream${if (totalStreams == 1) "" else "s"}."
-                                    partialFailure -> "No streams found. Some providers failed to load."
-                                    else -> "No streams found for this title."
-                                },
+                            statusMessage = buildStreamStatusMessage(finalizedProviders, isLoading = false),
                         )
                     }
                 }.onFailure { error ->
                     if (error is CancellationException) return@onFailure
                     _uiState.update { previous ->
                         previous.copy(
-                            streamSelector = previous.streamSelector.copy(isLoading = false),
+                            streamSelector =
+                                previous.streamSelector.copy(
+                                    providers =
+                                        previous.streamSelector.providers.map { provider ->
+                                            provider.copy(isLoading = false)
+                                        },
+                                    isLoading = false,
+                                ),
                             statusMessage = error.message ?: "Failed to fetch streams.",
                         )
                     }
@@ -1164,6 +1203,65 @@ private fun ProviderStreamsResult.toUiState(): StreamProviderUiState {
         streams = streams,
         attemptedUrl = attemptedUrl,
     )
+}
+
+private fun StreamProviderDescriptor.toLoadingUiState(): StreamProviderUiState {
+    return StreamProviderUiState(
+        providerId = providerId,
+        providerName = providerName,
+        isLoading = true,
+    )
+}
+
+private fun List<StreamProviderUiState>.applyProviderResult(result: ProviderStreamsResult): List<StreamProviderUiState> {
+    var matched = false
+    val updated =
+        map { provider ->
+            if (provider.providerId.equals(result.providerId, ignoreCase = true)) {
+                matched = true
+                result.toUiState()
+            } else {
+                provider
+            }
+        }
+
+    return if (matched) updated else updated + result.toUiState()
+}
+
+private fun List<StreamProviderUiState>.finalizeFrom(results: List<ProviderStreamsResult>): List<StreamProviderUiState> {
+    if (isEmpty()) return emptyList()
+    val byProviderId = results.associateBy { result -> result.providerId.lowercase(Locale.US) }
+
+    return map { provider ->
+        byProviderId[provider.providerId.lowercase(Locale.US)]?.toUiState() ?: provider.copy(isLoading = false)
+    }
+}
+
+private fun StreamSelectorUiState.matchesTarget(target: StreamLookupTarget): Boolean {
+    return mediaType == target.mediaType && lookupId == target.lookupId
+}
+
+private fun buildStreamStatusMessage(
+    providers: List<StreamProviderUiState>,
+    isLoading: Boolean,
+): String {
+    val totalStreams = providers.sumOf { provider -> provider.streams.size }
+    val partialFailure = providers.any { provider -> provider.errorMessage != null }
+
+    if (isLoading) {
+        return if (totalStreams > 0) {
+            "Found $totalStreams stream${if (totalStreams == 1) "" else "s"} so far..."
+        } else {
+            "Fetching streams..."
+        }
+    }
+
+    return when {
+        totalStreams > 0 -> "Found $totalStreams stream${if (totalStreams == 1) "" else "s"}."
+        partialFailure -> "No streams found. Some providers failed to load."
+        providers.isEmpty() -> "No stream providers are available for this title."
+        else -> "No streams found for this title."
+    }
 }
 
 private fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {
