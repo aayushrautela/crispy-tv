@@ -233,7 +233,7 @@ class HomeCatalogService(
 
         return ContinueWatchingLoadResult(
             items = items,
-            statusMessage = "Loaded continue watching from watch history."
+            statusMessage = ""
         )
     }
 
@@ -292,7 +292,7 @@ class HomeCatalogService(
 
         return ContinueWatchingLoadResult(
             items = items,
-            statusMessage = "Loaded continue watching from provider playback."
+            statusMessage = ""
         )
     }
 

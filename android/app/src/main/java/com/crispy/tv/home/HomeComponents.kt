@@ -167,161 +167,174 @@ internal fun HomeRailCard(
         Modifier.clickable(onClick = onClick)
     }
 
-    Box(
-        modifier = Modifier
-            .width(260.dp)
-            .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(28.dp))
-            .then(cardInteractionModifier)
-    ) {
-        if (!item.backdropUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = item.backdropUrl,
-                contentDescription = item.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        } else {
+    Column(modifier = Modifier.width(260.dp)) {
+        Box(
+            modifier = Modifier
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(16.dp))
+                .then(cardInteractionModifier)
+        ) {
+            if (!item.backdropUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.backdropUrl,
+                    contentDescription = item.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.64f)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.64f)
+                            )
                         )
                     )
-                )
-        )
-
-        if (!badgeLabel.isNullOrBlank()) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 12.dp, top = 10.dp),
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.primary
-            ) {
-                Text(
-                    text = badgeLabel,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-        }
-
-        if (!item.logoUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = item.logoUrl,
-                contentDescription = "${item.title} logo",
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth(0.6f)
-                    .height(56.dp)
-                    .padding(top = 12.dp),
-                contentScale = ContentScale.Fit
             )
-        } else if (showTitleFallbackWhenNoLogo) {
-            Text(
-                text = item.title,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
 
-        if (!useBottomSheetActions && hasItemActions) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-            ) {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.small)
+            if (!badgeLabel.isNullOrBlank()) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 12.dp, top = 10.dp),
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primary
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.MoreVert,
-                        contentDescription = actionMenuContentDescription,
-                        tint = Color.White
+                    Text(
+                        text = badgeLabel,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                 }
+            }
 
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
+            if (!useBottomSheetActions && hasItemActions) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Details") },
-                        onClick = {
-                            menuExpanded = false
-                            onDetailsClick()
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.small)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.MoreVert,
+                            contentDescription = actionMenuContentDescription,
+                            tint = Color.White
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Details") },
+                            onClick = {
+                                menuExpanded = false
+                                onDetailsClick()
+                            }
+                        )
+                        onRemoveClick?.let { removeAction ->
+                            DropdownMenuItem(
+                                text = { Text("Remove") },
+                                onClick = {
+                                    menuExpanded = false
+                                    removeAction()
+                                }
+                            )
                         }
+                        onHideClick?.let { hideAction ->
+                            DropdownMenuItem(
+                                text = { Text("Hide") },
+                                onClick = {
+                                    menuExpanded = false
+                                    hideAction()
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (!item.logoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.logoUrl,
+                    contentDescription = "${item.title} logo",
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth(0.55f)
+                        .height(40.dp)
+                        .padding(start = 12.dp, bottom = 10.dp),
+                    contentScale = ContentScale.Fit
+                )
+            } else if (showTitleFallbackWhenNoLogo) {
+                Text(
+                    text = item.title,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (showProgressBar && item.progressPercent > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(Color.White.copy(alpha = 0.3f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(
+                                fraction = (item.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
+                            )
+                            .background(MaterialTheme.colorScheme.primary)
                     )
-                    onRemoveClick?.let { removeAction ->
-                        DropdownMenuItem(
-                            text = { Text("Remove") },
-                            onClick = {
-                                menuExpanded = false
-                                removeAction()
-                            }
-                        )
-                    }
-                    onHideClick?.let { hideAction ->
-                        DropdownMenuItem(
-                            text = { Text("Hide") },
-                            onClick = {
-                                menuExpanded = false
-                                hideAction()
-                            }
-                        )
-                    }
                 }
             }
         }
 
         Text(
-            text = subtitle,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.95f),
+            text = item.title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .fillMaxWidth()
         )
 
-        if (showProgressBar && item.progressPercent > 0) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(Color.White.copy(alpha = 0.3f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(
-                            fraction = (item.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
-                        )
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-            }
+        if (subtitle.isNotBlank()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 
