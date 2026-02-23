@@ -1,10 +1,13 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+)
 
 package com.crispy.tv.details
 
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,17 +21,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,63 +73,65 @@ internal fun StreamSelectorBottomSheet(
         sheetState = sheetState,
         modifier = Modifier.testTag("stream_sheet"),
     ) {
-        LazyColumn(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                StreamSheetHeader(details = details)
-            }
-
-            item {
-                ProviderChipsRow(
-                    state = state,
-                    onProviderSelected = onProviderSelected,
-                )
-            }
-
-            if (state.isLoading) {
+        CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+            LazyColumn(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 item {
-                    ElevatedCard {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    StreamSheetHeader(details = details)
+                }
+
+                item {
+                    ProviderChipsRow(
+                        state = state,
+                        onProviderSelected = onProviderSelected,
+                    )
+                }
+
+                if (state.isLoading) {
+                    item {
+                        ElevatedCard {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                Text(
+                                    text = "Fetching streams from providers...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (!state.isLoading && filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null && !provider.isLoading }) {
+                    item {
+                        ElevatedCard {
                             Text(
-                                text = "Fetching streams from providers...",
+                                text = "No streams found for this title.",
+                                modifier = Modifier.padding(16.dp),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
                     }
                 }
-            }
 
-            if (!state.isLoading && filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null && !provider.isLoading }) {
-                item {
-                    ElevatedCard {
-                        Text(
-                            text = "No streams found for this title.",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
+                items(
+                    items = filteredProviders,
+                    key = { provider -> provider.providerId },
+                ) { provider ->
+                    ProviderStreamsSection(
+                        provider = provider,
+                        onRetry = onRetryProvider,
+                        onStreamSelected = onStreamSelected,
+                    )
                 }
-            }
-
-            items(
-                items = filteredProviders,
-                key = { provider -> provider.providerId },
-            ) { provider ->
-                ProviderStreamsSection(
-                    provider = provider,
-                    onRetry = onRetryProvider,
-                    onStreamSelected = onStreamSelected,
-                )
             }
         }
     }
@@ -321,12 +327,22 @@ private fun StreamRow(
                     )
                 }
             },
-            trailingContent = {
-                if (stream.cached) {
-                    AssistChip(onClick = {}, label = { Text("Cached") })
-                } else {
-                    Box(modifier = Modifier.size(1.dp))
+            trailingContent = if (stream.cached) {
+                {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                    ) {
+                        Text(
+                            text = "Cached",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
                 }
+            } else {
+                null
             },
         )
     }
