@@ -518,11 +518,16 @@ internal class TraktWatchHistoryProvider(
 
     private fun normalizeTraktImageUrl(url: String): String {
         val trimmed = url.trim()
+        if (trimmed.isBlank()) return trimmed
         return when {
             trimmed.startsWith("https://") -> trimmed
             trimmed.startsWith("http://") -> "https://" + trimmed.removePrefix("http://")
             trimmed.startsWith("//") -> "https:$trimmed"
-            else -> trimmed
+            trimmed.contains("://") -> trimmed
+            trimmed.startsWith("/") -> trimmed
+            // Trakt sometimes returns host/path without scheme (e.g. walter.trakt.tv/...).
+            // Coil expects a fully-qualified URL, so assume https.
+            else -> "https://$trimmed"
         }
     }
 
