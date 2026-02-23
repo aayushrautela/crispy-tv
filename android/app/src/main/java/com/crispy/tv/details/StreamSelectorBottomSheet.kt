@@ -51,7 +51,7 @@ internal fun StreamSelectorBottomSheet(
 ) {
     if (!state.visible) return
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val filteredProviders =
         remember(state.providers, state.selectedProviderId) {
             val selectedProvider = state.selectedProviderId
@@ -142,7 +142,7 @@ private fun StreamSheetHeader(details: MediaDetails?) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
-                    model = details.posterUrl,
+                    model = details.backdropUrl ?: details.posterUrl,
                     contentDescription = null,
                     modifier = Modifier.size(width = 96.dp, height = 56.dp),
                 )
@@ -312,8 +312,6 @@ private fun StreamRow(
                     detailsText?.let { text ->
                         Text(
                             text = text,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     Text(
