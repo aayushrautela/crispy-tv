@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
@@ -42,17 +44,28 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.crispy.tv.home.HomeCatalogPosterCard
+import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.tmdb.TmdbCastMember
+import com.crispy.tv.metadata.tmdb.TmdbMovieDetails
 import com.crispy.tv.metadata.tmdb.TmdbProductionEntity
 import com.crispy.tv.metadata.tmdb.TmdbReview
 import com.crispy.tv.metadata.tmdb.TmdbTrailer
+import com.crispy.tv.metadata.tmdb.TmdbTvDetails
+import com.crispy.tv.metadata.tmdb.TmdbTitleDetails
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 internal fun DetailsBody(
@@ -170,7 +183,7 @@ internal fun DetailsBody(
             Spacer(modifier = Modifier.height(10.dp))
             LazyRow(
                 contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(items = tmdbCast, key = { it.id }) { member ->
                     TmdbCastCard(member = member)
@@ -186,10 +199,10 @@ internal fun DetailsBody(
             Spacer(modifier = Modifier.height(8.dp))
             LazyRow(
                 contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(details.cast.take(24)) { name ->
-                    AssistChip(onClick = { }, label = { Text(name) })
+                    SimpleCastItem(name = name)
                 }
             }
         }
@@ -251,39 +264,6 @@ internal fun DetailsBody(
             ) {
                 items(items = production, key = { it.id }) { entity ->
                     TmdbProductionCard(entity = entity)
-                }
-            }
-        }
-
-        val titleDetails = tmdb?.titleDetails
-        val facts = if (tmdb != null && titleDetails != null) tmdbFacts(tmdb, titleDetails) else emptyList()
-        if (facts.isNotEmpty() || titleDetails?.tagline?.isNotBlank() == true) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "Details",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-
-            titleDetails?.tagline?.takeIf { it.isNotBlank() }?.let { tagline ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = tagline,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = horizontalPadding)
-                )
-            }
-
-            if (facts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(
-                    contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(facts) { fact ->
-                        AssistChip(onClick = { }, label = { Text(fact) })
-                    }
                 }
             }
         }
@@ -379,6 +359,47 @@ internal fun DetailsBody(
                 }
             }
         }
+
+        val detailRows = buildDetailsRows(details = details, titleDetails = tmdb?.titleDetails)
+        if (detailRows.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(22.dp))
+
+            val header = if (details.mediaType == "series") "Show Details" else "Movie Details"
+            Text(
+                text = header,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                detailRows.forEach { (label, value) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.widthIn(min = 100.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = value,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -387,62 +408,212 @@ private fun TmdbCastCard(
     member: TmdbCastMember,
     modifier: Modifier = Modifier
 ) {
-    ElevatedCard(modifier = modifier.width(124.dp)) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-            ) {
-                val profileUrl = member.profileUrl?.trim().orEmpty()
-                if (profileUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = profileUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                1f to Color.Black.copy(alpha = 0.55f)
-                            )
-                        )
+    Column(
+        modifier = modifier.width(100.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        val profileUrl = member.profileUrl?.trim().orEmpty()
+        Surface(
+            modifier = Modifier.size(80.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            if (profileUrl.isNotBlank()) {
+                AsyncImage(
+                    model = profileUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
-            }
-
-            Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = member.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                member.character?.takeIf { it.isNotBlank() }?.let { character ->
+            } else {
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = character,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = initials(member.name),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
+
+        Text(
+            text = member.name,
+            style =
+                MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        member.character?.takeIf { it.isNotBlank() }?.let { character ->
+            Text(
+                text = character,
+                style =
+                    MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        textAlign = TextAlign.Center
+                    ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun SimpleCastItem(
+    name: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.width(100.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Surface(
+            modifier = Modifier.size(80.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = initials(name),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Text(
+            text = name,
+            style =
+                MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun initials(name: String): String {
+    val parts =
+        name
+            .trim()
+            .split("\\s+".toRegex())
+            .filter { it.isNotBlank() }
+
+    if (parts.isEmpty()) return "?"
+    if (parts.size == 1) return parts[0].take(1).uppercase()
+    return (parts[0].take(1) + parts[1].take(1)).uppercase()
+}
+
+private fun buildDetailsRows(
+    details: MediaDetails,
+    titleDetails: TmdbTitleDetails?
+): List<Pair<String, String>> {
+    val rows = mutableListOf<Pair<String, String>>()
+
+    when (titleDetails) {
+        is TmdbTvDetails -> {
+            titleDetails.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
+
+            formatLongDate(titleDetails.firstAirDate)?.let { rows += "FIRST AIR DATE" to it }
+            formatLongDate(titleDetails.lastAirDate)?.let { rows += "LAST AIR DATE" to it }
+
+            titleDetails.numberOfSeasons?.takeIf { it > 0 }?.let { rows += "SEASONS" to "$it" }
+            titleDetails.numberOfEpisodes?.takeIf { it > 0 }?.let { rows += "EPISODES" to "$it" }
+
+            val episodeRuntime = titleDetails.episodeRunTimeMinutes.filter { it > 0 }
+            if (episodeRuntime.isNotEmpty()) {
+                rows += "EPISODE RUNTIME" to "${episodeRuntime.joinToString(" - ")} min"
+            }
+
+            if (titleDetails.originCountries.isNotEmpty()) {
+                rows += "ORIGIN COUNTRY" to titleDetails.originCountries.joinToString(", ")
+            }
+
+            titleDetails.originalLanguage?.takeIf { it.isNotBlank() }?.let {
+                rows += "ORIGINAL LANGUAGE" to it.uppercase()
+            }
+
+            if (details.creators.isNotEmpty()) {
+                rows += "CREATED BY" to details.creators.joinToString(", ")
+            }
+        }
+
+        is TmdbMovieDetails -> {
+            titleDetails.tagline?.takeIf { it.isNotBlank() }?.let {
+                rows += "TAGLINE" to "\"$it\""
+            }
+            titleDetails.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
+
+            formatLongDate(titleDetails.releaseDate)?.let { rows += "RELEASE DATE" to it }
+
+            val runtime = formatRuntimeMinutes(titleDetails.runtimeMinutes) ?: details.runtime?.takeIf { it.isNotBlank() }
+            runtime?.let { rows += "RUNTIME" to it }
+
+            formatCurrency(titleDetails.budget)?.let { rows += "BUDGET" to it }
+            formatCurrency(titleDetails.revenue)?.let { rows += "REVENUE" to it }
+
+            if (titleDetails.originCountries.isNotEmpty()) {
+                rows += "ORIGIN COUNTRY" to titleDetails.originCountries.joinToString(", ")
+            }
+
+            titleDetails.originalLanguage?.takeIf { it.isNotBlank() }?.let {
+                rows += "ORIGINAL LANGUAGE" to it.uppercase()
+            }
+        }
+
+        else -> Unit
+    }
+
+    return rows
+}
+
+private fun formatCurrency(amount: Long?): String? {
+    if (amount == null || amount <= 0) return null
+    return try {
+        NumberFormat
+            .getCurrencyInstance(Locale.US)
+            .apply { maximumFractionDigits = 0 }
+            .format(amount)
+    } catch (_: Throwable) {
+        "$amount"
+    }
+}
+
+private fun formatLongDate(date: String?): String? {
+    val raw = date?.trim().orEmpty()
+    if (raw.isBlank()) return null
+
+    val iso = if (raw.length >= 10) raw.take(10) else raw
+    return try {
+        val parsed = LocalDate.parse(iso)
+        parsed.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
+    } catch (_: Throwable) {
+        date
+    }
+}
+
+private fun formatRuntimeMinutes(minutes: Int?): String? {
+    if (minutes == null || minutes <= 0) return null
+    val h = minutes / 60
+    val m = minutes % 60
+
+    return when {
+        h > 0 && m > 0 -> "$h hr $m min"
+        h > 0 -> "$h hr"
+        else -> "$m min"
     }
 }
 
