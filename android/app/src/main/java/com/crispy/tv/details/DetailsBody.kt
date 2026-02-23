@@ -17,18 +17,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +69,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun DetailsBody(
     uiState: DetailsUiState,
     onRetry: () -> Unit,
@@ -77,32 +82,46 @@ internal fun DetailsBody(
     val contentPadding = PaddingValues(horizontal = horizontalPadding)
 
     var expandedReview by remember { mutableStateOf<TmdbReview?>(null) }
+    val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     expandedReview?.let { review ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { expandedReview = null },
-            title = { Text(review.author) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    review.rating?.let {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFD54F)
-                            )
-                            Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
-                        }
+            sheetState = reviewSheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = horizontalPadding)
+                    .padding(top = 6.dp, bottom = 18.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(review.author, style = MaterialTheme.typography.titleMedium)
+
+                review.rating?.let {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD54F)
+                        )
+                        Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
                     }
-                    Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { expandedReview = null }) { Text("Close") }
+
+                Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
+
+                TextButton(
+                    onClick = { expandedReview = null },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Close")
+                }
             }
-        )
+        }
     }
 
     Column(
