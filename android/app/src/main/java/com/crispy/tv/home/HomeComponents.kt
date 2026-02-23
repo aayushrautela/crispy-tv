@@ -78,7 +78,8 @@ internal fun HomeRailSection(
     badgeLabel: String? = null,
     showProgressBar: Boolean = false,
     showTitleFallbackWhenNoLogo: Boolean = false,
-    useBottomSheetActions: Boolean = false
+    useBottomSheetActions: Boolean = false,
+    usePosterCardStyle: Boolean = false
 ) {
     if (items.isEmpty()) {
         return
@@ -95,19 +96,26 @@ internal fun HomeRailSection(
             contentPadding = PaddingValues(0.dp)
         ) {
             items(items, key = { it.id }) { item ->
-                HomeRailCard(
-                    item = item,
-                    subtitle = subtitleFor(item),
-                    actionMenuContentDescription = actionMenuContentDescription,
-                    onClick = { onItemClick(item) },
-                    onHideClick = onHideItem?.let { { it(item) } },
-                    onRemoveClick = onRemoveItem?.let { { it(item) } },
-                    onDetailsClick = { onItemClick(item) },
-                    badgeLabel = badgeLabel,
-                    showProgressBar = showProgressBar,
-                    showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo,
-                    useBottomSheetActions = useBottomSheetActions
-                )
+                if (usePosterCardStyle) {
+                    HomeRailPosterCard(
+                        item = item,
+                        onClick = { onItemClick(item) }
+                    )
+                } else {
+                    HomeRailCard(
+                        item = item,
+                        subtitle = subtitleFor(item),
+                        actionMenuContentDescription = actionMenuContentDescription,
+                        onClick = { onItemClick(item) },
+                        onHideClick = onHideItem?.let { { it(item) } },
+                        onRemoveClick = onRemoveItem?.let { { it(item) } },
+                        onDetailsClick = { onItemClick(item) },
+                        badgeLabel = badgeLabel,
+                        showProgressBar = showProgressBar,
+                        showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo,
+                        useBottomSheetActions = useBottomSheetActions
+                    )
+                }
             }
         }
     }
@@ -168,15 +176,16 @@ internal fun HomeRailCard(
     }
 
     Column(modifier = Modifier.width(260.dp)) {
+        val imageUrl = item.posterUrl ?: item.backdropUrl
         Box(
             modifier = Modifier
                 .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(16.dp))
                 .then(cardInteractionModifier)
         ) {
-            if (!item.backdropUrl.isNullOrBlank()) {
+            if (!imageUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = item.backdropUrl,
+                    model = imageUrl,
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -275,10 +284,10 @@ internal fun HomeRailCard(
                     model = item.logoUrl,
                     contentDescription = "${item.title} logo",
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth(0.55f)
-                        .height(40.dp)
-                        .padding(start = 12.dp, bottom = 10.dp),
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(0.7f)
+                        .height(52.dp)
+                        .padding(bottom = 10.dp),
                     contentScale = ContentScale.Fit
                 )
             } else if (showTitleFallbackWhenNoLogo) {
@@ -515,6 +524,38 @@ internal fun HomeCatalogSectionRow(
         }
     }
 
+}
+
+@Composable
+private fun HomeRailPosterCard(
+    item: ContinueWatchingItem,
+    onClick: () -> Unit
+) {
+    Column(modifier = Modifier.width(124.dp)) {
+        Card(
+            modifier = Modifier
+                .aspectRatio(2f / 3f)
+                .clip(MaterialTheme.shapes.large)
+                .clickable(onClick = onClick)
+        ) {
+            val imageUrl = item.posterUrl ?: item.backdropUrl
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = item.title,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

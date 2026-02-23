@@ -11,6 +11,32 @@ import kotlinx.coroutines.coroutineScope
 import org.json.JSONArray
 import org.json.JSONObject
 
+private object TmdbGenre {
+    private val genres = mapOf(
+        28 to "Action",
+        12 to "Adventure",
+        16 to "Animation",
+        35 to "Comedy",
+        80 to "Crime",
+        99 to "Documentary",
+        18 to "Drama",
+        10751 to "Family",
+        14 to "Fantasy",
+        36 to "History",
+        27 to "Horror",
+        10402 to "Music",
+        9648 to "Mystery",
+        10749 to "Romance",
+        878 to "Sci-Fi",
+        10770 to "TV Movie",
+        53 to "Thriller",
+        10752 to "War",
+        37 to "Western"
+    )
+
+    fun fromId(id: Int): String? = genres[id]
+}
+
 data class TmdbEnrichmentResult(
     val enrichment: TmdbEnrichment,
     val fallbackDetails: MediaDetails
@@ -187,6 +213,13 @@ class TmdbEnrichmentRepository(
                     MetadataLabMediaType.SERIES -> item.optStringNonBlank("name")
                 } ?: return@mapNotNull null
 
+            val year = item.optStringNonBlank("release_date")?.take(4)
+                ?: item.optStringNonBlank("first_air_date")?.take(4)
+            val genre = item.optJSONArray("genre_ids")?.let { ids ->
+                if (ids.length() > 0) TmdbGenre.fromId(ids.optInt(0))
+                else null
+            }
+
             CatalogItem(
                 id = "tmdb:$id",
                 title = title,
@@ -194,7 +227,9 @@ class TmdbEnrichmentRepository(
                 backdropUrl = TmdbApi.imageUrl(item.optStringNonBlank("backdrop_path"), size = "w780"),
                 addonId = "tmdb",
                 type = mediaType.toCatalogType(),
-                rating = item.optDoubleOrNull("vote_average")?.formatVoteAverage()
+                rating = item.optDoubleOrNull("vote_average")?.formatVoteAverage(),
+                year = year,
+                genre = genre
             )
         }
     }
@@ -237,6 +272,7 @@ class TmdbEnrichmentRepository(
                 .mapNotNull { part ->
                     val id = part.optInt("id").takeIf { it > 0 } ?: return@mapNotNull null
                     val title = part.optStringNonBlank("title") ?: return@mapNotNull null
+                    val year = part.optStringNonBlank("release_date")?.take(4)
                     CatalogItem(
                         id = "tmdb:$id",
                         title = title,
@@ -244,7 +280,9 @@ class TmdbEnrichmentRepository(
                         backdropUrl = TmdbApi.imageUrl(part.optStringNonBlank("backdrop_path"), size = "w780"),
                         addonId = "tmdb",
                         type = "movie",
-                        rating = null
+                        rating = null,
+                        year = year,
+                        genre = null
                     )
                 }
 

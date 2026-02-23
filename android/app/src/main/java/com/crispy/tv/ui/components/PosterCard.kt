@@ -35,6 +35,8 @@ fun PosterCard(
     posterUrl: String?,
     backdropUrl: String?,
     rating: String?,
+    year: String? = null,
+    genre: String? = null,
     modifier: Modifier = Modifier,
     showTitle: Boolean = true,
     onClick: () -> Unit
@@ -109,15 +111,23 @@ fun PosterCard(
 
         if (showTitle) {
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(36.dp)
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (year != null || genre != null) {
+                    Text(
+                        text = listOfNotNull(year, genre).joinToString(" • "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }

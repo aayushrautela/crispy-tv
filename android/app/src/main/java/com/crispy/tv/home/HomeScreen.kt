@@ -155,7 +155,8 @@ internal fun HomeScreen(
                     onItemClick = onContinueWatchingClick,
                     onHideItem = null,
                     onRemoveItem = null,
-                    showTitleFallbackWhenNoLogo = true
+                    showTitleFallbackWhenNoLogo = true,
+                    usePosterCardStyle = true
                 )
             }
 

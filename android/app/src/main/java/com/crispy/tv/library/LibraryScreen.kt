@@ -438,6 +438,8 @@ private fun LibraryScreen(
                                 posterUrl = tmdbArtwork.first,
                                 backdropUrl = tmdbArtwork.second,
                                 rating = null,
+                                year = null,
+                                genre = null,
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = { onItemClick(entry) }
                             )
@@ -554,6 +556,8 @@ private fun LibraryScreen(
                                     posterUrl = artwork.first,
                                     backdropUrl = artwork.second,
                                     rating = null,
+                                    year = null,
+                                    genre = null,
                                     modifier = Modifier.fillMaxWidth(),
                                     onClick = { onItemClick(mapped) }
                                 )

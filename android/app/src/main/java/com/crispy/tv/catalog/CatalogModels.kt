@@ -19,7 +19,9 @@ data class CatalogItem(
     val backdropUrl: String?,
     val addonId: String,
     val type: String,
-    val rating: String? = null
+    val rating: String? = null,
+    val year: String? = null,
+    val genre: String? = null
 )
 
 data class CatalogPageResult(

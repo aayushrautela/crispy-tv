@@ -59,6 +59,7 @@ data class ContinueWatchingItem(
     val providerPlaybackId: String?,
     val isUpNextPlaceholder: Boolean = false,
     val backdropUrl: String?,
+    val posterUrl: String?,
     val logoUrl: String?,
     val addonId: String?,
     val type: String
@@ -220,6 +221,7 @@ class HomeCatalogService(
                             providerPlaybackId = null,
                             isUpNextPlaceholder = false,
                             backdropUrl = resolvedMeta?.backdropUrl,
+                            posterUrl = resolvedMeta?.posterUrl,
                             logoUrl = resolvedMeta?.logoUrl,
                             addonId = resolvedMeta?.addonId,
                             type = mediaType
@@ -279,6 +281,7 @@ class HomeCatalogService(
                             providerPlaybackId = entry.providerPlaybackId,
                             isUpNextPlaceholder = entry.isUpNextPlaceholder,
                             backdropUrl = resolvedMeta?.backdropUrl,
+                            posterUrl = resolvedMeta?.posterUrl,
                             logoUrl = resolvedMeta?.logoUrl,
                             addonId = resolvedMeta?.addonId,
                             type = mediaType
@@ -704,6 +707,8 @@ class HomeCatalogService(
             val backdrop = nonBlank(meta.optString("background"))
             val type = nonBlank(meta.optString("type")) ?: mediaType
             val rating = parseRating(meta)
+            val year = parseYear(meta)
+            val genre = parseGenre(meta)
             items +=
                 CatalogItem(
                     id = id,
@@ -712,7 +717,9 @@ class HomeCatalogService(
                     backdropUrl = backdrop,
                     addonId = addonId,
                     type = type,
-                    rating = rating
+                    rating = rating,
+                    year = year,
+                    genre = genre
                 )
         }
         return items
@@ -725,6 +732,22 @@ class HomeCatalogService(
             is String -> nonBlank(raw)
             else -> null
         }
+    }
+
+    private fun parseYear(meta: JSONObject): String? {
+        val releaseInfo = nonBlank(meta.optString("releaseInfo"))
+        if (releaseInfo != null) {
+            return releaseInfo.take(4)
+        }
+        return nonBlank(meta.optString("year"))
+    }
+
+    private fun parseGenre(meta: JSONObject): String? {
+        val genres = meta.optJSONArray("genres")
+        if (genres != null && genres.length() > 0) {
+            return genres.optString(0)
+        }
+        return null
     }
 
     private fun parseCachedManifest(raw: String?): JSONObject? {
@@ -794,9 +817,8 @@ class HomeCatalogService(
                             nonBlank(meta.optString("name"))
                                 ?: nonBlank(meta.optString("title"))
                                 ?: nonBlank(entry.title),
-                        backdropUrl =
-                            nonBlank(meta.optString("background"))
-                                ?: nonBlank(meta.optString("poster")),
+                        backdropUrl = nonBlank(meta.optString("background")),
+                        posterUrl = nonBlank(meta.optString("poster")),
                         logoUrl = nonBlank(meta.optString("logo")),
                         addonId = addon.addonId
                     )
@@ -1058,11 +1080,12 @@ class HomeCatalogService(
     private data class ContinueWatchingMeta(
         val title: String?,
         val backdropUrl: String?,
+        val posterUrl: String?,
         val logoUrl: String?,
         val addonId: String?
     ) {
         fun hasDisplayData(): Boolean {
-            return !title.isNullOrBlank() || !backdropUrl.isNullOrBlank() || !logoUrl.isNullOrBlank()
+            return !title.isNullOrBlank() || !backdropUrl.isNullOrBlank() || !posterUrl.isNullOrBlank() || !logoUrl.isNullOrBlank()
         }
     }
 
