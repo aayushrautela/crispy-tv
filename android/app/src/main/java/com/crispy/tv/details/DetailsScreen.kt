@@ -167,6 +167,7 @@ internal fun DetailsScreen(
                         userRating = uiState.userRating,
                         isMutating = uiState.isMutating,
                         palette = palette,
+                        watchCta = uiState.watchCta,
                         showAiInsights = uiState.aiMode != AiInsightsMode.OFF,
                         aiInsightsEnabled = uiState.aiConfigured,
                         aiInsightsIsLoading = uiState.aiIsLoading,

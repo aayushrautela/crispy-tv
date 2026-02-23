@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+import android.text.format.DateFormat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
@@ -52,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlin.math.roundToInt
+import java.util.Date
 
 @Composable
 internal fun HeaderInfoSection(
@@ -62,6 +66,7 @@ internal fun HeaderInfoSection(
     userRating: Int?,
     isMutating: Boolean,
     palette: DetailsPaletteColors,
+    watchCta: WatchCta,
     showAiInsights: Boolean,
     aiInsightsEnabled: Boolean,
     aiInsightsIsLoading: Boolean,
@@ -187,8 +192,24 @@ internal fun HeaderInfoSection(
             }
         }
 
+        val context = LocalContext.current
+        val watchCtaSubtext =
+            when {
+                watchCta.kind == WatchCtaKind.REWATCH && watchCta.lastWatchedAtEpochMs != null -> {
+                    val date = DateFormat.getDateFormat(context).format(Date(watchCta.lastWatchedAtEpochMs))
+                    "Last watched on $date"
+                }
+                watchCta.remainingMinutes != null -> {
+                    val endsAtMs = System.currentTimeMillis() + (watchCta.remainingMinutes * 60_000L)
+                    val time = DateFormat.getTimeFormat(context).format(Date(endsAtMs))
+                    "Ends at $time"
+                }
+                else -> null
+            }
+
         Button(
             onClick = onWatchNow,
+            enabled = !isMutating,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -199,12 +220,32 @@ internal fun HeaderInfoSection(
                     contentColor = palette.onAccent
                 )
         ) {
+            val iconVector =
+                when (watchCta.icon) {
+                    WatchCtaIcon.REPLAY -> Icons.Outlined.Replay
+                    WatchCtaIcon.PLAY -> Icons.Filled.PlayArrow
+                }
             Icon(
-                imageVector = Icons.Filled.PlayArrow,
+                imageVector = iconVector,
                 contentDescription = null
             )
             Spacer(modifier = Modifier.size(10.dp))
-            Text("Watch now")
+            Column(horizontalAlignment = Alignment.Start) {
+                Text(
+                    text = watchCta.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (watchCtaSubtext != null) {
+                    Text(
+                        text = watchCtaSubtext,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = palette.onAccent.copy(alpha = 0.85f),
+                    )
+                }
+            }
         }
 
         DetailsQuickActionsRow(

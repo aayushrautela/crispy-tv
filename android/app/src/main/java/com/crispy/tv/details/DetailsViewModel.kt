@@ -17,6 +17,7 @@ import com.crispy.tv.metadata.TmdbImdbIdResolver
 import com.crispy.tv.metadata.tmdb.TmdbEnrichment
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.network.AppHttp
+import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.math.roundToInt
 
 data class DetailsUiState(
     val itemId: String,
@@ -50,6 +52,7 @@ data class DetailsUiState(
     val isRated: Boolean = false,
     val userRating: Int? = null,
     val isMutating: Boolean = false,
+    val watchCta: WatchCta = WatchCta(),
     val selectedSeason: Int? = null
 ) {
     val seasons: List<Int>
@@ -133,6 +136,7 @@ class DetailsViewModel internal constructor(
 
     fun reload() {
         viewModelScope.launch {
+            val nowMs = System.currentTimeMillis()
             val aiSnapshot = aiSettingsStore.loadSnapshot()
             _uiState.update {
                 it.copy(
@@ -144,6 +148,7 @@ class DetailsViewModel internal constructor(
                     aiIsLoading = false,
                     aiInsights = null,
                     aiStoryVisible = false,
+                    watchCta = WatchCta(),
                 )
             }
 
@@ -195,6 +200,11 @@ class DetailsViewModel internal constructor(
                     resolveProviderState(enrichedDetails)
                 }
 
+            val watchCta =
+                withContext(Dispatchers.IO) {
+                    resolveWatchCta(enrichedDetails, providerState, nowMs)
+                }
+
             _uiState.update { state ->
                 val details = enrichedDetails
                 val firstSeason = details?.videos?.mapNotNull { it.season }?.distinct()?.minOrNull()
@@ -214,6 +224,7 @@ class DetailsViewModel internal constructor(
                     isInWatchlist = providerState.isInWatchlist,
                     isRated = providerState.isRated,
                     userRating = providerState.userRating,
+                    watchCta = watchCta,
                     selectedSeason = state.selectedSeason ?: firstSeason
                 )
             }
@@ -432,10 +443,32 @@ class DetailsViewModel internal constructor(
                     WatchProvider.LOCAL -> true
                 }
             _uiState.update {
+                val nextIsWatched = if (success) desired else it.isWatched
+                val nextCta =
+                    when {
+                        it.watchCta.kind == WatchCtaKind.CONTINUE -> it.watchCta
+                        nextIsWatched ->
+                            WatchCta(
+                                kind = WatchCtaKind.REWATCH,
+                                label = "Rewatch",
+                                icon = WatchCtaIcon.REPLAY,
+                                remainingMinutes = null,
+                                lastWatchedAtEpochMs = System.currentTimeMillis(),
+                            )
+                        else ->
+                            WatchCta(
+                                kind = WatchCtaKind.WATCH,
+                                label = "Watch now",
+                                icon = WatchCtaIcon.PLAY,
+                                remainingMinutes = parseRuntimeMinutes(it.details?.runtime),
+                                lastWatchedAtEpochMs = null,
+                            )
+                    }
                 it.copy(
                     isMutating = false,
                     statusMessage = result.statusMessage,
-                    isWatched = if (success) desired else it.isWatched
+                    isWatched = nextIsWatched,
+                    watchCta = nextCta,
                 )
             }
         }
@@ -517,10 +550,130 @@ class DetailsViewModel internal constructor(
 
     private data class ProviderState(
         val isWatched: Boolean,
+        val watchedAtEpochMs: Long?,
         val isInWatchlist: Boolean,
         val isRated: Boolean,
         val userRating: Int?
     )
+
+    private suspend fun resolveWatchCta(
+        details: MediaDetails?,
+        providerState: ProviderState,
+        nowMs: Long,
+    ): WatchCta {
+        if (details == null) return WatchCta()
+
+        val mediaType = details.mediaType.trim().lowercase(Locale.US)
+        val isSeries = mediaType == "series" || mediaType == "show" || mediaType == "tv"
+        val expectedType = details.mediaType.toMetadataLabMediaTypeOrNull()
+        val source = settingsStore.load().watchDataSource
+
+        val continueEntry = resolveContinueWatchingEntry(details, expectedType, source, nowMs)
+        val canContinue =
+            continueEntry != null &&
+                !continueEntry.isUpNextPlaceholder &&
+                continueEntry.progressPercent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
+                continueEntry.progressPercent < CTA_CONTINUE_COMPLETION_PERCENT
+
+        if (canContinue) {
+            val label =
+                if (isSeries) {
+                    val season = continueEntry?.season
+                    val episode = continueEntry?.episode
+                    if (season != null && episode != null) {
+                        "Continue (S$season E$episode)"
+                    } else {
+                        "Continue"
+                    }
+                } else {
+                    val progress = continueEntry?.progressPercent
+                    if (progress != null) {
+                        "Resume from ${progress.roundToInt()}%"
+                    } else {
+                        "Continue"
+                    }
+                }
+
+            val remainingMinutes =
+                parseRuntimeMinutes(details.runtime)?.let { runtimeMinutes ->
+                    val progress = continueEntry?.progressPercent ?: 0.0
+                    val remaining = runtimeMinutes.toDouble() * (1.0 - (progress / 100.0))
+                    remaining.roundToInt().coerceAtLeast(0)
+                }
+
+            return WatchCta(
+                kind = WatchCtaKind.CONTINUE,
+                label = label,
+                icon = WatchCtaIcon.PLAY,
+                remainingMinutes = remainingMinutes,
+                lastWatchedAtEpochMs = null,
+            )
+        }
+
+        if (!isSeries && providerState.isWatched) {
+            return WatchCta(
+                kind = WatchCtaKind.REWATCH,
+                label = "Rewatch",
+                icon = WatchCtaIcon.REPLAY,
+                remainingMinutes = null,
+                lastWatchedAtEpochMs = providerState.watchedAtEpochMs,
+            )
+        }
+
+        return WatchCta(
+            kind = WatchCtaKind.WATCH,
+            label = "Watch now",
+            icon = WatchCtaIcon.PLAY,
+            remainingMinutes = parseRuntimeMinutes(details.runtime),
+            lastWatchedAtEpochMs = null,
+        )
+    }
+
+    private suspend fun resolveContinueWatchingEntry(
+        details: MediaDetails,
+        expectedType: MetadataLabMediaType?,
+        source: WatchProvider,
+        nowMs: Long,
+    ): ContinueWatchingEntry? {
+        val connected =
+            if (source == WatchProvider.LOCAL) {
+                true
+            } else {
+                val authState = watchHistoryService.authState()
+                when (source) {
+                    WatchProvider.TRAKT -> authState.traktAuthenticated
+                    WatchProvider.SIMKL -> authState.simklAuthenticated
+                    WatchProvider.LOCAL -> false
+                }
+            }
+        if (!connected) return null
+
+        val normalizedTargetId = normalizeNuvioMediaId(details.id).contentId.lowercase(Locale.US)
+        val normalizedImdbId =
+            details.imdbId?.let { imdb ->
+                normalizeNuvioMediaId(imdb).contentId.lowercase(Locale.US)
+            }
+
+        fun matchesItemContent(itemContentId: String): Boolean {
+            return matchesContentId(itemContentId, normalizedTargetId) ||
+                (normalizedImdbId != null && matchesContentId(itemContentId, normalizedImdbId))
+        }
+
+        val cached = watchHistoryService.getCachedContinueWatching(limit = 50, nowMs = nowMs, source = source)
+        val snapshot =
+            if (cached.entries.isNotEmpty()) {
+                cached
+            } else {
+                watchHistoryService.listContinueWatching(limit = 50, nowMs = nowMs, source = source)
+            }
+
+        return snapshot.entries
+            .asSequence()
+            .filter { entry ->
+                matchesItemContent(entry.contentId) && matchesMediaType(expectedType, entry.contentType)
+            }
+            .maxByOrNull { it.lastUpdatedEpochMs }
+    }
 
     private suspend fun resolveProviderState(details: MediaDetails?): ProviderState {
         val source = settingsStore.load().watchDataSource
@@ -539,12 +692,18 @@ class DetailsViewModel internal constructor(
         return when (source) {
             WatchProvider.LOCAL -> {
                 val local = watchHistoryService.listLocalHistory(limit = 250)
-                val watched =
-                    local.entries.any { entry ->
-                        matchesItemContent(entry.contentId) && matchesMediaType(expectedType, entry.contentType)
-                    }
+                val watchedEntry =
+                    local.entries
+                        .asSequence()
+                        .filter { entry ->
+                            matchesItemContent(entry.contentId) && matchesMediaType(expectedType, entry.contentType)
+                        }
+                        .maxByOrNull { it.watchedAtEpochMs }
+
+                val watched = watchedEntry != null
                 ProviderState(
                     isWatched = watched,
+                    watchedAtEpochMs = watchedEntry?.watchedAtEpochMs,
                     isInWatchlist = false,
                     isRated = false,
                     userRating = null
@@ -561,7 +720,13 @@ class DetailsViewModel internal constructor(
                         WatchProvider.LOCAL -> false
                     }
                 if (!connected) {
-                    return ProviderState(false, false, false, null)
+                    return ProviderState(
+                        isWatched = false,
+                        watchedAtEpochMs = null,
+                        isInWatchlist = false,
+                        isRated = false,
+                        userRating = null,
+                    )
                 }
 
                 val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 250, source = source)
@@ -572,13 +737,16 @@ class DetailsViewModel internal constructor(
                         watchHistoryService.listProviderLibrary(limitPerFolder = 250, source = source)
                     }
 
-                val watched =
-                    snapshot.items.any { item ->
+                val watchedItem =
+                    snapshot.items.firstOrNull { item ->
                         item.provider == source &&
                             source.isWatchedFolder(item.folderId) &&
                             matchesItemContent(item.contentId) &&
                             matchesMediaType(expectedType, item.contentType)
                     }
+
+                val watchedAtEpochMs = watchedItem?.addedAtEpochMs
+                val watched = watchedItem != null
 
                 val watchlistFolderId =
                     when (source) {
@@ -604,6 +772,7 @@ class DetailsViewModel internal constructor(
 
                 ProviderState(
                     isWatched = watched,
+                    watchedAtEpochMs = watchedAtEpochMs,
                     isInWatchlist = inWatchlist,
                     isRated = isRated,
                     userRating = null
@@ -612,17 +781,20 @@ class DetailsViewModel internal constructor(
         }
     }
 
-    // resolveWatchedState removed in favor of resolveProviderState.
-
     private fun matchesMediaType(expected: MetadataLabMediaType?, actual: MetadataLabMediaType): Boolean {
         return expected == null || expected == actual
     }
+
+    // resolveWatchedState removed in favor of resolveProviderState.
 
     private fun matchesContentId(candidate: String, targetNormalizedId: String): Boolean {
         return normalizeNuvioMediaId(candidate).contentId.lowercase(Locale.US) == targetNormalizedId
     }
 
     companion object {
+        private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
+        private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
+
         fun factory(context: Context, itemId: String): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {

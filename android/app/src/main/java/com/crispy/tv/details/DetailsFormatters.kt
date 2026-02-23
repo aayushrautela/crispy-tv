@@ -71,6 +71,20 @@ internal fun episodePrefix(video: MediaVideo): String? {
     }
 }
 
+internal fun parseRuntimeMinutes(runtime: String?): Int? {
+    val input = runtime?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val hourMatch = Regex("(\\d+)\\s*h").find(input)
+    val minMatch = Regex("(\\d+)\\s*min").find(input)
+    if (hourMatch != null || minMatch != null) {
+        val hours = hourMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        val minutes = minMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        val total = (hours * 60) + minutes
+        return total.takeIf { it > 0 }
+    }
+
+    return input.toIntOrNull()?.takeIf { it > 0 }
+}
+
 internal fun formatRuntime(runtime: String?): String? {
     val input = runtime?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val hourMatch = Regex("(\\d+)\\s*h").find(input)
