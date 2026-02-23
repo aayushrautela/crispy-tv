@@ -13,12 +13,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
@@ -59,6 +61,7 @@ internal fun HeaderInfoSection(
     userRating: Int?,
     isMutating: Boolean,
     palette: DetailsPaletteColors,
+    onWatchNow: () -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onSetRating: (Int?) -> Unit,
@@ -166,6 +169,26 @@ internal fun HeaderInfoSection(
             )
             Spacer(modifier = Modifier.size(10.dp))
             Text("AI insights")
+        }
+
+        Button(
+            onClick = onWatchNow,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = palette.accent,
+                    contentColor = palette.onAccent
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PlayArrow,
+                contentDescription = null
+            )
+            Spacer(modifier = Modifier.size(10.dp))
+            Text("Watch now")
         }
 
         DetailsQuickActionsRow(

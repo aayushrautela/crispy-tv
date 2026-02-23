@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,6 +37,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun DetailsScreen(
@@ -50,6 +52,7 @@ internal fun DetailsScreen(
 ) {
     val details = uiState.details
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     val theming = rememberDetailsTheming(imageUrl = details?.backdropUrl ?: details?.posterUrl)
     val palette = theming.palette
     val detailsScheme = theming.colorScheme
@@ -163,6 +166,20 @@ internal fun DetailsScreen(
                         userRating = uiState.userRating,
                         isMutating = uiState.isMutating,
                         palette = palette,
+                        onWatchNow = {
+                            if (!trailerKey.isNullOrBlank()) {
+                                showTrailer = true
+                                revealTrailer = true
+                                userPausedTrailer = false
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(0)
+                                }
+                            } else {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("No trailer available.")
+                                }
+                            }
+                        },
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
                         onSetRating = onSetRating
