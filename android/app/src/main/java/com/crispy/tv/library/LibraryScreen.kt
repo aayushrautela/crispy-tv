@@ -218,9 +218,11 @@ class LibraryViewModel internal constructor(
                                 ?: fallbackFolder
                     )
                 }
-            }
-    }
+     }
+}
 
+/** Material 3 standard TopAppBar height (TopAppBarSmallTokens.ContainerHeight). */
+private val TopAppBarHeight = 64.dp
     fun selectSource(source: LibrarySource) {
         settingsStore.save(
             settingsStore.load().copy(
@@ -321,7 +323,7 @@ private fun LibraryScreen(
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
-    val topContentPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp + 12.dp
+    val topContentPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopAppBarHeight + 12.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(

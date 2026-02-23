@@ -64,7 +64,7 @@ internal fun HomeScreen(
     val horizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
-    val topContentPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp
+    val topContentPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopAppBarHeight
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -194,3 +194,6 @@ private fun HomeProfileSelector() {
         modifier = Modifier.padding(12.dp)
     )
 }
+
+/** Material 3 standard TopAppBar height (TopAppBarSmallTokens.ContainerHeight). */
+private val TopAppBarHeight = 64.dp

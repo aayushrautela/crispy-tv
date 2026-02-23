@@ -315,6 +315,9 @@ class DiscoverViewModel(
 
 private const val PAGE_SIZE = 60
 
+/** Material 3 standard TopAppBar height (TopAppBarSmallTokens.ContainerHeight). */
+private val TopAppBarHeight = 64.dp
+
 private fun buildGenreFilters(selectedGenre: String?): List<CatalogFilter> {
     val normalized = selectedGenre?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
     return listOf(CatalogFilter(key = "genre", value = normalized))
@@ -383,7 +386,7 @@ private fun DiscoverScreen(
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val topContentPadding =
-        WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp + Dimensions.SmallSpacing
+        WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopAppBarHeight + Dimensions.SmallSpacing
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(
