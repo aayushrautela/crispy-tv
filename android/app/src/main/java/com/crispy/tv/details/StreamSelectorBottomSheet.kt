@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -47,6 +49,10 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.ui.components.skeletonElement
 
+// Keep the sheet's measured height stable while provider results stream in.
+// Without this, ModalBottomSheet can recalculate anchors as content grows and snap between sizes.
+private const val STREAM_SHEET_HEIGHT_FRACTION = 0.92f
+
 @Composable
 internal fun StreamSelectorBottomSheet(
     details: MediaDetails?,
@@ -79,80 +85,98 @@ internal fun StreamSelectorBottomSheet(
         modifier = Modifier.testTag("stream_sheet"),
     ) {
         CompositionLocalProvider(LocalOverscrollFactory provides null) {
-            LazyColumn(
+            Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                        .fillMaxHeight(STREAM_SHEET_HEIGHT_FRACTION),
             ) {
-                item {
-                    StreamSheetHeader(details = details)
-                }
+                LazyColumn(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .navigationBarsPadding(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item {
+                        StreamSheetHeader(details = details)
+                    }
 
-                item {
-                    ProviderChipsRow(
-                        state = state,
-                        onProviderSelected = onProviderSelected,
-                    )
-                }
+                    item {
+                        ProviderChipsRow(
+                            state = state,
+                            onProviderSelected = onProviderSelected,
+                        )
+                    }
 
-                if (showInitialSkeleton) {
-                    items(6) {
-                        ElevatedCard {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth(0.72f)
-                                            .height(14.dp)
-                                            .skeletonElement(color = DetailsSkeletonColors.Base)
-                                )
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth(0.5f)
-                                            .height(12.dp)
-                                            .skeletonElement(color = DetailsSkeletonColors.Base)
+                    if (showInitialSkeleton) {
+                        items(6) {
+                            ElevatedCard {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth(0.72f)
+                                                .height(14.dp)
+                                                .skeletonElement(color = DetailsSkeletonColors.Base)
+                                    )
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth(0.5f)
+                                                .height(12.dp)
+                                                .skeletonElement(color = DetailsSkeletonColors.Base)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (
+                        !anyFilteredProviderLoading &&
+                            filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null }
+                    ) {
+                        item {
+                            ElevatedCard {
+                                Text(
+                                    text = "No streams found for this title.",
+                                    modifier = Modifier.padding(16.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
                         }
                     }
-                }
 
-                if (
-                    !anyFilteredProviderLoading &&
-                        filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null }
-                ) {
-                    item {
-                        ElevatedCard {
-                            Text(
-                                text = "No streams found for this title.",
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodyMedium,
+                    filteredProviders.forEach { provider ->
+                        item(key = "provider_header_${provider.providerId}") {
+                            ProviderHeaderCard(
+                                provider = provider,
+                                onRetry = onRetryProvider,
                             )
                         }
+
+                        if (provider.streams.isNotEmpty()) {
+                            items(
+                                items = provider.streams,
+                                key = { stream -> stream.stableKey },
+                            ) { stream ->
+                                StreamRow(
+                                    stream = stream,
+                                    providerName = provider.providerName,
+                                    onClick = { onStreamSelected(stream) },
+                                )
+                            }
+                        }
                     }
-                }
 
-                items(
-                    items = filteredProviders,
-                    key = { provider -> provider.providerId },
-                ) { provider ->
-                    ProviderStreamsSection(
-                        provider = provider,
-                        onRetry = onRetryProvider,
-                        onStreamSelected = onStreamSelected,
-                    )
-                }
-
-                if (!showInitialSkeleton && anyFilteredProviderLoading) {
-                    item {
-                        LoadingMoreStreamsRow()
+                    if (!showInitialSkeleton && anyFilteredProviderLoading) {
+                        item {
+                            LoadingMoreStreamsRow()
+                        }
                     }
                 }
             }
@@ -241,10 +265,9 @@ private fun ProviderChipsRow(
 }
 
 @Composable
-private fun ProviderStreamsSection(
+private fun ProviderHeaderCard(
     provider: StreamProviderUiState,
     onRetry: (String) -> Unit,
-    onStreamSelected: (AddonStream) -> Unit,
 ) {
     ElevatedCard {
         Column(
@@ -261,6 +284,10 @@ private fun ProviderStreamsSection(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(modifier = Modifier.weight(1f))
+                if (provider.isLoading) {
+                    LoadingIndicator(modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
                 Text(
                     text = "${provider.streams.size}",
                     style = MaterialTheme.typography.labelLarge,
@@ -283,14 +310,6 @@ private fun ProviderStreamsSection(
                         Text("Retry")
                     }
                 }
-            }
-
-            provider.streams.forEach { stream ->
-                StreamRow(
-                    stream = stream,
-                    providerName = provider.providerName,
-                    onClick = { onStreamSelected(stream) },
-                )
             }
         }
     }
