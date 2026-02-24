@@ -209,27 +209,22 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
+                .padding(innerPadding)
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
-            Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding()))
+            Text(
+                text = "Customize your experience",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = pageHorizontalPadding)
+            )
 
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
-            ) {
-                Text(
-                    text = "Customize your experience",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = pageHorizontalPadding)
-                )
-
-                settingsGroups.forEach { group ->
-                    SettingsGroupCard(group = group)
-                }
-
-                Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
+            settingsGroups.forEach { group ->
+                SettingsGroupCard(group = group)
             }
+
+            Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
         }
     }
 }

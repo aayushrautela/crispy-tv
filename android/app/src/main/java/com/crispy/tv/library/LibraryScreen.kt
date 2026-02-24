@@ -7,14 +7,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -32,24 +29,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -79,7 +71,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 enum class LibrarySource {
     LOCAL,
@@ -331,17 +322,46 @@ private fun LibraryScreen(
             .filter { item -> selectedFolder == null || item.folderId == selectedFolder }
 
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
-    var headerHeightPx by remember { mutableIntStateOf(0) }
-    val topContentPadding = with(LocalDensity.current) { headerHeightPx.toDp() } + 12.dp
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            Column {
+                StandardTopAppBar(
+                    title = "Library",
+                    actions = {
+                        IconButton(onClick = onRefresh) {
+                            Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+
+                if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = pageHorizontalPadding)
+                    ) {
+                        items(providerFolders, key = { it.id }) { folder ->
+                            FilterChip(
+                                selected = folder.id == selectedFolder,
+                                onClick = { onSelectProviderFolder(folder.id) },
+                                label = { Text("${folder.label} (${folder.itemCount})") }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 124.dp),
-            modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
-                top = topContentPadding,
+                top = innerPadding.calculateTopPadding() + 12.dp,
                 end = pageHorizontalPadding,
                 bottom = 12.dp + Dimensions.PageBottomPadding
             ),
@@ -523,47 +543,6 @@ private fun LibraryScreen(
                                 )
                             }
                         }
-                    }
-                }
-            }
-        }
-
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { size ->
-                        headerHeightPx = size.height
-                        scrollBehavior.state.heightOffsetLimit = -size.height.toFloat()
-                    }
-                    .offset { IntOffset(x = 0, y = scrollBehavior.state.heightOffset.roundToInt()) }
-        ) {
-            StandardTopAppBar(
-                title = "Library",
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
-                ),
-                windowInsets = WindowInsets.statusBars
-            )
-
-            if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = pageHorizontalPadding)
-                ) {
-                    items(providerFolders, key = { it.id }) { folder ->
-                        FilterChip(
-                            selected = folder.id == selectedFolder,
-                            onClick = { onSelectProviderFolder(folder.id) },
-                            label = { Text("${folder.label} (${folder.itemCount})") }
-                        )
                     }
                 }
             }

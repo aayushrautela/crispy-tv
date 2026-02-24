@@ -3,13 +3,10 @@ package com.crispy.tv.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -18,9 +15,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -29,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -65,17 +61,24 @@ internal fun HomeScreen(
     val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
 
     val horizontalPadding = responsivePageHorizontalPadding()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
-    val topContentPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopAppBarHeight
-
-    Box(modifier = Modifier.fillMaxSize()) {
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            StandardTopAppBar(
+                title = { CrispyWordmark(Modifier.height(36.dp)) },
+                actions = { HomeProfileSelector() },
+                scrollBehavior = scrollBehavior
+            )
+        }
+    ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = horizontalPadding,
                 end = horizontalPadding,
-                top = topContentPadding,
+                top = innerPadding.calculateTopPadding(),
                 bottom = Dimensions.PageBottomPadding
             ),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
@@ -184,16 +187,6 @@ internal fun HomeScreen(
                 }
             }
         }
-
-        StandardTopAppBar(
-            title = { CrispyWordmark(Modifier.height(36.dp)) },
-            actions = { HomeProfileSelector() },
-            scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surface
-            )
-        )
     }
 }
 
@@ -205,6 +198,3 @@ private fun HomeProfileSelector() {
         modifier = Modifier.padding(12.dp)
     )
 }
-
-/** Material 3 standard TopAppBar height (TopAppBarSmallTokens.ContainerHeight). */
-private val TopAppBarHeight = 64.dp
