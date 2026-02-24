@@ -65,6 +65,8 @@ import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import java.util.Locale
 
+import com.crispy.tv.ui.components.skeletonElement
+
 @Composable
 internal fun HomeRailSection(
     title: String,
@@ -501,15 +503,19 @@ internal fun HomeCatalogSectionRow(
         ) {
             if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
                 items(10) {
-                    Card(
-                        modifier = Modifier
-                            .width(124.dp)
-                            .aspectRatio(2f / 3f)
-                    ) {
+                    Column(modifier = Modifier.width(124.dp)) {
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .skeletonElement()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(14.dp)
+                                .skeletonElement()
                         )
                     }
                 }

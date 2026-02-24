@@ -53,9 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import kotlin.math.roundToInt
-import java.util.Date
 
 @Composable
 internal fun HeaderInfoSection(
@@ -76,7 +75,84 @@ internal fun HeaderInfoSection(
     onToggleWatched: () -> Unit,
     onSetRating: (Int?) -> Unit,
 ) {
-    if (details == null) return
+    val horizontalPadding = responsivePageHorizontalPadding()
+
+    if (details == null) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = horizontalPadding)
+                .padding(top = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Genre skeleton
+            Box(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(18.dp)
+                    .skeletonElement(color = palette.pillBackground)
+            )
+
+            // Rating/Meta row skeleton
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(modifier = Modifier.width(50.dp).height(18.dp).skeletonElement(color = palette.pillBackground))
+                Box(modifier = Modifier.width(40.dp).height(18.dp).skeletonElement(color = palette.pillBackground))
+                Box(modifier = Modifier.width(60.dp).height(18.dp).skeletonElement(color = palette.pillBackground))
+            }
+
+            // Description skeleton
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(modifier = Modifier.fillMaxWidth(0.9f).height(14.dp).skeletonElement(color = palette.pillBackground.copy(alpha = 0.65f)))
+                Box(modifier = Modifier.fillMaxWidth(0.84f).height(14.dp).skeletonElement(color = palette.pillBackground.copy(alpha = 0.65f)))
+                Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).skeletonElement(color = palette.pillBackground.copy(alpha = 0.65f)))
+            }
+
+            // Buttons skeleton
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .skeletonElement(color = palette.pillBackground)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .skeletonElement(color = palette.accent.copy(alpha = 0.45f))
+            )
+
+            // Quick actions skeleton
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(3) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(vertical = 6.dp)
+                    ) {
+                        Box(modifier = Modifier.size(48.dp).skeletonElement(color = palette.pillBackground))
+                        Box(modifier = Modifier.width(44.dp).height(10.dp).skeletonElement(color = palette.pillBackground))
+                    }
+                }
+            }
+        }
+        return
+    }
+
 
     val horizontalPadding = responsivePageHorizontalPadding()
     val genre = details.genres.firstOrNull()?.trim().orEmpty()

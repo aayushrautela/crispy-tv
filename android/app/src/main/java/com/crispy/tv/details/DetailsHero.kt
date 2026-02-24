@@ -63,6 +63,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
 
@@ -91,12 +92,46 @@ internal fun HeroSection(
         val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
 
         if (details == null) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = palette.pillBackground
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .skeletonElement(
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        color = palette.pillBackground
+                    )
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = palette.onPillBackground)
+                // Bottom fade to merge hero into the page background.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops =
+                                    arrayOf(
+                                        0f to Color.Transparent,
+                                        0.58f to Color.Transparent,
+                                        1f to palette.pageBackground
+                                    ),
+                                startY = 0f,
+                                endY = heightPx
+                            )
+                        )
+                )
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = horizontalPadding)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.64f)
+                            .height(38.dp)
+                            .skeletonElement(color = palette.onPillBackground.copy(alpha = 0.28f))
+                    )
                 }
             }
             return@BoxWithConstraints

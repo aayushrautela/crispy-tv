@@ -61,12 +61,8 @@ import com.crispy.tv.metadata.tmdb.TmdbProductionEntity
 import com.crispy.tv.metadata.tmdb.TmdbReview
 import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.metadata.tmdb.TmdbTitleDetails
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
-import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import java.text.NumberFormat
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +79,9 @@ internal fun DetailsBody(
 
     var expandedReview by remember { mutableStateOf<TmdbReview?>(null) }
     val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    expandedReview?.let { review ->
+
+    if (expandedReview != null) {
+        val review = expandedReview!!
         ModalBottomSheet(
             onDismissRequest = { expandedReview = null },
             sheetState = reviewSheetState
@@ -110,6 +108,111 @@ internal fun DetailsBody(
                         )
                         Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
                     }
+                }
+
+                Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
+
+                TextButton(
+                    onClick = { expandedReview = null },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Close")
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = Dimensions.PageBottomPadding)
+    ) {
+        Spacer(modifier = Modifier.height(18.dp))
+
+        if (details == null) {
+            if (uiState.isLoading) {
+                Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                    // Director/Creator skeleton
+                    Column(
+                        modifier = Modifier.padding(horizontal = horizontalPadding),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(modifier = Modifier.width(160.dp).height(16.dp).skeletonElement())
+                        Box(modifier = Modifier.width(120.dp).height(16.dp).skeletonElement())
+                    }
+
+                    // Cast skeleton
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = horizontalPadding)
+                                .width(60.dp)
+                                .height(20.dp)
+                                .skeletonElement()
+                        )
+                        LazyRow(
+                            contentPadding = contentPadding,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            userScrollEnabled = false
+                        ) {
+                            items(6) {
+                                Column(
+                                    modifier = Modifier.width(100.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(modifier = Modifier.size(80.dp).skeletonElement(shape = CircleShape))
+                                    Box(modifier = Modifier.width(60.dp).height(12.dp).skeletonElement())
+                                }
+                            }
+                        }
+                    }
+
+                    // Similar items skeleton
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = horizontalPadding)
+                                .width(80.dp)
+                                .height(20.dp)
+                                .skeletonElement()
+                        )
+                        LazyRow(
+                            contentPadding = contentPadding,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            userScrollEnabled = false
+                        ) {
+                            items(5) {
+                                Column(modifier = Modifier.width(124.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(2f / 3f)
+                                            .skeletonElement()
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(modifier = Modifier.fillMaxWidth().height(14.dp).skeletonElement())
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = uiState.statusMessage.ifBlank { "Unable to load details." },
+                    modifier = Modifier.padding(horizontal = horizontalPadding)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.padding(horizontal = horizontalPadding)
+                ) {
+                    Text("Retry")
+                }
+            }
+            return
+        }
+
                 }
 
                 Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
@@ -176,15 +279,61 @@ internal fun DetailsBody(
             }
         }
 
-        if (uiState.tmdbIsLoading) {
+        if (uiState.tmdbIsLoading && tmdb == null) {
             Spacer(modifier = Modifier.height(18.dp))
-            Row(
-                modifier = Modifier.padding(horizontal = horizontalPadding),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                Text("Loading extras...", style = MaterialTheme.typography.bodyMedium)
+
+            // Cast skeleton
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = horizontalPadding)
+                        .width(60.dp)
+                        .height(20.dp)
+                        .skeletonElement()
+                )
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    userScrollEnabled = false
+                ) {
+                    items(6) {
+                        Column(
+                            modifier = Modifier.width(100.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(modifier = Modifier.size(80.dp).skeletonElement(shape = CircleShape))
+                            Box(modifier = Modifier.width(60.dp).height(12.dp).skeletonElement())
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Reviews/Similar skeleton
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = horizontalPadding)
+                        .width(80.dp)
+                        .height(20.dp)
+                        .skeletonElement()
+                )
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    userScrollEnabled = false
+                ) {
+                    items(3) {
+                        Box(
+                            modifier = Modifier
+                                .width(280.dp)
+                                .height(120.dp)
+                                .skeletonElement()
+                        )
+                    }
+                }
             }
         }
 
