@@ -290,20 +290,43 @@ internal class TraktWatchHistoryProvider(
                 val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
 
                 if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-                    if (showTraktId.isBlank()) continue
-                    val next = nextEpisodeForShow(showTraktId) ?: continue
+                    // Episode is completed (>= 85%). Try to find next episode.
+                    if (showTraktId.isNotBlank()) {
+                        val next = nextEpisodeForShow(showTraktId)
+                        if (next != null) {
+                            // Next episode found — add up-next placeholder at 0%
+                            playbackEntries.add(
+                                ContinueWatchingEntry(
+                                    contentId = contentId,
+                                    contentType = MetadataLabMediaType.SERIES,
+                                    title = showTitle,
+                                    season = next.season,
+                                    episode = next.episode,
+                                    progressPercent = 0.0,
+                                    lastUpdatedEpochMs = pausedAt,
+                                    provider = WatchProvider.TRAKT,
+                                    providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                                    isUpNextPlaceholder = true,
+                                )
+                            )
+                            continue
+                        }
+                    }
+                    // No next episode (series/season finale) or no Trakt ID.
+                    // Keep current episode at 84.9% so the show doesn't vanish
+                    // from continue watching. Matches Nuvio's fallback behavior.
                     playbackEntries.add(
                         ContinueWatchingEntry(
                             contentId = contentId,
                             contentType = MetadataLabMediaType.SERIES,
-                            title = showTitle,
-                            season = next.season,
-                            episode = next.episode,
-                            progressPercent = 0.0,
+                            title = title,
+                            season = episodeSeason,
+                            episode = episodeNumber,
+                            progressPercent = CONTINUE_WATCHING_COMPLETION_PERCENT - 0.1,
                             lastUpdatedEpochMs = pausedAt,
                             provider = WatchProvider.TRAKT,
                             providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
-                            isUpNextPlaceholder = true,
+                            isUpNextPlaceholder = false,
                         )
                     )
                     continue

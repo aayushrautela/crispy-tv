@@ -7,6 +7,9 @@ import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.watchhistory.CONTINUE_WATCHING_COMPLETION_PERCENT
+import com.crispy.tv.watchhistory.CONTINUE_WATCHING_MIN_PROGRESS_PERCENT
+import com.crispy.tv.watchhistory.STALE_PLAYBACK_WINDOW_MS
 import com.crispy.tv.watchhistory.auth.ProviderSessionStore
 import com.crispy.tv.watchhistory.local.NormalizedWatchRequest
 import com.crispy.tv.watchhistory.provider.NormalizedContentRequest
@@ -105,6 +108,8 @@ internal class SimklWatchHistoryProvider(
         val payload = simklGetAny("/sync/playback") ?: throw IllegalStateException("Simkl /sync/playback returned null")
         val array = payload.toJsonArrayOrNull() ?: throw IllegalStateException("Simkl /sync/playback returned non-array")
 
+        val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
+
         // Cache IMDb resolutions within this CW fetch to avoid repeated Simkl search calls.
         val imdbResolutionCache = mutableMapOf<String, String>()
 
@@ -123,13 +128,23 @@ internal class SimklWatchHistoryProvider(
                 val progress = obj.optDouble("progress", -1.0)
                 if (progress < 0) continue
 
+                val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
+
+                // Stale window: skip items older than the cutoff
+                if (pausedAt < staleCutoff) continue
+
+                // Min progress: skip items barely started
+                if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
+
                 if (type == "movie") {
+                    // Completed movies don't belong in continue watching
+                    if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
+
                     val movie = obj.optJSONObject("movie") ?: continue
                     val ids = movie.optJSONObject("ids")
                     val contentId = resolveAndCacheImdb(ids)
                     if (contentId.isEmpty()) continue
                     val title = movie.optString("title").trim().ifEmpty { contentId }
-                    val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
                     add(
                         ContinueWatchingEntry(
                             contentId = contentId,
@@ -161,7 +176,26 @@ internal class SimklWatchHistoryProvider(
                         ?: episode?.optInt("number", 0)?.takeIf { it > 0 }
                 val episodeTitle = episode?.optString("title")?.trim().orEmpty()
                 val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
-                val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
+
+                if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+                    // Completed episode — Simkl has no next-episode API.
+                    // Keep at 84.9% so the show stays in continue watching
+                    // (matches Nuvio's fallback behavior for completed episodes).
+                    add(
+                        ContinueWatchingEntry(
+                            contentId = contentId,
+                            contentType = MetadataLabMediaType.SERIES,
+                            title = title,
+                            season = season,
+                            episode = number,
+                            progressPercent = CONTINUE_WATCHING_COMPLETION_PERCENT - 0.1,
+                            lastUpdatedEpochMs = pausedAt,
+                            provider = WatchProvider.SIMKL,
+                            providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                        )
+                    )
+                    continue
+                }
 
                 add(
                     ContinueWatchingEntry(
