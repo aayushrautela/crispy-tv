@@ -234,7 +234,7 @@ internal fun HeaderInfoSection(
             text = details.description,
             textAlign = TextAlign.Center,
             textColor = palette.onPageBackground.copy(alpha = 0.9f),
-            placeholderColor = palette.onPageBackground.copy(alpha = 0.7f)
+            placeholderColor = Color(0xFF9E9E9E)
         )
 
         if (showAiInsights) {
