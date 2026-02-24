@@ -1,6 +1,7 @@
 @file:OptIn(
     androidx.compose.foundation.ExperimentalFoundationApi::class,
     androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
 )
 
 package com.crispy.tv.details
@@ -25,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -68,6 +70,8 @@ internal fun StreamSelectorBottomSheet(
                 }
             }
         }
+    val showInitialSkeleton = state.isLoading && state.providers.isEmpty()
+    val anyFilteredProviderLoading = filteredProviders.any { provider -> provider.isLoading }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -94,7 +98,7 @@ internal fun StreamSelectorBottomSheet(
                     )
                 }
 
-                if (state.isLoading) {
+                if (showInitialSkeleton) {
                     items(6) {
                         ElevatedCard {
                             Column(
@@ -120,7 +124,10 @@ internal fun StreamSelectorBottomSheet(
                     }
                 }
 
-                if (!state.isLoading && filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null && !provider.isLoading }) {
+                if (
+                    !anyFilteredProviderLoading &&
+                        filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null }
+                ) {
                     item {
                         ElevatedCard {
                             Text(
@@ -141,6 +148,12 @@ internal fun StreamSelectorBottomSheet(
                         onRetry = onRetryProvider,
                         onStreamSelected = onStreamSelected,
                     )
+                }
+
+                if (!showInitialSkeleton && anyFilteredProviderLoading) {
+                    item {
+                        LoadingMoreStreamsRow()
+                    }
                 }
             }
         }
@@ -255,23 +268,6 @@ private fun ProviderStreamsSection(
                 )
             }
 
-            if (provider.isLoading) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    repeat(3) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(44.dp)
-                                    .skeletonElement(color = DetailsSkeletonColors.Base)
-                        )
-                    }
-                }
-            }
-
             if (provider.errorMessage != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -296,6 +292,25 @@ private fun ProviderStreamsSection(
                     onClick = { onStreamSelected(stream) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LoadingMoreStreamsRow() {
+    ElevatedCard {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            LoadingIndicator(modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Loading more streams...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
