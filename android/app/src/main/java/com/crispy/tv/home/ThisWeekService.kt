@@ -130,8 +130,9 @@ class ThisWeekService(
 
         // Continue Watching shows (highest priority)
         try {
-            val cw = watchHistoryService.getCachedContinueWatching(nowMs = nowMs)
-                ?: watchHistoryService.listContinueWatching(nowMs = nowMs)
+            val cached = watchHistoryService.getCachedContinueWatching(nowMs = nowMs)
+            val cw = if (cached.entries.isNotEmpty()) cached
+                else watchHistoryService.listContinueWatching(nowMs = nowMs)
             cw.entries
                 .filter { it.contentType == MetadataLabMediaType.SERIES }
                 .forEach { entry ->
@@ -145,8 +146,9 @@ class ThisWeekService(
 
         // Library series (watchlist + collected)
         try {
-            val lib = watchHistoryService.getCachedProviderLibrary()
-                ?: watchHistoryService.listProviderLibrary()
+            val cachedLib = watchHistoryService.getCachedProviderLibrary()
+            val lib = if (cachedLib.items.isNotEmpty()) cachedLib
+                else watchHistoryService.listProviderLibrary()
             lib.items
                 .filter { it.contentType == MetadataLabMediaType.SERIES }
                 .forEach { item ->
