@@ -386,15 +386,8 @@ internal fun DetailsBody(
         tmdb?.collection?.takeIf { it.parts.isNotEmpty() }?.let { collection ->
             Spacer(modifier = Modifier.height(18.dp))
             Text(
-                text = "Collection",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
                 text = collection.name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = horizontalPadding),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
