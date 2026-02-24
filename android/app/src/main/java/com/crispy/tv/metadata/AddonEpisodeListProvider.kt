@@ -7,6 +7,7 @@ import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.EpisodeListProvider
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 
@@ -66,10 +67,10 @@ internal class AddonEpisodeListProvider(
 
                 val response = httpClient.get(
                     url.toHttpUrl(),
-                    headers = mapOf("Accept" to "application/json"),
+                    headers = Headers.headersOf("Accept", "application/json"),
                 )
-                val body = response.body?.string()
-                if (body.isNullOrBlank()) continue
+                val body = response.body
+                if (body.isBlank()) continue
 
                 val root = JSONObject(body)
                 val meta = root.optJSONObject("meta") ?: continue
