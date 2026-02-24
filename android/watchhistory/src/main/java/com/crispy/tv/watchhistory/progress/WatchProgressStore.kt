@@ -628,6 +628,18 @@ internal class WatchProgressStore(
                 simklProgressPercent = obj.optDoubleOrNull("simklProgress"),
             )
         }
+
+        private fun JSONObject.optLongOrNull(key: String): Long? {
+            if (!has(key)) return null
+            val value = optLong(key, Long.MIN_VALUE)
+            return value.takeIf { it != Long.MIN_VALUE }
+        }
+
+        private fun JSONObject.optDoubleOrNull(key: String): Double? {
+            if (!has(key)) return null
+            val value = optDouble(key, Double.NaN)
+            return value.takeIf { !it.isNaN() }
+        }
     }
 
     private fun WatchProgress.toJson(): JSONObject {
@@ -646,18 +658,6 @@ internal class WatchProgressStore(
         if (simklProgressPercent != null) obj.put("simklProgress", simklProgressPercent)
 
         return obj
-    }
-
-    private fun JSONObject.optLongOrNull(key: String): Long? {
-        if (!has(key)) return null
-        val value = optLong(key, Long.MIN_VALUE)
-        return value.takeIf { it != Long.MIN_VALUE }
-    }
-
-    private fun JSONObject.optDoubleOrNull(key: String): Double? {
-        if (!has(key)) return null
-        val value = optDouble(key, Double.NaN)
-        return value.takeIf { !it.isNaN() }
     }
 
     private companion object {

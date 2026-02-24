@@ -152,7 +152,7 @@ internal class TraktApi(
 
     private suspend fun postRawInternal(path: String, payload: JSONObject, forceRefreshToken: Boolean): CrispyHttpResponse? {
         val token = ensureAccessToken(forceRefresh = forceRefreshToken) ?: return null
-        val url = apiUrl(path)
+        val url = "https://api.trakt.tv$path"
         val response = http.postJsonRaw(url = url, headers = jsonHeaders(token), payload = payload) ?: return null
 
         if (response.code == 401 && !forceRefreshToken) {

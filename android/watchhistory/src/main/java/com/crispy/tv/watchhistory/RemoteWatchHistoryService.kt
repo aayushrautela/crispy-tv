@@ -21,6 +21,7 @@ import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchProgressSnapshot
 import com.crispy.tv.player.WatchProgressSyncResult
 import com.crispy.tv.player.WatchHistoryService
+import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
 import com.crispy.tv.watchhistory.auth.ProviderSessionStore
