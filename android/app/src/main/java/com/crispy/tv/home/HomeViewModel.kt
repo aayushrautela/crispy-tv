@@ -20,6 +20,7 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.metadata.AddonEpisodeListProvider
 import com.crispy.tv.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,6 +68,12 @@ data class ForYouState(
 )
 
 @Immutable
+data class ThisWeekState(
+    val items: List<ThisWeekItem> = emptyList(),
+    val statusMessage: String = ""
+)
+
+@Immutable
 data class CatalogSectionsState(
     val sections: List<HomeCatalogSectionUi> = emptyList(),
     val statusMessage: String = ""
@@ -83,6 +90,7 @@ data class HomeCatalogSectionUi(
 class HomeViewModel internal constructor(
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryService,
+    private val thisWeekService: ThisWeekService,
     private val suppressionStore: ContinueWatchingSuppressionStore,
     private val settingsStore: HomeScreenSettingsStore
 ) : ViewModel() {
@@ -103,6 +111,14 @@ class HomeViewModel internal constructor(
                                     httpClient = AppHttp.client(appContext),
                                 ),
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                            thisWeekService = ThisWeekService(
+                                watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                                episodeListProvider = AddonEpisodeListProvider(
+                                    context = appContext,
+                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                                    httpClient = AppHttp.client(appContext),
+                                ),
+                            ),
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
                             settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
@@ -124,6 +140,9 @@ class HomeViewModel internal constructor(
 
     private val _forYouState = MutableStateFlow(ForYouState())
     val forYouState: StateFlow<ForYouState> = _forYouState.asStateFlow()
+
+    private val _thisWeekState = MutableStateFlow(ThisWeekState())
+    val thisWeekState: StateFlow<ThisWeekState> = _thisWeekState.asStateFlow()
 
     private val _catalogSectionsState = MutableStateFlow(CatalogSectionsState())
     val catalogSectionsState: StateFlow<CatalogSectionsState> = _catalogSectionsState.asStateFlow()
@@ -296,6 +315,16 @@ class HomeViewModel internal constructor(
 
                 catalogSectionsJob = launch {
                     loadCatalogSections()
+                }
+
+                launch {
+                    val thisWeekResult = withContext(Dispatchers.IO) {
+                        thisWeekService.loadThisWeek(System.currentTimeMillis())
+                    }
+                    _thisWeekState.value = ThisWeekState(
+                        items = thisWeekResult.items,
+                        statusMessage = thisWeekResult.statusMessage.orEmpty()
+                    )
                 }
             }
         }

@@ -9,6 +9,7 @@ import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.details.DetailsRoute
 import com.crispy.tv.home.HomeScreen
+import com.crispy.tv.home.ThisWeekItem
 import com.crispy.tv.playerui.PlayerRoute
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
@@ -19,6 +20,9 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             },
             onContinueWatchingClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.contentId, item.type))
+            },
+            onThisWeekClick = { item ->
+                navController.navigate(AppRoutes.homeDetailsRoute(item.seriesId, item.type))
             },
             onCatalogItemClick = { catalogItem ->
                 navController.navigate(AppRoutes.homeDetailsRoute(catalogItem.id, catalogItem.type))

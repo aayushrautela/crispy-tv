@@ -46,6 +46,7 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 internal fun HomeScreen(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
+    onThisWeekClick: (ThisWeekItem) -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit
 ) {
@@ -59,6 +60,7 @@ internal fun HomeScreen(
     val heroState by viewModel.heroState.collectAsStateWithLifecycle()
     val continueWatchingState by viewModel.continueWatchingState.collectAsStateWithLifecycle()
     val upNextState by viewModel.upNextState.collectAsStateWithLifecycle()
+    val thisWeekState by viewModel.thisWeekState.collectAsStateWithLifecycle()
     val forYouState by viewModel.forYouState.collectAsStateWithLifecycle()
     val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
 
@@ -141,6 +143,13 @@ internal fun HomeScreen(
                     onRemoveItem = viewModel::removeContinueWatchingItem,
                     badgeLabel = "UP NEXT",
                     showProgressBar = true
+                )
+            }
+
+            item(contentType = "thisWeek") {
+                ThisWeekSection(
+                    items = thisWeekState.items,
+                    onItemClick = onThisWeekClick,
                 )
             }
 

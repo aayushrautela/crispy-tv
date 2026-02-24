@@ -558,6 +558,126 @@ private fun HomeRailPosterCard(
     }
 }
 
+/**
+ * "This Week" section — horizontal rail of episodes airing this calendar week
+ * for shows the user is tracking. Matches Nuvio's ThisWeekSection layout.
+ */
+@Composable
+internal fun ThisWeekSection(
+    items: List<ThisWeekItem>,
+    onItemClick: (ThisWeekItem) -> Unit = {},
+) {
+    if (items.isEmpty()) return
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HomeRailHeader(title = "This Week")
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(items, key = { it.id }) { item ->
+                ThisWeekCard(item = item, onClick = { onItemClick(item) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThisWeekCard(
+    item: ThisWeekItem,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(124.dp)
+            .clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        // Poster card with badge overlay
+        Box {
+            Card(
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f),
+            ) {
+                AsyncImage(
+                    model = item.posterUrl,
+                    contentDescription = item.seriesName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            // Badge: "NEW" if released, otherwise date
+            val badgeText = if (item.isReleased) {
+                "NEW"
+            } else {
+                // Show short date like "Mar 5"
+                try {
+                    val date = java.time.LocalDate.parse(item.releaseDate.take(10))
+                    "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            if (badgeText != null) {
+                Text(
+                    text = badgeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .background(
+                            color = if (item.isReleased) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                            } else {
+                                Color.Black.copy(alpha = 0.7f)
+                            },
+                            shape = RoundedCornerShape(4.dp),
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+
+        // Series name
+        Text(
+            text = item.seriesName,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        // Episode info: "S1 E3" or "S1 E1-E3"
+        val episodeLabel = if (item.episodeRange != null) {
+            "S${item.season} ${item.episodeRange}"
+        } else {
+            "S${item.season} E${item.episode}"
+        }
+        Text(
+            text = episodeLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.7f),
+            maxLines = 1,
+        )
+
+        // Episode title
+        if (!item.episodeTitle.isNullOrBlank()) {
+            Text(
+                text = item.episodeTitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.5f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 @Composable
 internal fun HomeCatalogPosterCard(
     item: CatalogItem,
