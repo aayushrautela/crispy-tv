@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -97,7 +96,7 @@ internal fun HeroSection(
                     .fillMaxSize()
                     .skeletonElement(
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        color = palette.pillBackground
+                        color = DetailsSkeletonColors.Base
                     )
             ) {
                 // Bottom fade to merge hero into the page background.
@@ -130,7 +129,7 @@ internal fun HeroSection(
                         modifier = Modifier
                             .fillMaxWidth(0.64f)
                             .height(38.dp)
-                            .skeletonElement(color = palette.onPillBackground.copy(alpha = 0.28f))
+                            .skeletonElement(color = DetailsSkeletonColors.Elevated)
                     )
                 }
             }

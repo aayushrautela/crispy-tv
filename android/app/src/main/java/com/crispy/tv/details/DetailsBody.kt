@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -142,8 +141,19 @@ internal fun DetailsBody(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text(uiState.statusMessage.ifBlank { "Loading..." })
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(18.dp)
+                                .skeletonElement(shape = CircleShape, color = DetailsSkeletonColors.Elevated)
+                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .width(170.dp)
+                                .height(12.dp)
+                                .skeletonElement(color = DetailsSkeletonColors.Base)
+                    )
                 }
             } else {
                 Text(
@@ -190,25 +200,36 @@ internal fun DetailsBody(
                         .padding(horizontal = horizontalPadding)
                         .width(60.dp)
                         .height(20.dp)
-                        .skeletonElement()
-                )
-                LazyRow(
-                    contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    userScrollEnabled = false
-                ) {
-                    items(6) {
-                        Column(
-                            modifier = Modifier.width(100.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(modifier = Modifier.size(80.dp).skeletonElement(shape = CircleShape))
-                            Box(modifier = Modifier.width(60.dp).height(12.dp).skeletonElement())
-                        }
-                    }
-                }
-            }
+                        .skeletonElement(color = DetailsSkeletonColors.Base)
+                 )
+                 LazyRow(
+                     contentPadding = contentPadding,
+                     horizontalArrangement = Arrangement.spacedBy(16.dp),
+                     userScrollEnabled = false
+                 ) {
+                     items(6) {
+                         Column(
+                             modifier = Modifier.width(100.dp),
+                             horizontalAlignment = Alignment.CenterHorizontally,
+                             verticalArrangement = Arrangement.spacedBy(8.dp)
+                         ) {
+                             Box(
+                                 modifier =
+                                     Modifier
+                                         .size(80.dp)
+                                         .skeletonElement(shape = CircleShape, color = DetailsSkeletonColors.Base)
+                             )
+                             Box(
+                                 modifier =
+                                     Modifier
+                                         .width(60.dp)
+                                         .height(12.dp)
+                                         .skeletonElement(color = DetailsSkeletonColors.Base)
+                             )
+                         }
+                     }
+                 }
+             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -219,24 +240,24 @@ internal fun DetailsBody(
                         .padding(horizontal = horizontalPadding)
                         .width(80.dp)
                         .height(20.dp)
-                        .skeletonElement()
-                )
-                LazyRow(
-                    contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    userScrollEnabled = false
-                ) {
-                    items(3) {
-                        Box(
-                            modifier = Modifier
-                                .width(280.dp)
-                                .height(120.dp)
-                                .skeletonElement()
-                        )
-                    }
-                }
-            }
-        }
+                        .skeletonElement(color = DetailsSkeletonColors.Base)
+                 )
+                 LazyRow(
+                     contentPadding = contentPadding,
+                     horizontalArrangement = Arrangement.spacedBy(12.dp),
+                     userScrollEnabled = false
+                 ) {
+                     items(3) {
+                         Box(
+                             modifier = Modifier
+                                 .width(280.dp)
+                                 .height(120.dp)
+                                 .skeletonElement(color = DetailsSkeletonColors.Base)
+                         )
+                     }
+                 }
+             }
+         }
 
         val tmdbCast = tmdb?.cast.orEmpty()
         if (tmdbCast.isNotEmpty()) {

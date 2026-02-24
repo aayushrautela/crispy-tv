@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
@@ -44,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.ui.components.skeletonElement
 
 @Composable
 internal fun StreamSelectorBottomSheet(
@@ -95,14 +95,27 @@ internal fun StreamSelectorBottomSheet(
                 }
 
                 if (state.isLoading) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator()
+                    items(6) {
+                        ElevatedCard {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth(0.72f)
+                                            .height(14.dp)
+                                            .skeletonElement(color = DetailsSkeletonColors.Base)
+                                )
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth(0.5f)
+                                            .height(12.dp)
+                                            .skeletonElement(color = DetailsSkeletonColors.Base)
+                                )
+                            }
                         }
                     }
                 }
@@ -243,11 +256,19 @@ private fun ProviderStreamsSection(
             }
 
             if (provider.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    repeat(3) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .skeletonElement(color = DetailsSkeletonColors.Base)
+                        )
+                    }
                 }
             }
 

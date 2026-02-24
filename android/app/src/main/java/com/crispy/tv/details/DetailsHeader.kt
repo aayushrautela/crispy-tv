@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -95,7 +94,7 @@ internal fun HeaderInfoSection(
                 modifier = Modifier
                     .width(80.dp)
                     .height(18.dp)
-                    .skeletonElement(color = palette.pillBackground)
+                    .skeletonElement(color = DetailsSkeletonColors.Base)
             )
 
             // Rating/Meta row skeleton
@@ -103,9 +102,9 @@ internal fun HeaderInfoSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(modifier = Modifier.width(50.dp).height(18.dp).skeletonElement(color = palette.pillBackground))
-                Box(modifier = Modifier.width(40.dp).height(18.dp).skeletonElement(color = palette.pillBackground))
-                Box(modifier = Modifier.width(60.dp).height(18.dp).skeletonElement(color = palette.pillBackground))
+                Box(modifier = Modifier.width(50.dp).height(18.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                Box(modifier = Modifier.width(40.dp).height(18.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                Box(modifier = Modifier.width(60.dp).height(18.dp).skeletonElement(color = DetailsSkeletonColors.Base))
             }
 
             // Description skeleton
@@ -114,9 +113,9 @@ internal fun HeaderInfoSection(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(modifier = Modifier.fillMaxWidth(0.9f).height(14.dp).skeletonElement(color = palette.pillBackground.copy(alpha = 0.65f)))
-                Box(modifier = Modifier.fillMaxWidth(0.84f).height(14.dp).skeletonElement(color = palette.pillBackground.copy(alpha = 0.65f)))
-                Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).skeletonElement(color = palette.pillBackground.copy(alpha = 0.65f)))
+                Box(modifier = Modifier.fillMaxWidth(0.9f).height(14.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                Box(modifier = Modifier.fillMaxWidth(0.84f).height(14.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).skeletonElement(color = DetailsSkeletonColors.Base))
             }
 
             // Buttons skeleton
@@ -124,14 +123,14 @@ internal fun HeaderInfoSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .skeletonElement(color = palette.pillBackground)
+                    .skeletonElement(color = DetailsSkeletonColors.Base)
             )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .skeletonElement(color = palette.accent.copy(alpha = 0.45f))
+                    .skeletonElement(color = DetailsSkeletonColors.Elevated)
             )
 
             // Quick actions skeleton
@@ -148,8 +147,8 @@ internal fun HeaderInfoSection(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.padding(vertical = 6.dp)
                     ) {
-                        Box(modifier = Modifier.size(48.dp).skeletonElement(color = palette.pillBackground))
-                        Box(modifier = Modifier.width(44.dp).height(10.dp).skeletonElement(color = palette.pillBackground))
+                        Box(modifier = Modifier.size(48.dp).skeletonElement(color = DetailsSkeletonColors.Base))
+                        Box(modifier = Modifier.width(44.dp).height(10.dp).skeletonElement(color = DetailsSkeletonColors.Base))
                     }
                 }
             }
@@ -255,10 +254,11 @@ internal fun HeaderInfoSection(
                     )
             ) {
                 if (aiInsightsIsLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = palette.onPillBackground,
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(18.dp)
+                                .skeletonElement(shape = androidx.compose.foundation.shape.CircleShape, color = DetailsSkeletonColors.Elevated)
                     )
                 } else {
                     Icon(
