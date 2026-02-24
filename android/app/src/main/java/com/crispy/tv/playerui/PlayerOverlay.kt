@@ -610,9 +610,10 @@ private fun PlayerLoadingCurtain(
 private fun rememberOverlayPadding(minPadding: Dp): PaddingValues {
     val safeInsets = WindowInsets.safeDrawing
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
 
-    val left = with(density) { safeInsets.getLeft(this).toDp() }
-    val right = with(density) { safeInsets.getRight(this).toDp() }
+    val left = with(density) { safeInsets.getLeft(this, layoutDirection).toDp() }
+    val right = with(density) { safeInsets.getRight(this, layoutDirection).toDp() }
     val top = with(density) { safeInsets.getTop(this).toDp() }
     val bottom = with(density) { safeInsets.getBottom(this).toDp() }
 
