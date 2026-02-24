@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -317,6 +318,7 @@ private const val PAGE_SIZE = 60
 
 /** Material 3 standard TopAppBar height (TopAppBarSmallTokens.ContainerHeight). */
 private val TopAppBarHeight = 64.dp
+private val DiscoverFilterHeaderHeight = 40.dp
 
 private fun buildGenreFilters(selectedGenre: String?): List<CatalogFilter> {
     val normalized = selectedGenre?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
@@ -385,8 +387,9 @@ private fun DiscoverScreen(
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val topContentPadding =
-        WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopAppBarHeight + Dimensions.SmallSpacing
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val filterHeaderTopPadding = statusBarPadding + TopAppBarHeight + Dimensions.SmallSpacing
+    val topContentPadding = filterHeaderTopPadding + DiscoverFilterHeaderHeight + Dimensions.SmallSpacing
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(
@@ -401,79 +404,25 @@ private fun DiscoverScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilterChip(
-                            selected = false,
-                            onClick = { activeSheet = DiscoverSheet.Type },
-                            label = { Text(uiState.typeFilter.label) },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-
-                        FilterChip(
-                            selected = false,
-                            onClick = { activeSheet = DiscoverSheet.Catalog },
-                            label = {
-                                Text(
-                                    text = selectedCatalog?.section?.title ?: "Select catalog",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-
-                        if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
-                            FilterChip(
-                                selected = false,
-                                onClick = { activeSheet = DiscoverSheet.Genre },
-                                label = {
-                                    Text(
-                                        text = uiState.selectedGenre ?: "All genres",
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                trailingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.KeyboardArrowDown,
-                                        contentDescription = null
-                                    )
-                                }
+            if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (selectedCatalog != null) {
+                            val summaryGenre = uiState.selectedGenre ?: "All genres"
+                            Text(
+                                text = "${selectedCatalog.addonName} | ${selectedCatalog.section.mediaType.uppercase(Locale.US)} | $summaryGenre",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
 
-                    if (selectedCatalog != null) {
-                        val summaryGenre = uiState.selectedGenre ?: "All genres"
-                        Text(
-                            text = "${selectedCatalog.addonName} | ${selectedCatalog.section.mediaType.uppercase(Locale.US)} | $summaryGenre",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    if (uiState.statusMessage.isNotBlank()) {
-                        Text(
-                            text = uiState.statusMessage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (uiState.statusMessage.isNotBlank()) {
+                            Text(
+                                text = uiState.statusMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -559,6 +508,71 @@ private fun DiscoverScreen(
                             Text("Load more")
                         }
                     }
+                }
+            }
+        }
+
+        LazyRow(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = filterHeaderTopPadding),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = pageHorizontalPadding)
+        ) {
+            item {
+                FilterChip(
+                    selected = false,
+                    onClick = { activeSheet = DiscoverSheet.Type },
+                    label = { Text(uiState.typeFilter.label) },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                            contentDescription = null
+                        )
+                    }
+                )
+            }
+
+            item {
+                FilterChip(
+                    selected = false,
+                    onClick = { activeSheet = DiscoverSheet.Catalog },
+                    label = {
+                        Text(
+                            text = selectedCatalog?.section?.title ?: "Select catalog",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                            contentDescription = null
+                        )
+                    }
+                )
+            }
+
+            if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
+                item {
+                    FilterChip(
+                        selected = false,
+                        onClick = { activeSheet = DiscoverSheet.Genre },
+                        label = {
+                            Text(
+                                text = uiState.selectedGenre ?: "All genres",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.KeyboardArrowDown,
+                                contentDescription = null
+                            )
+                        }
+                    )
                 }
             }
         }
