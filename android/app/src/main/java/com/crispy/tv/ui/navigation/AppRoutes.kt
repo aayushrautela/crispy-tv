@@ -2,6 +2,7 @@ package com.crispy.tv.ui.navigation
 
 import android.net.Uri
 import com.crispy.tv.catalog.CatalogSectionRef
+import java.util.Locale
 
 object AppRoutes {
     const val HomeRoute = "home"
@@ -32,8 +33,9 @@ object AppRoutes {
     const val CatalogBaseUrlArg = "baseUrl"
     const val CatalogQueryArg = "query"
 
+    // Details: type + id are required route segments.
     val HomeDetailsRoutePattern: String =
-        "$HomeDetailsRoute/{$HomeDetailsItemIdArg}?$HomeDetailsMediaTypeArg={$HomeDetailsMediaTypeArg}"
+        "$HomeDetailsRoute/{$HomeDetailsMediaTypeArg}/{$HomeDetailsItemIdArg}"
     val PlayerRoutePattern: String =
         "$PlayerRoute?$PlayerUrlArg={$PlayerUrlArg}&$PlayerTitleArg={$PlayerTitleArg}"
     val CatalogListRoutePattern: String =
@@ -43,9 +45,14 @@ object AppRoutes {
             "&$CatalogBaseUrlArg={$CatalogBaseUrlArg}" +
             "&$CatalogQueryArg={$CatalogQueryArg}"
 
-    fun homeDetailsRoute(itemId: String, mediaType: String? = null): String {
-        val base = "$HomeDetailsRoute/${Uri.encode(itemId)}"
-        return if (mediaType != null) "$base?$HomeDetailsMediaTypeArg=${Uri.encode(mediaType)}" else base
+    fun homeDetailsRoute(itemId: String, mediaType: String): String {
+        val normalizedType =
+            when (mediaType.trim().lowercase(Locale.US)) {
+                "movie" -> "movie"
+                "series", "show", "tv" -> "series"
+                else -> mediaType.trim().lowercase(Locale.US)
+            }
+        return "$HomeDetailsRoute/${Uri.encode(normalizedType)}/${Uri.encode(itemId.trim())}"
     }
 
     fun playerRoute(url: String, title: String): String {

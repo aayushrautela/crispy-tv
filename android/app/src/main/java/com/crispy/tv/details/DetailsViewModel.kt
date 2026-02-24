@@ -102,7 +102,7 @@ sealed interface DetailsNavigationEvent {
 
 class DetailsViewModel internal constructor(
     private val itemId: String,
-    private val mediaType: String?,
+    private val mediaType: String,
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryService,
     private val settingsStore: HomeScreenSettingsStore,
@@ -117,6 +117,9 @@ class DetailsViewModel internal constructor(
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
     private val _navigationEvents = MutableSharedFlow<DetailsNavigationEvent>(extraBufferCapacity = 1)
     val navigationEvents: SharedFlow<DetailsNavigationEvent> = _navigationEvents.asSharedFlow()
+
+    private val requestedMediaType: MetadataLabMediaType =
+        checkNotNull(mediaType.toMetadataLabMediaTypeOrNull()) { "Unsupported mediaType: $mediaType" }
 
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
@@ -212,9 +215,7 @@ class DetailsViewModel internal constructor(
                 }
 
             val addonDetails = addonResult.details
-            val mediaTypeHint =
-                addonDetails?.mediaType?.toMetadataLabMediaTypeOrNull()
-                    ?: resolvedForAddon.resolvedMediaType
+            val mediaTypeHint = resolvedForAddon.resolvedMediaType
 
             val tmdbResult =
                 withContext(Dispatchers.IO) {
@@ -292,7 +293,7 @@ class DetailsViewModel internal constructor(
             val aiConfigured = aiSnapshot.openRouterKey.isNotBlank()
 
             if (tmdbId != null && detailsForAi != null && aiMode != AiInsightsMode.OFF) {
-                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId) }
+                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId, requestedMediaType) }
                 if (cached != null) {
                     _uiState.update { it.copy(aiInsights = cached) }
                 } else if (aiMode == AiInsightsMode.ALWAYS && aiConfigured) {
@@ -365,7 +366,12 @@ class DetailsViewModel internal constructor(
 
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        aiRepository.generate(tmdbId = tmdbId, details = details, reviews = reviews)
+                        aiRepository.generate(
+                            tmdbId = tmdbId,
+                            mediaType = requestedMediaType,
+                            details = details,
+                            reviews = reviews,
+                        )
                     }
                 }.onSuccess { result ->
                     _uiState.update {
@@ -404,11 +410,11 @@ class DetailsViewModel internal constructor(
                 ?.takeIf { it.isNotBlank() }
                 ?.let { videoId ->
                     StreamLookupTarget(
-                        mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
+                        mediaType = requestedMediaType,
                         lookupId = videoId,
                     )
                 }
-                ?: resolveStreamLookupTarget(details, state.selectedSeasonOrFirst)
+                ?: resolveStreamLookupTarget(details, state.selectedSeasonOrFirst, fallbackMediaType = requestedMediaType)
 
         openStreamSelectorWithTarget(target, blankIdMessage = "Unable to resolve stream lookup id for this title.")
     }
@@ -422,7 +428,7 @@ class DetailsViewModel internal constructor(
         }
         val target =
             StreamLookupTarget(
-                mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
+                mediaType = requestedMediaType,
                 lookupId = videoId.trim(),
             )
         openStreamSelectorWithTarget(target, blankIdMessage = "This episode does not have a stream lookup id.")
@@ -901,42 +907,31 @@ class DetailsViewModel internal constructor(
      */
     private suspend fun resolveItemIdForAddonFetch(rawId: String): ResolvedItemId {
         val trimmed = rawId.trim()
-        if (trimmed.isEmpty()) return ResolvedItemId(trimmed, null, null)
+        if (trimmed.isEmpty()) return ResolvedItemId(trimmed, mediaType, requestedMediaType)
 
         val lowered = trimmed.lowercase(Locale.US)
 
         // Already IMDb — use directly, but carry forward the known type
         if (lowered.startsWith("tt") && lowered.length >= 4) {
-            return ResolvedItemId(trimmed, mediaType, mediaType?.toMetadataLabMediaTypeOrNull())
+            return ResolvedItemId(trimmed, mediaType, requestedMediaType)
         }
 
         // tmdb:X — resolve to IMDb before addon fetch
         if (lowered.startsWith("tmdb:")) {
             // When type is known from navigation, try ONLY that type (Nuvio: getStremioId(type, tmdbId))
-            val typesToTry = when (mediaType?.lowercase(Locale.US)) {
-                "movie" -> listOf(MetadataLabMediaType.MOVIE)
-                "series" -> listOf(MetadataLabMediaType.SERIES)
-                else -> listOf(MetadataLabMediaType.SERIES, MetadataLabMediaType.MOVIE) // fallback: series-first
-            }
-            for (type in typesToTry) {
-                val imdb = tmdbImdbIdResolver.resolveImdbId(trimmed, type)
-                if (imdb != null) {
-                    val mediaTypeStr = when (type) {
-                        MetadataLabMediaType.MOVIE -> "movie"
-                        MetadataLabMediaType.SERIES -> "series"
-                    }
-                    return ResolvedItemId(imdb, mediaTypeStr, type)
-                }
+            val imdb = tmdbImdbIdResolver.resolveImdbId(trimmed, requestedMediaType)
+            if (imdb != null) {
+                return ResolvedItemId(imdb, mediaType, requestedMediaType)
             }
         }
 
-        return ResolvedItemId(trimmed, mediaType, mediaType?.toMetadataLabMediaTypeOrNull())
+        return ResolvedItemId(trimmed, mediaType, requestedMediaType)
     }
 
     private data class ResolvedItemId(
         val id: String,
-        val mediaTypeHint: String?,
-        val resolvedMediaType: MetadataLabMediaType?,
+        val mediaTypeHint: String,
+        val resolvedMediaType: MetadataLabMediaType,
     )
 
     private suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
@@ -947,7 +942,7 @@ class DetailsViewModel internal constructor(
             return if (fromField == existing) details else details.copy(imdbId = existing)
         }
 
-        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: return details
+        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
         val resolved = tmdbImdbIdResolver.resolveImdbId(details.id, mediaType) ?: return details
         return details.copy(imdbId = resolved)
     }
@@ -967,9 +962,8 @@ class DetailsViewModel internal constructor(
     ): Pair<WatchCta, String?> {
         if (details == null) return Pair(WatchCta(), null)
 
-        val mediaType = details.mediaType.trim().lowercase(Locale.US)
-        val isSeries = mediaType == "series" || mediaType == "show" || mediaType == "tv"
-        val expectedType = details.mediaType.toMetadataLabMediaTypeOrNull()
+        val isSeries = requestedMediaType == MetadataLabMediaType.SERIES
+        val expectedType = requestedMediaType
         val source = settingsStore.load().watchDataSource
 
         val continueEntry = resolveContinueWatchingEntry(details, expectedType, source, nowMs)
@@ -1052,7 +1046,7 @@ class DetailsViewModel internal constructor(
 
     private suspend fun resolveContinueWatchingEntry(
         details: MediaDetails,
-        expectedType: MetadataLabMediaType?,
+        expectedType: MetadataLabMediaType,
         source: WatchProvider,
         nowMs: Long,
     ): ContinueWatchingEntry? {
@@ -1103,7 +1097,7 @@ class DetailsViewModel internal constructor(
             details?.imdbId?.let { imdb ->
                 normalizeNuvioMediaId(imdb).contentId.lowercase(Locale.US)
             }
-        val expectedType = details?.mediaType.toMetadataLabMediaTypeOrNull()
+        val expectedType = requestedMediaType
 
         fun matchesItemContent(itemContentId: String): Boolean {
             return matchesContentId(itemContentId, normalizedTargetId) ||
@@ -1216,7 +1210,7 @@ class DetailsViewModel internal constructor(
         private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
         private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
 
-        fun factory(context: Context, itemId: String, mediaType: String? = null): ViewModelProvider.Factory {
+        fun factory(context: Context, itemId: String, mediaType: String): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -1279,8 +1273,9 @@ private data class StreamLookupTarget(
 private fun resolveStreamLookupTarget(
     details: MediaDetails,
     selectedSeason: Int?,
+    fallbackMediaType: MetadataLabMediaType,
 ): StreamLookupTarget {
-    val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+    val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
     val lookupId =
         when (mediaType) {
             MetadataLabMediaType.MOVIE -> details.id.trim()

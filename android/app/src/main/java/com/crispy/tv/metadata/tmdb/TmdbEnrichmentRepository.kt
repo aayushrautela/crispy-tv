@@ -431,14 +431,26 @@ class TmdbEnrichmentRepository(
     ): ResolvedTmdb? {
         val tmdbIdFromId = extractTmdbId(normalizedContentId)
         if (tmdbIdFromId != null) {
-            val byHint = hint ?: MetadataLabMediaType.MOVIE
-            val details = fetchDetails(byHint, tmdbIdFromId, language)
-            if (details != null) return ResolvedTmdb(tmdbIdFromId, byHint)
+            if (hint != null) {
+                val details = fetchDetails(hint, tmdbIdFromId, language)
+                if (details != null) return ResolvedTmdb(tmdbIdFromId, hint)
 
-            val other = if (byHint == MetadataLabMediaType.MOVIE) MetadataLabMediaType.SERIES else MetadataLabMediaType.MOVIE
-            val otherDetails = fetchDetails(other, tmdbIdFromId, language)
-            if (otherDetails != null) return ResolvedTmdb(tmdbIdFromId, other)
-            return null
+                val other =
+                    if (hint == MetadataLabMediaType.MOVIE) MetadataLabMediaType.SERIES else MetadataLabMediaType.MOVIE
+                val otherDetails = fetchDetails(other, tmdbIdFromId, language)
+                if (otherDetails != null) return ResolvedTmdb(tmdbIdFromId, other)
+                return null
+            }
+
+            // Suspenders: tmdb:<id> is ambiguous without a type hint (movie vs tv IDs can collide).
+            // Only accept the ID if exactly one namespace resolves.
+            val movieDetails = fetchDetails(MetadataLabMediaType.MOVIE, tmdbIdFromId, language)
+            val tvDetails = fetchDetails(MetadataLabMediaType.SERIES, tmdbIdFromId, language)
+            return when {
+                movieDetails != null && tvDetails == null -> ResolvedTmdb(tmdbIdFromId, MetadataLabMediaType.MOVIE)
+                tvDetails != null && movieDetails == null -> ResolvedTmdb(tmdbIdFromId, MetadataLabMediaType.SERIES)
+                else -> null
+            }
         }
 
         val imdb = imdbId ?: return null
@@ -467,8 +479,8 @@ class TmdbEnrichmentRepository(
                     ?: movieId?.let { ResolvedTmdb(it, MetadataLabMediaType.MOVIE) }
             null -> {
                 when {
-                    movieId != null -> ResolvedTmdb(movieId, MetadataLabMediaType.MOVIE)
-                    tvId != null -> ResolvedTmdb(tvId, MetadataLabMediaType.SERIES)
+                    movieId != null && tvId == null -> ResolvedTmdb(movieId, MetadataLabMediaType.MOVIE)
+                    tvId != null && movieId == null -> ResolvedTmdb(tvId, MetadataLabMediaType.SERIES)
                     else -> null
                 }
             }

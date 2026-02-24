@@ -98,7 +98,7 @@ internal fun HomeRailSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(0.dp)
         ) {
-            items(items, key = { it.id }) { item ->
+            items(items, key = { "${it.type}:${it.id}" }) { item ->
                 if (usePosterCardStyle) {
                     HomeRailPosterCard(
                         item = item,
@@ -521,7 +521,7 @@ internal fun HomeCatalogSectionRow(
                     }
                 }
             } else {
-                items(sectionUi.items, key = { it.id }) { item ->
+                items(sectionUi.items, key = { "${it.type}:${it.id}" }) { item ->
                     HomeCatalogPosterCard(
                         item = item,
                         onClick = { onItemClick(item) }
@@ -583,7 +583,7 @@ internal fun ThisWeekSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(items, key = { it.id }) { item ->
+            items(items, key = { "${it.type}:${it.id}" }) { item ->
                 ThisWeekCard(item = item, onClick = { onItemClick(item) })
             }
         }

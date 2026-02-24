@@ -75,7 +75,7 @@ internal fun DetailsBody(
     uiState: DetailsUiState,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
-    onItemClick: (String, String?) -> Unit,
+    onItemClick: (String, String) -> Unit,
     onEpisodeClick: (videoId: String) -> Unit = {},
 ) {
     val details = uiState.details
@@ -336,7 +336,7 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(items = collection.parts, key = { it.id }) { item ->
+                items(items = collection.parts, key = { "${it.type}:${it.id}" }) { item ->
                     HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id, item.type) })
                 }
             }
@@ -355,7 +355,7 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(items = similar, key = { it.id }) { item ->
+                items(items = similar, key = { "${it.type}:${it.id}" }) { item ->
                     HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id, item.type) })
                 }
             }

@@ -84,7 +84,7 @@ fun CatalogRoute(
             ) {
                 items(
                     count = pagingItems.itemCount,
-                    key = pagingItems.itemKey { it.id }
+                    key = pagingItems.itemKey { "${it.type}:${it.id}" }
                 ) { index ->
                     val item = pagingItems[index] ?: return@items
                     PosterCard(

@@ -69,16 +69,12 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(
         route = AppRoutes.HomeDetailsRoutePattern,
         arguments = listOf(
+            navArgument(AppRoutes.HomeDetailsMediaTypeArg) { type = NavType.StringType },
             navArgument(AppRoutes.HomeDetailsItemIdArg) { type = NavType.StringType },
-            navArgument(AppRoutes.HomeDetailsMediaTypeArg) {
-                type = NavType.StringType
-                nullable = true
-                defaultValue = null
-            },
         )
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
-        val mediaType = entry.arguments?.getString(AppRoutes.HomeDetailsMediaTypeArg)
+        val mediaType = entry.arguments?.getString(AppRoutes.HomeDetailsMediaTypeArg).orEmpty()
         DetailsRoute(
             itemId = itemId,
             mediaType = mediaType,

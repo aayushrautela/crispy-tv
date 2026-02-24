@@ -12,6 +12,7 @@ import com.crispy.tv.player.WatchProviderAuthState
 import com.crispy.tv.watchhistory.KEY_LOCAL_WATCHED_ITEMS
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 internal class LocalWatchHistoryStore(
     private val prefs: SharedPreferences,
@@ -154,9 +155,9 @@ internal class LocalWatchHistoryStore(
     fun upsertEntry(existing: List<LocalWatchedItem>, next: LocalWatchedItem): List<LocalWatchedItem> {
         val byKey = linkedMapOf<String, LocalWatchedItem>()
         existing.forEach { item ->
-            byKey[watchedKey(item.contentId, item.season, item.episode)] = item
+            byKey[watchedKey(item.contentType, item.contentId, item.season, item.episode)] = item
         }
-        val key = watchedKey(next.contentId, next.season, next.episode)
+        val key = watchedKey(next.contentType, next.contentId, next.season, next.episode)
         val current = byKey[key]
         if (current == null || next.watchedAtEpochMs >= current.watchedAtEpochMs) {
             byKey[key] = next
@@ -167,7 +168,7 @@ internal class LocalWatchHistoryStore(
     fun dedupeEntries(items: List<LocalWatchedItem>): List<LocalWatchedItem> {
         val byKey = linkedMapOf<String, LocalWatchedItem>()
         items.forEach { item ->
-            val key = watchedKey(item.contentId, item.season, item.episode)
+            val key = watchedKey(item.contentType, item.contentId, item.season, item.episode)
             val current = byKey[key]
             if (current == null || item.watchedAtEpochMs >= current.watchedAtEpochMs) {
                 byKey[key] = item
@@ -177,9 +178,9 @@ internal class LocalWatchHistoryStore(
     }
 
     fun removeEntry(existing: List<LocalWatchedItem>, request: NormalizedWatchRequest): List<LocalWatchedItem> {
-        val removalKey = watchedKey(request.contentId, request.season, request.episode)
+        val removalKey = watchedKey(request.contentType, request.contentId, request.season, request.episode)
         return existing.filterNot { item ->
-            watchedKey(item.contentId, item.season, item.episode) == removalKey
+            watchedKey(item.contentType, item.contentId, item.season, item.episode) == removalKey
         }
     }
 
@@ -200,8 +201,10 @@ internal class LocalWatchHistoryStore(
             }
     }
 
-    private fun watchedKey(contentId: String, season: Int?, episode: Int?): String {
-        return "$contentId::${season ?: -1}::${episode ?: -1}"
+    private fun watchedKey(contentType: MetadataLabMediaType, contentId: String, season: Int?, episode: Int?): String {
+        val normalizedId = normalizeNuvioMediaId(contentId).contentId.trim().lowercase(Locale.US)
+        val typeKey = contentType.name.lowercase(Locale.US)
+        return "$typeKey:$normalizedId::${season ?: -1}::${episode ?: -1}"
     }
 }
 

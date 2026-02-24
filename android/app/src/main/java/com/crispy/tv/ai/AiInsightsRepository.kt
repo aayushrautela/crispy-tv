@@ -2,6 +2,7 @@ package com.crispy.tv.ai
 
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.metadata.tmdb.TmdbReview
+import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.settings.AiInsightsModelType
 import com.crispy.tv.settings.AiInsightsSettingsStore
 import org.json.JSONArray
@@ -12,9 +13,15 @@ class AiInsightsRepository(
     private val settingsStore: AiInsightsSettingsStore,
     private val cacheStore: AiInsightsCacheStore,
 ) {
-    fun loadCached(tmdbId: Int): AiInsightsResult? = cacheStore.load(tmdbId)
+    fun loadCached(tmdbId: Int, mediaType: MetadataLabMediaType): AiInsightsResult? =
+        cacheStore.load(tmdbId, mediaType)
 
-    suspend fun generate(tmdbId: Int, details: MediaDetails, reviews: List<TmdbReview>): AiInsightsResult {
+    suspend fun generate(
+        tmdbId: Int,
+        mediaType: MetadataLabMediaType,
+        details: MediaDetails,
+        reviews: List<TmdbReview>,
+    ): AiInsightsResult {
         val snapshot = settingsStore.loadSnapshot()
         val key = snapshot.openRouterKey.trim()
         if (key.isEmpty()) {
@@ -25,7 +32,7 @@ class AiInsightsRepository(
         val prompt = buildPrompt(details = details, reviews = reviews)
         val content = openRouterClient.chatCompletionsJsonObject(apiKey = key, model = model, userPrompt = prompt)
         val result = parseAiInsightsResult(content)
-        cacheStore.save(tmdbId, result)
+        cacheStore.save(tmdbId, mediaType, result)
         return result
     }
 

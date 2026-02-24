@@ -2,6 +2,7 @@ package com.crispy.tv.ai
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.crispy.tv.player.MetadataLabMediaType
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -9,8 +10,8 @@ class AiInsightsCacheStore(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun load(tmdbId: Int): AiInsightsResult? {
-        val raw = prefs.getString(keyFor(tmdbId), null) ?: return null
+    fun load(tmdbId: Int, mediaType: MetadataLabMediaType): AiInsightsResult? {
+        val raw = prefs.getString(keyFor(mediaType, tmdbId), null) ?: return null
         val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
 
         val trivia = json.optString("trivia", "").trim()
@@ -32,7 +33,7 @@ class AiInsightsCacheStore(context: Context) {
         return AiInsightsResult(insights = insights, trivia = trivia)
     }
 
-    fun save(tmdbId: Int, result: AiInsightsResult) {
+    fun save(tmdbId: Int, mediaType: MetadataLabMediaType, result: AiInsightsResult) {
         val json = JSONObject()
         val insightsArray = JSONArray()
         result.insights.forEach { card ->
@@ -47,10 +48,11 @@ class AiInsightsCacheStore(context: Context) {
         json.put("insights", insightsArray)
         json.put("trivia", result.trivia)
 
-        prefs.edit().putString(keyFor(tmdbId), json.toString()).apply()
+        prefs.edit().putString(keyFor(mediaType, tmdbId), json.toString()).apply()
     }
 
-    private fun keyFor(tmdbId: Int): String = "$CACHE_PREFIX$tmdbId"
+    private fun keyFor(mediaType: MetadataLabMediaType, tmdbId: Int): String =
+        "$CACHE_PREFIX${mediaType.name}_$tmdbId"
 
     companion object {
         private const val PREFS_NAME = "ai_insights_cache"

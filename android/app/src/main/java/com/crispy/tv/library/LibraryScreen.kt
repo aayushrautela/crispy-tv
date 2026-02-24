@@ -389,7 +389,7 @@ private fun LibraryScreen(
                         }
                         gridItems(
                             items = uiState.localEntries,
-                            key = { entry -> "local:${entry.contentId}:${entry.watchedAtEpochMs}" }
+                            key = { entry -> "local:${entry.contentType}:${entry.contentId}:${entry.watchedAtEpochMs}" }
                         ) { entry ->
                             val tmdbArtwork by
                                 produceState(
@@ -463,7 +463,7 @@ private fun LibraryScreen(
                         } else {
                             gridItems(
                                 items = providerItems,
-                                key = { item -> "${item.provider.name}:${item.folderId}:${item.contentId}:${item.addedAtEpochMs}" }
+                                key = { item -> "${item.provider.name}:${item.folderId}:${item.contentType}:${item.contentId}:${item.addedAtEpochMs}" }
                             ) { item ->
                                 val mapped =
                                     WatchHistoryEntry(
