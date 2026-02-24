@@ -407,7 +407,7 @@ internal fun DetailsBody(
         if (similar.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
-                text = "Similar",
+                text = "More like this",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = horizontalPadding)
             )
