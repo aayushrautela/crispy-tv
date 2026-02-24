@@ -228,8 +228,7 @@ internal class WatchProgressStore(
 
         val all = prefs.all
         val result = LinkedHashMap<String, WatchProgress>()
-        for ((k, v) in all) {
-            val key = k as? String ?: continue
+        for ((key, v) in all) {
             if (!key.startsWith(WATCH_PROGRESS_KEY_PREFIX)) continue
             val raw = v as? String ?: continue
             val stripped = key.removePrefix(WATCH_PROGRESS_KEY_PREFIX)
@@ -395,25 +394,25 @@ internal class WatchProgressStore(
 
         val local = getWatchProgress(id = id, type = type, episodeId = episodeId)
         if (local == null) {
-            var duration = getContentDurationSeconds(id = id, type = type, episodeId = episodeId)
+            var durationSeconds = getContentDurationSeconds(id = id, type = type, episodeId = episodeId) ?: 0.0
             var currentTime: Double
 
             if (exactTimeSeconds != null && exactTimeSeconds > 0.0) {
                 currentTime = exactTimeSeconds
-                if (duration == null || duration <= 0.0) {
-                    duration = if (providerProgress > 0.0) (exactTimeSeconds / providerProgress) * 100.0 else 0.0
+                if (durationSeconds <= 0.0) {
+                    durationSeconds = if (providerProgress > 0.0) (exactTimeSeconds / providerProgress) * 100.0 else 0.0
                 }
             } else {
-                if (duration == null || duration <= 0.0) {
-                    duration = estimateDurationSeconds(type = type, episodeId = episodeId)
+                if (durationSeconds <= 0.0) {
+                    durationSeconds = estimateDurationSeconds(type = type, episodeId = episodeId)
                 }
-                currentTime = (providerProgress / 100.0) * duration
+                currentTime = (providerProgress / 100.0) * durationSeconds
             }
 
             val base =
                 WatchProgress(
                     currentTimeSeconds = currentTime,
-                    durationSeconds = duration ?: 0.0,
+                    durationSeconds = durationSeconds,
                     lastUpdatedEpochMs = timestamp,
                     traktSynced = provider == Provider.TRAKT,
                     simklSynced = provider == Provider.SIMKL,

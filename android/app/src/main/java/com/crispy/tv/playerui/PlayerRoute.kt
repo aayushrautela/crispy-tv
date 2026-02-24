@@ -171,16 +171,8 @@ fun PlayerRoute(
                         playbackController.attachVlcSurface(surfaceView)
                     },
                 )
-    }
-}
-
-private class PlaybackMetricsHolder {
-    var positionMs: Long = 0L
-    var durationMs: Long = 0L
-    var isPlaying: Boolean = false
-}
-
-private const val PROGRESS_SYNC_INTERVAL_MS = 5_000L
+            }
+        }
 
         PlayerOverlay(
             title = uiState.title,
@@ -204,3 +196,11 @@ private const val PROGRESS_SYNC_INTERVAL_MS = 5_000L
         )
     }
 }
+
+private class PlaybackMetricsHolder {
+    var positionMs: Long = 0L
+    var durationMs: Long = 0L
+    var isPlaying: Boolean = false
+}
+
+private const val PROGRESS_SYNC_INTERVAL_MS = 5_000L
