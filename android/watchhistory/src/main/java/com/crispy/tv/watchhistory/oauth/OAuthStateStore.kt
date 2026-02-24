@@ -1,11 +1,17 @@
 package com.crispy.tv.watchhistory.oauth
 
 import android.content.SharedPreferences
+import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_CODE_VERIFIER
 import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_STATE
 import com.crispy.tv.watchhistory.KEY_TRAKT_OAUTH_CODE_VERIFIER
 import com.crispy.tv.watchhistory.KEY_TRAKT_OAUTH_STATE
 
 internal data class TraktOAuthState(
+    val state: String,
+    val codeVerifier: String,
+)
+
+internal data class SimklOAuthState(
     val state: String,
     val codeVerifier: String,
 )
@@ -33,15 +39,23 @@ internal class OAuthStateStore(
         }.apply()
     }
 
-    fun saveSimkl(state: String) {
-        prefs.edit().putString(KEY_SIMKL_OAUTH_STATE, state).apply()
+    fun saveSimkl(state: String, codeVerifier: String) {
+        prefs.edit().apply {
+            putString(KEY_SIMKL_OAUTH_STATE, state)
+            putString(KEY_SIMKL_OAUTH_CODE_VERIFIER, codeVerifier)
+        }.apply()
     }
 
-    fun loadSimklState(): String {
-        return prefs.getString(KEY_SIMKL_OAUTH_STATE, null)?.trim().orEmpty()
+    fun loadSimkl(): SimklOAuthState {
+        val state = prefs.getString(KEY_SIMKL_OAUTH_STATE, null)?.trim().orEmpty()
+        val codeVerifier = prefs.getString(KEY_SIMKL_OAUTH_CODE_VERIFIER, null)?.trim().orEmpty()
+        return SimklOAuthState(state = state, codeVerifier = codeVerifier)
     }
 
     fun clearSimkl() {
-        prefs.edit().remove(KEY_SIMKL_OAUTH_STATE).apply()
+        prefs.edit().apply {
+            remove(KEY_SIMKL_OAUTH_STATE)
+            remove(KEY_SIMKL_OAUTH_CODE_VERIFIER)
+        }.apply()
     }
 }

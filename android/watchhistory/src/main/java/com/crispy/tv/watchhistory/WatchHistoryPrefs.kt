@@ -17,6 +17,7 @@ internal const val KEY_TRAKT_OAUTH_CODE_VERIFIER = "trakt_oauth_code_verifier"
 internal const val KEY_SIMKL_TOKEN = "simkl_access_token"
 internal const val KEY_SIMKL_HANDLE = "simkl_user_handle"
 internal const val KEY_SIMKL_OAUTH_STATE = "simkl_oauth_state"
+internal const val KEY_SIMKL_OAUTH_CODE_VERIFIER = "simkl_oauth_code_verifier"
 
 internal const val STALE_PLAYBACK_WINDOW_MS = 30L * 24L * 60L * 60L * 1000L
 internal const val CONTINUE_WATCHING_MIN_PROGRESS_PERCENT = 2.0
@@ -52,6 +53,7 @@ internal fun migrateLegacyWatchHistoryPrefsIfNeeded(context: Context) {
             KEY_SIMKL_TOKEN,
             KEY_SIMKL_HANDLE,
             KEY_SIMKL_OAUTH_STATE,
+            KEY_SIMKL_OAUTH_CODE_VERIFIER,
         )
 
     var changed = false

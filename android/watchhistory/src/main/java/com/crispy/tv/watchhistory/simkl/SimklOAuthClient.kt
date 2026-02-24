@@ -13,7 +13,7 @@ internal class SimklOAuthClient(
     private val simklClientId: String,
     private val simklClientSecret: String,
     private val simklRedirectUri: String,
-    private val simklApi: SimklApi,
+    private val simklService: SimklService,
     private val sessionStore: ProviderSessionStore,
     private val stateStore: OAuthStateStore,
     private val callbackParser: OAuthCallbackParser,
@@ -34,9 +34,11 @@ internal class SimklOAuthClient(
         }
 
         val state = pkce.generateUrlSafeToken(16)
-        stateStore.saveSimkl(state)
+        val codeVerifier = pkce.generateUrlSafeToken(64)
+        val codeChallenge = pkce.codeChallengeFromVerifier(codeVerifier)
+        stateStore.saveSimkl(state = state, codeVerifier = codeVerifier)
 
-        val authorizationUrl = simklApi.authorizeUrl(state)
+        val authorizationUrl = simklService.authorizeUrl(state = state, codeChallenge = codeChallenge)
         return ProviderAuthStartResult(
             authorizationUrl = authorizationUrl,
             statusMessage = "Opening Simkl OAuth.",
@@ -81,15 +83,15 @@ internal class SimklOAuthClient(
             )
         }
 
-        val expectedState = stateStore.loadSimklState()
-        if (expectedState.isBlank()) {
+        val expected = stateStore.loadSimkl()
+        if (expected.state.isBlank()) {
             return ProviderAuthActionResult(
                 success = false,
                 statusMessage = "Simkl OAuth state mismatch.",
                 authState = sessionStore.authState(),
             )
         }
-        if (payload.state.isBlank() || payload.state != expectedState) {
+        if (payload.state.isBlank() || payload.state != expected.state) {
             stateStore.clearSimkl()
             return ProviderAuthActionResult(
                 success = false,
@@ -98,7 +100,16 @@ internal class SimklOAuthClient(
             )
         }
 
-        val tokenObject = simklApi.exchangeToken(code = payload.code)
+        if (expected.codeVerifier.isBlank()) {
+            stateStore.clearSimkl()
+            return ProviderAuthActionResult(
+                success = false,
+                statusMessage = "Simkl OAuth code verifier missing.",
+                authState = sessionStore.authState(),
+            )
+        }
+
+        val tokenObject = simklService.exchangeToken(code = payload.code, codeVerifier = expected.codeVerifier)
         if (tokenObject == null) {
             stateStore.clearSimkl()
             return ProviderAuthActionResult(
@@ -119,7 +130,7 @@ internal class SimklOAuthClient(
             )
         }
 
-        val userHandle = simklApi.fetchUserHandle(accessToken)
+        val userHandle = simklService.fetchUserHandle(accessToken)
         sessionStore.connectProvider(
             provider = WatchProvider.SIMKL,
             accessToken = accessToken,

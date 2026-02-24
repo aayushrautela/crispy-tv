@@ -29,8 +29,8 @@ import com.crispy.tv.watchhistory.provider.ProviderRouter
 import com.crispy.tv.watchhistory.provider.RecommendationResolver
 import com.crispy.tv.watchhistory.provider.ContinueWatchingNormalizer
 import com.crispy.tv.watchhistory.provider.syncStatusLabel
-import com.crispy.tv.watchhistory.simkl.SimklApi
 import com.crispy.tv.watchhistory.simkl.SimklOAuthClient
+import com.crispy.tv.watchhistory.simkl.SimklService
 import com.crispy.tv.watchhistory.simkl.SimklWatchHistoryProvider
 import com.crispy.tv.watchhistory.trakt.TraktApi
 import com.crispy.tv.watchhistory.trakt.TraktOAuthClient
@@ -57,9 +57,10 @@ class RemoteWatchHistoryService(
     private val localStore = LocalWatchHistoryStore(sessionStore.prefs)
 
     private val http = WatchHistoryHttp(httpClient = httpClient, tag = TAG)
-    private val simklApi =
-        SimklApi(
+    private val simklService =
+        SimklService(
             http = http,
+            sessionStore = sessionStore,
             simklClientId = simklClientId,
             simklClientSecret = simklClientSecret,
             simklRedirectUri = simklRedirectUri,
@@ -95,7 +96,7 @@ class RemoteWatchHistoryService(
             simklClientId = simklClientId,
             simklClientSecret = simklClientSecret,
             simklRedirectUri = simklRedirectUri,
-            simklApi = simklApi,
+            simklService = simklService,
             sessionStore = sessionStore,
             stateStore = oauthStateStore,
             callbackParser = callbackParser,
@@ -111,10 +112,9 @@ class RemoteWatchHistoryService(
         )
     private val simklProvider =
         SimklWatchHistoryProvider(
-            simklApi = simklApi,
+            simklService = simklService,
             sessionStore = sessionStore,
             simklClientId = simklClientId,
-            episodeListProvider = episodeListProvider,
         )
     private val providerRouter = ProviderRouter(traktProvider = traktProvider, simklProvider = simklProvider)
     private val continueWatchingNormalizer = ContinueWatchingNormalizer()

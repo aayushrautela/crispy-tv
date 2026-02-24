@@ -7,6 +7,7 @@ import com.crispy.tv.player.WatchProviderAuthState
 import com.crispy.tv.player.WatchProviderSession
 import com.crispy.tv.security.KeystoreSecretStore
 import com.crispy.tv.watchhistory.KEY_SIMKL_HANDLE
+import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_CODE_VERIFIER
 import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_STATE
 import com.crispy.tv.watchhistory.KEY_SIMKL_TOKEN
 import com.crispy.tv.watchhistory.KEY_TRAKT_EXPIRES_AT
@@ -55,6 +56,7 @@ internal class ProviderSessionStore(
                     remove(KEY_SIMKL_TOKEN)
                     remove(KEY_SIMKL_HANDLE)
                     remove(KEY_SIMKL_OAUTH_STATE)
+                    remove(KEY_SIMKL_OAUTH_CODE_VERIFIER)
 
                     putString(KEY_TRAKT_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedAccess))
 
@@ -107,6 +109,7 @@ internal class ProviderSessionStore(
                     remove(KEY_SIMKL_TOKEN)
                     remove(KEY_SIMKL_HANDLE)
                     remove(KEY_SIMKL_OAUTH_STATE)
+                    remove(KEY_SIMKL_OAUTH_CODE_VERIFIER)
                 }
 
                 WatchProvider.LOCAL -> Unit
@@ -137,6 +140,7 @@ internal class ProviderSessionStore(
     fun clearPendingSimklOAuth() {
         prefs.edit().apply {
             remove(KEY_SIMKL_OAUTH_STATE)
+            remove(KEY_SIMKL_OAUTH_CODE_VERIFIER)
         }.apply()
     }
 
