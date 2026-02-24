@@ -28,7 +28,7 @@ internal class LocalWatchHistoryStore(
             if (entries.isEmpty()) {
                 "No local watched entries yet."
             } else {
-                "Loaded ${entries.size} local watched entries."
+                ""
             }
 
         return WatchHistoryResult(
@@ -83,7 +83,7 @@ internal class LocalWatchHistoryStore(
         }
 
         return WatchHistoryResult(
-            statusMessage = "Reconciled ${merged.size} remote watched entries to local history.",
+            statusMessage = "Reconciled remote watched history to local history.",
             entries = merged.sortedByDescending { item -> item.watchedAtEpochMs }.map { item -> item.toPublicEntry() },
             authState = authState,
         )

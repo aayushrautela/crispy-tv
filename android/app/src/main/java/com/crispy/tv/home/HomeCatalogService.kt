@@ -48,7 +48,7 @@ data class HomeHeroItem(
 @Immutable
 data class HomeHeroLoadResult(
     val items: List<HomeHeroItem> = emptyList(),
-    val statusMessage: String = "Home is ready."
+    val statusMessage: String = ""
 )
 
 @Immutable
@@ -178,7 +178,7 @@ class HomeCatalogService(
                 if (deduped.size >= targetCount) {
                     return HomeHeroLoadResult(
                         items = deduped.values.take(targetCount),
-                        statusMessage = "Loaded featured items from ${candidate.name}."
+                        statusMessage = ""
                     )
                 }
             }
@@ -187,7 +187,7 @@ class HomeCatalogService(
         if (deduped.isNotEmpty()) {
             return HomeHeroLoadResult(
                 items = deduped.values.take(targetCount),
-                statusMessage = "Loaded featured items from installed addons."
+                statusMessage = ""
             )
         }
 
@@ -341,7 +341,7 @@ class HomeCatalogService(
                         encodedAddonQuery = addon.seed.encodedQuery
                     )
                 if (sections.size >= targetCount) {
-                    return sections to "Loaded ${sections.size} catalogs."
+                    return sections to ""
                 }
             }
         }
@@ -350,7 +350,7 @@ class HomeCatalogService(
             return emptyList<CatalogSectionRef>() to "No movie or series catalogs found in installed addons."
         }
 
-        return sections to "Loaded ${sections.size} catalogs."
+        return sections to ""
     }
 
     suspend fun listDiscoverCatalogs(
@@ -413,7 +413,7 @@ class HomeCatalogService(
                     )
 
                 if (catalogs.size >= targetCount) {
-                    return catalogs to "Loaded ${catalogs.size} discover catalogs."
+                    return catalogs to ""
                 }
             }
         }
@@ -423,7 +423,7 @@ class HomeCatalogService(
             return emptyList<DiscoverCatalogRef>() to "No discover catalogs found$suffix in installed addons."
         }
 
-        return catalogs to "Loaded ${catalogs.size} discover catalogs."
+        return catalogs to ""
     }
 
     suspend fun loadMediaDetails(
@@ -473,7 +473,7 @@ class HomeCatalogService(
                         ) ?: continue
                     return MediaDetailsLoadResult(
                         details = parsed,
-                        statusMessage = "Loaded details.",
+                        statusMessage = "",
                         attemptedUrls = attemptedUrls
                     )
                 }
@@ -533,7 +533,7 @@ class HomeCatalogService(
 
             return CatalogPageResult(
                 items = items,
-                statusMessage = if (items.isEmpty()) "No catalog items available." else "Loaded ${items.size} items.",
+                statusMessage = if (items.isEmpty()) "No catalog items available." else "",
                 attemptedUrls = attemptedUrls
             )
         }

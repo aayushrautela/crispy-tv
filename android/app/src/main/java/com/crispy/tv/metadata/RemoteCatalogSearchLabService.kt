@@ -102,7 +102,7 @@ class RemoteCatalogSearchLabService(
                     items = items,
                     attemptedUrls = attemptedUrls,
                     statusMessage =
-                        "Loaded ${items.size} items from ${entry.addonId} (${entry.catalogId})."
+                        if (items.isEmpty()) "No items found." else ""
                 )
             }
         }

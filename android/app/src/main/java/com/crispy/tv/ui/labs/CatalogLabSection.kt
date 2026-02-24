@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackLabUiState
 import com.crispy.tv.player.PlaybackLabViewModel
-import com.crispy.tv.ui.navigation.AppRoutes
 
 @Composable
 internal fun CatalogLabSection(
@@ -127,12 +126,9 @@ internal fun CatalogLabSection(
 
             val catalogsText =
                 if (uiState.catalogAvailableCatalogs.isEmpty()) {
-                    "catalogs=none"
+                    "Catalogs: none"
                 } else {
-                    "catalogs=" + uiState.catalogAvailableCatalogs.take(6).joinToString { catalog ->
-                        val mode = if (catalog.supportsSearch) AppRoutes.SearchRoute else "browse"
-                        "${catalog.name} [${catalog.catalogType}/${catalog.catalogId}] @${catalog.addonId} ($mode)"
-                    }
+                    "Catalogs: " + uiState.catalogAvailableCatalogs.take(6).joinToString { catalog -> catalog.name }
                 }
             Text(
                 modifier = Modifier.testTag("catalog_catalogs_text"),
@@ -142,27 +138,13 @@ internal fun CatalogLabSection(
 
             val itemsText =
                 if (uiState.catalogItems.isEmpty()) {
-                    "results=none"
+                    "Results: none"
                 } else {
-                    "results=" + uiState.catalogItems.take(5).joinToString { item ->
-                        "${item.id}:${item.title}"
-                    }
+                    "Results: " + uiState.catalogItems.take(5).joinToString { item -> item.title }
                 }
             Text(
                 modifier = Modifier.testTag("catalog_results_text"),
                 text = itemsText,
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            val attemptText =
-                if (uiState.catalogAttemptedUrls.isEmpty()) {
-                    "attempts=none"
-                } else {
-                    "attempts=" + uiState.catalogAttemptedUrls.takeLast(3).joinToString(separator = " | ")
-                }
-            Text(
-                modifier = Modifier.testTag("catalog_attempts_text"),
-                text = attemptText,
                 style = MaterialTheme.typography.bodySmall
             )
         }

@@ -58,7 +58,7 @@ internal class RecommendationResolver(
         return try {
             val items = traktProvider.listRecommendations(limit)
             ProviderRecommendationsResult(
-                statusMessage = if (items.isEmpty()) "No Trakt recommendations available." else "Loaded ${items.size} Trakt recommendations.",
+                statusMessage = if (items.isEmpty()) "No Trakt recommendations available." else "",
                 items = items,
             )
         } catch (_: Throwable) {
@@ -77,7 +77,7 @@ internal class RecommendationResolver(
         return try {
             val items = simklProvider.listRecommendations(limit)
             ProviderRecommendationsResult(
-                statusMessage = if (items.isEmpty()) "No Simkl recommendations available." else "Loaded ${items.size} Simkl recommendations.",
+                statusMessage = if (items.isEmpty()) "No Simkl recommendations available." else "",
                 items = items,
             )
         } catch (_: Throwable) {

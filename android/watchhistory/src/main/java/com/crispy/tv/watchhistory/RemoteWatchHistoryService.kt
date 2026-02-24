@@ -33,7 +33,6 @@ import com.crispy.tv.watchhistory.oauth.Pkce
 import com.crispy.tv.watchhistory.provider.ProviderRouter
 import com.crispy.tv.watchhistory.provider.RecommendationResolver
 import com.crispy.tv.watchhistory.provider.ContinueWatchingNormalizer
-import com.crispy.tv.watchhistory.provider.syncStatusLabel
 import com.crispy.tv.watchhistory.simkl.SimklOAuthClient
 import com.crispy.tv.watchhistory.simkl.SimklService
 import com.crispy.tv.watchhistory.simkl.SimklWatchHistoryProvider
@@ -230,13 +229,7 @@ class RemoteWatchHistoryService(
             }
 
         val entries = updated.sortedByDescending { it.watchedAtEpochMs }.map { it.toPublicEntry() }
-        val statusMessage =
-            when (source) {
-                WatchProvider.TRAKT -> "Marked watched locally. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)}"
-                WatchProvider.SIMKL -> "Marked watched locally. simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-                WatchProvider.LOCAL -> "Marked watched locally."
-                null -> "Marked watched locally. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)} simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-            }
+        val statusMessage = "Marked watched."
 
         return WatchHistoryResult(
             statusMessage = statusMessage,
@@ -266,13 +259,7 @@ class RemoteWatchHistoryService(
             }
 
         val entries = updated.sortedByDescending { it.watchedAtEpochMs }.map { it.toPublicEntry() }
-        val statusMessage =
-            when (source) {
-                WatchProvider.TRAKT -> "Removed watched entry locally. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)}"
-                WatchProvider.SIMKL -> "Removed watched entry locally. simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-                WatchProvider.LOCAL -> "Removed watched entry locally."
-                null -> "Removed watched entry locally. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)} simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-            }
+        val statusMessage = "Removed from watched."
 
         return WatchHistoryResult(
             statusMessage = statusMessage,
@@ -307,14 +294,7 @@ class RemoteWatchHistoryService(
         if (syncedTrakt) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.TRAKT)
         if (syncedSimkl) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.SIMKL)
 
-        val verb = if (inWatchlist) "Saved" else "Removed"
-        val statusMessage =
-            when (source) {
-                WatchProvider.TRAKT -> "$verb. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)}"
-                WatchProvider.SIMKL -> "$verb. simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-                WatchProvider.LOCAL -> "$verb."
-                null -> "$verb. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)} simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-            }
+        val statusMessage = if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
 
         return WatchHistoryResult(
             statusMessage = statusMessage,
@@ -346,13 +326,7 @@ class RemoteWatchHistoryService(
         if (syncedSimkl) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.SIMKL)
 
         val verb = if (ratingValue == null) "Removed rating" else "Rated $ratingValue/10"
-        val statusMessage =
-            when (source) {
-                WatchProvider.TRAKT -> "$verb. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)}"
-                WatchProvider.SIMKL -> "$verb. simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-                WatchProvider.LOCAL -> "$verb."
-                null -> "$verb. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)} simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-            }
+        val statusMessage = "$verb."
 
         return WatchHistoryResult(
             statusMessage = statusMessage,
@@ -387,13 +361,7 @@ class RemoteWatchHistoryService(
                 null -> simklProvider.removeFromPlayback(id)
             }
 
-        val statusMessage =
-            when (source) {
-                WatchProvider.TRAKT -> "Removed from continue watching. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)}"
-                WatchProvider.SIMKL -> "Removed from continue watching. simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-                WatchProvider.LOCAL -> "Removed from continue watching."
-                null -> "Removed from continue watching. trakt=${syncStatusLabel(syncedTrakt, sessionStore.traktAccessToken(), traktClientId)} simkl=${syncStatusLabel(syncedSimkl, sessionStore.simklAccessToken(), simklClientId)}"
-            }
+        val statusMessage = "Removed from continue watching."
 
         return WatchHistoryResult(
             statusMessage = statusMessage,
@@ -411,7 +379,7 @@ class RemoteWatchHistoryService(
             if (source == WatchProvider.LOCAL) {
                 val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
                 val normalized = continueWatchingNormalizer.normalize(entries = local, nowMs = nowMs, limit = targetLimit)
-                val status = if (normalized.isNotEmpty()) "Loaded ${normalized.size} local continue watching entries." else "No local continue watching entries yet."
+                val status = if (normalized.isNotEmpty()) "" else "No local continue watching entries yet."
                 return ContinueWatchingResult(statusMessage = status, entries = normalized)
             }
 
@@ -435,8 +403,7 @@ class RemoteWatchHistoryService(
                 val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
                 val normalizedLocal = continueWatchingNormalizer.normalize(entries = local, nowMs = nowMs, limit = targetLimit)
                 if (normalizedLocal.isNotEmpty()) {
-                    val status = "Loaded ${normalizedLocal.size} local continue watching entries."
-                    return ContinueWatchingResult(statusMessage = status, entries = normalizedLocal)
+                    return ContinueWatchingResult(statusMessage = "", entries = normalizedLocal)
                 }
             }
             val status =
@@ -447,7 +414,7 @@ class RemoteWatchHistoryService(
                         } else if (sessionStore.traktAccessToken().isBlank()) {
                             "Connect Trakt to load continue watching."
                         } else if (normalized.isNotEmpty()) {
-                            "Loaded ${normalized.size} Trakt continue watching entries."
+                            ""
                         } else {
                             "No Trakt continue watching entries available."
                         }
@@ -459,7 +426,7 @@ class RemoteWatchHistoryService(
                         } else if (sessionStore.simklAccessToken().isBlank()) {
                             "Connect Simkl to load continue watching."
                         } else if (normalized.isNotEmpty()) {
-                            "Loaded ${normalized.size} Simkl continue watching entries."
+                            ""
                         } else {
                             "No Simkl continue watching entries available."
                         }
@@ -482,14 +449,14 @@ class RemoteWatchHistoryService(
 
             val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
             val normalized = continueWatchingNormalizer.normalize(entries = local, nowMs = nowMs, limit = targetLimit)
-            val status = if (normalized.isNotEmpty()) "Loaded ${normalized.size} local continue watching entries." else "No continue watching entries yet."
+            val status = if (normalized.isNotEmpty()) "" else "No continue watching entries yet."
             return ContinueWatchingResult(statusMessage = status, entries = normalized)
         }
 
         val merged = continueWatchingNormalizer.normalize(entries = traktEntries + simklEntries, nowMs = nowMs, limit = targetLimit)
         val status =
             when {
-                merged.isNotEmpty() -> "Loaded ${merged.size} continue watching entries."
+                merged.isNotEmpty() -> ""
                 sessionStore.traktAccessToken().isNotEmpty() -> "No Trakt continue watching entries available."
                 sessionStore.simklAccessToken().isNotEmpty() -> "No Simkl continue watching entries available."
                 else -> "No continue watching entries yet."
@@ -526,7 +493,7 @@ class RemoteWatchHistoryService(
                         } else if (sessionStore.traktAccessToken().isBlank()) {
                             "Connect Trakt to load provider library."
                         } else if (selected.first.isNotEmpty()) {
-                            "Loaded ${selected.first.size} Trakt folders."
+                            ""
                         } else {
                             "No Trakt library data available."
                         }
@@ -538,7 +505,7 @@ class RemoteWatchHistoryService(
                         } else if (sessionStore.simklAccessToken().isBlank()) {
                             "Connect Simkl to load provider library."
                         } else if (selected.first.isNotEmpty()) {
-                            "Loaded ${selected.first.size} Simkl folders."
+                            ""
                         } else {
                             "No Simkl library data available."
                         }
@@ -582,7 +549,7 @@ class RemoteWatchHistoryService(
 
         val status =
             when {
-                folders.isNotEmpty() -> "Loaded ${folders.size} provider folders."
+                folders.isNotEmpty() -> ""
                 authState().traktAuthenticated || authState().simklAuthenticated -> "No provider library data available."
                 else -> "Connect Trakt or Simkl to load provider library."
             }

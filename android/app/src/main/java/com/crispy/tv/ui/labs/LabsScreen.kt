@@ -217,7 +217,7 @@ internal fun LabsScreen() {
                 if (intervals.isEmpty()) {
                     "No skip segments found for this episode."
                 } else {
-                    "Loaded ${intervals.size} skip segment${if (intervals.size == 1) "" else "s"}."
+                    ""
                 }
         }.onFailure { error ->
             introSkipIntervals = emptyList()

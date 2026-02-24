@@ -270,7 +270,7 @@ class DetailsViewModel internal constructor(
                 val statusMessage =
                     when {
                         addonResult.details != null -> addonResult.statusMessage
-                        details != null && tmdbResult != null -> "Loaded from TMDB."
+                        details != null && tmdbResult != null -> ""
                         else -> addonResult.statusMessage
                     }
                 state.copy(

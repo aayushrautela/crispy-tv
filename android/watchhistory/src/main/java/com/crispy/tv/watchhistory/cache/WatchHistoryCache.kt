@@ -33,7 +33,7 @@ internal class WatchHistoryCache(
 
         if (source == WatchProvider.LOCAL) {
             val local = localFallback().take(targetLimit)
-            val status = if (local.isNotEmpty()) "Loaded ${local.size} local continue watching entries." else "No continue watching entries yet."
+            val status = if (local.isNotEmpty()) "" else "No continue watching entries yet."
             return ContinueWatchingResult(statusMessage = status, entries = local)
         }
 
@@ -45,12 +45,8 @@ internal class WatchHistoryCache(
             }
 
         val mergedEntries = mutableListOf<ContinueWatchingEntry>()
-        val statusParts = mutableListOf<String>()
         for (provider in providers) {
             val cached = readContinueWatchingCache(provider) ?: continue
-            val age = formatCacheAge(nowMs = nowMs, updatedAtEpochMs = cached.updatedAtEpochMs)
-            val count = cached.value.entries.size
-            statusParts += "${provider.name.lowercase(Locale.US)}=$count (${age} old)"
             mergedEntries += cached.value.entries
         }
 
@@ -65,8 +61,7 @@ internal class WatchHistoryCache(
         }
 
         val normalized = normalize(mergedEntries, nowMs, targetLimit)
-        val status = "Loaded cached continue watching (${statusParts.joinToString(", ")})."
-        return ContinueWatchingResult(statusMessage = status, entries = normalized)
+        return ContinueWatchingResult(statusMessage = "", entries = normalized)
     }
 
     suspend fun getCachedProviderLibrary(
@@ -100,13 +95,9 @@ internal class WatchHistoryCache(
 
         val mergedFolders = mutableListOf<ProviderLibraryFolder>()
         val mergedItems = mutableListOf<ProviderLibraryItem>()
-        val statusParts = mutableListOf<String>()
-        val nowMs = System.currentTimeMillis()
 
         for (provider in providers) {
             val cached = readProviderLibraryCache(provider) ?: continue
-            val age = formatCacheAge(nowMs = nowMs, updatedAtEpochMs = cached.updatedAtEpochMs)
-            statusParts += "${provider.name.lowercase(Locale.US)}=${cached.value.folders.size} folders (${age} old)"
             mergedFolders += cached.value.folders
             mergedItems += cached.value.items
         }
@@ -123,7 +114,7 @@ internal class WatchHistoryCache(
 
         val limited = applyLimit(
             ProviderLibrarySnapshot(
-                statusMessage = "Loaded cached provider library (${statusParts.joinToString(", ")}).",
+                statusMessage = "",
                 folders = mergedFolders.sortedBy { it.label.lowercase(Locale.US) },
                 items = mergedItems.sortedByDescending { it.addedAtEpochMs },
             )
@@ -233,19 +224,6 @@ internal class WatchHistoryCache(
     private fun providerLibraryCacheFile(provider: WatchProvider): File {
         val name = provider.name.lowercase(Locale.US)
         return File(providerCacheDir, "${name}_library.json")
-    }
-
-    private fun formatCacheAge(nowMs: Long, updatedAtEpochMs: Long): String {
-        val deltaMs = (nowMs - updatedAtEpochMs).coerceAtLeast(0L)
-        val minutes = deltaMs / 60_000L
-        val hours = deltaMs / 3_600_000L
-        val days = deltaMs / 86_400_000L
-        return when {
-            deltaMs < 60_000L -> "just now"
-            minutes < 60L -> "${minutes}m"
-            hours < 24L -> "${hours}h"
-            else -> "${days}d"
-        }
     }
 
     private suspend fun writeFileAtomic(file: File, text: String) {

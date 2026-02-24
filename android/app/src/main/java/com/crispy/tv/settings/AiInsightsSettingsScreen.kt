@@ -108,7 +108,7 @@ private class AiInsightsSettingsViewModel(
                         _uiState.update {
                             it.copy(
                                 snapshot = snapshot,
-                                statusMessage = "Loaded AI settings from Supabase.",
+                                statusMessage = null,
                                 errorMessage = null
                             )
                         }

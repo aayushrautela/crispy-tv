@@ -134,7 +134,7 @@ internal class TraktWatchHistoryProvider(
             }
 
         return ProviderCommentResult(
-            statusMessage = if (comments.isEmpty()) "No comments found." else "Loaded ${comments.size} comments.",
+            statusMessage = if (comments.isEmpty()) "No comments found." else "",
             comments = comments,
         )
     }

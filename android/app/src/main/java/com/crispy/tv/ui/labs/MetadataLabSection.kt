@@ -124,11 +124,11 @@ internal fun MetadataLabSection(
                 )
                 val transportText =
                     if (resolved.transportStats.isEmpty()) {
-                        "transport=none"
+                        "Transport: none"
                     } else {
-                        "transport=" + resolved.transportStats.joinToString(separator = " | ") { stat ->
-                            "${stat.addonId}:stream=${stat.streamCount},sub=${stat.subtitleCount}"
-                        }
+                        val totalStreams = resolved.transportStats.sumOf { stat -> stat.streamCount }
+                        val totalSubtitles = resolved.transportStats.sumOf { stat -> stat.subtitleCount }
+                        "Transport: streams=$totalStreams | subtitles=$totalSubtitles"
                     }
                 Text(
                     modifier = Modifier.testTag("metadata_transport_text"),

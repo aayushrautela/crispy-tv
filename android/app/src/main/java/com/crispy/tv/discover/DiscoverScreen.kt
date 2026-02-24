@@ -474,14 +474,14 @@ private fun DiscoverScreen(
             if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (selectedCatalog != null) {
-                            val summaryGenre = uiState.selectedGenre ?: "All genres"
-                            Text(
-                                text = "${selectedCatalog.addonName} | ${selectedCatalog.section.mediaType.uppercase(Locale.US)} | $summaryGenre",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                         if (selectedCatalog != null) {
+                             val summaryGenre = uiState.selectedGenre ?: "All genres"
+                             Text(
+                                 text = "${selectedCatalog.section.title} | ${selectedCatalog.section.mediaType.uppercase(Locale.US)} | $summaryGenre",
+                                 style = MaterialTheme.typography.bodySmall,
+                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                             )
+                         }
 
                         if (uiState.statusMessage.isNotBlank()) {
                             Text(
@@ -663,13 +663,13 @@ private fun DiscoverScreen(
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                         },
-                                        supportingContent = {
-                                            Text(
-                                                text = "${catalog.addonName} | ${catalog.section.mediaType.uppercase(Locale.US)}",
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        },
+                                         supportingContent = {
+                                             Text(
+                                                 text = catalog.section.mediaType.uppercase(Locale.US),
+                                                 maxLines = 1,
+                                                 overflow = TextOverflow.Ellipsis
+                                             )
+                                         },
                                         trailingContent =
                                             if (uiState.selectedCatalogKey == catalog.key) {
                                                 {
