@@ -327,33 +327,15 @@ private fun LibraryScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            Column {
-                StandardTopAppBar(
-                    title = "Library",
-                    actions = {
-                        IconButton(onClick = onRefresh) {
-                            Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                        }
-                    },
-                    scrollBehavior = scrollBehavior
-                )
-
-                if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(horizontal = pageHorizontalPadding)
-                    ) {
-                        items(providerFolders, key = { it.id }) { folder ->
-                            FilterChip(
-                                selected = folder.id == selectedFolder,
-                                onClick = { onSelectProviderFolder(folder.id) },
-                                label = { Text("${folder.label} (${folder.itemCount})") }
-                            )
-                        }
+            StandardTopAppBar(
+                title = "Library",
+                actions = {
+                    IconButton(onClick = onRefresh) {
+                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }
-                }
-            }
+                },
+                scrollBehavior = scrollBehavior
+            )
         }
     ) { innerPadding ->
         LazyVerticalGrid(
@@ -368,6 +350,24 @@ private fun LibraryScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = pageHorizontalPadding)
+                    ) {
+                        items(providerFolders, key = { it.id }) { folder ->
+                            FilterChip(
+                                selected = folder.id == selectedFolder,
+                                onClick = { onSelectProviderFolder(folder.id) },
+                                label = { Text("${folder.label} (${folder.itemCount})") }
+                            )
+                        }
+                    }
+                }
+            }
+
             if (uiState.statusMessage.isNotBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(

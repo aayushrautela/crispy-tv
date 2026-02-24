@@ -384,19 +384,32 @@ private fun DiscoverScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            Column {
-                StandardTopAppBar(
-                    title = "Discover",
-                    actions = {
-                        IconButton(onClick = onRefresh) {
-                            Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                        }
-                    },
-                    scrollBehavior = scrollBehavior
-                )
-
+            StandardTopAppBar(
+                title = "Discover",
+                actions = {
+                    IconButton(onClick = onRefresh) {
+                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
+                    }
+                },
+                scrollBehavior = scrollBehavior
+            )
+        }
+    ) { innerPadding ->
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 124.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = pageHorizontalPadding,
+                top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
+                end = pageHorizontalPadding,
+                bottom = Dimensions.PageBottomPadding
+            ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = Dimensions.SmallSpacing),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = pageHorizontalPadding)
                 ) {
@@ -457,20 +470,7 @@ private fun DiscoverScreen(
                     }
                 }
             }
-        }
-    ) { innerPadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 124.dp),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = pageHorizontalPadding,
-                top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
-                end = pageHorizontalPadding,
-                bottom = Dimensions.PageBottomPadding
-            ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+
             if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

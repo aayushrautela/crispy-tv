@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -62,6 +64,16 @@ internal fun HomeScreen(
 
     val horizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val headerChips =
+        remember {
+            listOf(
+                "Featured",
+                "Continue",
+                "Up Next",
+                "This Week",
+                "For You"
+            )
+        }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -83,6 +95,21 @@ internal fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
+            item(contentType = "headerChips") {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(headerChips, key = { it }) { chipLabel ->
+                        FilterChip(
+                            selected = false,
+                            onClick = {},
+                            label = { Text(chipLabel) }
+                        )
+                    }
+                }
+            }
+
             item(contentType = "hero") {
                 when {
                     heroState.isLoading && heroState.items.isEmpty() -> {
