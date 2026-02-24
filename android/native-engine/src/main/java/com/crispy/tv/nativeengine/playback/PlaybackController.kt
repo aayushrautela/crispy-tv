@@ -21,8 +21,11 @@ sealed interface NativePlaybackEvent {
 
 interface PlaybackController {
     fun play(url: String, engine: NativePlaybackEngine)
+    fun setPlaying(isPlaying: Boolean)
+    fun isPlaying(): Boolean
     fun seekTo(positionMs: Long)
     fun currentPositionMs(): Long
+    fun durationMs(): Long
     fun stop()
     fun release()
     fun bindExoPlayerView(playerView: PlayerView)

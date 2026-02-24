@@ -75,6 +75,24 @@ internal class VlcPlaybackRuntime(
         startPlayback(url)
     }
 
+    fun setPlaying(isPlaying: Boolean) {
+        if (isPlaying) {
+            val currentlyPlaying = runCatching { mediaPlayer.isPlaying }.getOrDefault(false)
+            if (!currentlyPlaying) {
+                runCatching { mediaPlayer.play() }
+            }
+        } else {
+            val currentlyPlaying = runCatching { mediaPlayer.isPlaying }.getOrDefault(false)
+            if (currentlyPlaying) {
+                runCatching { mediaPlayer.pause() }
+            }
+        }
+    }
+
+    fun isPlaying(): Boolean {
+        return runCatching { mediaPlayer.isPlaying }.getOrDefault(false)
+    }
+
     fun stop() {
         pendingUrl = null
         runCatching { mediaPlayer.stop() }
@@ -89,6 +107,10 @@ internal class VlcPlaybackRuntime(
 
     fun currentPositionMs(): Long {
         return runCatching { mediaPlayer.time.coerceAtLeast(0L) }.getOrDefault(0L)
+    }
+
+    fun durationMs(): Long {
+        return runCatching { mediaPlayer.length.coerceAtLeast(0L) }.getOrDefault(0L)
     }
 
     fun release() {

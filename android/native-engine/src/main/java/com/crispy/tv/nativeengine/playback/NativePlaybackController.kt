@@ -2,6 +2,7 @@ package com.crispy.tv.nativeengine.playback
 
 import android.content.Context
 import android.view.SurfaceView
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -68,6 +69,30 @@ class NativePlaybackController(
         }
     }
 
+    override fun setPlaying(isPlaying: Boolean) {
+        when (currentEngine) {
+            NativePlaybackEngine.EXO -> {
+                if (isPlaying) {
+                    exoPlayer.play()
+                } else {
+                    exoPlayer.pause()
+                }
+            }
+
+            NativePlaybackEngine.VLC -> {
+                vlcRuntime.setPlaying(isPlaying)
+            }
+        }
+    }
+
+    override fun isPlaying(): Boolean {
+        return when (currentEngine) {
+            NativePlaybackEngine.EXO ->
+                exoPlayer.playWhenReady && exoPlayer.playbackState != Player.STATE_ENDED
+            NativePlaybackEngine.VLC -> vlcRuntime.isPlaying()
+        }
+    }
+
     override fun seekTo(positionMs: Long) {
         val clampedPositionMs = positionMs.coerceAtLeast(0L)
         when (currentEngine) {
@@ -80,6 +105,21 @@ class NativePlaybackController(
         return when (currentEngine) {
             NativePlaybackEngine.EXO -> exoPlayer.currentPosition.coerceAtLeast(0L)
             NativePlaybackEngine.VLC -> vlcRuntime.currentPositionMs()
+        }
+    }
+
+    override fun durationMs(): Long {
+        return when (currentEngine) {
+            NativePlaybackEngine.EXO -> {
+                val duration = exoPlayer.duration
+                when {
+                    duration == C.TIME_UNSET -> 0L
+                    duration < 0L -> 0L
+                    else -> duration
+                }
+            }
+
+            NativePlaybackEngine.VLC -> vlcRuntime.durationMs()
         }
     }
 
