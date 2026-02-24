@@ -4,6 +4,7 @@ import android.text.format.DateFormat
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.widthimport androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
@@ -55,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import java.util.Date
+import kotlin.math.roundToInt
 
 @Composable
 internal fun HeaderInfoSection(
@@ -154,7 +157,6 @@ internal fun HeaderInfoSection(
     }
 
 
-    val horizontalPadding = responsivePageHorizontalPadding()
     val genre = details.genres.firstOrNull()?.trim().orEmpty()
 
     var showRatingDialog by rememberSaveable { mutableStateOf(false) }
