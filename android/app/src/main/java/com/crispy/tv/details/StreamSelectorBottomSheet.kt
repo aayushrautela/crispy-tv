@@ -5,7 +5,7 @@
 
 package com.crispy.tv.details
 
-import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -73,7 +73,7 @@ internal fun StreamSelectorBottomSheet(
         sheetState = sheetState,
         modifier = Modifier.testTag("stream_sheet"),
     ) {
-        CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
             LazyColumn(
                 modifier =
                     Modifier

@@ -949,16 +949,12 @@ class DetailsViewModel internal constructor(
                     }
                 } else {
                     val progress = continueEntry.progressPercent
-                    if (progress != null) {
-                        "Resume from ${progress.roundToInt()}%"
-                    } else {
-                        "Continue"
-                    }
+                    "Resume from ${progress.roundToInt()}%"
                 }
 
             val remainingMinutes =
                 parseRuntimeMinutes(details.runtime)?.let { runtimeMinutes ->
-                    val progress = continueEntry.progressPercent ?: 0.0
+                    val progress = continueEntry.progressPercent
                     val remaining = runtimeMinutes.toDouble() * (1.0 - (progress / 100.0))
                     remaining.roundToInt().coerceAtLeast(0)
                 }
