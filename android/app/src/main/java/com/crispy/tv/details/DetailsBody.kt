@@ -75,7 +75,7 @@ internal fun DetailsBody(
     uiState: DetailsUiState,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
-    onItemClick: (String) -> Unit,
+    onItemClick: (String, String?) -> Unit,
     onEpisodeClick: (videoId: String) -> Unit = {},
 ) {
     val details = uiState.details
@@ -337,7 +337,7 @@ internal fun DetailsBody(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(items = collection.parts, key = { it.id }) { item ->
-                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id) })
+                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id, item.type) })
                 }
             }
         }
@@ -356,7 +356,7 @@ internal fun DetailsBody(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(items = similar, key = { it.id }) { item ->
-                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id) })
+                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id, item.type) })
                 }
             }
         }
@@ -861,7 +861,7 @@ private fun EpisodeCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                video.released?.takeIf { it.isNotBlank() }?.let { released ->
+                formatLongDate(video.released)?.let { released ->
                     Text(
                         text = released,
                         style = MaterialTheme.typography.labelMedium,

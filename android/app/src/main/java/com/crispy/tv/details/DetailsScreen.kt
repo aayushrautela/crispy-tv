@@ -41,7 +41,7 @@ import kotlinx.coroutines.delay
 internal fun DetailsScreen(
     uiState: DetailsUiState,
     onBack: () -> Unit,
-    onItemClick: (String) -> Unit,
+    onItemClick: (String, String?) -> Unit,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onOpenStreamSelector: () -> Unit,

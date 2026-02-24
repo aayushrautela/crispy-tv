@@ -38,7 +38,7 @@ fun DetailsRoute(
     DetailsScreen(
         uiState = uiState,
         onBack = onBack,
-        onItemClick = { id -> onItemClick(id, null) },
+        onItemClick = onItemClick,
         onRetry = viewModel::reload,
         onSeasonSelected = viewModel::onSeasonSelected,
         onOpenStreamSelector = viewModel::onOpenStreamSelector,
