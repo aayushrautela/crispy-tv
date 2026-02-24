@@ -297,7 +297,6 @@ fun LibraryRoute(
         onRefresh = viewModel::refresh,
         onItemClick = onItemClick,
         onNavigateToDiscover = onNavigateToDiscover,
-        onSelectSource = viewModel::selectSource,
         onSelectProviderFolder = viewModel::selectProviderFolder
     )
 }
@@ -310,11 +309,16 @@ private fun LibraryScreen(
     onRefresh: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
-    onSelectSource: (LibrarySource) -> Unit,
     onSelectProviderFolder: (String) -> Unit
 ) {
     val selectedProvider = uiState.selectedSource.toProvider()
     val providerFolders = uiState.providerFolders.filter { folder -> folder.provider == selectedProvider }
+    val providerAuthenticated =
+        when (uiState.selectedSource) {
+            LibrarySource.LOCAL -> false
+            LibrarySource.TRAKT -> uiState.authState.traktAuthenticated
+            LibrarySource.SIMKL -> uiState.authState.simklAuthenticated
+        }
     val selectedFolder = uiState.selectedProviderFolderId
     val providerItems =
         uiState.providerItems
@@ -339,30 +343,16 @@ private fun LibraryScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        FilterChip(
-                            selected = uiState.selectedSource == LibrarySource.LOCAL,
-                            onClick = { onSelectSource(LibrarySource.LOCAL) },
-                            label = { Text("Local") }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = uiState.selectedSource == LibrarySource.TRAKT,
-                            onClick = { onSelectSource(LibrarySource.TRAKT) },
-                            label = { Text("Trakt") }
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = uiState.selectedSource == LibrarySource.SIMKL,
-                            onClick = { onSelectSource(LibrarySource.SIMKL) },
-                            label = { Text("Simkl") }
-                        )
+            if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(providerFolders, key = { it.id }) { folder ->
+                            FilterChip(
+                                selected = folder.id == selectedFolder,
+                                onClick = { onSelectProviderFolder(folder.id) },
+                                label = { Text("${folder.label} (${folder.itemCount})") }
+                            )
+                        }
                     }
                 }
             }
@@ -449,14 +439,7 @@ private fun LibraryScreen(
 
                 LibrarySource.TRAKT,
                 LibrarySource.SIMKL -> {
-                    val authenticated =
-                        if (uiState.selectedSource == LibrarySource.TRAKT) {
-                            uiState.authState.traktAuthenticated
-                        } else {
-                            uiState.authState.simklAuthenticated
-                        }
-
-                    if (!authenticated) {
+                    if (!providerAuthenticated) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
@@ -468,20 +451,6 @@ private fun LibraryScreen(
                             }
                         }
                     } else {
-                        if (providerFolders.isNotEmpty()) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    items(providerFolders, key = { it.id }) { folder ->
-                                        FilterChip(
-                                            selected = folder.id == selectedFolder,
-                                            onClick = { onSelectProviderFolder(folder.id) },
-                                            label = { Text("${folder.label} (${folder.itemCount})") }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
                         if (providerItems.isEmpty()) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 val emptyMessage =
