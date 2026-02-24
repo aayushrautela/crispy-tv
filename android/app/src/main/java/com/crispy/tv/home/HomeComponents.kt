@@ -570,7 +570,7 @@ internal fun ThisWeekSection(
     if (items.isEmpty()) return
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        HomeRailHeader(title = "This Week")
+        HomeRailHeader(title = "This Week", statusMessage = "")
 
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
