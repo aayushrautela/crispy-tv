@@ -77,7 +77,6 @@ internal fun StreamSelectorBottomSheet(
             }
         }
     val showInitialSkeleton = state.isLoading && state.providers.isEmpty()
-    val anyFilteredProviderLoading = filteredProviders.any { provider -> provider.isLoading }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -137,7 +136,7 @@ internal fun StreamSelectorBottomSheet(
                     }
 
                     if (
-                        !anyFilteredProviderLoading &&
+                        !state.isLoading &&
                             filteredProviders.all { provider -> provider.streams.isEmpty() && provider.errorMessage == null }
                     ) {
                         item {
@@ -152,11 +151,13 @@ internal fun StreamSelectorBottomSheet(
                     }
 
                     filteredProviders.forEach { provider ->
-                        item(key = "provider_header_${provider.providerId}") {
-                            ProviderHeaderCard(
-                                provider = provider,
-                                onRetry = onRetryProvider,
-                            )
+                        if (provider.errorMessage != null) {
+                            item(key = "provider_error_${provider.providerId}") {
+                                ProviderErrorRow(
+                                    provider = provider,
+                                    onRetry = onRetryProvider,
+                                )
+                            }
                         }
 
                         if (provider.streams.isNotEmpty()) {
@@ -173,7 +174,7 @@ internal fun StreamSelectorBottomSheet(
                         }
                     }
 
-                    if (!showInitialSkeleton && anyFilteredProviderLoading) {
+                    if (!showInitialSkeleton && state.isLoading) {
                         item {
                             LoadingMoreStreamsRow()
                         }
@@ -265,51 +266,23 @@ private fun ProviderChipsRow(
 }
 
 @Composable
-private fun ProviderHeaderCard(
+private fun ProviderErrorRow(
     provider: StreamProviderUiState,
     onRetry: (String) -> Unit,
 ) {
     ElevatedCard {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = provider.providerName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                if (provider.isLoading) {
-                    LoadingIndicator(modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(10.dp))
-                }
-                Text(
-                    text = "${provider.streams.size}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (provider.errorMessage != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = provider.errorMessage,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    TextButton(onClick = { onRetry(provider.providerId) }) {
-                        Text("Retry")
-                    }
-                }
+            Text(
+                text = "${provider.providerName}: ${provider.errorMessage}",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            TextButton(onClick = { onRetry(provider.providerId) }) {
+                Text("Retry")
             }
         }
     }
