@@ -61,6 +61,7 @@ data class DetailsUiState(
     val userRating: Int? = null,
     val isMutating: Boolean = false,
     val watchCta: WatchCta = WatchCta(),
+    val continueVideoId: String? = null,
     val selectedSeason: Int? = null,
     val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
 ) {
@@ -255,7 +256,7 @@ class DetailsViewModel internal constructor(
                     resolveProviderState(enrichedDetails)
                 }
 
-            val watchCta =
+            val (watchCta, continueVideoId) =
                 withContext(Dispatchers.IO) {
                     resolveWatchCta(enrichedDetails, providerState, nowMs)
                 }
@@ -280,6 +281,7 @@ class DetailsViewModel internal constructor(
                     isRated = providerState.isRated,
                     userRating = providerState.userRating,
                     watchCta = watchCta,
+                    continueVideoId = continueVideoId,
                     selectedSeason = state.selectedSeason ?: firstSeason
                 )
             }
@@ -397,13 +399,45 @@ class DetailsViewModel internal constructor(
             return
         }
 
-        val target = resolveStreamLookupTarget(details, state.selectedSeasonOrFirst)
+        val target =
+            state.continueVideoId
+                ?.takeIf { it.isNotBlank() }
+                ?.let { videoId ->
+                    StreamLookupTarget(
+                        mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
+                        lookupId = videoId,
+                    )
+                }
+                ?: resolveStreamLookupTarget(details, state.selectedSeasonOrFirst)
+
+        openStreamSelectorWithTarget(target, blankIdMessage = "Unable to resolve stream lookup id for this title.")
+    }
+
+    fun onOpenStreamSelectorForEpisode(videoId: String) {
+        val state = _uiState.value
+        val details = state.details
+        if (details == null) {
+            _uiState.update { it.copy(statusMessage = "Details are still loading.") }
+            return
+        }
+        val target =
+            StreamLookupTarget(
+                mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
+                lookupId = videoId.trim(),
+            )
+        openStreamSelectorWithTarget(target, blankIdMessage = "This episode does not have a stream lookup id.")
+    }
+
+    private fun openStreamSelectorWithTarget(
+        target: StreamLookupTarget,
+        blankIdMessage: String,
+    ) {
         if (target.lookupId.isBlank()) {
-            _uiState.update { it.copy(statusMessage = "Unable to resolve stream lookup id for this title.") }
+            _uiState.update { it.copy(statusMessage = blankIdMessage) }
             return
         }
 
-        val current = state.streamSelector
+        val current = _uiState.value.streamSelector
         if (
             current.lookupId == target.lookupId &&
             current.mediaType == target.mediaType &&
@@ -930,8 +964,8 @@ class DetailsViewModel internal constructor(
         details: MediaDetails?,
         providerState: ProviderState,
         nowMs: Long,
-    ): WatchCta {
-        if (details == null) return WatchCta()
+    ): Pair<WatchCta, String?> {
+        if (details == null) return Pair(WatchCta(), null)
 
         val mediaType = details.mediaType.trim().lowercase(Locale.US)
         val isSeries = mediaType == "series" || mediaType == "show" || mediaType == "tv"
@@ -967,31 +1001,52 @@ class DetailsViewModel internal constructor(
                     remaining.roundToInt().coerceAtLeast(0)
                 }
 
-            return WatchCta(
-                kind = WatchCtaKind.CONTINUE,
-                label = label,
-                icon = WatchCtaIcon.PLAY,
-                remainingMinutes = remainingMinutes,
-                lastWatchedAtEpochMs = null,
+            val continueVideoId =
+                if (isSeries && continueEntry.season != null && continueEntry.episode != null) {
+                    details.videos
+                        .firstOrNull { video ->
+                            video.season == continueEntry.season &&
+                                video.episode == continueEntry.episode &&
+                                video.id.trim().isNotBlank()
+                        }?.id?.trim()
+                } else {
+                    null
+                }
+
+            return Pair(
+                WatchCta(
+                    kind = WatchCtaKind.CONTINUE,
+                    label = label,
+                    icon = WatchCtaIcon.PLAY,
+                    remainingMinutes = remainingMinutes,
+                    lastWatchedAtEpochMs = null,
+                ),
+                continueVideoId,
             )
         }
 
         if (!isSeries && providerState.isWatched) {
-            return WatchCta(
-                kind = WatchCtaKind.REWATCH,
-                label = "Rewatch",
-                icon = WatchCtaIcon.REPLAY,
-                remainingMinutes = null,
-                lastWatchedAtEpochMs = providerState.watchedAtEpochMs,
+            return Pair(
+                WatchCta(
+                    kind = WatchCtaKind.REWATCH,
+                    label = "Rewatch",
+                    icon = WatchCtaIcon.REPLAY,
+                    remainingMinutes = null,
+                    lastWatchedAtEpochMs = providerState.watchedAtEpochMs,
+                ),
+                null,
             )
         }
 
-        return WatchCta(
-            kind = WatchCtaKind.WATCH,
-            label = "Watch now",
-            icon = WatchCtaIcon.PLAY,
-            remainingMinutes = parseRuntimeMinutes(details.runtime),
-            lastWatchedAtEpochMs = null,
+        return Pair(
+            WatchCta(
+                kind = WatchCtaKind.WATCH,
+                label = "Watch now",
+                icon = WatchCtaIcon.PLAY,
+                remainingMinutes = parseRuntimeMinutes(details.runtime),
+                lastWatchedAtEpochMs = null,
+            ),
+            null,
         )
     }
 

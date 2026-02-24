@@ -70,7 +70,8 @@ internal fun DetailsBody(
     uiState: DetailsUiState,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
-    onItemClick: (String) -> Unit
+    onItemClick: (String) -> Unit,
+    onEpisodeClick: (videoId: String) -> Unit = {},
 ) {
     val details = uiState.details
     val tmdb = uiState.tmdbEnrichment
@@ -499,7 +500,8 @@ internal fun DetailsBody(
                     items(items = episodes, key = { it.id }) { video ->
                         EpisodeCard(
                             video = video,
-                            modifier = Modifier.width(280.dp)
+                            modifier = Modifier.width(280.dp),
+                            onClick = { onEpisodeClick(video.id) }
                         )
                     }
                 }
@@ -878,9 +880,11 @@ private fun TmdbReviewCard(
 @Composable
 private fun EpisodeCard(
     video: MediaVideo,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
     ElevatedCard(
+        onClick = onClick,
         modifier = modifier,
         colors =
             CardDefaults.elevatedCardColors(

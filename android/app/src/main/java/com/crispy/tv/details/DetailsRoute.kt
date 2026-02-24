@@ -42,6 +42,7 @@ fun DetailsRoute(
         onRetry = viewModel::reload,
         onSeasonSelected = viewModel::onSeasonSelected,
         onOpenStreamSelector = viewModel::onOpenStreamSelector,
+        onEpisodeClick = viewModel::onOpenStreamSelectorForEpisode,
         onDismissStreamSelector = viewModel::onDismissStreamSelector,
         onProviderSelected = viewModel::onProviderSelected,
         onRetryProvider = viewModel::onRetryProvider,
