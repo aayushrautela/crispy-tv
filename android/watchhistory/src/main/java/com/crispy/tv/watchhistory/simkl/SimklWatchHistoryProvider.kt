@@ -1,7 +1,10 @@
 package com.crispy.tv.watchhistory.simkl
 
+import android.util.Log
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
+import com.crispy.tv.domain.watch.findNextEpisode
 import com.crispy.tv.player.ContinueWatchingEntry
+import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
@@ -23,6 +26,7 @@ internal class SimklWatchHistoryProvider(
     private val simklApi: SimklApi,
     private val sessionStore: ProviderSessionStore,
     private val simklClientId: String,
+    private val episodeListProvider: EpisodeListProvider,
 ) : WatchHistoryProvider {
     override val source: WatchProvider = WatchProvider.SIMKL
 
@@ -123,64 +127,109 @@ internal class SimklWatchHistoryProvider(
 
         return buildList {
             for (index in 0 until array.length()) {
-                val obj = array.optJSONObject(index) ?: continue
-                val type = obj.optString("type").trim().lowercase(Locale.US)
-                val progress = obj.optDouble("progress", -1.0)
-                if (progress < 0) continue
+                try {
+                    val obj = array.optJSONObject(index) ?: continue
+                    val type = obj.optString("type").trim().lowercase(Locale.US)
+                    val progress = obj.optDouble("progress", -1.0)
+                    if (progress < 0) continue
 
-                val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
+                    val pausedAt = parseIsoToEpochMs(obj.optString("paused_at")) ?: nowMs
 
-                // Stale window: skip items older than the cutoff
-                if (pausedAt < staleCutoff) continue
+                    // Stale window: skip items older than the cutoff
+                    if (pausedAt < staleCutoff) continue
 
-                // Min progress: skip items barely started
-                if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
+                    // Min progress: skip items barely started
+                    if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
 
-                if (type == "movie") {
-                    // Completed movies don't belong in continue watching
-                    if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
+                    if (type == "movie") {
+                        // Completed movies don't belong in continue watching
+                        if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
 
-                    val movie = obj.optJSONObject("movie") ?: continue
-                    val ids = movie.optJSONObject("ids")
+                        val movie = obj.optJSONObject("movie") ?: continue
+                        val ids = movie.optJSONObject("ids")
+                        val contentId = resolveAndCacheImdb(ids)
+                        if (contentId.isEmpty()) continue
+                        val title = movie.optString("title").trim().ifEmpty { contentId }
+                        add(
+                            ContinueWatchingEntry(
+                                contentId = contentId,
+                                contentType = MetadataLabMediaType.MOVIE,
+                                title = title,
+                                season = null,
+                                episode = null,
+                                progressPercent = progress,
+                                lastUpdatedEpochMs = pausedAt,
+                                provider = WatchProvider.SIMKL,
+                                providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                            )
+                        )
+                        continue
+                    }
+
+                    val show = obj.optJSONObject("show")
+                    val episode = obj.optJSONObject("episode")
+                    if (show == null && episode == null) continue
+
+                    val ids = show?.optJSONObject("ids") ?: episode?.optJSONObject("show")
                     val contentId = resolveAndCacheImdb(ids)
                     if (contentId.isEmpty()) continue
-                    val title = movie.optString("title").trim().ifEmpty { contentId }
-                    add(
-                        ContinueWatchingEntry(
-                            contentId = contentId,
-                            contentType = MetadataLabMediaType.MOVIE,
-                            title = title,
-                            season = null,
-                            episode = null,
-                            progressPercent = progress,
-                            lastUpdatedEpochMs = pausedAt,
-                            provider = WatchProvider.SIMKL,
-                            providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+
+                    val showTitle = show?.optString("title")?.trim().orEmpty().ifBlank { contentId }
+                    val season = episode?.optInt("season", 0)?.takeIf { it > 0 }
+                    val number =
+                        episode?.optInt("episode", 0)?.takeIf { it > 0 }
+                            ?: episode?.optInt("number", 0)?.takeIf { it > 0 }
+                    val episodeTitle = episode?.optString("title")?.trim().orEmpty()
+                    val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
+
+                    if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT && season != null && number != null) {
+                        // Completed episode — use addon-based findNextEpisode (matching Nuvio).
+                        try {
+                            val episodes = episodeListProvider.fetchEpisodeList("series", contentId)
+                            if (episodes != null) {
+                                val next = findNextEpisode(
+                                    currentSeason = season,
+                                    currentEpisode = number,
+                                    episodes = episodes,
+                                )
+                                if (next != null) {
+                                    // Up-next: next unwatched episode at progress 0
+                                    add(
+                                        ContinueWatchingEntry(
+                                            contentId = contentId,
+                                            contentType = MetadataLabMediaType.SERIES,
+                                            title = showTitle,
+                                            season = next.season,
+                                            episode = next.episode,
+                                            progressPercent = 0.0,
+                                            lastUpdatedEpochMs = pausedAt,
+                                            provider = WatchProvider.SIMKL,
+                                            providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                                        )
+                                    )
+                                    continue
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Simkl CW: addon lookup failed for $contentId S${season}E${number}, fallback", e)
+                        }
+                        // Fallback: keep at 84.9% so the show stays in continue watching
+                        add(
+                            ContinueWatchingEntry(
+                                contentId = contentId,
+                                contentType = MetadataLabMediaType.SERIES,
+                                title = title,
+                                season = season,
+                                episode = number,
+                                progressPercent = CONTINUE_WATCHING_COMPLETION_PERCENT - 0.1,
+                                lastUpdatedEpochMs = pausedAt,
+                                provider = WatchProvider.SIMKL,
+                                providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                            )
                         )
-                    )
-                    continue
-                }
+                        continue
+                    }
 
-                val show = obj.optJSONObject("show")
-                val episode = obj.optJSONObject("episode")
-                if (show == null && episode == null) continue
-
-                val ids = show?.optJSONObject("ids") ?: episode?.optJSONObject("show")
-                val contentId = resolveAndCacheImdb(ids)
-                if (contentId.isEmpty()) continue
-
-                val showTitle = show?.optString("title")?.trim().orEmpty().ifBlank { contentId }
-                val season = episode?.optInt("season", 0)?.takeIf { it > 0 }
-                val number =
-                    episode?.optInt("episode", 0)?.takeIf { it > 0 }
-                        ?: episode?.optInt("number", 0)?.takeIf { it > 0 }
-                val episodeTitle = episode?.optString("title")?.trim().orEmpty()
-                val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
-
-                if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-                    // Completed episode — Simkl has no next-episode API.
-                    // Keep at 84.9% so the show stays in continue watching
-                    // (matches Nuvio's fallback behavior for completed episodes).
                     add(
                         ContinueWatchingEntry(
                             contentId = contentId,
@@ -188,28 +237,15 @@ internal class SimklWatchHistoryProvider(
                             title = title,
                             season = season,
                             episode = number,
-                            progressPercent = CONTINUE_WATCHING_COMPLETION_PERCENT - 0.1,
+                            progressPercent = progress,
                             lastUpdatedEpochMs = pausedAt,
                             provider = WatchProvider.SIMKL,
                             providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
                         )
                     )
-                    continue
+                } catch (e: Exception) {
+                    Log.w(TAG, "Simkl CW: error processing playback item $index, skipping", e)
                 }
-
-                add(
-                    ContinueWatchingEntry(
-                        contentId = contentId,
-                        contentType = MetadataLabMediaType.SERIES,
-                        title = title,
-                        season = season,
-                        episode = number,
-                        progressPercent = progress,
-                        lastUpdatedEpochMs = pausedAt,
-                        provider = WatchProvider.SIMKL,
-                        providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
-                    )
-                )
             }
         }
     }
@@ -658,5 +694,9 @@ internal class SimklWatchHistoryProvider(
 
     private fun Any?.toJsonObjectOrNull(): JSONObject? {
         return this as? JSONObject
+    }
+
+    companion object {
+        private const val TAG = "SimklWatchHistory"
     }
 }

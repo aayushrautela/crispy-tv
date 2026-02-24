@@ -2,7 +2,9 @@ package com.crispy.tv.watchhistory.trakt
 
 import android.util.Log
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
+import com.crispy.tv.domain.watch.findNextEpisode
 import com.crispy.tv.player.ContinueWatchingEntry
+import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ProviderComment
 import com.crispy.tv.player.ProviderCommentQuery
@@ -30,6 +32,7 @@ internal class TraktWatchHistoryProvider(
     private val traktApi: TraktApi,
     private val sessionStore: ProviderSessionStore,
     private val traktClientId: String,
+    private val episodeListProvider: EpisodeListProvider,
 ) : WatchHistoryProvider {
     override val source: WatchProvider = WatchProvider.TRAKT
 
@@ -136,10 +139,13 @@ internal class TraktWatchHistoryProvider(
         )
     }
 
-    private data class TraktNextEpisode(
-        val season: Int,
-        val episode: Int,
-        val title: String?,
+    private data class WatchedShowCandidate(
+        val contentId: String,
+        val title: String,
+        val lastWatchedAtMs: Long,
+        val watchedSet: Set<String>,
+        val lastWatchedSeason: Int,
+        val lastWatchedEpisode: Int,
     )
 
     /**
@@ -185,36 +191,25 @@ internal class TraktWatchHistoryProvider(
         }
     }
 
+    /**
+     * Fetches continue-watching entries from Trakt.
+     *
+     * 1:1 port of Nuvio's CW Trakt path:
+     * 1. Fetch /sync/playback → in-progress movies & episodes
+     * 2. For completed episodes (>=85%): fetch addon episode list via
+     *    [episodeListProvider], compute next episode with [findNextEpisode].
+     *    If found → up-next at 0%. If not → 84.9% fallback.
+     * 3. Fetch /sync/watched/shows → for shows NOT in playback, parse
+     *    seasons data, build watched set, compute next episode.
+     *
+     * Per-item error handling: a single show failure never crashes the
+     * entire CW pipeline.
+     */
     private suspend fun fetchTraktContinueWatching(nowMs: Long): List<ContinueWatchingEntry> {
         val payload = traktGetArray("/sync/playback")
             ?: throw IllegalStateException("Trakt /sync/playback returned null")
 
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
-        val nextEpisodeCache = mutableMapOf<String, TraktNextEpisode?>()
-
-        suspend fun nextEpisodeForShow(showTraktId: String): TraktNextEpisode? {
-            val id = showTraktId.trim()
-            if (id.isEmpty()) return null
-            if (nextEpisodeCache.containsKey(id)) return nextEpisodeCache[id]
-
-            val endpoint = "/shows/$id/progress/watched?hidden=true&specials=false&count_specials=false"
-            val obj = traktGetObject(endpoint)
-            val next = obj?.optJSONObject("next_episode")
-            val season = next?.optInt("season", 0) ?: 0
-            val number = next?.optInt("number", 0) ?: 0
-            val result =
-                if (season <= 0 || number <= 0) {
-                    null
-                } else {
-                    TraktNextEpisode(
-                        season = season,
-                        episode = number,
-                        title = next?.optString("title")?.trim()?.ifEmpty { null },
-                    )
-                }
-            nextEpisodeCache[id] = result
-            return result
-        }
 
         val playbackItems =
             buildList<Pair<Long, JSONObject>> {
@@ -241,88 +236,28 @@ internal class TraktWatchHistoryProvider(
         val playbackEntries = mutableListOf<ContinueWatchingEntry>()
 
         for ((pausedAt, obj) in playbackItems) {
-            val type = obj.optString("type").trim().lowercase(Locale.US)
-            val progress = obj.optDouble("progress", -1.0)
-            if (progress < 0) continue
-            if (pausedAt < staleCutoff) continue
-            if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
+            try {
+                val type = obj.optString("type").trim().lowercase(Locale.US)
+                val progress = obj.optDouble("progress", -1.0)
+                if (progress < 0) continue
+                if (pausedAt < staleCutoff) continue
+                if (progress < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
 
-            if (type == "movie") {
-                if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
+                if (type == "movie") {
+                    if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
 
-                val movie = obj.optJSONObject("movie") ?: continue
-                val contentId = resolveAndCacheImdb(movie.optJSONObject("ids"), "movie")
-                if (contentId.isEmpty()) continue
-                val title = movie.optString("title").trim().ifEmpty { contentId }
-                playbackEntries.add(
-                    ContinueWatchingEntry(
-                        contentId = contentId,
-                        contentType = MetadataLabMediaType.MOVIE,
-                        title = title,
-                        season = null,
-                        episode = null,
-                        progressPercent = progress,
-                        lastUpdatedEpochMs = pausedAt,
-                        provider = WatchProvider.TRAKT,
-                        providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
-                        isUpNextPlaceholder = false,
-                    )
-                )
-                continue
-            }
-
-            if (type == "episode") {
-                val episode = obj.optJSONObject("episode") ?: continue
-                val show = obj.optJSONObject("show") ?: continue
-                val ids = show.optJSONObject("ids")
-                val contentId = resolveAndCacheImdb(ids, "show")
-                if (contentId.isEmpty()) continue
-
-                val showTraktId = ids?.opt("trakt")?.toString()?.trim().orEmpty()
-                if (showTraktId.isNotEmpty()) {
-                    existingSeriesTraktIds.add(showTraktId)
-                }
-
-                val episodeSeason = episode.optInt("season", 0).takeIf { it > 0 }
-                val episodeNumber = episode.optInt("number", 0).takeIf { it > 0 }
-                val showTitle = show.optString("title").trim().ifEmpty { contentId }
-                val episodeTitle = episode.optString("title").trim()
-                val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
-
-                if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-                    // Episode is completed (>= 85%). Try to find next episode.
-                    if (showTraktId.isNotBlank()) {
-                        val next = nextEpisodeForShow(showTraktId)
-                        if (next != null) {
-                            // Next episode found — add up-next placeholder at 0%
-                            playbackEntries.add(
-                                ContinueWatchingEntry(
-                                    contentId = contentId,
-                                    contentType = MetadataLabMediaType.SERIES,
-                                    title = showTitle,
-                                    season = next.season,
-                                    episode = next.episode,
-                                    progressPercent = 0.0,
-                                    lastUpdatedEpochMs = pausedAt,
-                                    provider = WatchProvider.TRAKT,
-                                    providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
-                                    isUpNextPlaceholder = true,
-                                )
-                            )
-                            continue
-                        }
-                    }
-                    // No next episode (series/season finale) or no Trakt ID.
-                    // Keep current episode at 84.9% so the show doesn't vanish
-                    // from continue watching. Matches Nuvio's fallback behavior.
+                    val movie = obj.optJSONObject("movie") ?: continue
+                    val contentId = resolveAndCacheImdb(movie.optJSONObject("ids"), "movie")
+                    if (contentId.isEmpty()) continue
+                    val title = movie.optString("title").trim().ifEmpty { contentId }
                     playbackEntries.add(
                         ContinueWatchingEntry(
                             contentId = contentId,
-                            contentType = MetadataLabMediaType.SERIES,
+                            contentType = MetadataLabMediaType.MOVIE,
                             title = title,
-                            season = episodeSeason,
-                            episode = episodeNumber,
-                            progressPercent = CONTINUE_WATCHING_COMPLETION_PERCENT - 0.1,
+                            season = null,
+                            episode = null,
+                            progressPercent = progress,
                             lastUpdatedEpochMs = pausedAt,
                             provider = WatchProvider.TRAKT,
                             providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
@@ -332,22 +267,104 @@ internal class TraktWatchHistoryProvider(
                     continue
                 }
 
-                playbackEntries.add(
-                    ContinueWatchingEntry(
-                        contentId = contentId,
-                        contentType = MetadataLabMediaType.SERIES,
-                        title = title,
-                        season = episodeSeason,
-                        episode = episodeNumber,
-                        progressPercent = progress,
-                        lastUpdatedEpochMs = pausedAt,
-                        provider = WatchProvider.TRAKT,
-                        providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
-                        isUpNextPlaceholder = false,
+                if (type == "episode") {
+                    val episode = obj.optJSONObject("episode") ?: continue
+                    val show = obj.optJSONObject("show") ?: continue
+                    val ids = show.optJSONObject("ids")
+                    val contentId = resolveAndCacheImdb(ids, "show")
+                    if (contentId.isEmpty()) continue
+
+                    val showTraktId = ids?.opt("trakt")?.toString()?.trim().orEmpty()
+                    if (showTraktId.isNotEmpty()) {
+                        existingSeriesTraktIds.add(showTraktId)
+                    }
+
+                    val episodeSeason = episode.optInt("season", 0).takeIf { it > 0 }
+                    val episodeNumber = episode.optInt("number", 0).takeIf { it > 0 }
+                    val showTitle = show.optString("title").trim().ifEmpty { contentId }
+                    val episodeTitle = episode.optString("title").trim()
+                    val title = if (episodeTitle.isBlank()) showTitle else "$showTitle - $episodeTitle"
+                    val playbackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null }
+
+                    if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+                        // Episode completed (>=85%). Fetch addon episode list and find next.
+                        // Mirrors Nuvio: getCachedMetadata('series', showImdb) → findNextEpisode.
+                        if (episodeSeason != null && episodeNumber != null) {
+                            try {
+                                val episodeList = episodeListProvider.fetchEpisodeList("series", contentId)
+                                if (episodeList != null) {
+                                    val next = findNextEpisode(
+                                        currentSeason = episodeSeason,
+                                        currentEpisode = episodeNumber,
+                                        episodes = episodeList,
+                                        watchedSet = null,
+                                        showId = contentId,
+                                    )
+                                    if (next != null) {
+                                        playbackEntries.add(
+                                            ContinueWatchingEntry(
+                                                contentId = contentId,
+                                                contentType = MetadataLabMediaType.SERIES,
+                                                title = showTitle,
+                                                season = next.season,
+                                                episode = next.episode,
+                                                progressPercent = 0.0,
+                                                lastUpdatedEpochMs = pausedAt,
+                                                provider = WatchProvider.TRAKT,
+                                                providerPlaybackId = playbackId,
+                                                isUpNextPlaceholder = true,
+                                            )
+                                        )
+                                        continue
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed to find next episode for $contentId", e)
+                            }
+                        }
+                        // Fallback: no next episode found (series/season finale, metadata
+                        // unavailable, etc.). Keep current episode at 84.9% so the show
+                        // doesn't vanish from continue watching.
+                        playbackEntries.add(
+                            ContinueWatchingEntry(
+                                contentId = contentId,
+                                contentType = MetadataLabMediaType.SERIES,
+                                title = title,
+                                season = episodeSeason,
+                                episode = episodeNumber,
+                                progressPercent = CONTINUE_WATCHING_COMPLETION_PERCENT - 0.1,
+                                lastUpdatedEpochMs = pausedAt,
+                                provider = WatchProvider.TRAKT,
+                                providerPlaybackId = playbackId,
+                                isUpNextPlaceholder = false,
+                            )
+                        )
+                        continue
+                    }
+
+                    playbackEntries.add(
+                        ContinueWatchingEntry(
+                            contentId = contentId,
+                            contentType = MetadataLabMediaType.SERIES,
+                            title = title,
+                            season = episodeSeason,
+                            episode = episodeNumber,
+                            progressPercent = progress,
+                            lastUpdatedEpochMs = pausedAt,
+                            provider = WatchProvider.TRAKT,
+                            providerPlaybackId = playbackId,
+                            isUpNextPlaceholder = false,
+                        )
                     )
-                )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Skipping playback item due to error", e)
             }
         }
+
+        // --- /sync/watched/shows → up-next for shows not in playback ---
+        // Mirrors Nuvio: fetch watched shows, parse seasons data, build
+        // watched set, fetch addon metadata, call findNextEpisode.
 
         val existingSeriesIds =
             playbackEntries
@@ -358,38 +375,72 @@ internal class TraktWatchHistoryProvider(
 
         val watchedShows = traktGetArray("/sync/watched/shows") ?: return playbackEntries
 
-        data class WatchedShowCandidate(
-            val contentId: String,
-            val traktId: String,
-            val title: String,
-            val lastWatchedAtMs: Long,
-        )
-
         val candidateBuffer = mutableListOf<WatchedShowCandidate>()
         for (index in 0 until watchedShows.length()) {
-            val obj = watchedShows.optJSONObject(index) ?: continue
-            val lastWatchedAt = parseIsoToEpochMs(obj.optString("last_watched_at")) ?: continue
-            if (lastWatchedAt < staleCutoff) continue
+            try {
+                val obj = watchedShows.optJSONObject(index) ?: continue
+                val lastWatchedAt = parseIsoToEpochMs(obj.optString("last_watched_at")) ?: continue
+                if (lastWatchedAt < staleCutoff) continue
 
-            val show = obj.optJSONObject("show") ?: continue
-            val ids = show.optJSONObject("ids")
-            val contentId = resolveAndCacheImdb(ids, "show")
-            if (contentId.isEmpty()) continue
-            if (contentId.lowercase(Locale.US) in existingSeriesIds) continue
+                val show = obj.optJSONObject("show") ?: continue
+                val ids = show.optJSONObject("ids")
+                val contentId = resolveAndCacheImdb(ids, "show")
+                if (contentId.isEmpty()) continue
+                if (contentId.lowercase(Locale.US) in existingSeriesIds) continue
 
-            val traktId = ids?.opt("trakt")?.toString()?.trim().orEmpty()
-            if (traktId.isEmpty()) continue
-            if (existingSeriesTraktIds.contains(traktId)) continue
+                val traktId = ids?.opt("trakt")?.toString()?.trim().orEmpty()
+                if (traktId.isNotEmpty() && existingSeriesTraktIds.contains(traktId)) continue
 
-            val title = show.optString("title").trim().ifEmpty { contentId }
-            candidateBuffer.add(
-                WatchedShowCandidate(
-                    contentId = contentId,
-                    traktId = traktId,
-                    title = title,
-                    lastWatchedAtMs = lastWatchedAt,
+                val title = show.optString("title").trim().ifEmpty { contentId }
+
+                // Parse Trakt seasons data: build watched set and find last watched episode.
+                // Mirrors Nuvio: iterate seasons[].episodes[], track latest by last_watched_at.
+                val seasonsArray = obj.optJSONArray("seasons")
+                val watchedSet = mutableSetOf<String>()
+                var latestSeason = 0
+                var latestEpisode = 0
+                var latestEpisodeMs = 0L
+
+                if (seasonsArray != null) {
+                    for (si in 0 until seasonsArray.length()) {
+                        val season = seasonsArray.optJSONObject(si) ?: continue
+                        val seasonNum = season.optInt("number", 0)
+                        val episodes = season.optJSONArray("episodes") ?: continue
+                        for (ei in 0 until episodes.length()) {
+                            val ep = episodes.optJSONObject(ei) ?: continue
+                            val epNum = ep.optInt("number", 0)
+                            if (seasonNum <= 0 || epNum <= 0) continue
+
+                            // Watched set key format matches Nuvio: ${imdbId}:${season}:${episode}
+                            val cleanId = if (contentId.startsWith("tt")) contentId else "tt$contentId"
+                            watchedSet.add("$cleanId:$seasonNum:$epNum")
+
+                            val epWatchedAt = parseIsoToEpochMs(ep.optString("last_watched_at")) ?: 0L
+                            if (epWatchedAt > latestEpisodeMs) {
+                                latestEpisodeMs = epWatchedAt
+                                latestSeason = seasonNum
+                                latestEpisode = epNum
+                            }
+                        }
+                    }
+                }
+
+                // Nuvio: if season=0 and episode=0 => skip
+                if (latestSeason <= 0 || latestEpisode <= 0) continue
+
+                candidateBuffer.add(
+                    WatchedShowCandidate(
+                        contentId = contentId,
+                        title = title,
+                        lastWatchedAtMs = latestEpisodeMs.coerceAtLeast(lastWatchedAt),
+                        watchedSet = watchedSet,
+                        lastWatchedSeason = latestSeason,
+                        lastWatchedEpisode = latestEpisode,
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                Log.w(TAG, "Skipping watched show due to error", e)
+            }
         }
 
         val candidates =
@@ -400,21 +451,33 @@ internal class TraktWatchHistoryProvider(
 
         val upNextFromWatchedShows = mutableListOf<ContinueWatchingEntry>()
         for (candidate in candidates) {
-            val next = nextEpisodeForShow(candidate.traktId) ?: continue
-            upNextFromWatchedShows.add(
-                ContinueWatchingEntry(
-                    contentId = candidate.contentId,
-                    contentType = MetadataLabMediaType.SERIES,
-                    title = candidate.title,
-                    season = next.season,
-                    episode = next.episode,
-                    progressPercent = 0.0,
-                    lastUpdatedEpochMs = candidate.lastWatchedAtMs,
-                    provider = WatchProvider.TRAKT,
-                    providerPlaybackId = null,
-                    isUpNextPlaceholder = true,
+            try {
+                val episodeList = episodeListProvider.fetchEpisodeList("series", candidate.contentId) ?: continue
+                val next = findNextEpisode(
+                    currentSeason = candidate.lastWatchedSeason,
+                    currentEpisode = candidate.lastWatchedEpisode,
+                    episodes = episodeList,
+                    watchedSet = candidate.watchedSet,
+                    showId = candidate.contentId,
+                ) ?: continue
+
+                upNextFromWatchedShows.add(
+                    ContinueWatchingEntry(
+                        contentId = candidate.contentId,
+                        contentType = MetadataLabMediaType.SERIES,
+                        title = candidate.title,
+                        season = next.season,
+                        episode = next.episode,
+                        progressPercent = 0.0,
+                        lastUpdatedEpochMs = candidate.lastWatchedAtMs,
+                        provider = WatchProvider.TRAKT,
+                        providerPlaybackId = null,
+                        isUpNextPlaceholder = true,
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to find next episode for ${candidate.contentId}", e)
+            }
         }
 
         return playbackEntries + upNextFromWatchedShows

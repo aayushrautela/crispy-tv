@@ -12,6 +12,7 @@ object AppRoutes {
 
     const val HomeDetailsRoute = "home/details"
     const val HomeDetailsItemIdArg = "itemId"
+    const val HomeDetailsMediaTypeArg = "mediaType"
     const val PlayerRoute = "player"
     const val PlayerUrlArg = "url"
     const val PlayerTitleArg = "title"
@@ -31,7 +32,8 @@ object AppRoutes {
     const val CatalogBaseUrlArg = "baseUrl"
     const val CatalogQueryArg = "query"
 
-    val HomeDetailsRoutePattern: String = "$HomeDetailsRoute/{$HomeDetailsItemIdArg}"
+    val HomeDetailsRoutePattern: String =
+        "$HomeDetailsRoute/{$HomeDetailsItemIdArg}?$HomeDetailsMediaTypeArg={$HomeDetailsMediaTypeArg}"
     val PlayerRoutePattern: String =
         "$PlayerRoute?$PlayerUrlArg={$PlayerUrlArg}&$PlayerTitleArg={$PlayerTitleArg}"
     val CatalogListRoutePattern: String =
@@ -41,7 +43,10 @@ object AppRoutes {
             "&$CatalogBaseUrlArg={$CatalogBaseUrlArg}" +
             "&$CatalogQueryArg={$CatalogQueryArg}"
 
-    fun homeDetailsRoute(itemId: String): String = "$HomeDetailsRoute/${Uri.encode(itemId)}"
+    fun homeDetailsRoute(itemId: String, mediaType: String? = null): String {
+        val base = "$HomeDetailsRoute/${Uri.encode(itemId)}"
+        return if (mediaType != null) "$base?$HomeDetailsMediaTypeArg=${Uri.encode(mediaType)}" else base
+    }
 
     fun playerRoute(url: String, title: String): String {
         return "$PlayerRoute?$PlayerUrlArg=${Uri.encode(url)}&$PlayerTitleArg=${Uri.encode(title)}"

@@ -1,6 +1,7 @@
 package com.crispy.tv
 
 import android.content.Context
+import com.crispy.tv.metadata.AddonEpisodeListProvider
 import com.crispy.tv.metadata.RemoteCatalogSearchLabService
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
@@ -64,11 +65,17 @@ private fun newCatalogSearchService(context: Context): CatalogSearchLabService {
 
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
+    val episodeListProvider = AddonEpisodeListProvider(
+        context = appContext,
+        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+        httpClient = AppHttp.client(appContext),
+    )
     return RemoteWatchHistoryService(
         context = appContext,
         httpClient = AppHttp.client(appContext),
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
         simklClientId = BuildConfig.SIMKL_CLIENT_ID,
+        episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(
                 traktClientSecret = BuildConfig.TRAKT_CLIENT_SECRET,

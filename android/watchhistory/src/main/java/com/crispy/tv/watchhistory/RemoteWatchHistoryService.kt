@@ -4,6 +4,7 @@ import android.content.Context
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
+import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.ProviderAuthActionResult
 import com.crispy.tv.player.ProviderAuthStartResult
 import com.crispy.tv.player.ProviderCommentQuery
@@ -41,6 +42,7 @@ class RemoteWatchHistoryService(
     httpClient: CrispyHttpClient,
     private val traktClientId: String,
     private val simklClientId: String,
+    private val episodeListProvider: EpisodeListProvider,
     private val config: WatchHistoryConfig = WatchHistoryConfig(),
 ) : WatchHistoryService {
     private val appContext = context.applicationContext
@@ -105,12 +107,14 @@ class RemoteWatchHistoryService(
             traktApi = traktApi,
             sessionStore = sessionStore,
             traktClientId = traktClientId,
+            episodeListProvider = episodeListProvider,
         )
     private val simklProvider =
         SimklWatchHistoryProvider(
             simklApi = simklApi,
             sessionStore = sessionStore,
             simklClientId = simklClientId,
+            episodeListProvider = episodeListProvider,
         )
     private val providerRouter = ProviderRouter(traktProvider = traktProvider, simklProvider = simklProvider)
     private val continueWatchingNormalizer = ContinueWatchingNormalizer()

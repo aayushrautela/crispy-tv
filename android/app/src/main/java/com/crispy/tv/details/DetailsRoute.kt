@@ -12,15 +12,16 @@ import kotlinx.coroutines.flow.collectLatest
 @Composable
 fun DetailsRoute(
     itemId: String,
+    mediaType: String? = null,
     onBack: () -> Unit,
-    onItemClick: (String) -> Unit = {},
+    onItemClick: (String, String?) -> Unit = { _, _ -> },
     onOpenPlayer: (String, String) -> Unit = { _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
     val viewModel: DetailsViewModel =
         viewModel(
             key = itemId,
-            factory = remember(appContext, itemId) { DetailsViewModel.factory(appContext, itemId) }
+            factory = remember(appContext, itemId, mediaType) { DetailsViewModel.factory(appContext, itemId, mediaType) }
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -37,7 +38,7 @@ fun DetailsRoute(
     DetailsScreen(
         uiState = uiState,
         onBack = onBack,
-        onItemClick = onItemClick,
+        onItemClick = { id -> onItemClick(id, null) },
         onRetry = viewModel::reload,
         onSeasonSelected = viewModel::onSeasonSelected,
         onOpenStreamSelector = viewModel::onOpenStreamSelector,

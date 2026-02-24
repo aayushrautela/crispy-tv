@@ -101,6 +101,7 @@ sealed interface DetailsNavigationEvent {
 
 class DetailsViewModel internal constructor(
     private val itemId: String,
+    private val mediaType: String?,
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryService,
     private val settingsStore: HomeScreenSettingsStore,
@@ -859,9 +860,10 @@ class DetailsViewModel internal constructor(
 
     /**
      * Resolves a raw content ID to an addon-friendly format BEFORE fetching.
-     * For tmdb:X IDs, resolves to IMDb (series first, then movie) so addons
-     * can look up the content properly. Matches Nuvio behavior where IMDb
-     * is always the canonical content ID for addon fetches.
+     * For tmdb:X IDs, resolves to IMDb so addons can look up the content
+     * properly. When [mediaType] is known from navigation, uses it directly
+     * instead of guessing (fixes wrong-content-opens bug). Matches Nuvio
+     * behavior where `getStremioId(type, tmdbId)` is always type-aware.
      */
     private suspend fun resolveItemIdForAddonFetch(rawId: String): ResolvedItemId {
         val trimmed = rawId.trim()
@@ -869,14 +871,20 @@ class DetailsViewModel internal constructor(
 
         val lowered = trimmed.lowercase(Locale.US)
 
-        // Already IMDb — use directly
+        // Already IMDb — use directly, but carry forward the known type
         if (lowered.startsWith("tt") && lowered.length >= 4) {
-            return ResolvedItemId(trimmed, null, null)
+            return ResolvedItemId(trimmed, mediaType, mediaType?.toMetadataLabMediaTypeOrNull())
         }
 
         // tmdb:X — resolve to IMDb before addon fetch
         if (lowered.startsWith("tmdb:")) {
-            for (type in listOf(MetadataLabMediaType.SERIES, MetadataLabMediaType.MOVIE)) {
+            // When type is known from navigation, try ONLY that type (Nuvio: getStremioId(type, tmdbId))
+            val typesToTry = when (mediaType?.lowercase(Locale.US)) {
+                "movie" -> listOf(MetadataLabMediaType.MOVIE)
+                "series" -> listOf(MetadataLabMediaType.SERIES)
+                else -> listOf(MetadataLabMediaType.SERIES, MetadataLabMediaType.MOVIE) // fallback: series-first
+            }
+            for (type in typesToTry) {
                 val imdb = tmdbImdbIdResolver.resolveImdbId(trimmed, type)
                 if (imdb != null) {
                     val mediaTypeStr = when (type) {
@@ -888,7 +896,7 @@ class DetailsViewModel internal constructor(
             }
         }
 
-        return ResolvedItemId(trimmed, null, null)
+        return ResolvedItemId(trimmed, mediaType, mediaType?.toMetadataLabMediaTypeOrNull())
     }
 
     private data class ResolvedItemId(
@@ -1153,7 +1161,7 @@ class DetailsViewModel internal constructor(
         private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
         private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
 
-        fun factory(context: Context, itemId: String): ViewModelProvider.Factory {
+        fun factory(context: Context, itemId: String, mediaType: String? = null): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -1192,6 +1200,7 @@ class DetailsViewModel internal constructor(
                         )
                     return DetailsViewModel(
                         itemId = itemId,
+                        mediaType = mediaType,
                         homeCatalogService = homeCatalogService,
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                         settingsStore = HomeScreenSettingsStore(appContext),

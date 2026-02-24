@@ -15,13 +15,13 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) {
         HomeScreen(
             onHeroClick = { hero ->
-                navController.navigate(AppRoutes.homeDetailsRoute(hero.id))
+                navController.navigate(AppRoutes.homeDetailsRoute(hero.id, hero.type))
             },
             onContinueWatchingClick = { item ->
-                navController.navigate(AppRoutes.homeDetailsRoute(item.contentId))
+                navController.navigate(AppRoutes.homeDetailsRoute(item.contentId, item.type))
             },
             onCatalogItemClick = { catalogItem ->
-                navController.navigate(AppRoutes.homeDetailsRoute(catalogItem.id))
+                navController.navigate(AppRoutes.homeDetailsRoute(catalogItem.id, catalogItem.type))
             },
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))
@@ -58,19 +58,28 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         CatalogRoute(
             section = section,
             onBack = { navController.popBackStack() },
-            onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id)) }
+            onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
         )
     }
 
     composable(
         route = AppRoutes.HomeDetailsRoutePattern,
-        arguments = listOf(navArgument(AppRoutes.HomeDetailsItemIdArg) { type = NavType.StringType })
+        arguments = listOf(
+            navArgument(AppRoutes.HomeDetailsItemIdArg) { type = NavType.StringType },
+            navArgument(AppRoutes.HomeDetailsMediaTypeArg) {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+        )
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
+        val mediaType = entry.arguments?.getString(AppRoutes.HomeDetailsMediaTypeArg)
         DetailsRoute(
             itemId = itemId,
+            mediaType = mediaType,
             onBack = { navController.popBackStack() },
-            onItemClick = { nextId -> navController.navigate(AppRoutes.homeDetailsRoute(nextId)) },
+            onItemClick = { nextId, nextType -> navController.navigate(AppRoutes.homeDetailsRoute(nextId, nextType)) },
             onOpenPlayer = { playbackUrl, title ->
                 navController.navigate(AppRoutes.playerRoute(playbackUrl, title))
             },
