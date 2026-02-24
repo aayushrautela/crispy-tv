@@ -3,6 +3,7 @@ package com.crispy.tv.ui.navigation
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.crispy.tv.catalog.CatalogRoute
@@ -10,7 +11,7 @@ import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.details.DetailsRoute
 import com.crispy.tv.home.HomeScreen
 import com.crispy.tv.home.ThisWeekItem
-import com.crispy.tv.playerui.PlayerRoute
+import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) {
@@ -75,41 +76,15 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
         val mediaType = entry.arguments?.getString(AppRoutes.HomeDetailsMediaTypeArg).orEmpty()
+        val context = LocalContext.current
         DetailsRoute(
             itemId = itemId,
             mediaType = mediaType,
             onBack = { navController.popBackStack() },
             onItemClick = { nextId, nextType -> navController.navigate(AppRoutes.homeDetailsRoute(nextId, nextType)) },
-            onOpenPlayer = { playbackUrl, title ->
-                navController.navigate(AppRoutes.playerRoute(playbackUrl, title))
+            onOpenPlayer = { playbackUrl, title, identity ->
+                context.startActivity(PlayerActivity.intent(context, playbackUrl, title, identity))
             },
-        )
-    }
-
-    composable(
-        route = AppRoutes.PlayerRoutePattern,
-        arguments =
-            listOf(
-                navArgument(AppRoutes.PlayerUrlArg) {
-                    type = NavType.StringType
-                    defaultValue = ""
-                },
-                navArgument(AppRoutes.PlayerTitleArg) {
-                    type = NavType.StringType
-                    defaultValue = ""
-                },
-            ),
-    ) { entry ->
-        val playbackUrl = entry.arguments?.getString(AppRoutes.PlayerUrlArg).orEmpty()
-        if (playbackUrl.isBlank()) {
-            navController.popBackStack()
-            return@composable
-        }
-
-        PlayerRoute(
-            playbackUrl = playbackUrl,
-            title = entry.arguments?.getString(AppRoutes.PlayerTitleArg).orEmpty(),
-            onBack = { navController.popBackStack() },
         )
     }
 }

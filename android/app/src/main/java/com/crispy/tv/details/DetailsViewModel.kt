@@ -19,6 +19,7 @@ import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.settings.AiInsightsMode
@@ -97,6 +98,7 @@ sealed interface DetailsNavigationEvent {
     data class OpenPlayer(
         val playbackUrl: String,
         val title: String,
+        val identity: PlaybackIdentity,
     ) : DetailsNavigationEvent
 }
 
@@ -689,12 +691,65 @@ class DetailsViewModel internal constructor(
                 statusMessage = "",
             )
         }
-        _navigationEvents.tryEmit(
-            DetailsNavigationEvent.OpenPlayer(
-                playbackUrl = playbackUrl,
-                title = title,
+
+        val initialDetails = _uiState.value.details
+        val lookupId = _uiState.value.streamSelector.lookupId
+
+        viewModelScope.launch {
+            val details = initialDetails
+                ?: return@launch
+
+            val enriched =
+                withContext(Dispatchers.IO) {
+                    ensureImdbId(details)
+                }
+            if (enriched.imdbId != details.imdbId) {
+                _uiState.update { it.copy(details = enriched) }
+            }
+
+            val resolvedMediaType = enriched.mediaType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
+            val normalizedLookupId =
+                normalizeNuvioMediaId(
+                    lookupId
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: enriched.id,
+                )
+
+            val season = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.season else null
+            val episode = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.episode else null
+
+            val yearInt = enriched.year?.trim()?.toIntOrNull()
+            val tmdbId = extractTmdbIdOrNull(enriched.id) ?: extractTmdbIdOrNull(lookupId)
+
+            val identity =
+                PlaybackIdentity(
+                    imdbId = enriched.imdbId,
+                    tmdbId = tmdbId,
+                    contentType = resolvedMediaType,
+                    season = season,
+                    episode = episode,
+                    title = title,
+                    year = yearInt,
+                    showTitle = if (resolvedMediaType == MetadataLabMediaType.SERIES) enriched.title else null,
+                    showYear = if (resolvedMediaType == MetadataLabMediaType.SERIES) yearInt else null,
+                )
+
+            _navigationEvents.tryEmit(
+                DetailsNavigationEvent.OpenPlayer(
+                    playbackUrl = playbackUrl,
+                    title = title,
+                    identity = identity,
+                )
             )
-        )
+        }
+    }
+
+    private fun extractTmdbIdOrNull(rawId: String?): Int? {
+        val value = rawId?.trim().orEmpty()
+        if (value.isBlank()) return null
+        val match = TMDB_ID_REGEX.find(value) ?: return null
+        return match.groupValues.getOrNull(1)?.toIntOrNull()
     }
 
     fun toggleWatchlist() {
@@ -1209,6 +1264,8 @@ class DetailsViewModel internal constructor(
     companion object {
         private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
         private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
+
+        private val TMDB_ID_REGEX = Regex("\\btmdb:(?:movie:|show:|tv:)?(\\d+)")
 
         fun factory(context: Context, itemId: String, mediaType: String): ViewModelProvider.Factory {
             val appContext = context.applicationContext

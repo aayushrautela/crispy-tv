@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.withLock
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 internal class SimklService(
     private val http: WatchHistoryHttp,
@@ -48,7 +49,39 @@ internal class SimklService(
     private var userSettingsCachedToken: String = ""
     private var userSettingsCache: JSONObject? = null
 
+    private val scrobbleMutex = Mutex()
+    private val lastScrobblePauseAtByKeyElapsedMs = LinkedHashMap<String, Long>()
+
     fun userAgent(): String = "$appName/$appVersion"
+
+    internal data class SimklIds(
+        val imdbId: String?,
+        val tmdbId: Long? = null,
+        val simklId: Long? = null,
+        val malId: String? = null,
+    )
+
+    internal sealed interface SimklScrobbleContent {
+        val title: String
+        val year: Int?
+        val ids: SimklIds
+
+        data class Movie(
+            override val title: String,
+            override val year: Int?,
+            override val ids: SimklIds,
+        ) : SimklScrobbleContent
+
+        data class Episode(
+            val showTitle: String,
+            val showYear: Int?,
+            val season: Int,
+            val episode: Int,
+            override val title: String,
+            override val year: Int?,
+            override val ids: SimklIds,
+        ) : SimklScrobbleContent
+    }
 
     fun authorizeUrl(state: String, codeChallenge: String?): String {
         val builder = SIMKL_AUTHORIZE_BASE.toHttpUrl().newBuilder()
@@ -98,6 +131,58 @@ internal class SimklService(
         return runCatching { JSONObject(response.body) }
             .onFailure { Log.w(logTag, "Simkl token exchange JSON parse failed", it) }
             .getOrNull()
+    }
+
+    suspend fun scrobbleStart(content: SimklScrobbleContent, progressPercent: Double): Boolean {
+        val token = sessionStore.simklAccessToken()
+        if (token.isBlank()) return false
+
+        val payload = buildScrobblePayload(content = content, progressPercent = progressPercent)
+        val response = apiRequestRaw(method = "POST", path = "/scrobble/start", query = emptyMap(), accessToken = token, payload = payload)
+            ?: return false
+        return (response.code in 200..299) || response.code == 409
+    }
+
+    suspend fun scrobblePause(content: SimklScrobbleContent, progressPercent: Double, force: Boolean = false): Boolean {
+        val token = sessionStore.simklAccessToken()
+        if (token.isBlank()) return false
+
+        val key = scrobbleKey(content)
+        val nowElapsedMs = SystemClock.elapsedRealtime()
+        scrobbleMutex.withLock {
+            val last = lastScrobblePauseAtByKeyElapsedMs[key]
+            if (!force && last != null && nowElapsedMs - last < SIMKL_SCROBBLE_DEBOUNCE_MS) {
+                return true
+            }
+            lastScrobblePauseAtByKeyElapsedMs[key] = nowElapsedMs
+        }
+
+        val payload = buildScrobblePayload(content = content, progressPercent = progressPercent)
+        val response = apiRequestRaw(method = "POST", path = "/scrobble/pause", query = emptyMap(), accessToken = token, payload = payload)
+            ?: return false
+        return (response.code in 200..299) || response.code == 409
+    }
+
+    suspend fun scrobbleStop(content: SimklScrobbleContent, progressPercent: Double): Boolean {
+        val token = sessionStore.simklAccessToken()
+        if (token.isBlank()) return false
+
+        val payload = buildScrobblePayload(content = content, progressPercent = progressPercent)
+        val response = apiRequestRaw(method = "POST", path = "/scrobble/stop", query = emptyMap(), accessToken = token, payload = payload)
+
+        if (response != null && response.code in 200..299) {
+            return true
+        }
+
+        val progress = progressPercent.coerceIn(0.0, 100.0)
+        if (progress >= SIMKL_COMPLETION_THRESHOLD_PERCENT) {
+            val historyPayload = buildHistoryFallbackPayload(content)
+            if (historyPayload != null) {
+                return addToHistory(historyPayload)
+            }
+        }
+
+        return response?.code == 409
     }
 
     suspend fun fetchUserHandle(accessToken: String): String? {
@@ -293,6 +378,90 @@ internal class SimklService(
         )
     }
 
+    private fun buildScrobblePayload(content: SimklScrobbleContent, progressPercent: Double): JSONObject {
+        val progress = progressPercent.coerceIn(0.0, 100.0)
+        val ids = buildIdsJson(content.ids)
+
+        return when (content) {
+            is SimklScrobbleContent.Movie -> {
+                val movie = JSONObject().put("title", content.title)
+                if (content.year != null) movie.put("year", content.year)
+                movie.put("ids", ids)
+                JSONObject()
+                    .put("progress", progress)
+                    .put("movie", movie)
+            }
+
+            is SimklScrobbleContent.Episode -> {
+                val show = JSONObject().put("title", content.showTitle)
+                if (content.showYear != null) show.put("year", content.showYear)
+                show.put("ids", ids)
+
+                val episode =
+                    JSONObject()
+                        .put("season", content.season)
+                        .put("number", content.episode)
+
+                JSONObject()
+                    .put("progress", progress)
+                    .put("show", show)
+                    .put("episode", episode)
+            }
+        }
+    }
+
+    private fun buildHistoryFallbackPayload(content: SimklScrobbleContent): JSONObject? {
+        val ids = buildIdsJson(content.ids)
+        if (ids.length() == 0) return null
+
+        return when (content) {
+            is SimklScrobbleContent.Movie -> {
+                JSONObject().put("movies", JSONArray().put(JSONObject().put("ids", ids)))
+            }
+
+            is SimklScrobbleContent.Episode -> {
+                val seasonObj =
+                    JSONObject().put(
+                        "number",
+                        content.season,
+                    ).put(
+                        "episodes",
+                        JSONArray().put(JSONObject().put("number", content.episode)),
+                    )
+                val showObj =
+                    JSONObject()
+                        .put("ids", ids)
+                        .put("seasons", JSONArray().put(seasonObj))
+                JSONObject().put("shows", JSONArray().put(showObj))
+            }
+        }
+    }
+
+    private fun buildIdsJson(ids: SimklIds): JSONObject {
+        val obj = JSONObject()
+
+        val imdb = ids.imdbId?.trim()?.lowercase(Locale.US)
+        if (!imdb.isNullOrBlank()) {
+            obj.put("imdb", if (imdb.startsWith("tt")) imdb else "tt$imdb")
+        }
+        if (ids.tmdbId != null) obj.put("tmdb", ids.tmdbId)
+        if (ids.simklId != null) obj.put("simkl", ids.simklId)
+        if (!ids.malId.isNullOrBlank()) obj.put("mal", ids.malId)
+
+        return obj
+    }
+
+    private fun scrobbleKey(content: SimklScrobbleContent): String {
+        val idPart = content.ids.imdbId?.ifBlank { null }
+            ?: content.ids.tmdbId?.toString()
+            ?: content.title
+
+        return when (content) {
+            is SimklScrobbleContent.Movie -> "movie:$idPart"
+            is SimklScrobbleContent.Episode -> "episode:$idPart:${content.season}:${content.episode}"
+        }
+    }
+
     private suspend fun apiGetAny(path: String, query: Map<String, String>, accessToken: String): Any? {
         return apiRequest(method = "GET", path = path, query = query, accessToken = accessToken, payload = null)
     }
@@ -436,5 +605,8 @@ internal class SimklService(
         private const val MIN_API_INTERVAL_MS = 500L
         private const val PLAYBACK_CACHE_TTL_MS = 10_000L
         private const val USER_SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000L
+
+        private const val SIMKL_SCROBBLE_DEBOUNCE_MS = 15_000L
+        private const val SIMKL_COMPLETION_THRESHOLD_PERCENT = 80.0
     }
 }

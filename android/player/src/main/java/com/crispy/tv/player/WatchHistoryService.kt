@@ -138,6 +138,32 @@ data class ProviderAuthActionResult(
     val authState: WatchProviderAuthState = WatchProviderAuthState()
 )
 
+data class PlaybackIdentity(
+    val imdbId: String?,
+    val tmdbId: Int? = null,
+    val contentType: MetadataLabMediaType,
+    val season: Int? = null,
+    val episode: Int? = null,
+    val title: String,
+    val year: Int? = null,
+    val showTitle: String? = null,
+    val showYear: Int? = null
+)
+
+data class WatchProgressSnapshot(
+    val currentTimeSeconds: Double,
+    val durationSeconds: Double,
+    val lastUpdatedEpochMs: Long
+) {
+    val progressPercent: Double
+        get() = if (durationSeconds <= 0.0) 0.0 else (currentTimeSeconds / durationSeconds) * 100.0
+}
+
+data class WatchProgressSyncResult(
+    val statusMessage: String,
+    val updatedCount: Int = 0
+)
+
 interface WatchHistoryService {
     fun connectProvider(
         provider: WatchProvider,
@@ -263,6 +289,39 @@ interface WatchHistoryService {
 
     suspend fun completeSimklOAuth(callbackUri: String): ProviderAuthActionResult {
         return ProviderAuthActionResult(success = false, statusMessage = "Simkl OAuth unavailable.")
+    }
+
+    suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
+        return null
+    }
+
+    suspend fun removeLocalWatchProgress(identity: PlaybackIdentity): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Local watch progress removal unavailable.")
+    }
+
+    suspend fun onPlaybackStarted(identity: PlaybackIdentity, positionMs: Long, durationMs: Long) {
+    }
+
+    suspend fun onPlaybackProgress(identity: PlaybackIdentity, positionMs: Long, durationMs: Long, isPlaying: Boolean) {
+    }
+
+    suspend fun onPlaybackStopped(identity: PlaybackIdentity, positionMs: Long, durationMs: Long) {
+    }
+
+    suspend fun fetchAndMergeTraktProgress(): WatchProgressSyncResult {
+        return WatchProgressSyncResult(statusMessage = "Trakt progress merge unavailable.")
+    }
+
+    suspend fun fetchAndMergeSimklProgress(): WatchProgressSyncResult {
+        return WatchProgressSyncResult(statusMessage = "Simkl progress merge unavailable.")
+    }
+
+    suspend fun syncAllTraktProgress(): WatchProgressSyncResult {
+        return WatchProgressSyncResult(statusMessage = "Trakt progress sync unavailable.")
+    }
+
+    suspend fun syncAllSimklProgress(): WatchProgressSyncResult {
+        return WatchProgressSyncResult(statusMessage = "Simkl progress sync unavailable.")
     }
 }
 

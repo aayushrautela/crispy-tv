@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crispy.tv.player.PlaybackIdentity
 import kotlinx.coroutines.flow.collectLatest
 import java.util.Locale
 
@@ -16,7 +17,7 @@ fun DetailsRoute(
     mediaType: String,
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit = { _, _ -> },
-    onOpenPlayer: (String, String) -> Unit = { _, _ -> },
+    onOpenPlayer: (String, String, PlaybackIdentity) -> Unit = { _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
 
@@ -48,7 +49,7 @@ fun DetailsRoute(
         viewModel.navigationEvents.collectLatest { event ->
             when (event) {
                 is DetailsNavigationEvent.OpenPlayer -> {
-                    onOpenPlayer(event.playbackUrl, event.title)
+                    onOpenPlayer(event.playbackUrl, event.title, event.identity)
                 }
             }
         }

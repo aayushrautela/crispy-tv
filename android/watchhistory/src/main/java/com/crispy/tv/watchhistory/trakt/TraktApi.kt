@@ -9,6 +9,7 @@ import com.crispy.tv.watchhistory.TRAKT_TOKEN_URL
 import com.crispy.tv.watchhistory.WatchHistoryHttp
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.crispy.tv.network.CrispyHttpResponse
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -129,6 +130,10 @@ internal class TraktApi(
         return response.code in 200..299
     }
 
+    suspend fun postRaw(path: String, payload: JSONObject): CrispyHttpResponse? {
+        return postRawInternal(path = path, payload = payload, forceRefreshToken = false)
+    }
+
     suspend fun delete(path: String): Boolean {
         val token = ensureAccessToken() ?: return false
         val url = "https://api.trakt.tv$path"
@@ -143,6 +148,18 @@ internal class TraktApi(
         }
 
         return response.code in 200..299 || response.code == 404
+    }
+
+    private suspend fun postRawInternal(path: String, payload: JSONObject, forceRefreshToken: Boolean): CrispyHttpResponse? {
+        val token = ensureAccessToken(forceRefresh = forceRefreshToken) ?: return null
+        val url = apiUrl(path)
+        val response = http.postJsonRaw(url = url, headers = jsonHeaders(token), payload = payload) ?: return null
+
+        if (response.code == 401 && !forceRefreshToken) {
+            return postRawInternal(path = path, payload = payload, forceRefreshToken = true)
+        }
+
+        return response
     }
 
     private fun headers(accessToken: String?): Map<String, String> {

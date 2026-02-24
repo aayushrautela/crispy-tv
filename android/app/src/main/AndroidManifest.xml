@@ -18,6 +18,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CrispyRewrite">
         <activity
+            android:name="com.crispy.tv.playerui.PlayerActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
+        <activity
             android:name="com.crispy.tv.MainActivity"
             android:exported="true">
             <intent-filter>

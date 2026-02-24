@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.safeGestures
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -608,14 +609,32 @@ private fun PlayerLoadingCurtain(
 
 @Composable
 private fun rememberOverlayPadding(minPadding: Dp): PaddingValues {
-    val safeInsets = WindowInsets.safeDrawing
+    val safeDrawing = WindowInsets.safeDrawing
+    val safeGestures = WindowInsets.safeGestures
     val density = androidx.compose.ui.platform.LocalDensity.current
     val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
 
-    val left = with(density) { safeInsets.getLeft(this, layoutDirection).toDp() }
-    val right = with(density) { safeInsets.getRight(this, layoutDirection).toDp() }
-    val top = with(density) { safeInsets.getTop(this).toDp() }
-    val bottom = with(density) { safeInsets.getBottom(this).toDp() }
+    val leftPx = maxOf(
+        safeDrawing.getLeft(density, layoutDirection),
+        safeGestures.getLeft(density, layoutDirection),
+    )
+    val rightPx = maxOf(
+        safeDrawing.getRight(density, layoutDirection),
+        safeGestures.getRight(density, layoutDirection),
+    )
+    val topPx = maxOf(
+        safeDrawing.getTop(density),
+        safeGestures.getTop(density),
+    )
+    val bottomPx = maxOf(
+        safeDrawing.getBottom(density),
+        safeGestures.getBottom(density),
+    )
+
+    val left = with(density) { leftPx.toDp() }
+    val right = with(density) { rightPx.toDp() }
+    val top = with(density) { topPx.toDp() }
+    val bottom = with(density) { bottomPx.toDp() }
 
     return remember(left, right, top, bottom, minPadding) {
         PaddingValues(

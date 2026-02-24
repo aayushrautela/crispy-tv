@@ -16,6 +16,7 @@ import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.ProviderRecommendationsResult
+import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
@@ -433,10 +434,14 @@ class HomeViewModel internal constructor(
                         )
                     }
                     item.provider == WatchProvider.LOCAL -> {
-                        watchHistoryService.unmarkWatched(
-                            request = item.toUnmarkRequest(),
-                            source = item.provider
-                        )
+                        if (item.progressPercent < 100.0) {
+                            watchHistoryService.removeLocalWatchProgress(item.toPlaybackIdentity())
+                        } else {
+                            watchHistoryService.unmarkWatched(
+                                request = item.toUnmarkRequest(),
+                                source = item.provider
+                            )
+                        }
                     }
                     !item.providerPlaybackId.isNullOrBlank() -> {
                         watchHistoryService.removeFromPlayback(
@@ -537,6 +542,27 @@ class HomeViewModel internal constructor(
         }
 
         return filtered
+    }
+
+    private fun ContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity {
+        val contentType =
+            when (type.lowercase(Locale.US)) {
+                "series" -> MetadataLabMediaType.SERIES
+                else -> MetadataLabMediaType.MOVIE
+            }
+        val normalizedImdb = contentId.trim().lowercase(Locale.US).takeIf { it.startsWith("tt") }
+
+        return PlaybackIdentity(
+            imdbId = normalizedImdb,
+            tmdbId = null,
+            contentType = contentType,
+            season = season,
+            episode = episode,
+            title = title,
+            year = null,
+            showTitle = if (contentType == MetadataLabMediaType.SERIES) title else null,
+            showYear = null,
+        )
     }
 
     private fun applyProviderLibrarySuppressionFilter(entries: List<ProviderLibraryItem>): List<ProviderLibraryItem> {
