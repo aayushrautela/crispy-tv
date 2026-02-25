@@ -390,14 +390,27 @@ private fun DiscoverScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Discover",
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Discover",
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
 
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconButton(onClick = onRefresh) {
+                                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
+                            }
+                        }
+
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             item {
                                 FilterChip(
                                     selected = false,
@@ -454,11 +467,6 @@ private fun DiscoverScreen(
                                 }
                             }
                         }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }
                 },
                 scrollBehavior = scrollBehavior

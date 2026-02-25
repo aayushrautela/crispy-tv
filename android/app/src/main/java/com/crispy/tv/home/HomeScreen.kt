@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -85,9 +86,21 @@ internal fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        CrispyWordmark(Modifier.height(36.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CrispyWordmark(Modifier.height(36.dp))
 
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(modifier = Modifier.weight(1f))
+
+                            HomeProfileSelector()
+                        }
+
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             items(headerChips, key = { it }) { chipLabel ->
                                 FilterChip(
                                     selected = false,
@@ -98,7 +111,6 @@ internal fun HomeScreen(
                         }
                     }
                 },
-                actions = { HomeProfileSelector() },
                 scrollBehavior = scrollBehavior
             )
         }

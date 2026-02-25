@@ -333,15 +333,28 @@ private fun LibraryScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Library",
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Library",
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            IconButton(onClick = onRefresh) {
+                                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
+                            }
+                        }
 
                         if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 items(providerFolders, key = { it.id }) { folder ->
                                     FilterChip(
                                         selected = folder.id == selectedFolder,
@@ -351,11 +364,6 @@ private fun LibraryScreen(
                                 }
                             }
                         }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }
                 },
                 scrollBehavior = scrollBehavior
