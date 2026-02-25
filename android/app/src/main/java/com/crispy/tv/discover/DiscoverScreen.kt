@@ -385,7 +385,77 @@ private fun DiscoverScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
-                title = "Discover",
+                title = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Discover",
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { activeSheet = DiscoverSheet.Type },
+                                    label = { Text(uiState.typeFilter.label) },
+                                    trailingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
+                            }
+
+                            item {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { activeSheet = DiscoverSheet.Catalog },
+                                    label = {
+                                        Text(
+                                            text = selectedCatalog?.section?.title ?: "Select catalog",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
+                            }
+
+                            if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
+                                item {
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { activeSheet = DiscoverSheet.Genre },
+                                        label = {
+                                            Text(
+                                                text = uiState.selectedGenre ?: "All genres",
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Outlined.KeyboardArrowDown,
+                                                contentDescription = null
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
                 actions = {
                     IconButton(onClick = onRefresh) {
                         Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
@@ -407,70 +477,6 @@ private fun DiscoverScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = Dimensions.SmallSpacing),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = pageHorizontalPadding)
-                ) {
-                    item {
-                        FilterChip(
-                            selected = false,
-                            onClick = { activeSheet = DiscoverSheet.Type },
-                            label = { Text(uiState.typeFilter.label) },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                    }
-
-                    item {
-                        FilterChip(
-                            selected = false,
-                            onClick = { activeSheet = DiscoverSheet.Catalog },
-                            label = {
-                                Text(
-                                    text = selectedCatalog?.section?.title ?: "Select catalog",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                    }
-
-                    if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
-                        item {
-                            FilterChip(
-                                selected = false,
-                                onClick = { activeSheet = DiscoverSheet.Genre },
-                                label = {
-                                    Text(
-                                        text = uiState.selectedGenre ?: "All genres",
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                trailingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.KeyboardArrowDown,
-                                        contentDescription = null
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
             if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

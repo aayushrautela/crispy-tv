@@ -2,6 +2,7 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -79,7 +80,24 @@ internal fun HomeScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
-                title = { CrispyWordmark(Modifier.height(36.dp)) },
+                title = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CrispyWordmark(Modifier.height(36.dp))
+
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(headerChips, key = { it }) { chipLabel ->
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {},
+                                    label = { Text(chipLabel) }
+                                )
+                            }
+                        }
+                    }
+                },
                 actions = { HomeProfileSelector() },
                 scrollBehavior = scrollBehavior
             )
@@ -95,21 +113,6 @@ internal fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
-            item(contentType = "headerChips") {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(headerChips, key = { it }) { chipLabel ->
-                        FilterChip(
-                            selected = false,
-                            onClick = {},
-                            label = { Text(chipLabel) }
-                        )
-                    }
-                }
-            }
-
             item(contentType = "hero") {
                 when {
                     heroState.isLoading && heroState.items.isEmpty() -> {
