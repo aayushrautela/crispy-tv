@@ -349,7 +349,7 @@ private fun HeroYouTubeTrailerLayer(
     val context = androidx.compose.ui.platform.LocalContext.current
     val webView = remember(trailerKey) {
         WebView(context).apply {
-            setBackgroundColor(android.graphics.Color.BLACK)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             isFocusable = false
             isFocusableInTouchMode = false
             isClickable = false
