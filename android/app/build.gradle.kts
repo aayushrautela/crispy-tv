@@ -189,6 +189,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.5.0-alpha14")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.woowla.compose.icon.collections:simpleicons:16.6.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("com.materialkolor:material-kolor:4.1.1")

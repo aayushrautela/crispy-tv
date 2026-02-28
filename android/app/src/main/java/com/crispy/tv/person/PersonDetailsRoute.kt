@@ -28,9 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AlternateEmail
-import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +58,10 @@ import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.woowla.compose.icon.collections.simpleicons.Simpleicons
+import com.woowla.compose.icon.collections.simpleicons.simpleicons.Imdb
+import com.woowla.compose.icon.collections.simpleicons.simpleicons.Instagram
+import com.woowla.compose.icon.collections.simpleicons.simpleicons.X
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -445,9 +446,9 @@ private fun PersonSocialLinks(person: PersonDetails) {
     val links =
         remember(imdbUrl, instagramUrl, twitterUrl) {
             listOfNotNull(
-                imdbUrl?.let { Link(label = "IMDb", url = it, icon = Icons.Outlined.Language) },
-                instagramUrl?.let { Link(label = "Instagram", url = it, icon = Icons.Outlined.PhotoCamera) },
-                twitterUrl?.let { Link(label = "Twitter", url = it, icon = Icons.Outlined.AlternateEmail) }
+                imdbUrl?.let { Link(label = "IMDb", url = it, icon = Simpleicons.Imdb) },
+                instagramUrl?.let { Link(label = "Instagram", url = it, icon = Simpleicons.Instagram) },
+                twitterUrl?.let { Link(label = "Twitter", url = it, icon = Simpleicons.X) }
             )
         }
 
