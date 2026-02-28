@@ -291,10 +291,7 @@ private func sourceRank(_ addonId: String, preferredAddonId: String?) -> Int {
        addonId.caseInsensitiveCompare(preferredAddonId) == .orderedSame {
         return 0
     }
-    if addonId.range(of: "cinemeta", options: [.caseInsensitive]) != nil {
-        return 1
-    }
-    return 2
+    return 1
 }
 
 private func parseYear(_ value: String?) -> Int? {

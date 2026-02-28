@@ -53,9 +53,10 @@ val introDbApiUrl =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
-val metadataAddonUrls = "stremio://v3-cinemeta.strem.io/manifest.json"
-    .replace("\\", "\\\\")
-    .replace("\"", "\\\"")
+val metadataAddonUrls =
+    (providers.gradleProperty("METADATA_ADDON_URLS").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
 
 val releaseKeystorePath = providers.gradleProperty("RELEASE_KEYSTORE_PATH").orNull
 val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASSWORD").orNull

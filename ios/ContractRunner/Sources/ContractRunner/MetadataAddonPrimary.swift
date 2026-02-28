@@ -62,9 +62,5 @@ private func sourceRank(_ addonId: String, preferredAddonId: String?) -> Int {
         return 0
     }
 
-    if addonId.range(of: "cinemeta", options: [.caseInsensitive]) != nil {
-        return 1
-    }
-
-    return 2
+    return 1
 }

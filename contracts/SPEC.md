@@ -43,7 +43,7 @@ This directory defines parity-critical behavior for the rewrite apps.
   - `year` is parsed from the first 4 digits of `release_date`/`first_air_date` when present; invalid/missing yields `null`.
 - `metadata_addon_primary`
   - Addon-first metadata merge with deterministic precedence.
-  - Source ranking is `preferred_addon_id` first, then Cinemeta, then remaining addons.
+  - Source ranking is `preferred_addon_id` first, then remaining addons in input order (stable).
 - `metadata_tmdb_enhancer`
   - TMDB may only fill missing metadata fields; it must not override addon-provided values.
   - `tmdb:*` IDs may be bridged to IMDb (`tt...`) for addon retries.

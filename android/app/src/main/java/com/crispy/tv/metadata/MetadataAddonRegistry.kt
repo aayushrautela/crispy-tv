@@ -74,14 +74,9 @@ internal class MetadataAddonRegistry(
         val now = System.currentTimeMillis()
         val installed = linkedMapOf<String, PersistedAddon>()
         val orderedInstallations = mutableListOf<String>()
-        var includesCinemeta = false
         var includesOpenSubtitles = false
 
         parsedRows.forEach { seed ->
-            includesCinemeta =
-                includesCinemeta ||
-                    seed.addonIdHint.equals(DEFAULT_CINEMETA_ADDON_ID, ignoreCase = true) ||
-                    seed.manifestUrl.contains("cinemeta", ignoreCase = true)
             includesOpenSubtitles =
                 includesOpenSubtitles ||
                     seed.addonIdHint.equals(DEFAULT_OPENSUBTITLES_ADDON_ID, ignoreCase = true) ||
@@ -119,8 +114,7 @@ internal class MetadataAddonRegistry(
 
         val nextRemovedIds =
             state.userRemovedAddonIds.filterNot { removedId ->
-                (includesCinemeta && removedId.equals(DEFAULT_CINEMETA_ADDON_ID, ignoreCase = true)) ||
-                    (includesOpenSubtitles && removedId.equals(DEFAULT_OPENSUBTITLES_ADDON_ID, ignoreCase = true))
+                includesOpenSubtitles && removedId.equals(DEFAULT_OPENSUBTITLES_ADDON_ID, ignoreCase = true)
             }.toSet()
 
         persistState(
@@ -205,7 +199,7 @@ internal class MetadataAddonRegistry(
         val userRemovedAddonIds = state.userRemovedAddonIds.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
         val defaultRemovalTargets =
-            setOf(DEFAULT_CINEMETA_ADDON_ID, DEFAULT_OPENSUBTITLES_ADDON_ID)
+            setOf(DEFAULT_OPENSUBTITLES_ADDON_ID)
                 .filter { id -> userRemovedAddonIds.any { it.equals(id, ignoreCase = true) } }
                 .toSet()
         if (defaultRemovalTargets.isNotEmpty()) {
@@ -253,17 +247,6 @@ internal class MetadataAddonRegistry(
             }
         }
 
-        val cinemetaIds =
-            installed.values
-                .filter { addon -> addon.matchesAddonId(DEFAULT_CINEMETA_ADDON_ID) }
-                .sortedWith(compareBy<PersistedAddon> { it.addedAtEpochMs }.thenBy { it.installationId })
-                .map { addon -> addon.installationId }
-        cinemetaIds.forEach { installationId ->
-            if (installationId !in orderedIds) {
-                orderedIds += installationId
-            }
-        }
-
         val opensubtitlesIds =
             installed.values
                 .filter { addon -> addon.matchesAddonId(DEFAULT_OPENSUBTITLES_ADDON_ID) }
@@ -295,12 +278,6 @@ internal class MetadataAddonRegistry(
 
         parseConfiguredManifestUrls(configuredManifestUrlsCsv).forEach(parsedSeeds::add)
 
-        if (userRemovedAddonIds.none { it.equals(DEFAULT_CINEMETA_ADDON_ID, ignoreCase = true) }) {
-            parseManifestSeed(
-                manifestUrl = DEFAULT_CINEMETA_MANIFEST,
-                addonIdHintOverride = DEFAULT_CINEMETA_ADDON_ID
-            )?.let(parsedSeeds::add)
-        }
         if (userRemovedAddonIds.none { it.equals(DEFAULT_OPENSUBTITLES_ADDON_ID, ignoreCase = true) }) {
             parseManifestSeed(
                 manifestUrl = DEFAULT_OPENSUBTITLES_MANIFEST,
@@ -417,7 +394,6 @@ internal class MetadataAddonRegistry(
 
         private const val DEFAULT_CINEMETA_ADDON_ID = "com.linvo.cinemeta"
         private const val DEFAULT_OPENSUBTITLES_ADDON_ID = "org.stremio.opensubtitlesv3"
-        private const val DEFAULT_CINEMETA_MANIFEST = "stremio://v3-cinemeta.strem.io/manifest.json"
         private const val DEFAULT_OPENSUBTITLES_MANIFEST = "stremio://opensubtitles-v3.strem.io/manifest.json"
 
         private val URI_SCHEME_REGEX = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")

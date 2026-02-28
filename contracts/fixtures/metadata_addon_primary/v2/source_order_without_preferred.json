@@ -1,10 +1,9 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "metadata_addon_primary",
-  "case_id": "preferred_addon_wins_even_if_not_cinemeta",
+  "case_id": "no_preferred_addon_prefers_source_order",
   "now_ms": 1739923200000,
   "input": {
-    "preferred_addon_id": "meta.community",
     "addon_results": [
       {
         "addon_id": "meta.community",
@@ -15,11 +14,6 @@
         "addon_id": "com.linvo.cinemeta",
         "media_id": "tt0944947",
         "title": "Game of Thrones"
-      },
-      {
-        "addon_id": "z.archive",
-        "media_id": "tt0944947",
-        "title": "GoT"
       }
     ]
   },
@@ -28,8 +22,7 @@
     "title": "Game of Thrones (Community)",
     "sources": [
       "meta.community",
-      "com.linvo.cinemeta",
-      "z.archive"
+      "com.linvo.cinemeta"
     ]
   }
 }

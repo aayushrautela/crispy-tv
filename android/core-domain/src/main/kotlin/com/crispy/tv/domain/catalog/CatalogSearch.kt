@@ -211,10 +211,7 @@ private fun sourceRank(addonId: String, preferredAddonId: String?): Int {
     if (preferredAddonId != null && addonId.equals(preferredAddonId, ignoreCase = true)) {
         return 0
     }
-    if (addonId.contains("cinemeta", ignoreCase = true)) {
-        return 1
-    }
-    return 2
+    return 1
 }
 
 private fun parseYear(value: String?): Int? {

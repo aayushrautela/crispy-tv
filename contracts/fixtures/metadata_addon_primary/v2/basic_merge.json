@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "metadata_addon_primary",
   "case_id": "basic_merge_prefers_source_order",
   "now_ms": 1739923200000,

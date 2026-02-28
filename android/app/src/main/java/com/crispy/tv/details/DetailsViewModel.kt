@@ -201,36 +201,39 @@ class DetailsViewModel internal constructor(
                 )
             }
 
-            // Phase 1d: resolve tmdb:X → IMDb BEFORE addon fetch (matching Nuvio).
-            // This ensures addons receive an IMDb ID they can look up for series.
-            val resolvedForAddon =
-                withContext(Dispatchers.IO) {
-                    resolveItemIdForAddonFetch(itemId)
-                }
-
-            val addonResult =
-                withContext(Dispatchers.IO) {
-                    homeCatalogService.loadMediaDetails(
-                        rawId = resolvedForAddon.id,
-                        preferredMediaType = resolvedForAddon.mediaTypeHint,
-                    )
-                }
-
-            val addonDetails = addonResult.details
-            val mediaTypeHint = resolvedForAddon.resolvedMediaType
-
             val tmdbResult =
                 withContext(Dispatchers.IO) {
-                    tmdbEnrichmentRepository.load(rawId = itemId, mediaTypeHint = mediaTypeHint)
+                    tmdbEnrichmentRepository.load(rawId = itemId, mediaTypeHint = requestedMediaType)
                 }
 
             val tmdbEnrichment = tmdbResult?.enrichment
             val tmdbFallbackDetails = tmdbResult?.fallbackDetails
 
+            val isMovie = requestedMediaType == MetadataLabMediaType.MOVIE
+
+            val addonResult =
+                if (!isMovie || tmdbFallbackDetails == null) {
+                    // Resolve tmdb:X → IMDb before addon fetch (matching Nuvio) so addons can look it up.
+                    val resolvedForAddon =
+                        withContext(Dispatchers.IO) {
+                            resolveItemIdForAddonFetch(itemId)
+                        }
+                    withContext(Dispatchers.IO) {
+                        homeCatalogService.loadMediaDetails(
+                            rawId = resolvedForAddon.id,
+                            preferredMediaType = resolvedForAddon.mediaTypeHint,
+                        )
+                    }
+                } else {
+                    null
+                }
+
+            val addonDetails = addonResult?.details
+
             var mergedDetails: MediaDetails? =
                 when {
-                    addonDetails != null && tmdbFallbackDetails != null ->
-                        mergeDetails(addonDetails, tmdbFallbackDetails, tmdbEnrichment)
+                    tmdbFallbackDetails != null && isMovie -> tmdbFallbackDetails
+                    addonDetails != null && tmdbFallbackDetails != null -> mergeDetails(addonDetails, tmdbFallbackDetails, tmdbEnrichment)
                     addonDetails != null -> addonDetails
                     tmdbFallbackDetails != null -> tmdbFallbackDetails
                     else -> null
@@ -264,19 +267,21 @@ class DetailsViewModel internal constructor(
                     resolveWatchCta(enrichedDetails, providerState, nowMs)
                 }
 
-            _uiState.update { state ->
-                val details = enrichedDetails
-                val firstSeason = details?.videos?.mapNotNull { it.season }?.distinct()?.minOrNull()
-                val statusMessage =
-                    when {
-                        addonResult.details != null -> addonResult.statusMessage
-                        details != null && tmdbResult != null -> ""
-                        else -> addonResult.statusMessage
-                    }
-                state.copy(
-                    isLoading = false,
-                    tmdbIsLoading = false,
-                    details = details,
+                _uiState.update { state ->
+                    val details = enrichedDetails
+                    val firstSeason = details?.videos?.mapNotNull { it.season }?.distinct()?.minOrNull()
+                    val statusMessage =
+                        when {
+                            addonResult?.details != null -> addonResult.statusMessage
+                            details != null && tmdbResult != null -> ""
+                            details != null -> ""
+                            addonResult != null -> addonResult.statusMessage
+                            else -> "Unable to load details."
+                        }
+                    state.copy(
+                        isLoading = false,
+                        tmdbIsLoading = false,
+                        details = details,
                     tmdbEnrichment = tmdbEnrichment,
                     statusMessage = statusMessage,
                     isWatched = providerState.isWatched,
