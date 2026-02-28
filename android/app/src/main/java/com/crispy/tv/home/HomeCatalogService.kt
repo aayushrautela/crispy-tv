@@ -610,8 +610,8 @@ class HomeCatalogService(
             val description = nonBlank(meta.optString("description")) ?: "No description provided."
             val rating = parseRating(meta)
             val type = nonBlank(meta.optString("type")) ?: mediaType
-            val year = extractYear(meta)
-            val genres = readStringList(meta, "genres")
+            val year = parseYear(meta)
+            val genres = parseGenres(meta)
 
             items +=
                 HomeHeroItem(
@@ -682,11 +682,17 @@ class HomeCatalogService(
     }
 
     private fun parseGenre(meta: JSONObject): String? {
-        val genres = meta.optJSONArray("genres")
-        if (genres != null && genres.length() > 0) {
-            return genres.optString(0)
+        return parseGenres(meta).firstOrNull()
+    }
+
+    private fun parseGenres(meta: JSONObject): List<String> {
+        val genres = meta.optJSONArray("genres") ?: return emptyList()
+        return buildList {
+            for (index in 0 until genres.length()) {
+                val genre = nonBlank(genres.optString(index)) ?: continue
+                add(genre)
+            }
         }
-        return null
     }
 
     private fun parseCachedManifest(raw: String?): JSONObject? {

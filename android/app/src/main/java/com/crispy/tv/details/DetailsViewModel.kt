@@ -1051,12 +1051,12 @@ class DetailsViewModel internal constructor(
                 continueEntry.progressPercent < CTA_CONTINUE_COMPLETION_PERCENT
 
         if (canContinue) {
+            val continueSeason = continueEntry.season
+            val continueEpisode = continueEntry.episode
             val label =
                 if (isSeries) {
-                    val season = continueEntry.season
-                    val episode = continueEntry.episode
-                    if (season != null && episode != null) {
-                        "Continue (S$season E$episode)"
+                    if (continueSeason != null && continueEpisode != null) {
+                        "Continue (S$continueSeason E$continueEpisode)"
                     } else {
                         "Continue"
                     }
@@ -1073,11 +1073,11 @@ class DetailsViewModel internal constructor(
                 }
 
             val continueVideoId =
-                if (isSeries && continueEntry.season != null && continueEntry.episode != null) {
+                if (isSeries && continueSeason != null && continueEpisode != null) {
                     buildEpisodeLookupId(
                         details = details,
-                        season = continueEntry.season,
-                        episode = continueEntry.episode,
+                        season = continueSeason,
+                        episode = continueEpisode,
                     )
                 } else {
                     null
