@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
@@ -39,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -106,50 +105,50 @@ private fun SearchScreen(
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "Search",
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
+
+                            TextField(
+                                value = uiState.query,
+                                onValueChange = onQueryChange,
+                                modifier = Modifier.weight(1f).height(Dimensions.SearchBarPillHeight),
+                                singleLine = true,
+                                placeholder = { Text("Search") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Search,
+                                        contentDescription = null
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (uiState.query.isNotBlank()) {
+                                        IconButton(onClick = onClearQuery) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Clear,
+                                                contentDescription = "Clear"
+                                            )
+                                        }
+                                    }
+                                },
+                                shape = MaterialTheme.shapes.extraLarge,
+                                colors =
+                                    TextFieldDefaults.colors(
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        disabledIndicatorColor = Color.Transparent,
+                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                                    )
                             )
                         }
-
-                        TextField(
-                            value = uiState.query,
-                            onValueChange = onQueryChange,
-                            modifier = Modifier.fillMaxWidth().height(Dimensions.SearchBarPillHeight),
-                            singleLine = true,
-                            placeholder = { Text("Search") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Search,
-                                    contentDescription = null
-                                )
-                            },
-                            trailingIcon = {
-                                if (uiState.query.isNotBlank()) {
-                                    IconButton(onClick = onClearQuery) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Clear,
-                                            contentDescription = "Clear"
-                                        )
-                                    }
-                                }
-                            },
-                            shape = MaterialTheme.shapes.extraLarge,
-                            colors =
-                                TextFieldDefaults.colors(
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    disabledIndicatorColor = Color.Transparent,
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                                )
-                        )
 
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
@@ -163,14 +162,6 @@ private fun SearchScreen(
                                 )
                             }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Outlined.ArrowBack,
-                            contentDescription = "Back"
-                        )
                     }
                 }
             )

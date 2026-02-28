@@ -20,53 +20,24 @@ class TmdbSearchRepository(
             return emptyList()
         }
 
-        val excludePeopleFromAll = filter == SearchTypeFilter.ALL
+        val requestQuery =
+            mapOf(
+                "query" to trimmedQuery,
+                "page" to "1",
+                "include_adult" to "false",
+                "language" to languageTag
+            )
 
-        val (path, mediaTypeHint) =
-            when (filter) {
-                SearchTypeFilter.ALL -> "search/multi" to null
-                SearchTypeFilter.MOVIES -> "search/movie" to "movie"
-                SearchTypeFilter.SERIES -> "search/tv" to "tv"
-                SearchTypeFilter.PEOPLE -> "search/person" to "person"
-            }
-
-        val json =
-            tmdbClient.getJson(
-                path = path,
-                query =
-                    mapOf(
-                        "query" to trimmedQuery,
-                        "page" to "1",
-                        "include_adult" to "false",
-                        "language" to languageTag
-                    )
-            ) ?: return emptyList()
-
-        val resultsArray = json.optJSONArray("results") ?: JSONArray()
         val inputs =
-            buildList {
-                for (i in 0 until resultsArray.length()) {
-                    val result = resultsArray.optJSONObject(i) ?: continue
-                    val mediaType = result.optStringOrNull("media_type") ?: mediaTypeHint ?: continue
-
-                    if (excludePeopleFromAll && mediaType.equals("person", ignoreCase = true)) {
-                        continue
-                    }
-
-                    add(
-                        TmdbSearchResultInput(
-                            mediaType = mediaType,
-                            id = result.optInt("id", 0),
-                            title = result.optStringOrNull("title"),
-                            name = result.optStringOrNull("name"),
-                            releaseDate = result.optStringOrNull("release_date"),
-                            firstAirDate = result.optStringOrNull("first_air_date"),
-                            posterPath = result.optStringOrNull("poster_path") ?: result.optStringOrNull("backdrop_path"),
-                            profilePath = result.optStringOrNull("profile_path"),
-                            voteAverage = result.optDoubleOrNull("vote_average")
-                        )
-                    )
+            when (filter) {
+                SearchTypeFilter.ALL -> {
+                    val movies = fetchInputs(path = "search/movie", mediaTypeHint = "movie", query = requestQuery)
+                    val series = fetchInputs(path = "search/tv", mediaTypeHint = "tv", query = requestQuery)
+                    interleave(movies, series)
                 }
+                SearchTypeFilter.MOVIES -> fetchInputs(path = "search/movie", mediaTypeHint = "movie", query = requestQuery)
+                SearchTypeFilter.SERIES -> fetchInputs(path = "search/tv", mediaTypeHint = "tv", query = requestQuery)
+                SearchTypeFilter.PEOPLE -> fetchInputs(path = "search/person", mediaTypeHint = "person", query = requestQuery)
             }
 
         val normalized = normalizeTmdbSearchResults(inputs)
@@ -84,6 +55,47 @@ class TmdbSearchRepository(
                 genre = null
             )
         }
+    }
+
+    private suspend fun fetchInputs(
+        path: String,
+        mediaTypeHint: String?,
+        query: Map<String, String?>
+    ): List<TmdbSearchResultInput> {
+        val json = tmdbClient.getJson(path = path, query = query) ?: return emptyList()
+        val resultsArray = json.optJSONArray("results") ?: JSONArray()
+        return buildList {
+            for (i in 0 until resultsArray.length()) {
+                val result = resultsArray.optJSONObject(i) ?: continue
+                val mediaType = result.optStringOrNull("media_type") ?: mediaTypeHint ?: continue
+                add(
+                    TmdbSearchResultInput(
+                        mediaType = mediaType,
+                        id = result.optInt("id", 0),
+                        title = result.optStringOrNull("title"),
+                        name = result.optStringOrNull("name"),
+                        releaseDate = result.optStringOrNull("release_date"),
+                        firstAirDate = result.optStringOrNull("first_air_date"),
+                        posterPath = result.optStringOrNull("poster_path") ?: result.optStringOrNull("backdrop_path"),
+                        profilePath = result.optStringOrNull("profile_path"),
+                        voteAverage = result.optDoubleOrNull("vote_average")
+                    )
+                )
+            }
+        }
+    }
+
+    private fun <T> interleave(a: List<T>, b: List<T>): List<T> {
+        if (a.isEmpty()) return b
+        if (b.isEmpty()) return a
+
+        val out = ArrayList<T>(a.size + b.size)
+        val max = maxOf(a.size, b.size)
+        for (i in 0 until max) {
+            if (i < a.size) out.add(a[i])
+            if (i < b.size) out.add(b[i])
+        }
+        return out
     }
 
     private fun JSONObject.optStringOrNull(key: String): String? {
