@@ -1,5 +1,10 @@
 package com.crispy.tv.person
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,9 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,12 +26,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material.icons.outlined.AlternateEmail
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -79,18 +84,36 @@ fun PersonDetailsRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PersonDetailsScreen(
     uiState: PersonDetailsUiState,
     onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scrollTopBarAlpha by remember {
+        androidx.compose.runtime.derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                (listState.firstVisibleItemScrollOffset / 420f).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val topBarAlpha = if (uiState.person != null) scrollTopBarAlpha else 1f
+    val containerColor = MaterialTheme.colorScheme.background.copy(alpha = topBarAlpha)
+    val contentColor =
+        androidx.compose.ui.graphics.lerp(
+            Color.White,
+            MaterialTheme.colorScheme.onBackground,
+            topBarAlpha
+        )
+
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    LoadingIndicator()
+                    androidx.compose.material3.CircularProgressIndicator()
                 }
             }
 
@@ -98,6 +121,7 @@ private fun PersonDetailsScreen(
                 PersonDetailsContent(
                     person = uiState.person,
                     onItemClick = onItemClick,
+                    listState = listState,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -109,7 +133,31 @@ private fun PersonDetailsScreen(
             }
         }
 
-        FloatingBackButton(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+        androidx.compose.material3.TopAppBar(
+            title = {
+                Text(
+                    text = if (topBarAlpha > 0.65f) uiState.person?.name.orEmpty() else "",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+            },
+            windowInsets = androidx.compose.material3.TopAppBarDefaults.windowInsets,
+            colors =
+                androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = containerColor,
+                    titleContentColor = contentColor,
+                    navigationIconContentColor = contentColor,
+                    actionIconContentColor = contentColor
+                )
+        )
     }
 }
 
@@ -117,10 +165,16 @@ private fun PersonDetailsScreen(
 private fun PersonDetailsContent(
     person: PersonDetails,
     onItemClick: (CatalogItem) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = modifier.imePadding(),
+        state = listState,
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.background)
+                .navigationBarsPadding()
+                .imePadding(),
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
         item(key = "hero") {
@@ -136,6 +190,7 @@ private fun PersonDetailsContent(
 @Composable
 private fun PersonHero(person: PersonDetails) {
     val heroShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+    val horizontalPadding = responsivePageHorizontalPadding()
 
     Box(
         modifier =
@@ -166,6 +221,18 @@ private fun PersonHero(person: PersonDetails) {
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.55f),
+                            0.38f to Color.Transparent
+                        )
+                    )
+        )
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
                             colors =
                                 listOf(
                                     Color.Transparent,
@@ -176,25 +243,97 @@ private fun PersonHero(person: PersonDetails) {
                     )
         )
 
-        Column(
+        Row(
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
-                    .padding(horizontal = responsivePageHorizontalPadding(), vertical = 24.dp)
+                    .padding(horizontal = horizontalPadding, vertical = 24.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = person.name,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold
+            PersonCookieImage(
+                profileUrl = person.profileUrl,
+                contentDescription = person.name,
+                modifier = Modifier.size(width = 96.dp, height = 128.dp)
             )
-            person.knownForDepartment?.takeIf { it.isNotBlank() }?.let { dept ->
-                Spacer(modifier = Modifier.height(6.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = dept,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+                    text = person.name,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold
                 )
+                person.knownForDepartment?.takeIf { it.isNotBlank() }?.let { dept ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = dept,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun PersonCookieImage(
+    profileUrl: String?,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    animate: Boolean = true
+) {
+    val cookieShape =
+        RoundedCornerShape(
+            topStart = 28.dp,
+            bottomStart = 28.dp,
+            topEnd = 12.dp,
+            bottomEnd = 12.dp
+        )
+
+    val rotation =
+        rememberInfiniteTransition().animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(durationMillis = 90_000, easing = LinearEasing)
+                )
+        )
+
+    val shouldAnimate = animate && !profileUrl.isNullOrBlank()
+
+    Surface(
+        modifier =
+            modifier
+                .graphicsLayer {
+                    rotationZ = if (shouldAnimate) rotation.value else 0f
+                },
+        shape = cookieShape,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+        tonalElevation = 4.dp,
+        shadowElevation = 6.dp
+    ) {
+        if (profileUrl.isNullOrBlank()) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        } else {
+            AsyncImage(
+                model = profileUrl,
+                contentDescription = contentDescription,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // Counter-rotate so the photo stays upright.
+                            rotationZ = if (shouldAnimate) -rotation.value else 0f
+                        }
+            )
         }
     }
 }
@@ -239,10 +378,10 @@ private fun PersonBody(
             Spacer(modifier = Modifier.height(6.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 if (born != null) {
-                    PersonMeta(label = "BORN", value = born, modifier = Modifier.weight(1f, fill = false))
+                    PersonMeta(label = "BORN", value = born, modifier = Modifier.weight(1f))
                 }
                 if (from != null) {
-                    PersonMeta(label = "FROM", value = from, modifier = Modifier.weight(1f, fill = false))
+                    PersonMeta(label = "FROM", value = from, modifier = Modifier.weight(1f))
                 }
             }
             Spacer(modifier = Modifier.height(18.dp))
@@ -295,12 +434,18 @@ private fun PersonSocialLinks(person: PersonDetails) {
         person.instagramId?.trim()?.takeIf { it.isNotBlank() }?.let { "https://www.instagram.com/$it/" }
     val twitterUrl = person.twitterId?.trim()?.takeIf { it.isNotBlank() }?.let { "https://twitter.com/$it" }
 
+    data class Link(
+        val label: String,
+        val url: String,
+        val icon: androidx.compose.ui.graphics.vector.ImageVector
+    )
+
     val links =
         remember(imdbUrl, instagramUrl, twitterUrl) {
             listOfNotNull(
-                imdbUrl?.let { "IMDb" to it },
-                instagramUrl?.let { "Instagram" to it },
-                twitterUrl?.let { "Twitter" to it }
+                imdbUrl?.let { Link(label = "IMDb", url = it, icon = Icons.Outlined.Language) },
+                instagramUrl?.let { Link(label = "Instagram", url = it, icon = Icons.Outlined.PhotoCamera) },
+                twitterUrl?.let { Link(label = "Twitter", url = it, icon = Icons.Outlined.AlternateEmail) }
             )
         }
 
@@ -309,30 +454,19 @@ private fun PersonSocialLinks(person: PersonDetails) {
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        links.forEach { (label, url) ->
-            OutlinedButton(
-                onClick = { uriHandler.openUri(url) },
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                colors =
-                    ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onBackground
-                    )
+        links.forEach { link ->
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             ) {
-                Text(text = label, style = MaterialTheme.typography.labelLarge)
+                IconButton(
+                    onClick = { uriHandler.openUri(link.url) },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(imageVector = link.icon, contentDescription = link.label)
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun FloatingBackButton(onBack: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.padding(16.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-    ) {
-        IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
-            Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
         }
     }
 }
