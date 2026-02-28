@@ -748,8 +748,8 @@ private fun parseBestTitleLogoUrl(images: JSONObject?, preferredLanguage: String
                 val langScore =
                     when {
                         preferredBase.isNotBlank() && iso == preferredBase -> 3
-                        iso == null -> 2
-                        iso == "en" -> 1
+                        iso == "en" -> 2
+                        iso == null -> 1
                         else -> 0
                     }
                 LogoCandidate(
