@@ -38,7 +38,7 @@ data class PersonDetailsUiState(
     val errorMessage: String? = null
 )
 
-class PersonDetailsViewModel(
+class PersonDetailsViewModel internal constructor(
     private val personId: String,
     private val tmdbClient: TmdbJsonClient,
     private val localeProvider: () -> Locale = { Locale.getDefault() }
