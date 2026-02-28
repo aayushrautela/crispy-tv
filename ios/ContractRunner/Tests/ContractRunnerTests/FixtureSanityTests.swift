@@ -9,8 +9,6 @@ final class FixtureSanityTests: XCTestCase {
             "id_prefixes",
             "catalog_url_building",
             "search_ranking_and_dedup",
-            "metadata_addon_primary",
-            "metadata_tmdb_enhancer",
             "sync_planner",
             "storage_v1",
         ]

@@ -1,6 +1,7 @@
 package com.crispy.tv.details
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,6 +77,7 @@ internal fun DetailsBody(
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onItemClick: (String, String) -> Unit,
+    onPersonClick: (String) -> Unit = {},
     onEpisodeClick: (videoId: String) -> Unit = {},
 ) {
     val details = uiState.details
@@ -273,23 +276,10 @@ internal fun DetailsBody(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(items = tmdbCast, key = { it.id }) { member ->
-                    TmdbCastCard(member = member)
-                }
-            }
-        } else if (details.cast.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "Cast",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            LazyRow(
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(details.cast.take(24)) { name ->
-                    SimpleCastItem(name = name)
+                    TmdbCastCard(
+                        member = member,
+                        onClick = { onPersonClick(member.id.toString()) }
+                    )
                 }
             }
         }
@@ -317,7 +307,7 @@ internal fun DetailsBody(
             }
         }
 
-        val production = tmdb?.production.orEmpty()
+        val production = tmdb?.production.orEmpty().filter { !it.logoUrl.isNullOrBlank() }
         if (production.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
@@ -336,7 +326,7 @@ internal fun DetailsBody(
             }
         }
 
-        if (details.mediaType == "series" && details.videos.isNotEmpty()) {
+        if (details.mediaType == "series" && uiState.seasons.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
             Text(
                 text = "Episodes",
@@ -361,23 +351,51 @@ internal fun DetailsBody(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
                 val episodes =
-                    details.videos
-                        .filter { it.season == selectedSeason }
+                    uiState.seasonEpisodes
                         .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
                         .take(50)
 
-                Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(
-                    contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(items = episodes, key = { it.id }) { video ->
-                        EpisodeCard(
-                            video = video,
-                            modifier = Modifier.width(280.dp),
-                            onClick = { onEpisodeClick(video.id) }
+                when {
+                    uiState.episodesIsLoading && episodes.isEmpty() -> {
+                        Row(
+                            modifier = Modifier.padding(horizontal = horizontalPadding),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text(
+                                text = "Loading episodes...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    uiState.episodesStatusMessage.isNotBlank() && episodes.isEmpty() -> {
+                        Text(
+                            text = uiState.episodesStatusMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = horizontalPadding)
                         )
+                    }
+
+                    episodes.isNotEmpty() -> {
+                        LazyRow(
+                            contentPadding = contentPadding,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(items = episodes, key = { it.id }) { video ->
+                                EpisodeCard(
+                                    video = video,
+                                    modifier = Modifier.width(280.dp),
+                                    onClick = { onEpisodeClick(video.id) }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -468,10 +486,14 @@ internal fun DetailsBody(
 @Composable
 private fun TmdbCastCard(
     member: TmdbCastMember,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
     Column(
-        modifier = modifier.width(100.dp),
+        modifier =
+            modifier
+                .width(100.dp)
+                .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -684,40 +706,28 @@ private fun TmdbProductionCard(
     entity: TmdbProductionEntity,
     modifier: Modifier = Modifier
 ) {
-    ElevatedCard(modifier = modifier.width(160.dp)) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                val logo = entity.logoUrl?.trim().orEmpty()
-                if (logo.isNotBlank()) {
-                    AsyncImage(
-                        model = logo,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.Center
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                }
-            }
+    val logo = entity.logoUrl?.trim().orEmpty()
+    if (logo.isBlank()) return
 
-            Text(
-                text = entity.name,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+    Surface(
+        modifier = modifier
+            .width(160.dp)
+            .height(56.dp),
+        shape = MaterialTheme.shapes.large,
+        color = Color(0xFFF7F3EA)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = logo,
+                contentDescription = entity.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.Center
             )
         }
     }

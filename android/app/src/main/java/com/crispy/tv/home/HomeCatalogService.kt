@@ -3,6 +3,7 @@ package com.crispy.tv.home
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Immutable
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -12,6 +13,7 @@ import com.crispy.tv.domain.catalog.CatalogRequestInput
 import com.crispy.tv.domain.catalog.buildCatalogRequestUrls
 import com.crispy.tv.metadata.AddonManifestSeed
 import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
@@ -27,9 +29,6 @@ import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import com.crispy.tv.metadata.TmdbImdbIdResolver
 import java.util.Locale
 
 @Immutable
@@ -76,12 +75,6 @@ data class ContinueWatchingLoadResult(
     val statusMessage: String = ""
 )
 
-data class MediaDetailsLoadResult(
-    val details: MediaDetails? = null,
-    val statusMessage: String = "",
-    val attemptedUrls: List<String> = emptyList()
-)
-
 data class MediaDetails(
     val id: String,
     val imdbId: String?,
@@ -117,7 +110,8 @@ class HomeCatalogService(
     context: Context,
     addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,
-    private val tmdbImdbIdResolver: TmdbImdbIdResolver? = null,
+    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository =
+        TmdbEnrichmentRepository(apiKey = BuildConfig.TMDB_API_KEY, httpClient = httpClient),
 ) {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
@@ -208,14 +202,13 @@ class HomeCatalogService(
             return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
         }
 
-        val resolvedAddons = resolveAddons()
         val items = coroutineScope {
             dedupedEntries.map { entry ->
                 async(Dispatchers.IO) {
                     metaResolveSemaphore.acquire()
                     try {
                         val mediaType = entry.asCatalogMediaType()
-                        val resolvedMeta = resolveContinueWatchingMeta(entry, mediaType, resolvedAddons)
+                        val resolvedMeta = resolveContinueWatchingMeta(entry)
                         ContinueWatchingItem(
                             id = continueWatchingKey(entry),
                             contentId = entry.contentId,
@@ -260,7 +253,6 @@ class HomeCatalogService(
             return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
         }
 
-        val resolvedAddons = resolveAddons()
         val items = coroutineScope {
             dedupedEntries.map { entry ->
                 async(Dispatchers.IO) {
@@ -275,7 +267,7 @@ class HomeCatalogService(
                             watchedAtEpochMs = entry.lastUpdatedEpochMs
                         )
                         val mediaType = fakeWatchEntry.asCatalogMediaType()
-                        val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry, mediaType, resolvedAddons)
+                        val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry)
                         ContinueWatchingItem(
                             id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
                             contentId = entry.contentId,
@@ -424,66 +416,6 @@ class HomeCatalogService(
         }
 
         return catalogs to ""
-    }
-
-    suspend fun loadMediaDetails(
-        rawId: String,
-        preferredAddonId: String? = null,
-        preferredMediaType: String? = null
-    ): MediaDetailsLoadResult {
-        val requestedId = rawId.trim()
-        if (requestedId.isBlank()) {
-            return MediaDetailsLoadResult(statusMessage = "Missing content id.")
-        }
-
-        val seeds = addonRegistry.orderedSeeds()
-        if (seeds.isEmpty()) {
-            return MediaDetailsLoadResult(statusMessage = "No installed addons available.")
-        }
-
-        val mediaTypesToTry = buildMediaTypesToTry(preferredMediaType)
-        val lookupIds = lookupIdsForContinueWatching(requestedId, preferredMediaType)
-        if (lookupIds.isEmpty()) {
-            return MediaDetailsLoadResult(statusMessage = "Missing content id.")
-        }
-
-        val orderedSeeds =
-            if (preferredAddonId.isNullOrBlank()) {
-                seeds
-            } else {
-                seeds.sortedBy { seed ->
-                    if (seed.addonIdHint.equals(preferredAddonId, ignoreCase = true)) 0 else 1
-                }
-            }
-
-        val attemptedUrls = mutableListOf<String>()
-        for (mediaType in mediaTypesToTry) {
-            for (seed in orderedSeeds) {
-                for (lookupId in lookupIds) {
-                    val url = buildMetaUrl(seed = seed, mediaType = mediaType, lookupId = lookupId)
-                    attemptedUrls += url
-                    val response = httpGetJson(url) ?: continue
-                    val meta = response.optJSONObject("meta") ?: continue
-                    val parsed =
-                        parseMediaDetails(
-                            meta = meta,
-                            fallbackId = lookupId,
-                            fallbackMediaType = mediaType,
-                            addonId = seed.addonIdHint
-                        ) ?: continue
-                    return MediaDetailsLoadResult(
-                        details = parsed,
-                        statusMessage = "",
-                        attemptedUrls = attemptedUrls
-                    )
-                }
-            }
-        }
-
-        return MediaDetailsLoadResult(
-            statusMessage = "No metadata found for $requestedId.",
-            attemptedUrls = attemptedUrls
-        )
     }
 
     suspend fun fetchCatalogPage(
@@ -792,279 +724,44 @@ class HomeCatalogService(
             )
     }
 
-    private suspend fun resolveContinueWatchingMeta(
-        entry: WatchHistoryEntry,
-        mediaType: String,
-        resolvedAddons: List<ResolvedAddon>
-    ): ContinueWatchingMeta? {
-        val lookupIds = lookupIdsForContinueWatching(entry.contentId, mediaType)
-        if (lookupIds.isEmpty()) {
+    private suspend fun resolveContinueWatchingMeta(entry: WatchHistoryEntry): ContinueWatchingMeta? {
+        val rawId = entry.contentId.trim()
+        if (rawId.isBlank()) {
             return null
         }
 
-        for (lookupId in lookupIds) {
-            val cached = readCachedContinueWatchingMeta(cacheKey = continueWatchingCacheKey(mediaType, lookupId))
-            if (cached != null) {
-                return cached
-            }
+        val episodeMatch = EPISODE_SUFFIX_REGEX.matchEntire(rawId)
+        val baseId = episodeMatch?.groupValues?.get(1)?.trim().orEmpty().ifBlank { rawId }
+        val mediaType = entry.asCatalogMediaType()
+        val cacheKey = continueWatchingCacheKey(mediaType = mediaType, contentId = baseId)
+
+        val cached = readCachedContinueWatchingMeta(cacheKey = cacheKey)
+        if (cached != null) {
+            return cached
         }
 
-        for (addon in resolvedAddons) {
-            for (lookupId in lookupIds) {
-                val response =
-                    fetchAddonMeta(
-                        seed = addon.seed,
-                        mediaType = mediaType,
-                        lookupId = lookupId
-                    ) ?: continue
-                val meta = response.optJSONObject("meta") ?: continue
-                val resolved =
-                    ContinueWatchingMeta(
-                        title =
-                            nonBlank(meta.optString("name"))
-                                ?: nonBlank(meta.optString("title"))
-                                ?: nonBlank(entry.title),
-                        backdropUrl = nonBlank(meta.optString("background")),
-                        posterUrl = nonBlank(meta.optString("poster")),
-                        logoUrl = nonBlank(meta.optString("logo")),
-                        addonId = addon.addonId
-                    )
-                if (!resolved.hasDisplayData()) {
-                    continue
-                }
+        val details =
+            runCatching {
+                tmdbEnrichmentRepository.loadArtwork(
+                    rawId = baseId,
+                    mediaTypeHint = entry.contentType,
+                )
+            }.getOrNull() ?: return null
 
-                for (candidateLookupId in lookupIds) {
-                    cacheContinueWatchingMeta(
-                        cacheKey = continueWatchingCacheKey(mediaType, candidateLookupId),
-                        value = resolved
-                    )
-                }
-                return resolved
-            }
-        }
-
-        return null
-    }
-
-    private suspend fun fetchAddonMeta(seed: AddonManifestSeed, mediaType: String, lookupId: String): JSONObject? {
-        return httpGetJson(buildMetaUrl(seed = seed, mediaType = mediaType, lookupId = lookupId))
-    }
-
-    private fun buildMetaUrl(seed: AddonManifestSeed, mediaType: String, lookupId: String): String {
-        val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
-        return buildString {
-            append(seed.baseUrl.trimEnd('/'))
-            append("/meta/")
-            append(mediaType)
-            append('/')
-            append(encodedId)
-            append(".json")
-            if (!seed.encodedQuery.isNullOrBlank()) {
-                append('?')
-                append(seed.encodedQuery)
-            }
-        }
-    }
-
-    private fun buildMediaTypesToTry(preferred: String?): List<String> {
-        val normalized = preferred?.trim()?.lowercase(Locale.US)
-        return when (normalized) {
-            "movie" -> listOf("movie", "series")
-            "series" -> listOf("series", "movie")
-            else -> listOf("movie", "series")
-        }
-    }
-
-    private fun parseMediaDetails(
-        meta: JSONObject,
-        fallbackId: String,
-        fallbackMediaType: String,
-        addonId: String
-    ): MediaDetails? {
-        val id = nonBlank(meta.optString("id")) ?: fallbackId
-        val imdbId =
-            normalizeImdbId(
-                nonBlank(meta.optString("imdbId"))
-                    ?: nonBlank(meta.optString("imdb_id"))
-                    ?: nonBlank(meta.optString("imdb"))
+        val resolved =
+            ContinueWatchingMeta(
+                title = nonBlank(details.title) ?: nonBlank(entry.title),
+                backdropUrl = details.backdropUrl,
+                posterUrl = details.posterUrl,
+                logoUrl = details.logoUrl,
+                addonId = details.addonId ?: "tmdb",
             )
-        val mediaType =
-            nonBlank(meta.optString("type"))?.lowercase(Locale.US)
-                ?: fallbackMediaType.lowercase(Locale.US)
-        if (mediaType != "movie" && mediaType != "series") {
+        if (!resolved.hasDisplayData()) {
             return null
         }
 
-        val title = nonBlank(meta.optString("name")) ?: nonBlank(meta.optString("title")) ?: id
-        val posterUrl = nonBlank(meta.optString("poster"))
-        val backdropUrl = nonBlank(meta.optString("background")) ?: posterUrl
-        val logoUrl = nonBlank(meta.optString("logo"))
-        val description = nonBlank(meta.optString("description"))
-        val genres = readStringList(meta, "genres")
-        val runtime = nonBlank(meta.optString("runtime"))
-        val year = extractYear(meta)
-        val certification =
-            nonBlank(meta.optString("certification"))
-                ?: nonBlank(meta.optString("mpaaRating"))
-                ?: nonBlank(meta.optString("ageRating"))
-        val rating = parseMetaRating(meta)
-        val cast = readStringList(meta, "cast")
-        val directors = readStringList(meta, "director").ifEmpty { readStringList(meta, "directors") }
-        val creators = readStringList(meta, "creators").ifEmpty { readStringList(meta, "creator") }
-        val videos = parseVideos(meta)
-
-        return MediaDetails(
-            id = id,
-            imdbId = imdbId,
-            mediaType = mediaType,
-            title = title,
-            posterUrl = posterUrl,
-            backdropUrl = backdropUrl,
-            logoUrl = logoUrl,
-            description = description,
-            genres = genres,
-            year = year,
-            runtime = runtime,
-            certification = certification,
-            rating = rating,
-            cast = cast,
-            directors = directors,
-            creators = creators,
-            videos = videos,
-            addonId = addonId
-        )
-    }
-
-    private fun parseMetaRating(meta: JSONObject): String? {
-        val value = meta.opt("imdbRating") ?: meta.opt("rating") ?: return null
-        return when (value) {
-            is Number -> String.format(Locale.US, "%.1f", value.toDouble())
-            else -> nonBlank(value.toString())
-        }
-    }
-
-    private fun extractYear(meta: JSONObject): String? {
-        val yearInt = meta.optInt("year", 0)
-        if (yearInt in 1800..2200) {
-            return yearInt.toString()
-        }
-
-        val candidates =
-            listOf(
-                nonBlank(meta.optString("releaseInfo")),
-                nonBlank(meta.optString("released")),
-                nonBlank(meta.optString("releaseDate"))
-            ).filterNotNull()
-
-        val regex = Regex("\\b(19\\d{2}|20\\d{2})\\b")
-        return candidates.firstNotNullOfOrNull { text ->
-            regex.find(text)?.value
-        }
-    }
-
-    private fun readStringList(meta: JSONObject, key: String): List<String> {
-        val value = meta.opt(key) ?: return emptyList()
-        return when (value) {
-            is JSONArray -> {
-                buildList {
-                    for (index in 0 until value.length()) {
-                        nonBlank(value.optString(index))?.let { add(it) }
-                    }
-                }
-            }
-
-            is String -> listOfNotNull(nonBlank(value))
-            else -> emptyList()
-        }
-    }
-
-    private fun parseVideos(meta: JSONObject): List<MediaVideo> {
-        val array = meta.optJSONArray("videos") ?: return emptyList()
-        val videos =
-            buildList {
-                for (index in 0 until array.length()) {
-                    val item = array.optJSONObject(index) ?: continue
-                    val id = nonBlank(item.optString("id")) ?: continue
-                    val title = nonBlank(item.optString("title")) ?: nonBlank(item.optString("name")) ?: id
-                    val season = item.optInt("season", 0).takeIf { it > 0 }
-                    val episode = item.optInt("episode", 0).takeIf { it > 0 }
-                    val released = nonBlank(item.optString("released"))
-                    val overview = nonBlank(item.optString("overview"))
-                    val thumbnailUrl =
-                        nonBlank(item.optString("thumbnail"))
-                            ?: nonBlank(item.optString("poster"))
-                            ?: nonBlank(item.optString("background"))
-                    add(
-                        MediaVideo(
-                            id = id,
-                            title = title,
-                            season = season,
-                            episode = episode,
-                            released = released,
-                            overview = overview,
-                            thumbnailUrl = thumbnailUrl
-                        )
-                    )
-                }
-            }
-        return videos.sortedWith(
-            compareBy<MediaVideo> { it.season ?: Int.MAX_VALUE }
-                .thenBy { it.episode ?: Int.MAX_VALUE }
-                .thenBy { it.title.lowercase(Locale.US) }
-        )
-    }
-
-    private suspend fun lookupIdsForContinueWatching(contentId: String, mediaTypeHint: String? = null): List<String> {
-        val normalized = contentId.trim()
-        if (normalized.isEmpty()) {
-            return emptyList()
-        }
-
-        // Strip episode suffix to get base content ID (e.g. "tt1234567:1:3" → "tt1234567")
-        val episodeMatch = EPISODE_SUFFIX_REGEX.matchEntire(normalized)
-        val base = episodeMatch?.groupValues?.get(1) ?: normalized
-
-        val ids = mutableListOf<String>()
-        val lowered = base.lowercase(Locale.US)
-
-        if (lowered.startsWith("tt") && lowered.length >= 4) {
-            // IMDb ID — addons prefer IMDb, put it first. Optionally add TMDB variant.
-            ids += base
-            val tmdbResult = tmdbImdbIdResolver?.resolveTmdbFromImdb(base)
-            if (tmdbResult != null) {
-                ids += "tmdb:${tmdbResult.tmdbId}"
-            }
-        } else if (lowered.startsWith("tmdb:")) {
-            // TMDB ID — resolve to IMDb first (addon priority), keep TMDB as fallback.
-            val hintLabType = when (mediaTypeHint?.trim()?.lowercase(Locale.US)) {
-                "movie" -> MetadataLabMediaType.MOVIE
-                "series", "show", "tv" -> MetadataLabMediaType.SERIES
-                else -> null
-            }
-            // Try to resolve IMDb (series first — that's the main bug area)
-            val typesToTry = when (hintLabType) {
-                MetadataLabMediaType.SERIES -> listOf(MetadataLabMediaType.SERIES)
-                MetadataLabMediaType.MOVIE -> listOf(MetadataLabMediaType.MOVIE)
-                null -> listOf(MetadataLabMediaType.SERIES, MetadataLabMediaType.MOVIE)
-            }
-            for (type in typesToTry) {
-                val imdb = tmdbImdbIdResolver?.resolveImdbId(base, type)
-                if (imdb != null) {
-                    ids += imdb
-                    break
-                }
-            }
-            ids += base
-        } else {
-            ids += base
-        }
-
-        // If original had episode suffix, prepend the full episode-specific ID
-        if (base != normalized && normalized !in ids) {
-            ids.add(0, normalized)
-        }
-
-        return ids.distinct()
+        cacheContinueWatchingMeta(cacheKey = cacheKey, value = resolved)
+        return resolved
     }
 
     private fun continueWatchingCacheKey(mediaType: String, contentId: String): String {

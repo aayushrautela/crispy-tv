@@ -17,6 +17,7 @@ fun DetailsRoute(
     mediaType: String,
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit = { _, _ -> },
+    onPersonClick: (String) -> Unit = {},
     onOpenPlayer: (String, String, PlaybackIdentity) -> Unit = { _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
@@ -59,6 +60,7 @@ fun DetailsRoute(
         uiState = uiState,
         onBack = onBack,
         onItemClick = onItemClick,
+        onPersonClick = onPersonClick,
         onRetry = viewModel::reload,
         onSeasonSelected = viewModel::onSeasonSelected,
         onOpenStreamSelector = viewModel::onOpenStreamSelector,

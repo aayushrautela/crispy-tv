@@ -38,41 +38,6 @@ data class MetadataRecord(
     val videos: List<MetadataVideo>
 )
 
-fun needsTmdbMetaEnrichment(meta: MetadataRecord, mediaType: MetadataMediaType): Boolean {
-    if (meta.castWithDetails.isEmpty()) {
-        return true
-    }
-    if (meta.similar.isEmpty()) {
-        return true
-    }
-    return mediaType == MetadataMediaType.MOVIE && meta.collectionItems.isEmpty()
-}
-
-fun mergeAddonAndTmdbMeta(
-    addonMeta: MetadataRecord,
-    tmdbMeta: MetadataRecord?,
-    mediaType: MetadataMediaType
-): MetadataRecord {
-    if (tmdbMeta == null) {
-        return addonMeta
-    }
-
-    return addonMeta.copy(
-        id = addonMeta.id.ifBlank { tmdbMeta.id },
-        imdbId = addonMeta.imdbId.nonBlankOrNull() ?: tmdbMeta.imdbId.nonBlankOrNull(),
-        cast = addonMeta.cast.ifEmpty { tmdbMeta.cast },
-        director = addonMeta.director.ifEmpty { tmdbMeta.director },
-        castWithDetails = addonMeta.castWithDetails.ifEmpty { tmdbMeta.castWithDetails },
-        similar = addonMeta.similar.ifEmpty { tmdbMeta.similar },
-        collectionItems =
-            if (mediaType == MetadataMediaType.MOVIE) {
-                addonMeta.collectionItems.ifEmpty { tmdbMeta.collectionItems }
-            } else {
-                addonMeta.collectionItems
-            }
-    )
-}
-
 fun withDerivedSeasons(meta: MetadataRecord, mediaType: MetadataMediaType): MetadataRecord {
     if (mediaType != MetadataMediaType.SERIES || meta.seasons.isNotEmpty()) {
         return meta

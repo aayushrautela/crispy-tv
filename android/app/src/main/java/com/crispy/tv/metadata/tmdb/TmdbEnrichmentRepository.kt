@@ -165,6 +165,38 @@ class TmdbEnrichmentRepository(
         )
     }
 
+    suspend fun loadSeasonEpisodes(
+        tmdbId: Int,
+        seasonNumber: Int,
+        locale: Locale = Locale.getDefault(),
+    ): List<TmdbSeasonEpisode> {
+        if (tmdbId <= 0) return emptyList()
+        if (seasonNumber < 0) return emptyList()
+
+        val language = locale.toTmdbLanguageTag()
+        val path = "tv/$tmdbId/season/$seasonNumber"
+        val json = client.getJson(path = path, query = mapOf("language" to language)) ?: return emptyList()
+        val episodes = json.optJSONArray("episodes") ?: return emptyList()
+
+        return episodes
+            .toJsonObjectList()
+            .mapNotNull { episodeJson ->
+                val epNum = episodeJson.optInt("episode_number", -1)
+                if (epNum <= 0) return@mapNotNull null
+                val seasonNum = episodeJson.optInt("season_number", seasonNumber)
+                val name = episodeJson.optStringNonBlank("name") ?: "Episode $epNum"
+                TmdbSeasonEpisode(
+                    seasonNumber = seasonNum,
+                    episodeNumber = epNum,
+                    name = name,
+                    airDate = episodeJson.optStringNonBlank("air_date"),
+                    overview = episodeJson.optStringNonBlank("overview"),
+                    stillUrl = TmdbApi.imageUrl(episodeJson.optStringNonBlank("still_path"), size = "w300"),
+                )
+            }
+            .sortedWith(compareBy({ it.episodeNumber }, { it.name }))
+    }
+
     private suspend fun fetchArtworkDetails(
         mediaType: MetadataLabMediaType,
         tmdbId: Int,

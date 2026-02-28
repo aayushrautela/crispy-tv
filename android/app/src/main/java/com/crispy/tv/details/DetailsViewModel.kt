@@ -11,20 +11,21 @@ import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.ai.OpenRouterClient
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
-import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.TmdbImdbIdResolver
 import com.crispy.tv.metadata.tmdb.TmdbEnrichment
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
+import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.player.WatchProviderAuthState
 import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.settings.AiInsightsSettingsStore
-import com.crispy.tv.settings.HomeScreenSettingsStore
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
@@ -64,11 +65,12 @@ data class DetailsUiState(
     val watchCta: WatchCta = WatchCta(),
     val continueVideoId: String? = null,
     val selectedSeason: Int? = null,
+    val seasons: List<Int> = emptyList(),
+    val seasonEpisodes: List<MediaVideo> = emptyList(),
+    val episodesIsLoading: Boolean = false,
+    val episodesStatusMessage: String = "",
     val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
 ) {
-    val seasons: List<Int>
-        get() = details?.videos?.mapNotNull { it.season }?.distinct()?.sorted() ?: emptyList()
-
     val selectedSeasonOrFirst: Int?
         get() = selectedSeason ?: seasons.firstOrNull()
 }
@@ -105,9 +107,7 @@ sealed interface DetailsNavigationEvent {
 class DetailsViewModel internal constructor(
     private val itemId: String,
     private val mediaType: String,
-    private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryService,
-    private val settingsStore: HomeScreenSettingsStore,
     private val tmdbImdbIdResolver: TmdbImdbIdResolver,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     private val aiSettingsStore: AiInsightsSettingsStore,
@@ -125,70 +125,21 @@ class DetailsViewModel internal constructor(
 
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
+    private var episodesJob: Job? = null
+    private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
 
     init {
         reload()
-    }
-
-    private fun mergeDetails(
-        addon: MediaDetails,
-        tmdbFallback: MediaDetails,
-        tmdb: TmdbEnrichment?
-    ): MediaDetails {
-        fun String?.nullIfBlank(): String? = this?.trim()?.takeIf { it.isNotBlank() }
-
-        var out = addon
-        val tmdbCastNames = tmdb?.cast?.map { it.name }?.distinct().orEmpty()
-
-        if (out.imdbId.nullIfBlank() == null) {
-            out = out.copy(imdbId = tmdbFallback.imdbId ?: tmdb?.imdbId)
-        }
-        if (out.posterUrl.nullIfBlank() == null) {
-            out = out.copy(posterUrl = tmdbFallback.posterUrl)
-        }
-        if (out.backdropUrl.nullIfBlank() == null) {
-            out = out.copy(backdropUrl = tmdbFallback.backdropUrl)
-        }
-        if (out.logoUrl.nullIfBlank() == null) {
-            out = out.copy(logoUrl = tmdbFallback.logoUrl)
-        }
-        if (out.description.nullIfBlank() == null) {
-            out = out.copy(description = tmdbFallback.description)
-        }
-        if (out.genres.isEmpty() && tmdbFallback.genres.isNotEmpty()) {
-            out = out.copy(genres = tmdbFallback.genres)
-        }
-        if (out.year.nullIfBlank() == null) {
-            out = out.copy(year = tmdbFallback.year)
-        }
-        if (out.runtime.nullIfBlank() == null) {
-            out = out.copy(runtime = tmdbFallback.runtime)
-        }
-        if (out.rating.nullIfBlank() == null) {
-            out = out.copy(rating = tmdbFallback.rating)
-        }
-        if (out.cast.isEmpty()) {
-            out =
-                when {
-                    tmdbCastNames.isNotEmpty() -> out.copy(cast = tmdbCastNames.take(24))
-                    tmdbFallback.cast.isNotEmpty() -> out.copy(cast = tmdbFallback.cast)
-                    else -> out
-                }
-        }
-        if (out.directors.isEmpty() && tmdbFallback.directors.isNotEmpty()) {
-            out = out.copy(directors = tmdbFallback.directors)
-        }
-        if (out.creators.isEmpty() && tmdbFallback.creators.isNotEmpty()) {
-            out = out.copy(creators = tmdbFallback.creators)
-        }
-
-        return out
     }
 
     fun reload() {
         viewModelScope.launch {
             val nowMs = System.currentTimeMillis()
             val aiSnapshot = aiSettingsStore.loadSnapshot()
+
+            episodesJob?.cancel()
+            seasonEpisodesCache.clear()
+
             _uiState.update {
                 it.copy(
                     isLoading = true,
@@ -200,6 +151,11 @@ class DetailsViewModel internal constructor(
                     aiInsights = null,
                     aiStoryVisible = false,
                     watchCta = WatchCta(),
+                    continueVideoId = null,
+                    seasons = emptyList(),
+                    seasonEpisodes = emptyList(),
+                    episodesIsLoading = false,
+                    episodesStatusMessage = "",
                     streamSelector = StreamSelectorUiState(),
                 )
             }
@@ -212,35 +168,7 @@ class DetailsViewModel internal constructor(
             val tmdbEnrichment = tmdbResult?.enrichment
             val tmdbFallbackDetails = tmdbResult?.fallbackDetails
 
-            val isMovie = requestedMediaType == MetadataLabMediaType.MOVIE
-
-            val addonResult =
-                if (!isMovie || tmdbFallbackDetails == null) {
-                    // Resolve tmdb:X → IMDb before addon fetch (matching Nuvio) so addons can look it up.
-                    val resolvedForAddon =
-                        withContext(Dispatchers.IO) {
-                            resolveItemIdForAddonFetch(itemId)
-                        }
-                    withContext(Dispatchers.IO) {
-                        homeCatalogService.loadMediaDetails(
-                            rawId = resolvedForAddon.id,
-                            preferredMediaType = resolvedForAddon.mediaTypeHint,
-                        )
-                    }
-                } else {
-                    null
-                }
-
-            val addonDetails = addonResult?.details
-
-            var mergedDetails: MediaDetails? =
-                when {
-                    tmdbFallbackDetails != null && isMovie -> tmdbFallbackDetails
-                    addonDetails != null && tmdbFallbackDetails != null -> mergeDetails(addonDetails, tmdbFallbackDetails, tmdbEnrichment)
-                    addonDetails != null -> addonDetails
-                    tmdbFallbackDetails != null -> tmdbFallbackDetails
-                    else -> null
-                }
+            var mergedDetails: MediaDetails? = tmdbFallbackDetails
 
             mergedDetails =
                 withContext(Dispatchers.IO) {
@@ -270,21 +198,27 @@ class DetailsViewModel internal constructor(
                     resolveWatchCta(enrichedDetails, providerState, nowMs)
                 }
 
-                _uiState.update { state ->
-                    val details = enrichedDetails
-                    val firstSeason = details?.videos?.mapNotNull { it.season }?.distinct()?.minOrNull()
-                    val statusMessage =
-                        when {
-                            addonResult?.details != null -> addonResult.statusMessage
-                            details != null && tmdbResult != null -> ""
-                            details != null -> ""
-                            addonResult != null -> addonResult.statusMessage
-                            else -> "Unable to load details."
-                        }
-                    state.copy(
-                        isLoading = false,
-                        tmdbIsLoading = false,
-                        details = details,
+            _uiState.update { state ->
+                val details = enrichedDetails
+                val isSeries = details?.mediaType?.trim()?.equals("series", ignoreCase = true) == true
+                val seasonCount = (tmdbEnrichment?.titleDetails as? TmdbTvDetails)?.numberOfSeasons ?: 0
+                val seasons = if (isSeries && seasonCount > 0) (1..seasonCount).toList() else emptyList()
+                val selectedSeason =
+                    when {
+                        state.selectedSeason != null && state.selectedSeason in seasons -> state.selectedSeason
+                        seasons.isNotEmpty() -> seasons.first()
+                        else -> null
+                    }
+
+                val statusMessage =
+                    when {
+                        details != null -> ""
+                        else -> "Unable to load details."
+                    }
+                state.copy(
+                    isLoading = false,
+                    tmdbIsLoading = false,
+                    details = details,
                     tmdbEnrichment = tmdbEnrichment,
                     statusMessage = statusMessage,
                     isWatched = providerState.isWatched,
@@ -293,8 +227,17 @@ class DetailsViewModel internal constructor(
                     userRating = providerState.userRating,
                     watchCta = watchCta,
                     continueVideoId = continueVideoId,
-                    selectedSeason = state.selectedSeason ?: firstSeason
+                    seasons = seasons,
+                    selectedSeason = selectedSeason,
+                    seasonEpisodes = emptyList(),
+                    episodesIsLoading = false,
+                    episodesStatusMessage = "",
                 )
+            }
+
+            val seasonToLoad = _uiState.value.selectedSeasonOrFirst
+            if (enrichedDetails?.mediaType?.trim()?.equals("series", ignoreCase = true) == true && seasonToLoad != null) {
+                loadEpisodesForSeason(seasonToLoad, force = true)
             }
 
             val tmdbId = tmdbEnrichment?.tmdbId
@@ -404,7 +347,18 @@ class DetailsViewModel internal constructor(
     }
 
     fun onSeasonSelected(season: Int) {
-        _uiState.update { it.copy(selectedSeason = season) }
+        val cached = seasonEpisodesCache[season]
+        _uiState.update {
+            it.copy(
+                selectedSeason = season,
+                seasonEpisodes = cached ?: emptyList(),
+                episodesIsLoading = cached == null,
+                episodesStatusMessage = "",
+            )
+        }
+        if (cached == null) {
+            loadEpisodesForSeason(season)
+        }
     }
 
     fun onOpenStreamSelector() {
@@ -424,9 +378,97 @@ class DetailsViewModel internal constructor(
                         lookupId = videoId,
                     )
                 }
-                ?: resolveStreamLookupTarget(details, state.selectedSeasonOrFirst, fallbackMediaType = requestedMediaType)
+                ?: resolveStreamLookupTarget(
+                    details = details,
+                    selectedSeason = state.selectedSeasonOrFirst,
+                    seasonEpisodes = state.seasonEpisodes,
+                    fallbackMediaType = requestedMediaType,
+                )
 
         openStreamSelectorWithTarget(target, blankIdMessage = "Unable to resolve stream lookup id for this title.")
+    }
+
+    private fun loadEpisodesForSeason(
+        season: Int,
+        force: Boolean = false,
+    ) {
+        val state = _uiState.value
+        val details = state.details ?: return
+        val tmdb = state.tmdbEnrichment ?: return
+        if (details.mediaType.trim().equals("series", ignoreCase = true).not()) return
+        if (tmdb.mediaType != MetadataLabMediaType.SERIES) return
+
+        val cached = if (!force) seasonEpisodesCache[season] else null
+        if (cached != null) {
+            _uiState.update { it.copy(seasonEpisodes = cached, episodesIsLoading = false, episodesStatusMessage = "") }
+            return
+        }
+
+        episodesJob?.cancel()
+        _uiState.update { it.copy(episodesIsLoading = true, episodesStatusMessage = "", seasonEpisodes = emptyList()) }
+
+        episodesJob =
+            viewModelScope.launch {
+                val episodes =
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            tmdbEnrichmentRepository.loadSeasonEpisodes(tmdbId = tmdb.tmdbId, seasonNumber = season)
+                        }
+                    }.getOrElse {
+                        _uiState.update { current ->
+                            if (current.selectedSeasonOrFirst != season) current
+                            else current.copy(
+                                episodesIsLoading = false,
+                                episodesStatusMessage = "Failed to load episodes.",
+                            )
+                        }
+                        return@launch
+                    }
+
+                val videos =
+                    episodes
+                        .mapNotNull { ep ->
+                            val lookupId = buildEpisodeLookupId(details = details, season = ep.seasonNumber, episode = ep.episodeNumber)
+                                ?: return@mapNotNull null
+                            MediaVideo(
+                                id = lookupId,
+                                title = ep.name,
+                                season = ep.seasonNumber,
+                                episode = ep.episodeNumber,
+                                released = ep.airDate,
+                                overview = ep.overview,
+                                thumbnailUrl = ep.stillUrl,
+                            )
+                        }
+                        .sortedWith(
+                            compareBy<MediaVideo>({ it.episode ?: Int.MAX_VALUE }, { it.title.lowercase(Locale.US) }, { it.id })
+                        )
+
+                seasonEpisodesCache[season] = videos
+
+                _uiState.update { current ->
+                    if (current.selectedSeasonOrFirst != season) current
+                    else current.copy(
+                        seasonEpisodes = videos,
+                        episodesIsLoading = false,
+                        episodesStatusMessage = if (videos.isEmpty()) "No episodes found." else "",
+                    )
+                }
+            }
+    }
+
+    private fun buildEpisodeLookupId(
+        details: MediaDetails,
+        season: Int,
+        episode: Int,
+    ): String? {
+        if (season <= 0 || episode <= 0) return null
+        val base = details.imdbId?.trim().takeIf { !it.isNullOrBlank() }
+            ?: details.id.trim().takeIf { it.isNotBlank() }
+            ?: return null
+        val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
+        if (canonicalBase.isBlank()) return null
+        return "$canonicalBase:$season:$episode"
     }
 
     fun onOpenStreamSelectorForEpisode(videoId: String) {
@@ -763,13 +805,16 @@ class DetailsViewModel internal constructor(
     fun toggleWatchlist() {
         val details = uiState.value.details ?: return
         val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
-        val source = settingsStore.load().watchDataSource
-        if (source == WatchProvider.LOCAL) {
-            _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to use watchlist.") }
-            return
-        }
-
         viewModelScope.launch {
+            val source =
+                withContext(Dispatchers.IO) {
+                    preferredWatchProvider(watchHistoryService.authState())
+                }
+            if (source == WatchProvider.LOCAL) {
+                _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to use watchlist.") }
+                return@launch
+            }
+
             val desired = !_uiState.value.isInWatchlist
             _uiState.update { it.copy(isMutating = true) }
 
@@ -824,9 +869,12 @@ class DetailsViewModel internal constructor(
             _uiState.update { it.copy(statusMessage = "Marking an entire series as watched isn't supported yet. Mark episodes from the episode list.") }
             return
         }
-        val source = settingsStore.load().watchDataSource
-
         viewModelScope.launch {
+            val source =
+                withContext(Dispatchers.IO) {
+                    preferredWatchProvider(watchHistoryService.authState())
+                }
+
             val desired = !_uiState.value.isWatched
             _uiState.update { it.copy(isMutating = true) }
 
@@ -903,17 +951,20 @@ class DetailsViewModel internal constructor(
     fun setRating(rating: Int?) {
         val details = uiState.value.details ?: return
         val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
-        val source = settingsStore.load().watchDataSource
-        if (source == WatchProvider.LOCAL) {
-            _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to rate.") }
-            return
-        }
-        if (source == WatchProvider.SIMKL && rating == null) {
-            _uiState.update { it.copy(statusMessage = "Removing ratings is not supported for Simkl yet.") }
-            return
-        }
-
         viewModelScope.launch {
+            val source =
+                withContext(Dispatchers.IO) {
+                    preferredWatchProvider(watchHistoryService.authState())
+                }
+            if (source == WatchProvider.LOCAL) {
+                _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to rate.") }
+                return@launch
+            }
+            if (source == WatchProvider.SIMKL && rating == null) {
+                _uiState.update { it.copy(statusMessage = "Removing ratings is not supported for Simkl yet.") }
+                return@launch
+            }
+
             _uiState.update { it.copy(isMutating = true) }
 
             val enriched =
@@ -961,42 +1012,6 @@ class DetailsViewModel internal constructor(
         }
     }
 
-    /**
-     * Resolves a raw content ID to an addon-friendly format BEFORE fetching.
-     * For tmdb:X IDs, resolves to IMDb so addons can look up the content
-     * properly. When [mediaType] is known from navigation, uses it directly
-     * instead of guessing (fixes wrong-content-opens bug). Matches Nuvio
-     * behavior where `getStremioId(type, tmdbId)` is always type-aware.
-     */
-    private suspend fun resolveItemIdForAddonFetch(rawId: String): ResolvedItemId {
-        val trimmed = rawId.trim()
-        if (trimmed.isEmpty()) return ResolvedItemId(trimmed, mediaType, requestedMediaType)
-
-        val lowered = trimmed.lowercase(Locale.US)
-
-        // Already IMDb — use directly, but carry forward the known type
-        if (lowered.startsWith("tt") && lowered.length >= 4) {
-            return ResolvedItemId(trimmed, mediaType, requestedMediaType)
-        }
-
-        // tmdb:X — resolve to IMDb before addon fetch
-        if (lowered.startsWith("tmdb:")) {
-            // When type is known from navigation, try ONLY that type (Nuvio: getStremioId(type, tmdbId))
-            val imdb = tmdbImdbIdResolver.resolveImdbId(trimmed, requestedMediaType)
-            if (imdb != null) {
-                return ResolvedItemId(imdb, mediaType, requestedMediaType)
-            }
-        }
-
-        return ResolvedItemId(trimmed, mediaType, requestedMediaType)
-    }
-
-    private data class ResolvedItemId(
-        val id: String,
-        val mediaTypeHint: String,
-        val resolvedMediaType: MetadataLabMediaType,
-    )
-
     private suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
         val fromId = details.id.trim().takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
         val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
@@ -1027,9 +1042,8 @@ class DetailsViewModel internal constructor(
 
         val isSeries = requestedMediaType == MetadataLabMediaType.SERIES
         val expectedType = requestedMediaType
-        val source = settingsStore.load().watchDataSource
 
-        val continueEntry = resolveContinueWatchingEntry(details, expectedType, source, nowMs)
+        val continueEntry = resolveContinueWatchingEntry(details, expectedType, nowMs)
         val canContinue =
             continueEntry != null &&
                 !continueEntry.isUpNextPlaceholder &&
@@ -1060,12 +1074,11 @@ class DetailsViewModel internal constructor(
 
             val continueVideoId =
                 if (isSeries && continueEntry.season != null && continueEntry.episode != null) {
-                    details.videos
-                        .firstOrNull { video ->
-                            video.season == continueEntry.season &&
-                                video.episode == continueEntry.episode &&
-                                video.id.trim().isNotBlank()
-                        }?.id?.trim()
+                    buildEpisodeLookupId(
+                        details = details,
+                        season = continueEntry.season,
+                        episode = continueEntry.episode,
+                    )
                 } else {
                     null
                 }
@@ -1110,21 +1123,9 @@ class DetailsViewModel internal constructor(
     private suspend fun resolveContinueWatchingEntry(
         details: MediaDetails,
         expectedType: MetadataLabMediaType,
-        source: WatchProvider,
         nowMs: Long,
     ): ContinueWatchingEntry? {
-        val connected =
-            if (source == WatchProvider.LOCAL) {
-                true
-            } else {
-                val authState = watchHistoryService.authState()
-                when (source) {
-                    WatchProvider.TRAKT -> authState.traktAuthenticated
-                    WatchProvider.SIMKL -> authState.simklAuthenticated
-                    WatchProvider.LOCAL -> false
-                }
-            }
-        if (!connected) return null
+        val source = preferredWatchProvider(watchHistoryService.authState())
 
         val normalizedTargetId = normalizeNuvioMediaId(details.id).contentId.lowercase(Locale.US)
         val normalizedImdbId =
@@ -1154,7 +1155,8 @@ class DetailsViewModel internal constructor(
     }
 
     private suspend fun resolveProviderState(details: MediaDetails?): ProviderState {
-        val source = settingsStore.load().watchDataSource
+        val authState = watchHistoryService.authState()
+        val source = preferredWatchProvider(authState)
         val normalizedTargetId = normalizeNuvioMediaId(details?.id ?: itemId).contentId.lowercase(Locale.US)
         val normalizedImdbId =
             details?.imdbId?.let { imdb ->
@@ -1190,23 +1192,6 @@ class DetailsViewModel internal constructor(
 
             WatchProvider.TRAKT,
             WatchProvider.SIMKL -> {
-                val authState = watchHistoryService.authState()
-                val connected =
-                    when (source) {
-                        WatchProvider.TRAKT -> authState.traktAuthenticated
-                        WatchProvider.SIMKL -> authState.simklAuthenticated
-                        WatchProvider.LOCAL -> false
-                    }
-                if (!connected) {
-                    return ProviderState(
-                        isWatched = false,
-                        watchedAtEpochMs = null,
-                        isInWatchlist = false,
-                        isRated = false,
-                        userRating = null,
-                    )
-                }
-
                 val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 250, source = source)
                 val snapshot =
                     if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) {
@@ -1286,13 +1271,6 @@ class DetailsViewModel internal constructor(
                             apiKey = BuildConfig.TMDB_API_KEY,
                             httpClient = httpClient
                         )
-                    val homeCatalogService =
-                        HomeCatalogService(
-                            context = appContext,
-                            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                            httpClient = httpClient,
-                            tmdbImdbIdResolver = tmdbImdbIdResolver,
-                        )
                     val tmdbEnrichmentRepository =
                         TmdbEnrichmentRepository(
                             apiKey = BuildConfig.TMDB_API_KEY,
@@ -1315,9 +1293,7 @@ class DetailsViewModel internal constructor(
                     return DetailsViewModel(
                         itemId = itemId,
                         mediaType = mediaType,
-                        homeCatalogService = homeCatalogService,
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                        settingsStore = HomeScreenSettingsStore(appContext),
                         tmdbImdbIdResolver = tmdbImdbIdResolver,
                         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                         aiSettingsStore = aiSettingsStore,
@@ -1330,6 +1306,14 @@ class DetailsViewModel internal constructor(
     }
 }
 
+private fun preferredWatchProvider(authState: WatchProviderAuthState): WatchProvider {
+    return when {
+        authState.traktAuthenticated -> WatchProvider.TRAKT
+        authState.simklAuthenticated -> WatchProvider.SIMKL
+        else -> WatchProvider.LOCAL
+    }
+}
+
 private data class StreamLookupTarget(
     val mediaType: MetadataLabMediaType,
     val lookupId: String,
@@ -1338,28 +1322,26 @@ private data class StreamLookupTarget(
 private fun resolveStreamLookupTarget(
     details: MediaDetails,
     selectedSeason: Int?,
+    seasonEpisodes: List<MediaVideo>,
     fallbackMediaType: MetadataLabMediaType,
 ): StreamLookupTarget {
     val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
     val lookupId =
         when (mediaType) {
-            MetadataLabMediaType.MOVIE -> details.id.trim()
+            MetadataLabMediaType.MOVIE -> details.imdbId?.trim()?.takeIf { it.isNotBlank() } ?: details.id.trim()
             MetadataLabMediaType.SERIES -> {
-                val seasonalEpisodes =
-                    details.videos
-                        .asSequence()
-                        .filter { video ->
-                            val id = video.id.trim()
-                            id.isNotBlank() && (selectedSeason == null || video.season == selectedSeason)
-                        }.sortedWith(compareBy({ it.episode ?: Int.MAX_VALUE }, { it.title.lowercase(Locale.US) }))
-                        .toList()
-
-                val fallbackEpisode =
-                    details.videos
-                        .firstOrNull { video -> video.id.trim().isNotBlank() }
-
-                (seasonalEpisodes.firstOrNull() ?: fallbackEpisode)?.id?.trim().orEmpty().ifBlank {
-                    details.id.trim()
+                val fromLoadedEpisodes = seasonEpisodes.firstOrNull { it.id.trim().isNotBlank() }?.id?.trim()
+                if (fromLoadedEpisodes != null) {
+                    fromLoadedEpisodes
+                } else {
+                    val season = selectedSeason ?: seasonEpisodes.firstOrNull()?.season ?: 1
+                    val base = details.imdbId?.trim()?.takeIf { it.isNotBlank() } ?: details.id.trim()
+                    val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
+                    if (canonicalBase.isNotBlank() && season > 0) {
+                        "$canonicalBase:$season:1"
+                    } else {
+                        base
+                    }
                 }
             }
         }

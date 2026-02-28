@@ -287,11 +287,15 @@ internal class TraktWatchHistoryProvider(
                     val playbackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null }
 
                     if (progress >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-                        // Episode completed (>=85%). Fetch addon episode list and find next.
-                        // Mirrors Nuvio: getCachedMetadata('series', showImdb) → findNextEpisode.
+                        // Episode completed (>=85%). Fetch episode list and find next.
                         if (episodeSeason != null && episodeNumber != null) {
                             try {
-                                val episodeList = episodeListProvider.fetchEpisodeList("series", contentId)
+                                val episodeList =
+                                    episodeListProvider.fetchEpisodeList(
+                                        mediaType = "series",
+                                        contentId = contentId,
+                                        seasonHint = episodeSeason,
+                                    )
                                 if (episodeList != null) {
                                     val next = findNextEpisode(
                                         currentSeason = episodeSeason,
@@ -452,7 +456,12 @@ internal class TraktWatchHistoryProvider(
         val upNextFromWatchedShows = mutableListOf<ContinueWatchingEntry>()
         for (candidate in candidates) {
             try {
-                val episodeList = episodeListProvider.fetchEpisodeList("series", candidate.contentId) ?: continue
+                val episodeList =
+                    episodeListProvider.fetchEpisodeList(
+                        mediaType = "series",
+                        contentId = candidate.contentId,
+                        seasonHint = candidate.lastWatchedSeason,
+                    ) ?: continue
                 val next = findNextEpisode(
                     currentSeason = candidate.lastWatchedSeason,
                     currentEpisode = candidate.lastWatchedEpisode,

@@ -9,7 +9,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.crispy.tv.settings.AddonsSettingsRoute
 import com.crispy.tv.settings.AiInsightsSettingsRoute
-import com.crispy.tv.settings.HomeScreenSettingsRoute
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.ProviderAuthPortalRoute
@@ -19,9 +18,6 @@ import com.crispy.tv.ui.labs.LabsScreen
 internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostController) {
     composable(AppRoutes.SettingsRoute) {
         SettingsScreen(
-            onNavigateToHomeScreenSettings = {
-                navController.navigate(AppRoutes.HomeScreenSettingsRoute)
-            },
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
             },
@@ -38,10 +34,6 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
                 navController.navigate(AppRoutes.ProviderPortalRoute)
             }
         )
-    }
-
-    composable(AppRoutes.HomeScreenSettingsRoute) {
-        HomeScreenSettingsRoute(onBack = { navController.popBackStack() })
     }
 
     composable(AppRoutes.AddonsSettingsRoute) {

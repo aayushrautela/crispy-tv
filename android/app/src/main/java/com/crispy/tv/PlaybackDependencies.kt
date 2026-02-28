@@ -1,12 +1,13 @@
 package com.crispy.tv
 
 import android.content.Context
-import com.crispy.tv.metadata.AddonEpisodeListProvider
+import com.crispy.tv.metadata.TmdbEpisodeListProvider
 import com.crispy.tv.metadata.RemoteCatalogSearchLabService
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
 import com.crispy.tv.metadata.RemoteSupabaseSyncLabService
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.watchhistory.RemoteWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.network.AppHttp
@@ -65,14 +66,18 @@ private fun newCatalogSearchService(context: Context): CatalogSearchLabService {
 
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
-    val episodeListProvider = AddonEpisodeListProvider(
-        context = appContext,
-        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-        httpClient = AppHttp.client(appContext),
+    val httpClient = AppHttp.client(appContext)
+    val tmdbEnrichmentRepository =
+        TmdbEnrichmentRepository(
+            apiKey = BuildConfig.TMDB_API_KEY,
+            httpClient = httpClient,
+        )
+    val episodeListProvider = TmdbEpisodeListProvider(
+        tmdbEnrichmentRepository = tmdbEnrichmentRepository,
     )
     return RemoteWatchHistoryService(
         context = appContext,
-        httpClient = AppHttp.client(appContext),
+        httpClient = httpClient,
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
         simklClientId = BuildConfig.SIMKL_CLIENT_ID,
         episodeListProvider = episodeListProvider,

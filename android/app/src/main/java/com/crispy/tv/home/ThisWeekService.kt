@@ -1,7 +1,6 @@
 package com.crispy.tv.home
 
 import android.util.Log
-import com.crispy.tv.domain.watch.AddonEpisodeInfo
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
@@ -46,7 +45,7 @@ data class ThisWeekItem(
     val releasedAtMs: Long,
     /** Whether the episode has already aired. */
     val isReleased: Boolean,
-    /** Poster URL — episode still not available from Cinemeta so fallback to series poster. */
+    /** Poster URL — episode still may be missing so fallback to series poster. */
     val posterUrl: String?,
     /** Type — always "series". */
     val type: String = "series",
@@ -55,7 +54,7 @@ data class ThisWeekItem(
 /**
  * Loads "This Week" calendar episodes matching Nuvio's exact logic:
  * 1. Gather all user's series (CW + library, deduplicated, up to 300).
- * 2. For each series, fetch episode list from addon (via [EpisodeListProvider]).
+ * 2. For each series, fetch episode list from metadata backend (via [EpisodeListProvider]).
  * 3. Filter episodes released within the current calendar week (Monday–Sunday).
  * 4. Exclude specials (season 0).
  * 5. Group episodes by series + release date (multi-episode groups).

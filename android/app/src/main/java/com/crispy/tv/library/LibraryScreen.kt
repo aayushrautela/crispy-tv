@@ -63,7 +63,6 @@ import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
-import com.crispy.tv.settings.HomeScreenSettingsStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,15 +89,9 @@ data class LibraryUiState(
 )
 
 class LibraryViewModel internal constructor(
-    private val watchHistoryService: WatchHistoryService,
-    private val settingsStore: HomeScreenSettingsStore
+    private val watchHistoryService: WatchHistoryService
 ) : ViewModel() {
-    private val _uiState =
-        MutableStateFlow(
-            LibraryUiState(
-                selectedSource = settingsStore.load().watchDataSource.toLibrarySource()
-            )
-        )
+    private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
 
     private var refreshJob: Job? = null
@@ -111,23 +104,30 @@ class LibraryViewModel internal constructor(
         refreshJob?.cancel()
         refreshJob =
             viewModelScope.launch {
-                val selectedSource = settingsStore.load().watchDataSource.toLibrarySource()
                 _uiState.update {
                     it.copy(
                         isRefreshing = true,
                         statusMessage = "Loading library...",
-                        selectedSource = selectedSource
                     )
                 }
 
                 val authState = watchHistoryService.authState()
+
+                val selectedSource =
+                    when {
+                        authState.traktAuthenticated -> LibrarySource.TRAKT
+                        authState.simklAuthenticated -> LibrarySource.SIMKL
+                        else -> LibrarySource.LOCAL
+                    }
+
+                _uiState.update { it.copy(selectedSource = selectedSource) }
+
                 val selectedProvider = selectedSource.toProvider()
                 val providerAuthenticated =
                     when (selectedProvider) {
-                        WatchProvider.LOCAL,
                         WatchProvider.TRAKT -> authState.traktAuthenticated
                         WatchProvider.SIMKL -> authState.simklAuthenticated
-                        null -> false
+                        else -> false
                     }
                 val localResult =
                     if (selectedSource == LibrarySource.LOCAL) {
@@ -220,21 +220,6 @@ class LibraryViewModel internal constructor(
      }
 }
 
-    fun selectSource(source: LibrarySource) {
-        settingsStore.save(
-            settingsStore.load().copy(
-                watchDataSource = source.toWatchProvider()
-            )
-        )
-        _uiState.update { current ->
-            current.copy(
-                selectedSource = source,
-                selectedProviderFolderId = defaultFolderIdFor(source, current.providerFolders)
-            )
-        }
-        refresh()
-    }
-
     fun selectProviderFolder(folderId: String) {
         _uiState.update { it.copy(selectedProviderFolderId = folderId) }
     }
@@ -253,7 +238,6 @@ class LibraryViewModel internal constructor(
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                            settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -682,22 +666,6 @@ private fun LibrarySource.toProvider(): WatchProvider? {
         LibrarySource.LOCAL -> null
         LibrarySource.TRAKT -> WatchProvider.TRAKT
         LibrarySource.SIMKL -> WatchProvider.SIMKL
-    }
-}
-
-private fun LibrarySource.toWatchProvider(): WatchProvider {
-    return when (this) {
-        LibrarySource.LOCAL -> WatchProvider.LOCAL
-        LibrarySource.TRAKT -> WatchProvider.TRAKT
-        LibrarySource.SIMKL -> WatchProvider.SIMKL
-    }
-}
-
-private fun WatchProvider.toLibrarySource(): LibrarySource {
-    return when (this) {
-        WatchProvider.LOCAL -> LibrarySource.LOCAL
-        WatchProvider.TRAKT -> LibrarySource.TRAKT
-        WatchProvider.SIMKL -> LibrarySource.SIMKL
     }
 }
 

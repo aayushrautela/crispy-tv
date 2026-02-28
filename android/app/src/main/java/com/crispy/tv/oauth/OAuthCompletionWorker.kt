@@ -12,7 +12,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.settings.HomeScreenSettingsStore
 import com.crispy.tv.sync.ProviderSyncScheduler
 import java.util.concurrent.TimeUnit
 
@@ -73,7 +72,6 @@ class OAuthCompletionWorker(
         )
 
         if (completionResult.success) {
-            HomeScreenSettingsStore(applicationContext).setWatchDataSource(pending.provider)
             store.setLastCompletedCallbackId(PendingOAuthStore.callbackIdForUri(pending.callbackUri))
             store.clearPending()
             store.setPendingErrorMessage(null)

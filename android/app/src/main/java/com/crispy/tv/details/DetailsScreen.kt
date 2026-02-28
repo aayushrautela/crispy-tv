@@ -42,6 +42,7 @@ internal fun DetailsScreen(
     uiState: DetailsUiState,
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit,
+    onPersonClick: (String) -> Unit,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onOpenStreamSelector: () -> Unit,
@@ -189,6 +190,7 @@ internal fun DetailsScreen(
                         onRetry = onRetry,
                         onSeasonSelected = onSeasonSelected,
                         onItemClick = onItemClick,
+                        onPersonClick = onPersonClick,
                         onEpisodeClick = onEpisodeClick,
                     )
                 }

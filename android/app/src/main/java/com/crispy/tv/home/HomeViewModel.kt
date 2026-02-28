@@ -21,8 +21,8 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.metadata.AddonEpisodeListProvider
-import com.crispy.tv.settings.HomeScreenSettingsStore
+import com.crispy.tv.metadata.TmdbEpisodeListProvider
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -92,8 +92,7 @@ class HomeViewModel internal constructor(
     private val homeCatalogService: HomeCatalogService,
     private val watchHistoryService: WatchHistoryService,
     private val thisWeekService: ThisWeekService,
-    private val suppressionStore: ContinueWatchingSuppressionStore,
-    private val settingsStore: HomeScreenSettingsStore
+    private val suppressionStore: ContinueWatchingSuppressionStore
 ) : ViewModel() {
     companion object {
         private const val CATALOG_CONCURRENCY_LIMIT = 6
@@ -103,25 +102,28 @@ class HomeViewModel internal constructor(
             return object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
+                        val httpClient = AppHttp.client(appContext)
+                        val tmdbEnrichmentRepository =
+                            TmdbEnrichmentRepository(
+                                apiKey = BuildConfig.TMDB_API_KEY,
+                                httpClient = httpClient,
+                            )
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             homeCatalogService =
                                 HomeCatalogService(
                                     context = appContext,
                                     addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                                    httpClient = AppHttp.client(appContext),
+                                    httpClient = httpClient,
                                 ),
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                             thisWeekService = ThisWeekService(
                                 watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                                episodeListProvider = AddonEpisodeListProvider(
-                                    context = appContext,
-                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                                    httpClient = AppHttp.client(appContext),
+                                episodeListProvider = TmdbEpisodeListProvider(
+                                    tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                                 ),
                             ),
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
-                            settingsStore = HomeScreenSettingsStore(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -165,24 +167,22 @@ class HomeViewModel internal constructor(
                 suppressedItemsByKey = suppressionMap
 
                 coroutineScope {
-                    val settingsDeferred = async { settingsStore.load() }
                     val authStateDeferred = async { watchHistoryService.authState() }
                     val heroDeferred = async { homeCatalogService.loadHeroItems(limit = 10) }
                     val watchHistoryDeferred = async { watchHistoryService.listLocalHistory(limit = 40) }
                     
-                    val settings = settingsDeferred.await()
                     val authState = authStateDeferred.await()
-                    val selectedSource = settings.watchDataSource
-                    
-                    val providerConnected = when (selectedSource) {
-                        WatchProvider.LOCAL -> true
-                        WatchProvider.TRAKT -> authState.traktAuthenticated
-                        WatchProvider.SIMKL -> authState.simklAuthenticated
-                    }
+
+                    val selectedSource =
+                        when {
+                            authState.traktAuthenticated -> WatchProvider.TRAKT
+                            authState.simklAuthenticated -> WatchProvider.SIMKL
+                            else -> WatchProvider.LOCAL
+                        }
                     
                     val providerContinueWatchingDeferred = async {
                         when (selectedSource) {
-                            WatchProvider.LOCAL -> ContinueWatchingResult(statusMessage = "Local source selected.")
+                            WatchProvider.LOCAL -> ContinueWatchingResult(statusMessage = "")
                             WatchProvider.TRAKT, WatchProvider.SIMKL -> {
                                 watchHistoryService.listContinueWatching(
                                     limit = 20,
@@ -193,22 +193,16 @@ class HomeViewModel internal constructor(
                     }
 
                     val providerRecommendationsDeferred = async {
-                        val recommendationSource = preferredRecommendationSource(
-                            selectedSource = selectedSource,
-                            traktAuthenticated = authState.traktAuthenticated,
-                            simklAuthenticated = authState.simklAuthenticated
-                        )
-                        when {
-                            !settings.traktTopPicksEnabled -> {
-                                ProviderRecommendationsResult(statusMessage = "")
+                        when (selectedSource) {
+                            WatchProvider.LOCAL -> {
+                                ProviderRecommendationsResult(
+                                    statusMessage = "Connect Trakt or Simkl in Settings to load For You."
+                                )
                             }
-                            recommendationSource == null -> {
-                                ProviderRecommendationsResult(statusMessage = "Connect Trakt or Simkl in Settings to load For You.")
-                            }
-                            else -> {
+                            WatchProvider.TRAKT, WatchProvider.SIMKL -> {
                                 watchHistoryService.listProviderRecommendations(
                                     limit = 20,
-                                    source = recommendationSource
+                                    source = selectedSource
                                 )
                             }
                         }
@@ -219,8 +213,7 @@ class HomeViewModel internal constructor(
                         watchHistoryEntries = watchHistoryDeferred.await().entries,
                         providerContinueWatchingResult = providerContinueWatchingDeferred.await(),
                         providerRecommendationsResult = providerRecommendationsDeferred.await(),
-                        selectedSource = selectedSource,
-                        providerConnected = providerConnected
+                        selectedSource = selectedSource
                     )
                 }
             }
@@ -259,11 +252,7 @@ class HomeViewModel internal constructor(
                                     ContinueWatchingLoadResult(
                                         items = emptyList(),
                                         statusMessage = baseResult.providerContinueWatchingResult.statusMessage.ifBlank {
-                                            if (baseResult.providerConnected) {
-                                                "No continue watching entries available."
-                                            } else {
-                                                "Connect ${baseResult.selectedSource.displayName()} in Settings to load continue watching."
-                                            }
+                                            "No continue watching entries available."
                                         }
                                     )
                                 }
@@ -609,8 +598,7 @@ private data class HomeFeedLoadResult(
     val watchHistoryEntries: List<WatchHistoryEntry>,
     val providerContinueWatchingResult: ContinueWatchingResult,
     val providerRecommendationsResult: ProviderRecommendationsResult,
-    val selectedSource: WatchProvider,
-    val providerConnected: Boolean
+    val selectedSource: WatchProvider
 )
 
 class ContinueWatchingSuppressionStore(context: Context) {
@@ -705,22 +693,4 @@ private fun ProviderLibraryItem.toProviderContinueWatchingEntry(): ContinueWatch
         providerPlaybackId = null,
         isUpNextPlaceholder = false
     )
-}
-
-private fun WatchProvider.displayName(): String {
-    return name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }
-}
-
-private fun preferredRecommendationSource(
-    selectedSource: WatchProvider,
-    traktAuthenticated: Boolean,
-    simklAuthenticated: Boolean
-): WatchProvider? {
-    return when {
-        selectedSource == WatchProvider.SIMKL && simklAuthenticated -> WatchProvider.SIMKL
-        selectedSource == WatchProvider.TRAKT && traktAuthenticated -> WatchProvider.TRAKT
-        traktAuthenticated -> WatchProvider.TRAKT
-        simklAuthenticated -> WatchProvider.SIMKL
-        else -> null
-    }
 }

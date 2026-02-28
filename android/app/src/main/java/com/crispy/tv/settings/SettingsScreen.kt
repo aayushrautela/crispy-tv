@@ -24,7 +24,6 @@ import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Extension
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Language
@@ -72,7 +71,6 @@ data class SettingsGroup(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onNavigateToHomeScreenSettings: () -> Unit = {},
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToAiInsightsSettings: () -> Unit = {},
@@ -88,13 +86,6 @@ fun SettingsScreen(
                 title = "PERSONALIZATION",
                 items =
                     listOf(
-                        SettingsItem(
-                            label = "Home Screen",
-                            description = "Catalog rows, hero cards, and watch source",
-                            icon = Icons.Outlined.Home,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            onClick = onNavigateToHomeScreenSettings
-                        ),
                         SettingsItem(
                             label = "Search",
                             description = "Search filters and default behavior",

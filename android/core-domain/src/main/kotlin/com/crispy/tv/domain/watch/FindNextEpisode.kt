@@ -1,12 +1,16 @@
 package com.crispy.tv.domain.watch
 
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /**
- * Episode metadata from an addon (e.g. Cinemeta).
- * Maps to the `videos` array entries in a Stremio meta response.
+ * Episode metadata for a show.
+ *
+ * This is a lightweight descriptor used by watch-history flows to
+ * compute "up next" episodes.
  */
-data class AddonEpisodeInfo(
+data class EpisodeInfo(
     val season: Int,
     val episode: Int,
     val title: String? = null,
@@ -25,7 +29,7 @@ data class NextEpisodeResult(
 /**
  * 1:1 port of Nuvio's `findNextEpisode`.
  *
- * Given the current season/episode and a full episode list from an addon,
+ * Given the current season/episode and a full episode list,
  * returns the next *released* episode that isn't in [watchedSet].
  *
  * Sorting: ascending by season, then by episode (matching Nuvio).
@@ -39,7 +43,7 @@ data class NextEpisodeResult(
 fun findNextEpisode(
     currentSeason: Int,
     currentEpisode: Int,
-    episodes: List<AddonEpisodeInfo>,
+    episodes: List<EpisodeInfo>,
     watchedSet: Set<String>? = null,
     showId: String? = null,
 ): NextEpisodeResult? {
@@ -81,11 +85,17 @@ fun findNextEpisode(
  */
 private fun isEpisodeReleased(released: String?): Boolean {
     if (released.isNullOrBlank()) return false
+    val trimmed = released.trim()
     return try {
-        val releaseInstant = Instant.parse(released)
+        val releaseInstant = Instant.parse(trimmed)
         !releaseInstant.isAfter(Instant.now())
     } catch (_: Exception) {
-        // Nuvio also returns false on parse errors
-        false
+        try {
+            val date = LocalDate.parse(trimmed.take(10))
+            !date.isAfter(LocalDate.now(ZoneOffset.UTC))
+        } catch (_: Exception) {
+            // Return false on parse errors
+            false
+        }
     }
 }

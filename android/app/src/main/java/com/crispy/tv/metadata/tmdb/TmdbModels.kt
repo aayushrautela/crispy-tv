@@ -35,6 +35,15 @@ data class TmdbReview(
     val createdAt: String?
 )
 
+data class TmdbSeasonEpisode(
+    val seasonNumber: Int,
+    val episodeNumber: Int,
+    val name: String,
+    val airDate: String?,
+    val overview: String?,
+    val stillUrl: String?
+)
+
 sealed interface TmdbTitleDetails {
     val status: String?
     val originalLanguage: String?

@@ -41,13 +41,8 @@ class RemoteMetadataLabDataSource(
         val contentId = normalizedId.contentId
         val streamLookupId = normalizedId.videoId ?: contentId
         val subtitleLookupId = normalizedId.videoId ?: contentId
-        val tmdbMeta = tmdbClient.fetchMeta(request.mediaType, contentId)
-
-        var addonCandidates = addonClient.fetchMeta(
-            mediaType = request.mediaType,
-            contentId = contentId,
-            preferredAddonId = request.preferredAddonId
-        )
+        val tmdbResult = tmdbClient.fetchMeta(request.mediaType, contentId)
+        val tmdbMeta = tmdbResult?.record
         var transportStats = addonClient.fetchTransportStats(
             mediaType = request.mediaType,
             contentId = contentId,
@@ -56,53 +51,38 @@ class RemoteMetadataLabDataSource(
             preferredAddonId = request.preferredAddonId
         )
 
-        if (addonCandidates.isEmpty() && contentId.startsWith("tmdb:", ignoreCase = true)) {
+        if (transportStats.isEmpty() && contentId.startsWith("tmdb:", ignoreCase = true)) {
             val bridgedImdb = tmdbMeta?.imdbId?.takeIf { it.startsWith("tt", ignoreCase = true) }
             if (bridgedImdb != null) {
-                addonCandidates = addonClient.fetchMeta(
+                transportStats = addonClient.fetchTransportStats(
                     mediaType = request.mediaType,
                     contentId = bridgedImdb,
+                    streamLookupId = rewriteLookupBase(streamLookupId, contentId, bridgedImdb),
+                    subtitleLookupId = rewriteLookupBase(subtitleLookupId, contentId, bridgedImdb),
                     preferredAddonId = request.preferredAddonId
                 )
-                if (transportStats.isEmpty()) {
-                    transportStats = addonClient.fetchTransportStats(
-                        mediaType = request.mediaType,
-                        contentId = bridgedImdb,
-                        streamLookupId = rewriteLookupBase(streamLookupId, contentId, bridgedImdb),
-                        subtitleLookupId = rewriteLookupBase(subtitleLookupId, contentId, bridgedImdb),
-                        preferredAddonId = request.preferredAddonId
-                    )
-                }
             }
         }
 
-        if (addonCandidates.isEmpty()) {
-            val fallback = fallbackMetadata(contentId)
-            return@withContext MetadataLabPayload(
-                addonResults = listOf(
-                    AddonMetadataCandidate(
-                        addonId = "fallback.local",
-                        mediaId = fallback.id,
-                        title = "Unavailable"
-                    )
-                ),
-                addonMeta = fallback,
-                tmdbMeta = tmdbMeta,
-                transportStats = transportStats
-            )
-        }
-
-        val addonResults = addonCandidates.map {
-            AddonMetadataCandidate(
-                addonId = it.addonId,
-                mediaId = it.record.id,
-                title = it.title
-            )
-        }
+        val primaryMeta = tmdbMeta ?: fallbackMetadata(contentId)
+        val primaryCandidate =
+            if (tmdbResult != null) {
+                AddonMetadataCandidate(
+                    addonId = "tmdb",
+                    mediaId = primaryMeta.id,
+                    title = tmdbResult.title
+                )
+            } else {
+                AddonMetadataCandidate(
+                    addonId = "fallback.local",
+                    mediaId = primaryMeta.id,
+                    title = "Unavailable"
+                )
+            }
 
         MetadataLabPayload(
-            addonResults = addonResults,
-            addonMeta = addonCandidates.first().record,
+            addonResults = listOf(primaryCandidate),
+            addonMeta = primaryMeta,
             tmdbMeta = tmdbMeta,
             transportStats = transportStats
         )
@@ -133,7 +113,6 @@ class RemoteMetadataLabDataSource(
 }
 
 private enum class AddonResourceKind(val apiPath: String) {
-    META("meta"),
     STREAM("stream"),
     SUBTITLES("subtitles")
 }
@@ -176,12 +155,6 @@ private data class AddonEndpoint(
     }
 }
 
-private data class AddonCandidate(
-    val addonId: String,
-    val title: String,
-    val record: MetadataRecord
-)
-
 private class AddonMetadataClient(
     private val addonRegistry: MetadataAddonRegistry,
     private val httpClient: CrispyHttpClient,
@@ -190,44 +163,6 @@ private class AddonMetadataClient(
     private var resolvedEndpoints: List<AddonEndpoint>? = null
     @Volatile
     private var resolvedFingerprint: String? = null
-
-    suspend fun fetchMeta(
-        mediaType: MetadataLabMediaType,
-        contentId: String,
-        preferredAddonId: String?
-    ): List<AddonCandidate> {
-        if (contentId.isBlank()) {
-            return emptyList()
-        }
-
-        val endpoints = resolveEndpoints().filter { it.supports(AddonResourceKind.META, mediaType) }
-        if (!isValidContentId(endpoints, AddonResourceKind.META, mediaType, contentId)) {
-            return emptyList()
-        }
-
-        val orderedEndpoints = orderedEndpoints(endpoints, preferredAddonId)
-        val candidates = mutableListOf<AddonCandidate>()
-        for (endpoint in orderedEndpoints) {
-            val requestId = endpoint.formatLookupId(AddonResourceKind.META, mediaType, contentId)
-            if (requestId == null) {
-                continue
-            }
-            val response = fetchAddonMeta(endpoint, mediaType, requestId) ?: continue
-            val metaObject = response.optJSONObject("meta") ?: continue
-            val record = parseAddonMetadata(metaObject, fallbackId = requestId)
-            val title =
-                nonBlank(metaObject.optString("name"))
-                    ?: nonBlank(metaObject.optString("title"))
-                    ?: record.id
-
-            candidates += AddonCandidate(
-                addonId = endpoint.addonId,
-                title = title,
-                record = record
-            )
-        }
-        return candidates
-    }
 
     suspend fun fetchTransportStats(
         mediaType: MetadataLabMediaType,
@@ -344,7 +279,6 @@ private class AddonMetadataClient(
                 encodedQuery = seed.encodedQuery,
                 supportedTypes =
                     mapOf(
-                        AddonResourceKind.META to setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES),
                         AddonResourceKind.STREAM to setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES),
                         AddonResourceKind.SUBTITLES to setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
                     ),
@@ -366,7 +300,6 @@ private class AddonMetadataClient(
 
         if (resources == null) {
             val defaults = setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
-            supportedTypes[AddonResourceKind.META] = defaults.toMutableSet()
             supportedTypes[AddonResourceKind.STREAM] = defaults.toMutableSet()
             supportedTypes[AddonResourceKind.SUBTITLES] = defaults.toMutableSet()
         } else {
@@ -446,12 +379,6 @@ private class AddonMetadataClient(
                                 .put("types", JSONArray().put("movie").put("series"))
                                 .put("idPrefixes", JSONArray().put("tt"))
                         )
-                        .put(
-                            JSONObject()
-                                .put("name", "meta")
-                                .put("types", JSONArray().put("movie").put("series"))
-                                .put("idPrefixes", JSONArray().put("tt"))
-                        )
                 )
         }
 
@@ -524,19 +451,6 @@ private class AddonMetadataClient(
         ) != null
     }
 
-    private suspend fun fetchAddonMeta(
-        endpoint: AddonEndpoint,
-        mediaType: MetadataLabMediaType,
-        contentId: String
-    ): JSONObject? {
-        return fetchResource(
-            endpoint = endpoint,
-            resourceKind = AddonResourceKind.META,
-            mediaType = mediaType,
-            lookupId = contentId
-        )
-    }
-
     private suspend fun fetchResourceCount(
         endpoint: AddonEndpoint,
         resourceKind: AddonResourceKind,
@@ -547,7 +461,6 @@ private class AddonMetadataClient(
         val arrayKey = when (resourceKind) {
             AddonResourceKind.STREAM -> "streams"
             AddonResourceKind.SUBTITLES -> "subtitles"
-            AddonResourceKind.META -> "meta"
         }
         return response.optJSONArray(arrayKey)?.length() ?: 0
     }
@@ -575,90 +488,6 @@ private class AddonMetadataClient(
             }
         }
         return httpClient.getJsonObject(url)
-    }
-
-    private fun parseAddonMetadata(meta: JSONObject, fallbackId: String): MetadataRecord {
-        val id = nonBlank(meta.optString("id")) ?: fallbackId
-        val videos = parseVideos(meta.optJSONArray("videos"))
-
-        return MetadataRecord(
-            id = id,
-            imdbId =
-                nonBlank(meta.optString("imdb_id"))
-                    ?: nonBlank(meta.optString("imdbId")),
-            cast = parseStringArray(meta.optJSONArray("cast")),
-            director = parseStringArray(meta.optJSONArray("director")),
-            castWithDetails = parseCastWithDetails(meta.optJSONArray("castWithDetails")),
-            similar = parseSimilarIds(meta.optJSONArray("similar")),
-            collectionItems = parseCollectionItems(meta.optJSONObject("collection")),
-            seasons = parseSeasons(meta.optJSONArray("seasons"), id, videos),
-            videos = videos
-        )
-    }
-
-    private fun parseVideos(videos: JSONArray?): List<MetadataVideo> {
-        if (videos == null) {
-            return emptyList()
-        }
-
-        val output = mutableListOf<MetadataVideo>()
-        for (index in 0 until videos.length()) {
-            val entry = videos.optJSONObject(index) ?: continue
-            val season = entry.optInt("season", -1).takeIf { it > 0 }
-            val episode = entry.optInt("episode", -1).takeIf { it > 0 }
-            val released = nonBlank(entry.optString("released"))
-            output += MetadataVideo(
-                season = season,
-                episode = episode,
-                released = released
-            )
-        }
-        return output
-    }
-
-    private fun parseSeasons(
-        seasons: JSONArray?,
-        contentId: String,
-        videos: List<MetadataVideo>
-    ): List<MetadataSeason> {
-        if (seasons == null) {
-            return emptyList()
-        }
-
-        val output = mutableListOf<MetadataSeason>()
-        for (index in 0 until seasons.length()) {
-            val seasonObj = seasons.optJSONObject(index) ?: continue
-            val seasonNumber =
-                seasonObj.optInt("season", -1).takeIf { it > 0 }
-                    ?: seasonObj.optInt("season_number", -1).takeIf { it > 0 }
-                    ?: continue
-
-            val explicitEpisodeCount =
-                seasonObj.optInt("episode_count", -1).takeIf { it > 0 }
-                    ?: seasonObj.optInt("episodes", -1).takeIf { it > 0 }
-            val derivedEpisodeCount =
-                videos.count { video ->
-                    val episodeNumber = video.episode
-                    video.season == seasonNumber &&
-                        episodeNumber != null &&
-                        episodeNumber > 0
-                }
-            val episodeCount = explicitEpisodeCount ?: derivedEpisodeCount
-            if (episodeCount <= 0) {
-                continue
-            }
-
-            output += MetadataSeason(
-                id = "$contentId:season:$seasonNumber",
-                name = nonBlank(seasonObj.optString("name")) ?: "Season $seasonNumber",
-                overview = nonBlank(seasonObj.optString("overview")) ?: "",
-                seasonNumber = seasonNumber,
-                episodeCount = episodeCount,
-                airDate = nonBlank(seasonObj.optString("air_date"))
-                    ?: nonBlank(seasonObj.optString("first_aired"))
-            )
-        }
-        return output.sortedBy { it.seasonNumber }
     }
 
     private fun parseCastWithDetails(castWithDetails: JSONArray?): List<String> {
@@ -776,7 +605,6 @@ private class AddonMetadataClient(
 
     private fun toResourceKindOrNull(value: String?): AddonResourceKind? {
         return when {
-            value.equals("meta", ignoreCase = true) -> AddonResourceKind.META
             value.equals("stream", ignoreCase = true) -> AddonResourceKind.STREAM
             value.equals("subtitles", ignoreCase = true) -> AddonResourceKind.SUBTITLES
             else -> null
@@ -792,7 +620,12 @@ private class TmdbMetadataClient(
     private val apiKey: String,
     private val httpClient: CrispyHttpClient,
 ) {
-    suspend fun fetchMeta(mediaType: MetadataLabMediaType, contentId: String): MetadataRecord? {
+    data class TmdbMetaResult(
+        val title: String,
+        val record: MetadataRecord,
+    )
+
+    suspend fun fetchMeta(mediaType: MetadataLabMediaType, contentId: String): TmdbMetaResult? {
         if (apiKey.isBlank()) {
             return null
         }
@@ -846,7 +679,18 @@ private class TmdbMetadataClient(
             emptyList()
         }
 
-        return MetadataRecord(
+        val title =
+            when (mediaType) {
+                MetadataLabMediaType.MOVIE ->
+                    nonBlank(details.optString("title"))
+                        ?: nonBlank(details.optString("original_title"))
+
+                MetadataLabMediaType.SERIES ->
+                    nonBlank(details.optString("name"))
+                        ?: nonBlank(details.optString("original_name"))
+            } ?: "tmdb:$tmdbId"
+
+        val record = MetadataRecord(
             id = "tmdb:$tmdbId",
             imdbId = imdbId,
             cast = castNames,
@@ -856,6 +700,11 @@ private class TmdbMetadataClient(
             collectionItems = collectionItems,
             seasons = seasons,
             videos = emptyList()
+        )
+
+        return TmdbMetaResult(
+            title = title,
+            record = record,
         )
     }
 

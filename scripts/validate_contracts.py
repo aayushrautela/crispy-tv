@@ -13,8 +13,6 @@ SUITE_TO_SCHEMA = {
     "id_prefixes": "id_prefixes.schema.json",
     "catalog_url_building": "catalog_url_building.schema.json",
     "search_ranking_and_dedup": "search_ranking_and_dedup.schema.json",
-    "metadata_addon_primary": "metadata_addon_primary.schema.json",
-    "metadata_tmdb_enhancer": "metadata_tmdb_enhancer.schema.json",
     "sync_planner": "sync_planner.schema.json",
     "storage_v1": "storage_v1.schema.json",
     "continue_watching": "continue_watching.schema.json",

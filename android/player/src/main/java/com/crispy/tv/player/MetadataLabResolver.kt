@@ -4,9 +4,6 @@ import com.crispy.tv.domain.metadata.AddonMetadataCandidate
 import com.crispy.tv.domain.metadata.MetadataMediaType
 import com.crispy.tv.domain.metadata.MetadataRecord
 import com.crispy.tv.domain.metadata.bridgeCandidateIds
-import com.crispy.tv.domain.metadata.mergeAddonAndTmdbMeta
-import com.crispy.tv.domain.metadata.mergeAddonPrimaryMetadata
-import com.crispy.tv.domain.metadata.needsTmdbMetaEnrichment
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.domain.metadata.withDerivedSeasons
 
@@ -72,21 +69,17 @@ class CoreDomainMetadataLabResolver(
         require(payload.addonResults.isNotEmpty()) { "addon results must not be empty" }
 
         val domainMediaType = request.mediaType.toDomainMediaType()
-        val primary = mergeAddonPrimaryMetadata(payload.addonResults, request.preferredAddonId)
-        val needsEnrichment = needsTmdbMetaEnrichment(payload.addonMeta, domainMediaType)
-        val merged = withDerivedSeasons(
-            mergeAddonAndTmdbMeta(payload.addonMeta, payload.tmdbMeta, domainMediaType),
-            domainMediaType
-        )
+        val primary = payload.addonResults.first()
+        val merged = withDerivedSeasons(payload.tmdbMeta ?: payload.addonMeta, domainMediaType)
 
         return MetadataLabResolution(
             contentId = normalized.contentId,
             videoId = normalized.videoId,
             addonLookupId = normalized.addonLookupId,
-            primaryId = primary.primaryId,
+            primaryId = primary.mediaId,
             primaryTitle = primary.title,
-            sources = primary.sources,
-            needsEnrichment = needsEnrichment,
+            sources = listOf(primary.addonId),
+            needsEnrichment = false,
             bridgeCandidateIds = bridgeCandidateIds(
                 contentId = normalized.contentId,
                 season = normalized.season,

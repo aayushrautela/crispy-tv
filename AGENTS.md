@@ -103,7 +103,7 @@ General:
 
 Contracts:
 - Fixtures include `contract_version`, `suite`, `case_id` (and `now_ms` when specified).
-- Suites currently covered include: `player_machine`, `continue_watching`, `trakt_scrobble_policy`, `media_ids`, `id_prefixes`, `catalog_url_building`, `search_ranking_and_dedup`, `metadata_addon_primary`, `metadata_tmdb_enhancer`, `sync_planner`, `storage_v1`.
+- Suites currently covered include: `player_machine`, `continue_watching`, `trakt_scrobble_policy`, `media_ids`, `id_prefixes`, `catalog_url_building`, `search_ranking_and_dedup`, `sync_planner`, `storage_v1`.
 - If you change behavior: bump `contract_version` (per SPEC), update fixtures/schemas, and keep Kotlin + Swift implementations in lockstep.
 
 Kotlin (Android + JVM):
@@ -118,7 +118,7 @@ Kotlin details (common patterns in this repo):
 - Model actions/events as `sealed interface` + `data class`/`data object`.
 - Prefer explicit mapping helpers for contract string values (canonical casing/format).
 - Avoid nondeterminism: no `System.currentTimeMillis()` in domain; no iteration over unordered maps when output order matters.
-- When enriching/merging metadata, keep precedence stable (addon-first; fill missing only).
+- When enriching/merging metadata, keep precedence stable (TMDB-first; fill missing only).
 
 Swift (ContractRunner + placeholders):
 - Keep APIs small and explicit; prefer `struct`.
