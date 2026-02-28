@@ -217,18 +217,6 @@ private fun PersonHero(person: PersonDetails) {
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.55f),
-                            0.38f to Color.Transparent
-                        )
-                    )
-        )
-
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
                             colors =
                                 listOf(
                                     Color.Transparent,
