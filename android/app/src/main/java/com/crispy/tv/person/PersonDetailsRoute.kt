@@ -2,11 +2,6 @@
 
 package com.crispy.tv.person
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -45,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -254,12 +247,6 @@ private fun PersonHero(person: PersonDetails) {
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            PersonCookieImage(
-                profileUrl = person.profileUrl,
-                contentDescription = person.name,
-                modifier = Modifier.size(width = 96.dp, height = 128.dp)
-            )
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = person.name,
@@ -275,68 +262,6 @@ private fun PersonHero(person: PersonDetails) {
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PersonCookieImage(
-    profileUrl: String?,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-    animate: Boolean = true
-) {
-    val cookieShape =
-        RoundedCornerShape(
-            topStart = 28.dp,
-            bottomStart = 28.dp,
-            topEnd = 12.dp,
-            bottomEnd = 12.dp
-        )
-
-    val rotation =
-        rememberInfiniteTransition().animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(durationMillis = 90_000, easing = LinearEasing)
-                )
-        )
-
-    val shouldAnimate = animate && !profileUrl.isNullOrBlank()
-
-    Surface(
-        modifier =
-            modifier
-                .graphicsLayer {
-                    rotationZ = if (shouldAnimate) rotation.value else 0f
-                },
-        shape = cookieShape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp
-    ) {
-        if (profileUrl.isNullOrBlank()) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-        } else {
-            AsyncImage(
-                model = profileUrl,
-                contentDescription = contentDescription,
-                contentScale = ContentScale.Crop,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            // Counter-rotate so the photo stays upright.
-                            rotationZ = if (shouldAnimate) -rotation.value else 0f
-                        }
-            )
         }
     }
 }
