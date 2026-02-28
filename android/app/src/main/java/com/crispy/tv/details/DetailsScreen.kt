@@ -85,12 +85,12 @@ internal fun DetailsScreen(
 
     var showTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
     var userPausedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
-    var userMutedTrailer by rememberSaveable(trailerKey) { mutableStateOf(true) }
+    var userMutedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
 
     LaunchedEffect(trailerKey) {
         showTrailer = false
         userPausedTrailer = false
-        userMutedTrailer = true
+        userMutedTrailer = false
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
 

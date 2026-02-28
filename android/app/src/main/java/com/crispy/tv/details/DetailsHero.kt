@@ -11,6 +11,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
+import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
@@ -398,6 +399,8 @@ private fun HeroYouTubeTrailerLayer(
                 },
                 "CrispyBridge",
             )
+
+            webChromeClient = WebChromeClient()
 
             webViewClient =
                 object : WebViewClient() {
