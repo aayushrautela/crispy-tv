@@ -13,7 +13,6 @@ import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.ProviderAuthPortalRoute
 import com.crispy.tv.settings.SettingsScreen
-import com.crispy.tv.ui.labs.LabsScreen
 
 internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostController) {
     composable(AppRoutes.SettingsRoute) {
@@ -26,9 +25,6 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             },
             onNavigateToAiInsightsSettings = {
                 navController.navigate(AppRoutes.AiInsightsSettingsRoute)
-            },
-            onNavigateToLabs = {
-                navController.navigate(AppRoutes.LabsRoute)
             },
             onNavigateToProviderPortal = {
                 navController.navigate(AppRoutes.ProviderPortalRoute)
@@ -61,9 +57,5 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             onSkipIntroChanged = playbackSettingsRepository::setSkipIntroEnabled,
             onBack = { navController.popBackStack() }
         )
-    }
-
-    composable(AppRoutes.LabsRoute) {
-        LabsScreen()
     }
 }

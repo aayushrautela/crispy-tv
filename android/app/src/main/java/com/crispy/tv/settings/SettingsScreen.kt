@@ -5,39 +5,29 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Science
-import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.VideoSettings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -74,7 +64,6 @@ fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToAiInsightsSettings: () -> Unit = {},
-    onNavigateToLabs: () -> Unit = {},
     onNavigateToProviderPortal: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
@@ -86,12 +75,6 @@ fun SettingsScreen(
                 title = "PERSONALIZATION",
                 items =
                     listOf(
-                        SettingsItem(
-                            label = "Search",
-                            description = "Search filters and default behavior",
-                            icon = Icons.Outlined.Search,
-                            iconTint = MaterialTheme.colorScheme.tertiary
-                        ),
                         SettingsItem(
                             label = "Playback",
                             description = "Player defaults and intro controls",
@@ -130,12 +113,6 @@ fun SettingsScreen(
                             description = "Preferred content language",
                             icon = Icons.Outlined.Language,
                             iconTint = MaterialTheme.colorScheme.primary
-                        ),
-                        SettingsItem(
-                            label = "Storage",
-                            description = "Cache, downloads, and local data",
-                            icon = Icons.Outlined.Storage,
-                            iconTint = MaterialTheme.colorScheme.secondary
                         )
                     )
             ),
@@ -144,36 +121,11 @@ fun SettingsScreen(
                 items =
                     listOf(
                         SettingsItem(
-                            label = "Labs",
-                            description = "Try experimental features",
-                            icon = Icons.Outlined.Science,
-                            iconTint = MaterialTheme.colorScheme.tertiary,
-                            onClick = onNavigateToLabs
-                        ),
-                        SettingsItem(
                             label = "AI Insights",
-                            description = "Model, key, and sync",
+                            description = "Model and API key",
                             icon = Icons.Outlined.AutoAwesome,
                             iconTint = MaterialTheme.colorScheme.primary,
                             onClick = onNavigateToAiInsightsSettings
-                        ),
-                        SettingsItem(
-                            label = "Appearance",
-                            description = "Themes and visual accents",
-                            icon = Icons.Outlined.Brush,
-                            iconTint = MaterialTheme.colorScheme.secondary
-                        ),
-                        SettingsItem(
-                            label = "Developer",
-                            description = "Diagnostics and debug options",
-                            icon = Icons.Outlined.Code,
-                            iconTint = MaterialTheme.colorScheme.tertiary
-                        ),
-                        SettingsItem(
-                            label = "Account",
-                            description = "Profile and identity",
-                            icon = Icons.Outlined.Person,
-                            iconTint = MaterialTheme.colorScheme.primary
                         ),
                         SettingsItem(
                             label = "About",

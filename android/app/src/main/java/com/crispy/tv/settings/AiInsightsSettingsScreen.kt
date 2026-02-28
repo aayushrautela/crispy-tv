@@ -4,16 +4,13 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.Card
@@ -41,17 +38,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewModelScope
-import com.crispy.tv.network.AppHttp
-import com.crispy.tv.supabase.SupabaseLabSessionStore
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 @Composable
 fun AiInsightsSettingsRoute(onBack: () -> Unit) {
@@ -67,55 +58,18 @@ fun AiInsightsSettingsRoute(onBack: () -> Unit) {
         onModelTypeSelected = vm::setModelType,
         onCustomModelNameChanged = vm::setCustomModelName,
         onOpenRouterKeyChanged = vm::setOpenRouterKey,
-        onPullFromCloud = vm::pullFromCloud,
-        onPushToCloud = vm::pushToCloud,
     )
 }
 
 data class AiInsightsSettingsUiState(
     val snapshot: AiInsightsSettingsSnapshot = AiInsightsSettingsSnapshot(AiInsightsSettings(), ""),
-    val cloudAvailable: Boolean = false,
-    val isSyncing: Boolean = false,
-    val statusMessage: String? = null,
-    val errorMessage: String? = null,
 )
 
 private class AiInsightsSettingsViewModel(
     private val settingsStore: AiInsightsSettingsStore,
-    private val cloudSync: AiInsightsSupabaseSettingsSync,
-    private val sessionStore: SupabaseLabSessionStore,
-    private val httpClient: com.crispy.tv.network.CrispyHttpClient,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AiInsightsSettingsUiState(snapshot = settingsStore.loadSnapshot()))
     val uiState: StateFlow<AiInsightsSettingsUiState> = _uiState
-
-    private var pushDebounceJob: Job? = null
-
-    init {
-        viewModelScope.launch {
-            val cloudAvailable = sessionStore.getValidSession(httpClient = httpClient) != null
-            _uiState.update { it.copy(cloudAvailable = cloudAvailable) }
-        }
-
-        viewModelScope.launch {
-            val local = settingsStore.loadSnapshot()
-            if (local.openRouterKey.isNotBlank()) return@launch
-
-            runCatching { cloudSync.pull() }
-                .onSuccess { snapshot ->
-                    if (snapshot != null && snapshot.openRouterKey.isNotBlank()) {
-                        settingsStore.saveSnapshot(snapshot)
-                        _uiState.update {
-                            it.copy(
-                                snapshot = snapshot,
-                                statusMessage = null,
-                                errorMessage = null
-                            )
-                        }
-                    }
-                }
-        }
-    }
 
     fun setMode(mode: AiInsightsMode) {
         updateSnapshot { it.copy(settings = it.settings.copy(mode = mode)) }
@@ -133,62 +87,10 @@ private class AiInsightsSettingsViewModel(
         updateSnapshot { it.copy(openRouterKey = key) }
     }
 
-    fun pullFromCloud() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, errorMessage = null, statusMessage = null) }
-            runCatching { cloudSync.pull() }
-                .onSuccess { snapshot ->
-                    if (snapshot == null) {
-                        _uiState.update { it.copy(isSyncing = false, statusMessage = "Not signed in to Supabase.") }
-                        return@launch
-                    }
-                    settingsStore.saveSnapshot(snapshot)
-                    _uiState.update {
-                        it.copy(
-                            isSyncing = false,
-                            snapshot = snapshot,
-                            statusMessage = "Pulled from Supabase.",
-                            errorMessage = null
-                        )
-                    }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isSyncing = false, errorMessage = e.message ?: "Pull failed") }
-                }
-        }
-    }
-
-    fun pushToCloud() {
-        val snapshot = _uiState.value.snapshot
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, errorMessage = null, statusMessage = null) }
-            runCatching { cloudSync.push(snapshot) }
-                .onSuccess {
-                    _uiState.update { it.copy(isSyncing = false, statusMessage = "Pushed to Supabase.") }
-                }
-                .onFailure { e ->
-                    _uiState.update { it.copy(isSyncing = false, errorMessage = e.message ?: "Push failed") }
-                }
-        }
-    }
-
     private fun updateSnapshot(transform: (AiInsightsSettingsSnapshot) -> AiInsightsSettingsSnapshot) {
         val next = transform(_uiState.value.snapshot)
         settingsStore.saveSnapshot(next)
-        _uiState.update { it.copy(snapshot = next, errorMessage = null) }
-
-        pushDebounceJob?.cancel()
-        pushDebounceJob =
-            viewModelScope.launch {
-                delay(900L)
-                runCatching { cloudSync.push(next) }
-                    .onSuccess {
-                        _uiState.update { it.copy(statusMessage = "Synced to Supabase.") }
-                    }
-                    .onFailure {
-                        // Silent by default; user can use the manual buttons.
-                    }
-            }
+        _uiState.update { it.copy(snapshot = next) }
     }
 
     companion object {
@@ -197,18 +99,8 @@ private class AiInsightsSettingsViewModel(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val httpClient = AppHttp.client(appContext)
-                    val sessionStore = SupabaseLabSessionStore(appContext)
                     return AiInsightsSettingsViewModel(
                         settingsStore = AiInsightsSettingsStore(appContext),
-                        cloudSync =
-                            AiInsightsSupabaseSettingsSync(
-                                context = appContext,
-                                httpClient = httpClient,
-                                sessionStore = sessionStore,
-                            ),
-                        sessionStore = sessionStore,
-                        httpClient = httpClient,
                     ) as T
                 }
             }
@@ -225,8 +117,6 @@ private fun AiInsightsSettingsScreen(
     onModelTypeSelected: (AiInsightsModelType) -> Unit,
     onCustomModelNameChanged: (String) -> Unit,
     onOpenRouterKeyChanged: (String) -> Unit,
-    onPullFromCloud: () -> Unit,
-    onPushToCloud: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     var showKey by remember { mutableStateOf(false) }
@@ -338,7 +228,7 @@ private fun AiInsightsSettingsScreen(
                         visualTransformation =
                             if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                         supportingText = {
-                            Text("Stored in your Supabase profile settings for sync across devices.")
+                            Text("Stored locally on this device.")
                         }
                     )
 
@@ -352,51 +242,6 @@ private fun AiInsightsSettingsScreen(
                 }
             }
 
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(imageVector = Icons.Outlined.CloudSync, contentDescription = null)
-                        Text(
-                            text = "Supabase Sync",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-
-                    Text(
-                        text =
-                            if (uiState.cloudAvailable) {
-                                "Signed in (via Labs). Settings will auto-sync best-effort."
-                            } else {
-                                "Not signed in. Use Labs > Supabase Sync to sign in."
-                            },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Row {
-                        androidx.compose.material3.FilledTonalButton(
-                            onClick = onPullFromCloud,
-                            enabled = !uiState.isSyncing,
-                        ) {
-                            Text("Pull")
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        androidx.compose.material3.OutlinedButton(
-                            onClick = onPushToCloud,
-                            enabled = !uiState.isSyncing,
-                        ) {
-                            Text("Push")
-                        }
-                    }
-
-                    uiState.statusMessage?.let {
-                        Text(text = it, style = MaterialTheme.typography.bodySmall)
-                    }
-                    uiState.errorMessage?.let {
-                        Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
         }
     }
 }

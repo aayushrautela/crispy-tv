@@ -18,7 +18,6 @@ object AppRoutes {
     const val PersonDetailsRoute = "person/details"
     const val PersonDetailsPersonIdArg = "personId"
 
-    const val LabsRoute = "labs"
     const val PlaybackSettingsRoute = "settings/playback"
     const val AddonsSettingsRoute = "settings/addons"
     const val AiInsightsSettingsRoute = "settings/ai"
