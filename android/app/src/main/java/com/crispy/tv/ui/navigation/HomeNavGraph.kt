@@ -26,6 +26,9 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onThisWeekClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.seriesId, item.type))
             },
+            onSearchClick = {
+                navController.navigate(AppRoutes.SearchRoute)
+            },
             onCatalogItemClick = { catalogItem ->
                 navController.navigate(AppRoutes.homeDetailsRoute(catalogItem.id, catalogItem.type))
             },

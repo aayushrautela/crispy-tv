@@ -15,7 +15,7 @@ enum class TopLevelDestination(
     val showInBottomBar: Boolean = true
 ) {
     Home(route = AppRoutes.HomeRoute, label = "Home", icon = Icons.Outlined.Home),
-    Search(route = AppRoutes.SearchRoute, label = "Search", icon = Icons.Outlined.Search),
+    Search(route = AppRoutes.SearchRoute, label = "Search", icon = Icons.Outlined.Search, showInBottomBar = false),
     Discover(route = AppRoutes.DiscoverRoute, label = "Discover", icon = Icons.Outlined.Explore),
     Library(route = AppRoutes.LibraryRoute, label = "Library", icon = Icons.Outlined.VideoLibrary),
     Settings(route = AppRoutes.SettingsRoute, label = "Settings", icon = Icons.Outlined.Settings)

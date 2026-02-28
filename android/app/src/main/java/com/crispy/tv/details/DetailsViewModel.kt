@@ -149,6 +149,9 @@ class DetailsViewModel internal constructor(
         if (out.backdropUrl.nullIfBlank() == null) {
             out = out.copy(backdropUrl = tmdbFallback.backdropUrl)
         }
+        if (out.logoUrl.nullIfBlank() == null) {
+            out = out.copy(logoUrl = tmdbFallback.logoUrl)
+        }
         if (out.description.nullIfBlank() == null) {
             out = out.copy(description = tmdbFallback.description)
         }

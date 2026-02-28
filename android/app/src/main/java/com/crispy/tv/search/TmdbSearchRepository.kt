@@ -20,6 +20,8 @@ class TmdbSearchRepository(
             return emptyList()
         }
 
+        val excludePeopleFromAll = filter == SearchTypeFilter.ALL
+
         val (path, mediaTypeHint) =
             when (filter) {
                 SearchTypeFilter.ALL -> "search/multi" to null
@@ -47,6 +49,10 @@ class TmdbSearchRepository(
                     val result = resultsArray.optJSONObject(i) ?: continue
                     val mediaType = result.optStringOrNull("media_type") ?: mediaTypeHint ?: continue
 
+                    if (excludePeopleFromAll && mediaType.equals("person", ignoreCase = true)) {
+                        continue
+                    }
+
                     add(
                         TmdbSearchResultInput(
                             mediaType = mediaType,
@@ -55,7 +61,7 @@ class TmdbSearchRepository(
                             name = result.optStringOrNull("name"),
                             releaseDate = result.optStringOrNull("release_date"),
                             firstAirDate = result.optStringOrNull("first_air_date"),
-                            posterPath = result.optStringOrNull("poster_path"),
+                            posterPath = result.optStringOrNull("poster_path") ?: result.optStringOrNull("backdrop_path"),
                             profilePath = result.optStringOrNull("profile_path"),
                             voteAverage = result.optDoubleOrNull("vote_average")
                         )
@@ -64,7 +70,8 @@ class TmdbSearchRepository(
             }
 
         val normalized = normalizeTmdbSearchResults(inputs)
-        return normalized.map { item ->
+        val withImagesOnly = normalized.filter { item -> !item.imageUrl.isNullOrBlank() }
+        return withImagesOnly.map { item ->
             CatalogItem(
                 id = item.id,
                 title = item.title,

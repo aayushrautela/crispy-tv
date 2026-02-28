@@ -121,7 +121,13 @@ class TmdbEnrichmentRepository(
                 titleDetails = titleDetails
             )
 
-        val fallbackDetails = detailsJson.toFallbackMediaDetails(normalizedContentId, mediaType, imdbFromDetails ?: imdbId)
+        val fallbackDetails =
+            detailsJson.toFallbackMediaDetails(
+                normalizedContentId = normalizedContentId,
+                mediaType = mediaType,
+                imdbId = imdbFromDetails ?: imdbId,
+                preferredLanguage = language
+            )
 
         return TmdbEnrichmentResult(
             enrichment = enrichment,
@@ -151,7 +157,12 @@ class TmdbEnrichmentRepository(
                 MetadataLabMediaType.SERIES -> detailsJson.optJSONObject("external_ids")?.optStringNonBlank("imdb_id")
             }
 
-        return detailsJson.toFallbackMediaDetails(normalizedContentId, mediaType, imdbFromDetails ?: imdbId)
+        return detailsJson.toFallbackMediaDetails(
+            normalizedContentId = normalizedContentId,
+            mediaType = mediaType,
+            imdbId = imdbFromDetails ?: imdbId,
+            preferredLanguage = language
+        )
     }
 
     private suspend fun fetchArtworkDetails(
@@ -160,12 +171,16 @@ class TmdbEnrichmentRepository(
         language: String
     ): JSONObject? {
         val path = "${mediaType.pathSegment()}/$tmdbId"
+        val append =
+            buildList {
+                add("images")
+                if (mediaType == MetadataLabMediaType.SERIES) add("external_ids")
+            }.joinToString(",")
         val query =
             buildMap {
                 put("language", language)
-                if (mediaType == MetadataLabMediaType.SERIES) {
-                    put("append_to_response", "external_ids")
-                }
+                put("append_to_response", append)
+                put("include_image_language", buildIncludeImageLanguage(language))
             }
         return client.getJson(path = path, query = query)
     }
@@ -178,14 +193,15 @@ class TmdbEnrichmentRepository(
         val path = "${mediaType.pathSegment()}/$tmdbId"
         val append =
             when (mediaType) {
-                MetadataLabMediaType.MOVIE -> "credits,videos,reviews"
-                MetadataLabMediaType.SERIES -> "credits,videos,reviews,external_ids"
+                MetadataLabMediaType.MOVIE -> "credits,videos,reviews,images"
+                MetadataLabMediaType.SERIES -> "credits,videos,reviews,external_ids,images"
             }
         return client.getJson(
             path = path,
             query = mapOf(
                 "language" to language,
-                "append_to_response" to append
+                "append_to_response" to append,
+                "include_image_language" to buildIncludeImageLanguage(language)
             )
         )
     }
@@ -584,7 +600,8 @@ private fun JSONObject.optLongOrNull(key: String): Long? {
 private fun JSONObject.toFallbackMediaDetails(
     normalizedContentId: String,
     mediaType: MetadataLabMediaType,
-    imdbId: String?
+    imdbId: String?,
+    preferredLanguage: String
 ): MediaDetails {
     val title =
         when (mediaType) {
@@ -594,6 +611,7 @@ private fun JSONObject.toFallbackMediaDetails(
 
     val posterUrl = TmdbApi.imageUrl(optStringNonBlank("poster_path"), size = "w500")
     val backdropUrl = TmdbApi.imageUrl(optStringNonBlank("backdrop_path"), size = "w780")
+    val logoUrl = parseBestTitleLogoUrl(images = optJSONObject("images"), preferredLanguage = preferredLanguage)
     val description = optStringNonBlank("overview")
 
     val genres =
@@ -650,7 +668,7 @@ private fun JSONObject.toFallbackMediaDetails(
         title = title,
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,
-        logoUrl = null,
+        logoUrl = logoUrl,
         description = description,
         genres = genres,
         year = year,
@@ -663,4 +681,65 @@ private fun JSONObject.toFallbackMediaDetails(
         videos = emptyList(),
         addonId = "tmdb"
     )
+}
+
+private fun buildIncludeImageLanguage(language: String): String {
+    val base = language.substringBefore('-').trim().lowercase(Locale.US)
+    val out = linkedSetOf<String>()
+    if (base.isNotBlank()) out.add(base)
+    out.add("en")
+    out.add("null")
+    return out.joinToString(",")
+}
+
+private fun parseBestTitleLogoUrl(images: JSONObject?, preferredLanguage: String): String? {
+    val logos = images?.optJSONArray("logos") ?: return null
+    if (logos.length() == 0) return null
+
+    data class LogoCandidate(
+        val filePath: String,
+        val iso6391: String?,
+        val voteAverage: Double,
+        val voteCount: Int,
+        val width: Int,
+        val height: Int,
+        val langScore: Int
+    )
+
+    val preferredBase = preferredLanguage.substringBefore('-').trim().lowercase(Locale.US)
+    val candidates =
+        logos
+            .toJsonObjectList()
+            .mapNotNull { item ->
+                val filePath = item.optStringNonBlank("file_path") ?: return@mapNotNull null
+                val iso = item.optStringNonBlank("iso_639_1")?.trim()?.lowercase(Locale.US)
+                val langScore =
+                    when {
+                        preferredBase.isNotBlank() && iso == preferredBase -> 3
+                        iso == null -> 2
+                        iso == "en" -> 1
+                        else -> 0
+                    }
+                LogoCandidate(
+                    filePath = filePath,
+                    iso6391 = iso,
+                    voteAverage = item.optDoubleOrNull("vote_average") ?: 0.0,
+                    voteCount = item.optInt("vote_count", 0),
+                    width = item.optInt("width", 0),
+                    height = item.optInt("height", 0),
+                    langScore = langScore
+                )
+            }
+
+    val best =
+        candidates.maxWithOrNull(
+            compareByDescending<LogoCandidate> { it.langScore }
+                .thenByDescending { it.voteAverage }
+                .thenByDescending { it.voteCount }
+                .thenByDescending { it.width }
+                .thenByDescending { it.height }
+                .thenBy { it.filePath }
+        ) ?: return null
+
+    return TmdbApi.imageUrl(best.filePath, size = "w500")
 }
