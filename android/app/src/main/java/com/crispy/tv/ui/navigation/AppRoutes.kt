@@ -22,6 +22,7 @@ object AppRoutes {
     const val AddonsSettingsRoute = "settings/addons"
     const val AiInsightsSettingsRoute = "settings/ai"
     const val ProviderPortalRoute = "settings/providers"
+    const val AccountsProfilesRoute = "settings/accounts"
 
     const val CatalogListRoute = "catalog"
     const val CatalogMediaTypeArg = "mediaType"

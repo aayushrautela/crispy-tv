@@ -50,6 +50,7 @@ internal fun HomeScreen(
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onThisWeekClick: (ThisWeekItem) -> Unit,
     onSearchClick: () -> Unit,
+    onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit
 ) {
@@ -104,7 +105,7 @@ internal fun HomeScreen(
                                 )
                             }
 
-                            HomeProfileSelector()
+                            HomeProfileSelector(onClick = onProfileClick)
                         }
 
                         LazyRow(
@@ -243,10 +244,11 @@ internal fun HomeScreen(
 }
 
 @Composable
-private fun HomeProfileSelector() {
-    Icon(
-        imageVector = Icons.Outlined.Person,
-        contentDescription = "Profile",
-        modifier = Modifier.padding(12.dp)
-    )
+private fun HomeProfileSelector(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = Icons.Outlined.Person,
+            contentDescription = "Profile"
+        )
+    }
 }

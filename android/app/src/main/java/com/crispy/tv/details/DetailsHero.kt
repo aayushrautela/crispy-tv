@@ -483,60 +483,102 @@ private fun HeroYouTubeTrailerLayer(
 private fun buildYoutubeTrailerHtml(videoId: String, origin: String): String {
     val id = escapeJsString(videoId.trim())
     val o = escapeJsString(origin.trim())
-    return (
-        "<!DOCTYPE html>" +
-            "<html>" +
-            "<head>" +
-            "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'/>" +
-            "<style>" +
-            "html,body{margin:0;padding:0;background:#000;overflow:hidden;}" +
-            "#player{position:absolute;top:0;left:0;width:100%;height:100%;transform:scale(1.35);transform-origin:center center;}" +
-            "</style>" +
-            "</head>" +
-            "<body>" +
-            "<div id='player'></div>" +
-            "<script>" +
-            "(function(){" +
-            "var VIDEO_ID='$id';" +
-            "var ORIGIN='$o';" +
-            "var desiredMuted=true;" +
-            "var desiredPlaying=false;" +
-            "var player=null;" +
-            "function safeCall(fn){try{fn();}catch(e){}}" +
-            "function notifyReady(){safeCall(function(){CrispyBridge.onReady();});}" +
-            "function notifyState(state){" +
-            "  var t=0;" +
-            "  safeCall(function(){ if(player&&player.getCurrentTime){ t=player.getCurrentTime(); } });" +
-            "  safeCall(function(){ CrispyBridge.onState(state,t); });" +
-            "}" +
-            "function notifyError(code){safeCall(function(){CrispyBridge.onError(code);});}" +
-            "window.__crispyTrailer={" +
-            "  setMuted:function(m){ desiredMuted=!!m; if(!player){return;} safeCall(function(){ if(desiredMuted){ player.mute(); player.setVolume(0);} else { player.setVolume(100); player.unMute(); } }); }," +
-            "  setPlaying:function(p){ desiredPlaying=!!p; if(!player){return;} safeCall(function(){ if(desiredPlaying){ player.playVideo(); } else { player.pauseVideo(); } }); }" +
-            "};" +
-            "window.onYouTubeIframeAPIReady=function(){" +
-            "  player=new YT.Player('player',{" +
-            "    width:'100%',height:'100%',videoId:VIDEO_ID," +
-            "    playerVars:{autoplay:0,controls:0,rel:0,modestbranding:1,playsinline:1,mute:1,loop:1,playlist:VIDEO_ID,enablejsapi:1,origin:ORIGIN}," +
-            "    events:{" +
-            "      onReady:function(){" +
-            "        safeCall(function(){ if(desiredMuted){ player.mute(); player.setVolume(0);} else { player.setVolume(100); player.unMute(); } });" +
-            "        safeCall(function(){ if(desiredPlaying){ player.playVideo(); } });" +
-            "        notifyReady();" +
-            "      }," +
-            "      onStateChange:function(e){ notifyState(e.data); }," +
-            "      onError:function(e){ notifyError(e.data); }" +
-            "    }" +
-            "  });" +
-            "};" +
-            "var tag=document.createElement('script');" +
-            "tag.src='https://www.youtube.com/iframe_api';" +
-            "document.head.appendChild(tag);" +
-            "})();" +
-            "</script>" +
-            "</body>" +
-            "</html>"
-    )
+    //language=HTML
+    return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+        <style>
+          html, body {
+            margin: 0; padding: 0;
+            background: #000;
+            overflow: hidden;
+            width: 100%; height: 100%;
+          }
+          /* Oversized + centred to crop YouTube chrome (controls, logo, watermark).
+             Pure layout – no CSS transform – so the iframe's SurfaceView composites
+             correctly on every Android WebView version. */
+          #player {
+            position: absolute;
+            width: 135%; height: 135%;
+            top: -17.5%; left: -17.5%;
+          }
+        </style>
+        </head>
+        <body>
+        <div id="player"></div>
+        <script>
+        (function() {
+          var VIDEO_ID = '$id';
+          var ORIGIN  = '$o';
+          var desiredMuted   = false;
+          var desiredPlaying = false;
+          var player = null;
+
+          function safeCall(fn) { try { fn(); } catch(e) {} }
+          function notifyReady()      { safeCall(function() { CrispyBridge.onReady(); }); }
+          function notifyState(state) {
+            var t = 0;
+            safeCall(function() { if (player && player.getCurrentTime) t = player.getCurrentTime(); });
+            safeCall(function() { CrispyBridge.onState(state, t); });
+          }
+          function notifyError(code) { safeCall(function() { CrispyBridge.onError(code); }); }
+
+          function applyMute() {
+            if (!player) return;
+            safeCall(function() {
+              if (desiredMuted) { player.mute(); player.setVolume(0); }
+              else              { player.setVolume(100); player.unMute(); }
+            });
+          }
+
+          window.__crispyTrailer = {
+            setMuted: function(m) {
+              desiredMuted = !!m;
+              applyMute();
+            },
+            setPlaying: function(p) {
+              desiredPlaying = !!p;
+              if (!player) return;
+              safeCall(function() {
+                if (desiredPlaying) player.playVideo();
+                else                player.pauseVideo();
+              });
+            }
+          };
+
+          window.onYouTubeIframeAPIReady = function() {
+            player = new YT.Player('player', {
+              width: '100%', height: '100%',
+              videoId: VIDEO_ID,
+              playerVars: {
+                autoplay: 0, controls: 0, rel: 0,
+                modestbranding: 1, playsinline: 1,
+                mute: 1,          /* keeps autoplay allowed; Kotlin bridge unmutes after load */
+                loop: 1, playlist: VIDEO_ID,
+                enablejsapi: 1, origin: ORIGIN
+              },
+              events: {
+                onReady: function() {
+                  applyMute();
+                  safeCall(function() { if (desiredPlaying) player.playVideo(); });
+                  notifyReady();
+                },
+                onStateChange: function(e) { notifyState(e.data); },
+                onError:       function(e) { notifyError(e.data); }
+              }
+            });
+          };
+
+          var tag = document.createElement('script');
+          tag.src = 'https://www.youtube.com/iframe_api';
+          document.head.appendChild(tag);
+        })();
+        </script>
+        </body>
+        </html>
+    """.trimIndent()
 }
 
 private fun escapeJsString(value: String): String {

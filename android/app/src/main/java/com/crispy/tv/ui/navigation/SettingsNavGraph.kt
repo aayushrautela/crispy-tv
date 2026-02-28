@@ -7,6 +7,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import com.crispy.tv.settings.AccountsProfilesRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
 import com.crispy.tv.settings.AiInsightsSettingsRoute
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
@@ -28,6 +29,9 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             },
             onNavigateToProviderPortal = {
                 navController.navigate(AppRoutes.ProviderPortalRoute)
+            },
+            onNavigateToAccountsProfiles = {
+                navController.navigate(AppRoutes.AccountsProfilesRoute)
             }
         )
     }
@@ -42,6 +46,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
     composable(AppRoutes.ProviderPortalRoute) {
         ProviderAuthPortalRoute(onBack = { navController.popBackStack() })
+    }
+
+    composable(AppRoutes.AccountsProfilesRoute) {
+        AccountsProfilesRoute(onBack = { navController.popBackStack() })
     }
 
     composable(AppRoutes.PlaybackSettingsRoute) {

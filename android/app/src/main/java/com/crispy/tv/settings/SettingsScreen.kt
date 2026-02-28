@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.VideoSettings
@@ -64,7 +65,8 @@ fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToAiInsightsSettings: () -> Unit = {},
-    onNavigateToProviderPortal: () -> Unit = {}
+    onNavigateToProviderPortal: () -> Unit = {},
+    onNavigateToAccountsProfiles: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -107,6 +109,13 @@ fun SettingsScreen(
                             icon = Icons.Outlined.Cloud,
                             iconTint = MaterialTheme.colorScheme.tertiary,
                             onClick = onNavigateToProviderPortal
+                        ),
+                        SettingsItem(
+                            label = "Accounts & Profiles",
+                            description = "Sign in and manage profiles",
+                            icon = Icons.Outlined.Person,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onClick = onNavigateToAccountsProfiles
                         ),
                         SettingsItem(
                             label = "Language & Region",
