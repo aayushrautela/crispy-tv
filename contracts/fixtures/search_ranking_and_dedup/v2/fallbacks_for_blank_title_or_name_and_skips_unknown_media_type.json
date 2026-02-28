@@ -1,0 +1,64 @@
+{
+  "contract_version": 2,
+  "suite": "search_ranking_and_dedup",
+  "case_id": "fallbacks_for_blank_title_or_name_and_skips_unknown_media_type",
+  "input": {
+    "results": [
+      {
+        "media_type": "movie",
+        "id": 101,
+        "title": "   ",
+        "name": "Fallback Movie",
+        "release_date": "2010-01-02",
+        "vote_average": 7.0
+      },
+      {
+        "media_type": "tv",
+        "id": 202,
+        "name": "",
+        "title": "Fallback Series",
+        "first_air_date": "2009-12-31",
+        "poster_path": "/series.jpg",
+        "vote_average": 9.0
+      },
+      {
+        "media_type": "person",
+        "id": 303,
+        "name": " ",
+        "title": "Name From Title",
+        "profile_path": "/person.jpg"
+      },
+      {
+        "media_type": "collection",
+        "id": 404,
+        "title": "Should Skip",
+        "poster_path": "/skip.jpg"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "id": "tmdb:101",
+        "type": "movie",
+        "title": "Fallback Movie",
+        "year": 2010,
+        "rating": 7.0
+      },
+      {
+        "id": "tmdb:202",
+        "type": "series",
+        "title": "Fallback Series",
+        "year": 2009,
+        "image_url": "https://image.tmdb.org/t/p/w500/series.jpg",
+        "rating": 9.0
+      },
+      {
+        "id": "tmdb:303",
+        "type": "person",
+        "title": "Name From Title",
+        "image_url": "https://image.tmdb.org/t/p/h632/person.jpg"
+      }
+    ]
+  }
+}

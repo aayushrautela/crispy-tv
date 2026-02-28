@@ -1,0 +1,68 @@
+{
+  "contract_version": 2,
+  "suite": "search_ranking_and_dedup",
+  "case_id": "includes_people_and_keeps_tmdb_order",
+  "input": {
+    "results": [
+      {
+        "media_type": "person",
+        "id": 287,
+        "name": "Brad Pitt",
+        "profile_path": "/kU3B75TyRiCgE270EyZnHjfivoq.jpg"
+      },
+      {
+        "media_type": "movie",
+        "id": 550,
+        "title": "Fight Club",
+        "release_date": "1999-10-15",
+        "poster_path": "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+        "vote_average": 8.4
+      },
+      {
+        "media_type": "tv",
+        "id": 1399,
+        "name": "Game of Thrones",
+        "first_air_date": "2011-04-17",
+        "poster_path": "/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg",
+        "vote_average": 8.4
+      },
+      {
+        "media_type": "person",
+        "id": 287,
+        "name": "Brad Pitt (dup)",
+        "profile_path": "/dup.jpg"
+      },
+      {
+        "media_type": "movie",
+        "id": 550,
+        "title": "Fight Club (dup)"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "id": "tmdb:287",
+        "type": "person",
+        "title": "Brad Pitt",
+        "image_url": "https://image.tmdb.org/t/p/h632/kU3B75TyRiCgE270EyZnHjfivoq.jpg"
+      },
+      {
+        "id": "tmdb:550",
+        "type": "movie",
+        "title": "Fight Club",
+        "year": 1999,
+        "image_url": "https://image.tmdb.org/t/p/w500/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+        "rating": 8.4
+      },
+      {
+        "id": "tmdb:1399",
+        "type": "series",
+        "title": "Game of Thrones",
+        "year": 2011,
+        "image_url": "https://image.tmdb.org/t/p/w500/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg",
+        "rating": 8.4
+      }
+    ]
+  }
+}

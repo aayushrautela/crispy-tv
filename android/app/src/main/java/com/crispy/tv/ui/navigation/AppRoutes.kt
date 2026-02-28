@@ -15,6 +15,9 @@ object AppRoutes {
     const val HomeDetailsItemIdArg = "itemId"
     const val HomeDetailsMediaTypeArg = "mediaType"
 
+    const val PersonDetailsRoute = "person/details"
+    const val PersonDetailsPersonIdArg = "personId"
+
     const val LabsRoute = "labs"
     const val PlaybackSettingsRoute = "settings/playback"
     const val HomeScreenSettingsRoute = "settings/home"
@@ -33,6 +36,8 @@ object AppRoutes {
     // Details: type + id are required route segments.
     val HomeDetailsRoutePattern: String =
         "$HomeDetailsRoute/{$HomeDetailsMediaTypeArg}/{$HomeDetailsItemIdArg}"
+    val PersonDetailsRoutePattern: String =
+        "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}"
     val CatalogListRoutePattern: String =
         "$CatalogListRoute/{$CatalogMediaTypeArg}/{$CatalogIdArg}" +
             "?$CatalogTitleArg={$CatalogTitleArg}" +
@@ -57,5 +62,9 @@ object AppRoutes {
             "&$CatalogAddonIdArg=${Uri.encode(section.addonId)}" +
             "&$CatalogBaseUrlArg=${Uri.encode(section.baseUrl)}" +
             "&$CatalogQueryArg=${Uri.encode(query)}"
+    }
+
+    fun personDetailsRoute(personId: String): String {
+        return "$PersonDetailsRoute/${Uri.encode(personId.trim())}"
     }
 }

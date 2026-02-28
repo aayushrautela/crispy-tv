@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 
 @Composable
@@ -49,8 +48,7 @@ fun SearchRoute(
         uiState = uiState,
         onQueryChange = viewModel::updateQuery,
         onClearQuery = viewModel::clearQuery,
-        onMediaTypeChange = viewModel::setMediaType,
-        onCatalogToggle = viewModel::toggleCatalog,
+        onFilterChange = viewModel::setFilter,
         onItemClick = onItemClick
     )
 }
@@ -61,8 +59,7 @@ private fun SearchScreen(
     uiState: SearchUiState,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
-    onMediaTypeChange: (MetadataLabMediaType?) -> Unit,
-    onCatalogToggle: (String) -> Unit,
+    onFilterChange: (SearchTypeFilter) -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val pageHorizontalPadding = responsivePageHorizontalPadding()
@@ -116,8 +113,7 @@ private fun SearchScreen(
             ) {
                 SearchResultsContent(
                     uiState = uiState,
-                    onMediaTypeChange = onMediaTypeChange,
-                    onCatalogToggle = onCatalogToggle,
+                    onFilterChange = onFilterChange,
                     onItemClick = onItemClick,
                     modifier = Modifier.fillMaxWidth().imePadding()
                 )
@@ -126,8 +122,7 @@ private fun SearchScreen(
             if (!isExpanded) {
                 SearchResultsContent(
                     uiState = uiState,
-                    onMediaTypeChange = onMediaTypeChange,
-                    onCatalogToggle = onCatalogToggle,
+                    onFilterChange = onFilterChange,
                     onItemClick = onItemClick,
                     modifier =
                         Modifier

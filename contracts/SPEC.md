@@ -34,8 +34,13 @@ This directory defines parity-critical behavior for the rewrite apps.
   - For page 1 with no filters, try simple path first, then path-style extras, then legacy query style.
   - Path/query forms must include canonical `skip` and `limit`, preserve deterministic filter ordering, and keep addon query parameters.
 - `search_ranking_and_dedup`
-  - Search result ordering is deterministic: `preferred_addon_id` first, then Cinemeta, then other addons in stable order.
-  - Deduplicate by metadata id after ranking; keep the first occurrence and source addon.
+  - Normalize TMDB search results and preserve the upstream (TMDB) ordering.
+  - Include `person` results (no filtering).
+  - Type mapping: TMDB `movie` -> `movie`, TMDB `tv` -> `series`, TMDB `person` -> `person` (unknown media types are ignored).
+  - Dedupe key is `(type, tmdb_id)`; keep the first occurrence.
+  - Canonical id form is `tmdb:<id>`.
+  - Image URLs use `w500` for movie/series posters and `h632` for person profiles.
+  - `year` is parsed from the first 4 digits of `release_date`/`first_air_date` when present; invalid/missing yields `null`.
 - `metadata_addon_primary`
   - Addon-first metadata merge with deterministic precedence.
   - Source ranking is `preferred_addon_id` first, then Cinemeta, then remaining addons.

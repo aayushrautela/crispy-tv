@@ -1,0 +1,71 @@
+{
+  "contract_version": 2,
+  "suite": "search_ranking_and_dedup",
+  "case_id": "skips_invalid_ids_and_dedups_per_type",
+  "input": {
+    "results": [
+      {
+        "media_type": "movie",
+        "id": 0,
+        "title": "Invalid Movie",
+        "release_date": "2012-01-01",
+        "poster_path": "/x.jpg"
+      },
+      {
+        "media_type": "person",
+        "id": -1,
+        "name": "Invalid Person",
+        "profile_path": "/p.jpg"
+      },
+      {
+        "media_type": "tv",
+        "id": 123,
+        "name": "Same Id Series",
+        "first_air_date": "abcd",
+        "poster_path": "/s.jpg",
+        "vote_average": 5.25
+      },
+      {
+        "media_type": "tv",
+        "id": 123,
+        "name": "Same Id Series (dup)",
+        "first_air_date": "2011-01-01",
+        "poster_path": "/s2.jpg"
+      },
+      {
+        "media_type": "movie",
+        "id": 123,
+        "title": "Same Id Movie",
+        "release_date": "2018-05-01",
+        "poster_path": "/m.jpg",
+        "vote_average": 6.0
+      },
+      {
+        "media_type": "movie",
+        "id": 123,
+        "title": "Same Id Movie (dup)",
+        "release_date": "2019-01-01",
+        "poster_path": "/m2.jpg"
+      }
+    ]
+  },
+  "expected": {
+    "items": [
+      {
+        "id": "tmdb:123",
+        "type": "series",
+        "title": "Same Id Series",
+        "image_url": "https://image.tmdb.org/t/p/w500/s.jpg",
+        "rating": 5.25
+      },
+      {
+        "id": "tmdb:123",
+        "type": "movie",
+        "title": "Same Id Movie",
+        "year": 2018,
+        "image_url": "https://image.tmdb.org/t/p/w500/m.jpg",
+        "rating": 6.0
+      }
+    ]
+  }
+}

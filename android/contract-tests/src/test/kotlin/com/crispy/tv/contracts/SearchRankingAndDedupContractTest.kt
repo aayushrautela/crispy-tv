@@ -1,9 +1,12 @@
 package com.crispy.tv.contracts
 
-import com.crispy.tv.domain.catalog.AddonSearchResult
-import com.crispy.tv.domain.catalog.SearchMetaInput
-import com.crispy.tv.domain.catalog.mergeSearchResults
+import com.crispy.tv.domain.catalog.NormalizedSearchItem
+import com.crispy.tv.domain.catalog.TmdbSearchResultInput
+import com.crispy.tv.domain.catalog.normalizeTmdbSearchResults
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -24,51 +27,49 @@ class SearchRankingAndDedupContractTest {
             )
 
             val input = fixture.requireJsonObject("input", path)
-            val addonResults =
-                input.requireJsonArray("addon_results", path).mapIndexed { index, element ->
-                    val addon =
+            val results =
+                input.requireJsonArray("results", path).mapIndexed { index, element ->
+                    val result =
                         element as? JsonObject
-                            ?: error("$caseId: input.addon_results[$index] must be object")
-
-                    val metas =
-                        addon.requireJsonArray("metas", path).mapIndexed { metaIndex, metaElement ->
-                            val meta =
-                                metaElement as? JsonObject
-                                    ?: error("$caseId: input.addon_results[$index].metas[$metaIndex] must be object")
-                            SearchMetaInput(
-                                id = meta.requireString("id", path),
-                                title = meta.requireString("title", path)
-                            )
-                        }
-
-                    AddonSearchResult(
-                        addonId = addon.requireString("addon_id", path),
-                        metas = metas
+                            ?: error("$caseId: input.results[$index] must be object")
+                    TmdbSearchResultInput(
+                        mediaType = result.requireString("media_type", path),
+                        id = result.requireInt("id", path),
+                        title = result.optionalString("title", path),
+                        name = result.optionalString("name", path),
+                        releaseDate = result.optionalString("release_date", path),
+                        firstAirDate = result.optionalString("first_air_date", path),
+                        posterPath = result.optionalString("poster_path", path),
+                        profilePath = result.optionalString("profile_path", path),
+                        voteAverage = result.optionalDouble("vote_average")
                     )
                 }
 
             val expected = fixture.requireJsonObject("expected", path)
-            val expectedMerged =
-                expected.requireJsonArray("merged", path).mapIndexed { index, element ->
-                    val meta =
+            val expectedItems =
+                expected.requireJsonArray("items", path).mapIndexed { index, element ->
+                    val item =
                         element as? JsonObject
-                            ?: error("$caseId: expected.merged[$index] must be object")
-                    Triple(
-                        meta.requireString("id", path),
-                        meta.requireString("title", path),
-                        meta.requireString("addon_id", path)
+                            ?: error("$caseId: expected.items[$index] must be object")
+                    NormalizedSearchItem(
+                        id = item.requireString("id", path),
+                        type = item.requireString("type", path),
+                        title = item.requireString("title", path),
+                        year = item.optionalInt("year", path),
+                        imageUrl = item.optionalString("image_url", path),
+                        rating = item.optionalDouble("rating")
                     )
                 }
 
-            val actualMerged =
-                mergeSearchResults(
-                    addonResults = addonResults,
-                    preferredAddonId = input.optionalString("preferred_addon_id", path)
-                ).map { meta ->
-                    Triple(meta.id, meta.title, meta.addonId)
-                }
+            val actualItems = normalizeTmdbSearchResults(results)
 
-            assertEquals(expectedMerged, actualMerged, "$caseId: merged")
+            assertEquals(expectedItems, actualItems, "$caseId: items")
         }
     }
+}
+
+private fun JsonObject.optionalDouble(key: String): Double? {
+    val element = this[key] ?: return null
+    val primitive = element as? JsonPrimitive ?: return null
+    return primitive.jsonPrimitive.doubleOrNull
 }

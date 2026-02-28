@@ -5,325 +5,124 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
-import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.domain.catalog.CatalogFilter
-import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.player.CatalogLabResult
-import com.crispy.tv.player.CatalogPageRequest
-import com.crispy.tv.player.CatalogSearchLabService
-import com.crispy.tv.player.MetadataLabMediaType
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-data class SearchCatalogOption(
-    val key: String,
-    val label: String,
-    val sections: List<CatalogSectionRef>
-)
+enum class SearchTypeFilter {
+    ALL,
+    MOVIES,
+    SERIES,
+    PEOPLE
+}
 
 data class SearchUiState(
     val query: String = "",
-    val mediaType: MetadataLabMediaType? = null,
-    val isLoadingCatalogs: Boolean = false,
-    val catalogs: List<SearchCatalogOption> = emptyList(),
-    val selectedCatalogKeys: Set<String> = emptySet(),
+    val filter: SearchTypeFilter = SearchTypeFilter.ALL,
     val isSearching: Boolean = false,
     val results: List<CatalogItem> = emptyList()
 )
 
 class SearchViewModel(
-    private val appContext: Context,
-    private val homeCatalogService: HomeCatalogService,
-    private val catalogSearchService: CatalogSearchLabService
+    private val searchRepository: TmdbSearchRepository,
+    private val localeProvider: () -> Locale = { Locale.getDefault() }
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState
 
-    private var refreshJob: Job? = null
     private var searchJob: Job? = null
-    private var debounceJob: Job? = null
-
-    init {
-        refreshCatalogs()
-    }
-
-    fun setMediaType(mediaType: MetadataLabMediaType?) {
-        if (_uiState.value.mediaType == mediaType) {
-            return
-        }
-        _uiState.value =
-            _uiState.value.copy(
-                mediaType = mediaType,
-                results = emptyList(),
-                catalogs = emptyList(),
-                selectedCatalogKeys = emptySet()
-            )
-        refreshCatalogs()
-    }
-
-    fun refreshCatalogs() {
-        refreshJob?.cancel()
-        refreshJob =
-            viewModelScope.launch {
-                _uiState.value =
-                    _uiState.value.copy(
-                        isLoadingCatalogs = true,
-                        catalogs = emptyList()
-                    )
-
-                val mediaTypes = when (val mt = _uiState.value.mediaType) {
-                    null -> listOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
-                    else -> listOf(mt)
-                }
-                val allOptions = LinkedHashMap<String, SearchCatalogOption>()
-                for (type in mediaTypes) {
-                    val typeString = type.toCatalogTypeString()
-                    val (discoverCatalogs, _) =
-                        withContext(Dispatchers.IO) {
-                            homeCatalogService.listDiscoverCatalogs(mediaType = typeString, limit = 200)
-                        }
-                    val labResult =
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                catalogSearchService.fetchCatalogPage(
-                                    request =
-                                        CatalogPageRequest(
-                                            mediaType = type,
-                                            catalogId = ""
-                                        )
-                                )
-                            }.getOrElse {
-                                CatalogLabResult()
-                            }
-                        }
-                    val options = buildOptions(discoverCatalogs, labResult)
-                    allOptions.putAll(options)
-                }
-
-                val options = allOptions.values.toList()
-                val previousSelection = _uiState.value.selectedCatalogKeys
-                val nextSelection =
-                    previousSelection
-                        .filter { allOptions.containsKey(it) }
-                        .toSet()
-                        .ifEmpty { options.map { it.key }.toSet() }
-
-                _uiState.value =
-                    _uiState.value.copy(
-                        isLoadingCatalogs = false,
-                        catalogs = options,
-                        selectedCatalogKeys = nextSelection
-                    )
-                debounceSearch()
-            }
-    }
+    private var searchToken: Long = 0
 
     fun updateQuery(query: String) {
         _uiState.value = _uiState.value.copy(query = query)
-        debounceSearch()
-    }
-
-    fun toggleCatalog(key: String) {
-        val current = _uiState.value.selectedCatalogKeys
-        val allKeys = _uiState.value.catalogs.map { it.key }.toSet()
-        val next =
-            if (key == "__all__") {
-                if (current.size == allKeys.size) emptySet() else allKeys
-            } else if (current.contains(key)) {
-                val filtered = current - key
-                if (filtered.isEmpty()) current else filtered
-            } else {
-                current + key
-            }
-        _uiState.value = _uiState.value.copy(selectedCatalogKeys = next)
-        debounceSearch()
+        scheduleSearch()
     }
 
     fun clearQuery() {
         searchJob?.cancel()
-        debounceJob?.cancel()
-        _uiState.value =
-            _uiState.value.copy(
-                query = "",
-                isSearching = false,
-                results = emptyList()
-            )
+        _uiState.value = _uiState.value.copy(query = "", isSearching = false, results = emptyList())
     }
 
-    private fun debounceSearch() {
-        debounceJob?.cancel()
-        debounceJob =
-            viewModelScope.launch {
-                delay(250)
-                runSearchNow()
-            }
+    fun setFilter(filter: SearchTypeFilter) {
+        if (_uiState.value.filter == filter) {
+            return
+        }
+        _uiState.value = _uiState.value.copy(filter = filter)
+        scheduleSearch()
     }
 
-    private fun runSearchNow() {
-        val query = _uiState.value.query.trim()
-        if (query.isBlank()) {
-            searchJob?.cancel()
-            _uiState.value =
-                _uiState.value.copy(
-                    isSearching = false,
-                    results = emptyList()
-                )
-            return
-        }
-
-        val selected =
-            _uiState.value.catalogs.filter { _uiState.value.selectedCatalogKeys.contains(it.key) }
-        if (selected.isEmpty()) {
-            _uiState.value =
-                _uiState.value.copy(
-                    isSearching = false,
-                    results = emptyList()
-                )
-            return
-        }
-
+    private fun scheduleSearch() {
+        searchToken += 1
+        val token = searchToken
         searchJob?.cancel()
         searchJob =
             viewModelScope.launch {
-                _uiState.value =
-                    _uiState.value.copy(
-                        isSearching = true,
-                        results = emptyList()
-                    )
+                delay(250)
 
-                val items =
+                val query = _uiState.value.query.trim()
+                if (query.isBlank()) {
+                    _uiState.value = _uiState.value.copy(isSearching = false, results = emptyList())
+                    return@launch
+                }
+
+                if (token != searchToken) {
+                    return@launch
+                }
+
+                _uiState.value = _uiState.value.copy(isSearching = true)
+
+                val languageTag = localeProvider().toTmdbLanguageTag()
+                val filter = _uiState.value.filter
+                val results =
                     withContext(Dispatchers.IO) {
-                        coroutineScope {
-                            selected
-                                .flatMap { it.sections }
-                                .map { section ->
-                                    async {
-                                        runCatching {
-                                            homeCatalogService.fetchCatalogPage(
-                                                section = section,
-                                                page = 1,
-                                                pageSize = 60,
-                                                filters = listOf(CatalogFilter(key = "search", value = query))
-                                            )
-                                        }.getOrNull()?.items.orEmpty()
-                                    }
-                                }.awaitAll()
-                                .flatten()
-                        }
+                        runCatching {
+                            searchRepository.search(
+                                query = query,
+                                filter = filter,
+                                languageTag = languageTag
+                            )
+                        }.getOrElse { emptyList() }
                     }
-                val merged = mergeItems(items)
 
-                _uiState.value =
-                    _uiState.value.copy(
-                        isSearching = false,
-                        results = merged
-                    )
+                if (token != searchToken) {
+                    return@launch
+                }
+
+                _uiState.value = _uiState.value.copy(isSearching = false, results = results)
             }
     }
 
-    private fun buildOptions(
-        discoverCatalogs: List<DiscoverCatalogRef>,
-        labResult: CatalogLabResult
-    ): LinkedHashMap<String, SearchCatalogOption> {
-        val discoverByKey =
-            discoverCatalogs.associateBy {
-                catalogKey(
-                    addonId = it.section.addonId,
-                    mediaType = it.section.mediaType,
-                    catalogId = it.section.catalogId
-                )
-            }
-        val sectionsByAddonId = LinkedHashMap<String, MutableList<CatalogSectionRef>>()
-        val addonNameById = HashMap<String, String>()
-        labResult.catalogs
-            .filter { it.supportsSearch }
-            .forEach { catalog ->
-                val key =
-                    catalogKey(
-                        addonId = catalog.addonId,
-                        mediaType = catalog.catalogType,
-                        catalogId = catalog.catalogId
-                    )
-                val discover = discoverByKey[key] ?: return@forEach
-                val addonId = catalog.addonId
-                sectionsByAddonId.getOrPut(addonId) { mutableListOf() }.add(discover.section)
-                addonNameById[addonId] = discover.addonName.trim()
-            }
-        val output = LinkedHashMap<String, SearchCatalogOption>()
-        sectionsByAddonId.forEach { (addonId, sections) ->
-            output[addonId] = SearchCatalogOption(
-                key = addonId,
-                label = addonNameById[addonId] ?: addonId,
-                sections = sections
-            )
-        }
-        return output
-    }
-
-    private fun mergeItems(items: List<CatalogItem>): List<CatalogItem> {
-        val seen = HashSet<String>(items.size)
-        val output = ArrayList<CatalogItem>(items.size)
-        items.forEach { item ->
-            val id = item.id.trim()
-            if (id.isEmpty()) {
-                return@forEach
-            }
-            val key = "${item.type.lowercase(Locale.US)}:${id.lowercase(Locale.US)}"
-            if (seen.add(key)) {
-                output += item
-            }
-        }
-        return output
-    }
-
-    private fun MetadataLabMediaType.toCatalogTypeString(): String {
-        return if (this == MetadataLabMediaType.SERIES) {
-            "series"
-        } else {
-            "movie"
-        }
+    private fun Locale.toTmdbLanguageTag(): String? {
+        val language = language.trim().takeIf { it.isNotBlank() } ?: return null
+        val country = country.trim().takeIf { it.isNotBlank() }
+        return if (country == null) language else "$language-$country"
     }
 
     companion object {
-        private fun catalogKey(addonId: String, mediaType: String, catalogId: String): String {
-            return "${addonId.trim().lowercase(Locale.US)}:${mediaType.trim().lowercase(Locale.US)}:${catalogId.trim().lowercase(Locale.US)}"
-        }
-
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext
             return object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(SearchViewModel::class.java).not()) {
+                    if (!modelClass.isAssignableFrom(SearchViewModel::class.java)) {
                         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                     }
 
-                    val homeCatalogService =
-                        HomeCatalogService(
-                            context = context,
-                            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                            httpClient = AppHttp.client(context),
+                    val repository =
+                        TmdbSearchRepository(
+                            apiKey = BuildConfig.TMDB_API_KEY,
+                            httpClient = AppHttp.client(context)
                         )
-                    val catalogSearchService = PlaybackDependencies.catalogSearchServiceFactory(context)
+
                     @Suppress("UNCHECKED_CAST")
-                    return SearchViewModel(
-                        appContext = context,
-                        homeCatalogService = homeCatalogService,
-                        catalogSearchService = catalogSearchService
-                    ) as T
+                    return SearchViewModel(searchRepository = repository) as T
                 }
             }
         }

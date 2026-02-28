@@ -11,6 +11,7 @@ import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.details.DetailsRoute
 import com.crispy.tv.home.HomeScreen
 import com.crispy.tv.home.ThisWeekItem
+import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
@@ -85,6 +86,20 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onOpenPlayer = { playbackUrl, title, identity ->
                 context.startActivity(PlayerActivity.intent(context, playbackUrl, title, identity))
             },
+        )
+    }
+
+    composable(
+        route = AppRoutes.PersonDetailsRoutePattern,
+        arguments = listOf(
+            navArgument(AppRoutes.PersonDetailsPersonIdArg) { type = NavType.StringType }
+        )
+    ) { entry ->
+        val personId = entry.arguments?.getString(AppRoutes.PersonDetailsPersonIdArg).orEmpty()
+        PersonDetailsRoute(
+            personId = personId,
+            onBack = { navController.popBackStack() },
+            onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
         )
     }
 }
