@@ -473,10 +473,7 @@ private fun HeroYouTubeTrailerLayer(
 
     Box(modifier = modifier.clipToBounds()) {
         AndroidView(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
+            modifier = Modifier.fillMaxSize(),
             factory = { webView },
             update = {}
         )
@@ -493,7 +490,7 @@ private fun buildYoutubeTrailerHtml(videoId: String, origin: String): String {
             "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'/>" +
             "<style>" +
             "html,body{margin:0;padding:0;background:#000;overflow:hidden;}" +
-            "#player{position:absolute;top:0;left:0;width:100%;height:100%;}" +
+            "#player{position:absolute;top:0;left:0;width:100%;height:100%;transform:scale(1.35);transform-origin:center center;}" +
             "</style>" +
             "</head>" +
             "<body>" +
