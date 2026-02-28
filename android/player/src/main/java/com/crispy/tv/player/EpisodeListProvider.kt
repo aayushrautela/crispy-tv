@@ -22,5 +22,5 @@ fun interface EpisodeListProvider {
      * @param seasonHint Optional hint for the season the caller cares about.
      * @return list of episodes, or `null` if metadata couldn't be fetched
      */
-    suspend fun fetchEpisodeList(mediaType: String, contentId: String, seasonHint: Int? = null): List<EpisodeInfo>?
+    suspend fun fetchEpisodeList(mediaType: String, contentId: String, seasonHint: Int?): List<EpisodeInfo>?
 }

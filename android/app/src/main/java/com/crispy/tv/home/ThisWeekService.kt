@@ -170,7 +170,7 @@ class ThisWeekService(
         weekEnd: LocalDate,
         zone: ZoneId,
     ): List<RawThisWeekEpisode> {
-        val episodes = episodeListProvider.fetchEpisodeList("series", contentId)
+        val episodes = episodeListProvider.fetchEpisodeList("series", contentId, seasonHint = null)
             ?: return emptyList()
 
         return episodes.mapNotNull { ep ->

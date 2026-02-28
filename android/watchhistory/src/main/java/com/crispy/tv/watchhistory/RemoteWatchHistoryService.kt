@@ -1056,7 +1056,7 @@ class RemoteWatchHistoryService(
 
             val episodeList =
                 runCatching {
-                    episodeListProvider.fetchEpisodeList(mediaType = "series", contentId = showId)
+                    episodeListProvider.fetchEpisodeList(mediaType = "series", contentId = showId, seasonHint = null)
                 }.getOrNull()
                     ?: continue
             val watchedSet = watchedSetByShow[showId]
