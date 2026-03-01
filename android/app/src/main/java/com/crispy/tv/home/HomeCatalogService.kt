@@ -3,15 +3,14 @@ package com.crispy.tv.home
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Immutable
+import com.crispy.tv.accounts.ActiveProfileStore
+import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.catalog.DiscoverCatalogRef
 import com.crispy.tv.domain.catalog.CatalogFilter
-import com.crispy.tv.domain.catalog.CatalogRequestInput
-import com.crispy.tv.domain.catalog.buildCatalogRequestUrls
-import com.crispy.tv.metadata.AddonManifestSeed
-import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.metadata.tmdb.TmdbApi
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import com.crispy.tv.network.CrispyHttpClient
@@ -108,84 +107,78 @@ data class MediaVideo(
 
 class HomeCatalogService(
     context: Context,
-    addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,
+    supabaseUrl: String,
+    supabaseAnonKey: String,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository =
         TmdbEnrichmentRepositoryProvider.get(context),
 ) {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
+    private val appContext = context.applicationContext
+
+    private val supabaseBaseUrl: String = supabaseUrl.trim().trimEnd('/')
+    private val supabaseAnonKeyValue: String = supabaseAnonKey.trim()
+
+    private val supabaseAccountClient =
+        SupabaseAccountClient(
+            appContext = appContext,
+            httpClient = httpClient,
+            supabaseUrl = supabaseBaseUrl,
+            supabaseAnonKey = supabaseAnonKeyValue
+        )
+    private val activeProfileStore = ActiveProfileStore(appContext)
+
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
-
-    @Volatile
-    private var resolvedAddonsCache: List<ResolvedAddon>? = null
-    @Volatile
-    private var resolvedAddonsCacheTimestamp: Long = 0
-    private val resolvedAddonsCacheLock = Any()
-
-    private val manifestFetchSemaphore = Semaphore(8)
     private val metaResolveSemaphore = Semaphore(6)
 
-    fun invalidateAddonsCache() {
-        synchronized(resolvedAddonsCacheLock) {
-            resolvedAddonsCache = null
-            resolvedAddonsCacheTimestamp = 0
-        }
-    }
+    private val recommendationsCacheLock = Any()
+    @Volatile
+    private var recommendationsCacheProfileId: String? = null
+    @Volatile
+    private var recommendationsCache: List<SupabaseCatalogList>? = null
+    @Volatile
+    private var recommendationsCacheTimestampMs: Long = 0
 
     suspend fun loadHeroItems(limit: Int = 10): HomeHeroLoadResult {
-        val resolvedAddons = resolveAddons()
-        if (resolvedAddons.isEmpty()) {
-            return HomeHeroLoadResult(statusMessage = "No installed addons available.")
-        }
-
-        val candidates = catalogCandidates(resolvedAddons)
-        if (candidates.isEmpty()) {
-            return HomeHeroLoadResult(statusMessage = "No movie or series catalogs found in installed addons.")
-        }
-
-        val deduped = linkedMapOf<String, HomeHeroItem>()
         val targetCount = limit.coerceAtLeast(1)
 
-        for (candidate in candidates) {
-            val urls =
-                buildCatalogRequestUrls(
-                    CatalogRequestInput(
-                        baseUrl = candidate.seed.baseUrl,
-                        mediaType = candidate.catalogType,
-                        catalogId = candidate.catalogId,
-                        page = 1,
-                        pageSize = targetCount * 2,
-                        filters = emptyList(),
-                        encodedAddonQuery = candidate.seed.encodedQuery
-                    )
-                )
-
-            for (url in urls) {
-                val response = httpGetJson(url) ?: continue
-                parseHeroItems(
-                    metas = response.optJSONArray("metas"),
-                    addonId = candidate.addonId,
-                    mediaType = candidate.catalogType
-                ).forEach { item ->
-                    deduped.putIfAbsent(item.id, item)
-                }
-                if (deduped.size >= targetCount) {
-                    return HomeHeroLoadResult(
-                        items = deduped.values.take(targetCount),
-                        statusMessage = ""
-                    )
-                }
-            }
-        }
-
-        if (deduped.isNotEmpty()) {
+        val snapshot = loadSupabaseCatalogSnapshot(forceRefresh = false)
+        if (snapshot.lists.isEmpty()) {
             return HomeHeroLoadResult(
-                items = deduped.values.take(targetCount),
-                statusMessage = ""
+                items = emptyList(),
+                statusMessage = snapshot.statusMessage
             )
         }
 
-        return HomeHeroLoadResult(statusMessage = "No featured catalog items available from addons.")
+        val firstList = snapshot.lists.first()
+        val heroItems =
+            firstList.items
+                .asSequence()
+                .mapNotNull { item ->
+                    val backdrop = item.backdropUrl ?: item.posterUrl
+                    if (backdrop.isNullOrBlank()) return@mapNotNull null
+                    HomeHeroItem(
+                        id = item.id,
+                        title = item.title,
+                        description = firstList.title.ifBlank { "Recommended for you." },
+                        rating = item.rating,
+                        year = item.year,
+                        genres = emptyList(),
+                        backdropUrl = backdrop,
+                        addonId = "supabase",
+                        type = item.type
+                    )
+                }
+                .take(targetCount)
+                .toList()
+
+        if (heroItems.isEmpty()) {
+            return HomeHeroLoadResult(
+                items = emptyList(),
+                statusMessage = snapshot.statusMessage.ifBlank { "No featured items available." }
+            )
+        }
+
+        return HomeHeroLoadResult(items = heroItems, statusMessage = "")
     }
 
     suspend fun loadContinueWatchingItems(
@@ -299,48 +292,25 @@ class HomeCatalogService(
     }
 
     suspend fun listHomeCatalogSections(limit: Int = 15): Pair<List<CatalogSectionRef>, String> {
-        val targetCount = limit.coerceAtLeast(1)
-        val resolvedAddons = resolveAddons()
-        if (resolvedAddons.isEmpty()) {
-            return emptyList<CatalogSectionRef>() to "No installed addons available."
+        val snapshot = loadSupabaseCatalogSnapshot(forceRefresh = false)
+        if (snapshot.lists.isEmpty()) {
+            return emptyList<CatalogSectionRef>() to snapshot.statusMessage
         }
 
-        val sections = mutableListOf<CatalogSectionRef>()
-        val seenKeys = mutableSetOf<String>()
+        val targetCount =
+            limit
+                .coerceAtLeast(1)
+                .coerceAtMost(MAX_SUPABASE_CATALOGS)
 
-        resolvedAddons.forEach { addon ->
-            val manifest = addon.manifest ?: return@forEach
-            val catalogs = manifest.optJSONArray("catalogs") ?: return@forEach
-            for (index in 0 until catalogs.length()) {
-                val catalog = catalogs.optJSONObject(index) ?: continue
-                val type = nonBlank(catalog.optString("type"))?.lowercase(Locale.US) ?: continue
-                if (type != "movie" && type != "series") {
-                    continue
-                }
-                val id = nonBlank(catalog.optString("id")) ?: continue
-                val key = "$type:$id"
-                if (!seenKeys.add(key)) {
-                    continue
-                }
-                val name = nonBlank(catalog.optString("name")) ?: id
-                sections +=
+        val sections =
+            snapshot.lists
+                .take(targetCount)
+                .map { list ->
                     CatalogSectionRef(
-                        title = name,
-                        catalogId = id,
-                        mediaType = type,
-                        addonId = addon.addonId,
-                        baseUrl = addon.seed.baseUrl,
-                        encodedAddonQuery = addon.seed.encodedQuery
+                        title = list.title,
+                        catalogId = list.id
                     )
-                if (sections.size >= targetCount) {
-                    return sections to ""
                 }
-            }
-        }
-
-        if (sections.isEmpty()) {
-            return emptyList<CatalogSectionRef>() to "No movie or series catalogs found in installed addons."
-        }
 
         return sections to ""
     }
@@ -358,62 +328,36 @@ class HomeCatalogService(
             return emptyList<DiscoverCatalogRef>() to "Unsupported media type: $mediaType"
         }
 
-        val targetCount = limit.coerceAtLeast(1)
-        val resolvedAddons = resolveAddons()
-        if (resolvedAddons.isEmpty()) {
-            return emptyList<DiscoverCatalogRef>() to "No installed addons available."
+        val snapshot = loadSupabaseCatalogSnapshot(forceRefresh = false)
+        if (snapshot.lists.isEmpty()) {
+            return emptyList<DiscoverCatalogRef>() to snapshot.statusMessage
         }
 
-        val catalogs = mutableListOf<DiscoverCatalogRef>()
-        val seenKeys = mutableSetOf<String>()
-
-        resolvedAddons.forEach { addon ->
-            val manifest = addon.manifest ?: return@forEach
-            val addonName = nonBlank(manifest.optString("name")) ?: addon.addonId
-            val manifestCatalogs = manifest.optJSONArray("catalogs") ?: return@forEach
-
-            for (index in 0 until manifestCatalogs.length()) {
-                val catalog = manifestCatalogs.optJSONObject(index) ?: continue
-                val type = nonBlank(catalog.optString("type"))?.lowercase(Locale.US) ?: continue
-                if (type != "movie" && type != "series") {
-                    continue
-                }
-                if (normalizedType != null && type != normalizedType) {
-                    continue
-                }
-                val id = nonBlank(catalog.optString("id")) ?: continue
-                val key = "${addon.addonId.lowercase(Locale.US)}:$type:${id.lowercase(Locale.US)}"
-                if (!seenKeys.add(key)) {
-                    continue
-                }
-                val name = nonBlank(catalog.optString("name")) ?: id
-                val genres = parseGenreOptions(catalog)
-
-                catalogs +=
-                    DiscoverCatalogRef(
-                        section =
-                            CatalogSectionRef(
-                                title = name,
-                                catalogId = id,
-                                mediaType = type,
-                                addonId = addon.addonId,
-                                baseUrl = addon.seed.baseUrl,
-                                encodedAddonQuery = addon.seed.encodedQuery
-                            ),
-                        addonName = addonName,
-                        genres = genres
-                    )
-
-                if (catalogs.size >= targetCount) {
-                    return catalogs to ""
-                }
+        val filteredLists =
+            snapshot.lists.filter { list ->
+                normalizedType == null || list.mediaTypes.contains(normalizedType)
             }
+
+        if (filteredLists.isEmpty()) {
+            val suffix = if (normalizedType == null) "" else " for $normalizedType"
+            return emptyList<DiscoverCatalogRef>() to "No discover catalogs found$suffix."
         }
 
-        if (catalogs.isEmpty()) {
-            val suffix = if (normalizedType == null) "" else " for $normalizedType"
-            return emptyList<DiscoverCatalogRef>() to "No discover catalogs found$suffix in installed addons."
-        }
+        val targetCount =
+            limit
+                .coerceAtLeast(1)
+                .coerceAtMost(MAX_SUPABASE_CATALOGS)
+
+        val catalogs =
+            filteredLists
+                .take(targetCount)
+                .map { list ->
+                    DiscoverCatalogRef(
+                        section = CatalogSectionRef(title = list.title, catalogId = list.id),
+                        addonName = "Supabase",
+                        genres = emptyList()
+                    )
+                }
 
         return catalogs to ""
     }
@@ -426,309 +370,297 @@ class HomeCatalogService(
     ): CatalogPageResult {
         val targetPage = page.coerceAtLeast(1)
         val targetSize = pageSize.coerceAtLeast(1)
-        val attemptedUrls = mutableListOf<String>()
 
-        val urls =
-            runCatching {
-                buildCatalogRequestUrls(
-                    CatalogRequestInput(
-                        baseUrl = section.baseUrl,
-                        mediaType = section.mediaType,
-                        catalogId = section.catalogId,
-                        page = targetPage,
-                        pageSize = targetSize,
-                        filters = filters,
-                        encodedAddonQuery = section.encodedAddonQuery
-                    )
-                )
-            }.getOrElse { error ->
-                return CatalogPageResult(
-                    items = emptyList(),
-                    statusMessage = error.message ?: "Failed to build catalog request.",
-                    attemptedUrls = emptyList()
-                )
-            }
-
-        for ((index, url) in urls.withIndex()) {
-            attemptedUrls += url
-            val response = httpGetJson(url) ?: continue
-            val items =
-                parseCatalogItems(
-                    metas = response.optJSONArray("metas"),
-                    addonId = section.addonId,
-                    mediaType = section.mediaType
-                )
-
-            if (items.isEmpty() && index < urls.lastIndex) {
-                continue
-            }
-
+        val snapshot = loadSupabaseCatalogSnapshot(forceRefresh = false)
+        if (snapshot.lists.isEmpty()) {
             return CatalogPageResult(
-                items = items,
-                statusMessage = if (items.isEmpty()) "No catalog items available." else "",
-                attemptedUrls = attemptedUrls
+                items = emptyList(),
+                statusMessage = snapshot.statusMessage,
+                attemptedUrls = emptyList()
             )
         }
 
+        val list =
+            snapshot.lists.firstOrNull { it.id.equals(section.catalogId.trim(), ignoreCase = true) }
+                ?: return CatalogPageResult(
+                    items = emptyList(),
+                    statusMessage = "Catalog not found.",
+                    attemptedUrls = emptyList()
+                )
+
+        val attempted =
+            listOf(
+                "supabase:profile_recommendations:${snapshot.profileId.orEmpty()}:${list.id}:page=$targetPage"
+            )
+
+        if (targetPage != 1) {
+            return CatalogPageResult(
+                items = emptyList(),
+                statusMessage = "No more items available.",
+                attemptedUrls = attempted
+            )
+        }
+
+        val items = list.items.take(targetSize)
         return CatalogPageResult(
-            items = emptyList(),
-            statusMessage = "No catalog items available.",
-            attemptedUrls = attemptedUrls
+            items = items,
+            statusMessage = if (items.isEmpty()) "No catalog items available." else "",
+            attemptedUrls = attempted
         )
     }
 
-    private fun parseGenreOptions(catalog: JSONObject): List<String> {
-        val extras = catalog.optJSONArray("extra") ?: return emptyList()
-        val genres = LinkedHashSet<String>()
+    private suspend fun loadSupabaseCatalogSnapshot(forceRefresh: Boolean): SupabaseCatalogSnapshot {
+        if (!supabaseAccountClient.isConfigured()) {
+            return SupabaseCatalogSnapshot(
+                profileId = null,
+                lists = emptyList(),
+                statusMessage = "Supabase is not configured."
+            )
+        }
 
-        for (index in 0 until extras.length()) {
-            val extra = extras.optJSONObject(index) ?: continue
-            val extraName = nonBlank(extra.optString("name"))?.lowercase(Locale.US) ?: continue
-            if (extraName != "genre") {
-                continue
-            }
+        val session =
+            runCatching { supabaseAccountClient.ensureValidSession() }.getOrNull()
+                ?: return SupabaseCatalogSnapshot(
+                    profileId = null,
+                    lists = emptyList(),
+                    statusMessage = "Sign in to Supabase to load catalogs."
+                )
 
-            val options = extra.optJSONArray("options") ?: continue
-            for (optionIndex in 0 until options.length()) {
-                val option = nonBlank(options.optString(optionIndex)) ?: continue
-                genres += option
+        val profileId = activeProfileStore.getActiveProfileId(session.userId)
+        if (profileId.isNullOrBlank()) {
+            return SupabaseCatalogSnapshot(
+                profileId = null,
+                lists = emptyList(),
+                statusMessage = "Select a profile to load catalogs."
+            )
+        }
+
+        val now = System.currentTimeMillis()
+        synchronized(recommendationsCacheLock) {
+            val cachedLists = recommendationsCache
+            val cachedProfileId = recommendationsCacheProfileId
+            val cacheAgeMs = now - recommendationsCacheTimestampMs
+            if (!forceRefresh && cachedLists != null && cachedProfileId == profileId && cacheAgeMs < SUPABASE_CATALOGS_CACHE_TTL_MS) {
+                return SupabaseCatalogSnapshot(
+                    profileId = profileId,
+                    lists = cachedLists,
+                    statusMessage = ""
+                )
             }
         }
 
-        return genres.toList()
+        val (lists, statusMessage) =
+            fetchSupabaseCatalogLists(
+                accessToken = session.accessToken,
+                profileId = profileId
+            )
+
+        synchronized(recommendationsCacheLock) {
+            recommendationsCacheProfileId = profileId
+            recommendationsCache = lists
+            recommendationsCacheTimestampMs = System.currentTimeMillis()
+        }
+
+        return SupabaseCatalogSnapshot(
+            profileId = profileId,
+            lists = lists,
+            statusMessage = statusMessage
+        )
     }
 
-    private suspend fun resolveAddons(): List<ResolvedAddon> {
-        val now = System.currentTimeMillis()
-        synchronized(resolvedAddonsCacheLock) {
-            val cached = resolvedAddonsCache
-            if (cached != null && (now - resolvedAddonsCacheTimestamp) < RESOLVED_ADDONS_CACHE_TTL_MS) {
-                return cached
+    private suspend fun fetchSupabaseCatalogLists(
+        accessToken: String,
+        profileId: String,
+    ): Pair<List<SupabaseCatalogList>, String> {
+        if (supabaseBaseUrl.isBlank() || supabaseAnonKeyValue.isBlank()) {
+            return emptyList<SupabaseCatalogList>() to "Supabase is not configured."
+        }
+
+        val url =
+            runCatching {
+                "$supabaseBaseUrl/rest/v1/profile_recommendations".toHttpUrl().newBuilder()
+                    .addQueryParameter("select", "lists")
+                    .addQueryParameter("profile_id", "eq.$profileId")
+                    .addQueryParameter("order", "generated_at.desc")
+                    .addQueryParameter("limit", "1")
+                    .build()
+            }.getOrElse { error ->
+                return emptyList<SupabaseCatalogList>() to (error.message ?: "Invalid Supabase URL.")
             }
+
+        val response =
+            runCatching {
+                httpClient.get(
+                    url = url,
+                    headers = supabaseAuthHeaders(accessToken),
+                    callTimeoutMs = 12_000L,
+                )
+            }.getOrElse { error ->
+                Log.w(TAG, "Supabase catalogs fetch failed", error)
+                return emptyList<SupabaseCatalogList>() to (error.message ?: "Failed to load catalogs.")
+            }
+
+        if (response.code !in 200..299) {
+            val msg = extractSupabaseErrorMessage(response.body)
+            return emptyList<SupabaseCatalogList>() to (msg ?: "Supabase catalogs request failed (HTTP ${response.code}).")
         }
 
-        val seeds = addonRegistry.orderedSeeds()
-        if (seeds.isEmpty()) {
-            return emptyList()
+        val body = response.body
+        if (body.isBlank()) {
+            return emptyList<SupabaseCatalogList>() to "No catalogs available."
         }
 
-        val resolved = coroutineScope {
-            seeds.mapIndexed { index, seed ->
-                async(Dispatchers.IO) {
-                    manifestFetchSemaphore.acquire()
-                    try {
-                        val networkManifest = httpGetJson(seed.manifestUrl)
-                        if (networkManifest != null) {
-                            addonRegistry.cacheManifest(seed, networkManifest)
-                        }
-                        val manifest = networkManifest ?: parseCachedManifest(seed.cachedManifestJson) ?: fallbackManifestFor(seed)
-                        val addonId = nonBlank(manifest?.optString("id")) ?: seed.addonIdHint
-                        ResolvedAddon(
-                            orderIndex = index,
-                            seed = seed,
-                            addonId = addonId,
-                            manifest = manifest
-                        )
-                    } finally {
-                        manifestFetchSemaphore.release()
+        val lists =
+            runCatching { parseSupabaseCatalogLists(body) }.getOrElse { error ->
+                Log.w(TAG, "Supabase catalogs parse failed", error)
+                return emptyList<SupabaseCatalogList>() to "Failed to parse catalogs."
+            }
+
+        if (lists.isEmpty()) {
+            return emptyList<SupabaseCatalogList>() to "No catalogs available."
+        }
+
+        return lists to ""
+    }
+
+    private fun supabaseAuthHeaders(accessToken: String): Headers {
+        val token = accessToken.trim()
+        return Headers.headersOf(
+            "apikey",
+            supabaseAnonKeyValue,
+            "Authorization",
+            "Bearer $token",
+            "Accept",
+            "application/json",
+            "Content-Type",
+            "application/json",
+        )
+    }
+
+    private fun extractSupabaseErrorMessage(body: String): String? {
+        if (body.isBlank()) return null
+        val obj = runCatching { JSONObject(body) }.getOrNull() ?: return null
+        return nonBlank(obj.optString("message"))
+            ?: nonBlank(obj.optString("msg"))
+            ?: nonBlank(obj.optString("error_description"))
+            ?: nonBlank(obj.optString("error"))
+    }
+
+    private fun parseSupabaseCatalogLists(body: String): List<SupabaseCatalogList> {
+        val rows = JSONArray(body)
+        val row = rows.optJSONObject(0) ?: return emptyList()
+        val lists = row.optJSONArray("lists") ?: return emptyList()
+
+        val parsed = mutableListOf<SupabaseCatalogList>()
+        val targetCount = minOf(lists.length(), MAX_SUPABASE_CATALOGS)
+        for (index in 0 until targetCount) {
+            val listObj = lists.optJSONObject(index) ?: continue
+            val list = parseSupabaseCatalogList(listObj) ?: continue
+            parsed += list
+        }
+        return parsed
+    }
+
+    private fun parseSupabaseCatalogList(obj: JSONObject): SupabaseCatalogList? {
+        val id = nonBlank(obj.optString("name")) ?: return null
+        val title = nonBlank(obj.optString("heading")) ?: id
+        val results = obj.optJSONArray("results")
+
+        val items =
+            if (results == null) {
+                emptyList()
+            } else {
+                buildList {
+                    for (i in 0 until results.length()) {
+                        val itemObj = results.optJSONObject(i) ?: continue
+                        val item = parseSupabaseCatalogItem(itemObj) ?: continue
+                        add(item)
                     }
                 }
-            }.awaitAll()
-        }
 
-        synchronized(resolvedAddonsCacheLock) {
-            resolvedAddonsCache = resolved
-            resolvedAddonsCacheTimestamp = System.currentTimeMillis()
-        }
+        val mediaTypes = items.map { it.type }.toSet()
 
-        return resolved
-    }
-
-    private fun catalogCandidates(resolvedAddons: List<ResolvedAddon>): List<CatalogCandidate> {
-        val candidates = mutableListOf<CatalogCandidate>()
-
-        resolvedAddons.forEach { addon ->
-            val manifest = addon.manifest ?: return@forEach
-            val catalogs = manifest.optJSONArray("catalogs") ?: return@forEach
-            for (index in 0 until catalogs.length()) {
-                val catalog = catalogs.optJSONObject(index) ?: continue
-                val type = nonBlank(catalog.optString("type"))?.lowercase() ?: continue
-                if (type != "movie" && type != "series") {
-                    continue
-                }
-                val id = nonBlank(catalog.optString("id")) ?: continue
-                val name = nonBlank(catalog.optString("name")) ?: id
-                candidates +=
-                    CatalogCandidate(
-                        addonOrderIndex = addon.orderIndex,
-                        addonId = addon.addonId,
-                        seed = addon.seed,
-                        catalogId = id,
-                        catalogType = type,
-                        name = name,
-                        priority = catalogPriority(id, name)
-                    )
-            }
-        }
-
-        return candidates.sortedWith(
-            compareBy<CatalogCandidate> { it.addonOrderIndex }
-                .thenBy { it.priority }
-                .thenBy { it.name.lowercase(Locale.US) }
+        return SupabaseCatalogList(
+            id = id,
+            title = title,
+            items = items,
+            mediaTypes = mediaTypes
         )
     }
 
-    private fun catalogPriority(catalogId: String, catalogName: String): Int {
-        val key = "$catalogId $catalogName".lowercase(Locale.US)
-        return when {
-            key.contains("featured") -> 0
-            key.contains("top") -> 1
-            key.contains("trending") -> 2
-            key.contains("popular") -> 3
-            key.contains("new") -> 4
-            else -> 5
-        }
+    private fun parseSupabaseCatalogItem(obj: JSONObject): CatalogItem? {
+        val idAny = obj.opt("id")
+        val id =
+            when (idAny) {
+                is Number -> idAny.toLong().takeIf { it > 0 }?.toString()
+                is String -> nonBlank(idAny)
+                else -> null
+            } ?: return null
+
+        val rawMediaType = nonBlank(obj.optString("media_type"))?.lowercase(Locale.US)
+        val type = normalizeSupabaseMediaType(rawMediaType) ?: return null
+
+        val title =
+            nonBlank(obj.optString("title"))
+                ?: nonBlank(obj.optString("name"))
+                ?: return null
+
+        val posterPath = nonBlank(obj.optString("poster_path"))
+        val backdropPath = nonBlank(obj.optString("backdrop_path"))
+
+        val posterUrl = TmdbApi.imageUrl(posterPath, size = "w500")
+        val backdropUrl = TmdbApi.imageUrl(backdropPath, size = "w780")
+        val rating = formatVoteAverage(obj.optDoubleOrNull("vote_average"))
+
+        return CatalogItem(
+            id = id,
+            title = title,
+            posterUrl = posterUrl,
+            backdropUrl = backdropUrl,
+            addonId = "supabase",
+            type = type,
+            rating = rating,
+            year = null,
+            genre = null
+        )
     }
 
-    private fun parseHeroItems(metas: JSONArray?, addonId: String, mediaType: String): List<HomeHeroItem> {
-        if (metas == null) {
-            return emptyList()
-        }
-
-        val items = mutableListOf<HomeHeroItem>()
-        for (index in 0 until metas.length()) {
-            val meta = metas.optJSONObject(index) ?: continue
-            val id = nonBlank(meta.optString("id")) ?: continue
-            val title =
-                nonBlank(meta.optString("name"))
-                    ?: nonBlank(meta.optString("title"))
-                    ?: continue
-            val backdrop =
-                nonBlank(meta.optString("background"))
-                    ?: nonBlank(meta.optString("poster"))
-                    ?: continue
-            val description = nonBlank(meta.optString("description")) ?: "No description provided."
-            val rating = parseRating(meta)
-            val type = nonBlank(meta.optString("type")) ?: mediaType
-            val year = parseYear(meta)
-            val genres = parseGenres(meta)
-
-            items +=
-                HomeHeroItem(
-                    id = id,
-                    title = title,
-                    description = description,
-                    rating = rating,
-                    year = year,
-                    genres = genres,
-                    backdropUrl = backdrop,
-                    addonId = addonId,
-                    type = type
-                )
-        }
-        return items
-    }
-
-    private fun parseCatalogItems(metas: JSONArray?, addonId: String, mediaType: String): List<CatalogItem> {
-        if (metas == null) {
-            return emptyList()
-        }
-
-        val items = mutableListOf<CatalogItem>()
-        for (index in 0 until metas.length()) {
-            val meta = metas.optJSONObject(index) ?: continue
-            val id = nonBlank(meta.optString("id")) ?: continue
-            val title =
-                nonBlank(meta.optString("name"))
-                    ?: nonBlank(meta.optString("title"))
-                    ?: continue
-            val poster = nonBlank(meta.optString("poster"))
-            val backdrop = nonBlank(meta.optString("background"))
-            val type = nonBlank(meta.optString("type")) ?: mediaType
-            val rating = parseRating(meta)
-            val year = parseYear(meta)
-            val genre = parseGenre(meta)
-            items +=
-                CatalogItem(
-                    id = id,
-                    title = title,
-                    posterUrl = poster,
-                    backdropUrl = backdrop,
-                    addonId = addonId,
-                    type = type,
-                    rating = rating,
-                    year = year,
-                    genre = genre
-                )
-        }
-        return items
-    }
-
-    private fun parseRating(meta: JSONObject): String? {
-        val raw = meta.opt("imdbRating") ?: meta.opt("rating")
-        return when (raw) {
-            is Number -> String.format(Locale.US, "%.1f", raw.toDouble())
-            is String -> nonBlank(raw)
+    private fun normalizeSupabaseMediaType(raw: String?): String? {
+        return when (raw?.trim()?.lowercase(Locale.US)) {
+            "movie" -> "movie"
+            "tv", "series", "show" -> "series"
             else -> null
         }
     }
 
-    private fun parseYear(meta: JSONObject): String? {
-        val releaseInfo = nonBlank(meta.optString("releaseInfo"))
-        if (releaseInfo != null) {
-            return releaseInfo.take(4)
-        }
-        return nonBlank(meta.optString("year"))
-    }
-
-    private fun parseGenre(meta: JSONObject): String? {
-        return parseGenres(meta).firstOrNull()
-    }
-
-    private fun parseGenres(meta: JSONObject): List<String> {
-        val genres = meta.optJSONArray("genres") ?: return emptyList()
-        return buildList {
-            for (index in 0 until genres.length()) {
-                val genre = nonBlank(genres.optString(index)) ?: continue
-                add(genre)
-            }
+    private fun JSONObject.optDoubleOrNull(key: String): Double? {
+        val raw = opt(key) ?: return null
+        return when (raw) {
+            is Number -> raw.toDouble()
+            is String -> raw.trim().toDoubleOrNull()
+            else -> null
         }
     }
 
-    private fun parseCachedManifest(raw: String?): JSONObject? {
-        if (raw.isNullOrBlank()) {
-            return null
-        }
-        return runCatching { JSONObject(raw) }.getOrNull()
+    private fun formatVoteAverage(value: Double?): String? {
+        val v = value ?: return null
+        if (!v.isFinite() || v <= 0.0) return null
+        val formatted = String.format(Locale.US, "%.1f", v)
+        return if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
     }
 
-    private fun fallbackManifestFor(seed: AddonManifestSeed): JSONObject? {
-        val looksLikeCinemeta =
-            seed.addonIdHint.contains("cinemeta", ignoreCase = true) ||
-                seed.manifestUrl.contains("cinemeta", ignoreCase = true)
-        if (!looksLikeCinemeta) {
-            return null
-        }
+    private data class SupabaseCatalogSnapshot(
+        val profileId: String?,
+        val lists: List<SupabaseCatalogList>,
+        val statusMessage: String,
+    )
 
-        return JSONObject()
-            .put("id", "com.linvo.cinemeta")
-            .put(
-                "catalogs",
-                JSONArray()
-                    .put(
-                        JSONObject()
-                            .put("type", "movie")
-                            .put("id", "top")
-                            .put("name", "Top Movies")
-                    )
-                    .put(
-                        JSONObject()
-                            .put("type", "series")
-                            .put("id", "top")
-                            .put("name", "Top Series")
-                    )
-            )
-    }
+    private data class SupabaseCatalogList(
+        val id: String,
+        val title: String,
+        val items: List<CatalogItem>,
+        val mediaTypes: Set<String>,
+    )
 
     private suspend fun resolveContinueWatchingMeta(entry: WatchHistoryEntry): ContinueWatchingMeta? {
         val rawId = entry.contentId.trim()
@@ -809,23 +741,6 @@ class HomeCatalogService(
         return "${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:$seasonPart:$episodePart"
     }
 
-    private data class ResolvedAddon(
-        val orderIndex: Int,
-        val seed: AddonManifestSeed,
-        val addonId: String,
-        val manifest: JSONObject?
-    )
-
-    private data class CatalogCandidate(
-        val addonOrderIndex: Int,
-        val addonId: String,
-        val seed: AddonManifestSeed,
-        val catalogId: String,
-        val catalogType: String,
-        val name: String,
-        val priority: Int
-    )
-
     private data class ContinueWatchingMeta(
         val title: String?,
         val backdropUrl: String?,
@@ -843,45 +758,20 @@ class HomeCatalogService(
         val cachedAtEpochMs: Long
     )
 
-    private suspend fun httpGetJson(url: String): JSONObject? {
-        return withContext(Dispatchers.IO) {
-            val response =
-                runCatching {
-                    httpClient.get(
-                        url = url.toHttpUrl(),
-                        headers = Headers.headersOf("Accept", "application/json"),
-                        callTimeoutMs = 12_000L,
-                    )
-                }.getOrNull() ?: return@withContext null
-
-            if (response.code !in 200..299) {
-                return@withContext null
-            }
-            val body = response.body
-            if (body.isBlank()) {
-                return@withContext null
-            }
-            runCatching { JSONObject(body) }.getOrNull()
-        }
-    }
-
     companion object {
         private const val TAG = "HomeCatalogService"
         private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
+
+        private const val MAX_SUPABASE_CATALOGS = 6
+
         private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
-        private const val RESOLVED_ADDONS_CACHE_TTL_MS = 60_000L
+        private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
     }
 }
 
 private fun nonBlank(value: String?): String? {
     val trimmed = value?.trim()
     return if (trimmed.isNullOrEmpty()) null else trimmed
-}
-
-private fun normalizeImdbId(value: String?): String? {
-    val trimmed = nonBlank(value) ?: return null
-    val normalized = trimmed.lowercase(Locale.US)
-    return if (normalized.startsWith("tt") && normalized.length >= 4) normalized else null
 }
 
 private fun WatchHistoryEntry.asCatalogMediaType(): String {

@@ -297,11 +297,12 @@ class DiscoverViewModel(
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
                             homeCatalogService =
-                                 HomeCatalogService(
-                                     context = appContext,
-                                     addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                                     httpClient = AppHttp.client(appContext),
-                                 )
+                                  HomeCatalogService(
+                                      context = appContext,
+                                      httpClient = AppHttp.client(appContext),
+                                      supabaseUrl = BuildConfig.SUPABASE_URL,
+                                      supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
+                                  )
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -491,7 +492,7 @@ private fun DiscoverScreen(
                          if (selectedCatalog != null) {
                              val summaryGenre = uiState.selectedGenre ?: "All genres"
                              Text(
-                                 text = "${selectedCatalog.section.title} | ${selectedCatalog.section.mediaType.uppercase(Locale.US)} | $summaryGenre",
+                                 text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label} | $summaryGenre",
                                  style = MaterialTheme.typography.bodySmall,
                                  color = MaterialTheme.colorScheme.onSurfaceVariant
                              )
@@ -679,7 +680,7 @@ private fun DiscoverScreen(
                                         },
                                          supportingContent = {
                                              Text(
-                                                 text = catalog.section.mediaType.uppercase(Locale.US),
+                                                 text = catalog.addonName,
                                                  maxLines = 1,
                                                  overflow = TextOverflow.Ellipsis
                                              )

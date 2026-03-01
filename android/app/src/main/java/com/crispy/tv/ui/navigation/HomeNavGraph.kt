@@ -45,27 +45,15 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         route = AppRoutes.CatalogListRoutePattern,
         arguments =
             listOf(
-                navArgument(AppRoutes.CatalogMediaTypeArg) { type = NavType.StringType },
                 navArgument(AppRoutes.CatalogIdArg) { type = NavType.StringType },
-                navArgument(AppRoutes.CatalogTitleArg) { type = NavType.StringType; defaultValue = "" },
-                navArgument(AppRoutes.CatalogAddonIdArg) {
-                    type = NavType.StringType
-                    defaultValue = ""
-                },
-                navArgument(AppRoutes.CatalogBaseUrlArg) { type = NavType.StringType; defaultValue = "" },
-                navArgument(AppRoutes.CatalogQueryArg) { type = NavType.StringType; defaultValue = "" }
+                navArgument(AppRoutes.CatalogTitleArg) { type = NavType.StringType; defaultValue = "" }
             )
     ) { entry ->
         val args = entry.arguments
         val section =
             CatalogSectionRef(
                 title = args?.getString(AppRoutes.CatalogTitleArg).orEmpty(),
-                catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty(),
-                mediaType = args?.getString(AppRoutes.CatalogMediaTypeArg).orEmpty(),
-                addonId = args?.getString(AppRoutes.CatalogAddonIdArg).orEmpty(),
-                baseUrl = args?.getString(AppRoutes.CatalogBaseUrlArg).orEmpty(),
-                encodedAddonQuery =
-                    args?.getString(AppRoutes.CatalogQueryArg)?.takeIf { it.isNotBlank() }
+                catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty()
             )
         CatalogRoute(
             section = section,

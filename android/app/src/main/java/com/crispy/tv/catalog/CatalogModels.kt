@@ -1,18 +1,15 @@
 package com.crispy.tv.catalog
 
 import androidx.compose.runtime.Immutable
+import java.util.Locale
 
 @Immutable
 data class CatalogSectionRef(
     val title: String,
-    val catalogId: String,
-    val mediaType: String,
-    val addonId: String,
-    val baseUrl: String,
-    val encodedAddonQuery: String?
+    val catalogId: String
 ) {
     val key: String
-        get() = "${mediaType.lowercase()}:$catalogId"
+        get() = catalogId.trim().lowercase(Locale.US)
 }
 
 @Immutable
@@ -42,5 +39,5 @@ data class DiscoverCatalogRef(
     val genres: List<String> = emptyList()
 ) {
     val key: String
-        get() = "${section.addonId.lowercase()}:${section.mediaType.lowercase()}:${section.catalogId.lowercase()}"
+        get() = section.key
 }

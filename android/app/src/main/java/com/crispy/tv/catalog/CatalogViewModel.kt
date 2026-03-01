@@ -41,8 +41,9 @@ class CatalogViewModel(
                         return CatalogViewModel(
                             homeCatalogService = HomeCatalogService(
                                 context = appContext,
-                                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                                 httpClient = AppHttp.client(appContext),
+                                supabaseUrl = BuildConfig.SUPABASE_URL,
+                                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
                             ),
                             section = section
                         ) as T

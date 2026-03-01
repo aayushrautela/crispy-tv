@@ -110,8 +110,9 @@ class HomeViewModel internal constructor(
                             homeCatalogService =
                                 HomeCatalogService(
                                     context = appContext,
-                                    addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                                     httpClient = httpClient,
+                                    supabaseUrl = BuildConfig.SUPABASE_URL,
+                                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
                                 ),
                             watchHistoryService = watchHistoryService,
                             thisWeekService = ThisWeekService(

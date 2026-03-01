@@ -25,12 +25,8 @@ object AppRoutes {
     const val AccountsProfilesRoute = "settings/accounts"
 
     const val CatalogListRoute = "catalog"
-    const val CatalogMediaTypeArg = "mediaType"
     const val CatalogIdArg = "catalogId"
     const val CatalogTitleArg = "title"
-    const val CatalogAddonIdArg = "addonId"
-    const val CatalogBaseUrlArg = "baseUrl"
-    const val CatalogQueryArg = "query"
 
     // Details: type + id are required route segments.
     val HomeDetailsRoutePattern: String =
@@ -38,11 +34,8 @@ object AppRoutes {
     val PersonDetailsRoutePattern: String =
         "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}"
     val CatalogListRoutePattern: String =
-        "$CatalogListRoute/{$CatalogMediaTypeArg}/{$CatalogIdArg}" +
-            "?$CatalogTitleArg={$CatalogTitleArg}" +
-            "&$CatalogAddonIdArg={$CatalogAddonIdArg}" +
-            "&$CatalogBaseUrlArg={$CatalogBaseUrlArg}" +
-            "&$CatalogQueryArg={$CatalogQueryArg}"
+        "$CatalogListRoute/{$CatalogIdArg}" +
+            "?$CatalogTitleArg={$CatalogTitleArg}"
 
     fun homeDetailsRoute(itemId: String, mediaType: String): String {
         val normalizedType =
@@ -55,12 +48,8 @@ object AppRoutes {
     }
 
     fun catalogListRoute(section: CatalogSectionRef): String {
-        val query = section.encodedAddonQuery ?: ""
-        return "$CatalogListRoute/${Uri.encode(section.mediaType)}/${Uri.encode(section.catalogId)}" +
-            "?$CatalogTitleArg=${Uri.encode(section.title)}" +
-            "&$CatalogAddonIdArg=${Uri.encode(section.addonId)}" +
-            "&$CatalogBaseUrlArg=${Uri.encode(section.baseUrl)}" +
-            "&$CatalogQueryArg=${Uri.encode(query)}"
+        return "$CatalogListRoute/${Uri.encode(section.catalogId)}" +
+            "?$CatalogTitleArg=${Uri.encode(section.title)}"
     }
 
     fun personDetailsRoute(personId: String): String {
