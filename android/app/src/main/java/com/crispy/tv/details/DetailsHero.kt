@@ -62,7 +62,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -340,9 +339,7 @@ private fun HeroYouTubeTrailerLayer(
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
     onError: () -> Unit,
 ) {
-    val clientIdentityOrigin = remember { "https://${BuildConfig.APPLICATION_ID}" }
-    val baseUrl = remember(clientIdentityOrigin) { "$clientIdentityOrigin/" }
-    val playerHtml = remember(trailerKey, clientIdentityOrigin) { buildYoutubeTrailerHtml(trailerKey, clientIdentityOrigin) }
+    val embedUrl = remember(trailerKey) { buildYouTubeEmbedUrl(trailerKey) }
     val latestOnError by rememberUpdatedState(onError)
     val latestOnPlaybackState by rememberUpdatedState(onPlaybackState)
     val latestMuted by rememberUpdatedState(isMuted)
@@ -365,8 +362,6 @@ private fun HeroYouTubeTrailerLayer(
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false
-            settings.loadWithOverviewMode = true
-            settings.useWideViewPort = true
 
             CookieManager.getInstance().setAcceptCookie(true)
             runCatching { CookieManager.getInstance().setAcceptThirdPartyCookies(this, true) }
@@ -434,10 +429,9 @@ private fun HeroYouTubeTrailerLayer(
                         return true
                     }
 
-                    override fun onPageFinished(view: WebView, url: String) {
-                        // Best effort: apply current state after load.
-                        applyMute(view, latestMuted)
-                        applyPlayPause(view, latestShouldPlay)
+                    override fun onPageFinished(view: WebView, url: String?) {
+                        if (url == null || url.startsWith("about:")) return
+                        injectBridge(view)
                     }
                 }
         }
@@ -451,15 +445,9 @@ private fun HeroYouTubeTrailerLayer(
         }
     }
 
-    LaunchedEffect(webView, baseUrl, playerHtml) {
+    LaunchedEffect(webView, embedUrl) {
         runCatching {
-            webView.loadDataWithBaseURL(
-                baseUrl,
-                playerHtml,
-                "text/html",
-                "utf-8",
-                null
-            )
+            webView.loadUrl(embedUrl)
         }.onFailure {
             latestOnError()
         }
@@ -482,113 +470,106 @@ private fun HeroYouTubeTrailerLayer(
     }
 }
 
-private fun buildYoutubeTrailerHtml(videoId: String, origin: String): String {
-    val id = escapeJsString(videoId.trim())
-    val o = escapeJsString(origin.trim())
-    //language=HTML
-    return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-        <style>
-          html, body {
-            margin: 0; padding: 0;
-            background: #000;
-            overflow: hidden;
-            width: 100%; height: 100%;
-          }
-          /* Oversized + centred to crop YouTube chrome (controls, logo, watermark).
-             Pure layout – no CSS transform – so the iframe's SurfaceView composites
-             correctly on every Android WebView version. */
-          #player {
-            position: absolute;
-            width: 135%; height: 135%;
-            top: -17.5%; left: -17.5%;
-          }
-        </style>
-        </head>
-        <body>
-        <div id="player"></div>
-        <script>
-        (function() {
-          var VIDEO_ID = '$id';
-          var ORIGIN  = '$o';
-          var desiredMuted   = false;
-          var desiredPlaying = false;
-          var player = null;
-
-          function safeCall(fn) { try { fn(); } catch(e) {} }
-          function notifyReady()      { safeCall(function() { CrispyBridge.onReady(); }); }
-          function notifyState(state) {
-            var t = 0;
-            safeCall(function() { if (player && player.getCurrentTime) t = player.getCurrentTime(); });
-            safeCall(function() { CrispyBridge.onState(state, t); });
-          }
-          function notifyError(code) { safeCall(function() { CrispyBridge.onError(code); }); }
-
-          function applyMute() {
-            if (!player) return;
-            safeCall(function() {
-              if (desiredMuted) { player.mute(); player.setVolume(0); }
-              else              { player.setVolume(100); player.unMute(); }
-            });
-          }
-
-          window.__crispyTrailer = {
-            setMuted: function(m) {
-              desiredMuted = !!m;
-              applyMute();
-            },
-            setPlaying: function(p) {
-              desiredPlaying = !!p;
-              if (!player) return;
-              safeCall(function() {
-                if (desiredPlaying) player.playVideo();
-                else                player.pauseVideo();
-              });
-            }
-          };
-
-          window.onYouTubeIframeAPIReady = function() {
-            player = new YT.Player('player', {
-              width: '100%', height: '100%',
-              videoId: VIDEO_ID,
-              playerVars: {
-                autoplay: 0, controls: 0, rel: 0,
-                modestbranding: 1, playsinline: 1,
-                mute: 1,          /* keeps autoplay allowed; Kotlin bridge unmutes after load */
-                loop: 1, playlist: VIDEO_ID,
-                enablejsapi: 1, origin: ORIGIN
-              },
-              events: {
-                onReady: function() {
-                  applyMute();
-                  safeCall(function() { if (desiredPlaying) player.playVideo(); });
-                  notifyReady();
-                },
-                onStateChange: function(e) { notifyState(e.data); },
-                onError:       function(e) { notifyError(e.data); }
-              }
-            });
-          };
-
-          var tag = document.createElement('script');
-          tag.src = 'https://www.youtube.com/iframe_api';
-          document.head.appendChild(tag);
-        })();
-        </script>
-        </body>
-        </html>
-    """.trimIndent()
+private fun buildYouTubeEmbedUrl(videoId: String): String {
+    val id = videoId.trim()
+    return "https://www.youtube.com/embed/$id" +
+        "?autoplay=0&controls=0&rel=0&modestbranding=1&playsinline=1" +
+        "&mute=1&loop=1&playlist=$id&enablejsapi=1" +
+        "&iv_load_policy=3&showinfo=0&fs=0&disablekb=1"
 }
 
-private fun escapeJsString(value: String): String {
-    return value
-        .replace("\\", "\\\\")
-        .replace("'", "\\'")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
+/**
+ * Injected after the YouTube embed page finishes loading. Hides YouTube chrome
+ * via CSS, applies a 135 % crop-zoom on the video player element, and wires
+ * the native `movie_player` element to [CrispyBridge] for state callbacks and
+ * the `__crispyTrailer` control interface used by [applyMute]/[applyPlayPause].
+ */
+private fun injectBridge(view: WebView) {
+    //language=JavaScript
+    val js = """
+        (function() {
+            if (window.__crispyInjected) return;
+            window.__crispyInjected = true;
+
+            var style = document.createElement('style');
+            style.textContent = [
+                '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
+                '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
+                '.ytp-gradient-top, .ytp-gradient-bottom, .ytp-spinner,',
+                '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
+                '.ytp-impression-link, .iv-branding, .annotation,',
+                '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
+                '.html5-video-player {',
+                '  position:fixed!important; width:135%!important; height:135%!important;',
+                '  top:-17.5%!important; left:-17.5%!important;',
+                '}'
+            ].join('\n');
+            document.head.appendChild(style);
+
+            var desiredMuted = false;
+            var desiredPlaying = false;
+            var player = null;
+            var pollId = null;
+
+            function safeCall(fn) { try { fn(); } catch(e) {} }
+
+            function doApplyMute() {
+                if (!player) return;
+                safeCall(function() {
+                    if (desiredMuted) { player.mute(); player.setVolume(0); }
+                    else { player.setVolume(100); player.unMute(); }
+                });
+            }
+
+            window.__crispyTrailer = {
+                setMuted: function(m) {
+                    desiredMuted = !!m;
+                    doApplyMute();
+                },
+                setPlaying: function(p) {
+                    desiredPlaying = !!p;
+                    if (!player) return;
+                    safeCall(function() {
+                        if (desiredPlaying) player.playVideo();
+                        else player.pauseVideo();
+                    });
+                }
+            };
+
+            var lastState = -2;
+            function tryInit() {
+                var el = document.getElementById('movie_player');
+                if (!el || typeof el.playVideo !== 'function') return;
+                player = el;
+                if (pollId) { clearInterval(pollId); pollId = null; }
+
+                setInterval(function() {
+                    if (!player || !player.getPlayerState) return;
+                    var s = -2, t = 0;
+                    safeCall(function() { s = player.getPlayerState(); });
+                    safeCall(function() { t = player.getCurrentTime(); });
+                    if (s !== lastState) {
+                        lastState = s;
+                        safeCall(function() { CrispyBridge.onState(s, t); });
+                    }
+                }, 250);
+
+                safeCall(function() {
+                    player.addEventListener('onError', function(e) {
+                        safeCall(function() { CrispyBridge.onError(e.data || e); });
+                    });
+                });
+
+                doApplyMute();
+                safeCall(function() { if (desiredPlaying) player.playVideo(); });
+                safeCall(function() { CrispyBridge.onReady(); });
+            }
+
+            pollId = setInterval(tryInit, 250);
+            tryInit();
+        })();
+    """.trimIndent()
+    view.evaluateJavascript(js, null)
 }
 
 private fun applyMute(webView: WebView, muted: Boolean) {
