@@ -343,14 +343,15 @@ private fun HeroYouTubeTrailerLayer(
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
     onError: () -> Unit,
 ) {
-    val embedUrl = remember(trailerKey) { buildYouTubeEmbedUrl(trailerKey) }
-    Log.d("TrailerDbg", "layer: composed trailerKey=$trailerKey shouldPlay=$shouldPlay isMuted=$isMuted embedUrl=$embedUrl")
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val origin = remember { "https://${context.packageName}" }
+    val embedUrl = remember(trailerKey, origin) { buildYouTubeEmbedUrl(trailerKey, origin) }
+    Log.d("TrailerDbg", "layer: key=$trailerKey shouldPlay=$shouldPlay isMuted=$isMuted")
     val latestOnError by rememberUpdatedState(onError)
     val latestOnPlaybackState by rememberUpdatedState(onPlaybackState)
     val latestMuted by rememberUpdatedState(isMuted)
     val latestShouldPlay by rememberUpdatedState(shouldPlay)
 
-    val context = androidx.compose.ui.platform.LocalContext.current
     val webView = remember(trailerKey) {
         WebView(context).apply {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -371,7 +372,6 @@ private fun HeroYouTubeTrailerLayer(
             CookieManager.getInstance().setAcceptCookie(true)
             runCatching { CookieManager.getInstance().setAcceptThirdPartyCookies(this, true) }
 
-            // Treat as background video layer.
             setOnTouchListener { _, _ -> true }
 
             val mainHandler = Handler(Looper.getMainLooper())
@@ -379,7 +379,7 @@ private fun HeroYouTubeTrailerLayer(
                 object {
                     @JavascriptInterface
                     fun onReady() {
-                        Log.d("TrailerDbg", "bridge: onReady called")
+                        Log.d("TrailerDbg", "bridge: onReady")
                         mainHandler.post {
                             applyMute(this@apply, latestMuted)
                             applyPlayPause(this@apply, latestShouldPlay)
@@ -388,26 +388,23 @@ private fun HeroYouTubeTrailerLayer(
 
                     @JavascriptInterface
                     fun onState(state: Int, timeSeconds: Double) {
-                        Log.d("TrailerDbg", "bridge: onState state=$state time=$timeSeconds")
-                        mainHandler.post {
-                            latestOnPlaybackState(state, timeSeconds)
-                        }
+                        Log.d("TrailerDbg", "bridge: onState=$state t=$timeSeconds")
+                        mainHandler.post { latestOnPlaybackState(state, timeSeconds) }
                     }
 
                     @JavascriptInterface
                     fun onError(code: Int) {
-                        Log.d("TrailerDbg", "bridge: onError code=$code")
-                        mainHandler.post {
-                            latestOnError()
-                        }
+                        Log.d("TrailerDbg", "bridge: onError=$code")
+                        mainHandler.post { latestOnError() }
                     }
                 },
                 "CrispyBridge",
             )
 
+            // Required for HTML5 <video> playback pipeline in Android WebView.
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
-                    Log.d("TrailerDbg", "js: [${msg.messageLevel()}] ${msg.message()} (${msg.sourceId()}:${msg.lineNumber()})")
+                    Log.d("TrailerDbg", "js: [${msg.messageLevel()}] ${msg.message()}")
                     return true
                 }
             }
@@ -419,8 +416,8 @@ private fun HeroYouTubeTrailerLayer(
                         request: WebResourceRequest,
                         error: WebResourceError,
                     ) {
-                        Log.d("TrailerDbg", "webview: onReceivedError isMainFrame=${request.isForMainFrame} url=${request.url} error=${error.description}")
                         if (request.isForMainFrame) {
+                            Log.d("TrailerDbg", "webview: mainFrame error url=${request.url} err=${error.description}")
                             latestOnError()
                         }
                     }
@@ -444,7 +441,7 @@ private fun HeroYouTubeTrailerLayer(
                     }
 
                     override fun onPageFinished(view: WebView, url: String?) {
-                        Log.d("TrailerDbg", "webview: onPageFinished url=$url")
+                        Log.d("TrailerDbg", "onPageFinished: $url")
                         if (url == null || url.startsWith("about:")) return
                         injectBridge(view)
                     }
@@ -461,22 +458,14 @@ private fun HeroYouTubeTrailerLayer(
     }
 
     LaunchedEffect(webView, embedUrl) {
-        Log.d("TrailerDbg", "webview: calling loadUrl → $embedUrl")
+        Log.d("TrailerDbg", "loadUrl: $embedUrl referer=$origin")
         runCatching {
-            webView.loadUrl(embedUrl)
-        }.onFailure {
-            Log.d("TrailerDbg", "webview: loadUrl FAILED: ${it.message}")
-            latestOnError()
-        }
+            webView.loadUrl(embedUrl, mapOf("Referer" to origin))
+        }.onFailure { latestOnError() }
     }
 
-    LaunchedEffect(webView, isMuted) {
-        applyMute(webView, isMuted)
-    }
-
-    LaunchedEffect(webView, shouldPlay) {
-        applyPlayPause(webView, shouldPlay)
-    }
+    LaunchedEffect(webView, isMuted) { applyMute(webView, isMuted) }
+    LaunchedEffect(webView, shouldPlay) { applyPlayPause(webView, shouldPlay) }
 
     Box(modifier = modifier.clipToBounds()) {
         AndroidView(
@@ -487,28 +476,27 @@ private fun HeroYouTubeTrailerLayer(
     }
 }
 
-private fun buildYouTubeEmbedUrl(videoId: String): String {
+private fun buildYouTubeEmbedUrl(videoId: String, origin: String): String {
     val id = videoId.trim()
     return "https://www.youtube.com/embed/$id" +
         "?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1" +
         "&mute=1&loop=1&playlist=$id&enablejsapi=1" +
-        "&iv_load_policy=3&showinfo=0&fs=0&disablekb=1"
+        "&iv_load_policy=3&showinfo=0&fs=0&disablekb=1" +
+        "&origin=$origin"
 }
 
 /**
- * Injected after the YouTube embed page finishes loading. Hides YouTube chrome
- * via CSS, applies a 135 % crop-zoom on the video player element, and wires
- * the native `movie_player` element to [CrispyBridge] for state callbacks and
- * the `__crispyTrailer` control interface used by [applyMute]/[applyPlayPause].
+ * Injected after the YouTube embed page loads. Hides YouTube chrome via CSS,
+ * applies a 135% crop-zoom, and controls the raw HTML5 <video> element
+ * directly (bypassing YouTube's player JS API).
  */
 private fun injectBridge(view: WebView) {
-    Log.d("TrailerDbg", "injectBridge: called")
     //language=JavaScript
     val js = """
         (function() {
             if (window.__crispyInjected) return;
             window.__crispyInjected = true;
-            console.log('CrispyBridge: injection starting');
+            console.log('[Crispy] bridge injected');
 
             var style = document.createElement('style');
             style.textContent = [
@@ -525,70 +513,53 @@ private fun injectBridge(view: WebView) {
             ].join('\n');
             document.head.appendChild(style);
 
-            var desiredMuted = false;
-            var desiredPlaying = false;
-            var player = null;
+            var video = null;
             var pollId = null;
+            var lastState = -2;
 
-            function safeCall(fn) { try { fn(); } catch(e) {} }
+            function safe(fn) { try { fn(); } catch(e) {} }
 
-            function doApplyMute() {
-                if (!player) return;
-                safeCall(function() {
-                    if (desiredMuted) { player.mute(); player.setVolume(0); }
-                    else { player.setVolume(100); player.unMute(); }
-                });
+            function mapState() {
+                if (!video) return -1;
+                if (video.ended) return 0;
+                if (!video.paused && video.readyState >= 3) return 1;
+                if (video.paused) return 2;
+                return 3;
             }
 
             window.__crispyTrailer = {
                 setMuted: function(m) {
-                    desiredMuted = !!m;
-                    doApplyMute();
+                    if (!video) return;
+                    safe(function() { video.muted = !!m; video.volume = m ? 0 : 1; });
                 },
                 setPlaying: function(p) {
-                    desiredPlaying = !!p;
-                    if (!player) return;
-                    safeCall(function() {
-                        if (desiredPlaying) player.playVideo();
-                        else player.pauseVideo();
-                    });
+                    if (!video) return;
+                    safe(function() { if (p) video.play(); else video.pause(); });
                 }
             };
 
-            var lastState = -2;
-            var pollCount = 0;
             function tryInit() {
-                pollCount++;
-                var el = document.getElementById('movie_player');
-                if (pollCount <= 5 || pollCount % 20 === 0) {
-                    console.log('CrispyBridge: poll #' + pollCount + ' movie_player=' + (el ? 'found' : 'null') + (el ? ' hasPlayVideo=' + (typeof el.playVideo) : ''));
-                }
-                if (!el || typeof el.playVideo !== 'function') return;
-                console.log('CrispyBridge: player ready, wiring callbacks');
-                player = el;
+                var v = document.querySelector('video');
+                console.log('[Crispy] poll video=' + (v ? 'found' : 'null'));
+                if (!v) return;
+                video = v;
                 if (pollId) { clearInterval(pollId); pollId = null; }
 
                 setInterval(function() {
-                    if (!player || !player.getPlayerState) return;
-                    var s = -2, t = 0;
-                    safeCall(function() { s = player.getPlayerState(); });
-                    safeCall(function() { t = player.getCurrentTime(); });
+                    var s = mapState();
+                    var t = video.currentTime || 0;
                     if (s !== lastState) {
                         lastState = s;
-                        safeCall(function() { CrispyBridge.onState(s, t); });
+                        safe(function() { CrispyBridge.onState(s, t); });
                     }
                 }, 250);
 
-                safeCall(function() {
-                    player.addEventListener('onError', function(e) {
-                        safeCall(function() { CrispyBridge.onError(e.data || e); });
-                    });
+                video.addEventListener('error', function() {
+                    safe(function() { CrispyBridge.onError(video.error ? video.error.code : -1); });
                 });
 
-                doApplyMute();
-                safeCall(function() { if (desiredPlaying) player.playVideo(); });
-                safeCall(function() { CrispyBridge.onReady(); });
-                console.log('CrispyBridge: onReady fired, desiredPlaying=' + desiredPlaying + ' desiredMuted=' + desiredMuted);
+                console.log('[Crispy] video element wired, notifying ready');
+                safe(function() { CrispyBridge.onReady(); });
             }
 
             pollId = setInterval(tryInit, 250);
@@ -599,19 +570,17 @@ private fun injectBridge(view: WebView) {
 }
 
 private fun applyMute(webView: WebView, muted: Boolean) {
-    Log.d("TrailerDbg", "applyMute: muted=$muted")
     val m = if (muted) "true" else "false"
     webView.evaluateJavascript(
-        "try{window.__crispyTrailer && window.__crispyTrailer.setMuted($m);}catch(e){}",
+        "try{__crispyTrailer&&__crispyTrailer.setMuted($m)}catch(e){}",
         null
     )
 }
 
 private fun applyPlayPause(webView: WebView, playing: Boolean) {
-    Log.d("TrailerDbg", "applyPlayPause: playing=$playing")
     val p = if (playing) "true" else "false"
     webView.evaluateJavascript(
-        "try{window.__crispyTrailer && window.__crispyTrailer.setPlaying($p);}catch(e){}",
+        "try{__crispyTrailer&&__crispyTrailer.setPlaying($p)}catch(e){}",
         null
     )
 }
