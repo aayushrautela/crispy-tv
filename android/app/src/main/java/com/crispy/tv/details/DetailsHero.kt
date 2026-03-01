@@ -461,34 +461,16 @@ private fun injectBridge(view: WebView) {
 
             var style = document.createElement('style');
             style.textContent = [
-                /* black fallback on the page itself */
-                'html, body {',
-                '  background:black!important; overflow:hidden!important;',
-                '  margin:0!important; padding:0!important;',
-                '}',
-                /* inner YouTube containers must be transparent so <video> surface shows through */
-                '#player, #movie_player, .html5-video-player,',
-                '.html5-video-container, .html5-main-video {',
-                '  background:transparent!important; overflow:hidden!important;',
-                '  margin:0!important; padding:0!important;',
-                '  position:fixed!important; top:0!important; left:0!important;',
-                '  width:100vw!important; height:100vh!important;',
-                '}',
-                /* force the <video> element to fill the viewport */
-                'video {',
-                '  position:fixed!important; top:0!important; left:0!important;',
-                '  width:100vw!important; height:100vh!important;',
-                '  object-fit:cover!important;',
-                '  background:transparent!important;',
-                '}',
-                /* hide all YouTube chrome / overlays */
+                /* page baseline */
+                'html, body { background:black!important; overflow:hidden!important; margin:0!important; padding:0!important; }',
+                /* hide YouTube chrome */
                 '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
                 '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
                 '.ytp-gradient-top, .ytp-gradient-bottom, .ytp-spinner,',
                 '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
                 '.ytp-impression-link, .iv-branding, .annotation,',
                 '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
-                /* hide YouTube error / loading overlays left over from failed first stream */
+                /* hide error / loading overlays left over from failed first stream attempt */
                 '.ytp-error, .ytp-error-content-wrap, .ytp-error-content,',
                 '.ytp-offline-slate, .ytp-offline-slate-bar,',
                 '.html5-video-info-panel { display:none!important; }'
