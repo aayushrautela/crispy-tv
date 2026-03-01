@@ -56,7 +56,7 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
     val baseScheme = MaterialTheme.colorScheme
     val fallbackSeed = baseScheme.primary
 
-    var seedColor by remember(fallbackSeed) { mutableStateOf(fallbackSeed) }
+    var seedColor by remember(imageUrl, fallbackSeed) { mutableStateOf(fallbackSeed) }
     var isSeedColorResolved by remember(imageUrl, fallbackSeed) { mutableStateOf(imageUrl.isNullOrBlank()) }
 
     val context = LocalContext.current
