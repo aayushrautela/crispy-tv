@@ -461,13 +461,32 @@ private fun injectBridge(view: WebView) {
 
             var style = document.createElement('style');
             style.textContent = [
+                /* make every YouTube container transparent/black so the video surface shows */
+                'html, body, #player, #movie_player, .html5-video-player,',
+                '.html5-video-container, .html5-main-video {',
+                '  background:black!important; overflow:hidden!important;',
+                '  margin:0!important; padding:0!important;',
+                '  position:fixed!important; top:0!important; left:0!important;',
+                '  width:100vw!important; height:100vh!important;',
+                '}',
+                /* force the <video> element to fill the viewport */
+                'video {',
+                '  position:fixed!important; top:0!important; left:0!important;',
+                '  width:100vw!important; height:100vh!important;',
+                '  object-fit:cover!important; z-index:1!important;',
+                '  background:transparent!important;',
+                '}',
+                /* hide all YouTube chrome / overlays */
                 '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
                 '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
                 '.ytp-gradient-top, .ytp-gradient-bottom, .ytp-spinner,',
                 '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
                 '.ytp-impression-link, .iv-branding, .annotation,',
                 '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
-                'html, body { overflow:hidden!important; margin:0!important; padding:0!important; }'
+                /* hide YouTube error / loading overlays left over from failed first stream */
+                '.ytp-error, .ytp-error-content-wrap, .ytp-error-content,',
+                '.ytp-offline-slate, .ytp-offline-slate-bar,',
+                '.html5-video-info-panel { display:none!important; }'
             ].join('\n');
             document.head.appendChild(style);
 
