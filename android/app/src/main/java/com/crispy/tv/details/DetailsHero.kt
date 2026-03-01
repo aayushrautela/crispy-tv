@@ -461,10 +461,15 @@ private fun injectBridge(view: WebView) {
 
             var style = document.createElement('style');
             style.textContent = [
-                /* make every YouTube container transparent/black so the video surface shows */
-                'html, body, #player, #movie_player, .html5-video-player,',
-                '.html5-video-container, .html5-main-video {',
+                /* black fallback on the page itself */
+                'html, body {',
                 '  background:black!important; overflow:hidden!important;',
+                '  margin:0!important; padding:0!important;',
+                '}',
+                /* inner YouTube containers must be transparent so <video> surface shows through */
+                '#player, #movie_player, .html5-video-player,',
+                '.html5-video-container, .html5-main-video {',
+                '  background:transparent!important; overflow:hidden!important;',
                 '  margin:0!important; padding:0!important;',
                 '  position:fixed!important; top:0!important; left:0!important;',
                 '  width:100vw!important; height:100vh!important;',
@@ -473,7 +478,7 @@ private fun injectBridge(view: WebView) {
                 'video {',
                 '  position:fixed!important; top:0!important; left:0!important;',
                 '  width:100vw!important; height:100vh!important;',
-                '  object-fit:cover!important; z-index:1!important;',
+                '  object-fit:cover!important;',
                 '  background:transparent!important;',
                 '}',
                 /* hide all YouTube chrome / overlays */
