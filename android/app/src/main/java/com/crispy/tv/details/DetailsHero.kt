@@ -3,9 +3,7 @@ package com.crispy.tv.details
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.View
-import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
@@ -159,7 +157,6 @@ internal fun HeroSection(
         var trailerPlaybackConfirmed by remember(trailerKey) { mutableStateOf(false) }
 
         val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying && !trailerFailed
-        Log.d("TrailerDbg", "hero: showTrailer=$showTrailer hasTrailer=$hasTrailer isTrailerPlaying=$isTrailerPlaying trailerFailed=$trailerFailed → shouldAttemptPlayback=$shouldAttemptPlayback key=$trailerKey")
         val latestShouldAttemptPlayback by rememberUpdatedState(shouldAttemptPlayback)
 
         LaunchedEffect(trailerKey, shouldAttemptPlayback) {
@@ -182,7 +179,6 @@ internal fun HeroSection(
                 shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
                 onPlaybackState = { state, _ ->
-                    Log.d("TrailerDbg", "hero: onPlaybackState state=$state latestShouldAttempt=$latestShouldAttemptPlayback")
                     if (state == 1 && latestShouldAttemptPlayback) {
                         trailerPlaybackConfirmed = true
                     }
@@ -346,7 +342,6 @@ private fun HeroYouTubeTrailerLayer(
     val context = androidx.compose.ui.platform.LocalContext.current
     val origin = remember { "https://${context.packageName}" }
     val embedUrl = remember(trailerKey, origin) { buildYouTubeEmbedUrl(trailerKey, origin) }
-    Log.d("TrailerDbg", "layer: key=$trailerKey shouldPlay=$shouldPlay isMuted=$isMuted")
     val latestOnError by rememberUpdatedState(onError)
     val latestOnPlaybackState by rememberUpdatedState(onPlaybackState)
     val latestMuted by rememberUpdatedState(isMuted)
@@ -379,7 +374,6 @@ private fun HeroYouTubeTrailerLayer(
                 object {
                     @JavascriptInterface
                     fun onReady() {
-                        Log.d("TrailerDbg", "bridge: onReady")
                         mainHandler.post {
                             applyMute(this@apply, latestMuted)
                             applyPlayPause(this@apply, latestShouldPlay)
@@ -388,13 +382,11 @@ private fun HeroYouTubeTrailerLayer(
 
                     @JavascriptInterface
                     fun onState(state: Int, timeSeconds: Double) {
-                        Log.d("TrailerDbg", "bridge: onState=$state t=$timeSeconds")
                         mainHandler.post { latestOnPlaybackState(state, timeSeconds) }
                     }
 
                     @JavascriptInterface
                     fun onError(code: Int) {
-                        Log.d("TrailerDbg", "bridge: onError=$code")
                         mainHandler.post { latestOnError() }
                     }
                 },
@@ -402,12 +394,7 @@ private fun HeroYouTubeTrailerLayer(
             )
 
             // Required for HTML5 <video> playback pipeline in Android WebView.
-            webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
-                    Log.d("TrailerDbg", "js: [${msg.messageLevel()}] ${msg.message()}")
-                    return true
-                }
-            }
+            webChromeClient = WebChromeClient()
 
             webViewClient =
                 object : WebViewClient() {
@@ -417,7 +404,6 @@ private fun HeroYouTubeTrailerLayer(
                         error: WebResourceError,
                     ) {
                         if (request.isForMainFrame) {
-                            Log.d("TrailerDbg", "webview: mainFrame error url=${request.url} err=${error.description}")
                             latestOnError()
                         }
                     }
@@ -441,7 +427,6 @@ private fun HeroYouTubeTrailerLayer(
                     }
 
                     override fun onPageFinished(view: WebView, url: String?) {
-                        Log.d("TrailerDbg", "onPageFinished: $url")
                         if (url == null || url.startsWith("about:")) return
                         injectBridge(view)
                     }
@@ -458,7 +443,6 @@ private fun HeroYouTubeTrailerLayer(
     }
 
     LaunchedEffect(webView, embedUrl) {
-        Log.d("TrailerDbg", "loadUrl: $embedUrl referer=$origin")
         runCatching {
             webView.loadUrl(embedUrl, mapOf("Referer" to origin))
         }.onFailure { latestOnError() }
@@ -487,8 +471,9 @@ private fun buildYouTubeEmbedUrl(videoId: String, origin: String): String {
 
 /**
  * Injected after the YouTube embed page loads. Hides YouTube chrome via CSS,
- * applies a 135% crop-zoom, and controls the raw HTML5 <video> element
- * directly (bypassing YouTube's player JS API).
+ * applies viewport-relative cover-fill to eliminate black bars regardless of
+ * video aspect ratio, and controls the raw HTML5 <video> element directly
+ * (bypassing YouTube's player JS API).
  */
 private fun injectBridge(view: WebView) {
     //language=JavaScript
@@ -496,7 +481,6 @@ private fun injectBridge(view: WebView) {
         (function() {
             if (window.__crispyInjected) return;
             window.__crispyInjected = true;
-            console.log('[Crispy] bridge injected');
 
             var style = document.createElement('style');
             style.textContent = [
@@ -506,11 +490,24 @@ private fun injectBridge(view: WebView) {
                 '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
                 '.ytp-impression-link, .iv-branding, .annotation,',
                 '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
+                'html, body { overflow:hidden!important; margin:0!important; padding:0!important; }',
                 '.html5-video-player {',
-                '  position:fixed!important; width:135%!important; height:135%!important;',
-                '  top:-17.5%!important; left:-17.5%!important;',
+                '  position:fixed!important;',
+                '  top:50%!important; left:50%!important;',
+                '  width:100vw!important; height:100vh!important;',
+                '  min-width:177.78vh!important;',
+                '  min-height:56.25vw!important;',
+                '  transform:translate(-50%,-50%)!important;',
                 '}',
-                'video { object-fit:cover!important; }'
+                '.html5-video-container {',
+                '  width:100%!important; height:100%!important;',
+                '  position:relative!important;',
+                '}',
+                'video {',
+                '  position:absolute!important; top:0!important; left:0!important;',
+                '  width:100%!important; height:100%!important;',
+                '  object-fit:cover!important;',
+                '}'
             ].join('\n');
             document.head.appendChild(style);
 
@@ -541,7 +538,6 @@ private fun injectBridge(view: WebView) {
 
             function tryInit() {
                 var v = document.querySelector('video');
-                console.log('[Crispy] poll video=' + (v ? 'found' : 'null'));
                 if (!v) return;
                 video = v;
                 if (pollId) { clearInterval(pollId); pollId = null; }
@@ -559,7 +555,6 @@ private fun injectBridge(view: WebView) {
                     safe(function() { CrispyBridge.onError(video.error ? video.error.code : -1); });
                 });
 
-                console.log('[Crispy] video element wired, notifying ready');
                 safe(function() { CrispyBridge.onReady(); });
             }
 
