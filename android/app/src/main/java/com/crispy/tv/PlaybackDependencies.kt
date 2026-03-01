@@ -7,7 +7,7 @@ import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
 import com.crispy.tv.metadata.RemoteSupabaseSyncLabService
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import com.crispy.tv.watchhistory.RemoteWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.network.AppHttp
@@ -67,11 +67,7 @@ private fun newCatalogSearchService(context: Context): CatalogSearchLabService {
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
     val httpClient = AppHttp.client(appContext)
-    val tmdbEnrichmentRepository =
-        TmdbEnrichmentRepository(
-            apiKey = BuildConfig.TMDB_API_KEY,
-            httpClient = httpClient,
-        )
+    val tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext)
     val episodeListProvider = TmdbEpisodeListProvider(
         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
     )

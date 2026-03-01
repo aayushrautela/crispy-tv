@@ -23,6 +23,28 @@ import com.materialkolor.rememberDynamicColorScheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val SEED_COLOR_CACHE_MAX_ENTRIES = 96
+
+private object DetailsSeedColorCache {
+    private val cache =
+        object : LinkedHashMap<String, ULong>(SEED_COLOR_CACHE_MAX_ENTRIES, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ULong>): Boolean {
+                return size > SEED_COLOR_CACHE_MAX_ENTRIES
+            }
+        }
+
+    @Synchronized
+    fun get(imageUrl: String): Color? {
+        val value = cache[imageUrl] ?: return null
+        return Color(value)
+    }
+
+    @Synchronized
+    fun put(imageUrl: String, seedColor: Color) {
+        cache[imageUrl] = seedColor.value
+    }
+}
+
 @Stable
 internal data class DetailsPaletteColors(
     val pageBackground: Color,
@@ -56,18 +78,30 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
     val baseScheme = MaterialTheme.colorScheme
     val fallbackSeed = baseScheme.primary
 
-    var seedColor by remember(imageUrl, fallbackSeed) { mutableStateOf(fallbackSeed) }
-    var isSeedColorResolved by remember(imageUrl, fallbackSeed) { mutableStateOf(imageUrl.isNullOrBlank()) }
+    val cachedSeed =
+        remember(imageUrl) {
+            if (imageUrl.isNullOrBlank()) {
+                null
+            } else {
+                DetailsSeedColorCache.get(imageUrl)
+            }
+        }
+
+    var seedColor by remember(imageUrl, fallbackSeed) { mutableStateOf(cachedSeed ?: fallbackSeed) }
+    var isSeedColorResolved by
+        remember(imageUrl, fallbackSeed) {
+            mutableStateOf(imageUrl.isNullOrBlank() || cachedSeed != null)
+        }
 
     val context = LocalContext.current
     val imageLoader = context.imageLoader
 
     LaunchedEffect(imageUrl, fallbackSeed) {
-        seedColor = fallbackSeed
-        isSeedColorResolved = imageUrl.isNullOrBlank()
-        if (imageUrl.isNullOrBlank()) return@LaunchedEffect
+        seedColor = cachedSeed ?: fallbackSeed
+        isSeedColorResolved = imageUrl.isNullOrBlank() || cachedSeed != null
+        if (imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
 
-        seedColor =
+        val computedSeed =
             runCatching {
                 val request =
                     ImageRequest.Builder(context)
@@ -78,7 +112,7 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
                         .build()
 
                 val result = imageLoader.execute(request)
-                val drawable = (result as? SuccessResult)?.drawable ?: return@runCatching fallbackSeed
+                val drawable = (result as? SuccessResult)?.drawable ?: return@runCatching null
                 val bitmap = drawable.toBitmap()
 
                 withContext(Dispatchers.Default) {
@@ -86,7 +120,12 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
                         .asImageBitmap()
                         .themeColor(fallback = fallbackSeed, filter = true, maxColors = 128)
                 }
-            }.getOrDefault(fallbackSeed)
+            }.getOrNull()
+
+        seedColor = computedSeed ?: fallbackSeed
+        if (computedSeed != null) {
+            DetailsSeedColorCache.put(imageUrl, computedSeed)
+        }
 
         isSeedColorResolved = true
     }

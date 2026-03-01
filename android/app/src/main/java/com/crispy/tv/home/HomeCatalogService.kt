@@ -3,7 +3,6 @@ package com.crispy.tv.home
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -14,6 +13,7 @@ import com.crispy.tv.domain.catalog.buildCatalogRequestUrls
 import com.crispy.tv.metadata.AddonManifestSeed
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
@@ -111,7 +111,7 @@ class HomeCatalogService(
     addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository =
-        TmdbEnrichmentRepository(apiKey = BuildConfig.TMDB_API_KEY, httpClient = httpClient),
+        TmdbEnrichmentRepositoryProvider.get(context),
 ) {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()

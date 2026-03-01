@@ -22,7 +22,7 @@ import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.metadata.TmdbEpisodeListProvider
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -103,11 +103,8 @@ class HomeViewModel internal constructor(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                         val httpClient = AppHttp.client(appContext)
-                        val tmdbEnrichmentRepository =
-                            TmdbEnrichmentRepository(
-                                apiKey = BuildConfig.TMDB_API_KEY,
-                                httpClient = httpClient,
-                            )
+                        val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
+                        val tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             homeCatalogService =
@@ -116,9 +113,9 @@ class HomeViewModel internal constructor(
                                     addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
                                     httpClient = httpClient,
                                 ),
-                            watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                            watchHistoryService = watchHistoryService,
                             thisWeekService = ThisWeekService(
-                                watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                                watchHistoryService = watchHistoryService,
                                 episodeListProvider = TmdbEpisodeListProvider(
                                     tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                                 ),

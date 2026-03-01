@@ -9,10 +9,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class TmdbSearchRepository(
-    apiKey: String,
-    httpClient: CrispyHttpClient
+    private val tmdbClient: TmdbJsonClient,
 ) {
-    private val tmdbClient = TmdbJsonClient(apiKey = apiKey, httpClient = httpClient)
+    constructor(apiKey: String, httpClient: CrispyHttpClient) : this(
+        TmdbJsonClient(apiKey = apiKey, httpClient = httpClient)
+    )
 
     suspend fun search(query: String, filter: SearchTypeFilter, languageTag: String?): List<CatalogItem> {
         val trimmedQuery = query.trim()

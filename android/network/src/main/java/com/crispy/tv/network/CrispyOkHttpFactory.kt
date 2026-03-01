@@ -9,6 +9,9 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 
 object CrispyOkHttpFactory {
+    private const val TMDB_HOST = "api.themoviedb.org"
+    private const val TMDB_MAX_AGE_SECONDS = 6 * 60 * 60
+
     fun create(
         context: Context,
         userAgent: String,
@@ -33,6 +36,32 @@ object CrispyOkHttpFactory {
                 chain.proceed(request)
             }
 
+        val tmdbResponseCacheInterceptor =
+            Interceptor { chain ->
+                val request = chain.request()
+                val response = chain.proceed(request)
+
+                if (request.method != "GET") return@Interceptor response
+                if (request.url.host != TMDB_HOST) return@Interceptor response
+                if (!response.isSuccessful) return@Interceptor response
+
+                val existing = response.header("Cache-Control").orEmpty()
+                val shouldOverride =
+                    existing.isBlank() ||
+                        existing.contains("no-store", ignoreCase = true) ||
+                        existing.contains("no-cache", ignoreCase = true) ||
+                        existing.contains("max-age=0", ignoreCase = true) ||
+                        existing.contains("must-revalidate", ignoreCase = true)
+
+                if (!shouldOverride) return@Interceptor response
+
+                response
+                    .newBuilder()
+                    .removeHeader("Pragma")
+                    .header("Cache-Control", "public, max-age=$TMDB_MAX_AGE_SECONDS")
+                    .build()
+            }
+
         val builder =
             OkHttpClient.Builder()
                 .cache(cache)
@@ -42,6 +71,7 @@ object CrispyOkHttpFactory {
                 .writeTimeout(25, TimeUnit.SECONDS)
                 .callTimeout(45, TimeUnit.SECONDS)
                 .addInterceptor(userAgentInterceptor)
+                .addNetworkInterceptor(tmdbResponseCacheInterceptor)
 
         if (debugLogging) {
             val logging = HttpLoggingInterceptor().apply {

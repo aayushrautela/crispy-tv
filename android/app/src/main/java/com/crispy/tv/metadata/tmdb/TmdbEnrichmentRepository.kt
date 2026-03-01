@@ -43,10 +43,11 @@ data class TmdbEnrichmentResult(
 )
 
 class TmdbEnrichmentRepository(
-    apiKey: String,
-    httpClient: CrispyHttpClient
+    private val client: TmdbJsonClient,
 ) {
-    private val client = TmdbJsonClient(apiKey = apiKey, httpClient = httpClient)
+    constructor(apiKey: String, httpClient: CrispyHttpClient) : this(
+        TmdbJsonClient(apiKey = apiKey, httpClient = httpClient)
+    )
 
     suspend fun load(
         rawId: String,

@@ -4,11 +4,10 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.metadata.tmdb.TmdbApi
 import com.crispy.tv.metadata.tmdb.TmdbJsonClient
-import com.crispy.tv.network.AppHttp
+import com.crispy.tv.metadata.tmdb.TmdbJsonClientProvider
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -245,10 +244,7 @@ class PersonDetailsViewModel internal constructor(
                     }
 
                     val tmdbClient =
-                        TmdbJsonClient(
-                            apiKey = BuildConfig.TMDB_API_KEY,
-                            httpClient = AppHttp.client(context)
-                        )
+                        TmdbJsonClientProvider.get(context)
 
                     @Suppress("UNCHECKED_CAST")
                     return PersonDetailsViewModel(personId = personId, tmdbClient = tmdbClient) as T

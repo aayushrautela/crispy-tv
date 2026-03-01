@@ -48,10 +48,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.network.AppHttp
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
@@ -255,14 +254,7 @@ fun LibraryRoute(
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
 
-    val httpClient = remember(appContext) { AppHttp.client(appContext) }
-    val tmdbEnrichmentRepository =
-        remember(httpClient) {
-            TmdbEnrichmentRepository(
-                apiKey = BuildConfig.TMDB_API_KEY,
-                httpClient = httpClient
-            )
-        }
+    val tmdbEnrichmentRepository = remember(appContext) { TmdbEnrichmentRepositoryProvider.get(appContext) }
     val viewModel: LibraryViewModel =
         viewModel(
             factory = remember(appContext) {
