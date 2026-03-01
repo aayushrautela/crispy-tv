@@ -443,12 +443,20 @@ private fun buildYouTubeEmbedUrl(videoId: String, origin: String): String {
 }
 
 /**
- * Injected after the YouTube embed page loads. Hides YouTube chrome via CSS
- * and controls the raw HTML5 <video> element directly (bypassing YouTube's
- * player JS API).
+ * Injected once after the YouTube embed finishes initial page load.
  *
- * Re-queries `document.querySelector('video')` every tick so the bridge
- * survives YouTube's internal error-recovery which can replace the element.
+ * Static CSS  – hides YouTube chrome (controls, watermark, gradients) and
+ *               error/loading overlays. These selectors are cosmetic-only.
+ *
+ * Tick loop   – Every 250 ms:
+ *   1. Re-queries `document.querySelector('video')` so the bridge survives
+ *      YouTube's internal error-recovery which replaces the DOM element.
+ *   2. Forces inline styles (with !important) on `.html5-video-player`,
+ *      `.html5-video-container`, and the `<video>` element so the video
+ *      fills the WebView viewport edge-to-edge (no letterboxing).
+ *      Inline styles beat stylesheet rules at any specificity, and
+ *      re-applying every tick beats YouTube's async JS style mutations.
+ *   3. Reports playback state changes back to Kotlin via CrispyBridge.
  */
 private fun injectBridge(view: WebView) {
     //language=JavaScript
@@ -456,31 +464,27 @@ private fun injectBridge(view: WebView) {
         (function() {
             if (window.__crispyInjected) return;
             window.__crispyInjected = true;
-            console.log('[CrispyTrailer] bridge injecting');
 
+            /* ── Static CSS: hide YouTube chrome & error overlays ── */
             var style = document.createElement('style');
             style.textContent = [
-                /* hide YouTube chrome */
                 '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
                 '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
                 '.ytp-gradient-top, .ytp-gradient-bottom, .ytp-spinner,',
                 '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
                 '.ytp-impression-link, .iv-branding, .annotation,',
                 '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
-                /* hide error / loading overlays */
                 '.ytp-error, .ytp-error-content-wrap, .ytp-error-content,',
                 '.ytp-offline-slate, .ytp-offline-slate-bar,',
-                '.html5-video-info-panel { display:none!important; }',
-                /* oversize the player so it crops letterboxing */
-                '.html5-video-player { position:fixed!important; width:135%!important; height:135%!important; top:-17.5%!important; left:-17.5%!important; }',
-                'video { object-fit:cover!important; }'
+                '.html5-video-info-panel { display:none!important; }'
             ].join('\n');
             document.head.appendChild(style);
 
+            /* ── State ── */
             var video = null;
             var lastState = -2;
 
-            function safe(fn) { try { fn(); } catch(e) { console.log('[CrispyTrailer] safe error: ' + e); } }
+            function safe(fn) { try { fn(); } catch(e) {} }
 
             function mapState() {
                 if (!video) return -1;
@@ -490,6 +494,39 @@ private fun injectBridge(view: WebView) {
                 return 3;
             }
 
+            /* ── Force YouTube's player to cover the viewport ──
+             * YouTube sizes .html5-video-player to a 16:9 box and
+             * letterboxes inside the embed. We override with
+             * position:fixed filling the viewport, then set the
+             * <video> to object-fit:cover so it crops any mismatch
+             * between 16:9 content and the hero aspect ratio.
+             *
+             * Using element.style.setProperty(…, 'important') gives
+             * us the highest possible specificity. Re-applying every
+             * tick ensures YouTube's async JS never wins. */
+            function forceLayout() {
+                var p = document.querySelector('.html5-video-player');
+                if (p) {
+                    var s = p.style;
+                    s.setProperty('position', 'fixed', 'important');
+                    s.setProperty('left',     '0',     'important');
+                    s.setProperty('top',      '0',     'important');
+                    s.setProperty('width',    '100%',  'important');
+                    s.setProperty('height',   '100%',  'important');
+                }
+                var c = document.querySelector('.html5-video-container');
+                if (c) {
+                    c.style.setProperty('width',  '100%', 'important');
+                    c.style.setProperty('height', '100%', 'important');
+                }
+                if (video) {
+                    video.style.setProperty('width',      '100%',  'important');
+                    video.style.setProperty('height',     '100%',  'important');
+                    video.style.setProperty('object-fit', 'cover', 'important');
+                }
+            }
+
+            /* ── Mute / play API for Kotlin ── */
             window.__crispyTrailer = {
                 setMuted: function(m) {
                     if (!video) return;
@@ -501,16 +538,19 @@ private fun injectBridge(view: WebView) {
                 }
             };
 
+            /* ── Main tick ── */
             setInterval(function() {
                 var v = document.querySelector('video');
                 if (v && v !== video) {
                     video = v;
-                    console.log('[CrispyTrailer] <video> found, wiring state');
                     v.addEventListener('error', function() {
-                        safe(function() { CrispyBridge.onError(video && video.error ? video.error.code : -1); });
+                        safe(function() {
+                            CrispyBridge.onError(video && video.error ? video.error.code : -1);
+                        });
                     });
                     safe(function() { CrispyBridge.onReady(); });
                 }
+                forceLayout();
                 var s = mapState();
                 var t = (video && video.currentTime) || 0;
                 if (s !== lastState) {
