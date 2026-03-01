@@ -174,33 +174,18 @@ internal fun HeroSection(
         }
 
         if (showTrailer && hasTrailer) {
-            // Force a 16:9 viewport for YouTube, then crop overflow to fill the hero.
-            val trailerAspectRatio = 16f / 9f
-            val fitHeightWidth = maxHeight * trailerAspectRatio
-            val (trailerWidth, trailerHeight) =
-                if (fitHeightWidth >= maxWidth) {
-                    fitHeightWidth to maxHeight
-                } else {
-                    maxWidth to (maxWidth / trailerAspectRatio)
-                }
-
-            Box(
+            HeroYouTubeTrailerLayer(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                HeroYouTubeTrailerLayer(
-                    modifier = Modifier.size(trailerWidth, trailerHeight),
-                    trailerKey = trailerKey,
-                    shouldPlay = shouldAttemptPlayback,
-                    isMuted = isTrailerMuted,
-                    onPlaybackState = { state, _ ->
-                        if (state == 1 && latestShouldAttemptPlayback) {
-                            trailerPlaybackConfirmed = true
-                        }
-                    },
-                    onError = { trailerFailed = true }
-                )
-            }
+                trailerKey = trailerKey,
+                shouldPlay = shouldAttemptPlayback,
+                isMuted = isTrailerMuted,
+                onPlaybackState = { state, _ ->
+                    if (state == 1 && latestShouldAttemptPlayback) {
+                        trailerPlaybackConfirmed = true
+                    }
+                },
+                onError = { trailerFailed = true }
+            )
         }
 
         val coverAlpha by animateFloatAsState(
@@ -467,11 +452,13 @@ private fun HeroYouTubeTrailerLayer(
     LaunchedEffect(webView, isMuted) { applyMute(webView, isMuted) }
     LaunchedEffect(webView, shouldPlay) { applyPlayPause(webView, shouldPlay) }
 
-    AndroidView(
-        modifier = modifier.clipToBounds(),
-        factory = { webView },
-        update = {}
-    )
+    Box(modifier = modifier) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { webView },
+            update = {}
+        )
+    }
 }
 
 private fun buildYouTubeEmbedUrl(videoId: String, origin: String): String {
@@ -485,8 +472,10 @@ private fun buildYouTubeEmbedUrl(videoId: String, origin: String): String {
 
 /**
  * Injected after the YouTube embed page loads. Hides YouTube chrome via CSS,
- * and controls the raw HTML5 <video> element directly (bypassing YouTube's
- * player JS API).
+ * computes a cover-fill scale from the viewport dimensions to eliminate black
+ * bars (CSS transform: the browser compositor handles video correctly, unlike
+ * Compose graphicsLayer which breaks SurfaceView), and controls the raw HTML5
+ * <video> element directly (bypassing YouTube's player JS API).
  */
 private fun injectBridge(view: WebView) {
     //language=JavaScript
@@ -495,19 +484,28 @@ private fun injectBridge(view: WebView) {
             if (window.__crispyInjected) return;
             window.__crispyInjected = true;
 
+            // Compute cover-fill scale: zoom the player so 16:9 video fills the viewport.
+            // YouTube "contains" the video (fit-to-smaller-dim), so we scale up until both
+            // dimensions are covered. overflow:hidden on html/body clips the zoom overflow.
+            var vw = window.innerWidth || 1;
+            var vh = window.innerHeight || 1;
+            var scale = Math.max(vh * 16 / (vw * 9), vw * 9 / (vh * 16));
+
             var style = document.createElement('style');
-             style.textContent = [
-                 '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
-                 '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
-                 '.ytp-gradient-top, .ytp-gradient-bottom, .ytp-spinner,',
-                 '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
-                 '.ytp-impression-link, .iv-branding, .annotation,',
-                 '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
-                 'html, body { overflow:hidden!important; margin:0!important; padding:0!important; width:100%!important; height:100%!important; }',
-                 '.html5-video-player, .html5-video-container { width:100%!important; height:100%!important; }',
-                 'video { width:100%!important; height:100%!important; object-fit:cover!important; }'
-             ].join('\n');
-             document.head.appendChild(style);
+            style.textContent = [
+                '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
+                '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
+                '.ytp-gradient-top, .ytp-gradient-bottom, .ytp-spinner,',
+                '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
+                '.ytp-impression-link, .iv-branding, .annotation,',
+                '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
+                'html, body { overflow:hidden!important; margin:0!important; padding:0!important; }',
+                '.html5-video-player {',
+                '  transform:scale(' + scale.toFixed(4) + ')!important;',
+                '  transform-origin:center center!important;',
+                '}'
+            ].join('\n');
+            document.head.appendChild(style);
 
             var video = null;
             var pollId = null;
