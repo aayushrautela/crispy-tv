@@ -60,6 +60,9 @@ internal fun DetailsScreen(
     val details = uiState.details
     val listState = rememberLazyListState()
     val theming = rememberDetailsTheming(imageUrl = details?.backdropUrl ?: details?.posterUrl)
+    val showPalettePlaceholder = details != null && !theming.isSeedColorResolved
+    val visibleDetails = if (showPalettePlaceholder) null else details
+    val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
     val palette = theming.palette
     val detailsScheme = theming.colorScheme
 
@@ -122,7 +125,7 @@ internal fun DetailsScreen(
     LaunchedEffect(uiState.statusMessage) {
         val message = uiState.statusMessage.trim()
         if (message.isBlank()) return@LaunchedEffect
-        if (details == null && uiState.isLoading) return@LaunchedEffect
+        if (visibleDetails == null && visibleUiState.isLoading) return@LaunchedEffect
         if (message == lastSnackMessage) return@LaunchedEffect
 
         lastSnackMessage = message
@@ -140,7 +143,7 @@ internal fun DetailsScreen(
             ) {
                 item {
                     HeroSection(
-                        details = details,
+                        details = visibleDetails,
                         palette = palette,
                         trailerKey = trailerKey,
                         trailerWatchUrl = trailerWatchUrl,
@@ -165,17 +168,17 @@ internal fun DetailsScreen(
 
                 item {
                     HeaderInfoSection(
-                        details = details,
-                        isInWatchlist = uiState.isInWatchlist,
-                        isWatched = uiState.isWatched,
-                        isRated = uiState.isRated,
-                        userRating = uiState.userRating,
-                        isMutating = uiState.isMutating,
+                        details = visibleDetails,
+                        isInWatchlist = visibleUiState.isInWatchlist,
+                        isWatched = visibleUiState.isWatched,
+                        isRated = visibleUiState.isRated,
+                        userRating = visibleUiState.userRating,
+                        isMutating = visibleUiState.isMutating,
                         palette = palette,
-                        watchCta = uiState.watchCta,
-                        showAiInsights = uiState.aiMode != AiInsightsMode.OFF,
-                        aiInsightsEnabled = uiState.aiConfigured,
-                        aiInsightsIsLoading = uiState.aiIsLoading,
+                        watchCta = visibleUiState.watchCta,
+                        showAiInsights = visibleUiState.aiMode != AiInsightsMode.OFF,
+                        aiInsightsEnabled = visibleUiState.aiConfigured,
+                        aiInsightsIsLoading = visibleUiState.aiIsLoading,
                         onAiInsightsClick = onAiInsightsClick,
                         onWatchNow = onOpenStreamSelector,
                         onToggleWatchlist = onToggleWatchlist,
@@ -186,7 +189,7 @@ internal fun DetailsScreen(
 
                 item {
                     DetailsBody(
-                        uiState = uiState,
+                        uiState = visibleUiState,
                         onRetry = onRetry,
                         onSeasonSelected = onSeasonSelected,
                         onItemClick = onItemClick,
@@ -200,7 +203,7 @@ internal fun DetailsScreen(
                 windowInsets = TopAppBarDefaults.windowInsets,
                 title = {
                     Text(
-                        text = if (topBarAlpha > 0.65f) details?.title ?: "Details" else "",
+                        text = if (topBarAlpha > 0.65f) visibleDetails?.title ?: "Details" else "",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = contentColor
@@ -233,18 +236,18 @@ internal fun DetailsScreen(
             )
 
             StreamSelectorBottomSheet(
-                details = details,
-                state = uiState.streamSelector,
+                details = visibleDetails,
+                state = visibleUiState.streamSelector,
                 onDismiss = onDismissStreamSelector,
                 onProviderSelected = onProviderSelected,
                 onRetryProvider = onRetryProvider,
                 onStreamSelected = onStreamSelected,
             )
 
-            if (uiState.aiStoryVisible && uiState.aiInsights != null) {
+            if (visibleUiState.aiStoryVisible && visibleUiState.aiInsights != null) {
                 AiInsightsStoryOverlay(
-                    result = uiState.aiInsights,
-                    imageUrl = details?.backdropUrl ?: details?.posterUrl,
+                    result = visibleUiState.aiInsights,
+                    imageUrl = visibleDetails?.backdropUrl ?: visibleDetails?.posterUrl,
                     onDismiss = onDismissAiInsights,
                 )
             }

@@ -38,6 +38,7 @@ internal data class DetailsTheming(
     val colorScheme: ColorScheme,
     val palette: DetailsPaletteColors,
     val seedColor: Color,
+    val isSeedColorResolved: Boolean,
 )
 
 @Composable
@@ -46,31 +47,38 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
     val fallbackSeed = baseScheme.primary
 
     var seedColor by remember(fallbackSeed) { mutableStateOf(fallbackSeed) }
+    var isSeedColorResolved by remember { mutableStateOf(imageUrl.isNullOrBlank()) }
 
     val context = LocalContext.current
     val imageLoader = context.imageLoader
 
     LaunchedEffect(imageUrl, fallbackSeed) {
         seedColor = fallbackSeed
+        isSeedColorResolved = imageUrl.isNullOrBlank()
         if (imageUrl.isNullOrBlank()) return@LaunchedEffect
 
-        val request =
-            ImageRequest.Builder(context)
-                .data(imageUrl)
-                // Keep this small: quantization + scoring is proportional to pixel count.
-                .size(128)
-                .allowHardware(false)
-                .build()
-
-        val result = imageLoader.execute(request)
-        val drawable = (result as? SuccessResult)?.drawable ?: return@LaunchedEffect
-        val bitmap = drawable.toBitmap()
-        val imageBitmap = bitmap.asImageBitmap()
-
         seedColor =
-            withContext(Dispatchers.Default) {
-                imageBitmap.themeColor(fallback = fallbackSeed, filter = true, maxColors = 128)
-            }
+            runCatching {
+                val request =
+                    ImageRequest.Builder(context)
+                        .data(imageUrl)
+                        // Keep this small: quantization + scoring is proportional to pixel count.
+                        .size(128)
+                        .allowHardware(false)
+                        .build()
+
+                val result = imageLoader.execute(request)
+                val drawable = (result as? SuccessResult)?.drawable ?: return@runCatching fallbackSeed
+                val bitmap = drawable.toBitmap()
+
+                withContext(Dispatchers.Default) {
+                    bitmap
+                        .asImageBitmap()
+                        .themeColor(fallback = fallbackSeed, filter = true, maxColors = 128)
+                }
+            }.getOrDefault(fallbackSeed)
+
+        isSeedColorResolved = true
     }
 
     val detailsScheme =
@@ -93,5 +101,10 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
             )
         }
 
-    return DetailsTheming(colorScheme = detailsScheme, palette = palette, seedColor = seedColor)
+    return DetailsTheming(
+        colorScheme = detailsScheme,
+        palette = palette,
+        seedColor = seedColor,
+        isSeedColorResolved = isSeedColorResolved,
+    )
 }
