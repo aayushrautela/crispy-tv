@@ -490,7 +490,7 @@ private fun HeroYouTubeTrailerLayer(
 private fun buildYouTubeEmbedUrl(videoId: String): String {
     val id = videoId.trim()
     return "https://www.youtube.com/embed/$id" +
-        "?autoplay=0&controls=0&rel=0&modestbranding=1&playsinline=1" +
+        "?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1" +
         "&mute=1&loop=1&playlist=$id&enablejsapi=1" +
         "&iv_load_policy=3&showinfo=0&fs=0&disablekb=1"
 }
