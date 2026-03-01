@@ -68,7 +68,7 @@ object YouTubeTrailerExtractor {
         return streams
             .asSequence()
             .filter { it.isUrl }
-            .filterNot { it.isVideoOnly }
+            .filterNot { it.isVideoOnly() }
             .sortedWith(
                 compareByDescending<VideoStream> { videoHeight(it) }
                     .thenByDescending { it.fps }
@@ -82,7 +82,7 @@ object YouTubeTrailerExtractor {
         return streams
             .asSequence()
             .filter { it.isUrl }
-            .filter { it.isVideoOnly }
+            .filter { it.isVideoOnly() }
             .sortedWith(
                 compareByDescending<VideoStream> { videoHeight(it) }
                     .thenByDescending { it.fps }
@@ -106,7 +106,7 @@ object YouTubeTrailerExtractor {
     private fun videoHeight(stream: VideoStream): Int {
         val h = stream.height
         if (h > 0) return h
-        return parseHeightFromResolution(stream.resolution)
+        return parseHeightFromResolution(stream.getResolution())
     }
 
     private fun parseHeightFromResolution(resolution: String?): Int {
