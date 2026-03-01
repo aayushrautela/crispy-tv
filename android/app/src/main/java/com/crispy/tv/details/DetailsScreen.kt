@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -41,7 +42,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
-private const val PALETTE_MAX_WAIT_MS = 280L
+private const val PALETTE_MAX_WAIT_MS = 450L
 
 @Composable
 internal fun DetailsScreen(
@@ -69,9 +70,10 @@ internal fun DetailsScreen(
     val theming = rememberDetailsTheming(imageUrl = imageUrl)
 
     val isSeedColorResolvedState = rememberUpdatedState(theming.isSeedColorResolved)
-    var paletteWaitTimedOut by remember(imageUrl) { mutableStateOf(false) }
+    val colorSchemeState = rememberUpdatedState(theming.colorScheme)
+    var lockedScheme by remember(imageUrl) { mutableStateOf<ColorScheme?>(null) }
     LaunchedEffect(imageUrl) {
-        paletteWaitTimedOut = false
+        lockedScheme = null
         if (imageUrl.isNullOrBlank()) return@LaunchedEffect
         if (isSeedColorResolvedState.value) return@LaunchedEffect
 
@@ -81,7 +83,7 @@ internal fun DetailsScreen(
             } != null
 
         if (!resolvedInTime) {
-            paletteWaitTimedOut = true
+            lockedScheme = colorSchemeState.value
         }
     }
 
@@ -89,17 +91,12 @@ internal fun DetailsScreen(
         details != null &&
             !imageUrl.isNullOrBlank() &&
             !theming.isSeedColorResolved &&
-            !paletteWaitTimedOut
+            lockedScheme == null
 
     val visibleDetails = if (showPalettePlaceholder) null else details
     val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
 
-    val detailsScheme =
-        if (paletteWaitTimedOut) {
-            rememberAnimatedColorScheme(target = theming.colorScheme)
-        } else {
-            theming.colorScheme
-        }
+    val detailsScheme = lockedScheme ?: theming.colorScheme
     val palette = remember(detailsScheme) { detailsPaletteFromScheme(detailsScheme) }
 
     val selectedTrailer =
