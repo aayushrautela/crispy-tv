@@ -1,20 +1,13 @@
 package com.crispy.tv.details
 
-import android.annotation.SuppressLint
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
-import android.view.View
-import android.webkit.ConsoleMessage
-import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.RenderProcessGoneDetail
-import android.webkit.WebView
-import android.webkit.WebChromeClient
-import android.webkit.WebViewClient
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,15 +50,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import com.crispy.tv.details.trailer.TrailerPlaybackSource
+import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun HeroSection(
@@ -308,273 +306,136 @@ private fun HeroYouTubeTrailerLayer(
     isMuted: Boolean,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val origin = remember { "https://${context.packageName}" }
-    val embedUrl = remember(trailerKey, origin) { buildYouTubeEmbedUrl(trailerKey, origin) }
-    val latestOnPlaybackState by rememberUpdatedState(onPlaybackState)
-    val latestMuted by rememberUpdatedState(isMuted)
-    val latestShouldPlay by rememberUpdatedState(shouldPlay)
+    val context = LocalContext.current
 
-    val webView = remember(trailerKey) {
-        WebView(context).apply {
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            isFocusable = false
-            isFocusableInTouchMode = false
-            isClickable = false
-            isLongClickable = false
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-            overScrollMode = View.OVER_SCROLL_NEVER
-            isVerticalScrollBarEnabled = false
-            isHorizontalScrollBarEnabled = false
+    val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
+    val latestMuted = rememberUpdatedState(isMuted)
+    val latestShouldPlay = rememberUpdatedState(shouldPlay)
 
-            @SuppressLint("SetJavaScriptEnabled")
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.mediaPlaybackRequiresUserGesture = false
+    var source by remember(trailerKey) { mutableStateOf<TrailerPlaybackSource?>(null) }
 
-            CookieManager.getInstance().setAcceptCookie(true)
-            runCatching { CookieManager.getInstance().setAcceptThirdPartyCookies(this, true) }
+    LaunchedEffect(trailerKey) {
+        source = null
+    }
 
-            setOnTouchListener { _, _ -> true }
+    LaunchedEffect(trailerKey, shouldPlay) {
+        if (!shouldPlay) return@LaunchedEffect
+        if (source != null) return@LaunchedEffect
+        source = withContext(Dispatchers.IO) {
+            YouTubeTrailerExtractor.resolve(trailerKey)
+        }
+    }
 
-            val mainHandler = Handler(Looper.getMainLooper())
-            addJavascriptInterface(
-                object {
-                    @JavascriptInterface
-                    fun onReady() {
-                        Log.d("TrailerDbg", "CrispyBridge.onReady() called")
-                        mainHandler.post {
-                            applyMute(this@apply, latestMuted)
-                            applyPlayPause(this@apply, latestShouldPlay)
+    val playbackSource = source ?: return
+
+    val exoPlayer = remember(playbackSource.videoUrl, playbackSource.audioUrl) {
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(context))
+            .build()
+            .apply {
+                repeatMode = Player.REPEAT_MODE_ONE
+                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+            }
+    }
+
+    DisposableEffect(exoPlayer) {
+        onDispose {
+            runCatching { exoPlayer.release() }
+        }
+    }
+
+    var hasRenderedFirstFrame by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf(false) }
+    var lastSentState by remember(playbackSource.videoUrl, playbackSource.audioUrl) { mutableStateOf<Int?>(null) }
+
+    fun sendState(state: Int) {
+        if (lastSentState == state) return
+        lastSentState = state
+        latestOnPlaybackState.value(state, exoPlayer.currentPosition / 1000.0)
+    }
+
+    DisposableEffect(exoPlayer) {
+        val listener =
+            object : Player.Listener {
+                override fun onRenderedFirstFrame() {
+                    hasRenderedFirstFrame = true
+                    if (latestShouldPlay.value) {
+                        sendState(1)
+                    }
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    if (isPlaying) {
+                        if (hasRenderedFirstFrame) {
+                            sendState(1)
                         }
+                        return
                     }
 
-                    @JavascriptInterface
-                    fun onState(state: Int, timeSeconds: Double) {
-                        Log.d("TrailerDbg", "CrispyBridge.onState($state, $timeSeconds)")
-                        mainHandler.post { latestOnPlaybackState(state, timeSeconds) }
+                    when (exoPlayer.playbackState) {
+                        Player.STATE_ENDED -> sendState(0)
+                        Player.STATE_BUFFERING -> sendState(3)
+                        else -> sendState(2)
                     }
+                }
 
-                    @JavascriptInterface
-                    fun onError(code: Int) {
-                        Log.d("TrailerDbg", "CrispyBridge.onError($code)")
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (exoPlayer.isPlaying) return
+                    when (playbackState) {
+                        Player.STATE_ENDED -> sendState(0)
+                        Player.STATE_BUFFERING -> sendState(3)
                     }
-                },
-                "CrispyBridge",
-            )
-
-            // Required for HTML5 <video> playback pipeline in Android WebView.
-            webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
-                    Log.d("TrailerDbg", "JS[${msg.lineNumber()}]: ${msg.message()}")
-                    return true
                 }
             }
 
-            webViewClient =
-                object : WebViewClient() {
-                    override fun onReceivedError(
-                        view: WebView,
-                        request: WebResourceRequest,
-                        error: WebResourceError,
-                    ) {
-                        Log.d("TrailerDbg", "onReceivedError mainFrame=${request.isForMainFrame} url=${request.url} code=${error.errorCode} desc=${error.description}")
-                    }
+        exoPlayer.addListener(listener)
+        onDispose { exoPlayer.removeListener(listener) }
+    }
 
-                    override fun onReceivedHttpError(
-                        view: WebView,
-                        request: WebResourceRequest,
-                        errorResponse: WebResourceResponse,
-                    ) {
-                        Log.d("TrailerDbg", "onReceivedHttpError mainFrame=${request.isForMainFrame} url=${request.url} status=${errorResponse.statusCode}")
-                    }
+    LaunchedEffect(exoPlayer, playbackSource.videoUrl, playbackSource.audioUrl) {
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+        val videoSource = mediaSourceFactory.createMediaSource(MediaItem.fromUri(playbackSource.videoUrl))
+        val mediaSource =
+            playbackSource.audioUrl?.let { audioUrl ->
+                MergingMediaSource(
+                    videoSource,
+                    mediaSourceFactory.createMediaSource(MediaItem.fromUri(audioUrl))
+                )
+            } ?: videoSource
 
-                    override fun onRenderProcessGone(
-                        view: WebView,
-                        detail: RenderProcessGoneDetail,
-                    ): Boolean {
-                        Log.d("TrailerDbg", "onRenderProcessGone")
-                        return true
-                    }
+        hasRenderedFirstFrame = false
+        lastSentState = null
 
-                    override fun onPageFinished(view: WebView, url: String?) {
-                        Log.d("TrailerDbg", "onPageFinished url=$url")
-                        if (url == null || url.startsWith("about:")) return
-                        injectBridge(view)
-                    }
-                }
+        exoPlayer.setMediaSource(mediaSource)
+        exoPlayer.prepare()
+    }
+
+    LaunchedEffect(exoPlayer, latestMuted.value) {
+        exoPlayer.volume = if (latestMuted.value) 0f else 1f
+    }
+
+    LaunchedEffect(exoPlayer, latestShouldPlay.value) {
+        exoPlayer.playWhenReady = latestShouldPlay.value
+        if (latestShouldPlay.value) {
+            exoPlayer.play()
+        } else {
+            exoPlayer.pause()
         }
     }
-
-    DisposableEffect(webView) {
-        onDispose {
-            runCatching { webView.stopLoading() }
-            runCatching { webView.loadUrl("about:blank") }
-            runCatching { webView.destroy() }
-        }
-    }
-
-    LaunchedEffect(webView, embedUrl) {
-        Log.d("TrailerDbg", "loadUrl embedUrl=$embedUrl origin=$origin")
-        runCatching {
-            webView.loadUrl(embedUrl, mapOf("Referer" to origin))
-        }.onFailure { Log.d("TrailerDbg", "loadUrl failed: $it") }
-    }
-
-    LaunchedEffect(webView, isMuted) { applyMute(webView, isMuted) }
-    LaunchedEffect(webView, shouldPlay) { applyPlayPause(webView, shouldPlay) }
 
     Box(modifier = modifier.clipToBounds()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
-            factory = { webView },
-            update = {}
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    useController = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    player = exoPlayer
+                }
+            },
+            update = { view ->
+                view.player = exoPlayer
+            }
         )
     }
-}
-
-private fun buildYouTubeEmbedUrl(videoId: String, origin: String): String {
-    val id = videoId.trim()
-    return "https://www.youtube.com/embed/$id" +
-        "?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1" +
-        "&mute=1&loop=1&playlist=$id&enablejsapi=1" +
-        "&iv_load_policy=3&showinfo=0&fs=0&disablekb=1" +
-        "&origin=$origin"
-}
-
-/**
- * Injected once after the YouTube embed finishes initial page load.
- *
- * Static CSS  – hides YouTube chrome (controls, watermark, gradients) and
- *               error/loading overlays. These selectors are cosmetic-only.
- *
- * Tick loop   – Every 250 ms:
- *   1. Re-queries `document.querySelector('video')` so the bridge survives
- *      YouTube's internal error-recovery which replaces the DOM element.
- *   2. Forces inline styles (with !important) on `.html5-video-player`,
- *      `.html5-video-container`, and the `<video>` element so the video
- *      fills the WebView viewport edge-to-edge (no letterboxing).
- *      Inline styles beat stylesheet rules at any specificity, and
- *      re-applying every tick beats YouTube's async JS style mutations.
- *   3. Reports playback state changes back to Kotlin via CrispyBridge.
- */
-private fun injectBridge(view: WebView) {
-    //language=JavaScript
-    val js = """
-        (function() {
-            if (window.__crispyInjected) return;
-            window.__crispyInjected = true;
-
-            /* ── Static CSS: hide YouTube chrome & error overlays ── */
-            var style = document.createElement('style');
-            style.textContent = [
-                '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
-                '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
-                '.ytp-gradient-top, .ytp-gradient-bottom, .ytp-spinner,',
-                '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
-                '.ytp-impression-link, .iv-branding, .annotation,',
-                '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
-                '.ytp-error, .ytp-error-content-wrap, .ytp-error-content,',
-                '.ytp-offline-slate, .ytp-offline-slate-bar,',
-                '.html5-video-info-panel { display:none!important; }'
-            ].join('\n');
-            document.head.appendChild(style);
-
-            /* ── State ── */
-            var video = null;
-            var lastState = -2;
-
-            function safe(fn) { try { fn(); } catch(e) {} }
-
-            function mapState() {
-                if (!video) return -1;
-                if (video.ended) return 0;
-                if (!video.paused && video.readyState >= 3) return 1;
-                if (video.paused) return 2;
-                return 3;
-            }
-
-            /* ── Force YouTube's player to cover the viewport ──
-             * YouTube sizes .html5-video-player to a 16:9 box and
-             * letterboxes inside the embed. We override with
-             * position:fixed filling the viewport, then set the
-             * <video> to object-fit:cover so it crops any mismatch
-             * between 16:9 content and the hero aspect ratio.
-             *
-             * Using element.style.setProperty(…, 'important') gives
-             * us the highest possible specificity. Re-applying every
-             * tick ensures YouTube's async JS never wins. */
-            function forceLayout() {
-                var p = document.querySelector('.html5-video-player');
-                if (p) {
-                    var s = p.style;
-                    s.setProperty('position', 'fixed', 'important');
-                    s.setProperty('left',     '0',     'important');
-                    s.setProperty('top',      '0',     'important');
-                    s.setProperty('width',    '100%',  'important');
-                    s.setProperty('height',   '100%',  'important');
-                }
-                var c = document.querySelector('.html5-video-container');
-                if (c) {
-                    c.style.setProperty('width',  '100%', 'important');
-                    c.style.setProperty('height', '100%', 'important');
-                }
-                if (video) {
-                    video.style.setProperty('width',      '100%',  'important');
-                    video.style.setProperty('height',     '100%',  'important');
-                    video.style.setProperty('object-fit', 'cover', 'important');
-                }
-            }
-
-            /* ── Mute / play API for Kotlin ── */
-            window.__crispyTrailer = {
-                setMuted: function(m) {
-                    if (!video) return;
-                    safe(function() { video.muted = !!m; video.volume = m ? 0 : 1; });
-                },
-                setPlaying: function(p) {
-                    if (!video) return;
-                    safe(function() { if (p) video.play(); else video.pause(); });
-                }
-            };
-
-            /* ── Main tick ── */
-            setInterval(function() {
-                var v = document.querySelector('video');
-                if (v && v !== video) {
-                    video = v;
-                    v.addEventListener('error', function() {
-                        safe(function() {
-                            CrispyBridge.onError(video && video.error ? video.error.code : -1);
-                        });
-                    });
-                    safe(function() { CrispyBridge.onReady(); });
-                }
-                forceLayout();
-                var s = mapState();
-                var t = (video && video.currentTime) || 0;
-                if (s !== lastState) {
-                    lastState = s;
-                    safe(function() { CrispyBridge.onState(s, t); });
-                }
-            }, 250);
-        })();
-    """.trimIndent()
-    view.evaluateJavascript(js, null)
-}
-
-private fun applyMute(webView: WebView, muted: Boolean) {
-    val m = if (muted) "true" else "false"
-    webView.evaluateJavascript(
-        "try{__crispyTrailer&&__crispyTrailer.setMuted($m)}catch(e){}",
-        null
-    )
-}
-
-private fun applyPlayPause(webView: WebView, playing: Boolean) {
-    val p = if (playing) "true" else "false"
-    webView.evaluateJavascript(
-        "try{__crispyTrailer&&__crispyTrailer.setPlaying($p)}catch(e){}",
-        null
-    )
 }
