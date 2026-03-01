@@ -36,10 +36,20 @@ internal data class DetailsPaletteColors(
 @Stable
 internal data class DetailsTheming(
     val colorScheme: ColorScheme,
-    val palette: DetailsPaletteColors,
     val seedColor: Color,
     val isSeedColorResolved: Boolean,
 )
+
+internal fun detailsPaletteFromScheme(scheme: ColorScheme): DetailsPaletteColors {
+    return DetailsPaletteColors(
+        pageBackground = scheme.background,
+        onPageBackground = scheme.onBackground,
+        accent = scheme.primary,
+        onAccent = scheme.onPrimary,
+        pillBackground = scheme.surfaceContainerHigh.copy(alpha = 0.72f),
+        onPillBackground = scheme.onSurface,
+    )
+}
 
 @Composable
 internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
@@ -47,7 +57,7 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
     val fallbackSeed = baseScheme.primary
 
     var seedColor by remember(fallbackSeed) { mutableStateOf(fallbackSeed) }
-    var isSeedColorResolved by remember { mutableStateOf(imageUrl.isNullOrBlank()) }
+    var isSeedColorResolved by remember(imageUrl, fallbackSeed) { mutableStateOf(imageUrl.isNullOrBlank()) }
 
     val context = LocalContext.current
     val imageLoader = context.imageLoader
@@ -89,21 +99,8 @@ internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
             style = PaletteStyle.TonalSpot,
         )
 
-    val palette =
-        remember(detailsScheme) {
-            DetailsPaletteColors(
-                pageBackground = detailsScheme.background,
-                onPageBackground = detailsScheme.onBackground,
-                accent = detailsScheme.primary,
-                onAccent = detailsScheme.onPrimary,
-                pillBackground = detailsScheme.surfaceContainerHigh.copy(alpha = 0.72f),
-                onPillBackground = detailsScheme.onSurface,
-            )
-        }
-
     return DetailsTheming(
         colorScheme = detailsScheme,
-        palette = palette,
         seedColor = seedColor,
         isSeedColorResolved = isSeedColorResolved,
     )

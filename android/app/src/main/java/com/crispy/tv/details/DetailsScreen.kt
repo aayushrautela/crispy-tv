@@ -60,11 +60,9 @@ internal fun DetailsScreen(
     val details = uiState.details
     val listState = rememberLazyListState()
     val theming = rememberDetailsTheming(imageUrl = details?.backdropUrl ?: details?.posterUrl)
-    val showPalettePlaceholder = details != null && !theming.isSeedColorResolved
-    val visibleDetails = if (showPalettePlaceholder) null else details
-    val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
-    val palette = theming.palette
-    val detailsScheme = theming.colorScheme
+
+    val detailsScheme = rememberAnimatedColorScheme(target = theming.colorScheme)
+    val palette = remember(detailsScheme) { detailsPaletteFromScheme(detailsScheme) }
 
     val selectedTrailer =
         uiState.tmdbEnrichment
@@ -124,7 +122,7 @@ internal fun DetailsScreen(
     LaunchedEffect(uiState.statusMessage) {
         val message = uiState.statusMessage.trim()
         if (message.isBlank()) return@LaunchedEffect
-        if (visibleDetails == null && visibleUiState.isLoading) return@LaunchedEffect
+        if (details == null && uiState.isLoading) return@LaunchedEffect
         if (message == lastSnackMessage) return@LaunchedEffect
 
         lastSnackMessage = message
@@ -142,7 +140,7 @@ internal fun DetailsScreen(
             ) {
                 item {
                     HeroSection(
-                        details = visibleDetails,
+                        details = details,
                         palette = palette,
                         trailerKey = trailerKey,
                         showTrailer = showTrailer,
@@ -166,17 +164,17 @@ internal fun DetailsScreen(
 
                 item {
                     HeaderInfoSection(
-                        details = visibleDetails,
-                        isInWatchlist = visibleUiState.isInWatchlist,
-                        isWatched = visibleUiState.isWatched,
-                        isRated = visibleUiState.isRated,
-                        userRating = visibleUiState.userRating,
-                        isMutating = visibleUiState.isMutating,
+                        details = details,
+                        isInWatchlist = uiState.isInWatchlist,
+                        isWatched = uiState.isWatched,
+                        isRated = uiState.isRated,
+                        userRating = uiState.userRating,
+                        isMutating = uiState.isMutating,
                         palette = palette,
-                        watchCta = visibleUiState.watchCta,
-                        showAiInsights = visibleUiState.aiMode != AiInsightsMode.OFF,
-                        aiInsightsEnabled = visibleUiState.aiConfigured,
-                        aiInsightsIsLoading = visibleUiState.aiIsLoading,
+                        watchCta = uiState.watchCta,
+                        showAiInsights = uiState.aiMode != AiInsightsMode.OFF,
+                        aiInsightsEnabled = uiState.aiConfigured,
+                        aiInsightsIsLoading = uiState.aiIsLoading,
                         onAiInsightsClick = onAiInsightsClick,
                         onWatchNow = onOpenStreamSelector,
                         onToggleWatchlist = onToggleWatchlist,
@@ -187,7 +185,7 @@ internal fun DetailsScreen(
 
                 item {
                     DetailsBody(
-                        uiState = visibleUiState,
+                        uiState = uiState,
                         onRetry = onRetry,
                         onSeasonSelected = onSeasonSelected,
                         onItemClick = onItemClick,
@@ -201,7 +199,7 @@ internal fun DetailsScreen(
                 windowInsets = TopAppBarDefaults.windowInsets,
                 title = {
                     Text(
-                        text = if (topBarAlpha > 0.65f) visibleDetails?.title ?: "Details" else "",
+                        text = if (topBarAlpha > 0.65f) details?.title ?: "Details" else "",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = contentColor
@@ -234,18 +232,18 @@ internal fun DetailsScreen(
             )
 
             StreamSelectorBottomSheet(
-                details = visibleDetails,
-                state = visibleUiState.streamSelector,
+                details = details,
+                state = uiState.streamSelector,
                 onDismiss = onDismissStreamSelector,
                 onProviderSelected = onProviderSelected,
                 onRetryProvider = onRetryProvider,
                 onStreamSelected = onStreamSelected,
             )
 
-            if (visibleUiState.aiStoryVisible && visibleUiState.aiInsights != null) {
+            if (uiState.aiStoryVisible && uiState.aiInsights != null) {
                 AiInsightsStoryOverlay(
-                    result = visibleUiState.aiInsights,
-                    imageUrl = visibleDetails?.backdropUrl ?: visibleDetails?.posterUrl,
+                    result = uiState.aiInsights,
+                    imageUrl = details?.backdropUrl ?: details?.posterUrl,
                     onDismiss = onDismissAiInsights,
                 )
             }
