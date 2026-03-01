@@ -509,7 +509,8 @@ private fun injectBridge(view: WebView) {
                 '.html5-video-player {',
                 '  position:fixed!important; width:135%!important; height:135%!important;',
                 '  top:-17.5%!important; left:-17.5%!important;',
-                '}'
+                '}',
+                'video { object-fit:cover!important; }'
             ].join('\n');
             document.head.appendChild(style);
 
