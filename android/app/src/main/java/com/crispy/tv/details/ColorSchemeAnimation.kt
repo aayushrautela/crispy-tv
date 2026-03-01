@@ -74,5 +74,17 @@ internal fun lerpColorScheme(a: ColorScheme, b: ColorScheme, t: Float): ColorSch
         surfaceContainerHighest = lerp(a.surfaceContainerHighest, b.surfaceContainerHighest, clampedT),
         surfaceContainerLow = lerp(a.surfaceContainerLow, b.surfaceContainerLow, clampedT),
         surfaceContainerLowest = lerp(a.surfaceContainerLowest, b.surfaceContainerLowest, clampedT),
+        primaryFixed = lerp(a.primaryFixed, b.primaryFixed, clampedT),
+        onPrimaryFixed = lerp(a.onPrimaryFixed, b.onPrimaryFixed, clampedT),
+        primaryFixedDim = lerp(a.primaryFixedDim, b.primaryFixedDim, clampedT),
+        onPrimaryFixedVariant = lerp(a.onPrimaryFixedVariant, b.onPrimaryFixedVariant, clampedT),
+        secondaryFixed = lerp(a.secondaryFixed, b.secondaryFixed, clampedT),
+        onSecondaryFixed = lerp(a.onSecondaryFixed, b.onSecondaryFixed, clampedT),
+        secondaryFixedDim = lerp(a.secondaryFixedDim, b.secondaryFixedDim, clampedT),
+        onSecondaryFixedVariant = lerp(a.onSecondaryFixedVariant, b.onSecondaryFixedVariant, clampedT),
+        tertiaryFixed = lerp(a.tertiaryFixed, b.tertiaryFixed, clampedT),
+        onTertiaryFixed = lerp(a.onTertiaryFixed, b.onTertiaryFixed, clampedT),
+        tertiaryFixedDim = lerp(a.tertiaryFixedDim, b.tertiaryFixedDim, clampedT),
+        onTertiaryFixedVariant = lerp(a.onTertiaryFixedVariant, b.onTertiaryFixedVariant, clampedT),
     )
 }
