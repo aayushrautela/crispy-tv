@@ -78,7 +78,6 @@ internal fun DetailsScreen(
                 ?.firstOrNull { it.key.isNotBlank() }
 
     val trailerKey = selectedTrailer?.key?.trim().takeIf { !it.isNullOrBlank() }
-    val trailerWatchUrl = selectedTrailer?.watchUrl?.trim().takeIf { !it.isNullOrBlank() }
 
     val heroIsPinned by remember {
         derivedStateOf {
@@ -146,7 +145,6 @@ internal fun DetailsScreen(
                         details = visibleDetails,
                         palette = palette,
                         trailerKey = trailerKey,
-                        trailerWatchUrl = trailerWatchUrl,
                         showTrailer = showTrailer,
                         isTrailerPlaying = isTrailerPlaying,
                         isTrailerMuted = userMutedTrailer,

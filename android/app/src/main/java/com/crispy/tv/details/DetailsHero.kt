@@ -58,7 +58,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,14 +66,12 @@ import coil.compose.AsyncImage
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import kotlinx.coroutines.delay
 
 @Composable
 internal fun HeroSection(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
     trailerKey: String?,
-    trailerWatchUrl: String?,
     showTrailer: Boolean,
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
@@ -84,7 +81,6 @@ internal fun HeroSection(
     val configuration = LocalConfiguration.current
     val horizontalPadding = responsivePageHorizontalPadding()
     val heroHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(340.dp, 520.dp)
-    val uriHandler = LocalUriHandler.current
 
     BoxWithConstraints(
         modifier = Modifier
@@ -156,24 +152,8 @@ internal fun HeroSection(
         }
 
         val hasTrailer = !trailerKey.isNullOrBlank()
-        var trailerFailed by remember(trailerKey) { mutableStateOf(false) }
-        var trailerPlaybackConfirmed by remember(trailerKey) { mutableStateOf(false) }
-
-        val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying && !trailerFailed
-        val latestShouldAttemptPlayback by rememberUpdatedState(shouldAttemptPlayback)
-
-        LaunchedEffect(trailerKey, shouldAttemptPlayback) {
-            if (!shouldAttemptPlayback) {
-                trailerPlaybackConfirmed = false
-                return@LaunchedEffect
-            }
-
-            trailerPlaybackConfirmed = false
-            delay(8000)
-            if (!trailerPlaybackConfirmed) {
-                trailerFailed = true
-            }
-        }
+        var trailerIsPlaying by remember(trailerKey) { mutableStateOf(false) }
+        val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying
 
         if (showTrailer && hasTrailer) {
             HeroYouTubeTrailerLayer(
@@ -181,17 +161,12 @@ internal fun HeroSection(
                 trailerKey = trailerKey,
                 shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
-                onPlaybackState = { state, _ ->
-                    if (state == 1 && latestShouldAttemptPlayback) {
-                        trailerPlaybackConfirmed = true
-                    }
-                },
-                onError = { trailerFailed = true }
+                onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 },
             )
         }
 
         val coverAlpha by animateFloatAsState(
-            targetValue = if (shouldAttemptPlayback && trailerPlaybackConfirmed) 0f else 1f,
+            targetValue = if (shouldAttemptPlayback && trailerIsPlaying) 0f else 1f,
             animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
             label = "hero_trailer_cover_alpha",
         )
@@ -246,7 +221,7 @@ internal fun HeroSection(
                 )
         )
 
-        if (showTrailer && hasTrailer && !trailerFailed) {
+        if (shouldAttemptPlayback && trailerIsPlaying) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -265,23 +240,16 @@ internal fun HeroSection(
             }
         }
 
-        val resolvedTrailerWatchUrl = trailerWatchUrl?.trim().takeIf { !it.isNullOrBlank() }
         if (hasTrailer) {
-            val isActuallyPlaying = isTrailerPlaying && trailerPlaybackConfirmed && !trailerFailed
+            val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
             val icon = if (isActuallyPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
-            val label = if (trailerFailed && resolvedTrailerWatchUrl != null) "Open trailer" else if (isActuallyPlaying) "Pause" else "Trailer"
+            val label = if (isActuallyPlaying) "Pause" else "Trailer"
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 160.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
-                    .clickable {
-                        if (trailerFailed && resolvedTrailerWatchUrl != null) {
-                            uriHandler.openUri(resolvedTrailerWatchUrl)
-                        } else {
-                            onToggleTrailer()
-                        }
-                    },
+                    .clickable { onToggleTrailer() },
                 color = Color.Black.copy(alpha = 0.34f),
                 contentColor = Color.White
             ) {
@@ -340,12 +308,10 @@ private fun HeroYouTubeTrailerLayer(
     shouldPlay: Boolean,
     isMuted: Boolean,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
-    onError: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val origin = remember { "https://${context.packageName}" }
     val embedUrl = remember(trailerKey, origin) { buildYouTubeEmbedUrl(trailerKey, origin) }
-    val latestOnError by rememberUpdatedState(onError)
     val latestOnPlaybackState by rememberUpdatedState(onPlaybackState)
     val latestMuted by rememberUpdatedState(isMuted)
     val latestShouldPlay by rememberUpdatedState(shouldPlay)
@@ -393,7 +359,6 @@ private fun HeroYouTubeTrailerLayer(
                     @JavascriptInterface
                     fun onError(code: Int) {
                         Log.d("TrailerDbg", "CrispyBridge.onError($code)")
-                        mainHandler.post { latestOnError() }
                     }
                 },
                 "CrispyBridge",
@@ -415,9 +380,6 @@ private fun HeroYouTubeTrailerLayer(
                         error: WebResourceError,
                     ) {
                         Log.d("TrailerDbg", "onReceivedError mainFrame=${request.isForMainFrame} url=${request.url} code=${error.errorCode} desc=${error.description}")
-                        if (request.isForMainFrame) {
-                            latestOnError()
-                        }
                     }
 
                     override fun onReceivedHttpError(
@@ -426,9 +388,6 @@ private fun HeroYouTubeTrailerLayer(
                         errorResponse: WebResourceResponse,
                     ) {
                         Log.d("TrailerDbg", "onReceivedHttpError mainFrame=${request.isForMainFrame} url=${request.url} status=${errorResponse.statusCode}")
-                        if (request.isForMainFrame && errorResponse.statusCode >= 400) {
-                            latestOnError()
-                        }
                     }
 
                     override fun onRenderProcessGone(
@@ -436,7 +395,6 @@ private fun HeroYouTubeTrailerLayer(
                         detail: RenderProcessGoneDetail,
                     ): Boolean {
                         Log.d("TrailerDbg", "onRenderProcessGone")
-                        latestOnError()
                         return true
                     }
 
@@ -461,7 +419,7 @@ private fun HeroYouTubeTrailerLayer(
         Log.d("TrailerDbg", "loadUrl embedUrl=$embedUrl origin=$origin")
         runCatching {
             webView.loadUrl(embedUrl, mapOf("Referer" to origin))
-        }.onFailure { latestOnError() }
+        }.onFailure { Log.d("TrailerDbg", "loadUrl failed: $it") }
     }
 
     LaunchedEffect(webView, isMuted) { applyMute(webView, isMuted) }
@@ -489,6 +447,9 @@ private fun buildYouTubeEmbedUrl(videoId: String, origin: String): String {
  * Injected after the YouTube embed page loads. Hides YouTube chrome via CSS
  * and controls the raw HTML5 <video> element directly (bypassing YouTube's
  * player JS API).
+ *
+ * Re-queries `document.querySelector('video')` every tick so the bridge
+ * survives YouTube's internal error-recovery which can replace the element.
  */
 private fun injectBridge(view: WebView) {
     //language=JavaScript
@@ -511,7 +472,6 @@ private fun injectBridge(view: WebView) {
             document.head.appendChild(style);
 
             var video = null;
-            var pollId = null;
             var lastState = -2;
 
             function safe(fn) { try { fn(); } catch(e) { console.log('[CrispyTrailer] safe error: ' + e); } }
@@ -535,34 +495,23 @@ private fun injectBridge(view: WebView) {
                 }
             };
 
-            function tryInit() {
+            setInterval(function() {
                 var v = document.querySelector('video');
-                if (!v) {
-                    console.log('[CrispyTrailer] no <video> element yet');
-                    return;
+                if (v && v !== video) {
+                    video = v;
+                    console.log('[CrispyTrailer] <video> found, wiring state');
+                    v.addEventListener('error', function() {
+                        safe(function() { CrispyBridge.onError(video && video.error ? video.error.code : -1); });
+                    });
+                    safe(function() { CrispyBridge.onReady(); });
                 }
-                video = v;
-                console.log('[CrispyTrailer] <video> found, wiring state');
-                if (pollId) { clearInterval(pollId); pollId = null; }
-
-                setInterval(function() {
-                    var s = mapState();
-                    var t = video.currentTime || 0;
-                    if (s !== lastState) {
-                        lastState = s;
-                        safe(function() { CrispyBridge.onState(s, t); });
-                    }
-                }, 250);
-
-                video.addEventListener('error', function() {
-                    safe(function() { CrispyBridge.onError(video.error ? video.error.code : -1); });
-                });
-
-                safe(function() { CrispyBridge.onReady(); });
-            }
-
-            pollId = setInterval(tryInit, 250);
-            tryInit();
+                var s = mapState();
+                var t = (video && video.currentTime) || 0;
+                if (s !== lastState) {
+                    lastState = s;
+                    safe(function() { CrispyBridge.onState(s, t); });
+                }
+            }, 250);
         })();
     """.trimIndent()
     view.evaluateJavascript(js, null)
