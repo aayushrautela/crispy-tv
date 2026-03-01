@@ -85,14 +85,14 @@ internal class TmdbEpisodeListProvider(
             val cachedAgain = readCachedShowEntry(showKey)
             if (cachedAgain != null) return@withPermit cachedAgain
 
-            val result =
+            val enrichmentResult =
                 tmdbEnrichmentRepository.load(
                     rawId = rawId,
                     mediaTypeHint = MetadataLabMediaType.SERIES,
                     locale = localeProvider(),
                 ) ?: return@withPermit null
 
-            val enrichment = result.enrichment ?: return@withPermit null
+            val enrichment = enrichmentResult.enrichment
             val seasons = (enrichment.titleDetails as? TmdbTvDetails)?.numberOfSeasons ?: 0
             val entry =
                 ShowCacheEntry(
