@@ -459,6 +459,16 @@ private fun injectBridge(view: WebView) {
             window.__crispyInjected = true;
             console.log('[CrispyTrailer] bridge injecting');
 
+            /* Block AV1 so YouTube serves H.264 from the start —
+               avoids the AV1 decode-fail → retry cycle entirely. */
+            if (typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported) {
+                var _origIsType = MediaSource.isTypeSupported.bind(MediaSource);
+                MediaSource.isTypeSupported = function(mime) {
+                    if (/av01|av1/i.test(mime)) return false;
+                    return _origIsType(mime);
+                };
+            }
+
             var style = document.createElement('style');
             style.textContent = [
                 /* page baseline */
