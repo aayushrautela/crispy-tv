@@ -86,7 +86,6 @@ internal fun HeroSection(
         modifier = Modifier
             .fillMaxWidth()
             .height(heroHeight)
-            .clipToBounds()
     ) {
         val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
 
@@ -318,8 +317,7 @@ private fun HeroYouTubeTrailerLayer(
 
     val webView = remember(trailerKey) {
         WebView(context).apply {
-            setBackgroundColor(android.graphics.Color.BLACK)
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             isFocusable = false
             isFocusableInTouchMode = false
             isClickable = false
@@ -426,7 +424,7 @@ private fun HeroYouTubeTrailerLayer(
     LaunchedEffect(webView, isMuted) { applyMute(webView, isMuted) }
     LaunchedEffect(webView, shouldPlay) { applyPlayPause(webView, shouldPlay) }
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier.clipToBounds()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { webView },
@@ -462,8 +460,6 @@ private fun injectBridge(view: WebView) {
 
             var style = document.createElement('style');
             style.textContent = [
-                /* page baseline */
-                'html, body { background:black!important; overflow:hidden!important; margin:0!important; padding:0!important; }',
                 /* hide YouTube chrome */
                 '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-watermark,',
                 '.ytp-pause-overlay, .ytp-endscreen-content, .ytp-ce-element,',
@@ -471,10 +467,13 @@ private fun injectBridge(view: WebView) {
                 '.ytp-contextmenu, .ytp-show-cards-title, .ytp-paid-content-overlay,',
                 '.ytp-impression-link, .iv-branding, .annotation,',
                 '.ytp-chrome-controls { display:none!important; opacity:0!important; }',
-                /* hide error / loading overlays left over from failed first stream attempt */
+                /* hide error / loading overlays */
                 '.ytp-error, .ytp-error-content-wrap, .ytp-error-content,',
                 '.ytp-offline-slate, .ytp-offline-slate-bar,',
-                '.html5-video-info-panel { display:none!important; }'
+                '.html5-video-info-panel { display:none!important; }',
+                /* oversize the player so it crops letterboxing */
+                '.html5-video-player { position:fixed!important; width:135%!important; height:135%!important; top:-17.5%!important; left:-17.5%!important; }',
+                'video { object-fit:cover!important; }'
             ].join('\n');
             document.head.appendChild(style);
 
