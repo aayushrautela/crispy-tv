@@ -8,7 +8,7 @@ import com.crispy.tv.network.CrispyHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 
-class TmdbSearchRepository(
+class TmdbSearchRepository internal constructor(
     private val tmdbClient: TmdbJsonClient,
 ) {
     constructor(apiKey: String, httpClient: CrispyHttpClient) : this(

@@ -8,7 +8,7 @@ object TmdbJsonClientProvider {
     @Volatile
     private var instance: TmdbJsonClient? = null
 
-    fun get(context: Context): TmdbJsonClient {
+    internal fun get(context: Context): TmdbJsonClient {
         val existing = instance
         if (existing != null) {
             return existing

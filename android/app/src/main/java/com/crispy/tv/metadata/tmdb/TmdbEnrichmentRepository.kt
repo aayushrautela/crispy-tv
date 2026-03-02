@@ -42,7 +42,7 @@ data class TmdbEnrichmentResult(
     val fallbackDetails: MediaDetails
 )
 
-class TmdbEnrichmentRepository(
+class TmdbEnrichmentRepository internal constructor(
     private val client: TmdbJsonClient,
 ) {
     constructor(apiKey: String, httpClient: CrispyHttpClient) : this(
