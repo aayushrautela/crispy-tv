@@ -62,11 +62,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.metadata.CloudAddonRow
 import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,6 +122,7 @@ internal data class AddonsSettingsUiState(
 internal class AddonsSettingsViewModel(
     private val addonRegistry: MetadataAddonRegistry,
     private val httpClient: CrispyHttpClient,
+    private val householdAddonsCloudSync: HouseholdAddonsCloudSync,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddonsSettingsUiState())
@@ -127,6 +130,16 @@ internal class AddonsSettingsViewModel(
 
     init {
         refreshInstalledAddons()
+
+        viewModelScope.launch {
+            householdAddonsCloudSync.pullToLocal()
+                .onSuccess { refreshInstalledAddons() }
+                .onFailure {
+                    _uiState.update { state ->
+                        state.copy(errorMessage = "Addons sync failed: ${it.message.orEmpty()}")
+                    }
+                }
+        }
     }
 
     fun setDraftUrl(value: String) {
@@ -264,6 +277,7 @@ internal class AddonsSettingsViewModel(
             }
 
             val installedAddons = loadInstalledAddons()
+            val syncError = householdAddonsCloudSync.pushFromLocal().exceptionOrNull()?.message
             _uiState.update { state ->
                 state.copy(
                     installedAddons = installedAddons,
@@ -271,7 +285,12 @@ internal class AddonsSettingsViewModel(
                     pendingInstall = null,
                     isLoading = false,
                     isInstallingAddon = false,
-                    statusMessage = "Installed ${pending.name}.",
+                    statusMessage =
+                        if (syncError.isNullOrBlank()) {
+                            "Installed ${pending.name}."
+                        } else {
+                            "Installed ${pending.name} (sync failed)."
+                        },
                     errorMessage = null
                 )
             }
@@ -290,11 +309,17 @@ internal class AddonsSettingsViewModel(
         viewModelScope.launch {
             addonRegistry.markAddonRemoved(targetId)
             val installedAddons = loadInstalledAddons()
+            val syncError = householdAddonsCloudSync.pushFromLocal().exceptionOrNull()?.message
             _uiState.update { state ->
                 state.copy(
                     installedAddons = installedAddons,
                     isLoading = false,
-                    statusMessage = "Removed ${addon.name}.",
+                    statusMessage =
+                        if (syncError.isNullOrBlank()) {
+                            "Removed ${addon.name}."
+                        } else {
+                            "Removed ${addon.name} (sync failed)."
+                        },
                     errorMessage = null
                 )
             }
@@ -388,14 +413,24 @@ internal class AddonsSettingsViewModel(
             return object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(AddonsSettingsViewModel::class.java)) {
+                        val httpClient = AppHttp.client(appContext)
+                        val addonRegistry =
+                            MetadataAddonRegistry(
+                                context = appContext,
+                                configuredManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
+                            )
+                        val supabase =
+                            SupabaseAccountClient(
+                                appContext = appContext,
+                                httpClient = httpClient,
+                                supabaseUrl = BuildConfig.SUPABASE_URL,
+                                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
+                            )
                         @Suppress("UNCHECKED_CAST")
                         return AddonsSettingsViewModel(
-                            addonRegistry =
-                                MetadataAddonRegistry(
-                                    context = appContext,
-                                    configuredManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
-                                ),
-                            httpClient = AppHttp.client(appContext),
+                            addonRegistry = addonRegistry,
+                            httpClient = httpClient,
+                            householdAddonsCloudSync = HouseholdAddonsCloudSync(supabase, addonRegistry),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

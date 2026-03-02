@@ -4,7 +4,6 @@ import android.content.Context
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
 import okhttp3.Headers
-import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
@@ -44,6 +43,20 @@ class SupabaseAccountClient(
         val avatar: String?,
         val orderIndex: Int,
         val lastActiveAt: String?,
+    )
+
+    data class ProfileData(
+        val settings: Map<String, String>,
+        val catalogPrefs: Map<String, String>,
+        val traktAuth: Map<String, String>,
+        val simklAuth: Map<String, String>,
+        val updatedAt: String?,
+    )
+
+    data class HouseholdAddon(
+        val url: String,
+        val enabled: Boolean,
+        val name: String?,
     )
 
     fun isConfigured(): Boolean {
@@ -241,6 +254,101 @@ class SupabaseAccountClient(
         )
     }
 
+    suspend fun getProfileData(accessToken: String, profileId: String): ProfileData {
+        checkConfigured()
+        val url =
+            "$baseUrl/rest/v1/profile_data".toHttpUrl().newBuilder()
+                .addQueryParameter(
+                    "select",
+                    "settings,catalog_prefs,trakt_auth,simkl_auth,updated_at"
+                )
+                .addQueryParameter("profile_id", "eq.${profileId.trim()}")
+                .addQueryParameter("limit", "1")
+                .build()
+
+        val response = httpClient.get(url, authHeaders(accessToken), callTimeoutMs = CALL_TIMEOUT_MS)
+        val body = requireSuccess(response)
+        val arr = JSONArray(body)
+        val obj = arr.optJSONObject(0) ?: JSONObject()
+
+        val settings = obj.optJSONObject("settings")?.toStringMap() ?: emptyMap()
+        val catalogPrefs = obj.optJSONObject("catalog_prefs")?.toStringMap() ?: emptyMap()
+        val traktAuth = obj.optJSONObject("trakt_auth")?.toStringMap() ?: emptyMap()
+        val simklAuth = obj.optJSONObject("simkl_auth")?.toStringMap() ?: emptyMap()
+        val updatedAt = obj.optString("updated_at").trim().ifBlank { null }
+
+        return ProfileData(
+            settings = settings,
+            catalogPrefs = catalogPrefs,
+            traktAuth = traktAuth,
+            simklAuth = simklAuth,
+            updatedAt = updatedAt
+        )
+    }
+
+    suspend fun upsertProfileData(
+        accessToken: String,
+        profileId: String,
+        settings: Map<String, String>,
+        catalogPrefs: Map<String, String>,
+        traktAuth: Map<String, String>,
+        simklAuth: Map<String, String>,
+    ) {
+        checkConfigured()
+        val url = "$baseUrl/rest/v1/rpc/upsert_profile_data".toHttpUrl()
+        val payload =
+            JSONObject()
+                .put("p_profile_id", profileId.trim())
+                .put("p_settings", settings.toJsonObject())
+                .put("p_catalog_prefs", catalogPrefs.toJsonObject())
+                .put("p_trakt_auth", traktAuth.toJsonObject())
+                .put("p_simkl_auth", simklAuth.toJsonObject())
+                .toString()
+
+        val response = httpClient.postJson(url, payload, authHeaders(accessToken), callTimeoutMs = CALL_TIMEOUT_MS)
+        requireSuccess(response)
+    }
+
+    suspend fun getHouseholdAddons(accessToken: String): List<HouseholdAddon> {
+        checkConfigured()
+        val url = "$baseUrl/rest/v1/rpc/get_household_addons".toHttpUrl()
+        val response = httpClient.postJson(url, "{}", authHeaders(accessToken), callTimeoutMs = CALL_TIMEOUT_MS)
+        val body = requireSuccess(response)
+        val arr = JSONArray(body)
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val urlValue = obj.optString("url").trim()
+                if (urlValue.isBlank()) continue
+                val enabled = obj.optBoolean("enabled", true)
+                val name = obj.optString("name").trim().ifBlank { null }
+                add(HouseholdAddon(url = urlValue, enabled = enabled, name = name))
+            }
+        }
+    }
+
+    suspend fun replaceHouseholdAddons(accessToken: String, addons: List<HouseholdAddon>): Int? {
+        checkConfigured()
+        val url = "$baseUrl/rest/v1/rpc/replace_household_addons".toHttpUrl()
+
+        val arr = JSONArray()
+        for (addon in addons) {
+            val obj =
+                JSONObject()
+                    .put("url", addon.url.trim())
+                    .put("enabled", addon.enabled)
+                    .apply {
+                        if (!addon.name.isNullOrBlank()) put("name", addon.name.trim())
+                    }
+            arr.put(obj)
+        }
+
+        val payload = JSONObject().put("p_addons", arr).toString()
+        val response = httpClient.postJson(url, payload, authHeaders(accessToken), callTimeoutMs = CALL_TIMEOUT_MS)
+        val body = requireSuccess(response)
+        return parseIntBody(body)
+    }
+
     private fun checkConfigured() {
         if (!isConfigured()) throw IllegalStateException("Supabase is not configured.")
     }
@@ -328,6 +436,51 @@ class SupabaseAccountClient(
             trimmed.startsWith("{") -> JSONObject(trimmed)
             else -> trimmed
         }
+    }
+
+    private fun JSONObject.toStringMap(): Map<String, String> {
+        val iter = keys()
+        val result = mutableMapOf<String, String>()
+        while (iter.hasNext()) {
+            val key = iter.next()
+            val rawValue = opt(key)
+            if (rawValue == null || rawValue == JSONObject.NULL) continue
+            result[key] = rawValue.toString()
+        }
+        return result
+    }
+
+    private fun Map<String, String>.toJsonObject(): JSONObject {
+        val obj = JSONObject()
+        for (key in keys.sorted()) {
+            obj.put(key, getValue(key))
+        }
+        return obj
+    }
+
+    private fun parseIntBody(body: String): Int? {
+        val trimmed = body.trim()
+        if (trimmed.isBlank()) return null
+        return trimmed.toIntOrNull() ?: runCatching {
+            fun extractIntFromObject(obj: JSONObject?): Int? {
+                if (obj == null) return null
+                val iter = obj.keys()
+                if (!iter.hasNext()) return null
+                val firstKey = iter.next()
+                val value = obj.opt(firstKey)
+                return when (value) {
+                    is Number -> value.toInt()
+                    is String -> value.trim().toIntOrNull()
+                    else -> null
+                }
+            }
+
+            when (val parsed = parseJsonBody(trimmed)) {
+                is JSONObject -> extractIntFromObject(parsed)
+                is JSONArray -> extractIntFromObject(parsed.optJSONObject(0))
+                else -> null
+            }
+        }.getOrNull()
     }
 
     private fun JSONObject.firstNonBlank(vararg keys: String): String? {

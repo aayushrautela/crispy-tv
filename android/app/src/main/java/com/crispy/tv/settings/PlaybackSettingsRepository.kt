@@ -6,8 +6,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-private const val PREFS_NAME = "playback_settings"
-private const val KEY_SKIP_INTRO_ENABLED = "skip_intro_enabled"
+internal const val PLAYBACK_SETTINGS_PREFS_NAME = "playback_settings"
+internal const val PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED = "skip_intro_enabled"
 private const val DEFAULT_SKIP_INTRO_ENABLED = true
 
 data class PlaybackSettings(
@@ -27,7 +27,7 @@ private class SharedPreferencesPlaybackSettingsRepository(
 
     private val listener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == KEY_SKIP_INTRO_ENABLED) {
+            if (key == PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED) {
                 _settings.value = readSettings(preferences)
             }
         }
@@ -42,14 +42,14 @@ private class SharedPreferencesPlaybackSettingsRepository(
         }
 
         _settings.value = _settings.value.copy(skipIntroEnabled = enabled)
-        preferences.edit().putBoolean(KEY_SKIP_INTRO_ENABLED, enabled).apply()
+        preferences.edit().putBoolean(PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED, enabled).apply()
     }
 
     companion object {
         fun create(context: Context): PlaybackSettingsRepository {
             val prefs =
                 context.applicationContext.getSharedPreferences(
-                    PREFS_NAME,
+                    PLAYBACK_SETTINGS_PREFS_NAME,
                     Context.MODE_PRIVATE
                 )
             return SharedPreferencesPlaybackSettingsRepository(prefs)
@@ -59,7 +59,7 @@ private class SharedPreferencesPlaybackSettingsRepository(
             return PlaybackSettings(
                 skipIntroEnabled =
                     preferences.getBoolean(
-                        KEY_SKIP_INTRO_ENABLED,
+                        PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED,
                         DEFAULT_SKIP_INTRO_ENABLED
                     )
             )

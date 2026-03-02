@@ -38,11 +38,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
+import com.crispy.tv.BuildConfig
+import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.network.AppHttp
+import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 @Composable
 fun AiInsightsSettingsRoute(onBack: () -> Unit) {
@@ -67,9 +75,12 @@ data class AiInsightsSettingsUiState(
 
 private class AiInsightsSettingsViewModel(
     private val settingsStore: AiInsightsSettingsStore,
+    private val cloudSync: ProfileDataCloudSync,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AiInsightsSettingsUiState(snapshot = settingsStore.loadSnapshot()))
     val uiState: StateFlow<AiInsightsSettingsUiState> = _uiState
+
+    private var pushJob: Job? = null
 
     fun setMode(mode: AiInsightsMode) {
         updateSnapshot { it.copy(settings = it.settings.copy(mode = mode)) }
@@ -91,6 +102,13 @@ private class AiInsightsSettingsViewModel(
         val next = transform(_uiState.value.snapshot)
         settingsStore.saveSnapshot(next)
         _uiState.update { it.copy(snapshot = next) }
+
+        pushJob?.cancel()
+        pushJob =
+            viewModelScope.launch {
+                delay(800)
+                cloudSync.pushForActiveProfile()
+            }
     }
 
     companion object {
@@ -99,8 +117,17 @@ private class AiInsightsSettingsViewModel(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val httpClient = AppHttp.client(appContext)
+                    val supabase =
+                        SupabaseAccountClient(
+                            appContext = appContext,
+                            httpClient = httpClient,
+                            supabaseUrl = BuildConfig.SUPABASE_URL,
+                            supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
+                        )
                     return AiInsightsSettingsViewModel(
                         settingsStore = AiInsightsSettingsStore(appContext),
+                        cloudSync = ProfileDataCloudSync(appContext, supabase),
                     ) as T
                 }
             }
@@ -228,7 +255,7 @@ private fun AiInsightsSettingsScreen(
                         visualTransformation =
                             if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                         supportingText = {
-                            Text("Stored locally on this device.")
+                            Text("Stored locally and synced to your profile when signed in.")
                         }
                     )
 

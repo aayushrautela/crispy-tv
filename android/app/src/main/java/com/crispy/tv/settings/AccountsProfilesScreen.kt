@@ -45,7 +45,10 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
+import com.crispy.tv.sync.HouseholdAddonsCloudSync
+import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -318,6 +321,8 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
 class AccountsProfilesViewModel(
     private val supabase: SupabaseAccountClient,
     private val profileStore: ActiveProfileStore,
+    private val profileDataCloudSync: ProfileDataCloudSync,
+    private val householdAddonsCloudSync: HouseholdAddonsCloudSync,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AccountsProfilesUiState(configured = supabase.isConfigured()))
     val uiState: StateFlow<AccountsProfilesUiState> = _uiState
@@ -399,6 +404,11 @@ class AccountsProfilesViewModel(
                 profileStore.setActiveProfileId(session.userId, resolvedActive)
             }
 
+            val settingsSyncError =
+                profileDataCloudSync.pullForActiveProfile().exceptionOrNull()?.message
+            val addonsSyncError =
+                householdAddonsCloudSync.pullToLocal().exceptionOrNull()?.message
+
             _uiState.update {
                 it.copy(
                     isBusy = false,
@@ -408,7 +418,13 @@ class AccountsProfilesViewModel(
                     householdId = membership.householdId,
                     householdRole = membership.role,
                     profiles = profiles,
-                    activeProfileId = resolvedActive
+                    activeProfileId = resolvedActive,
+                    statusMessage =
+                        when {
+                            !settingsSyncError.isNullOrBlank() -> "Settings sync failed: $settingsSyncError"
+                            !addonsSyncError.isNullOrBlank() -> "Addons sync failed: $addonsSyncError"
+                            else -> ""
+                        }
                 )
             }
         }
@@ -478,6 +494,12 @@ class AccountsProfilesViewModel(
         if (userId.isNullOrBlank()) return
         profileStore.setActiveProfileId(userId, profileId)
         _uiState.update { it.copy(activeProfileId = profileId, statusMessage = "") }
+
+        viewModelScope.launch {
+            profileDataCloudSync.pullForActiveProfile().onFailure {
+                _uiState.update { s -> s.copy(statusMessage = "Settings sync failed: ${it.message.orEmpty()}") }
+            }
+        }
     }
 
     fun createProfile() {
@@ -548,7 +570,21 @@ class AccountsProfilesViewModel(
                             supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
                         )
                     val profileStore = ActiveProfileStore(safeContext)
-                    return AccountsProfilesViewModel(supabase, profileStore) as T
+                    val profileDataCloudSync =
+                        ProfileDataCloudSync(
+                            context = safeContext,
+                            supabase = supabase,
+                            activeProfileStore = profileStore
+                        )
+                    val addonRegistry = MetadataAddonRegistry(safeContext, BuildConfig.METADATA_ADDON_URLS)
+                    val householdAddonsCloudSync = HouseholdAddonsCloudSync(supabase, addonRegistry)
+
+                    return AccountsProfilesViewModel(
+                        supabase = supabase,
+                        profileStore = profileStore,
+                        profileDataCloudSync = profileDataCloudSync,
+                        householdAddonsCloudSync = householdAddonsCloudSync
+                    ) as T
                 }
             }
         }

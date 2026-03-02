@@ -215,29 +215,7 @@ class RemoteSupabaseSyncLabService(
             return@withContext result("Supabase sync is not configured.")
         }
 
-        val session = ensureValidSession()
-            ?: return@withContext result("Sign in to Supabase before generating a sync code.")
-        val normalizedPin = pin.trim()
-        if (normalizedPin.isEmpty()) {
-            return@withContext result("PIN is required to generate a sync code.")
-        }
-
-        runCatching {
-            val response =
-                callRpc(
-                    functionName = "generate_sync_code",
-                    bearerToken = session.accessToken,
-                    payload = JSONObject().put("p_pin", normalizedPin)
-                )
-            val code = extractSyncCode(response)
-                ?: throw IllegalStateException("No sync code returned by Supabase")
-            result(
-                message = "Generated sync code: $code",
-                syncCode = code
-            )
-        }.getOrElse { error ->
-            result("Generate sync code failed: ${error.message ?: "unknown error"}")
-        }
+        return@withContext result("Sync codes are not supported.")
     }
 
     override suspend fun claimSyncCode(code: String, pin: String): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
@@ -245,41 +223,7 @@ class RemoteSupabaseSyncLabService(
             return@withContext result("Supabase sync is not configured.")
         }
 
-        val session = ensureValidSession()
-            ?: return@withContext result("Sign in to Supabase before claiming a sync code.")
-        val normalizedCode = code.trim()
-        val normalizedPin = pin.trim()
-        if (normalizedCode.isEmpty() || normalizedPin.isEmpty()) {
-            return@withContext result("Sync code and PIN are required.")
-        }
-
-        runCatching {
-            val response =
-                callRpc(
-                    functionName = "claim_sync_code",
-                    bearerToken = session.accessToken,
-                    payload =
-                        JSONObject()
-                            .put("p_code", normalizedCode)
-                            .put("p_pin", normalizedPin)
-                            .put("p_device_name", DEVICE_NAME)
-                )
-            val claim = extractClaimResult(response)
-            if (!claim.success) {
-                return@runCatching result(
-                    claim.message.ifEmpty { "Sync code claim failed." }
-                )
-            }
-
-            val pullResult = pullAllInternal(session.accessToken)
-            result(
-                message = if (claim.message.isNotEmpty()) "${claim.message} ${pullResult.status}" else pullResult.status,
-                pulledAddons = pullResult.addons,
-                pulledWatchedItems = pullResult.watched
-            )
-        }.getOrElse { error ->
-            result("Claim sync code failed: ${error.message ?: "unknown error"}")
-        }
+        return@withContext result("Sync codes are not supported.")
     }
 
     override fun authState(): SupabaseSyncAuthState {
@@ -295,20 +239,9 @@ class RemoteSupabaseSyncLabService(
 
     private suspend fun pushAllInternal(accessToken: String): SyncCounts {
         val pushedAddons = pushAddons(accessToken)
-        val traktConnected = isTraktConnected()
-        val pushedWatched =
-            if (traktConnected) {
-                0
-            } else {
-                pushWatched(accessToken)
-            }
+        val pushedWatched = 0
 
-        val status =
-            if (traktConnected) {
-                "Pushed $pushedAddons addon rows. Trakt connected, skipped watched push."
-            } else {
-                "Pushed $pushedAddons addon rows and $pushedWatched watched rows."
-            }
+        val status = "Pushed $pushedAddons addon rows. Watched sync not implemented."
         return SyncCounts(
             status = status,
             addons = pushedAddons,
@@ -318,20 +251,9 @@ class RemoteSupabaseSyncLabService(
 
     private suspend fun pullAllInternal(accessToken: String): SyncCounts {
         val pulledAddons = pullAddons(accessToken)
-        val traktConnected = isTraktConnected()
-        val pulledWatched =
-            if (traktConnected) {
-                0
-            } else {
-                pullWatched(accessToken)
-            }
+        val pulledWatched = 0
 
-        val status =
-            if (traktConnected) {
-                "Pulled $pulledAddons addon rows. Trakt connected, skipped watched pull."
-            } else {
-                "Pulled $pulledAddons addon rows and $pulledWatched watched rows."
-            }
+        val status = "Pulled $pulledAddons addon rows. Watched sync not implemented."
         return SyncCounts(
             status = status,
             addons = pulledAddons,
@@ -346,11 +268,11 @@ class RemoteSupabaseSyncLabService(
             payloadRows.put(
                 JSONObject()
                     .put("url", row.manifestUrl)
-                    .put("sort_order", row.sortOrder)
+                    .put("enabled", true)
             )
         }
         callRpc(
-            functionName = "sync_push_addons",
+            functionName = "replace_household_addons",
             bearerToken = accessToken,
             payload = JSONObject().put("p_addons", payloadRows)
         )
@@ -359,17 +281,18 @@ class RemoteSupabaseSyncLabService(
 
     private suspend fun pullAddons(accessToken: String): Int {
         val response =
-            sendJsonRequest(
-                method = "GET",
-                url = "$baseUrl/rest/v1/addons?select=url,sort_order&order=sort_order.asc.nullslast,url.asc",
-                headers = authHeaders(accessToken),
-                payload = null
+            callRpc(
+                functionName = "get_household_addons",
+                bearerToken = accessToken,
+                payload = JSONObject()
             )
-        if (!response.isSuccessful()) {
-            throw IllegalStateException(extractErrorMessage(response.body) ?: "Supabase addons pull failed")
-        }
 
-        val array = JSONArray(response.body.ifBlank { "[]" })
+        val array =
+            when (response) {
+                is JSONArray -> response
+                is JSONObject -> response.optJSONArray("items") ?: JSONArray()
+                else -> JSONArray()
+            }
         val rows = mutableListOf<CloudAddonRow>()
         for (index in 0 until array.length()) {
             val item = array.optJSONObject(index) ?: continue
@@ -377,7 +300,9 @@ class RemoteSupabaseSyncLabService(
             if (url.isEmpty()) {
                 continue
             }
-            rows += CloudAddonRow(manifestUrl = url, sortOrder = item.optInt("sort_order", index))
+            val enabled = item.optBoolean("enabled", true)
+            if (!enabled) continue
+            rows += CloudAddonRow(manifestUrl = url, sortOrder = index)
         }
 
         addonRegistry.reconcileCloudAddons(rows)
@@ -385,38 +310,11 @@ class RemoteSupabaseSyncLabService(
     }
 
     private suspend fun pushWatched(accessToken: String): Int {
-        val localEntries = watchHistoryService.exportLocalHistory()
-        val payloadRows = JSONArray()
-        localEntries.forEach { entry ->
-            payloadRows.put(
-                JSONObject()
-                    .put("content_id", entry.contentId)
-                    .put("content_type", entry.contentType.name.lowercase())
-                    .put("title", entry.title)
-                    .put("season", entry.season)
-                    .put("episode", entry.episode)
-                    .put("watched_at", entry.watchedAtEpochMs)
-            )
-        }
-
-        callRpc(
-            functionName = "sync_push_watched_items",
-            bearerToken = accessToken,
-            payload = JSONObject().put("p_items", payloadRows)
-        )
-        return localEntries.size
+        return 0
     }
 
     private suspend fun pullWatched(accessToken: String): Int {
-        val response =
-            callRpc(
-                functionName = "sync_pull_watched_items",
-                bearerToken = accessToken,
-                payload = JSONObject()
-            )
-        val remoteEntries = parseWatchedEntries(response)
-        watchHistoryService.replaceLocalHistory(remoteEntries)
-        return remoteEntries.size
+        return 0
     }
 
     private fun parseWatchedEntries(raw: Any?): List<WatchHistoryEntry> {
