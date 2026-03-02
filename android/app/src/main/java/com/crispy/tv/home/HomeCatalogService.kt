@@ -577,6 +577,7 @@ class HomeCatalogService(
                         add(item)
                     }
                 }
+            }
 
         val mediaTypes = items.map { it.type }.toSet()
 
