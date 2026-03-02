@@ -159,8 +159,7 @@ class DiscoverViewModel(
                 val catalogsResult =
                     withContext(Dispatchers.IO) {
                         homeCatalogService.listDiscoverCatalogs(
-                            mediaType = filterSnapshot.mediaType,
-                            limit = 80
+                            mediaType = filterSnapshot.mediaType
                         )
                     }
                 val catalogs = catalogsResult.first

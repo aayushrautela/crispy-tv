@@ -327,7 +327,7 @@ class HomeViewModel internal constructor(
         }
 
         val sectionsResult = withContext(Dispatchers.IO) {
-            homeCatalogService.listHomeCatalogSections(limit = 15)
+            homeCatalogService.listHomeCatalogSections()
         }
         val sections = sectionsResult.first
         val statusMessage = sectionsResult.second

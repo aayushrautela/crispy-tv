@@ -29,7 +29,6 @@ This directory defines parity-critical behavior for the rewrite apps.
   - Nuvio-style addon ID-prefix compatibility formatting.
   - Resource-level `idPrefixes` are preferred; addon-level prefixes are fallback.
   - Prefix matching uses `startsWith`; when no prefixes are declared, return best-effort normalized ID.
-- `catalog_url_building`
   - Catalog requests must try deterministic URL forms in order.
   - For page 1 with no filters, try simple path first, then path-style extras, then legacy query style.
   - Path/query forms must include canonical `skip` and `limit`, preserve deterministic filter ordering, and keep addon query parameters.

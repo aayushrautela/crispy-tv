@@ -103,7 +103,7 @@ General:
 
 Contracts:
 - Fixtures include `contract_version`, `suite`, `case_id` (and `now_ms` when specified).
-- Suites currently covered include: `player_machine`, `continue_watching`, `trakt_scrobble_policy`, `media_ids`, `id_prefixes`, `catalog_url_building`, `search_ranking_and_dedup`, `sync_planner`, `storage_v1`.
+- Suites currently covered include: `player_machine`, `continue_watching`, `trakt_scrobble_policy`, `media_ids`, `id_prefixes`, `search_ranking_and_dedup`, `sync_planner`, `storage_v1`.
 - If you change behavior: bump `contract_version` (per SPEC), update fixtures/schemas, and keep Kotlin + Swift implementations in lockstep.
 
 Kotlin (Android + JVM):

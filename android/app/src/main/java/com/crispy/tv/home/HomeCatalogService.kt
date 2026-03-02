@@ -164,7 +164,7 @@ class HomeCatalogService(
                         year = item.year,
                         genres = emptyList(),
                         backdropUrl = backdrop,
-                        addonId = "supabase",
+                        addonId = item.addonId,
                         type = item.type
                     )
                 }
@@ -291,20 +291,18 @@ class HomeCatalogService(
         )
     }
 
-    suspend fun listHomeCatalogSections(limit: Int = 15): Pair<List<CatalogSectionRef>, String> {
+    suspend fun listHomeCatalogSections(limit: Int = Int.MAX_VALUE): Pair<List<CatalogSectionRef>, String> {
         val snapshot = loadSupabaseCatalogSnapshot(forceRefresh = false)
         if (snapshot.lists.isEmpty()) {
             return emptyList<CatalogSectionRef>() to snapshot.statusMessage
         }
 
-        val targetCount =
-            limit
-                .coerceAtLeast(1)
-                .coerceAtMost(MAX_SUPABASE_CATALOGS)
+        val targetCount = limit.coerceAtLeast(1)
+        val lists = snapshot.lists
+        val limitedLists = if (targetCount >= lists.size) lists else lists.take(targetCount)
 
         val sections =
-            snapshot.lists
-                .take(targetCount)
+            limitedLists
                 .map { list ->
                     CatalogSectionRef(
                         title = list.title,
@@ -317,7 +315,7 @@ class HomeCatalogService(
 
     suspend fun listDiscoverCatalogs(
         mediaType: String? = null,
-        limit: Int = 50
+        limit: Int = Int.MAX_VALUE
     ): Pair<List<DiscoverCatalogRef>, String> {
         val normalizedType =
             mediaType
@@ -343,14 +341,16 @@ class HomeCatalogService(
             return emptyList<DiscoverCatalogRef>() to "No discover catalogs found$suffix."
         }
 
-        val targetCount =
-            limit
-                .coerceAtLeast(1)
-                .coerceAtMost(MAX_SUPABASE_CATALOGS)
+        val targetCount = limit.coerceAtLeast(1)
+        val limitedLists =
+            if (targetCount >= filteredLists.size) {
+                filteredLists
+            } else {
+                filteredLists.take(targetCount)
+            }
 
         val catalogs =
-            filteredLists
-                .take(targetCount)
+            limitedLists
                 .map { list ->
                     DiscoverCatalogRef(
                         section = CatalogSectionRef(title = list.title, catalogId = list.id),
@@ -393,7 +393,9 @@ class HomeCatalogService(
                 "supabase:profile_recommendations:${snapshot.profileId.orEmpty()}:${list.id}:page=$targetPage"
             )
 
-        if (targetPage != 1) {
+        val allItems = list.items
+        val startIndexLong = (targetPage.toLong() - 1L) * targetSize.toLong()
+        if (startIndexLong >= allItems.size.toLong()) {
             return CatalogPageResult(
                 items = emptyList(),
                 statusMessage = "No more items available.",
@@ -401,10 +403,17 @@ class HomeCatalogService(
             )
         }
 
-        val items = list.items.take(targetSize)
+        val startIndex = startIndexLong.toInt()
+        val endIndex = minOf(startIndex + targetSize, allItems.size)
+        val items = if (startIndex < endIndex) allItems.subList(startIndex, endIndex) else emptyList()
         return CatalogPageResult(
             items = items,
-            statusMessage = if (items.isEmpty()) "No catalog items available." else "",
+            statusMessage =
+                when {
+                    items.isNotEmpty() -> ""
+                    targetPage <= 1 -> "No catalog items available."
+                    else -> "No more items available."
+                },
             attemptedUrls = attempted
         )
     }
@@ -552,8 +561,7 @@ class HomeCatalogService(
         val lists = row.optJSONArray("lists") ?: return emptyList()
 
         val parsed = mutableListOf<SupabaseCatalogList>()
-        val targetCount = minOf(lists.length(), MAX_SUPABASE_CATALOGS)
-        for (index in 0 until targetCount) {
+        for (index in 0 until lists.length()) {
             val listObj = lists.optJSONObject(index) ?: continue
             val list = parseSupabaseCatalogList(listObj) ?: continue
             parsed += list
@@ -591,7 +599,7 @@ class HomeCatalogService(
 
     private fun parseSupabaseCatalogItem(obj: JSONObject): CatalogItem? {
         val idAny = obj.opt("id")
-        val id =
+        val rawId =
             when (idAny) {
                 is Number -> idAny.toLong().takeIf { it > 0 }?.toString()
                 is String -> nonBlank(idAny)
@@ -600,6 +608,8 @@ class HomeCatalogService(
 
         val rawMediaType = nonBlank(obj.optString("media_type"))?.lowercase(Locale.US)
         val type = normalizeSupabaseMediaType(rawMediaType) ?: return null
+
+        val id = normalizeSupabaseTmdbId(rawId) ?: return null
 
         val title =
             nonBlank(obj.optString("title"))
@@ -618,12 +628,23 @@ class HomeCatalogService(
             title = title,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
-            addonId = "supabase",
+            addonId = "tmdb",
             type = type,
             rating = rating,
             year = null,
             genre = null
         )
+    }
+
+    private fun normalizeSupabaseTmdbId(rawId: String): String? {
+        val trimmed = rawId.trim()
+        if (trimmed.isBlank()) return null
+
+        return when {
+            trimmed.startsWith("tmdb:", ignoreCase = true) -> "tmdb:" + trimmed.substring(5)
+            trimmed.all { it.isDigit() } -> "tmdb:$trimmed"
+            else -> null
+        }
     }
 
     private fun normalizeSupabaseMediaType(raw: String?): String? {
@@ -762,8 +783,6 @@ class HomeCatalogService(
     companion object {
         private const val TAG = "HomeCatalogService"
         private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
-
-        private const val MAX_SUPABASE_CATALOGS = 6
 
         private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L

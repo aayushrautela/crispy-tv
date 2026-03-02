@@ -2,7 +2,6 @@ package com.crispy.tv
 
 import android.content.Context
 import com.crispy.tv.metadata.TmdbEpisodeListProvider
-import com.crispy.tv.metadata.RemoteCatalogSearchLabService
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
@@ -15,7 +14,6 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.NativePlaybackEvent
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.torrent.TorrentEngineClient
-import com.crispy.tv.player.CatalogSearchLabService
 import com.crispy.tv.player.CoreDomainMetadataLabResolver
 import com.crispy.tv.player.MetadataLabResolver
 import com.crispy.tv.player.SupabaseSyncLabService
@@ -52,15 +50,6 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
             tmdbApiKey = BuildConfig.TMDB_API_KEY,
             httpClient = AppHttp.client(appContext),
         )
-    )
-}
-
-private fun newCatalogSearchService(context: Context): CatalogSearchLabService {
-    val appContext = context.applicationContext
-    return RemoteCatalogSearchLabService(
-        context = appContext,
-        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-        httpClient = AppHttp.client(appContext),
     )
 }
 
@@ -121,11 +110,6 @@ object PlaybackDependencies {
     }
 
     @Volatile
-    var catalogSearchServiceFactory: (Context) -> CatalogSearchLabService = { context ->
-        newCatalogSearchService(context)
-    }
-
-    @Volatile
     var watchHistoryServiceFactory: (Context) -> WatchHistoryService = { context ->
         newWatchHistoryService(context)
     }
@@ -154,9 +138,6 @@ object PlaybackDependencies {
         torrentResolverFactory = { context -> NativeTorrentResolver(context) }
         metadataResolverFactory = { context ->
             newMetadataResolver(context)
-        }
-        catalogSearchServiceFactory = { context ->
-            newCatalogSearchService(context)
         }
         watchHistoryServiceFactory = { context ->
             newWatchHistoryService(context)

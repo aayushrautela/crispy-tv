@@ -7,7 +7,6 @@ final class FixtureSanityTests: XCTestCase {
             "player_machine",
             "media_ids",
             "id_prefixes",
-            "catalog_url_building",
             "search_ranking_and_dedup",
             "sync_planner",
             "storage_v1",
