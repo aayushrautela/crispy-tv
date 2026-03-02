@@ -159,8 +159,8 @@ class ProfileDataCloudSync(
         result[KEY_PLAYBACK_SKIP_INTRO_ENABLED] = skipIntroEnabled.toString()
 
         val aiSettings: AiInsightsSettings = aiInsightsSettingsStore.loadSettings()
-        result[KEY_AI_INSIGHTS_MODE] = aiSettings.mode.rawValue
-        result[KEY_AI_INSIGHTS_MODEL_TYPE] = aiSettings.modelType.rawValue
+        result[KEY_AI_INSIGHTS_MODE] = aiSettings.mode.raw
+        result[KEY_AI_INSIGHTS_MODEL_TYPE] = aiSettings.modelType.raw
 
         val customModelName = aiSettings.customModelName.trim()
         if (customModelName.isBlank()) {

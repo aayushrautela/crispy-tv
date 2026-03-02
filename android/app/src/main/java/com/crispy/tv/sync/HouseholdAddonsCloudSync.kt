@@ -4,7 +4,7 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.metadata.CloudAddonRow
 import com.crispy.tv.metadata.MetadataAddonRegistry
 
-class HouseholdAddonsCloudSync(
+internal class HouseholdAddonsCloudSync(
     private val supabase: SupabaseAccountClient,
     private val addonRegistry: MetadataAddonRegistry,
 ) {
