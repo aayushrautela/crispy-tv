@@ -318,7 +318,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
     }
 }
 
-class AccountsProfilesViewModel(
+internal class AccountsProfilesViewModel(
     private val supabase: SupabaseAccountClient,
     private val profileStore: ActiveProfileStore,
     private val profileDataCloudSync: ProfileDataCloudSync,
