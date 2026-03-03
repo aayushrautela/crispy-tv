@@ -83,47 +83,99 @@ internal fun HomeRailSection(
     showProgressBar: Boolean = false,
     showTitleFallbackWhenNoLogo: Boolean = false,
     useBottomSheetActions: Boolean = false,
-    usePosterCardStyle: Boolean = false
+    usePosterCardStyle: Boolean = false,
+    isLoading: Boolean = false
 ) {
-    if (items.isEmpty()) {
+    if (items.isEmpty() && !isLoading && statusMessage.isBlank()) {
         return
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = title,
-            statusMessage = statusMessage
+            statusMessage = if (isLoading) "" else statusMessage
         )
 
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            items(items, key = { "${it.type}:${it.id}" }) { item ->
-                if (usePosterCardStyle) {
-                    HomeRailPosterCard(
-                        item = item,
-                        onClick = { onItemClick(item) }
-                    )
+        if (isLoading || items.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                if (isLoading && items.isEmpty()) {
+                    if (usePosterCardStyle) {
+                        items(10) {
+                            HomeRailPosterSkeletonCard()
+                        }
+                    } else {
+                        items(6) {
+                            HomeRailSkeletonCard()
+                        }
+                    }
                 } else {
-                    HomeRailCard(
-                        item = item,
-                        subtitle = subtitleFor(item),
-                        actionMenuContentDescription = actionMenuContentDescription,
-                        onClick = { onItemClick(item) },
-                        onHideClick = onHideItem?.let { { it(item) } },
-                        onRemoveClick = onRemoveItem?.let { { it(item) } },
-                        onDetailsClick = { onItemClick(item) },
-                        badgeLabel = badgeLabel,
-                        showProgressBar = showProgressBar,
-                        showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo,
-                        useBottomSheetActions = useBottomSheetActions
-                    )
+                    items(items, key = { "${it.type}:${it.id}" }) { item ->
+                        if (usePosterCardStyle) {
+                            HomeRailPosterCard(
+                                item = item,
+                                onClick = { onItemClick(item) }
+                            )
+                        } else {
+                            HomeRailCard(
+                                item = item,
+                                subtitle = subtitleFor(item),
+                                actionMenuContentDescription = actionMenuContentDescription,
+                                onClick = { onItemClick(item) },
+                                onHideClick = onHideItem?.let { { it(item) } },
+                                onRemoveClick = onRemoveItem?.let { { it(item) } },
+                                onDetailsClick = { onItemClick(item) },
+                                badgeLabel = badgeLabel,
+                                showProgressBar = showProgressBar,
+                                showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo,
+                                useBottomSheetActions = useBottomSheetActions
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
+}
+
+@Composable
+private fun HomeRailSkeletonCard() {
+    Column(
+        modifier = Modifier.width(260.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .skeletonElement(shape = RoundedCornerShape(16.dp))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .height(16.dp)
+                .skeletonElement()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.45f)
+                .height(12.dp)
+                .skeletonElement()
+        )
+    }
+}
+
+@Composable
+private fun HomeRailPosterSkeletonCard() {
+    Box(
+        modifier = Modifier
+            .width(124.dp)
+            .aspectRatio(2f / 3f)
+            .skeletonElement(shape = RoundedCornerShape(8.dp))
+    )
 }
 
 @Composable
@@ -491,7 +543,7 @@ internal fun HomeCatalogSectionRow(
             }
         }
 
-        if (sectionUi.statusMessage.isNotBlank() && sectionUi.items.isEmpty()) {
+        if (!sectionUi.isLoading && sectionUi.statusMessage.isNotBlank() && sectionUi.items.isEmpty()) {
             Text(
                 text = sectionUi.statusMessage,
                 style = MaterialTheme.typography.bodySmall,
@@ -573,9 +625,10 @@ private fun HomeRailPosterCard(
 @Composable
 internal fun ThisWeekSection(
     items: List<ThisWeekItem>,
+    isLoading: Boolean = false,
     onItemClick: (ThisWeekItem) -> Unit = {},
 ) {
-    if (items.isEmpty()) return
+    if (items.isEmpty() && !isLoading) return
 
     Column(modifier = Modifier.fillMaxWidth()) {
         HomeRailHeader(title = "This Week", statusMessage = "")
@@ -584,10 +637,49 @@ internal fun ThisWeekSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(items, key = { "${it.type}:${it.id}" }) { item ->
-                ThisWeekCard(item = item, onClick = { onItemClick(item) })
+            if (isLoading && items.isEmpty()) {
+                items(8) {
+                    ThisWeekCardSkeleton()
+                }
+            } else {
+                items(items, key = { "${it.type}:${it.id}" }) { item ->
+                    ThisWeekCard(item = item, onClick = { onItemClick(item) })
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun ThisWeekCardSkeleton() {
+    Column(
+        modifier = Modifier.width(124.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .skeletonElement(shape = RoundedCornerShape(8.dp))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .height(12.dp)
+                .skeletonElement()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.45f)
+                .height(10.dp)
+                .skeletonElement()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.65f)
+                .height(10.dp)
+                .skeletonElement()
+        )
     }
 }
 
@@ -779,6 +871,17 @@ internal fun continueWatchingSubtitle(item: ContinueWatchingItem): String {
     ).toString()
 
     return listOfNotNull(upNext, seasonEpisode, relativeWatched).joinToString(separator = " • ")
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun HomeHeroSkeleton() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(320.dp)
+            .skeletonElement(shape = RoundedCornerShape(28.dp))
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)

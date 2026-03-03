@@ -139,18 +139,7 @@ internal fun HomeScreen(
             item(contentType = "hero") {
                 when {
                     heroState.isLoading && heroState.items.isEmpty() -> {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("Loading featured content...")
-                            }
-                        }
+                        HomeHeroSkeleton()
                     }
 
                     heroState.items.isEmpty() -> {
@@ -183,7 +172,8 @@ internal fun HomeScreen(
                     onHideItem = viewModel::hideContinueWatchingItem,
                     onRemoveItem = viewModel::removeContinueWatchingItem,
                     showTitleFallbackWhenNoLogo = true,
-                    useBottomSheetActions = true
+                    useBottomSheetActions = true,
+                    isLoading = continueWatchingState.isLoading
                 )
             }
 
@@ -198,13 +188,15 @@ internal fun HomeScreen(
                     onHideItem = viewModel::hideContinueWatchingItem,
                     onRemoveItem = viewModel::removeContinueWatchingItem,
                     badgeLabel = "UP NEXT",
-                    showProgressBar = true
+                    showProgressBar = true,
+                    isLoading = upNextState.isLoading
                 )
             }
 
             item(contentType = "thisWeek") {
                 ThisWeekSection(
                     items = thisWeekState.items,
+                    isLoading = thisWeekState.isLoading,
                     onItemClick = onThisWeekClick,
                 )
             }
@@ -222,7 +214,8 @@ internal fun HomeScreen(
                     onHideItem = null,
                     onRemoveItem = null,
                     showTitleFallbackWhenNoLogo = true,
-                    usePosterCardStyle = true
+                    usePosterCardStyle = true,
+                    isLoading = forYouState.isLoading
                 )
             }
 

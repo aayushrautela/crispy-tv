@@ -26,12 +26,13 @@ import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -53,24 +54,28 @@ data class HeroState(
 @Immutable
 data class ContinueWatchingState(
     val items: List<ContinueWatchingItem> = emptyList(),
+    val isLoading: Boolean = true,
     val statusMessage: String = ""
 )
 
 @Immutable
 data class UpNextState(
     val items: List<ContinueWatchingItem> = emptyList(),
+    val isLoading: Boolean = true,
     val statusMessage: String = ""
 )
 
 @Immutable
 data class ForYouState(
     val items: List<ContinueWatchingItem> = emptyList(),
+    val isLoading: Boolean = true,
     val statusMessage: String = ""
 )
 
 @Immutable
 data class ThisWeekState(
     val items: List<ThisWeekItem> = emptyList(),
+    val isLoading: Boolean = true,
     val statusMessage: String = ""
 )
 
@@ -96,6 +101,7 @@ class HomeViewModel internal constructor(
 ) : ViewModel() {
     companion object {
         private const val CATALOG_CONCURRENCY_LIMIT = 6
+        private const val SECTION_SKELETON_MIN_DURATION_MS = 450L
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -158,7 +164,21 @@ class HomeViewModel internal constructor(
     fun refresh() {
         catalogSectionsJob?.cancel()
         viewModelScope.launch {
+            val homeRefreshStartedAt = System.currentTimeMillis()
+
             _heroState.update { it.copy(isLoading = true, statusMessage = "Loading featured content...") }
+            _continueWatchingState.update { current ->
+                current.copy(isLoading = true, statusMessage = "")
+            }
+            _upNextState.update { current ->
+                current.copy(isLoading = true, statusMessage = "")
+            }
+            _forYouState.update { current ->
+                current.copy(isLoading = true, statusMessage = "")
+            }
+            _thisWeekState.update { current ->
+                current.copy(isLoading = true, statusMessage = "")
+            }
 
             val baseResult = withContext(Dispatchers.IO) {
                 val suppressionMap = suppressionStore.read()
@@ -216,6 +236,7 @@ class HomeViewModel internal constructor(
                 }
             }
 
+            delayForMinimumSkeletonVisibility(homeRefreshStartedAt)
             _heroState.update { current ->
                 val selectedId = current.selectedId?.takeIf { id -> baseResult.heroResult.items.any { it.id == id } }
                     ?: baseResult.heroResult.items.firstOrNull()?.id
@@ -230,6 +251,7 @@ class HomeViewModel internal constructor(
             // Run continue-watching enrichment, for-you enrichment, and catalog loading in parallel
             coroutineScope {
                 launch {
+                    val sectionLoadStartedAt = System.currentTimeMillis()
                     val continueWatchingResult = withContext(Dispatchers.IO) {
                         when (baseResult.selectedSource) {
                             WatchProvider.LOCAL -> {
@@ -258,21 +280,25 @@ class HomeViewModel internal constructor(
                         }
                     }
 
+                    delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
                     val inProgressItems = continueWatchingResult.items.filter { !it.isUpNextPlaceholder }
                     val upNextItems = continueWatchingResult.items.filter { it.isUpNextPlaceholder }
 
                     // Batch both emissions together to reduce recomposition count
                     _continueWatchingState.value = ContinueWatchingState(
                         items = inProgressItems,
+                        isLoading = false,
                         statusMessage = continueWatchingResult.statusMessage
                     )
                     _upNextState.value = UpNextState(
                         items = upNextItems,
+                        isLoading = false,
                         statusMessage = if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) "" else continueWatchingResult.statusMessage
                     )
                 }
 
                 launch {
+                    val sectionLoadStartedAt = System.currentTimeMillis()
                     val forYouResult = withContext(Dispatchers.IO) {
                         val filteredEntries = applyProviderLibrarySuppressionFilter(baseResult.providerRecommendationsResult.items)
                         if (filteredEntries.isEmpty()) {
@@ -295,8 +321,10 @@ class HomeViewModel internal constructor(
                         }
                     }
 
+                    delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
                     _forYouState.value = ForYouState(
                         items = forYouResult.items,
+                        isLoading = false,
                         statusMessage = forYouResult.statusMessage
                     )
                 }
@@ -306,11 +334,14 @@ class HomeViewModel internal constructor(
                 }
 
                 launch {
+                    val sectionLoadStartedAt = System.currentTimeMillis()
                     val thisWeekResult = withContext(Dispatchers.IO) {
                         thisWeekService.loadThisWeek(System.currentTimeMillis())
                     }
+                    delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
                     _thisWeekState.value = ThisWeekState(
                         items = thisWeekResult.items,
+                        isLoading = false,
                         statusMessage = thisWeekResult.statusMessage.orEmpty()
                     )
                 }
@@ -319,13 +350,6 @@ class HomeViewModel internal constructor(
     }
 
     private suspend fun loadCatalogSections() {
-        _catalogSectionsState.update { current ->
-            current.copy(
-                sections = emptyList(),
-                statusMessage = "Loading catalogs..."
-            )
-        }
-
         val sectionsResult = withContext(Dispatchers.IO) {
             homeCatalogService.listHomeCatalogSections()
         }
@@ -344,40 +368,47 @@ class HomeViewModel internal constructor(
         if (sections.isEmpty()) return
 
         val semaphore = Semaphore(CATALOG_CONCURRENCY_LIMIT)
-        val loadedSections = withContext(Dispatchers.IO) {
-            coroutineScope {
-                sections.map { section ->
-                    async {
+        val sectionSkeletonVisibleAt = System.currentTimeMillis()
+
+        coroutineScope {
+            sections.map { section ->
+                launch {
+                    val pageResult = withContext(Dispatchers.IO) {
                         semaphore.withPermit {
-                            val pageResult = homeCatalogService.fetchCatalogPage(
+                            homeCatalogService.fetchCatalogPage(
                                 section = section,
                                 page = 1,
                                 pageSize = 12
                             )
-                            section.key to pageResult
                         }
                     }
-                }.awaitAll()
-            }
-        }
 
-        val resultsByKey = loadedSections.toMap()
-
-        _catalogSectionsState.update { current ->
-            current.copy(
-                sections = current.sections.map { existing ->
-                    val result = resultsByKey[existing.section.key]
-                    if (result != null) {
-                        existing.copy(
-                            items = result.items,
-                            isLoading = false,
-                            statusMessage = result.statusMessage
+                    delayForMinimumSkeletonVisibility(sectionSkeletonVisibleAt)
+                    _catalogSectionsState.update { current ->
+                        current.copy(
+                            sections = current.sections.map { existing ->
+                                if (existing.section.key == section.key) {
+                                    existing.copy(
+                                        items = pageResult.items,
+                                        isLoading = false,
+                                        statusMessage = pageResult.statusMessage
+                                    )
+                                } else {
+                                    existing
+                                }
+                            }
                         )
-                    } else {
-                        existing
                     }
                 }
-            )
+            }.joinAll()
+        }
+    }
+
+    private suspend fun delayForMinimumSkeletonVisibility(visibleAtMs: Long) {
+        val elapsedMs = System.currentTimeMillis() - visibleAtMs
+        val remainingMs = SECTION_SKELETON_MIN_DURATION_MS - elapsedMs
+        if (remainingMs > 0L) {
+            delay(remainingMs)
         }
     }
 
