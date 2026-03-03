@@ -91,11 +91,6 @@ data class ProviderLibrarySnapshot(
     val items: List<ProviderLibraryItem> = emptyList()
 )
 
-data class ProviderRecommendationsResult(
-    val statusMessage: String,
-    val items: List<ProviderLibraryItem> = emptyList()
-)
-
 enum class ProviderCommentScope {
     MOVIE,
     SHOW,
@@ -257,13 +252,6 @@ interface WatchHistoryService {
         return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
     }
 
-    suspend fun listProviderRecommendations(
-        limit: Int = 20,
-        source: WatchProvider? = null
-    ): ProviderRecommendationsResult {
-        return ProviderRecommendationsResult(statusMessage = "Provider recommendations unavailable.")
-    }
-
     suspend fun getCachedProviderLibrary(
         limitPerFolder: Int = 200,
         source: WatchProvider? = null
@@ -379,13 +367,6 @@ object UnavailableWatchHistoryService : WatchHistoryService {
         source: WatchProvider?
     ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Watch history service unavailable.")
-    }
-
-    override suspend fun listProviderRecommendations(
-        limit: Int,
-        source: WatchProvider?
-    ): ProviderRecommendationsResult {
-        return ProviderRecommendationsResult(statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {

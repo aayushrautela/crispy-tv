@@ -31,8 +31,6 @@ internal interface WatchHistoryProvider {
 
     suspend fun listProviderLibrary(limitPerFolder: Int): Pair<List<ProviderLibraryFolder>, List<ProviderLibraryItem>>
 
-    suspend fun listRecommendations(limit: Int): List<ProviderLibraryItem>
-
     suspend fun fetchComments(query: ProviderCommentQuery): ProviderCommentResult {
         return ProviderCommentResult(statusMessage = "Comments unavailable.")
     }

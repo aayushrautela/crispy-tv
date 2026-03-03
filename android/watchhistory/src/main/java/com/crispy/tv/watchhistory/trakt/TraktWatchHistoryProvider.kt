@@ -72,10 +72,6 @@ internal class TraktWatchHistoryProvider(
         return fetchTraktLibrary(limitPerFolder)
     }
 
-    override suspend fun listRecommendations(limit: Int): List<ProviderLibraryItem> {
-        return fetchTraktRecommendationsMixed(limit)
-    }
-
     override suspend fun fetchComments(query: ProviderCommentQuery): ProviderCommentResult {
         if (sessionStore.traktAccessToken().isBlank() || traktClientId.isBlank()) {
             return ProviderCommentResult(statusMessage = "Trakt is not connected.")
@@ -570,62 +566,6 @@ internal class TraktWatchHistoryProvider(
         val shows = traktGetArray("/sync/ratings/shows?extended=images") ?: JSONArray()
         return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "ratings") +
             parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "ratings")
-    }
-
-    private suspend fun fetchTraktRecommendationsMixed(limit: Int): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/recommendations/movies?limit=$limit&extended=images") ?: JSONArray()
-        val shows = traktGetArray("/recommendations/shows?limit=$limit&extended=images") ?: JSONArray()
-        val movieItems = parseTraktRecommendationsArray(movies, MetadataLabMediaType.MOVIE)
-        val showItems = parseTraktRecommendationsArray(shows, MetadataLabMediaType.SERIES)
-
-        val merged = mutableListOf<ProviderLibraryItem>()
-        val maxSize = maxOf(movieItems.size, showItems.size)
-        for (index in 0 until maxSize) {
-            movieItems.getOrNull(index)?.let { merged += it }
-            if (merged.size >= limit) break
-            showItems.getOrNull(index)?.let { merged += it }
-            if (merged.size >= limit) break
-        }
-        return merged.take(limit)
-    }
-
-    private fun parseTraktRecommendationsArray(
-        array: JSONArray,
-        contentType: MetadataLabMediaType,
-    ): List<ProviderLibraryItem> {
-        return buildList {
-            for (index in 0 until array.length()) {
-                val node = array.optJSONObject(index) ?: continue
-                val media = node.optJSONObject("movie") ?: node.optJSONObject("show") ?: node
-                val contentId = normalizedContentIdFromIds(media.optJSONObject("ids"))
-                if (contentId.isEmpty()) continue
-                val title = media.optString("title").trim().ifEmpty { contentId }
-                val images = media.optJSONObject("images")
-                val posterUrl = traktPosterUrl(images)
-                val backdropUrl = traktBackdropUrl(images)
-                val rankedAt =
-                    parseIsoToEpochMs(node.optString("listed_at"))
-                        ?: parseIsoToEpochMs(node.optString("updated_at"))
-                        ?: parseIsoToEpochMs(media.optString("listed_at"))
-                        ?: parseIsoToEpochMs(media.optString("updated_at"))
-                        ?: parseIsoToEpochMs(node.optString("released"))
-                        ?: parseIsoToEpochMs(media.optString("released"))
-                        ?: (System.currentTimeMillis() - index)
-
-                add(
-                    ProviderLibraryItem(
-                        provider = WatchProvider.TRAKT,
-                        folderId = "for-you",
-                        contentId = contentId,
-                        contentType = contentType,
-                        title = title,
-                        posterUrl = posterUrl,
-                        backdropUrl = backdropUrl,
-                        addedAtEpochMs = rankedAt,
-                    )
-                )
-            }
-        }
     }
 
     private fun traktPosterUrl(images: JSONObject?): String? {

@@ -13,7 +13,6 @@ import com.crispy.tv.player.ProviderCommentResult
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.ProviderLibrarySnapshot
-import com.crispy.tv.player.ProviderRecommendationsResult
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
@@ -31,7 +30,6 @@ import com.crispy.tv.watchhistory.oauth.OAuthCallbackParser
 import com.crispy.tv.watchhistory.oauth.OAuthStateStore
 import com.crispy.tv.watchhistory.oauth.Pkce
 import com.crispy.tv.watchhistory.provider.ProviderRouter
-import com.crispy.tv.watchhistory.provider.RecommendationResolver
 import com.crispy.tv.watchhistory.provider.ContinueWatchingNormalizer
 import com.crispy.tv.watchhistory.simkl.SimklOAuthClient
 import com.crispy.tv.watchhistory.simkl.SimklService
@@ -135,14 +133,6 @@ class RemoteWatchHistoryService(
         )
     private val providerRouter = ProviderRouter(traktProvider = traktProvider, simklProvider = simklProvider)
     private val continueWatchingNormalizer = ContinueWatchingNormalizer()
-    private val recommendationResolver =
-        RecommendationResolver(
-            traktProvider = traktProvider,
-            simklProvider = simklProvider,
-            sessionStore = sessionStore,
-            traktClientId = traktClientId,
-            simklClientId = simklClientId,
-        )
 
     override fun connectProvider(
         provider: WatchProvider,
@@ -559,10 +549,6 @@ class RemoteWatchHistoryService(
             folders = folders.sortedBy { it.label.lowercase(Locale.US) },
             items = items.sortedByDescending { it.addedAtEpochMs },
         )
-    }
-
-    override suspend fun listProviderRecommendations(limit: Int, source: WatchProvider?): ProviderRecommendationsResult {
-        return recommendationResolver.listProviderRecommendations(limit = limit, source = source)
     }
 
     override suspend fun getCachedContinueWatching(limit: Int, nowMs: Long, source: WatchProvider?): ContinueWatchingResult {

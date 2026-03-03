@@ -20,14 +20,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -37,7 +35,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
@@ -65,7 +62,6 @@ internal fun HomeScreen(
     val continueWatchingState by viewModel.continueWatchingState.collectAsStateWithLifecycle()
     val upNextState by viewModel.upNextState.collectAsStateWithLifecycle()
     val thisWeekState by viewModel.thisWeekState.collectAsStateWithLifecycle()
-    val forYouState by viewModel.forYouState.collectAsStateWithLifecycle()
     val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
 
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -74,10 +70,9 @@ internal fun HomeScreen(
         remember {
             listOf(
                 "Featured",
-                "Continue",
+                "Continue Watching",
                 "Up Next",
-                "This Week",
-                "For You"
+                "This Week"
             )
         }
 
@@ -198,24 +193,6 @@ internal fun HomeScreen(
                     items = thisWeekState.items,
                     isLoading = thisWeekState.isLoading,
                     onItemClick = onThisWeekClick,
-                )
-            }
-
-            item(contentType = "forYou") {
-                HomeRailSection(
-                    title = "For You",
-                    items = forYouState.items,
-                    statusMessage = forYouState.statusMessage,
-                    actionMenuContentDescription = "For You actions",
-                    subtitleFor = {
-                        if (it.provider == WatchProvider.SIMKL) "Simkl recommendation" else "Trakt recommendation"
-                    },
-                    onItemClick = onContinueWatchingClick,
-                    onHideItem = null,
-                    onRemoveItem = null,
-                    showTitleFallbackWhenNoLogo = true,
-                    usePosterCardStyle = true,
-                    isLoading = forYouState.isLoading
                 )
             }
 

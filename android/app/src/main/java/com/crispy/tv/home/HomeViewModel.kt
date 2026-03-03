@@ -14,8 +14,6 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
-import com.crispy.tv.player.ProviderLibraryItem
-import com.crispy.tv.player.ProviderRecommendationsResult
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
@@ -60,13 +58,6 @@ data class ContinueWatchingState(
 
 @Immutable
 data class UpNextState(
-    val items: List<ContinueWatchingItem> = emptyList(),
-    val isLoading: Boolean = true,
-    val statusMessage: String = ""
-)
-
-@Immutable
-data class ForYouState(
     val items: List<ContinueWatchingItem> = emptyList(),
     val isLoading: Boolean = true,
     val statusMessage: String = ""
@@ -145,9 +136,6 @@ class HomeViewModel internal constructor(
     private val _upNextState = MutableStateFlow(UpNextState())
     val upNextState: StateFlow<UpNextState> = _upNextState.asStateFlow()
 
-    private val _forYouState = MutableStateFlow(ForYouState())
-    val forYouState: StateFlow<ForYouState> = _forYouState.asStateFlow()
-
     private val _thisWeekState = MutableStateFlow(ThisWeekState())
     val thisWeekState: StateFlow<ThisWeekState> = _thisWeekState.asStateFlow()
 
@@ -171,9 +159,6 @@ class HomeViewModel internal constructor(
                 current.copy(isLoading = true, statusMessage = "")
             }
             _upNextState.update { current ->
-                current.copy(isLoading = true, statusMessage = "")
-            }
-            _forYouState.update { current ->
                 current.copy(isLoading = true, statusMessage = "")
             }
             _thisWeekState.update { current ->
@@ -210,27 +195,10 @@ class HomeViewModel internal constructor(
                         }
                     }
 
-                    val providerRecommendationsDeferred = async {
-                        when (selectedSource) {
-                            WatchProvider.LOCAL -> {
-                                ProviderRecommendationsResult(
-                                    statusMessage = "Connect Trakt or Simkl in Settings to load For You."
-                                )
-                            }
-                            WatchProvider.TRAKT, WatchProvider.SIMKL -> {
-                                watchHistoryService.listProviderRecommendations(
-                                    limit = 20,
-                                    source = selectedSource
-                                )
-                            }
-                        }
-                    }
-
                     HomeFeedLoadResult(
                         heroResult = heroDeferred.await(),
                         watchHistoryEntries = watchHistoryDeferred.await().entries,
                         providerContinueWatchingResult = providerContinueWatchingDeferred.await(),
-                        providerRecommendationsResult = providerRecommendationsDeferred.await(),
                         selectedSource = selectedSource
                     )
                 }
@@ -248,7 +216,7 @@ class HomeViewModel internal constructor(
                 )
             }
 
-            // Run continue-watching enrichment, for-you enrichment, and catalog loading in parallel
+            // Run continue-watching enrichment and catalog loading in parallel
             coroutineScope {
                 launch {
                     val sectionLoadStartedAt = System.currentTimeMillis()
@@ -284,7 +252,6 @@ class HomeViewModel internal constructor(
                     val inProgressItems = continueWatchingResult.items.filter { !it.isUpNextPlaceholder }
                     val upNextItems = continueWatchingResult.items.filter { it.isUpNextPlaceholder }
 
-                    // Batch both emissions together to reduce recomposition count
                     _continueWatchingState.value = ContinueWatchingState(
                         items = inProgressItems,
                         isLoading = false,
@@ -293,39 +260,12 @@ class HomeViewModel internal constructor(
                     _upNextState.value = UpNextState(
                         items = upNextItems,
                         isLoading = false,
-                        statusMessage = if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) "" else continueWatchingResult.statusMessage
-                    )
-                }
-
-                launch {
-                    val sectionLoadStartedAt = System.currentTimeMillis()
-                    val forYouResult = withContext(Dispatchers.IO) {
-                        val filteredEntries = applyProviderLibrarySuppressionFilter(baseResult.providerRecommendationsResult.items)
-                        if (filteredEntries.isEmpty()) {
-                            ContinueWatchingLoadResult(
-                                items = emptyList(),
-                                statusMessage = baseResult.providerRecommendationsResult.statusMessage
-                            )
-                        } else {
-                            val loaded = homeCatalogService.loadContinueWatchingItemsFromProvider(
-                                entries = filteredEntries.map { it.toProviderContinueWatchingEntry() },
-                                limit = 20
-                            )
-                            val statusMessage =
-                                if (loaded.items.isNotEmpty()) {
-                                    ""
-                                } else {
-                                    baseResult.providerRecommendationsResult.statusMessage.ifBlank { loaded.statusMessage }
-                                }
-                            loaded.copy(statusMessage = statusMessage)
-                        }
-                    }
-
-                    delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-                    _forYouState.value = ForYouState(
-                        items = forYouResult.items,
-                        isLoading = false,
-                        statusMessage = forYouResult.statusMessage
+                        statusMessage =
+                            if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) {
+                                ""
+                            } else {
+                                continueWatchingResult.statusMessage
+                            }
                     )
                 }
 
@@ -583,34 +523,6 @@ class HomeViewModel internal constructor(
         )
     }
 
-    private fun applyProviderLibrarySuppressionFilter(entries: List<ProviderLibraryItem>): List<ProviderLibraryItem> {
-        if (entries.isEmpty()) return emptyList()
-        val suppressionMap = suppressedItemsByKey ?: return entries
-
-        var updated = false
-        val filtered = mutableListOf<ProviderLibraryItem>()
-        entries.forEach { entry ->
-            val key = continueWatchingContentKey(entry.contentType, entry.contentId)
-            val suppressedAt = suppressionMap[key]
-            if (suppressedAt == null) {
-                filtered += entry
-                return@forEach
-            }
-
-            if (entry.addedAtEpochMs > suppressedAt) {
-                suppressionMap.remove(key)
-                updated = true
-                filtered += entry
-            }
-        }
-
-        if (updated) {
-            suppressionStore.write(suppressionMap)
-        }
-
-        return filtered
-    }
-
     private fun suppressKeys(vararg keys: String) {
         val suppressionMap = suppressedItemsByKey ?: mutableMapOf<String, Long>().also { suppressedItemsByKey = it }
         val now = System.currentTimeMillis()
@@ -626,7 +538,6 @@ private data class HomeFeedLoadResult(
     val heroResult: HomeHeroLoadResult,
     val watchHistoryEntries: List<WatchHistoryEntry>,
     val providerContinueWatchingResult: ContinueWatchingResult,
-    val providerRecommendationsResult: ProviderRecommendationsResult,
     val selectedSource: WatchProvider
 )
 
@@ -686,11 +597,6 @@ private fun continueWatchingContentKey(type: String, contentId: String): String 
     return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
 }
 
-private fun continueWatchingContentKey(contentType: MetadataLabMediaType, contentId: String): String {
-    val type = if (contentType == MetadataLabMediaType.SERIES) "series" else "movie"
-    return continueWatchingContentKey(type = type, contentId = contentId)
-}
-
 private fun ContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
     return WatchHistoryRequest(
         contentId = contentId,
@@ -707,19 +613,4 @@ private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
     } else {
         MetadataLabMediaType.MOVIE
     }
-}
-
-private fun ProviderLibraryItem.toProviderContinueWatchingEntry(): ContinueWatchingEntry {
-    return ContinueWatchingEntry(
-        contentId = contentId,
-        contentType = contentType,
-        title = title,
-        season = season,
-        episode = episode,
-        progressPercent = 0.0,
-        lastUpdatedEpochMs = addedAtEpochMs,
-        provider = provider,
-        providerPlaybackId = null,
-        isUpNextPlaceholder = false
-    )
 }

@@ -148,10 +148,6 @@ internal class SimklWatchHistoryProvider(
         return folders to items
     }
 
-    override suspend fun listRecommendations(limit: Int): List<ProviderLibraryItem> {
-        return emptyList()
-    }
-
     private fun normalizeContentRequest(request: WatchHistoryRequest): NormalizedContentRequest {
         val normalizedId = normalizeNuvioMediaId(request.contentId)
         val contentId = normalizedId.contentId.trim()
