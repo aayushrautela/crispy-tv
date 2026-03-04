@@ -6,7 +6,8 @@ import java.util.Locale
 @Immutable
 data class CatalogSectionRef(
     val title: String,
-    val catalogId: String
+    val catalogId: String,
+    val subtitle: String = ""
 ) {
     val key: String
         get() = catalogId.trim().lowercase(Locale.US)
@@ -22,7 +23,8 @@ data class CatalogItem(
     val type: String,
     val rating: String? = null,
     val year: String? = null,
-    val genre: String? = null
+    val genre: String? = null,
+    val description: String? = null
 )
 
 @Immutable

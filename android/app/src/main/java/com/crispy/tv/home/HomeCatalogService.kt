@@ -149,9 +149,13 @@ class HomeCatalogService(
             )
         }
 
-        val firstList = snapshot.lists.first()
+        val heroList = snapshot.lists.firstOrNull { it.isHeroList() } ?: snapshot.lists.first()
+        val fallbackDescription =
+            heroList.subtitle
+                ?: heroList.heading
+                ?: heroList.title.ifBlank { "Recommended for you." }
         val heroItems =
-            firstList.items
+            heroList.items
                 .asSequence()
                 .mapNotNull { item ->
                     val backdrop = item.backdropUrl ?: item.posterUrl
@@ -159,7 +163,7 @@ class HomeCatalogService(
                     HomeHeroItem(
                         id = item.id,
                         title = item.title,
-                        description = firstList.title.ifBlank { "Recommended for you." },
+                        description = item.description ?: fallbackDescription,
                         rating = item.rating,
                         year = item.year,
                         genres = emptyList(),
@@ -298,7 +302,10 @@ class HomeCatalogService(
         }
 
         val targetCount = limit.coerceAtLeast(1)
-        val lists = snapshot.lists
+        val lists = snapshot.lists.filterNot { it.isHeroList() }
+        if (lists.isEmpty()) {
+            return emptyList<CatalogSectionRef>() to ""
+        }
         val limitedLists = if (targetCount >= lists.size) lists else lists.take(targetCount)
 
         val sections =
@@ -306,7 +313,8 @@ class HomeCatalogService(
                 .map { list ->
                     CatalogSectionRef(
                         title = list.title,
-                        catalogId = list.id
+                        catalogId = list.id,
+                        subtitle = list.subtitle.orEmpty()
                     )
                 }
 
@@ -333,7 +341,8 @@ class HomeCatalogService(
 
         val filteredLists =
             snapshot.lists.filter { list ->
-                normalizedType == null || list.mediaTypes.contains(normalizedType)
+                !list.isHeroList() &&
+                    (normalizedType == null || list.mediaTypes.contains(normalizedType))
             }
 
         if (filteredLists.isEmpty()) {
@@ -353,7 +362,12 @@ class HomeCatalogService(
             limitedLists
                 .map { list ->
                     DiscoverCatalogRef(
-                        section = CatalogSectionRef(title = list.title, catalogId = list.id),
+                        section =
+                            CatalogSectionRef(
+                                title = list.title,
+                                catalogId = list.id,
+                                subtitle = list.subtitle.orEmpty()
+                            ),
                         addonName = "Supabase",
                         genres = emptyList()
                     )
@@ -570,8 +584,15 @@ class HomeCatalogService(
     }
 
     private fun parseSupabaseCatalogList(obj: JSONObject): SupabaseCatalogList? {
-        val id = nonBlank(obj.optString("name")) ?: return null
-        val title = nonBlank(obj.optString("heading")) ?: id
+        val id = nonBlank(obj.optString("id")) ?: nonBlank(obj.optString("name")) ?: return null
+        val title =
+            nonBlank(obj.optString("title"))
+                ?: nonBlank(obj.optString("name"))
+                ?: nonBlank(obj.optString("heading"))
+                ?: id
+        val subtitle = nonBlank(obj.optString("subtitle"))
+        val heading = nonBlank(obj.optString("heading"))
+        val kind = nonBlank(obj.optString("kind"))
         val results = obj.optJSONArray("results")
 
         val items =
@@ -591,7 +612,10 @@ class HomeCatalogService(
 
         return SupabaseCatalogList(
             id = id,
+            kind = kind,
             title = title,
+            subtitle = subtitle,
+            heading = heading,
             items = items,
             mediaTypes = mediaTypes
         )
@@ -632,7 +656,8 @@ class HomeCatalogService(
             type = type,
             rating = rating,
             year = null,
-            genre = null
+            genre = null,
+            description = nonBlank(obj.optString("reason"))
         )
     }
 
@@ -679,10 +704,21 @@ class HomeCatalogService(
 
     private data class SupabaseCatalogList(
         val id: String,
+        val kind: String?,
         val title: String,
+        val subtitle: String?,
+        val heading: String?,
         val items: List<CatalogItem>,
         val mediaTypes: Set<String>,
     )
+
+    private fun SupabaseCatalogList.isHeroList(): Boolean {
+        val normalizedId = id.trim().lowercase(Locale.US)
+        val normalizedKind = kind?.trim()?.lowercase(Locale.US)
+        return normalizedId == HERO_LIST_ID ||
+            normalizedId.startsWith("hero.") ||
+            normalizedKind?.contains("hero") == true
+    }
 
     private suspend fun resolveContinueWatchingMeta(entry: WatchHistoryEntry): ContinueWatchingMeta? {
         val rawId = entry.contentId.trim()
@@ -783,6 +819,7 @@ class HomeCatalogService(
     companion object {
         private const val TAG = "HomeCatalogService"
         private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
+        private const val HERO_LIST_ID = "hero.shelf"
 
         private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
