@@ -66,14 +66,14 @@ internal fun HomeScreen(
 
     val horizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val headerChips =
-        remember {
-            listOf(
-                "Featured",
-                "Continue Watching",
-                "Up Next",
-                "This Week"
-            )
+    val headerSections =
+        remember(catalogSectionsState.sections) {
+            catalogSectionsState.sections
+                .asSequence()
+                .map { it.section }
+                .filter { it.title.trim().isNotEmpty() }
+                .distinctBy { it.key }
+                .toList()
         }
 
     Scaffold(
@@ -103,16 +103,18 @@ internal fun HomeScreen(
                             HomeProfileSelector(onClick = onProfileClick)
                         }
 
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(headerChips, key = { it }) { chipLabel ->
-                                FilterChip(
-                                    selected = false,
-                                    onClick = {},
-                                    label = { Text(chipLabel) }
-                                )
+                        if (headerSections.isNotEmpty()) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(headerSections, key = { it.key }) { section ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { onCatalogSeeAllClick(section) },
+                                        label = { Text(section.title) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -194,20 +196,6 @@ internal fun HomeScreen(
                     isLoading = thisWeekState.isLoading,
                     onItemClick = onThisWeekClick,
                 )
-            }
-
-            if (catalogSectionsState.sections.isNotEmpty()) {
-                items(
-                    items = catalogSectionsState.sections,
-                    key = { it.section.key },
-                    contentType = { "catalogSection" }
-                ) { sectionUi ->
-                    HomeCatalogSectionRow(
-                        sectionUi = sectionUi,
-                        onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
-                        onItemClick = onCatalogItemClick
-                    )
-                }
             }
         }
     }

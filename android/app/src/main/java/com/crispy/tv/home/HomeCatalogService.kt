@@ -404,7 +404,7 @@ class HomeCatalogService(
 
         val attempted =
             listOf(
-                "supabase:profile_recommendations:${snapshot.profileId.orEmpty()}:${list.id}:page=$targetPage"
+                "supabase:rpc:get_global_lists_feed:${snapshot.profileId.orEmpty()}:${list.id}:page=$targetPage"
             )
 
         val allItems = list.items
@@ -501,20 +501,22 @@ class HomeCatalogService(
 
         val url =
             runCatching {
-                "$supabaseBaseUrl/rest/v1/profile_recommendations".toHttpUrl().newBuilder()
-                    .addQueryParameter("select", "lists")
-                    .addQueryParameter("profile_id", "eq.$profileId")
-                    .addQueryParameter("order", "generated_at.desc")
-                    .addQueryParameter("limit", "1")
-                    .build()
+                "$supabaseBaseUrl/rest/v1/rpc/get_global_lists_feed".toHttpUrl()
             }.getOrElse { error ->
                 return emptyList<SupabaseCatalogList>() to (error.message ?: "Invalid Supabase URL.")
             }
 
+        val payload =
+            JSONObject()
+                .put("p_profile_id", profileId.trim())
+                .put("p_limit", SUPABASE_GLOBAL_LISTS_LIMIT)
+                .toString()
+
         val response =
             runCatching {
-                httpClient.get(
+                httpClient.postJson(
                     url = url,
+                    jsonBody = payload,
                     headers = supabaseAuthHeaders(accessToken),
                     callTimeoutMs = 12_000L,
                 )
@@ -570,9 +572,34 @@ class HomeCatalogService(
     }
 
     private fun parseSupabaseCatalogLists(body: String): List<SupabaseCatalogList> {
-        val rows = JSONArray(body)
-        val row = rows.optJSONObject(0) ?: return emptyList()
-        val lists = row.optJSONArray("lists") ?: return emptyList()
+        val trimmed = body.trim()
+        if (trimmed.isEmpty() || trimmed.equals("null", ignoreCase = true)) {
+            return emptyList()
+        }
+
+        val lists =
+            when {
+                trimmed.startsWith("[") -> {
+                    val arr = JSONArray(trimmed)
+                    val nested =
+                        arr.optJSONObject(0)?.let { first ->
+                            first.optJSONArray("lists")
+                                ?: first.optJSONArray("get_global_lists_feed")
+                                ?: first.optJSONArray("feed")
+                        }
+                    nested ?: arr
+                }
+
+                trimmed.startsWith("{") -> {
+                    val obj = JSONObject(trimmed)
+                    obj.optJSONArray("lists")
+                        ?: obj.optJSONArray("get_global_lists_feed")
+                        ?: obj.optJSONArray("feed")
+                        ?: JSONArray().apply { put(obj) }
+                }
+
+                else -> return emptyList()
+            }
 
         val parsed = mutableListOf<SupabaseCatalogList>()
         for (index in 0 until lists.length()) {
@@ -584,7 +611,12 @@ class HomeCatalogService(
     }
 
     private fun parseSupabaseCatalogList(obj: JSONObject): SupabaseCatalogList? {
-        val id = nonBlank(obj.optString("id")) ?: nonBlank(obj.optString("name")) ?: return null
+        val kind = nonBlank(obj.optString("kind"))
+        val id =
+            nonBlank(obj.optString("id"))
+                ?: nonBlank(obj.optString("name"))
+                ?: kind
+                ?: return null
         val title =
             nonBlank(obj.optString("title"))
                 ?: nonBlank(obj.optString("name"))
@@ -592,7 +624,6 @@ class HomeCatalogService(
                 ?: id
         val subtitle = nonBlank(obj.optString("subtitle"))
         val heading = nonBlank(obj.optString("heading"))
-        val kind = nonBlank(obj.optString("kind"))
         val results = obj.optJSONArray("results")
 
         val items =
@@ -823,6 +854,7 @@ class HomeCatalogService(
 
         private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
+        private const val SUPABASE_GLOBAL_LISTS_LIMIT = 50
     }
 }
 
