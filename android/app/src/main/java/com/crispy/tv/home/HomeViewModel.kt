@@ -30,7 +30,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Locale
@@ -88,6 +91,7 @@ class HomeViewModel internal constructor(
     private val suppressionStore: ContinueWatchingSuppressionStore
 ) : ViewModel() {
     companion object {
+        private const val CATALOG_CONCURRENCY_LIMIT = 6
         private const val SECTION_SKELETON_MIN_DURATION_MS = 450L
 
         fun factory(context: Context): ViewModelProvider.Factory {
@@ -295,10 +299,48 @@ class HomeViewModel internal constructor(
         _catalogSectionsState.update { current ->
             current.copy(
                 sections = sections.map { section ->
-                    HomeCatalogSectionUi(section = section, isLoading = false)
+                    HomeCatalogSectionUi(section = section)
                 },
                 statusMessage = statusMessage
             )
+        }
+
+        if (sections.isEmpty()) return
+
+        val semaphore = Semaphore(CATALOG_CONCURRENCY_LIMIT)
+        val sectionSkeletonVisibleAt = System.currentTimeMillis()
+
+        coroutineScope {
+            sections.map { section ->
+                launch {
+                    val pageResult = withContext(Dispatchers.IO) {
+                        semaphore.withPermit {
+                            homeCatalogService.fetchCatalogPage(
+                                section = section,
+                                page = 1,
+                                pageSize = 12
+                            )
+                        }
+                    }
+
+                    delayForMinimumSkeletonVisibility(sectionSkeletonVisibleAt)
+                    _catalogSectionsState.update { current ->
+                        current.copy(
+                            sections = current.sections.map { existing ->
+                                if (existing.section.key == section.key) {
+                                    existing.copy(
+                                        items = pageResult.items,
+                                        isLoading = false,
+                                        statusMessage = pageResult.statusMessage
+                                    )
+                                } else {
+                                    existing
+                                }
+                            }
+                        )
+                    }
+                }
+            }.joinAll()
         }
     }
 

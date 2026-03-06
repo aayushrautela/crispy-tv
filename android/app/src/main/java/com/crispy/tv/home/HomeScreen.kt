@@ -197,6 +197,20 @@ internal fun HomeScreen(
                     onItemClick = onThisWeekClick,
                 )
             }
+
+            if (catalogSectionsState.sections.isNotEmpty()) {
+                items(
+                    items = catalogSectionsState.sections,
+                    key = { it.section.key },
+                    contentType = { "catalogSection" }
+                ) { sectionUi ->
+                    HomeCatalogSectionRow(
+                        sectionUi = sectionUi,
+                        onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
+                        onItemClick = onCatalogItemClick
+                    )
+                }
+            }
         }
     }
 }
