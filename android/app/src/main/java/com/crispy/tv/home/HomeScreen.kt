@@ -2,7 +2,6 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,42 +86,22 @@ internal fun HomeScreen(
         topBar = {
             StandardTopAppBar(
                 title = {
-                    Column(
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CrispyWordmark(Modifier.height(36.dp))
+                        CrispyWordmark(Modifier.height(36.dp))
 
-                            Box(modifier = Modifier.weight(1f))
+                        Box(modifier = Modifier.weight(1f))
 
-                            IconButton(onClick = onSearchClick) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Search,
-                                    contentDescription = "Search"
-                                )
-                            }
-
-                            HomeProfileSelector(onClick = onProfileClick)
+                        IconButton(onClick = onSearchClick) {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = "Search"
+                            )
                         }
 
-                        if (headerSections.isNotEmpty()) {
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(headerSections, key = { it.key }) { section ->
-                                    FilterChip(
-                                        selected = false,
-                                        onClick = { onCatalogSeeAllClick(section) },
-                                        label = { Text(section.title) }
-                                    )
-                                }
-                            }
-                        }
+                        HomeProfileSelector(onClick = onProfileClick)
                     }
                 },
                 scrollBehavior = scrollBehavior
@@ -139,6 +118,15 @@ internal fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
+            if (headerSections.isNotEmpty()) {
+                item(contentType = "headerSections") {
+                    HomeHeaderSectionChips(
+                        sections = headerSections,
+                        onSectionClick = onCatalogSeeAllClick
+                    )
+                }
+            }
+
             item(contentType = "hero") {
                 when {
                     heroState.isLoading && heroState.items.isEmpty() -> {
@@ -243,6 +231,25 @@ internal fun HomeScreen(
 }
 
 private const val COLLECTION_CATALOG_PREFIX = "tmdb.collection."
+
+@Composable
+private fun HomeHeaderSectionChips(
+    sections: List<CatalogSectionRef>,
+    onSectionClick: (CatalogSectionRef) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(sections, key = { it.key }) { section ->
+            FilterChip(
+                selected = false,
+                onClick = { onSectionClick(section) },
+                label = { Text(section.title) }
+            )
+        }
+    }
+}
 
 @Composable
 private fun HomeProfileSelector(onClick: () -> Unit) {
