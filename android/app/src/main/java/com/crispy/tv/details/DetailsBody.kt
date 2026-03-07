@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
@@ -740,7 +741,7 @@ private fun TmdbReviewCard(
     onClick: () -> Unit
 ) {
     ElevatedCard(
-        modifier = modifier,
+        modifier = modifier.height(168.dp),
         onClick = onClick,
         colors =
             CardDefaults.elevatedCardColors(
@@ -748,7 +749,9 @@ private fun TmdbReviewCard(
             )
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
@@ -782,20 +785,27 @@ private fun TmdbReviewCard(
                 }
             }
 
-            Text(
-                text = review.content.replace("\n", " ").trim(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            review.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = createdAt.take(10),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = review.content.replace("\n", " ").trim(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
                 )
+
+                review.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
+                    Text(
+                        text = createdAt.take(10),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
