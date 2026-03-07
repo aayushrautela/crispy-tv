@@ -175,7 +175,7 @@ internal fun DetailsScreen(
             ) {
                 item {
                     HeroSection(
-                        details = visibleDetails,
+                        details = details,
                         palette = palette,
                         trailerKey = trailerKey,
                         showTrailer = showTrailer,
