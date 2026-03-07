@@ -107,11 +107,11 @@ internal fun HomeRailSection(
             ) {
                 if (isLoading && items.isEmpty()) {
                     if (usePosterCardStyle) {
-                        items(10) {
+                        items(HOME_POSTER_SKELETON_COUNT) {
                             HomeRailPosterSkeletonCard()
                         }
                     } else {
-                        items(6) {
+                        items(HOME_WIDE_SKELETON_COUNT) {
                             HomeRailSkeletonCard()
                         }
                     }
@@ -155,19 +155,19 @@ private fun HomeRailSkeletonCard() {
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .skeletonElement(shape = RoundedCornerShape(16.dp))
+                .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false)
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.7f)
                 .height(16.dp)
-                .skeletonElement()
+                .skeletonElement(pulse = false)
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.45f)
                 .height(12.dp)
-                .skeletonElement()
+                .skeletonElement(pulse = false)
         )
     }
 }
@@ -178,7 +178,7 @@ private fun HomeRailPosterSkeletonCard() {
         modifier = Modifier
             .width(124.dp)
             .aspectRatio(2f / 3f)
-            .skeletonElement(shape = RoundedCornerShape(8.dp))
+            .skeletonElement(shape = RoundedCornerShape(8.dp), pulse = false)
     )
 }
 
@@ -554,20 +554,20 @@ internal fun HomeCatalogSectionRow(
             contentPadding = PaddingValues(0.dp)
         ) {
             if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
-                items(10) {
+                items(HOME_POSTER_SKELETON_COUNT) {
                     Column(modifier = Modifier.width(124.dp)) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(2f / 3f)
-                                .skeletonElement()
+                                .skeletonElement(pulse = false)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(14.dp)
-                                .skeletonElement()
+                                .skeletonElement(pulse = false)
                         )
                     }
                 }
@@ -725,7 +725,7 @@ private fun HomeCollectionCard(
                 when {
                     sectionUi.isLoading && sectionUi.items.isEmpty() -> {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            repeat(COLLECTION_PREVIEW_ITEM_COUNT) {
+                            repeat(HOME_COLLECTION_SKELETON_ROW_COUNT) {
                                 HomeCollectionMovieSkeletonRow()
                             }
                         }
@@ -879,19 +879,19 @@ private fun HomeCollectionMovieSkeletonRow() {
             modifier = Modifier
                 .width(40.dp)
                 .aspectRatio(2f / 3f)
-                .skeletonElement(shape = RoundedCornerShape(10.dp))
+                .skeletonElement(shape = RoundedCornerShape(10.dp), pulse = false)
         )
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(16.dp)
-                .skeletonElement()
+                .skeletonElement(pulse = false)
         )
         Box(
             modifier = Modifier
                 .width(48.dp)
                 .height(16.dp)
-                .skeletonElement(shape = RoundedCornerShape(999.dp))
+                .skeletonElement(shape = RoundedCornerShape(999.dp), pulse = false)
         )
     }
 }
@@ -904,6 +904,10 @@ private fun collectionMovieCountLabel(itemCount: Int): String? {
     }
 }
 
+private const val HOME_WIDE_SKELETON_COUNT = 3
+private const val HOME_POSTER_SKELETON_COUNT = 5
+private const val HOME_COLLECTION_SKELETON_ROW_COUNT = 2
+private const val HOME_THIS_WEEK_SKELETON_COUNT = 5
 private const val COLLECTION_PREVIEW_ITEM_COUNT = 3
 
 @Composable
@@ -1069,7 +1073,7 @@ internal fun ThisWeekSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (isLoading && items.isEmpty()) {
-                items(8) {
+                items(HOME_THIS_WEEK_SKELETON_COUNT) {
                     ThisWeekCardSkeleton()
                 }
             } else {
@@ -1091,25 +1095,25 @@ private fun ThisWeekCardSkeleton() {
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .skeletonElement(shape = RoundedCornerShape(8.dp))
+                .skeletonElement(shape = RoundedCornerShape(8.dp), pulse = false)
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.8f)
                 .height(12.dp)
-                .skeletonElement()
+                .skeletonElement(pulse = false)
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.45f)
                 .height(10.dp)
-                .skeletonElement()
+                .skeletonElement(pulse = false)
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.65f)
                 .height(10.dp)
-                .skeletonElement()
+                .skeletonElement(pulse = false)
         )
     }
 }
@@ -1210,7 +1214,7 @@ internal fun HomeHeroSkeleton() {
         modifier = Modifier
             .fillMaxWidth()
             .height(320.dp)
-            .skeletonElement(shape = RoundedCornerShape(28.dp))
+            .skeletonElement(shape = RoundedCornerShape(28.dp), pulse = false)
     )
 }
 
