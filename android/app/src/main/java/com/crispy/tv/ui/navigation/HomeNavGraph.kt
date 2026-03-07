@@ -31,8 +31,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onProfileClick = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
             },
-            onCatalogItemClick = { catalogItem ->
-                navController.navigate(AppRoutes.homeDetailsRoute(catalogItem.id, catalogItem.type))
+            onCatalogItemClick = { item ->
+                navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
             },
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))

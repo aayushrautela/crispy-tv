@@ -77,6 +77,12 @@ data class CatalogSectionsState(
 )
 
 @Immutable
+data class CatalogHeaderSectionsState(
+    val sections: List<CatalogSectionRef> = emptyList(),
+    val statusMessage: String = ""
+)
+
+@Immutable
 data class HomeCatalogSectionUi(
     val section: CatalogSectionRef,
     val items: List<CatalogItem> = emptyList(),
@@ -142,15 +148,18 @@ class HomeViewModel internal constructor(
     private val _catalogSectionsState = MutableStateFlow(CatalogSectionsState())
     val catalogSectionsState: StateFlow<CatalogSectionsState> = _catalogSectionsState.asStateFlow()
 
+    private val _headerCatalogSectionsState = MutableStateFlow(CatalogHeaderSectionsState())
+    val headerCatalogSectionsState: StateFlow<CatalogHeaderSectionsState> = _headerCatalogSectionsState.asStateFlow()
+
     private var suppressedItemsByKey: MutableMap<String, Long>? = null
-    private var catalogSectionsJob: Job? = null
+    private var catalogContentJob: Job? = null
 
     init {
         refresh()
     }
 
     fun refresh() {
-        catalogSectionsJob?.cancel()
+        catalogContentJob?.cancel()
         viewModelScope.launch {
             val homeRefreshStartedAt = System.currentTimeMillis()
 
@@ -164,6 +173,8 @@ class HomeViewModel internal constructor(
             _thisWeekState.update { current ->
                 current.copy(isLoading = true, statusMessage = "")
             }
+            _catalogSectionsState.value = CatalogSectionsState()
+            _headerCatalogSectionsState.value = CatalogHeaderSectionsState()
 
             val baseResult = withContext(Dispatchers.IO) {
                 val suppressionMap = suppressionStore.read()
@@ -269,8 +280,15 @@ class HomeViewModel internal constructor(
                     )
                 }
 
-                catalogSectionsJob = launch {
-                    loadCatalogSections()
+                catalogContentJob = launch {
+                    coroutineScope {
+                        launch {
+                            loadCatalogSections()
+                        }
+                        launch {
+                            loadHeaderCatalogSections()
+                        }
+                    }
                 }
 
                 launch {
@@ -305,10 +323,12 @@ class HomeViewModel internal constructor(
             )
         }
 
-        if (sections.isEmpty()) return
+        if (sections.isEmpty()) {
+            return
+        }
 
+        val sectionLoadStartedAt = System.currentTimeMillis()
         val semaphore = Semaphore(CATALOG_CONCURRENCY_LIMIT)
-        val sectionSkeletonVisibleAt = System.currentTimeMillis()
 
         coroutineScope {
             sections.map { section ->
@@ -323,7 +343,7 @@ class HomeViewModel internal constructor(
                         }
                     }
 
-                    delayForMinimumSkeletonVisibility(sectionSkeletonVisibleAt)
+                    delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
                     _catalogSectionsState.update { current ->
                         current.copy(
                             sections = current.sections.map { existing ->
@@ -342,6 +362,16 @@ class HomeViewModel internal constructor(
                 }
             }.joinAll()
         }
+    }
+
+    private suspend fun loadHeaderCatalogSections() {
+        val sectionsResult = withContext(Dispatchers.IO) {
+            homeCatalogService.listGlobalCatalogSections()
+        }
+        _headerCatalogSectionsState.value = CatalogHeaderSectionsState(
+            sections = sectionsResult.first,
+            statusMessage = sectionsResult.second
+        )
     }
 
     private suspend fun delayForMinimumSkeletonVisibility(visibleAtMs: Long) {

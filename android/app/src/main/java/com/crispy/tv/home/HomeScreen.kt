@@ -63,14 +63,14 @@ internal fun HomeScreen(
     val upNextState by viewModel.upNextState.collectAsStateWithLifecycle()
     val thisWeekState by viewModel.thisWeekState.collectAsStateWithLifecycle()
     val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
+    val headerCatalogSectionsState by viewModel.headerCatalogSectionsState.collectAsStateWithLifecycle()
 
     val horizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val headerSections =
-        remember(catalogSectionsState.sections) {
-            catalogSectionsState.sections
+        remember(headerCatalogSectionsState.sections) {
+            headerCatalogSectionsState.sections
                 .asSequence()
-                .map { it.section }
                 .filter { it.title.trim().isNotEmpty() }
                 .distinctBy { it.key }
                 .toList()
@@ -196,6 +196,17 @@ internal fun HomeScreen(
                     isLoading = thisWeekState.isLoading,
                     onItemClick = onThisWeekClick,
                 )
+            }
+
+            if (catalogSectionsState.sections.isEmpty() && catalogSectionsState.statusMessage.isNotBlank()) {
+                item(contentType = "catalogStatus") {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = catalogSectionsState.statusMessage,
+                            modifier = Modifier.padding(Dimensions.CardInternalPadding)
+                        )
+                    }
+                }
             }
 
             if (catalogSectionsState.sections.isNotEmpty()) {
