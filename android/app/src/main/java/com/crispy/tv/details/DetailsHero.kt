@@ -60,6 +60,7 @@ import coil.compose.AsyncImage
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.metadata.tmdb.TmdbApi
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
@@ -77,15 +78,20 @@ internal fun HeroSection(
     onToggleTrailerMute: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
     val heroHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(340.dp, 520.dp)
+    val screenWidthPx = remember(configuration.screenWidthDp, density) {
+        with(density) { configuration.screenWidthDp.dp.toPx() }
+    }
+    val backdropSize = if (screenWidthPx > 1280f) "original" else "w1280"
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(heroHeight)
     ) {
-        val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+        val heightPx = with(density) { maxHeight.toPx() }
 
         if (details == null) {
             Box(
@@ -133,7 +139,10 @@ internal fun HeroSection(
             return@BoxWithConstraints
         }
 
-        val imageUrl = details.backdropUrl ?: details.posterUrl
+        val imageUrl = remember(details.backdropUrl, details.posterUrl, backdropSize) {
+            details.backdropUrl?.let { TmdbApi.resizedImageUrl(it, size = backdropSize) }
+                ?: details.posterUrl
+        }
         if (!imageUrl.isNullOrBlank()) {
             AsyncImage(
                 model = imageUrl,

@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.metadata.tmdb.TmdbApi
 import java.util.Locale
 
 import com.crispy.tv.ui.components.skeletonElement
@@ -915,6 +916,9 @@ internal fun HomeHeroCarousel(
             .height(320.dp)
     ) { index ->
             val item = items[index]
+            val heroBackdropUrl = remember(item.backdropUrl) {
+                TmdbApi.resizedImageUrl(item.backdropUrl, size = "w1280")
+            }
 
             Box(
                 modifier = Modifier
@@ -923,7 +927,7 @@ internal fun HomeHeroCarousel(
                     .clickable { onItemClick(item) }
             ) {
                 AsyncImage(
-                    model = item.backdropUrl,
+                    model = heroBackdropUrl ?: item.backdropUrl,
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

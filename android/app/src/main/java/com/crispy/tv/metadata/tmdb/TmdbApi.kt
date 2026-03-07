@@ -11,6 +11,19 @@ internal object TmdbApi {
         return "$IMAGE_BASE_URL$size$normalized"
     }
 
+    fun resizedImageUrl(url: String?, size: String): String? {
+        val trimmed = url?.trim().orEmpty()
+        if (trimmed.isBlank()) return null
+        if (!trimmed.startsWith(IMAGE_BASE_URL)) return trimmed
+
+        val relativePath = trimmed.removePrefix(IMAGE_BASE_URL)
+        val firstSlash = relativePath.indexOf('/')
+        if (firstSlash <= 0 || firstSlash == relativePath.lastIndex) return trimmed
+
+        val path = relativePath.substring(firstSlash)
+        return "$IMAGE_BASE_URL$size$path"
+    }
+
     fun youtubeWatchUrl(key: String?): String? {
         val trimmed = key?.trim().orEmpty()
         if (trimmed.isBlank()) return null
