@@ -75,6 +75,12 @@ internal fun HomeScreen(
                 .distinctBy { it.key }
                 .toList()
         }
+    val (collectionSections, standardCatalogSections) =
+        remember(catalogSectionsState.sections) {
+            catalogSectionsState.sections.partition {
+                it.section.catalogId.startsWith(COLLECTION_CATALOG_PREFIX, ignoreCase = true)
+            }
+        }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -198,6 +204,16 @@ internal fun HomeScreen(
                 )
             }
 
+            if (collectionSections.isNotEmpty()) {
+                item(contentType = "collections") {
+                    HomeCollectionSectionRow(
+                        sections = collectionSections,
+                        onCollectionClick = onCatalogSeeAllClick,
+                        onItemClick = onCatalogItemClick
+                    )
+                }
+            }
+
             if (catalogSectionsState.sections.isEmpty() && catalogSectionsState.statusMessage.isNotBlank()) {
                 item(contentType = "catalogStatus") {
                     Card(modifier = Modifier.fillMaxWidth()) {
@@ -211,7 +227,7 @@ internal fun HomeScreen(
 
             if (catalogSectionsState.sections.isNotEmpty()) {
                 items(
-                    items = catalogSectionsState.sections,
+                    items = standardCatalogSections,
                     key = { it.section.key },
                     contentType = { "catalogSection" }
                 ) { sectionUi ->
@@ -225,6 +241,8 @@ internal fun HomeScreen(
         }
     }
 }
+
+private const val COLLECTION_CATALOG_PREFIX = "tmdb.collection."
 
 @Composable
 private fun HomeProfileSelector(onClick: () -> Unit) {

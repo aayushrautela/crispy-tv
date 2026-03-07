@@ -35,6 +35,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
@@ -65,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.metadata.tmdb.TmdbApi
 import java.util.Locale
 
@@ -580,6 +583,328 @@ internal fun HomeCatalogSectionRow(
     }
 
 }
+
+@Composable
+internal fun HomeCollectionSectionRow(
+    sections: List<HomeCatalogSectionUi>,
+    onCollectionClick: (CatalogSectionRef) -> Unit,
+    onItemClick: (CatalogItem) -> Unit
+) {
+    val visibleSections =
+        remember(sections) {
+            sections.filter {
+                it.isLoading || it.items.isNotEmpty() || it.statusMessage.isNotBlank()
+            }
+        }
+
+    if (visibleSections.isEmpty()) {
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        HomeRailHeader(
+            title = "Collections",
+            statusMessage = ""
+        )
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            items(visibleSections, key = { it.section.key }) { sectionUi ->
+                HomeCollectionCard(
+                    sectionUi = sectionUi,
+                    onCollectionClick = { onCollectionClick(sectionUi.section) },
+                    onItemClick = onItemClick
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCollectionCard(
+    sectionUi: HomeCatalogSectionUi,
+    onCollectionClick: () -> Unit,
+    onItemClick: (CatalogItem) -> Unit
+) {
+    val previewItems = remember(sectionUi.items) { sectionUi.items.take(COLLECTION_PREVIEW_ITEM_COUNT) }
+    val firstMovie = previewItems.firstOrNull() ?: sectionUi.items.firstOrNull()
+    val artworkUrl =
+        remember(sectionUi.items) {
+            sectionUi.items.firstNotNullOfOrNull { item ->
+                item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
+            }
+        }
+
+    Card(modifier = Modifier.width(320.dp)) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+            ) {
+                if (!artworkUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = artworkUrl,
+                        contentDescription = sectionUi.section.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.08f),
+                                    Color.Black.copy(alpha = 0.78f)
+                                )
+                            )
+                        )
+                )
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = sectionUi.section.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size)
+                    if (movieCountLabel != null) {
+                        Text(
+                            text = movieCountLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.86f)
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                ) {
+                    if (sectionUi.section.subtitle.isNotBlank()) {
+                        Text(
+                            text = sectionUi.section.subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
+                when {
+                    sectionUi.isLoading && sectionUi.items.isEmpty() -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            repeat(COLLECTION_PREVIEW_ITEM_COUNT) {
+                                HomeCollectionMovieSkeletonRow()
+                            }
+                        }
+                    }
+
+                    previewItems.isNotEmpty() -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            repeat(COLLECTION_PREVIEW_ITEM_COUNT) { index ->
+                                val item = previewItems.getOrNull(index)
+                                if (item != null) {
+                                    HomeCollectionMovieRow(
+                                        item = item,
+                                        onClick = { onItemClick(item) }
+                                    )
+                                } else {
+                                    Spacer(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(72.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    else -> {
+                        Text(
+                            text = sectionUi.statusMessage.ifBlank { "No titles available yet." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilledTonalButton(
+                        onClick = onCollectionClick,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Collection")
+                    }
+
+                    OutlinedButton(
+                        onClick = { firstMovie?.let(onItemClick) },
+                        modifier = Modifier.weight(1f),
+                        enabled = firstMovie != null
+                    ) {
+                        Text("First Movie")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCollectionMovieRow(
+    item: CatalogItem,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(10.dp))
+            ) {
+                if (!item.posterUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = item.posterUrl,
+                        contentDescription = item.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface)
+                    )
+                }
+            }
+
+            Text(
+                text = item.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            item.rating
+                ?.takeIf { it.isNotBlank() }
+                ?.let { rating ->
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = Color(0xFFFFC107)
+                            )
+                            Text(
+                                text = rating,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+        }
+    }
+}
+
+@Composable
+private fun HomeCollectionMovieSkeletonRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(40.dp)
+                .aspectRatio(2f / 3f)
+                .skeletonElement(shape = RoundedCornerShape(10.dp))
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(16.dp)
+                .skeletonElement()
+        )
+        Box(
+            modifier = Modifier
+                .width(48.dp)
+                .height(16.dp)
+                .skeletonElement(shape = RoundedCornerShape(999.dp))
+        )
+    }
+}
+
+private fun collectionMovieCountLabel(itemCount: Int): String? {
+    return when {
+        itemCount <= 0 -> null
+        itemCount == 1 -> "1 movie"
+        else -> "$itemCount movies"
+    }
+}
+
+private const val COLLECTION_PREVIEW_ITEM_COUNT = 3
 
 @Composable
 private fun HomeRailPosterCard(
