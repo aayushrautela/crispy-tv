@@ -11,20 +11,8 @@ import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.catalog.DiscoverCatalogRef
 import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.metadata.tmdb.TmdbApi
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
-import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
-import com.crispy.tv.player.WatchHistoryEntry
-import com.crispy.tv.player.WatchProvider
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.sync.Semaphore
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
@@ -51,28 +39,10 @@ data class HomeHeroLoadResult(
 )
 
 @Immutable
-data class ContinueWatchingItem(
-    val id: String,
-    val contentId: String,
-    val title: String,
-    val season: Int?,
-    val episode: Int?,
-    val watchedAtEpochMs: Long,
-    val progressPercent: Double,
-    val provider: WatchProvider,
-    val providerPlaybackId: String?,
-    val isUpNextPlaceholder: Boolean = false,
-    val backdropUrl: String?,
-    val posterUrl: String?,
-    val logoUrl: String?,
-    val addonId: String?,
-    val type: String
-)
-
-@Immutable
-data class ContinueWatchingLoadResult(
-    val items: List<ContinueWatchingItem> = emptyList(),
-    val statusMessage: String = ""
+data class HomePersonalFeedLoadResult(
+    val heroResult: HomeHeroLoadResult = HomeHeroLoadResult(),
+    val sections: List<CatalogSectionRef> = emptyList(),
+    val sectionsStatusMessage: String = "",
 )
 
 data class MediaDetails(
@@ -111,8 +81,6 @@ class HomeCatalogService(
     private val httpClient: CrispyHttpClient,
     supabaseUrl: String,
     supabaseAnonKey: String,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository =
-        TmdbEnrichmentRepositoryProvider.get(context),
 ) {
     private val appContext = context.applicationContext
 
@@ -128,28 +96,54 @@ class HomeCatalogService(
         )
     private val activeProfileStore = ActiveProfileStore(appContext)
 
-    private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
-    private val metaResolveSemaphore = Semaphore(6)
-
-    private val recommendationsCacheLock = Any()
+    private val catalogCacheLock = Any()
     private val personalCatalogCache = SupabaseCatalogCache()
     private val globalCatalogCache = SupabaseCatalogCache()
 
-    suspend fun loadHeroItems(limit: Int = 10): HomeHeroLoadResult {
-        val targetCount = limit.coerceAtLeast(1)
-
+    suspend fun loadPersonalHomeFeed(
+        heroLimit: Int = 10,
+        sectionLimit: Int = Int.MAX_VALUE,
+    ): HomePersonalFeedLoadResult {
         val snapshot =
             loadSupabaseCatalogSnapshot(
                 forceRefresh = false,
-                source = SupabaseCatalogSource.PERSONAL
+                source = SupabaseCatalogSource.PERSONAL,
             )
         if (snapshot.lists.isEmpty()) {
-            return HomeHeroLoadResult(
-                items = emptyList(),
-                statusMessage = snapshot.statusMessage
+            return HomePersonalFeedLoadResult(
+                heroResult = HomeHeroLoadResult(statusMessage = snapshot.statusMessage),
+                sections = emptyList(),
+                sectionsStatusMessage = snapshot.statusMessage,
             )
         }
 
+        val heroResult = buildHeroResult(snapshot = snapshot, limit = heroLimit)
+        val sections = buildCatalogSections(snapshot.lists, SupabaseCatalogSource.PERSONAL, sectionLimit)
+        return HomePersonalFeedLoadResult(
+            heroResult = heroResult,
+            sections = sections,
+            sectionsStatusMessage = "",
+        )
+    }
+
+    suspend fun loadGlobalHeaderSections(limit: Int = Int.MAX_VALUE): List<CatalogSectionRef> {
+        val snapshot =
+            loadSupabaseCatalogSnapshot(
+                forceRefresh = false,
+                source = SupabaseCatalogSource.GLOBAL,
+            )
+        if (snapshot.lists.isEmpty()) {
+            return emptyList()
+        }
+
+        return buildCatalogSections(snapshot.lists, SupabaseCatalogSource.GLOBAL, limit)
+    }
+
+    private fun buildHeroResult(
+        snapshot: SupabaseCatalogSnapshot,
+        limit: Int,
+    ): HomeHeroLoadResult {
+        val targetCount = limit.coerceAtLeast(1)
         val heroList = snapshot.lists.firstOrNull { it.isHeroList() } ?: snapshot.lists.first()
         val fallbackDescription =
             heroList.subtitle
@@ -179,157 +173,11 @@ class HomeCatalogService(
         if (heroItems.isEmpty()) {
             return HomeHeroLoadResult(
                 items = emptyList(),
-                statusMessage = snapshot.statusMessage.ifBlank { "No featured items available." }
+                statusMessage = snapshot.statusMessage.ifBlank { "No featured items available." },
             )
         }
 
         return HomeHeroLoadResult(items = heroItems, statusMessage = "")
-    }
-
-    suspend fun loadContinueWatchingItems(
-        entries: List<WatchHistoryEntry>,
-        limit: Int = 20
-    ): ContinueWatchingLoadResult {
-        val targetCount = limit.coerceAtLeast(1)
-        val dedupedEntries = entries
-            .sortedByDescending { it.watchedAtEpochMs }
-            .distinctBy { continueWatchingKey(it) }
-            .take(targetCount)
-
-        if (dedupedEntries.isEmpty()) {
-            return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
-        }
-
-        val items = coroutineScope {
-            dedupedEntries.map { entry ->
-                async(Dispatchers.IO) {
-                    metaResolveSemaphore.acquire()
-                    try {
-                        val mediaType = entry.asCatalogMediaType()
-                        val resolvedMeta = resolveContinueWatchingMeta(entry)
-                        ContinueWatchingItem(
-                            id = continueWatchingKey(entry),
-                            contentId = entry.contentId,
-                            title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
-                            season = entry.season,
-                            episode = entry.episode,
-                            watchedAtEpochMs = entry.watchedAtEpochMs,
-                            progressPercent = 100.0,
-                            provider = WatchProvider.LOCAL,
-                            providerPlaybackId = null,
-                            isUpNextPlaceholder = false,
-                            backdropUrl = resolvedMeta?.backdropUrl,
-                            posterUrl = resolvedMeta?.posterUrl,
-                            logoUrl = resolvedMeta?.logoUrl,
-                            addonId = resolvedMeta?.addonId,
-                            type = mediaType
-                        )
-                    } finally {
-                        metaResolveSemaphore.release()
-                    }
-                }
-            }.awaitAll()
-        }
-
-        return ContinueWatchingLoadResult(
-            items = items,
-            statusMessage = ""
-        )
-    }
-
-    suspend fun loadContinueWatchingItemsFromProvider(
-        entries: List<ProviderContinueWatchingEntry>,
-        limit: Int = 20
-    ): ContinueWatchingLoadResult {
-        val targetCount = limit.coerceAtLeast(1)
-        val dedupedEntries = entries
-            .sortedByDescending { it.lastUpdatedEpochMs }
-            .distinctBy { "${it.contentType.name}:${it.contentId}:${it.season ?: -1}:${it.episode ?: -1}" }
-            .take(targetCount)
-
-        if (dedupedEntries.isEmpty()) {
-            return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
-        }
-
-        val items = coroutineScope {
-            dedupedEntries.map { entry ->
-                async(Dispatchers.IO) {
-                    metaResolveSemaphore.acquire()
-                    try {
-                        val fakeWatchEntry = WatchHistoryEntry(
-                            contentId = entry.contentId,
-                            contentType = entry.contentType,
-                            title = entry.title,
-                            season = entry.season,
-                            episode = entry.episode,
-                            watchedAtEpochMs = entry.lastUpdatedEpochMs
-                        )
-                        val mediaType = fakeWatchEntry.asCatalogMediaType()
-                        val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry)
-                        ContinueWatchingItem(
-                            id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
-                            contentId = entry.contentId,
-                            title = resolvedMeta?.title ?: entry.title,
-                            season = entry.season,
-                            episode = entry.episode,
-                            watchedAtEpochMs = entry.lastUpdatedEpochMs,
-                            progressPercent = entry.progressPercent,
-                            provider = entry.provider,
-                            providerPlaybackId = entry.providerPlaybackId,
-                            isUpNextPlaceholder = entry.isUpNextPlaceholder,
-                            backdropUrl = resolvedMeta?.backdropUrl,
-                            posterUrl = resolvedMeta?.posterUrl,
-                            logoUrl = resolvedMeta?.logoUrl,
-                            addonId = resolvedMeta?.addonId,
-                            type = mediaType
-                        )
-                    } finally {
-                        metaResolveSemaphore.release()
-                    }
-                }
-            }.awaitAll()
-        }
-
-        return ContinueWatchingLoadResult(
-            items = items,
-            statusMessage = ""
-        )
-    }
-
-    suspend fun listHomeCatalogSections(limit: Int = Int.MAX_VALUE): Pair<List<CatalogSectionRef>, String> {
-        val snapshot =
-            loadSupabaseCatalogSnapshot(
-                forceRefresh = false,
-                source = SupabaseCatalogSource.PERSONAL
-            )
-        if (snapshot.lists.isEmpty()) {
-            return emptyList<CatalogSectionRef>() to snapshot.statusMessage
-        }
-
-        val sections = buildCatalogSections(snapshot.lists, SupabaseCatalogSource.PERSONAL, limit)
-        if (sections.isEmpty()) {
-            return emptyList<CatalogSectionRef>() to ""
-        }
-
-        return sections to ""
-    }
-
-    suspend fun listGlobalCatalogSections(limit: Int = Int.MAX_VALUE): Pair<List<CatalogSectionRef>, String> {
-        val snapshot =
-            loadSupabaseCatalogSnapshot(
-                forceRefresh = false,
-                source = SupabaseCatalogSource.GLOBAL
-            )
-        if (snapshot.lists.isEmpty()) {
-            return emptyList<CatalogSectionRef>() to snapshot.statusMessage
-        }
-
-        val sections = buildCatalogSections(snapshot.lists, SupabaseCatalogSource.GLOBAL, limit)
-        if (sections.isEmpty()) {
-            return emptyList<CatalogSectionRef>() to ""
-        }
-
-        return sections to ""
     }
 
     suspend fun listDiscoverCatalogs(
@@ -485,7 +333,7 @@ class HomeCatalogService(
 
         val cache = catalogCache(source)
         val now = System.currentTimeMillis()
-        synchronized(recommendationsCacheLock) {
+        synchronized(catalogCacheLock) {
             val cachedLists = cache.lists
             val cachedProfileId = cache.profileId
             val cacheAgeMs = now - cache.timestampMs
@@ -515,7 +363,7 @@ class HomeCatalogService(
                 }
             }
 
-        synchronized(recommendationsCacheLock) {
+        synchronized(catalogCacheLock) {
             cache.profileId = profileId
             cache.lists = lists
             cache.timestampMs = System.currentTimeMillis()
@@ -896,109 +744,11 @@ class HomeCatalogService(
             normalizedKind?.contains("hero") == true
     }
 
-    private suspend fun resolveContinueWatchingMeta(entry: WatchHistoryEntry): ContinueWatchingMeta? {
-        val rawId = entry.contentId.trim()
-        if (rawId.isBlank()) {
-            return null
-        }
-
-        val episodeMatch = EPISODE_SUFFIX_REGEX.matchEntire(rawId)
-        val baseId = episodeMatch?.groupValues?.get(1)?.trim().orEmpty().ifBlank { rawId }
-        val mediaType = entry.asCatalogMediaType()
-        val cacheKey = continueWatchingCacheKey(mediaType = mediaType, contentId = baseId)
-
-        val cached = readCachedContinueWatchingMeta(cacheKey = cacheKey)
-        if (cached != null) {
-            return cached
-        }
-
-        val details =
-            runCatching {
-                tmdbEnrichmentRepository.loadArtwork(
-                    rawId = baseId,
-                    mediaTypeHint = entry.contentType,
-                )
-            }.getOrNull() ?: return null
-
-        val resolved =
-            ContinueWatchingMeta(
-                title = nonBlank(details.title) ?: nonBlank(entry.title),
-                backdropUrl = details.backdropUrl,
-                posterUrl = details.posterUrl,
-                logoUrl = details.logoUrl,
-                addonId = details.addonId ?: "tmdb",
-            )
-        if (!resolved.hasDisplayData()) {
-            return null
-        }
-
-        cacheContinueWatchingMeta(cacheKey = cacheKey, value = resolved)
-        return resolved
-    }
-
-    private fun continueWatchingCacheKey(mediaType: String, contentId: String): String {
-        return "${mediaType.lowercase(Locale.US)}:${contentId.lowercase(Locale.US)}"
-    }
-
-    private fun readCachedContinueWatchingMeta(cacheKey: String): ContinueWatchingMeta? {
-        val cached = continueWatchingMetaCache[cacheKey] ?: return null
-        val ageMs = System.currentTimeMillis() - cached.cachedAtEpochMs
-        if (ageMs > CONTINUE_WATCHING_META_CACHE_TTL_MS) {
-            continueWatchingMetaCache.remove(cacheKey)
-            return null
-        }
-        return cached.meta
-    }
-
-    private fun cacheContinueWatchingMeta(cacheKey: String, value: ContinueWatchingMeta) {
-        continueWatchingMetaCache[cacheKey] =
-            CachedContinueWatchingMeta(
-                meta = value,
-                cachedAtEpochMs = System.currentTimeMillis()
-            )
-    }
-
-    private fun fallbackContinueWatchingTitle(entry: WatchHistoryEntry): String {
-        val normalizedTitle = nonBlank(entry.title)
-        if (normalizedTitle != null) {
-            return normalizedTitle
-        }
-        if (entry.season != null && entry.episode != null) {
-            return "${entry.contentId} S${entry.season} E${entry.episode}"
-        }
-        return entry.contentId
-    }
-
-    private fun continueWatchingKey(entry: WatchHistoryEntry): String {
-        val seasonPart = entry.season?.toString() ?: "-"
-        val episodePart = entry.episode?.toString() ?: "-"
-        return "${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:$seasonPart:$episodePart"
-    }
-
-    private data class ContinueWatchingMeta(
-        val title: String?,
-        val backdropUrl: String?,
-        val posterUrl: String?,
-        val logoUrl: String?,
-        val addonId: String?
-    ) {
-        fun hasDisplayData(): Boolean {
-            return !title.isNullOrBlank() || !backdropUrl.isNullOrBlank() || !posterUrl.isNullOrBlank() || !logoUrl.isNullOrBlank()
-        }
-    }
-
-    private data class CachedContinueWatchingMeta(
-        val meta: ContinueWatchingMeta,
-        val cachedAtEpochMs: Long
-    )
-
     companion object {
         private const val TAG = "HomeCatalogService"
-        private val EPISODE_SUFFIX_REGEX = Regex("^(.*):(\\d+):(\\d+)$")
         private const val HERO_LIST_ID = "hero.shelf"
         private const val GLOBAL_CATALOG_ID_PREFIX = "global:"
 
-        private const val CONTINUE_WATCHING_META_CACHE_TTL_MS = 5 * 60 * 1000L
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
         private const val SUPABASE_GLOBAL_LISTS_LIMIT = 50
     }
@@ -1007,8 +757,4 @@ class HomeCatalogService(
 private fun nonBlank(value: String?): String? {
     val trimmed = value?.trim()
     return if (trimmed.isNullOrEmpty()) null else trimmed
-}
-
-private fun WatchHistoryEntry.asCatalogMediaType(): String {
-    return if (contentType == MetadataLabMediaType.SERIES) "series" else "movie"
 }
