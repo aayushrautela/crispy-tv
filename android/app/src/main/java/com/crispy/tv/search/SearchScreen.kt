@@ -99,69 +99,51 @@ private fun SearchScreen(
         topBar = {
             StandardTopAppBar(
                 title = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            IconButton(onClick = onBack) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                    contentDescription = "Back"
-                                )
-                            }
-
-                            TextField(
-                                value = uiState.query,
-                                onValueChange = onQueryChange,
-                                modifier = Modifier.weight(1f).height(Dimensions.SearchBarPillHeight),
-                                singleLine = true,
-                                placeholder = { Text("Search") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Search,
-                                        contentDescription = null
-                                    )
-                                },
-                                trailingIcon = {
-                                    if (uiState.query.isNotBlank()) {
-                                        IconButton(onClick = onClearQuery) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Clear,
-                                                contentDescription = "Clear"
-                                            )
-                                        }
-                                    }
-                                },
-                                shape = MaterialTheme.shapes.extraLarge,
-                                colors =
-                                    TextFieldDefaults.colors(
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent,
-                                        disabledIndicatorColor = Color.Transparent,
-                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                                    )
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = "Back"
                             )
                         }
 
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(filters, key = { it.first.name }) { (filter, label) ->
-                                FilterChip(
-                                    selected = uiState.filter == filter,
-                                    onClick = { onFilterChange(filter) },
-                                    label = { Text(label) }
+                        TextField(
+                            value = uiState.query,
+                            onValueChange = onQueryChange,
+                            modifier = Modifier.weight(1f).height(Dimensions.SearchBarPillHeight),
+                            singleLine = true,
+                            placeholder = { Text("Search") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Search,
+                                    contentDescription = null
                                 )
-                            }
-                        }
+                            },
+                            trailingIcon = {
+                                if (uiState.query.isNotBlank()) {
+                                    IconButton(onClick = onClearQuery) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Clear,
+                                            contentDescription = "Clear"
+                                        )
+                                    }
+                                }
+                            },
+                            shape = MaterialTheme.shapes.extraLarge,
+                            colors =
+                                TextFieldDefaults.colors(
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    disabledIndicatorColor = Color.Transparent,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                        )
                     }
                 }
             )
@@ -180,6 +162,21 @@ private fun SearchScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filters, key = { it.first.name }) { (filter, label) ->
+                        FilterChip(
+                            selected = uiState.filter == filter,
+                            onClick = { onFilterChange(filter) },
+                            label = { Text(label) }
+                        )
+                    }
+                }
+            }
+
             if (query.isBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SearchEmptyState(text = "Start typing to search")
