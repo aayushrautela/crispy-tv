@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -249,7 +250,8 @@ class LibraryViewModel internal constructor(
 @Composable
 fun LibraryRoute(
     onItemClick: (WatchHistoryEntry) -> Unit,
-    onNavigateToDiscover: () -> Unit
+    onNavigateToDiscover: () -> Unit,
+    onNavigateToCalendar: () -> Unit,
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -269,6 +271,7 @@ fun LibraryRoute(
         onRefresh = viewModel::refresh,
         onItemClick = onItemClick,
         onNavigateToDiscover = onNavigateToDiscover,
+        onNavigateToCalendar = onNavigateToCalendar,
         onSelectProviderFolder = viewModel::selectProviderFolder
     )
 }
@@ -281,6 +284,7 @@ private fun LibraryScreen(
     onRefresh: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
+    onNavigateToCalendar: () -> Unit,
     onSelectProviderFolder: (String) -> Unit
 ) {
     val selectedProvider = uiState.selectedSource.toProvider()
@@ -320,6 +324,10 @@ private fun LibraryScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
+
+                            IconButton(onClick = onNavigateToCalendar) {
+                                Icon(imageVector = Icons.Outlined.Event, contentDescription = "Calendar")
+                            }
 
                             IconButton(onClick = onRefresh) {
                                 Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")

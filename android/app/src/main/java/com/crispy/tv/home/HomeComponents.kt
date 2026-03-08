@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -47,6 +48,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
@@ -83,8 +85,8 @@ internal fun HomeRailSection(
     onItemClick: (ContinueWatchingItem) -> Unit,
     onHideItem: ((ContinueWatchingItem) -> Unit)? = null,
     onRemoveItem: ((ContinueWatchingItem) -> Unit)? = null,
-    badgeLabel: String? = null,
-    showProgressBar: Boolean = false,
+    badgeLabelFor: (ContinueWatchingItem) -> String? = { null },
+    showProgressBarFor: (ContinueWatchingItem) -> Boolean = { false },
     showTitleFallbackWhenNoLogo: Boolean = false,
     useBottomSheetActions: Boolean = false,
     usePosterCardStyle: Boolean = false,
@@ -131,8 +133,8 @@ internal fun HomeRailSection(
                                 onHideClick = onHideItem?.let { { it(item) } },
                                 onRemoveClick = onRemoveItem?.let { { it(item) } },
                                 onDetailsClick = { onItemClick(item) },
-                                badgeLabel = badgeLabel,
-                                showProgressBar = showProgressBar,
+                                badgeLabel = badgeLabelFor(item),
+                                showProgressBar = showProgressBarFor(item),
                                 showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo,
                                 useBottomSheetActions = useBottomSheetActions
                             )
@@ -185,15 +187,24 @@ private fun HomeRailPosterSkeletonCard() {
 @Composable
 internal fun HomeRailHeader(
     title: String,
-    statusMessage: String
+    statusMessage: String,
+    action: (@Composable () -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            action?.invoke()
+        }
 
         if (statusMessage.isNotBlank()) {
             Text(
@@ -204,6 +215,92 @@ internal fun HomeRailHeader(
         }
     }
 
+}
+
+@Composable
+private fun LandscapeArtworkFrame(
+    title: String,
+    imageUrl: String?,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    badgeLabel: String? = null,
+    progressFraction: Float? = null,
+    topEndContent: (@Composable BoxScope.() -> Unit)? = null,
+    bottomOverlayContent: @Composable BoxScope.() -> Unit = {},
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(20.dp))
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+    ) {
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.08f),
+                            Color.Black.copy(alpha = 0.24f),
+                            Color.Black.copy(alpha = 0.82f),
+                        ),
+                    ),
+                ),
+        )
+
+        if (!badgeLabel.isNullOrBlank()) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 12.dp, top = 12.dp),
+                shape = RoundedCornerShape(999.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Text(
+                    text = badgeLabel,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        topEndContent?.invoke(this)
+        bottomOverlayContent()
+
+        if (progressFraction != null && progressFraction > 0f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .background(Color.White.copy(alpha = 0.25f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progressFraction.coerceIn(0f, 1f))
+                        .background(MaterialTheme.colorScheme.tertiary),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -236,151 +333,105 @@ internal fun HomeRailCard(
     }
 
     Column(modifier = Modifier.width(260.dp)) {
-        val imageUrl = item.posterUrl ?: item.backdropUrl
-        Box(
+        val imageUrl = item.backdropUrl ?: item.posterUrl
+        LandscapeArtworkFrame(
+            title = item.title,
+            imageUrl = imageUrl,
+            onClick = null,
             modifier = Modifier
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(16.dp))
-                .then(cardInteractionModifier)
-        ) {
-            if (!imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.64f)
-                            )
-                        )
-                    )
-            )
-
-            if (!badgeLabel.isNullOrBlank()) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 12.dp, top = 10.dp),
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.primary
-                ) {
-                    Text(
-                        text = badgeLabel,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-
-            if (!useBottomSheetActions && hasItemActions) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                ) {
-                    IconButton(
-                        onClick = { menuExpanded = true },
-                        modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), shape = MaterialTheme.shapes.small)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.MoreVert,
-                            contentDescription = actionMenuContentDescription,
-                            tint = Color.White
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Details") },
-                            onClick = {
-                                menuExpanded = false
-                                onDetailsClick()
+                .then(cardInteractionModifier),
+            badgeLabel = badgeLabel,
+            progressFraction =
+                if (showProgressBar && item.progressPercent > 0) {
+                    (item.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
+                } else {
+                    null
+                },
+            topEndContent =
+                if (!useBottomSheetActions && hasItemActions) {
+                    {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp),
+                        ) {
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                modifier = Modifier.background(
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                                    shape = CircleShape,
+                                ),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.MoreVert,
+                                    contentDescription = actionMenuContentDescription,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                )
                             }
-                        )
-                        onRemoveClick?.let { removeAction ->
-                            DropdownMenuItem(
-                                text = { Text("Remove") },
-                                onClick = {
-                                    menuExpanded = false
-                                    removeAction()
+
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Details") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onDetailsClick()
+                                    },
+                                )
+                                onRemoveClick?.let { removeAction ->
+                                    DropdownMenuItem(
+                                        text = { Text("Remove") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            removeAction()
+                                        },
+                                    )
                                 }
-                            )
-                        }
-                        onHideClick?.let { hideAction ->
-                            DropdownMenuItem(
-                                text = { Text("Hide") },
-                                onClick = {
-                                    menuExpanded = false
-                                    hideAction()
+                                onHideClick?.let { hideAction ->
+                                    DropdownMenuItem(
+                                        text = { Text("Hide") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            hideAction()
+                                        },
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
-                }
-            }
-
-            if (!item.logoUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = item.logoUrl,
-                    contentDescription = "${item.title} logo",
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth(0.7f)
-                        .height(52.dp)
-                        .padding(bottom = 10.dp),
-                    contentScale = ContentScale.Fit
-                )
-            } else if (showTitleFallbackWhenNoLogo) {
-                Text(
-                    text = item.title,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (showProgressBar && item.progressPercent > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(Color.White.copy(alpha = 0.3f))
-                ) {
-                    Box(
+                } else {
+                    null
+                },
+            bottomOverlayContent = {
+                if (!item.logoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = item.logoUrl,
+                        contentDescription = "${item.title} logo",
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(
-                                fraction = (item.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
-                            )
-                            .background(MaterialTheme.colorScheme.primary)
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(0.72f)
+                            .height(54.dp)
+                            .padding(bottom = 12.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else if (showTitleFallbackWhenNoLogo) {
+                    Text(
+                        text = item.title,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
+            },
+        ) {
         }
 
         Text(
@@ -1037,48 +1088,45 @@ internal fun continueWatchingSubtitle(item: ContinueWatchingItem): String {
     return listOfNotNull(upNext, seasonEpisode, relativeWatched).joinToString(separator = " • ")
 }
 
-internal fun upNextSubtitle(item: ContinueWatchingItem): String {
-    val seasonEpisode =
-        if (
-            item.type.equals("series", ignoreCase = true) &&
-                item.season != null &&
-                item.episode != null
-        ) {
-            String.format(Locale.US, "S%02d:E%02d", item.season, item.episode)
-        } else {
-            null
-        }
-    val relativeWatched = DateUtils.getRelativeTimeSpanString(
-        item.watchedAtEpochMs,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS
-    ).toString()
-
-    return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
-}
-
 @Composable
 internal fun ThisWeekSection(
-    items: List<ThisWeekItem>,
+    items: List<CalendarEpisodeItem>,
     isLoading: Boolean = false,
-    onItemClick: (ThisWeekItem) -> Unit = {},
+    statusMessage: String = "",
+    onItemClick: (CalendarEpisodeItem) -> Unit = {},
+    onViewAllClick: (() -> Unit)? = null,
 ) {
-    if (items.isEmpty() && !isLoading) return
+    if (items.isEmpty() && !isLoading && statusMessage.isBlank()) return
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HomeRailHeader(title = "This Week", statusMessage = "")
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (isLoading && items.isEmpty()) {
-                items(HOME_THIS_WEEK_SKELETON_COUNT) {
-                    ThisWeekCardSkeleton()
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        HomeRailHeader(
+            title = "This Week",
+            statusMessage = if (isLoading) "" else statusMessage,
+            action = onViewAllClick?.let { action ->
+                {
+                    TextButton(onClick = action) {
+                        Text("View all")
+                    }
                 }
-            } else {
-                items(items, key = { "${it.type}:${it.id}" }) { item ->
-                    ThisWeekCard(item = item, onClick = { onItemClick(item) })
+            },
+        )
+
+        if (isLoading || items.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(0.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (isLoading && items.isEmpty()) {
+                    items(HOME_WIDE_SKELETON_COUNT) {
+                        HomeRailSkeletonCard()
+                    }
+                } else {
+                    items(items, key = { "${it.type}:${it.id}" }) { item ->
+                        CalendarEpisodeCard(item = item, onClick = { onItemClick(item) })
+                    }
                 }
             }
         }
@@ -1086,124 +1134,128 @@ internal fun ThisWeekSection(
 }
 
 @Composable
-private fun ThisWeekCardSkeleton() {
-    Column(
-        modifier = Modifier.width(124.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .skeletonElement(shape = RoundedCornerShape(8.dp), pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.8f)
-                .height(12.dp)
-                .skeletonElement(pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.45f)
-                .height(10.dp)
-                .skeletonElement(pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.65f)
-                .height(10.dp)
-                .skeletonElement(pulse = false)
-        )
-    }
-}
-
-@Composable
-private fun ThisWeekCard(
-    item: ThisWeekItem,
+internal fun CalendarEpisodeCard(
+    item: CalendarEpisodeItem,
     onClick: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .width(124.dp)
-            .clickable(onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.width(280.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box {
-            Card(
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f),
-            ) {
-                AsyncImage(
-                    model = item.posterUrl,
-                    contentDescription = item.seriesName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            val badgeText = if (item.isReleased) {
-                "NEW"
-            } else {
-                try {
-                    val date = java.time.LocalDate.parse(item.releaseDate.take(10))
-                    "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
-                } catch (_: Exception) {
-                    null
-                }
-            }
-            if (badgeText != null) {
-                Text(
-                    text = badgeText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
+        LandscapeArtworkFrame(
+            title = item.seriesName,
+            imageUrl = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
+            onClick = onClick,
+            modifier = Modifier.aspectRatio(16f / 9f),
+            badgeLabel = calendarBadgeLabel(item),
+            bottomOverlayContent = {
+                Column(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .background(
-                            color = if (item.isReleased) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                            } else {
-                                Color.Black.copy(alpha = 0.7f)
-                            },
-                            shape = RoundedCornerShape(4.dp),
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(
+                        text = item.seriesName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = calendarEpisodeLabel(item),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.84f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    calendarSupportingText(item)?.let { supportingText ->
+                        Text(
+                            text = supportingText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.72f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            }
-        }
-
-        Text(
-            text = item.seriesName,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+                    }
+                }
+            },
         )
+    }
+}
 
-        val episodeLabel = if (item.episodeRange != null) {
-            "S${item.season} ${item.episodeRange}"
-        } else {
-            "S${item.season} E${item.episode}"
-        }
-        Text(
-            text = episodeLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.7f),
-            maxLines = 1,
+@Composable
+internal fun CalendarSeriesCard(
+    item: CalendarSeriesItem,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.width(280.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LandscapeArtworkFrame(
+            title = item.title,
+            imageUrl = item.backdropUrl ?: item.posterUrl,
+            onClick = onClick,
+            modifier = Modifier.aspectRatio(16f / 9f),
+            badgeLabel = "No schedule",
+            bottomOverlayContent = {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    item.sourceLabel?.takeIf { it.isNotBlank() }?.let { sourceLabel ->
+                        Text(
+                            text = sourceLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.72f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            },
         )
+    }
+}
 
-        if (!item.episodeTitle.isNullOrBlank()) {
-            Text(
-                text = item.episodeTitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.5f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+private fun calendarBadgeLabel(item: CalendarEpisodeItem): String? {
+    if (item.isReleased) return "Released"
+    return try {
+        val date = java.time.LocalDate.parse(item.releaseDate.take(10))
+        "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun calendarEpisodeLabel(item: CalendarEpisodeItem): String {
+    return if (item.episodeRange != null) {
+        "S${item.season} ${item.episodeRange}"
+    } else {
+        "S${item.season} E${item.episode}"
+    }
+}
+
+private fun calendarSupportingText(item: CalendarEpisodeItem): String? {
+    return when {
+        item.isGroup -> "${item.episodeCount} new episodes"
+        !item.episodeTitle.isNullOrBlank() -> item.episodeTitle
+        !item.overview.isNullOrBlank() -> item.overview
+        else -> null
     }
 }
 

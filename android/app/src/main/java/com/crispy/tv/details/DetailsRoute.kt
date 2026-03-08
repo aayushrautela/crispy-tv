@@ -15,6 +15,9 @@ import java.util.Locale
 fun DetailsRoute(
     itemId: String,
     mediaType: String,
+    initialSeason: Int? = null,
+    initialEpisode: Int? = null,
+    autoOpenEpisode: Boolean = false,
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit = { _, _ -> },
     onPersonClick: (String) -> Unit = {},
@@ -56,6 +59,14 @@ fun DetailsRoute(
         }
     }
 
+    LaunchedEffect(viewModel, initialSeason, initialEpisode, autoOpenEpisode) {
+        viewModel.requestEpisodeNavigation(
+            initialSeason = initialSeason,
+            initialEpisode = initialEpisode,
+            autoOpenEpisode = autoOpenEpisode,
+        )
+    }
+
     DetailsScreen(
         uiState = uiState,
         onBack = onBack,
@@ -65,6 +76,7 @@ fun DetailsRoute(
         onSeasonSelected = viewModel::onSeasonSelected,
         onOpenStreamSelector = viewModel::onOpenStreamSelector,
         onEpisodeClick = viewModel::onOpenStreamSelectorForEpisode,
+        onToggleEpisodeWatched = viewModel::toggleEpisodeWatched,
         onDismissStreamSelector = viewModel::onDismissStreamSelector,
         onProviderSelected = viewModel::onProviderSelected,
         onRetryProvider = viewModel::onRetryProvider,

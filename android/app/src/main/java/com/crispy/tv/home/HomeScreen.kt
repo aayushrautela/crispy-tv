@@ -44,7 +44,8 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 internal fun HomeScreen(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
-    onThisWeekClick: (ThisWeekItem) -> Unit,
+    onThisWeekClick: (CalendarEpisodeItem) -> Unit,
+    onThisWeekSeeAllClick: () -> Unit,
     onSearchClick: () -> Unit,
     onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
@@ -59,7 +60,6 @@ internal fun HomeScreen(
     )
     val heroState by viewModel.heroState.collectAsStateWithLifecycle()
     val continueWatchingState by viewModel.continueWatchingState.collectAsStateWithLifecycle()
-    val upNextState by viewModel.upNextState.collectAsStateWithLifecycle()
     val thisWeekState by viewModel.thisWeekState.collectAsStateWithLifecycle()
     val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
     val headerCatalogSectionsState by viewModel.headerCatalogSectionsState.collectAsStateWithLifecycle()
@@ -162,25 +162,11 @@ internal fun HomeScreen(
                     onItemClick = onContinueWatchingClick,
                     onHideItem = viewModel::hideContinueWatchingItem,
                     onRemoveItem = viewModel::removeContinueWatchingItem,
+                    badgeLabelFor = { item -> if (item.isUpNextPlaceholder) "Up Next" else null },
+                    showProgressBarFor = { item -> !item.isUpNextPlaceholder && item.progressPercent > 0 },
                     showTitleFallbackWhenNoLogo = true,
                     useBottomSheetActions = true,
                     isLoading = continueWatchingState.isLoading
-                )
-            }
-
-            item(contentType = "upNext") {
-                HomeRailSection(
-                    title = "Up Next",
-                    items = upNextState.items,
-                    statusMessage = upNextState.statusMessage,
-                    actionMenuContentDescription = "Up next actions",
-                    subtitleFor = ::upNextSubtitle,
-                    onItemClick = onContinueWatchingClick,
-                    onHideItem = viewModel::hideContinueWatchingItem,
-                    onRemoveItem = viewModel::removeContinueWatchingItem,
-                    badgeLabel = "UP NEXT",
-                    showProgressBar = true,
-                    isLoading = upNextState.isLoading
                 )
             }
 
@@ -188,7 +174,9 @@ internal fun HomeScreen(
                 ThisWeekSection(
                     items = thisWeekState.items,
                     isLoading = thisWeekState.isLoading,
+                    statusMessage = thisWeekState.statusMessage,
                     onItemClick = onThisWeekClick,
+                    onViewAllClick = onThisWeekSeeAllClick,
                 )
             }
 

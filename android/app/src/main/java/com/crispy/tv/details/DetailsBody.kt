@@ -1,7 +1,9 @@
 package com.crispy.tv.details
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -65,6 +68,7 @@ import com.crispy.tv.metadata.tmdb.TmdbTitleDetails
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import kotlin.math.roundToInt
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -79,6 +83,7 @@ internal fun DetailsBody(
     onItemClick: (String, String) -> Unit,
     onPersonClick: (String) -> Unit = {},
     onEpisodeClick: (videoId: String) -> Unit = {},
+    onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
 ) {
     val details = uiState.details
     val tmdb = uiState.tmdbEnrichment
@@ -86,7 +91,9 @@ internal fun DetailsBody(
     val contentPadding = PaddingValues(horizontal = horizontalPadding)
 
     var expandedReview by remember { mutableStateOf<TmdbReview?>(null) }
+    var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
     val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val episodeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     if (expandedReview != null) {
         val review = expandedReview!!
@@ -125,6 +132,54 @@ internal fun DetailsBody(
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text("Close")
+                }
+            }
+        }
+    }
+
+    if (selectedEpisodeAction != null) {
+        val selectedEpisode = selectedEpisodeAction!!
+        val watchState = uiState.episodeWatchStates[selectedEpisode.id] ?: EpisodeWatchState()
+        val toggleLabel = if (watchState.isWatched) "Mark as unwatched" else "Mark as watched"
+
+        ModalBottomSheet(
+            onDismissRequest = { selectedEpisodeAction = null },
+            sheetState = episodeSheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = horizontalPadding)
+                    .padding(top = 6.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(selectedEpisode.title, style = MaterialTheme.typography.titleMedium)
+                formatLongDate(selectedEpisode.released)?.let { released ->
+                    Text(
+                        text = released,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        selectedEpisodeAction = null
+                        onEpisodeClick(selectedEpisode.id)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Open episode")
+                }
+
+                TextButton(
+                    onClick = {
+                        selectedEpisodeAction = null
+                        onToggleEpisodeWatched(selectedEpisode)
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text(toggleLabel)
                 }
             }
         }
@@ -391,8 +446,10 @@ internal fun DetailsBody(
                             items(items = episodes, key = { it.id }) { video ->
                                 EpisodeCard(
                                     video = video,
+                                    watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
                                     modifier = Modifier.width(280.dp),
-                                    onClick = { onEpisodeClick(video.id) }
+                                    onClick = { onEpisodeClick(video.id) },
+                                    onLongPress = { selectedEpisodeAction = video },
                                 )
                             }
                         }
@@ -811,14 +868,18 @@ private fun TmdbReviewCard(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun EpisodeCard(
     video: MediaVideo,
+    watchState: EpisodeWatchState,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
+    onLongPress: () -> Unit = {},
 ) {
+    val progressFraction = (watchState.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
+
     ElevatedCard(
-        onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongPress),
         colors =
             CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -881,6 +942,67 @@ private fun EpisodeCard(
                         )
                     }
                 }
+
+                if (watchState.isWatched) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp),
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                text = "Watched",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                } else if (watchState.progressPercent > 0.0) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp),
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.94f),
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Text(
+                            text = "${watchState.progressPercent.roundToInt()}%",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+
+                if (!watchState.isWatched && watchState.progressPercent > 0.0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .background(Color.White.copy(alpha = 0.25f)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(progressFraction)
+                                .background(MaterialTheme.colorScheme.tertiary),
+                        )
+                    }
+                }
             }
 
             Column(
@@ -910,7 +1032,7 @@ private fun EpisodeCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

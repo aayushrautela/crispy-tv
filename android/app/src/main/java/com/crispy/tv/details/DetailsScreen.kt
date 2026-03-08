@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.home.MediaVideo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -54,6 +55,7 @@ internal fun DetailsScreen(
     onSeasonSelected: (Int) -> Unit,
     onOpenStreamSelector: () -> Unit,
     onEpisodeClick: (String) -> Unit,
+    onToggleEpisodeWatched: (MediaVideo) -> Unit,
     onDismissStreamSelector: () -> Unit,
     onProviderSelected: (String?) -> Unit,
     onRetryProvider: (String) -> Unit,
@@ -226,6 +228,7 @@ internal fun DetailsScreen(
                         onItemClick = onItemClick,
                         onPersonClick = onPersonClick,
                         onEpisodeClick = onEpisodeClick,
+                        onToggleEpisodeWatched = onToggleEpisodeWatched,
                     )
                 }
             }

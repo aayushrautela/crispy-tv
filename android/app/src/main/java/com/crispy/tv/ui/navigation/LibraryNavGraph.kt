@@ -13,9 +13,17 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                     com.crispy.tv.player.MetadataLabMediaType.MOVIE -> "movie"
                     com.crispy.tv.player.MetadataLabMediaType.SERIES -> "series"
                 }
-                navController.navigate(AppRoutes.homeDetailsRoute(entry.contentId, type))
+                navController.navigate(
+                    AppRoutes.homeDetailsRoute(
+                        itemId = entry.contentId,
+                        mediaType = type,
+                        initialSeason = entry.season,
+                        initialEpisode = entry.episode,
+                    )
+                )
             },
-            onNavigateToDiscover = { navController.navigate(AppRoutes.DiscoverRoute) }
+            onNavigateToDiscover = { navController.navigate(AppRoutes.DiscoverRoute) },
+            onNavigateToCalendar = { navController.navigate(AppRoutes.CalendarRoute) },
         )
     }
 }

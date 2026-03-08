@@ -9,6 +9,9 @@ import androidx.navigation.navArgument
 import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.details.DetailsRoute
+import com.crispy.tv.home.CalendarEpisodeItem
+import com.crispy.tv.home.CalendarRoute
+import com.crispy.tv.home.CalendarSeriesItem
 import com.crispy.tv.home.HomeScreen
 import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.playerui.PlayerActivity
@@ -23,7 +26,10 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navController.navigate(AppRoutes.homeDetailsRoute(item.contentId, item.type))
             },
             onThisWeekClick = { item ->
-                navController.navigate(AppRoutes.homeDetailsRoute(item.seriesId, item.type))
+                navController.navigateToCalendarEpisode(item)
+            },
+            onThisWeekSeeAllClick = {
+                navController.navigate(AppRoutes.CalendarRoute)
             },
             onSearchClick = {
                 navController.navigate(AppRoutes.SearchRoute)
@@ -37,6 +43,14 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))
             }
+        )
+    }
+
+    composable(AppRoutes.CalendarRoute) {
+        CalendarRoute(
+            onBack = { navController.popBackStack() },
+            onEpisodeClick = { item -> navController.navigateToCalendarEpisode(item) },
+            onSeriesClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) },
         )
     }
 
@@ -66,14 +80,23 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         arguments = listOf(
             navArgument(AppRoutes.HomeDetailsMediaTypeArg) { type = NavType.StringType },
             navArgument(AppRoutes.HomeDetailsItemIdArg) { type = NavType.StringType },
+            navArgument(AppRoutes.HomeDetailsSeasonArg) { type = NavType.IntType; defaultValue = -1 },
+            navArgument(AppRoutes.HomeDetailsEpisodeArg) { type = NavType.IntType; defaultValue = -1 },
+            navArgument(AppRoutes.HomeDetailsAutoOpenEpisodeArg) { type = NavType.BoolType; defaultValue = false },
         )
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
         val mediaType = entry.arguments?.getString(AppRoutes.HomeDetailsMediaTypeArg).orEmpty()
+        val initialSeason = entry.arguments?.getInt(AppRoutes.HomeDetailsSeasonArg)?.takeIf { it > 0 }
+        val initialEpisode = entry.arguments?.getInt(AppRoutes.HomeDetailsEpisodeArg)?.takeIf { it > 0 }
+        val autoOpenEpisode = entry.arguments?.getBoolean(AppRoutes.HomeDetailsAutoOpenEpisodeArg) == true
         val context = LocalContext.current
         DetailsRoute(
             itemId = itemId,
             mediaType = mediaType,
+            initialSeason = initialSeason,
+            initialEpisode = initialEpisode,
+            autoOpenEpisode = autoOpenEpisode,
             onBack = { navController.popBackStack() },
             onItemClick = { nextId, nextType -> navController.navigate(AppRoutes.homeDetailsRoute(nextId, nextType)) },
             onPersonClick = { personId -> navController.navigate(AppRoutes.personDetailsRoute(personId)) },
@@ -96,4 +119,16 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
         )
     }
+}
+
+private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeItem) {
+    navigate(
+        AppRoutes.homeDetailsRoute(
+            itemId = item.seriesId,
+            mediaType = item.type,
+            initialSeason = item.season,
+            initialEpisode = item.episode.takeIf { !item.isGroup },
+            autoOpenEpisode = item.isReleased && !item.isGroup,
+        )
+    )
 }

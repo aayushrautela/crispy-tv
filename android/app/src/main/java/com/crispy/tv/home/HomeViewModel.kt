@@ -21,7 +21,6 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.metadata.TmdbEpisodeListProvider
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -60,15 +59,8 @@ data class ContinueWatchingState(
 )
 
 @Immutable
-data class UpNextState(
-    val items: List<ContinueWatchingItem> = emptyList(),
-    val isLoading: Boolean = true,
-    val statusMessage: String = ""
-)
-
-@Immutable
 data class ThisWeekState(
-    val items: List<ThisWeekItem> = emptyList(),
+    val items: List<CalendarEpisodeItem> = emptyList(),
     val isLoading: Boolean = true,
     val statusMessage: String = ""
 )
@@ -96,7 +88,7 @@ class HomeViewModel internal constructor(
     private val homeCatalogService: HomeCatalogService,
     private val homeWatchActivityService: HomeWatchActivityService,
     private val watchHistoryService: WatchHistoryService,
-    private val thisWeekService: ThisWeekService,
+    private val calendarService: CalendarService,
     private val suppressionStore: ContinueWatchingSuppressionStore
 ) : ViewModel() {
     companion object {
@@ -127,11 +119,9 @@ class HomeViewModel internal constructor(
                                     tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                                 ),
                             watchHistoryService = watchHistoryService,
-                            thisWeekService = ThisWeekService(
+                            calendarService = CalendarService(
                                 watchHistoryService = watchHistoryService,
-                                episodeListProvider = TmdbEpisodeListProvider(
-                                    tmdbEnrichmentRepository = tmdbEnrichmentRepository,
-                                ),
+                                tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                             ),
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
                         ) as T
@@ -147,9 +137,6 @@ class HomeViewModel internal constructor(
 
     private val _continueWatchingState = MutableStateFlow(ContinueWatchingState())
     val continueWatchingState: StateFlow<ContinueWatchingState> = _continueWatchingState.asStateFlow()
-
-    private val _upNextState = MutableStateFlow(UpNextState())
-    val upNextState: StateFlow<UpNextState> = _upNextState.asStateFlow()
 
     private val _thisWeekState = MutableStateFlow(ThisWeekState())
     val thisWeekState: StateFlow<ThisWeekState> = _thisWeekState.asStateFlow()
@@ -177,9 +164,6 @@ class HomeViewModel internal constructor(
 
         _heroState.update { it.copy(isLoading = true, statusMessage = "Loading featured content...") }
         _continueWatchingState.update { current ->
-            current.copy(isLoading = true, statusMessage = "")
-        }
-        _upNextState.update { current ->
             current.copy(isLoading = true, statusMessage = "")
         }
         _thisWeekState.update { current ->
@@ -380,30 +364,16 @@ class HomeViewModel internal constructor(
                 if (!isCurrentRefresh(generation)) return
                 val message = error.message ?: "Failed to load continue watching."
                 _continueWatchingState.value = ContinueWatchingState(isLoading = false, statusMessage = message)
-                _upNextState.value = UpNextState(isLoading = false, statusMessage = message)
                 return
             }
 
         delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
         if (!isCurrentRefresh(generation)) return
 
-        val inProgressItems = continueWatchingResult.items.filter { !it.isUpNextPlaceholder }
-        val upNextItems = continueWatchingResult.items.filter { it.isUpNextPlaceholder }
-
         _continueWatchingState.value = ContinueWatchingState(
-            items = inProgressItems,
+            items = continueWatchingResult.items,
             isLoading = false,
             statusMessage = continueWatchingResult.statusMessage,
-        )
-        _upNextState.value = UpNextState(
-            items = upNextItems,
-            isLoading = false,
-            statusMessage =
-                if (upNextItems.isEmpty() && inProgressItems.isNotEmpty()) {
-                    ""
-                } else {
-                    continueWatchingResult.statusMessage
-                },
         )
     }
 
@@ -412,7 +382,7 @@ class HomeViewModel internal constructor(
         val thisWeekResult =
             try {
                 withContext(Dispatchers.IO) {
-                    thisWeekService.loadThisWeek(System.currentTimeMillis())
+                    calendarService.loadThisWeek(System.currentTimeMillis())
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -463,9 +433,6 @@ class HomeViewModel internal constructor(
                 statusMessage = "Hidden ${item.title}."
             )
         }
-        _upNextState.update { current ->
-            current.copy(items = current.items.filterNot { it.id == item.id })
-        }
     }
 
     fun removeContinueWatchingItem(item: ContinueWatchingItem) {
@@ -478,9 +445,6 @@ class HomeViewModel internal constructor(
                 items = current.items.filterNot { it.id == item.id },
                 statusMessage = "Removing ${item.title}..."
             )
-        }
-        _upNextState.update { current ->
-            current.copy(items = current.items.filterNot { it.id == item.id })
         }
 
         viewModelScope.launch {
