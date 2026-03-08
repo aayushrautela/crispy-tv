@@ -398,6 +398,8 @@ class CalendarService(
         val fallbackDetails = enriched?.fallbackDetails
         val tvDetails = enriched?.enrichment?.titleDetails as? TmdbTvDetails
         val tmdbId = enriched?.enrichment?.tmdbId
+        val seasonCount = tvDetails?.numberOfSeasons ?: 0
+        val yearInt = fallbackDetails?.year?.trim()?.toIntOrNull()
 
         val series =
             CalendarSeriesItem(
@@ -408,12 +410,12 @@ class CalendarService(
                 sourceLabel = seed.sourceLabel,
             )
 
-        if (tvDetails == null || tmdbId == null || tvDetails.numberOfSeasons <= 0) {
+        if (tvDetails == null || tmdbId == null || seasonCount <= 0) {
             return SeriesCalendarLoadResult(series = series)
         }
 
         val seasonsToFetch =
-            (maxOf(1, tvDetails.numberOfSeasons - (MAX_SEASONS_PER_SERIES - 1))..tvDetails.numberOfSeasons).toList()
+            (maxOf(1, seasonCount - (MAX_SEASONS_PER_SERIES - 1))..seasonCount).toList()
 
         var hasScheduledEpisodesInWindow = false
         val episodes =
@@ -445,9 +447,9 @@ class CalendarService(
                                     season = episode.seasonNumber,
                                     episode = episode.episodeNumber,
                                     title = fallbackDetails?.title ?: seed.title,
-                                    year = fallbackDetails?.year,
+                                    year = yearInt,
                                     showTitle = fallbackDetails?.title ?: seed.title,
-                                    showYear = fallbackDetails?.year,
+                                    showYear = yearInt,
                                 ),
                         )
                     if (isWatched) return@mapNotNull null
@@ -460,7 +462,7 @@ class CalendarService(
                         overview = episode.overview,
                         season = episode.seasonNumber,
                         episode = episode.episodeNumber,
-                        releaseDate = episode.airDate,
+                        releaseDate = episode.airDate ?: releaseDate.toString(),
                         releasedAtMs = releasedAtMs,
                         posterUrl = series.posterUrl,
                         backdropUrl = series.backdropUrl,

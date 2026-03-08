@@ -431,8 +431,7 @@ internal fun HomeRailCard(
                     )
                 }
             },
-        ) {
-        }
+        )
 
         Text(
             text = item.title,

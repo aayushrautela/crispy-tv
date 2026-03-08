@@ -1413,6 +1413,7 @@ class DetailsViewModel internal constructor(
         if (videos.isEmpty()) return emptyMap()
 
         val watchedKeys = resolveEpisodeWatchKeys()
+        val yearInt = details.year?.trim()?.toIntOrNull()
         return videos.associate { video ->
             val season = video.season
             val episode = video.episode
@@ -1430,9 +1431,9 @@ class DetailsViewModel internal constructor(
                             season = season,
                             episode = episode,
                             title = video.title,
-                            year = details.year,
+                            year = yearInt,
                             showTitle = details.title,
-                            showYear = details.year,
+                            showYear = yearInt,
                         )
                     )
                 val progressPercent = localProgress?.progressPercent ?: 0.0
