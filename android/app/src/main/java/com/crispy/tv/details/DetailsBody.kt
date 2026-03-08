@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -50,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -229,6 +231,14 @@ internal fun DetailsBody(
             }
             return
         }
+
+        RatingsSection(
+            tmdbRating = details.rating,
+            omdbDetails = uiState.omdbDetails,
+            isLoading = uiState.omdbIsLoading,
+            horizontalPadding = horizontalPadding,
+            contentPadding = contentPadding,
+        )
 
         if (details.directors.isNotEmpty() || details.creators.isNotEmpty()) {
             Spacer(modifier = Modifier.height(14.dp))
@@ -539,6 +549,195 @@ internal fun DetailsBody(
             }
         }
     }
+}
+
+@Composable
+private fun RatingsSection(
+    tmdbRating: String?,
+    omdbDetails: com.crispy.tv.metadata.omdb.OmdbDetails?,
+    isLoading: Boolean,
+    horizontalPadding: androidx.compose.ui.unit.Dp,
+    contentPadding: PaddingValues,
+) {
+    val ratings = remember(tmdbRating, omdbDetails) { buildRatings(tmdbRating = tmdbRating, omdbDetails = omdbDetails) }
+    if (ratings.isEmpty() && !isLoading) return
+
+    Spacer(modifier = Modifier.height(18.dp))
+    Text(
+        text = "Ratings",
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(horizontal = horizontalPadding),
+    )
+    Spacer(modifier = Modifier.height(10.dp))
+
+    LazyRow(
+        contentPadding = contentPadding,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        userScrollEnabled = ratings.isNotEmpty(),
+    ) {
+        if (ratings.isEmpty()) {
+            items(2) {
+                RatingPillPlaceholder()
+            }
+        } else {
+            items(items = ratings, key = { it.key }) { rating ->
+                RatingPill(rating = rating)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingPill(rating: DetailsRatingPill, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.widthIn(min = 160.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = CircleShape,
+                color = rating.badgeColor,
+                contentColor = rating.badgeContentColor,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    val badgeText = rating.badgeText
+                    if (badgeText != null) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = rating.badgeIcon ?: Icons.Filled.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = rating.score,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = rating.source,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingPillPlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .width(160.dp)
+            .height(64.dp)
+            .skeletonElement(shape = RoundedCornerShape(32.dp), color = DetailsSkeletonColors.Base),
+    )
+}
+
+private data class DetailsRatingPill(
+    val key: String,
+    val source: String,
+    val score: String,
+    val badgeText: String?,
+    val badgeColor: Color,
+    val badgeContentColor: Color,
+    val badgeIcon: ImageVector? = null,
+)
+
+private fun buildRatings(
+    tmdbRating: String?,
+    omdbDetails: com.crispy.tv.metadata.omdb.OmdbDetails?,
+): List<DetailsRatingPill> {
+    val ratings = mutableListOf<DetailsRatingPill>()
+    tmdbRating?.trim()?.takeIf { it.isNotBlank() }?.let { rating ->
+        ratings +=
+            DetailsRatingPill(
+                key = "tmdb",
+                source = "TMDB",
+                score = formatTmdbRating(rating),
+                badgeText = "TMDB",
+                badgeColor = Color(0xFF0D253F),
+                badgeContentColor = Color.White,
+            )
+    }
+
+    omdbDetails?.ratings.orEmpty().forEachIndexed { index, rating ->
+        val source = rating.source.trim()
+        val value = rating.value.trim()
+        if (source.isBlank() || value.isBlank()) return@forEachIndexed
+
+        ratings +=
+            when {
+                source.equals("Internet Movie Database", ignoreCase = true) -> {
+                    DetailsRatingPill(
+                        key = "omdb-imdb-$index",
+                        source = "IMDb",
+                        score = value,
+                        badgeText = "IMDb",
+                        badgeColor = Color(0xFFF5C518),
+                        badgeContentColor = Color(0xFF121212),
+                    )
+                }
+
+                source.equals("Rotten Tomatoes", ignoreCase = true) -> {
+                    DetailsRatingPill(
+                        key = "omdb-rt-$index",
+                        source = "Rotten Tomatoes",
+                        score = value,
+                        badgeText = "RT",
+                        badgeColor = Color(0xFFD32F2F),
+                        badgeContentColor = Color.White,
+                    )
+                }
+
+                source.equals("Metacritic", ignoreCase = true) -> {
+                    DetailsRatingPill(
+                        key = "omdb-mc-$index",
+                        source = "Metacritic",
+                        score = value,
+                        badgeText = "MC",
+                        badgeColor = Color(0xFF1B5E20),
+                        badgeContentColor = Color.White,
+                    )
+                }
+
+                else -> {
+                    DetailsRatingPill(
+                        key = "omdb-$index",
+                        source = source,
+                        score = value,
+                        badgeText = null,
+                        badgeColor = Color(0xFFE2E8F0),
+                        badgeContentColor = Color(0xFF475569),
+                    )
+                }
+            }
+    }
+
+    return ratings
+}
+
+private fun formatTmdbRating(value: String): String {
+    val trimmed = value.trim()
+    if (trimmed.contains('/')) return trimmed
+    return "$trimmed/10"
 }
 
 @Composable

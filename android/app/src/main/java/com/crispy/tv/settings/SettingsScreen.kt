@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Language
@@ -63,6 +64,7 @@ data class SettingsGroup(
 @Composable
 fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
+    onNavigateToMetadataSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToAiInsightsSettings: () -> Unit = {},
     onNavigateToProviderPortal: () -> Unit = {},
@@ -116,6 +118,13 @@ fun SettingsScreen(
                             icon = Icons.Outlined.Person,
                             iconTint = MaterialTheme.colorScheme.primary,
                             onClick = onNavigateToAccountsProfiles
+                        ),
+                        SettingsItem(
+                            label = "Metadata",
+                            description = "OMDb API key for ratings pills",
+                            icon = Icons.Outlined.Key,
+                            iconTint = MaterialTheme.colorScheme.tertiary,
+                            onClick = onNavigateToMetadataSettings
                         ),
                         SettingsItem(
                             label = "Language & Region",

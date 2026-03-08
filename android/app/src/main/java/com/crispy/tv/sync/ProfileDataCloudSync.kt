@@ -7,6 +7,7 @@ import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.settings.AiInsightsModelType
 import com.crispy.tv.settings.AiInsightsSettings
 import com.crispy.tv.settings.AiInsightsSettingsStore
+import com.crispy.tv.settings.OmdbSettingsStore
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_MUTED
@@ -17,6 +18,7 @@ class ProfileDataCloudSync(
     private val supabase: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore = ActiveProfileStore(context),
     private val aiInsightsSettingsStore: AiInsightsSettingsStore = AiInsightsSettingsStore(context),
+    private val omdbSettingsStore: OmdbSettingsStore = OmdbSettingsStore(context),
     private val shadowStore: ProfileDataShadowStore = ProfileDataShadowStore(context),
 ) {
     suspend fun pullForActiveProfile(): Result<Unit> {
@@ -113,6 +115,7 @@ class ProfileDataCloudSync(
     private fun applyProfileSettingsToLocal(settings: Map<String, String>) {
         applyPlaybackSettings(settings)
         applyAiInsightsSettings(settings)
+        applyMetadataSettings(settings)
     }
 
     private fun applyPlaybackSettings(settings: Map<String, String>) {
@@ -191,7 +194,20 @@ class ProfileDataCloudSync(
             result[KEY_AI_OPENROUTER_KEY] = openRouterKey
         }
 
+        val omdbKey = omdbSettingsStore.loadOmdbKey().trim()
+        if (omdbKey.isBlank()) {
+            result.remove(KEY_METADATA_OMDB_KEY)
+        } else {
+            result[KEY_METADATA_OMDB_KEY] = omdbKey
+        }
+
         return result
+    }
+
+    private fun applyMetadataSettings(settings: Map<String, String>) {
+        if (settings.containsKey(KEY_METADATA_OMDB_KEY)) {
+            omdbSettingsStore.saveOmdbKey(settings[KEY_METADATA_OMDB_KEY].orEmpty())
+        }
     }
 
     private companion object {
@@ -204,6 +220,7 @@ class ProfileDataCloudSync(
         private const val KEY_AI_INSIGHTS_CUSTOM_MODEL_NAME = "ai.insights.custom_model_name"
 
         private const val KEY_AI_OPENROUTER_KEY = "ai.openrouter_key"
+        private const val KEY_METADATA_OMDB_KEY = "metadata.omdb_key"
     }
 }
 

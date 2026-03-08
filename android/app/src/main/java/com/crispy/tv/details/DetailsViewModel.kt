@@ -16,6 +16,9 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.TmdbImdbIdResolver
 import com.crispy.tv.metadata.TmdbImdbIdResolverProvider
+import com.crispy.tv.metadata.omdb.OmdbDetails
+import com.crispy.tv.metadata.omdb.OmdbRepository
+import com.crispy.tv.metadata.omdb.OmdbRepositoryProvider
 import com.crispy.tv.metadata.tmdb.TmdbEnrichment
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
@@ -63,6 +66,8 @@ data class DetailsUiState(
     val details: MediaDetails? = null,
     val tmdbIsLoading: Boolean = false,
     val tmdbEnrichment: TmdbEnrichment? = null,
+    val omdbIsLoading: Boolean = false,
+    val omdbDetails: OmdbDetails? = null,
     val statusMessage: String = "",
     val aiMode: AiInsightsMode = AiInsightsMode.ON_DEMAND,
     val aiConfigured: Boolean = false,
@@ -125,6 +130,7 @@ class DetailsViewModel internal constructor(
     private val watchHistoryService: WatchHistoryService,
     private val tmdbImdbIdResolver: TmdbImdbIdResolver,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
+    private val omdbRepository: OmdbRepository,
     private val aiSettingsStore: AiInsightsSettingsStore,
     private val aiRepository: AiInsightsRepository,
     private val addonStreamsService: AddonStreamsService,
@@ -141,6 +147,7 @@ class DetailsViewModel internal constructor(
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
+    private var omdbJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var resolvedTmdbId: Int? = null
     private var cachedEpisodeWatchKeys: Set<String>? = null
@@ -156,6 +163,7 @@ class DetailsViewModel internal constructor(
             val aiSnapshot = aiSettingsStore.loadSnapshot()
 
             episodesJob?.cancel()
+            omdbJob?.cancel()
             seasonEpisodesCache.clear()
             resolvedTmdbId = null
             cachedEpisodeWatchKeys = null
@@ -165,6 +173,8 @@ class DetailsViewModel internal constructor(
                     isLoading = true,
                     tmdbIsLoading = true,
                     statusMessage = "Loading...",
+                    omdbIsLoading = false,
+                    omdbDetails = null,
                     aiMode = aiSnapshot.settings.mode,
                     aiConfigured = aiSnapshot.openRouterKey.isNotBlank(),
                     aiIsLoading = false,
@@ -259,6 +269,8 @@ class DetailsViewModel internal constructor(
                     episodesStatusMessage = "",
                 )
             }
+
+            loadOmdbRatings(enrichedDetails)
 
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
             if (enrichedDetails?.mediaType?.trim()?.equals("series", ignoreCase = true) == true && seasonToLoad != null) {
@@ -1182,6 +1194,38 @@ class DetailsViewModel internal constructor(
         return details.copy(imdbId = resolved)
     }
 
+    private fun loadOmdbRatings(details: MediaDetails?) {
+        omdbJob?.cancel()
+
+        val imdbId =
+            details
+                ?.imdbId
+                ?.trim()
+                ?.takeIf { it.startsWith("tt", ignoreCase = true) }
+                ?.lowercase(Locale.US)
+
+        if (imdbId == null || !omdbRepository.isConfigured) {
+            _uiState.update { it.copy(omdbIsLoading = false, omdbDetails = null) }
+            return
+        }
+
+        omdbJob =
+            viewModelScope.launch {
+                _uiState.update { it.copy(omdbIsLoading = true, omdbDetails = null) }
+
+                val omdbDetails = withContext(Dispatchers.IO) { omdbRepository.load(imdbId) }
+
+                _uiState.update { state ->
+                    val currentImdbId = state.details?.imdbId?.trim()?.lowercase(Locale.US)
+                    if (currentImdbId != imdbId) {
+                        state
+                    } else {
+                        state.copy(omdbIsLoading = false, omdbDetails = omdbDetails)
+                    }
+                }
+            }
+    }
+
     private data class ProviderState(
         val isWatched: Boolean,
         val watchedAtEpochMs: Long?,
@@ -1533,6 +1577,7 @@ class DetailsViewModel internal constructor(
                     val httpClient = AppHttp.client(appContext)
                     val tmdbImdbIdResolver = TmdbImdbIdResolverProvider.get(appContext)
                     val tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext)
+                    val omdbRepository = OmdbRepositoryProvider.get(appContext)
                     val addonStreamsService =
                         AddonStreamsService(
                             context = appContext,
@@ -1553,6 +1598,7 @@ class DetailsViewModel internal constructor(
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                         tmdbImdbIdResolver = tmdbImdbIdResolver,
                         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
+                        omdbRepository = omdbRepository,
                         aiSettingsStore = aiSettingsStore,
                         aiRepository = aiRepository,
                         addonStreamsService = addonStreamsService,

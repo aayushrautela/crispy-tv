@@ -14,6 +14,7 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.settings.AccountsProfilesRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
 import com.crispy.tv.settings.AiInsightsSettingsRoute
+import com.crispy.tv.settings.MetadataSettingsRoute
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.ProviderAuthPortalRoute
@@ -26,6 +27,9 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
         SettingsScreen(
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
+            },
+            onNavigateToMetadataSettings = {
+                navController.navigate(AppRoutes.MetadataSettingsRoute)
             },
             onNavigateToPlaybackSettings = {
                 navController.navigate(AppRoutes.PlaybackSettingsRoute)
@@ -48,6 +52,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
     composable(AppRoutes.AiInsightsSettingsRoute) {
         AiInsightsSettingsRoute(onBack = { navController.popBackStack() })
+    }
+
+    composable(AppRoutes.MetadataSettingsRoute) {
+        MetadataSettingsRoute(onBack = { navController.popBackStack() })
     }
 
     composable(AppRoutes.ProviderPortalRoute) {
