@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -28,13 +27,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,7 +46,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.PosterCard
-import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 
@@ -95,121 +96,129 @@ private fun SearchScreen(
             )
         }
 
-    Scaffold(
-        topBar = {
-            StandardTopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        IconButton(onClick = onBack) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        expanded = true
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        SearchBar(
+            inputField = {
+                SearchBarDefaults.InputField(
+                    query = uiState.query,
+                    onQueryChange = onQueryChange,
+                    onSearch = { expanded = false },
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it },
+                    placeholder = { Text("Search") },
+                    leadingIcon = {
+                        if (expanded) {
+                            IconButton(
+                                onClick = {
+                                    expanded = false
+                                    onBack()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
+                        } else {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = "Back"
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = "Search"
                             )
                         }
-
-                        TextField(
-                            value = uiState.query,
-                            onValueChange = onQueryChange,
-                            modifier = Modifier.weight(1f).height(Dimensions.SearchBarPillHeight),
-                            singleLine = true,
-                            placeholder = { Text("Search") },
-                            leadingIcon = {
+                    },
+                    trailingIcon = {
+                        if (uiState.query.isNotBlank()) {
+                            IconButton(onClick = onClearQuery) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Search,
-                                    contentDescription = null
+                                    imageVector = Icons.Outlined.Clear,
+                                    contentDescription = "Clear"
                                 )
-                            },
-                            trailingIcon = {
-                                if (uiState.query.isNotBlank()) {
-                                    IconButton(onClick = onClearQuery) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Clear,
-                                            contentDescription = "Clear"
-                                        )
-                                    }
-                                }
-                            },
-                            shape = MaterialTheme.shapes.extraLarge,
-                            colors =
-                                TextFieldDefaults.colors(
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    disabledIndicatorColor = Color.Transparent,
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                                )
-                        )
+                            }
+                        }
                     }
-                }
-            )
-        }
-    ) { innerPadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 124.dp),
-            modifier = Modifier.fillMaxSize().imePadding(),
-            contentPadding =
-                PaddingValues(
-                    start = pageHorizontalPadding,
-                    end = pageHorizontalPadding,
-                    top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
-                    bottom = Dimensions.PageBottomPadding
-                ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filters, key = { it.first.name }) { (filter, label) ->
-                        FilterChip(
-                            selected = uiState.filter == filter,
-                            onClick = { onFilterChange(filter) },
-                            label = { Text(label) }
-                        )
-                    }
-                }
-            }
-
-            if (query.isBlank()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SearchEmptyState(text = "Start typing to search")
-                }
-                return@LazyVerticalGrid
-            }
-
-            if (uiState.isSearching) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SearchLoadingIndicator()
-                }
-            }
-
-            if (!uiState.isSearching && uiState.results.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SearchEmptyState(text = "No results")
-                }
-            }
-
-            items(
-                items = uiState.results,
-                key = { "${it.type}:${it.id}" }
-            ) { item ->
-                PosterCard(
-                    title = item.title,
-                    posterUrl = item.posterUrl,
-                    backdropUrl = item.backdropUrl,
-                    rating = item.rating,
-                    year = item.year,
-                    genre = item.genre,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onItemClick(item) }
                 )
+            },
+            expanded = expanded,
+            onExpandedChange = { 
+                expanded = it
+                if (!it && query.isBlank()) {
+                    onBack()
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(horizontal = if (expanded) 0.dp else pageHorizontalPadding)
+                .padding(top = if (expanded) 0.dp else Dimensions.SmallSpacing)
+        ) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 124.dp),
+                modifier = Modifier.fillMaxSize().imePadding(),
+                contentPadding =
+                    PaddingValues(
+                        start = pageHorizontalPadding,
+                        end = pageHorizontalPadding,
+                        top = Dimensions.SmallSpacing,
+                        bottom = Dimensions.PageBottomPadding
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(filters, key = { it.first.name }) { (filter, label) ->
+                            FilterChip(
+                                selected = uiState.filter == filter,
+                                onClick = { onFilterChange(filter) },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                }
+
+                if (query.isBlank()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SearchEmptyState(text = "Start typing to search")
+                    }
+                    return@LazyVerticalGrid
+                }
+
+                if (uiState.isSearching) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SearchLoadingIndicator()
+                    }
+                }
+
+                if (!uiState.isSearching && uiState.results.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SearchEmptyState(text = "No results")
+                    }
+                }
+
+                items(
+                    items = uiState.results,
+                    key = { "${it.type}:${it.id}" }
+                ) { item ->
+                    PosterCard(
+                        title = item.title,
+                        posterUrl = item.posterUrl,
+                        backdropUrl = item.backdropUrl,
+                        rating = item.rating,
+                        year = item.year,
+                        genre = item.genre,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onItemClick(item) }
+                    )
+                }
             }
         }
     }
