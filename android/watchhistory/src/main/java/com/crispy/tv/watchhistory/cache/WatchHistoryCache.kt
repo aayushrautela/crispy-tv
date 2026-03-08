@@ -151,6 +151,7 @@ internal class WatchHistoryCache(
             JSONObject()
                 .put("updatedAtEpochMs", updatedAt)
                 .put("statusMessage", result.statusMessage)
+                .put("isError", result.isError)
                 .put("entries", entriesJson)
 
         writeFileAtomic(continueWatchingCacheFile(provider), json.toString())
@@ -289,9 +290,10 @@ internal class WatchHistoryCache(
         }
 
         val statusMessage = root.optString("statusMessage").trim().ifEmpty { "Cached continue watching." }
+        val isError = root.optBoolean("isError", false)
         return CachedSnapshot(
             updatedAtEpochMs = updatedAt,
-            value = ContinueWatchingResult(statusMessage = statusMessage, entries = entries),
+            value = ContinueWatchingResult(statusMessage = statusMessage, entries = entries, isError = isError),
         )
     }
 

@@ -39,6 +39,7 @@ data class ContinueWatchingItem(
 data class ContinueWatchingLoadResult(
     val items: List<ContinueWatchingItem> = emptyList(),
     val statusMessage: String = "",
+    val isError: Boolean = false,
 )
 
 class HomeWatchActivityService(
@@ -59,14 +60,17 @@ class HomeWatchActivityService(
             WatchProvider.LOCAL -> loadLocalContinueWatchingItems(localEntries, limit)
             WatchProvider.TRAKT, WatchProvider.SIMKL -> {
                 if (providerResult.entries.isNotEmpty()) {
-                    loadProviderContinueWatchingItems(providerResult.entries, limit)
-                } else {
-                    ContinueWatchingLoadResult(
-                        items = emptyList(),
-                        statusMessage = providerResult.statusMessage.ifBlank {
-                            "No continue watching entries available."
-                        },
+                    loadProviderContinueWatchingItems(providerResult.entries, limit).copy(
+                        statusMessage = providerResult.statusMessage,
+                        isError = providerResult.isError,
                     )
+                } else if (providerResult.isError) {
+                    ContinueWatchingLoadResult(
+                        statusMessage = providerResult.statusMessage,
+                        isError = true,
+                    )
+                } else {
+                    ContinueWatchingLoadResult()
                 }
             }
         }
@@ -83,7 +87,7 @@ class HomeWatchActivityService(
             .take(targetCount)
 
         if (dedupedEntries.isEmpty()) {
-            return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
+            return ContinueWatchingLoadResult()
         }
 
         val items = coroutineScope {
@@ -131,7 +135,7 @@ class HomeWatchActivityService(
             .take(targetCount)
 
         if (dedupedEntries.isEmpty()) {
-            return ContinueWatchingLoadResult(statusMessage = "No continue watching items yet.")
+            return ContinueWatchingLoadResult()
         }
 
         val items = coroutineScope {

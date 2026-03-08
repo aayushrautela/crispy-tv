@@ -152,32 +152,36 @@ internal fun HomeScreen(
                 }
             }
 
-            item(contentType = "continueWatching") {
-                HomeRailSection(
-                    title = "Continue Watching",
-                    items = continueWatchingState.items,
-                    statusMessage = continueWatchingState.statusMessage,
-                    actionMenuContentDescription = "Continue watching actions",
-                    subtitleFor = ::continueWatchingSubtitle,
-                    onItemClick = onContinueWatchingClick,
-                    onHideItem = viewModel::hideContinueWatchingItem,
-                    onRemoveItem = viewModel::removeContinueWatchingItem,
-                    badgeLabelFor = { item -> if (item.isUpNextPlaceholder) "Up Next" else null },
-                    showProgressBarFor = { item -> !item.isUpNextPlaceholder && item.progressPercent > 0 },
-                    showTitleFallbackWhenNoLogo = true,
-                    useBottomSheetActions = true,
-                    isLoading = continueWatchingState.isLoading
-                )
+            if (continueWatchingState.isVisible) {
+                item(contentType = "continueWatching") {
+                    HomeRailSection(
+                        title = "Continue Watching",
+                        items = continueWatchingState.items,
+                        statusMessage = continueWatchingState.statusMessage,
+                        actionMenuContentDescription = "Continue watching actions",
+                        subtitleFor = ::continueWatchingSubtitle,
+                        onItemClick = onContinueWatchingClick,
+                        onHideItem = viewModel::hideContinueWatchingItem,
+                        onRemoveItem = viewModel::removeContinueWatchingItem,
+                        badgeLabelFor = { item -> if (item.isUpNextPlaceholder) "Up Next" else null },
+                        showProgressBarFor = { item -> !item.isUpNextPlaceholder && item.progressPercent > 0 },
+                        showTitleFallbackWhenNoLogo = true,
+                        useBottomSheetActions = true,
+                        isLoading = continueWatchingState.isLoading
+                    )
+                }
             }
 
-            item(contentType = "thisWeek") {
-                ThisWeekSection(
-                    items = thisWeekState.items,
-                    isLoading = thisWeekState.isLoading,
-                    statusMessage = thisWeekState.statusMessage,
-                    onItemClick = onThisWeekClick,
-                    onViewAllClick = onThisWeekSeeAllClick,
-                )
+            if (thisWeekState.isVisible) {
+                item(contentType = "thisWeek") {
+                    ThisWeekSection(
+                        items = thisWeekState.items,
+                        isLoading = thisWeekState.isLoading,
+                        statusMessage = thisWeekState.statusMessage,
+                        onItemClick = onThisWeekClick,
+                        onViewAllClick = onThisWeekSeeAllClick,
+                    )
+                }
             }
 
             if (collectionSections.isNotEmpty()) {

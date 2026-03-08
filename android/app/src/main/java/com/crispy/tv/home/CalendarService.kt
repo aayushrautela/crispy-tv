@@ -71,11 +71,13 @@ data class CalendarSection(
 data class CalendarSnapshot(
     val sections: List<CalendarSection>,
     val statusMessage: String? = null,
+    val isError: Boolean = false,
 )
 
 data class ThisWeekResult(
     val items: List<CalendarEpisodeItem>,
     val statusMessage: String?,
+    val isError: Boolean = false,
 )
 
 class CalendarService(
@@ -90,6 +92,7 @@ class CalendarService(
             CalendarSnapshot(
                 sections = emptyList(),
                 statusMessage = "Unable to load your calendar right now.",
+                isError = true,
             )
         }
     }
@@ -101,7 +104,11 @@ class CalendarService(
                 .firstOrNull { it.key == CalendarSectionKey.THIS_WEEK }
                 ?.episodeItems
                 .orEmpty()
-        return ThisWeekResult(items = items, statusMessage = snapshot.statusMessage)
+        return ThisWeekResult(
+            items = items,
+            statusMessage = snapshot.statusMessage,
+            isError = snapshot.isError,
+        )
     }
 
     private suspend fun fetchCalendarSnapshot(nowMs: Long): CalendarSnapshot {

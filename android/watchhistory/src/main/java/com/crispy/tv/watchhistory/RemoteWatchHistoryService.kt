@@ -373,7 +373,12 @@ class RemoteWatchHistoryService(
                 return ContinueWatchingResult(statusMessage = status, entries = normalized)
             }
 
-            val provider = providerRouter.providerFor(source) ?: return ContinueWatchingResult(statusMessage = "No continue watching entries yet.")
+            val provider =
+                providerRouter.providerFor(source)
+                    ?: return ContinueWatchingResult(
+                        statusMessage = "Continue watching provider unavailable.",
+                        isError = true,
+                    )
             val entries =
                 if (provider.hasAccessToken() && provider.hasClientId()) {
                     try {
@@ -381,7 +386,10 @@ class RemoteWatchHistoryService(
                     } catch (_: Throwable) {
                         val cached = getCachedContinueWatching(limit = targetLimit, nowMs = nowMs, source = source)
                         val prefix = if (source == WatchProvider.TRAKT) "Trakt" else "Simkl"
-                        return cached.copy(statusMessage = "$prefix temporarily unavailable. ${cached.statusMessage}")
+                        return cached.copy(
+                            statusMessage = "$prefix temporarily unavailable. ${cached.statusMessage}",
+                            isError = true,
+                        )
                     }
                 } else {
                     emptyList()
@@ -425,7 +433,17 @@ class RemoteWatchHistoryService(
                     WatchProvider.LOCAL -> "Local source selected."
                 }
 
-            val result = ContinueWatchingResult(statusMessage = status, entries = normalized)
+            val result =
+                ContinueWatchingResult(
+                    statusMessage = status,
+                    entries = normalized,
+                    isError =
+                        when (source) {
+                            WatchProvider.TRAKT -> traktClientId.isBlank() || sessionStore.traktAccessToken().isBlank()
+                            WatchProvider.SIMKL -> simklClientId.isBlank() || sessionStore.simklAccessToken().isBlank()
+                            WatchProvider.LOCAL -> false
+                        },
+                )
             watchHistoryCache.writeContinueWatchingCache(source, result)
             return result
         }

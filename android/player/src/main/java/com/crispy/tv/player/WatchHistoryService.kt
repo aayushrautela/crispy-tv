@@ -62,7 +62,8 @@ data class ContinueWatchingEntry(
 
 data class ContinueWatchingResult(
     val statusMessage: String,
-    val entries: List<ContinueWatchingEntry> = emptyList()
+    val entries: List<ContinueWatchingEntry> = emptyList(),
+    val isError: Boolean = false,
 )
 
 data class ProviderLibraryFolder(
@@ -234,7 +235,7 @@ interface WatchHistoryService {
         nowMs: Long = System.currentTimeMillis(),
         source: WatchProvider? = null
     ): ContinueWatchingResult {
-        return ContinueWatchingResult(statusMessage = "Continue watching unavailable.")
+        return ContinueWatchingResult(statusMessage = "Continue watching unavailable.", isError = true)
     }
 
     suspend fun getCachedContinueWatching(
@@ -242,7 +243,7 @@ interface WatchHistoryService {
         nowMs: Long = System.currentTimeMillis(),
         source: WatchProvider? = null
     ): ContinueWatchingResult {
-        return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.")
+        return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.", isError = true)
     }
 
     suspend fun listProviderLibrary(
@@ -359,7 +360,7 @@ object UnavailableWatchHistoryService : WatchHistoryService {
         nowMs: Long,
         source: WatchProvider?
     ): ContinueWatchingResult {
-        return ContinueWatchingResult(statusMessage = "Watch history service unavailable.")
+        return ContinueWatchingResult(statusMessage = "Watch history service unavailable.", isError = true)
     }
 
     override suspend fun listProviderLibrary(

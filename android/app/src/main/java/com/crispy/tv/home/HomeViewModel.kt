@@ -55,15 +55,23 @@ data class HeroState(
 data class ContinueWatchingState(
     val items: List<ContinueWatchingItem> = emptyList(),
     val isLoading: Boolean = true,
-    val statusMessage: String = ""
-)
+    val statusMessage: String = "",
+    val isError: Boolean = false,
+) {
+    val isVisible: Boolean
+        get() = isLoading || items.isNotEmpty() || isError
+}
 
 @Immutable
 data class ThisWeekState(
     val items: List<CalendarEpisodeItem> = emptyList(),
     val isLoading: Boolean = true,
-    val statusMessage: String = ""
-)
+    val statusMessage: String = "",
+    val isError: Boolean = false,
+) {
+    val isVisible: Boolean
+        get() = isLoading || items.isNotEmpty() || isError
+}
 
 @Immutable
 data class CatalogSectionsState(
@@ -164,10 +172,10 @@ class HomeViewModel internal constructor(
 
         _heroState.update { it.copy(isLoading = true, statusMessage = "Loading featured content...") }
         _continueWatchingState.update { current ->
-            current.copy(isLoading = true, statusMessage = "")
+            current.copy(isLoading = true, statusMessage = "", isError = false)
         }
         _thisWeekState.update { current ->
-            current.copy(isLoading = true, statusMessage = "")
+            current.copy(isLoading = true, statusMessage = "", isError = false)
         }
         _catalogSectionsState.value = CatalogSectionsState()
         _headerCatalogSectionsState.value = CatalogHeaderSectionsState()
@@ -363,7 +371,12 @@ class HomeViewModel internal constructor(
                 delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
                 if (!isCurrentRefresh(generation)) return
                 val message = error.message ?: "Failed to load continue watching."
-                _continueWatchingState.value = ContinueWatchingState(isLoading = false, statusMessage = message)
+                _continueWatchingState.value =
+                    ContinueWatchingState(
+                        isLoading = false,
+                        statusMessage = message,
+                        isError = true,
+                    )
                 return
             }
 
@@ -373,7 +386,11 @@ class HomeViewModel internal constructor(
         _continueWatchingState.value = ContinueWatchingState(
             items = continueWatchingResult.items,
             isLoading = false,
-            statusMessage = continueWatchingResult.statusMessage,
+            statusMessage =
+                continueWatchingResult.statusMessage.takeIf {
+                    continueWatchingResult.items.isNotEmpty() || continueWatchingResult.isError
+                }.orEmpty(),
+            isError = continueWatchingResult.isError,
         )
     }
 
@@ -389,7 +406,12 @@ class HomeViewModel internal constructor(
                 Log.w(TAG, "This week refresh failed", error)
                 delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
                 if (!isCurrentRefresh(generation)) return
-                _thisWeekState.value = ThisWeekState(isLoading = false, statusMessage = error.message ?: "Failed to load this week.")
+                _thisWeekState.value =
+                    ThisWeekState(
+                        isLoading = false,
+                        statusMessage = error.message ?: "Failed to load this week.",
+                        isError = true,
+                    )
                 return
             }
 
@@ -398,7 +420,11 @@ class HomeViewModel internal constructor(
         _thisWeekState.value = ThisWeekState(
             items = thisWeekResult.items,
             isLoading = false,
-            statusMessage = thisWeekResult.statusMessage.orEmpty(),
+            statusMessage =
+                thisWeekResult.statusMessage.takeIf {
+                    thisWeekResult.items.isNotEmpty() || thisWeekResult.isError
+                }.orEmpty(),
+            isError = thisWeekResult.isError,
         )
     }
 
@@ -428,9 +454,11 @@ class HomeViewModel internal constructor(
             continueWatchingContentKey(type = item.type, contentId = item.contentId)
         )
         _continueWatchingState.update { current ->
+            val remainingItems = current.items.filterNot { it.id == item.id }
             current.copy(
-                items = current.items.filterNot { it.id == item.id },
-                statusMessage = "Hidden ${item.title}."
+                items = remainingItems,
+                statusMessage = if (remainingItems.isEmpty()) "" else "Hidden ${item.title}.",
+                isError = false,
             )
         }
     }
@@ -441,9 +469,11 @@ class HomeViewModel internal constructor(
             continueWatchingContentKey(type = item.type, contentId = item.contentId)
         )
         _continueWatchingState.update { current ->
+            val remainingItems = current.items.filterNot { it.id == item.id }
             current.copy(
-                items = current.items.filterNot { it.id == item.id },
-                statusMessage = "Removing ${item.title}..."
+                items = remainingItems,
+                statusMessage = if (remainingItems.isEmpty()) "" else "Removing ${item.title}...",
+                isError = false,
             )
         }
 
@@ -479,7 +509,10 @@ class HomeViewModel internal constructor(
                 }
             }
             _continueWatchingState.update { current ->
-                current.copy(statusMessage = removalResult.statusMessage)
+                current.copy(
+                    statusMessage = removalResult.statusMessage.takeIf { current.items.isNotEmpty() }.orEmpty(),
+                    isError = false,
+                )
             }
         }
     }
