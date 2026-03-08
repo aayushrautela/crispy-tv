@@ -110,23 +110,17 @@ private fun HomeScreen(
         topBar = {
             StandardTopAppBar(
                 title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CrispyWordmark(Modifier.height(36.dp))
-
-                        Box(modifier = Modifier.weight(1f))
-
-                        IconButton(onClick = onSearchClick) {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = "Search",
-                            )
-                        }
-
-                        HomeProfileSelector(onClick = onProfileClick)
+                    CrispyWordmark(Modifier.height(36.dp))
+                },
+                actions = {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Search",
+                        )
                     }
+
+                    HomeProfileSelector(onClick = onProfileClick)
                 },
                 scrollBehavior = scrollBehavior,
             )
