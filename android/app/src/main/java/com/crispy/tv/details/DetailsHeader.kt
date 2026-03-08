@@ -478,6 +478,14 @@ private fun HeaderMetaRow(
             }
         }
 
+        if (year != null) {
+            Text(
+                text = year,
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.onPageBackground.copy(alpha = 0.86f)
+            )
+        }
+
         if (certification != null) {
             Surface(
                 shape = MaterialTheme.shapes.small,
@@ -490,14 +498,6 @@ private fun HeaderMetaRow(
                     style = MaterialTheme.typography.labelMedium
                 )
             }
-        }
-
-        if (year != null) {
-            Text(
-                text = year,
-                style = MaterialTheme.typography.labelLarge,
-                color = palette.onPageBackground.copy(alpha = 0.86f)
-            )
         }
 
         if (runtime != null) {

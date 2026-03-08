@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -318,7 +319,6 @@ private fun HeroYouTubeTrailerLayer(
     val context = LocalContext.current
 
     val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
-    val latestMuted = rememberUpdatedState(isMuted)
     val latestShouldPlay = rememberUpdatedState(shouldPlay)
 
     var source by remember(trailerKey) { mutableStateOf<TrailerPlaybackSource?>(null) }
@@ -344,6 +344,7 @@ private fun HeroYouTubeTrailerLayer(
             .apply {
                 repeatMode = Player.REPEAT_MODE_ONE
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                volume = if (isMuted) 0f else 1f
             }
     }
 
@@ -418,13 +419,13 @@ private fun HeroYouTubeTrailerLayer(
         exoPlayer.prepare()
     }
 
-    LaunchedEffect(exoPlayer, latestMuted.value) {
-        exoPlayer.volume = if (latestMuted.value) 0f else 1f
+    SideEffect {
+        exoPlayer.volume = if (isMuted) 0f else 1f
     }
 
-    LaunchedEffect(exoPlayer, latestShouldPlay.value) {
-        exoPlayer.playWhenReady = latestShouldPlay.value
-        if (latestShouldPlay.value) {
+    LaunchedEffect(exoPlayer, shouldPlay) {
+        exoPlayer.playWhenReady = shouldPlay
+        if (shouldPlay) {
             exoPlayer.play()
         } else {
             exoPlayer.pause()

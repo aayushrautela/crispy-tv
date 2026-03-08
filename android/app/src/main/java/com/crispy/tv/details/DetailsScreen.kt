@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.settings.AiInsightsMode
+import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
 import kotlinx.coroutines.delay
@@ -48,6 +49,7 @@ private const val PALETTE_MAX_WAIT_MS = 450L
 @Composable
 internal fun DetailsScreen(
     uiState: DetailsUiState,
+    playbackSettings: PlaybackSettings,
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit,
     onPersonClick: (String) -> Unit,
@@ -63,6 +65,7 @@ internal fun DetailsScreen(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onSetRating: (Int?) -> Unit,
+    onTrailerMutedChanged: (Boolean) -> Unit,
     onAiInsightsClick: () -> Unit,
     onDismissAiInsights: () -> Unit,
 ) {
@@ -122,14 +125,14 @@ internal fun DetailsScreen(
 
     var showTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
     var userPausedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
-    var userMutedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
+    val userMutedTrailer = playbackSettings.trailerMuted
 
-    LaunchedEffect(trailerKey) {
+    LaunchedEffect(trailerKey, playbackSettings.trailerAutoplayEnabled) {
         showTrailer = false
         userPausedTrailer = false
-        userMutedTrailer = false
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
+        if (!playbackSettings.trailerAutoplayEnabled) return@LaunchedEffect
 
         delay(2000)
         showTrailer = true
@@ -194,7 +197,7 @@ internal fun DetailsScreen(
                             }
                         },
                         onToggleTrailerMute = {
-                            userMutedTrailer = !userMutedTrailer
+                            onTrailerMutedChanged(!userMutedTrailer)
                         }
                     )
                 }

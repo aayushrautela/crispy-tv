@@ -81,6 +81,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
         PlaybackSettingsScreen(
             settings = playbackSettings,
+            onTrailerAutoplayChanged = { enabled ->
+                playbackSettingsRepository.setTrailerAutoplayEnabled(enabled)
+                coroutineScope.launch { cloudSync.pushForActiveProfile() }
+            },
             onSkipIntroChanged = { enabled ->
                 playbackSettingsRepository.setSkipIntroEnabled(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }

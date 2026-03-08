@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import kotlinx.coroutines.flow.collectLatest
 import java.util.Locale
 
@@ -47,6 +48,10 @@ fun DetailsRoute(
             key = viewModelKey,
             factory = remember(appContext, itemId, normalizedType) { DetailsViewModel.factory(appContext, itemId, normalizedType) }
         )
+    val playbackSettingsRepository = remember(appContext) {
+        PlaybackSettingsRepositoryProvider.get(appContext)
+    }
+    val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
@@ -69,6 +74,7 @@ fun DetailsRoute(
 
     DetailsScreen(
         uiState = uiState,
+        playbackSettings = playbackSettings,
         onBack = onBack,
         onItemClick = onItemClick,
         onPersonClick = onPersonClick,
@@ -84,6 +90,7 @@ fun DetailsRoute(
         onToggleWatchlist = viewModel::toggleWatchlist,
         onToggleWatched = viewModel::toggleWatched,
         onSetRating = viewModel::setRating,
+        onTrailerMutedChanged = playbackSettingsRepository::setTrailerMuted,
         onAiInsightsClick = viewModel::onAiInsightsClick,
         onDismissAiInsights = viewModel::dismissAiInsightsStory,
     )

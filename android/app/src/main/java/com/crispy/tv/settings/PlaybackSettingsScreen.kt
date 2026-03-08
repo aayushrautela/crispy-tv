@@ -35,6 +35,7 @@ import com.crispy.tv.ui.components.StandardTopAppBar
 @Composable
 fun PlaybackSettingsScreen(
     settings: PlaybackSettings,
+    onTrailerAutoplayChanged: (Boolean) -> Unit,
     onSkipIntroChanged: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
@@ -65,6 +66,23 @@ fun PlaybackSettingsScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = {
+                        Text("Trailer Autoplay")
+                    },
+                    supportingContent = {
+                        Text("Automatically start the details-page trailer once the hero settles.")
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.trailerAutoplayEnabled,
+                            onCheckedChange = onTrailerAutoplayChanged
+                        )
+                    }
+                )
+            }
+
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
                     headlineContent = {

@@ -37,6 +37,8 @@ private object TmdbGenre {
     fun fromId(id: Int): String? = genres[id]
 }
 
+private val CERTIFICATION_COUNTRY_PRIORITY = listOf("US", "GB")
+
 data class TmdbEnrichmentResult(
     val enrichment: TmdbEnrichment,
     val fallbackDetails: MediaDetails
@@ -226,8 +228,8 @@ class TmdbEnrichmentRepository internal constructor(
         val path = "${mediaType.pathSegment()}/$tmdbId"
         val append =
             when (mediaType) {
-                MetadataLabMediaType.MOVIE -> "credits,videos,reviews,images"
-                MetadataLabMediaType.SERIES -> "credits,videos,reviews,external_ids,images"
+                MetadataLabMediaType.MOVIE -> "credits,videos,reviews,images,release_dates"
+                MetadataLabMediaType.SERIES -> "credits,videos,reviews,external_ids,images,content_ratings"
             }
         return client.getJson(
             path = path,
@@ -706,7 +708,7 @@ private fun JSONObject.toFallbackMediaDetails(
         genres = genres,
         year = year,
         runtime = runtime,
-        certification = null,
+        certification = parseCertification(details = this, mediaType = mediaType),
         rating = optDoubleOrNull("vote_average")?.formatVoteAverage(),
         cast = cast,
         directors = directors,
@@ -714,6 +716,52 @@ private fun JSONObject.toFallbackMediaDetails(
         videos = emptyList(),
         addonId = "tmdb"
     )
+}
+
+private fun parseCertification(details: JSONObject, mediaType: MetadataLabMediaType): String? {
+    return when (mediaType) {
+        MetadataLabMediaType.MOVIE -> parseMovieCertification(details)
+        MetadataLabMediaType.SERIES -> parseSeriesCertification(details)
+    }
+}
+
+private fun parseMovieCertification(details: JSONObject): String? {
+    val results = details.optJSONObject("release_dates")?.optJSONArray("results") ?: return null
+    val entries = results.toJsonObjectList()
+
+    CERTIFICATION_COUNTRY_PRIORITY.forEach { countryCode ->
+        entries.firstCountryCertification(countryCode)?.let { return it }
+    }
+
+    return entries.asSequence().mapNotNull { it.firstMovieCertification() }.firstOrNull()
+}
+
+private fun parseSeriesCertification(details: JSONObject): String? {
+    val results = details.optJSONObject("content_ratings")?.optJSONArray("results") ?: return null
+    val entries = results.toJsonObjectList()
+
+    CERTIFICATION_COUNTRY_PRIORITY.forEach { countryCode ->
+        entries.firstCountryTvCertification(countryCode)?.let { return it }
+    }
+
+    return entries.asSequence().mapNotNull { it.optStringNonBlank("rating") }.firstOrNull()
+}
+
+private fun List<JSONObject>.firstCountryCertification(countryCode: String): String? {
+    return firstOrNull { entry ->
+        entry.optStringNonBlank("iso_3166_1")?.equals(countryCode, ignoreCase = true) == true
+    }?.firstMovieCertification()
+}
+
+private fun List<JSONObject>.firstCountryTvCertification(countryCode: String): String? {
+    return firstOrNull { entry ->
+        entry.optStringNonBlank("iso_3166_1")?.equals(countryCode, ignoreCase = true) == true
+    }?.optStringNonBlank("rating")
+}
+
+private fun JSONObject.firstMovieCertification(): String? {
+    val releaseDates = optJSONArray("release_dates") ?: return null
+    return releaseDates.toJsonObjectList().asSequence().mapNotNull { it.optStringNonBlank("certification") }.firstOrNull()
 }
 
 private fun buildIncludeImageLanguage(language: String): String {

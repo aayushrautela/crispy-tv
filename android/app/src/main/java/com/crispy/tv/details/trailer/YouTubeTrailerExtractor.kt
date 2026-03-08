@@ -55,13 +55,22 @@ object YouTubeTrailerExtractor {
     }
 
     private fun pickBestSource(info: StreamInfo): TrailerPlaybackSource? {
+        val adaptiveVideo = pickBestVideoOnly(info.videoOnlyStreams)
+        val adaptiveAudio = pickBestAudio(info.audioStreams)
+        if (adaptiveVideo != null && adaptiveAudio != null) {
+            return TrailerPlaybackSource(
+                videoUrl = adaptiveVideo.content,
+                audioUrl = adaptiveAudio.content,
+            )
+        }
+
         pickBestMuxed(info.videoStreams)?.let { muxed ->
             return TrailerPlaybackSource(videoUrl = muxed.content)
         }
 
-        val video = pickBestVideoOnly(info.videoOnlyStreams) ?: return null
-        val audio = pickBestAudio(info.audioStreams)
-        return TrailerPlaybackSource(videoUrl = video.content, audioUrl = audio?.content)
+        return adaptiveVideo?.let { video ->
+            TrailerPlaybackSource(videoUrl = video.content, audioUrl = adaptiveAudio?.content)
+        }
     }
 
     private fun pickBestMuxed(streams: List<VideoStream>): VideoStream? {

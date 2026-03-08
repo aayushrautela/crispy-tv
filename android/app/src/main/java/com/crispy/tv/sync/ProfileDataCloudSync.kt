@@ -8,6 +8,8 @@ import com.crispy.tv.settings.AiInsightsModelType
 import com.crispy.tv.settings.AiInsightsSettings
 import com.crispy.tv.settings.AiInsightsSettingsStore
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED
+import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED
+import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_MUTED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_PREFS_NAME
 
 class ProfileDataCloudSync(
@@ -114,17 +116,26 @@ class ProfileDataCloudSync(
     }
 
     private fun applyPlaybackSettings(settings: Map<String, String>) {
-        val raw = settings[KEY_PLAYBACK_SKIP_INTRO_ENABLED] ?: return
-        val parsed = raw.trim().lowercase()
-        val enabled =
-            when (parsed) {
-                "true" -> true
-                "false" -> false
-                else -> return
-            }
-
         val prefs = context.getSharedPreferences(PLAYBACK_SETTINGS_PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED, enabled).apply()
+        val editor = prefs.edit()
+        var hasChanges = false
+
+        parseBooleanSetting(settings[KEY_PLAYBACK_SKIP_INTRO_ENABLED])?.let { enabled ->
+            editor.putBoolean(PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED, enabled)
+            hasChanges = true
+        }
+        parseBooleanSetting(settings[KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED])?.let { enabled ->
+            editor.putBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED, enabled)
+            hasChanges = true
+        }
+        parseBooleanSetting(settings[KEY_PLAYBACK_TRAILER_MUTED])?.let { muted ->
+            editor.putBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_MUTED, muted)
+            hasChanges = true
+        }
+
+        if (hasChanges) {
+            editor.apply()
+        }
     }
 
     private fun applyAiInsightsSettings(settings: Map<String, String>) {
@@ -156,7 +167,11 @@ class ProfileDataCloudSync(
 
         val playbackPrefs = context.getSharedPreferences(PLAYBACK_SETTINGS_PREFS_NAME, Context.MODE_PRIVATE)
         val skipIntroEnabled = playbackPrefs.getBoolean(PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED, true)
+        val trailerAutoplayEnabled = playbackPrefs.getBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED, true)
+        val trailerMuted = playbackPrefs.getBoolean(PLAYBACK_SETTINGS_KEY_TRAILER_MUTED, false)
         result[KEY_PLAYBACK_SKIP_INTRO_ENABLED] = skipIntroEnabled.toString()
+        result[KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED] = trailerAutoplayEnabled.toString()
+        result[KEY_PLAYBACK_TRAILER_MUTED] = trailerMuted.toString()
 
         val aiSettings: AiInsightsSettings = aiInsightsSettingsStore.loadSettings()
         result[KEY_AI_INSIGHTS_MODE] = aiSettings.mode.raw
@@ -181,11 +196,21 @@ class ProfileDataCloudSync(
 
     private companion object {
         private const val KEY_PLAYBACK_SKIP_INTRO_ENABLED = "playback.skip_intro_enabled"
+        private const val KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED = "playback.trailer_autoplay_enabled"
+        private const val KEY_PLAYBACK_TRAILER_MUTED = "playback.trailer_muted"
 
         private const val KEY_AI_INSIGHTS_MODE = "ai.insights.mode"
         private const val KEY_AI_INSIGHTS_MODEL_TYPE = "ai.insights.model_type"
         private const val KEY_AI_INSIGHTS_CUSTOM_MODEL_NAME = "ai.insights.custom_model_name"
 
         private const val KEY_AI_OPENROUTER_KEY = "ai.openrouter_key"
+    }
+}
+
+private fun parseBooleanSetting(raw: String?): Boolean? {
+    return when (raw?.trim()?.lowercase()) {
+        "true" -> true
+        "false" -> false
+        else -> null
     }
 }
