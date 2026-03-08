@@ -5,6 +5,8 @@ import com.crispy.tv.domain.catalog.TmdbSearchResultInput
 import com.crispy.tv.domain.catalog.normalizeTmdbSearchResults
 import com.crispy.tv.metadata.tmdb.TmdbJsonClient
 import com.crispy.tv.network.CrispyHttpClient
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -29,18 +31,102 @@ class TmdbSearchRepository internal constructor(
                 "language" to languageTag
             )
 
-        val inputs =
-            when (filter) {
-                SearchTypeFilter.ALL -> {
-                    val movies = fetchInputs(path = "search/movie", mediaTypeHint = "movie", query = requestQuery)
-                    val series = fetchInputs(path = "search/tv", mediaTypeHint = "tv", query = requestQuery)
-                    interleave(movies, series)
-                }
-                SearchTypeFilter.MOVIES -> fetchInputs(path = "search/movie", mediaTypeHint = "movie", query = requestQuery)
-                SearchTypeFilter.SERIES -> fetchInputs(path = "search/tv", mediaTypeHint = "tv", query = requestQuery)
-                SearchTypeFilter.PEOPLE -> fetchInputs(path = "search/person", mediaTypeHint = "person", query = requestQuery)
+        return when (filter) {
+            SearchTypeFilter.ALL -> {
+                fetchInterleavedCatalogItems(
+                    first = EndpointRequest(path = "search/movie", mediaTypeHint = "movie", query = requestQuery),
+                    second = EndpointRequest(path = "search/tv", mediaTypeHint = "tv", query = requestQuery)
+                )
             }
+            SearchTypeFilter.MOVIES -> {
+                fetchCatalogItems(path = "search/movie", mediaTypeHint = "movie", query = requestQuery)
+            }
+            SearchTypeFilter.SERIES -> {
+                fetchCatalogItems(path = "search/tv", mediaTypeHint = "tv", query = requestQuery)
+            }
+            SearchTypeFilter.PEOPLE -> {
+                fetchCatalogItems(path = "search/person", mediaTypeHint = "person", query = requestQuery)
+            }
+        }
+    }
 
+    suspend fun discoverByGenre(
+        genreSuggestion: SearchGenreSuggestion,
+        filter: SearchTypeFilter,
+        languageTag: String?
+    ): List<CatalogItem> {
+        return when (filter) {
+            SearchTypeFilter.ALL -> {
+                val movieRequest =
+                    EndpointRequest(
+                        path = "discover/movie",
+                        mediaTypeHint = "movie",
+                        query = discoverQuery(genreSuggestion.movieGenreId, languageTag),
+                        genreLabel = genreSuggestion.label
+                    )
+                val tvRequest =
+                    genreSuggestion.tvGenreId?.let { genreId ->
+                        EndpointRequest(
+                            path = "discover/tv",
+                            mediaTypeHint = "tv",
+                            query = discoverQuery(genreId, languageTag),
+                            genreLabel = genreSuggestion.label
+                        )
+                    }
+
+                if (tvRequest == null) {
+                    fetchCatalogItems(movieRequest)
+                } else {
+                    fetchInterleavedCatalogItems(movieRequest, tvRequest)
+                }
+            }
+            SearchTypeFilter.MOVIES -> {
+                fetchCatalogItems(
+                    path = "discover/movie",
+                    mediaTypeHint = "movie",
+                    query = discoverQuery(genreSuggestion.movieGenreId, languageTag),
+                    genreLabel = genreSuggestion.label
+                )
+            }
+            SearchTypeFilter.SERIES -> {
+                val genreId = genreSuggestion.tvGenreId ?: return emptyList()
+                fetchCatalogItems(
+                    path = "discover/tv",
+                    mediaTypeHint = "tv",
+                    query = discoverQuery(genreId, languageTag),
+                    genreLabel = genreSuggestion.label
+                )
+            }
+            SearchTypeFilter.PEOPLE -> emptyList()
+        }
+    }
+
+    private suspend fun fetchInterleavedCatalogItems(
+        first: EndpointRequest,
+        second: EndpointRequest
+    ): List<CatalogItem> =
+        coroutineScope {
+            val firstItems = async { fetchCatalogItems(first) }
+            val secondItems = async { fetchCatalogItems(second) }
+            interleave(firstItems.await(), secondItems.await())
+        }
+
+    private suspend fun fetchCatalogItems(request: EndpointRequest): List<CatalogItem> {
+        return fetchCatalogItems(
+            path = request.path,
+            mediaTypeHint = request.mediaTypeHint,
+            query = request.query,
+            genreLabel = request.genreLabel
+        )
+    }
+
+    private suspend fun fetchCatalogItems(
+        path: String,
+        mediaTypeHint: String?,
+        query: Map<String, String?>,
+        genreLabel: String? = null
+    ): List<CatalogItem> {
+        val inputs = fetchInputs(path = path, mediaTypeHint = mediaTypeHint, query = query)
         val normalized = normalizeTmdbSearchResults(inputs)
         val withImagesOnly = normalized.filter { item -> !item.imageUrl.isNullOrBlank() }
         return withImagesOnly.map { item ->
@@ -53,9 +139,19 @@ class TmdbSearchRepository internal constructor(
                 type = item.type,
                 rating = item.rating?.toString(),
                 year = item.year?.toString(),
-                genre = null
+                genre = genreLabel
             )
         }
+    }
+
+    private fun discoverQuery(genreId: Int, languageTag: String?): Map<String, String?> {
+        return mapOf(
+            "with_genres" to genreId.toString(),
+            "page" to "1",
+            "include_adult" to "false",
+            "sort_by" to "popularity.desc",
+            "language" to languageTag
+        )
     }
 
     private suspend fun fetchInputs(
@@ -114,4 +210,11 @@ class TmdbSearchRepository internal constructor(
             }
         return number?.takeIf { it.isFinite() }
     }
+
+    private data class EndpointRequest(
+        val path: String,
+        val mediaTypeHint: String?,
+        val query: Map<String, String?>,
+        val genreLabel: String? = null
+    )
 }

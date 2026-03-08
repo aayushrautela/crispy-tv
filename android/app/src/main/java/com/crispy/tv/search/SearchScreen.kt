@@ -1,11 +1,14 @@
 package com.crispy.tv.search
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -17,42 +20,42 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 
 @Composable
 fun SearchRoute(
-    onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -70,161 +73,175 @@ fun SearchRoute(
         onQueryChange = viewModel::updateQuery,
         onClearQuery = viewModel::clearQuery,
         onFilterChange = viewModel::setFilter,
-        onBack = onBack,
+        onGenreSuggestionClick = viewModel::selectGenreSuggestion,
+        onClearGenreSuggestion = viewModel::clearGenreSuggestion,
         onItemClick = onItemClick
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SearchScreen(
     uiState: SearchUiState,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
     onFilterChange: (SearchTypeFilter) -> Unit,
-    onBack: () -> Unit,
+    onGenreSuggestionClick: (SearchGenreSuggestion) -> Unit,
+    onClearGenreSuggestion: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val query = uiState.query.trim()
-    val filters =
-        remember {
-            listOf(
-                SearchTypeFilter.ALL to "All",
-                SearchTypeFilter.MOVIES to "Movies",
-                SearchTypeFilter.SERIES to "Series",
-                SearchTypeFilter.PEOPLE to "People"
-            )
+    val activeGenreSuggestion = uiState.activeGenreSuggestion
+    val filters = SearchTypeFilter.entries
+    val genreSuggestions = SearchGenreSuggestion.entries
+
+    Scaffold(
+        topBar = {
+            StandardTopAppBar(title = "Search")
         }
-
-    var expanded by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        expanded = true
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        SearchBar(
-            inputField = {
-                SearchBarDefaults.InputField(
-                    query = uiState.query,
-                    onQueryChange = onQueryChange,
-                    onSearch = { },
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it },
-                    placeholder = { Text("Search") },
+    ) { innerPadding ->
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 124.dp),
+            modifier = Modifier.fillMaxSize().imePadding(),
+            contentPadding =
+                PaddingValues(
+                    start = pageHorizontalPadding,
+                    end = pageHorizontalPadding,
+                    top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
+                    bottom = Dimensions.PageBottomPadding
+                ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                OutlinedTextField(
+                    value = uiState.query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Search movies, shows, and people") },
                     leadingIcon = {
-                        if (expanded) {
-                            IconButton(
-                                onClick = {
-                                    expanded = false
-                                    onBack()
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                    contentDescription = "Back"
-                                )
-                            }
-                        } else {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = "Search"
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = null
+                        )
                     },
                     trailingIcon = {
                         if (uiState.query.isNotBlank()) {
                             IconButton(onClick = onClearQuery) {
                                 Icon(
                                     imageVector = Icons.Outlined.Clear,
-                                    contentDescription = "Clear"
+                                    contentDescription = "Clear search"
                                 )
                             }
                         }
                     }
                 )
-            },
-            expanded = expanded,
-            onExpandedChange = { 
-                expanded = it
-                if (!it && query.isBlank()) {
-                    onBack()
+            }
+
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filters, key = { it.name }) { filter ->
+                        FilterChip(
+                            selected = uiState.filter == filter,
+                            onClick = { onFilterChange(filter) },
+                            label = { Text(filter.label) }
+                        )
+                    }
                 }
-            },
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(horizontal = if (expanded) 0.dp else pageHorizontalPadding)
-                .padding(top = if (expanded) 0.dp else Dimensions.SmallSpacing)
-        ) {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 124.dp),
-                modifier = Modifier.fillMaxSize().imePadding(),
-                contentPadding =
-                    PaddingValues(
-                        start = pageHorizontalPadding,
-                        end = pageHorizontalPadding,
-                        top = Dimensions.SmallSpacing,
-                        bottom = Dimensions.PageBottomPadding
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            }
+
+            if (activeGenreSuggestion != null) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(filters, key = { it.first.name }) { (filter, label) ->
-                            FilterChip(
-                                selected = uiState.filter == filter,
-                                onClick = { onFilterChange(filter) },
-                                label = { Text(label) }
-                            )
-                        }
-                    }
+                    ActiveGenreSuggestionHeader(
+                        genreSuggestion = activeGenreSuggestion,
+                        onClear = onClearGenreSuggestion
+                    )
                 }
+            }
 
-                if (query.isBlank()) {
+            when {
+                uiState.showGenreSuggestions -> {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        SearchEmptyState(text = "Start typing to search")
+                        Text(
+                            text = "Explore genres",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
+                        )
                     }
-                    return@LazyVerticalGrid
+                    items(genreSuggestions, key = { it.name }) { genre ->
+                        GenreCard(
+                            genre = genre,
+                            onClick = { onGenreSuggestionClick(genre) }
+                        )
+                    }
                 }
 
-                if (uiState.isSearching) {
+                uiState.showBlankSearchHint -> {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SearchEmptyState(text = "Search for people by name")
+                    }
+                }
+
+                uiState.isLoading -> {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         SearchLoadingIndicator()
                     }
                 }
 
-                if (!uiState.isSearching && uiState.results.isEmpty()) {
+                uiState.results.isEmpty() -> {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        SearchEmptyState(text = "No results")
+                        SearchEmptyState(
+                            text = activeGenreSuggestion?.let { "No ${it.label} titles found" } ?: "No results"
+                        )
                     }
                 }
 
-                items(
-                    items = uiState.results,
-                    key = { "${it.type}:${it.id}" }
-                ) { item ->
-                    PosterCard(
-                        title = item.title,
-                        posterUrl = item.posterUrl,
-                        backdropUrl = item.backdropUrl,
-                        rating = item.rating,
-                        year = item.year,
-                        genre = item.genre,
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onItemClick(item) }
-                    )
+                else -> {
+                    items(
+                        items = uiState.results,
+                        key = { "${it.type}:${it.id}" }
+                    ) { item ->
+                        PosterCard(
+                            title = item.title,
+                            posterUrl = item.posterUrl,
+                            backdropUrl = item.backdropUrl,
+                            rating = item.rating,
+                            year = item.year,
+                            genre = item.genre,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onItemClick(item) }
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ActiveGenreSuggestionHeader(
+    genreSuggestion: SearchGenreSuggestion,
+    onClear: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Showing ${genreSuggestion.label}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        IconButton(onClick = onClear) {
+            Icon(
+                imageVector = Icons.Outlined.Clear,
+                contentDescription = "Clear genre suggestion"
+            )
         }
     }
 }
@@ -252,5 +269,50 @@ private fun SearchLoadingIndicator() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         LoadingIndicator(modifier = Modifier.size(36.dp))
+    }
+}
+
+@Composable
+private fun GenreCard(
+    genre: SearchGenreSuggestion,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Image(
+            painter = painterResource(id = genre.imageRes),
+            contentDescription = genre.label,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.8f)
+                        ),
+                        startY = 0f,
+                        endY = Float.POSITIVE_INFINITY
+                    )
+                )
+        )
+        Text(
+            text = genre.label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(12.dp)
+        )
     }
 }

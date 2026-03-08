@@ -31,9 +31,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onThisWeekSeeAllClick = {
                 navController.navigate(AppRoutes.CalendarRoute)
             },
-            onSearchClick = {
-                navController.navigate(AppRoutes.SearchRoute)
-            },
             onProfileClick = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
             },

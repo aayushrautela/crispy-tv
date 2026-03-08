@@ -19,16 +19,38 @@ enum class SearchTypeFilter {
     ALL,
     MOVIES,
     SERIES,
-    PEOPLE
+    PEOPLE;
+
+    val label: String
+        get() =
+            when (this) {
+                ALL -> "All"
+                MOVIES -> "Movies"
+                SERIES -> "Series"
+                PEOPLE -> "People"
+            }
+
+    val supportsGenreSuggestions: Boolean
+        get() = this != PEOPLE
 }
 
 @Immutable
 data class SearchUiState(
     val query: String = "",
     val filter: SearchTypeFilter = SearchTypeFilter.ALL,
-    val isSearching: Boolean = false,
+    val activeGenreSuggestion: SearchGenreSuggestion? = null,
+    val isLoading: Boolean = false,
     val results: List<CatalogItem> = emptyList()
-)
+) {
+    val trimmedQuery: String
+        get() = query.trim()
+
+    val showGenreSuggestions: Boolean
+        get() = trimmedQuery.isBlank() && activeGenreSuggestion == null && filter.supportsGenreSuggestions
+
+    val showBlankSearchHint: Boolean
+        get() = trimmedQuery.isBlank() && activeGenreSuggestion == null && !filter.supportsGenreSuggestions
+}
 
 class SearchViewModel(
     private val searchRepository: TmdbSearchRepository,
@@ -42,34 +64,87 @@ class SearchViewModel(
     private var searchToken: Long = 0
 
     fun updateQuery(query: String) {
-        _uiState.value = _uiState.value.copy(query = query)
-        scheduleSearch()
+        val currentState = _uiState.value
+        val visibleResults =
+            currentState.results.takeUnless { currentState.activeGenreSuggestion != null } ?: emptyList()
+
+        _uiState.value =
+            currentState.copy(
+                query = query,
+                activeGenreSuggestion = null,
+                results = visibleResults
+            )
+
+        if (query.trim().isBlank()) {
+            clearResults()
+            return
+        }
+
+        loadResults(debounceMs = QUERY_DEBOUNCE_MS)
     }
 
     fun clearQuery() {
-        searchJob?.cancel()
-        _uiState.value = _uiState.value.copy(query = "", isSearching = false, results = emptyList())
+        _uiState.value = _uiState.value.copy(query = "", activeGenreSuggestion = null)
+        clearResults()
+    }
+
+    fun selectGenreSuggestion(genreSuggestion: SearchGenreSuggestion) {
+        if (!_uiState.value.filter.supportsGenreSuggestions) {
+            return
+        }
+
+        _uiState.value =
+            _uiState.value.copy(
+                query = "",
+                activeGenreSuggestion = genreSuggestion
+            )
+        loadResults()
+    }
+
+    fun clearGenreSuggestion() {
+        _uiState.value = _uiState.value.copy(activeGenreSuggestion = null)
+        clearResults()
     }
 
     fun setFilter(filter: SearchTypeFilter) {
-        if (_uiState.value.filter == filter) {
+        val currentState = _uiState.value
+        if (currentState.filter == filter) {
             return
         }
-        _uiState.value = _uiState.value.copy(filter = filter)
-        scheduleSearch()
+
+        _uiState.value =
+            currentState.copy(
+                filter = filter,
+                activeGenreSuggestion = currentState.activeGenreSuggestion.takeIf { filter.supportsGenreSuggestions }
+            )
+
+        when {
+            _uiState.value.trimmedQuery.isNotBlank() -> loadResults()
+            _uiState.value.activeGenreSuggestion != null -> loadResults()
+            else -> clearResults()
+        }
     }
 
-    private fun scheduleSearch() {
+    private fun clearResults() {
+        searchToken += 1
+        searchJob?.cancel()
+        _uiState.value = _uiState.value.copy(isLoading = false, results = emptyList())
+    }
+
+    private fun loadResults(debounceMs: Long = 0L) {
         searchToken += 1
         val token = searchToken
         searchJob?.cancel()
         searchJob =
             viewModelScope.launch {
-                delay(250)
+                if (debounceMs > 0L) {
+                    delay(debounceMs)
+                }
 
-                val query = _uiState.value.query.trim()
-                if (query.isBlank()) {
-                    _uiState.value = _uiState.value.copy(isSearching = false, results = emptyList())
+                val state = _uiState.value
+                val request = state.toSearchRequest()
+                if (request is SearchRequest.Idle) {
+                    _uiState.value = state.copy(isLoading = false, results = emptyList())
                     return@launch
                 }
 
@@ -77,18 +152,29 @@ class SearchViewModel(
                     return@launch
                 }
 
-                _uiState.value = _uiState.value.copy(isSearching = true)
+                _uiState.value = state.copy(isLoading = true)
 
                 val languageTag = localeProvider().toTmdbLanguageTag()
-                val filter = _uiState.value.filter
                 val results =
                     withContext(Dispatchers.IO) {
                         runCatching {
-                            searchRepository.search(
-                                query = query,
-                                filter = filter,
-                                languageTag = languageTag
-                            )
+                            when (request) {
+                                is SearchRequest.Text -> {
+                                    searchRepository.search(
+                                        query = request.query,
+                                        filter = state.filter,
+                                        languageTag = languageTag
+                                    )
+                                }
+                                is SearchRequest.Genre -> {
+                                    searchRepository.discoverByGenre(
+                                        genreSuggestion = request.genreSuggestion,
+                                        filter = state.filter,
+                                        languageTag = languageTag
+                                    )
+                                }
+                                SearchRequest.Idle -> emptyList()
+                            }
                         }.getOrElse { emptyList() }
                     }
 
@@ -96,8 +182,24 @@ class SearchViewModel(
                     return@launch
                 }
 
-                _uiState.value = _uiState.value.copy(isSearching = false, results = results)
+                _uiState.value = _uiState.value.copy(isLoading = false, results = results)
             }
+    }
+
+    private fun SearchUiState.toSearchRequest(): SearchRequest {
+        return when {
+            trimmedQuery.isNotBlank() -> SearchRequest.Text(trimmedQuery)
+            activeGenreSuggestion != null && filter.supportsGenreSuggestions -> SearchRequest.Genre(activeGenreSuggestion)
+            else -> SearchRequest.Idle
+        }
+    }
+
+    private sealed interface SearchRequest {
+        data object Idle : SearchRequest
+
+        data class Text(val query: String) : SearchRequest
+
+        data class Genre(val genreSuggestion: SearchGenreSuggestion) : SearchRequest
     }
 
     private fun Locale.toTmdbLanguageTag(): String? {
@@ -107,6 +209,8 @@ class SearchViewModel(
     }
 
     companion object {
+        private const val QUERY_DEBOUNCE_MS = 250L
+
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext
             return object : ViewModelProvider.Factory {
