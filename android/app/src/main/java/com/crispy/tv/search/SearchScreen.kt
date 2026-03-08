@@ -1,5 +1,6 @@
 package com.crispy.tv.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,13 +103,17 @@ private fun SearchScreen(
         expanded = true
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         SearchBar(
             inputField = {
                 SearchBarDefaults.InputField(
                     query = uiState.query,
                     onQueryChange = onQueryChange,
-                    onSearch = { expanded = false },
+                    onSearch = { },
                     expanded = expanded,
                     onExpandedChange = { expanded = it },
                     placeholder = { Text("Search") },
