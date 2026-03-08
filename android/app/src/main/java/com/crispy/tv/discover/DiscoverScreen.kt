@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,7 @@ enum class DiscoverTypeFilter(val label: String, val mediaType: String?) {
     Series(label = "Series", mediaType = "series")
 }
 
+@Immutable
 data class DiscoverUiState(
     val typeFilter: DiscoverTypeFilter = DiscoverTypeFilter.Movies,
     val isRefreshing: Boolean = false,

@@ -1,6 +1,7 @@
 package com.crispy.tv.details
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -49,11 +50,13 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.roundToInt
 
+@Immutable
 data class EpisodeWatchState(
     val progressPercent: Double = 0.0,
     val isWatched: Boolean = false,
 )
 
+@Immutable
 data class DetailsUiState(
     val itemId: String,
     val isLoading: Boolean = true,
@@ -85,6 +88,7 @@ data class DetailsUiState(
         get() = selectedSeason ?: seasons.firstOrNull()
 }
 
+@Immutable
 data class StreamProviderUiState(
     val providerId: String,
     val providerName: String,
@@ -94,6 +98,7 @@ data class StreamProviderUiState(
     val attemptedUrl: String? = null,
 )
 
+@Immutable
 data class StreamSelectorUiState(
     val visible: Boolean = false,
     val mediaType: MetadataLabMediaType? = null,

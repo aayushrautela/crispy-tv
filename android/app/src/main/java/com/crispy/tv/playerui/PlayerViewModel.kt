@@ -1,5 +1,6 @@
 package com.crispy.tv.playerui
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+@Immutable
 data class PlayerUiState(
     val playbackUrl: String,
     val title: String,

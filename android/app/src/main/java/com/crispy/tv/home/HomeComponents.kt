@@ -1,6 +1,5 @@
 package com.crispy.tv.home
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -67,21 +66,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.metadata.tmdb.TmdbApi
-import java.util.Locale
+import kotlinx.coroutines.flow.StateFlow
 
 import com.crispy.tv.ui.components.skeletonElement
 
 @Composable
 internal fun HomeRailSection(
     title: String,
-    items: List<ContinueWatchingItem>,
+    items: List<HomeWatchActivityItemUi>,
     statusMessage: String,
     actionMenuContentDescription: String,
-    subtitleFor: (ContinueWatchingItem) -> String,
     onItemClick: (ContinueWatchingItem) -> Unit,
     onHideItem: ((ContinueWatchingItem) -> Unit)? = null,
     onRemoveItem: ((ContinueWatchingItem) -> Unit)? = null,
@@ -118,7 +117,8 @@ internal fun HomeRailSection(
                         }
                     }
                 } else {
-                    items(items, key = { "${it.type}:${it.id}" }) { item ->
+                    items(items, key = { "${it.item.type}:${it.item.id}" }) { railItem ->
+                        val item = railItem.item
                         if (usePosterCardStyle) {
                             HomeRailPosterCard(
                                 item = item,
@@ -127,7 +127,7 @@ internal fun HomeRailSection(
                         } else {
                             HomeRailCard(
                                 item = item,
-                                subtitle = subtitleFor(item),
+                                subtitle = railItem.subtitle,
                                 actionMenuContentDescription = actionMenuContentDescription,
                                 onClick = { onItemClick(item) },
                                 onHideClick = onHideItem?.let { { it(item) } },
@@ -249,18 +249,9 @@ private fun LandscapeArtworkFrame(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.08f),
-                            Color.Black.copy(alpha = 0.24f),
-                            Color.Black.copy(alpha = 0.82f),
-                        ),
-                    ),
-                ),
+        HomeArtworkBottomScrim(
+            heightFraction = 0.52f,
+            maxAlpha = 0.82f,
         )
 
         if (!badgeLabel.isNullOrBlank()) {
@@ -301,6 +292,27 @@ private fun LandscapeArtworkFrame(
             }
         }
     }
+}
+
+@Composable
+private fun BoxScope.HomeArtworkBottomScrim(
+    heightFraction: Float,
+    maxAlpha: Float,
+) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .fillMaxHeight(heightFraction.coerceIn(0f, 1f))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = maxAlpha),
+                    ),
+                ),
+            ),
+    )
 }
 
 @Composable
@@ -636,13 +648,19 @@ internal fun HomeCatalogSectionRow(
 
 @Composable
 internal fun HomeCollectionSectionRow(
-    sections: List<HomeCatalogSectionUi>,
+    sections: List<CatalogSectionRef>,
+    sectionState: (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem) -> Unit,
 ) {
+    val sectionStates = mutableListOf<HomeCatalogSectionUi>()
+    for (section in sections) {
+        val sectionUi by sectionState(section).collectAsStateWithLifecycle()
+        sectionStates += sectionUi
+    }
     val visibleSections =
-        remember(sections) {
-            sections.filter {
+        remember(sectionStates) {
+            sectionStates.filter {
                 it.isLoading || it.items.isNotEmpty() || it.statusMessage.isNotBlank()
             }
         }
@@ -709,17 +727,9 @@ private fun HomeCollectionCard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.08f),
-                                    Color.Black.copy(alpha = 0.78f)
-                                )
-                            )
-                        )
+                HomeArtworkBottomScrim(
+                    heightFraction = 0.56f,
+                    maxAlpha = 0.78f,
                 )
 
                 Column(
@@ -1066,27 +1076,6 @@ internal fun HomeCatalogPosterCard(
     }
 }
 
-internal fun continueWatchingSubtitle(item: ContinueWatchingItem): String {
-    val upNext = if (item.isUpNextPlaceholder) "Up Next" else null
-    val seasonEpisode =
-        if (
-            item.type.equals("series", ignoreCase = true) &&
-                item.season != null &&
-                item.episode != null
-        ) {
-            String.format(Locale.US, "S%02d:E%02d", item.season, item.episode)
-        } else {
-            null
-        }
-    val relativeWatched = DateUtils.getRelativeTimeSpanString(
-        item.watchedAtEpochMs,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS
-    ).toString()
-
-    return listOfNotNull(upNext, seasonEpisode, relativeWatched).joinToString(separator = " • ")
-}
-
 @Composable
 internal fun ThisWeekSection(
     items: List<CalendarEpisodeItem>,
@@ -1313,17 +1302,9 @@ internal fun HomeHeroCarousel(
                     contentScale = ContentScale.Crop
                 )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.72f)
-                                )
-                            )
-                        )
+                HomeArtworkBottomScrim(
+                    heightFraction = 0.46f,
+                    maxAlpha = 0.72f,
                 )
 
                 Column(

@@ -1,6 +1,7 @@
 package com.crispy.tv.search
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,7 @@ enum class SearchTypeFilter {
     PEOPLE
 }
 
+@Immutable
 data class SearchUiState(
     val query: String = "",
     val filter: SearchTypeFilter = SearchTypeFilter.ALL,

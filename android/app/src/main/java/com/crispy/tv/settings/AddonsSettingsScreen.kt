@@ -45,6 +45,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -83,6 +84,7 @@ import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.util.Locale
 
+@Immutable
 internal data class InstalledAddonUi(
     val installationId: String,
     val manifestUrl: String,
@@ -95,6 +97,7 @@ internal data class InstalledAddonUi(
     val types: List<String>
 )
 
+@Immutable
 internal data class PendingAddonInstallUi(
     val manifestUrl: String,
     val name: String,
@@ -108,6 +111,7 @@ internal data class PendingAddonInstallUi(
     val manifestJson: String
 )
 
+@Immutable
 internal data class AddonsSettingsUiState(
     val installedAddons: List<InstalledAddonUi> = emptyList(),
     val draftUrl: String = "",

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -38,10 +39,12 @@ import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import kotlinx.coroutines.flow.StateFlow
 
-@OptIn(ExperimentalMaterial3Api::class)
+private typealias HomeCatalogSectionStateProvider = (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>
+
 @Composable
-internal fun HomeScreen(
+internal fun HomeRoute(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
@@ -49,37 +52,59 @@ internal fun HomeScreen(
     onSearchClick: () -> Unit,
     onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
-    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit
+    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
     val viewModel: HomeViewModel = viewModel(
         factory = remember(appContext) {
             HomeViewModel.factory(appContext)
-        }
+        },
     )
-    val heroState by viewModel.heroState.collectAsStateWithLifecycle()
-    val continueWatchingState by viewModel.continueWatchingState.collectAsStateWithLifecycle()
-    val thisWeekState by viewModel.thisWeekState.collectAsStateWithLifecycle()
-    val catalogSectionsState by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
-    val headerCatalogSectionsState by viewModel.headerCatalogSectionsState.collectAsStateWithLifecycle()
+    val layoutState by viewModel.layoutState.collectAsStateWithLifecycle()
 
+    HomeScreen(
+        layoutState = layoutState,
+        heroState = viewModel.heroState,
+        continueWatchingState = viewModel.continueWatchingState,
+        upNextState = viewModel.upNextState,
+        thisWeekState = viewModel.thisWeekState,
+        catalogSectionState = viewModel::catalogSectionState,
+        onHideContinueWatchingItem = viewModel::hideContinueWatchingItem,
+        onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
+        onHeroClick = onHeroClick,
+        onContinueWatchingClick = onContinueWatchingClick,
+        onThisWeekClick = onThisWeekClick,
+        onThisWeekSeeAllClick = onThisWeekSeeAllClick,
+        onSearchClick = onSearchClick,
+        onProfileClick = onProfileClick,
+        onCatalogItemClick = onCatalogItemClick,
+        onCatalogSeeAllClick = onCatalogSeeAllClick,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeScreen(
+    layoutState: HomeLayoutState,
+    heroState: StateFlow<HeroState>,
+    continueWatchingState: StateFlow<HomeWatchActivityRailState>,
+    upNextState: StateFlow<HomeWatchActivityRailState>,
+    thisWeekState: StateFlow<ThisWeekState>,
+    catalogSectionState: HomeCatalogSectionStateProvider,
+    onHideContinueWatchingItem: (ContinueWatchingItem) -> Unit,
+    onRemoveContinueWatchingItem: (ContinueWatchingItem) -> Unit,
+    onHeroClick: (HomeHeroItem) -> Unit,
+    onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
+    onThisWeekClick: (CalendarEpisodeItem) -> Unit,
+    onThisWeekSeeAllClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onCatalogItemClick: (CatalogItem) -> Unit,
+    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
+) {
     val horizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val headerSections =
-        remember(headerCatalogSectionsState.sections) {
-            headerCatalogSectionsState.sections
-                .asSequence()
-                .filter { it.title.trim().isNotEmpty() }
-                .distinctBy { it.key }
-                .toList()
-        }
-    val (collectionSections, standardCatalogSections) =
-        remember(catalogSectionsState.sections) {
-            catalogSectionsState.sections.partition {
-                it.section.catalogId.startsWith(COLLECTION_CATALOG_PREFIX, ignoreCase = true)
-            }
-        }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -88,7 +113,7 @@ internal fun HomeScreen(
                 title = {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         CrispyWordmark(Modifier.height(36.dp))
 
@@ -97,16 +122,16 @@ internal fun HomeScreen(
                         IconButton(onClick = onSearchClick) {
                             Icon(
                                 imageVector = Icons.Outlined.Search,
-                                contentDescription = "Search"
+                                contentDescription = "Search",
                             )
                         }
 
                         HomeProfileSelector(onClick = onProfileClick)
                     }
                 },
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
             )
-        }
+        },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -114,107 +139,83 @@ internal fun HomeScreen(
                 start = horizontalPadding,
                 end = horizontalPadding,
                 top = innerPadding.calculateTopPadding(),
-                bottom = Dimensions.PageBottomPadding
+                bottom = Dimensions.PageBottomPadding,
             ),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing),
         ) {
-            if (headerSections.isNotEmpty()) {
+            if (layoutState.headerSections.isNotEmpty()) {
                 item(contentType = "headerSections") {
                     HomeHeaderSectionChips(
-                        sections = headerSections,
-                        onSectionClick = onCatalogSeeAllClick
+                        sections = layoutState.headerSections,
+                        onSectionClick = onCatalogSeeAllClick,
                     )
                 }
             }
 
             item(contentType = "hero") {
-                when {
-                    heroState.isLoading && heroState.items.isEmpty() -> {
-                        HomeHeroSkeleton()
-                    }
-
-                    heroState.items.isEmpty() -> {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = heroState.statusMessage,
-                                modifier = Modifier.padding(Dimensions.CardInternalPadding)
-                            )
-                        }
-                    }
-
-                    else -> {
-                        HomeHeroCarousel(
-                            items = heroState.items,
-                            selectedId = heroState.selectedId,
-                            onItemClick = onHeroClick
-                        )
-                    }
-                }
+                HomeHeroSection(
+                    heroState = heroState,
+                    onHeroClick = onHeroClick,
+                )
             }
 
-            if (continueWatchingState.isVisible) {
+            if (layoutState.showContinueWatching) {
                 item(contentType = "continueWatching") {
-                    HomeRailSection(
-                        title = "Continue Watching",
-                        items = continueWatchingState.items,
-                        statusMessage = continueWatchingState.statusMessage,
-                        actionMenuContentDescription = "Continue watching actions",
-                        subtitleFor = ::continueWatchingSubtitle,
+                    HomeContinueWatchingSection(
+                        continueWatchingState = continueWatchingState,
                         onItemClick = onContinueWatchingClick,
-                        onHideItem = viewModel::hideContinueWatchingItem,
-                        onRemoveItem = viewModel::removeContinueWatchingItem,
-                        badgeLabelFor = { item -> if (item.isUpNextPlaceholder) "Up Next" else null },
-                        showProgressBarFor = { item -> !item.isUpNextPlaceholder && item.progressPercent > 0 },
-                        showTitleFallbackWhenNoLogo = true,
-                        useBottomSheetActions = true,
-                        isLoading = continueWatchingState.isLoading
+                        onHideItem = onHideContinueWatchingItem,
+                        onRemoveItem = onRemoveContinueWatchingItem,
                     )
                 }
             }
 
-            if (thisWeekState.isVisible) {
+            if (layoutState.showUpNext) {
+                item(contentType = "upNext") {
+                    HomeUpNextSection(
+                        upNextState = upNextState,
+                        onItemClick = onContinueWatchingClick,
+                    )
+                }
+            }
+
+            if (layoutState.showThisWeek) {
                 item(contentType = "thisWeek") {
-                    ThisWeekSection(
-                        items = thisWeekState.items,
-                        isLoading = thisWeekState.isLoading,
-                        statusMessage = thisWeekState.statusMessage,
+                    HomeThisWeekRail(
+                        thisWeekState = thisWeekState,
                         onItemClick = onThisWeekClick,
                         onViewAllClick = onThisWeekSeeAllClick,
                     )
                 }
             }
 
-            if (collectionSections.isNotEmpty()) {
+            if (layoutState.collectionSections.isNotEmpty()) {
                 item(contentType = "collections") {
                     HomeCollectionSectionRow(
-                        sections = collectionSections,
+                        sections = layoutState.collectionSections,
+                        sectionState = catalogSectionState,
                         onCollectionClick = onCatalogSeeAllClick,
-                        onItemClick = onCatalogItemClick
+                        onItemClick = onCatalogItemClick,
                     )
                 }
             }
 
-            if (catalogSectionsState.sections.isEmpty() && catalogSectionsState.statusMessage.isNotBlank()) {
+            if (!layoutState.hasCatalogSections && layoutState.catalogStatusMessage.isNotBlank()) {
                 item(contentType = "catalogStatus") {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = catalogSectionsState.statusMessage,
-                            modifier = Modifier.padding(Dimensions.CardInternalPadding)
-                        )
-                    }
+                    HomeCatalogStatusCard(statusMessage = layoutState.catalogStatusMessage)
                 }
             }
 
-            if (catalogSectionsState.sections.isNotEmpty()) {
+            if (layoutState.standardCatalogSections.isNotEmpty()) {
                 items(
-                    items = standardCatalogSections,
-                    key = { it.section.key },
-                    contentType = { "catalogSection" }
-                ) { sectionUi ->
-                    HomeCatalogSectionRow(
-                        sectionUi = sectionUi,
-                        onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
-                        onItemClick = onCatalogItemClick
+                    items = layoutState.standardCatalogSections,
+                    key = { it.key },
+                    contentType = { "catalogSection" },
+                ) { section ->
+                    HomeCatalogSectionItem(
+                        sectionState = catalogSectionState(section),
+                        onSeeAllClick = onCatalogSeeAllClick,
+                        onItemClick = onCatalogItemClick,
                     )
                 }
             }
@@ -222,22 +223,135 @@ internal fun HomeScreen(
     }
 }
 
-private const val COLLECTION_CATALOG_PREFIX = "tmdb.collection."
+@Composable
+private fun HomeHeroSection(
+    heroState: StateFlow<HeroState>,
+    onHeroClick: (HomeHeroItem) -> Unit,
+) {
+    val state by heroState.collectAsStateWithLifecycle()
+
+    when {
+        state.isLoading && state.items.isEmpty() -> {
+            HomeHeroSkeleton()
+        }
+
+        state.items.isEmpty() -> {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = state.statusMessage,
+                    modifier = Modifier.padding(Dimensions.CardInternalPadding),
+                )
+            }
+        }
+
+        else -> {
+            HomeHeroCarousel(
+                items = state.items,
+                selectedId = state.selectedId,
+                onItemClick = onHeroClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeContinueWatchingSection(
+    continueWatchingState: StateFlow<HomeWatchActivityRailState>,
+    onItemClick: (ContinueWatchingItem) -> Unit,
+    onHideItem: (ContinueWatchingItem) -> Unit,
+    onRemoveItem: (ContinueWatchingItem) -> Unit,
+) {
+    val state by continueWatchingState.collectAsStateWithLifecycle()
+
+    HomeRailSection(
+        title = "Continue Watching",
+        items = state.items,
+        statusMessage = state.statusMessage,
+        actionMenuContentDescription = "Continue watching actions",
+        onItemClick = onItemClick,
+        onHideItem = onHideItem,
+        onRemoveItem = onRemoveItem,
+        showProgressBarFor = { item -> item.progressPercent > 0 },
+        showTitleFallbackWhenNoLogo = true,
+        useBottomSheetActions = true,
+        isLoading = state.isLoading,
+    )
+}
+
+@Composable
+private fun HomeUpNextSection(
+    upNextState: StateFlow<HomeWatchActivityRailState>,
+    onItemClick: (ContinueWatchingItem) -> Unit,
+) {
+    val state by upNextState.collectAsStateWithLifecycle()
+
+    HomeRailSection(
+        title = "Up Next",
+        items = state.items,
+        statusMessage = state.statusMessage,
+        actionMenuContentDescription = "Up next details",
+        onItemClick = onItemClick,
+        showTitleFallbackWhenNoLogo = true,
+        isLoading = state.isLoading,
+    )
+}
+
+@Composable
+private fun HomeThisWeekRail(
+    thisWeekState: StateFlow<ThisWeekState>,
+    onItemClick: (CalendarEpisodeItem) -> Unit,
+    onViewAllClick: () -> Unit,
+) {
+    val state by thisWeekState.collectAsStateWithLifecycle()
+
+    ThisWeekSection(
+        items = state.items,
+        isLoading = state.isLoading,
+        statusMessage = state.statusMessage,
+        onItemClick = onItemClick,
+        onViewAllClick = onViewAllClick,
+    )
+}
+
+@Composable
+private fun HomeCatalogStatusCard(statusMessage: String) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = statusMessage,
+            modifier = Modifier.padding(Dimensions.CardInternalPadding),
+        )
+    }
+}
+
+@Composable
+private fun HomeCatalogSectionItem(
+    sectionState: StateFlow<HomeCatalogSectionUi>,
+    onSeeAllClick: (CatalogSectionRef) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
+) {
+    val sectionUi by sectionState.collectAsStateWithLifecycle()
+
+    HomeCatalogSectionRow(
+        sectionUi = sectionUi,
+        onSeeAllClick = { onSeeAllClick(sectionUi.section) },
+        onItemClick = onItemClick,
+    )
+}
 
 @Composable
 private fun HomeHeaderSectionChips(
     sections: List<CatalogSectionRef>,
-    onSectionClick: (CatalogSectionRef) -> Unit
+    onSectionClick: (CatalogSectionRef) -> Unit,
 ) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(sections, key = { it.key }) { section ->
             FilterChip(
                 selected = false,
                 onClick = { onSectionClick(section) },
-                label = { Text(section.title) }
+                label = { Text(section.title) },
             )
         }
     }
@@ -248,7 +362,7 @@ private fun HomeProfileSelector(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
         Icon(
             imageVector = Icons.Outlined.Person,
-            contentDescription = "Profile"
+            contentDescription = "Profile",
         )
     }
 }

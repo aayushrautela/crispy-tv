@@ -1,6 +1,7 @@
 package com.crispy.tv.person
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -17,6 +18,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
+@Immutable
 data class PersonDetails(
     val tmdbPersonId: Int,
     val name: String,
@@ -31,6 +33,7 @@ data class PersonDetails(
     val knownFor: List<CatalogItem>
 )
 
+@Immutable
 data class PersonDetailsUiState(
     val isLoading: Boolean = true,
     val person: PersonDetails? = null,

@@ -1,5 +1,7 @@
 package com.crispy.tv.details
 
+import androidx.compose.runtime.Immutable
+
 enum class WatchCtaKind {
     WATCH,
     CONTINUE,
@@ -11,6 +13,7 @@ enum class WatchCtaIcon {
     REPLAY,
 }
 
+@Immutable
 data class WatchCta(
     val kind: WatchCtaKind = WatchCtaKind.WATCH,
     val label: String = "Watch now",

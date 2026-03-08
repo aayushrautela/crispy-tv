@@ -3,7 +3,6 @@ package com.crispy.tv.ui.navigation
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.crispy.tv.catalog.CatalogRoute
@@ -12,13 +11,13 @@ import com.crispy.tv.details.DetailsRoute
 import com.crispy.tv.home.CalendarEpisodeItem
 import com.crispy.tv.home.CalendarRoute
 import com.crispy.tv.home.CalendarSeriesItem
-import com.crispy.tv.home.HomeScreen
+import com.crispy.tv.home.HomeRoute
 import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) {
-        HomeScreen(
+        HomeRoute(
             onHeroClick = { hero ->
                 navController.navigate(AppRoutes.homeDetailsRoute(hero.id, hero.type))
             },

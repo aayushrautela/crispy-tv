@@ -28,6 +28,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +53,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Immutable
 data class ProviderPortalUiState(
     val traktRedirectUri: String = BuildConfig.TRAKT_REDIRECT_URI,
     val simklRedirectUri: String = BuildConfig.SIMKL_REDIRECT_URI,
