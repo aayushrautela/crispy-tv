@@ -94,10 +94,11 @@ internal fun JsonObject.requireJsonObject(key: String, path: Path): JsonObject {
         ?: error("${path.toDisplayPath()}: missing object '$key'")
 }
 
-internal fun JsonObject.optionalJsonObject(key: String): JsonObject? {
+internal fun JsonObject.optionalJsonObject(key: String, path: Path): JsonObject? {
     val value = this[key] ?: return null
     if (value is JsonNull) return null
-    return value.jsonObject
+    return value as? JsonObject
+        ?: error("${path.toDisplayPath()}: '$key' must be object or null")
 }
 
 internal fun JsonObject.requireJsonArray(key: String, path: Path): JsonArray {

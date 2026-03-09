@@ -47,7 +47,7 @@ class MetadataTmdbEnhancerContractTest {
             val expectedDerived = expected.requireJsonArray("derived_seasons", path).map {
                 parseMetadataSeason(it.jsonObject, path)
             }
-            val expectedBridgeCandidates = expected.requireJsonArray("bridge_candidate_ids", path).toStringList()
+            val expectedBridgeCandidates = expected.requireJsonArray("bridge_candidate_ids", path).toStringList(path)
 
             assertEquals(expectedDerived, actualDerived, "$caseId: derived_seasons")
             assertEquals(expectedBridgeCandidates, actualBridgeCandidates, "$caseId: bridge_candidate_ids")
@@ -58,11 +58,11 @@ class MetadataTmdbEnhancerContractTest {
         return MetadataRecord(
             id = json.requireString("id", path),
             imdbId = json.optionalString("imdb_id", path),
-            cast = json.requireJsonArray("cast", path).toStringList(),
-            director = json.requireJsonArray("director", path).toStringList(),
-            castWithDetails = json.requireJsonArray("cast_with_details", path).toStringList(),
-            similar = json.requireJsonArray("similar", path).toStringList(),
-            collectionItems = json.requireJsonArray("collection_items", path).toStringList(),
+            cast = json.requireJsonArray("cast", path).toStringList(path),
+            director = json.requireJsonArray("director", path).toStringList(path),
+            castWithDetails = json.requireJsonArray("cast_with_details", path).toStringList(path),
+            similar = json.requireJsonArray("similar", path).toStringList(path),
+            collectionItems = json.requireJsonArray("collection_items", path).toStringList(path),
             seasons = json.requireJsonArray("seasons", path).map { parseMetadataSeason(it.jsonObject, path) },
             videos = json.requireJsonArray("videos", path).map { parseMetadataVideo(it.jsonObject, path) },
         )

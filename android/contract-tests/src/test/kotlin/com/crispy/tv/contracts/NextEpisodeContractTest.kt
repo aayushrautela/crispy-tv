@@ -33,7 +33,7 @@ class NextEpisodeContractTest {
                 currentSeason = input.requireInt("current_season", path),
                 currentEpisode = input.requireInt("current_episode", path),
                 episodes = input.requireJsonArray("episodes", path).map { parseEpisode(it.jsonObject, path) },
-                watchedSet = input.optionalStringSet("watched_set"),
+                watchedSet = input.optionalStringSet("watched_set", path),
                 showId = input.optionalString("show_id", path),
                 nowMs = fixture.requireLong("now_ms", path),
             )
@@ -71,10 +71,10 @@ private fun JsonObject.requireLong(key: String, path: Path): Long {
         ?: throw AssertionError("${path.toDisplayPath()}: missing or invalid long '$key'")
 }
 
-private fun JsonObject.optionalStringSet(key: String): Set<String>? {
+private fun JsonObject.optionalStringSet(key: String, path: Path): Set<String>? {
     val element: JsonElement = this[key] ?: return null
     if (element is JsonNull) {
         return null
     }
-    return element.jsonArray.toStringList().toSet()
+    return element.jsonArray.toStringList(path).toSet()
 }

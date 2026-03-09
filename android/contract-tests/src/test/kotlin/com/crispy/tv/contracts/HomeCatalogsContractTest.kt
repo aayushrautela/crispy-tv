@@ -97,7 +97,7 @@ class HomeCatalogsContractTest {
             subtitle = json.optionalString("subtitle", path),
             heading = json.optionalString("heading", path),
             items = json.requireJsonArray("items", path).map { parseItem(it.jsonObject, path) },
-            mediaTypes = json.requireJsonArray("media_types", path).toStringList().toSet(),
+            mediaTypes = json.requireJsonArray("media_types", path).toStringList(path).toSet(),
         )
     }
 
@@ -137,7 +137,7 @@ class HomeCatalogsContractTest {
             description = json.requireString("description", path),
             rating = json.optionalString("rating", path),
             year = json.optionalString("year", path),
-            genres = json.requireJsonArray("genres", path).toStringList(),
+            genres = json.requireJsonArray("genres", path).toStringList(path),
             backdropUrl = json.requireString("backdrop_url", path),
             addonId = json.requireString("addon_id", path),
             type = json.requireString("type", path),
@@ -161,7 +161,7 @@ class HomeCatalogsContractTest {
         return HomeCatalogDiscoverRef(
             section = parseSection(json.requireJsonObject("section", path), path),
             addonName = json.requireString("addon_name", path),
-            genres = json.requireJsonArray("genres", path).toStringList(),
+            genres = json.requireJsonArray("genres", path).toStringList(path),
         )
     }
 
@@ -169,7 +169,7 @@ class HomeCatalogsContractTest {
         return HomeCatalogPageResult(
             items = json.requireJsonArray("items", path).map { parseItem(it.jsonObject, path) },
             statusMessage = json.requireString("status_message", path),
-            attemptedUrls = json.requireJsonArray("attempted_urls", path).toStringList(),
+            attemptedUrls = json.requireJsonArray("attempted_urls", path).toStringList(path),
         )
     }
 }
