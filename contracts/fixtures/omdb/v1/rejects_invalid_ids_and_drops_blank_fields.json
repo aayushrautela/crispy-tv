@@ -1,0 +1,38 @@
+{
+  "contract_version": 1,
+  "suite": "omdb",
+  "case_id": "rejects_invalid_ids_and_drops_blank_fields",
+  "input": {
+    "imdb_id": " imdb ",
+    "payload": {
+      "ratings": [
+        {
+          "source": "N/A",
+          "value": "90%"
+        },
+        {
+          "source": "Rotten Tomatoes",
+          "value": "N/A"
+        },
+        {
+          "source": null,
+          "value": "75%"
+        }
+      ],
+      "metascore": "N/A",
+      "imdb_rating": " ",
+      "imdb_votes": "",
+      "type": "N/A"
+    }
+  },
+  "expected": {
+    "normalized_imdb_id": null,
+    "details": {
+      "ratings": [],
+      "metascore": null,
+      "imdb_rating": null,
+      "imdb_votes": null,
+      "type": null
+    }
+  }
+}

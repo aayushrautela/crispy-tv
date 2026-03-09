@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["contract_version", "suite", "case_id", "input", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "metadata_tmdb_enhancer"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": ["media_type", "content_id", "season", "episode", "meta", "tmdb_meta"],
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {
+          "type": "string",
+          "enum": ["movie", "series"]
+        },
+        "content_id": {
+          "type": "string"
+        },
+        "season": {
+          "type": ["integer", "null"]
+        },
+        "episode": {
+          "type": ["integer", "null"]
+        },
+        "meta": {
+          "$ref": "#/$defs/metadata_record"
+        },
+        "tmdb_meta": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/metadata_record"
+            }
+          ]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["derived_seasons", "bridge_candidate_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "derived_seasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metadata_season"
+          }
+        },
+        "bridge_candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metadata_season": {
+      "type": "object",
+      "required": ["id", "name", "overview", "season_number", "episode_count", "air_date"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "overview": {
+          "type": "string"
+        },
+        "season_number": {
+          "type": "integer"
+        },
+        "episode_count": {
+          "type": "integer"
+        },
+        "air_date": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "metadata_video": {
+      "type": "object",
+      "required": ["season", "episode", "released"],
+      "additionalProperties": false,
+      "properties": {
+        "season": {
+          "type": ["integer", "null"]
+        },
+        "episode": {
+          "type": ["integer", "null"]
+        },
+        "released": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "metadata_record": {
+      "type": "object",
+      "required": [
+        "id",
+        "imdb_id",
+        "cast",
+        "director",
+        "cast_with_details",
+        "similar",
+        "collection_items",
+        "seasons",
+        "videos"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "imdb_id": {
+          "type": ["string", "null"]
+        },
+        "cast": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "director": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cast_with_details": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "similar": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "collection_items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metadata_season"
+          }
+        },
+        "videos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metadata_video"
+          }
+        }
+      }
+    }
+  }
+}

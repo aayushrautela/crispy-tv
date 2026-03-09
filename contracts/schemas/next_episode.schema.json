@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["contract_version", "suite", "case_id", "now_ms", "input", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "next_episode"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "now_ms": {
+      "type": "integer"
+    },
+    "input": {
+      "type": "object",
+      "required": ["current_season", "current_episode", "episodes"],
+      "additionalProperties": false,
+      "properties": {
+        "current_season": {
+          "type": "integer"
+        },
+        "current_episode": {
+          "type": "integer"
+        },
+        "show_id": {
+          "type": ["string", "null"]
+        },
+        "watched_set": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
+        },
+        "episodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["season", "episode"],
+            "additionalProperties": false,
+            "properties": {
+              "season": {
+                "type": "integer"
+              },
+              "episode": {
+                "type": "integer"
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "released": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["result"],
+      "additionalProperties": false,
+      "properties": {
+        "result": {
+          "type": ["object", "null"],
+          "required": ["season", "episode"],
+          "additionalProperties": false,
+          "properties": {
+            "season": {
+              "type": "integer"
+            },
+            "episode": {
+              "type": "integer"
+            },
+            "title": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

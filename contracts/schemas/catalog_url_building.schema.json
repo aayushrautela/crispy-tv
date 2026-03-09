@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["contract_version", "suite", "case_id", "input", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "catalog_url_building"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": ["base_url", "encoded_query", "media_type", "catalog_id", "skip", "limit", "filters"],
+      "additionalProperties": false,
+      "properties": {
+        "base_url": {
+          "type": "string"
+        },
+        "encoded_query": {
+          "type": ["string", "null"]
+        },
+        "media_type": {
+          "type": "string"
+        },
+        "catalog_id": {
+          "type": "string"
+        },
+        "skip": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["urls"],
+      "additionalProperties": false,
+      "properties": {
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

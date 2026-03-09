@@ -1,0 +1,210 @@
+{
+  "contract_version": 1,
+  "suite": "home_catalogs",
+  "case_id": "plans_hero_sections_discover_and_global_page",
+  "input": {
+    "snapshot": {
+      "profile_id": "profile-123",
+      "status_message": "",
+      "lists": [
+        {
+          "id": "hero.shelf",
+          "kind": "curated.hero",
+          "title": "Hero Shelf",
+          "subtitle": "Because you watched sci-fi",
+          "heading": null,
+          "media_types": ["movie"],
+          "items": [
+            {
+              "id": "movie-1",
+              "title": "Arrival",
+              "poster_url": null,
+              "backdrop_url": "https://img/arrival-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": "8.0",
+              "year": "2016",
+              "description": null
+            },
+            {
+              "id": "movie-2",
+              "title": "Dune",
+              "poster_url": "https://img/dune-poster.jpg",
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": "8.2",
+              "year": "2021",
+              "description": "Sand and prophecy"
+            },
+            {
+              "id": "movie-3",
+              "title": "No Art",
+              "poster_url": null,
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": null,
+              "year": null,
+              "description": null
+            }
+          ]
+        },
+        {
+          "id": "trending-series",
+          "kind": "rail",
+          "title": "Trending Series",
+          "subtitle": "Binge now",
+          "heading": null,
+          "media_types": ["series"],
+          "items": [
+            {
+              "id": "series-1",
+              "title": "Severance",
+              "poster_url": "https://img/severance.jpg",
+              "backdrop_url": "https://img/severance-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "series",
+              "rating": "8.7",
+              "year": "2022",
+              "description": "Work-life split"
+            },
+            {
+              "id": "series-2",
+              "title": "Silo",
+              "poster_url": "https://img/silo.jpg",
+              "backdrop_url": "https://img/silo-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "series",
+              "rating": "8.1",
+              "year": "2023",
+              "description": "Underground mystery"
+            }
+          ]
+        },
+        {
+          "id": "popular-movies",
+          "kind": "rail",
+          "title": "Popular Movies",
+          "subtitle": "Blockbusters",
+          "heading": null,
+          "media_types": ["movie"],
+          "items": [
+            {
+              "id": "movie-9",
+              "title": "Furiosa",
+              "poster_url": "https://img/furiosa.jpg",
+              "backdrop_url": "https://img/furiosa-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": "7.7",
+              "year": "2024",
+              "description": "Wasteland origin"
+            }
+          ]
+        }
+      ]
+    },
+    "hero_limit": 2,
+    "section_limit": 2,
+    "global_section_limit": 2,
+    "discover": {
+      "media_type": "series",
+      "limit": 3
+    },
+    "page": {
+      "catalog_id": "global:trending-series",
+      "page": 2,
+      "page_size": 1
+    }
+  },
+  "expected": {
+    "personal_feed": {
+      "hero_result": {
+        "items": [
+          {
+            "id": "movie-1",
+            "title": "Arrival",
+            "description": "Because you watched sci-fi",
+            "rating": "8.0",
+            "year": "2016",
+            "genres": [],
+            "backdrop_url": "https://img/arrival-backdrop.jpg",
+            "addon_id": "supabase",
+            "type": "movie"
+          },
+          {
+            "id": "movie-2",
+            "title": "Dune",
+            "description": "Sand and prophecy",
+            "rating": "8.2",
+            "year": "2021",
+            "genres": [],
+            "backdrop_url": "https://img/dune-poster.jpg",
+            "addon_id": "supabase",
+            "type": "movie"
+          }
+        ],
+        "status_message": ""
+      },
+      "sections": [
+        {
+          "title": "Trending Series",
+          "catalog_id": "trending-series",
+          "subtitle": "Binge now"
+        },
+        {
+          "title": "Popular Movies",
+          "catalog_id": "popular-movies",
+          "subtitle": "Blockbusters"
+        }
+      ],
+      "sections_status_message": ""
+    },
+    "global_sections": [
+      {
+        "title": "Trending Series",
+        "catalog_id": "global:trending-series",
+        "subtitle": "Binge now"
+      },
+      {
+        "title": "Popular Movies",
+        "catalog_id": "global:popular-movies",
+        "subtitle": "Blockbusters"
+      }
+    ],
+    "discover": {
+      "catalogs": [
+        {
+          "section": {
+            "title": "Trending Series",
+            "catalog_id": "trending-series",
+            "subtitle": "Binge now"
+          },
+          "addon_name": "Supabase",
+          "genres": []
+        }
+      ],
+      "status_message": ""
+    },
+    "page": {
+      "items": [
+        {
+          "id": "series-2",
+          "title": "Silo",
+          "poster_url": "https://img/silo.jpg",
+          "backdrop_url": "https://img/silo-backdrop.jpg",
+          "addon_id": "supabase",
+          "type": "series",
+          "rating": "8.1",
+          "year": "2023",
+          "description": "Underground mystery"
+        }
+      ],
+      "status_message": "",
+      "attempted_urls": [
+        "supabase:global_home_feed:profile-123:trending-series:page=2"
+      ]
+    }
+  }
+}

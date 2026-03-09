@@ -1,0 +1,99 @@
+{
+  "contract_version": 1,
+  "suite": "home_catalogs",
+  "case_id": "reports_missing_artwork_unsupported_type_and_missing_catalog",
+  "input": {
+    "snapshot": {
+      "profile_id": "p2",
+      "status_message": "",
+      "lists": [
+        {
+          "id": "hero.recommendations",
+          "kind": "hero",
+          "title": "Featured",
+          "subtitle": null,
+          "heading": null,
+          "media_types": ["movie"],
+          "items": [
+            {
+              "id": "movie-x",
+              "title": "Invisible",
+              "poster_url": null,
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": null,
+              "year": null,
+              "description": null
+            }
+          ]
+        },
+        {
+          "id": "drama",
+          "kind": "row",
+          "title": "Drama",
+          "subtitle": "Tense stories",
+          "heading": null,
+          "media_types": ["series"],
+          "items": [
+            {
+              "id": "show-9",
+              "title": "Dark Matter",
+              "poster_url": "https://img/dark-matter.jpg",
+              "backdrop_url": "https://img/dark-matter-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "series",
+              "rating": "7.5",
+              "year": "2024",
+              "description": "Parallel lives"
+            }
+          ]
+        }
+      ]
+    },
+    "hero_limit": 3,
+    "section_limit": 5,
+    "global_section_limit": 5,
+    "discover": {
+      "media_type": "anime",
+      "limit": 2
+    },
+    "page": {
+      "catalog_id": "global:unknown",
+      "page": 1,
+      "page_size": 5
+    }
+  },
+  "expected": {
+    "personal_feed": {
+      "hero_result": {
+        "items": [],
+        "status_message": "No featured items available."
+      },
+      "sections": [
+        {
+          "title": "Drama",
+          "catalog_id": "drama",
+          "subtitle": "Tense stories"
+        }
+      ],
+      "sections_status_message": ""
+    },
+    "global_sections": [
+      {
+        "title": "Drama",
+        "catalog_id": "global:drama",
+        "subtitle": "Tense stories"
+      }
+    ],
+    "discover": {
+      "catalogs": [],
+      "status_message": "Unsupported media type: anime"
+    },
+    "page": {
+      "items": [],
+      "status_message": "Catalog not found.",
+      "attempted_urls": []
+    }
+  }
+}

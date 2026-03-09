@@ -1,0 +1,51 @@
+{
+  "contract_version": 1,
+  "suite": "metadata_tmdb_enhancer",
+  "case_id": "keeps_existing_seasons_unchanged",
+  "input": {
+    "media_type": "series",
+    "content_id": "",
+    "season": null,
+    "episode": null,
+    "meta": {
+      "id": "tmdb:101",
+      "imdb_id": null,
+      "cast": [],
+      "director": [],
+      "cast_with_details": [],
+      "similar": [],
+      "collection_items": [],
+      "seasons": [
+        {
+          "id": "tmdb:101:season:9",
+          "name": "Season 9",
+          "overview": "existing",
+          "season_number": 9,
+          "episode_count": 10,
+          "air_date": "2020-01-01"
+        }
+      ],
+      "videos": [
+        {
+          "season": 1,
+          "episode": 1,
+          "released": "2025-01-01"
+        }
+      ]
+    },
+    "tmdb_meta": null
+  },
+  "expected": {
+    "derived_seasons": [
+      {
+        "id": "tmdb:101:season:9",
+        "name": "Season 9",
+        "overview": "existing",
+        "season_number": 9,
+        "episode_count": 10,
+        "air_date": "2020-01-01"
+      }
+    ],
+    "bridge_candidate_ids": []
+  }
+}

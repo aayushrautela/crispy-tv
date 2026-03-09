@@ -1,9 +1,12 @@
 package com.crispy.tv.metadata.omdb
 
 import androidx.compose.runtime.Immutable
+import com.crispy.tv.domain.metadata.OmdbDetails as DomainOmdbDetails
+import com.crispy.tv.domain.metadata.OmdbRatingInput
+import com.crispy.tv.domain.metadata.normalizeOmdbDetails
+import com.crispy.tv.domain.metadata.normalizeOmdbImdbId
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.settings.OmdbSettingsStore
-import java.util.Locale
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
@@ -32,7 +35,7 @@ class OmdbRepository internal constructor(
         get() = settingsStore.loadOmdbKey().isNotBlank()
 
     suspend fun load(imdbId: String): OmdbDetails? {
-        val normalizedId = normalizeImdbId(imdbId) ?: return null
+        val normalizedId = normalizeOmdbImdbId(imdbId) ?: return null
         val normalizedApiKey = settingsStore.loadOmdbKey().trim()
         if (normalizedApiKey.isBlank()) return null
 
@@ -56,62 +59,44 @@ class OmdbRepository internal constructor(
         val json = runCatching { JSONObject(response.body) }.getOrNull() ?: return null
         if (!json.optString("Response").equals("True", ignoreCase = true)) return null
 
-        val imdbRating = json.optStringValue("imdbRating")
-        val metascore = json.optStringValue("Metascore")
-        val ratings = parseRatings(json.optJSONArray("Ratings"), imdbRating = imdbRating, metascore = metascore)
-
-        return OmdbDetails(
-            ratings = ratings,
-            metascore = metascore,
-            imdbRating = imdbRating,
-            imdbVotes = json.optStringValue("imdbVotes"),
-            type = json.optStringValue("Type"),
+        return normalizeOmdbDetails(
+            ratings = parseRatingInputs(json.optJSONArray("Ratings")),
+            metascore = json.optRawString("Metascore"),
+            imdbRating = json.optRawString("imdbRating"),
+            imdbVotes = json.optRawString("imdbVotes"),
+            type = json.optRawString("Type"),
         )
+            .toAppModel()
     }
 
-    private fun parseRatings(
-        array: JSONArray?,
-        imdbRating: String?,
-        metascore: String?,
-    ): List<OmdbRating> {
-        val ratings = mutableListOf<OmdbRating>()
-        val seenSources = linkedSetOf<String>()
-
+    private fun parseRatingInputs(array: JSONArray?): List<OmdbRatingInput> {
+        val ratings = mutableListOf<OmdbRatingInput>()
         for (index in 0 until (array?.length() ?: 0)) {
             val item = array?.optJSONObject(index) ?: continue
-            val source = item.optStringValue("Source") ?: continue
-            val value = item.optStringValue("Value") ?: continue
-            val normalizedSource = source.lowercase(Locale.US)
-            if (!seenSources.add(normalizedSource)) continue
-            ratings += OmdbRating(source = source, value = value)
+            ratings += OmdbRatingInput(
+                source = item.optRawString("Source"),
+                value = item.optRawString("Value"),
+            )
         }
-
-        if (imdbRating != null && seenSources.add(INTERNET_MOVIE_DATABASE_SOURCE.lowercase(Locale.US))) {
-            ratings += OmdbRating(source = INTERNET_MOVIE_DATABASE_SOURCE, value = "$imdbRating/10")
-        }
-
-        if (metascore != null && seenSources.add(METACRITIC_SOURCE.lowercase(Locale.US))) {
-            ratings += OmdbRating(source = METACRITIC_SOURCE, value = "$metascore/100")
-        }
-
         return ratings
     }
 
-    private fun normalizeImdbId(value: String?): String? {
-        val normalized = value?.trim()?.lowercase(Locale.US).orEmpty()
-        return normalized.takeIf { IMDB_ID_REGEX.matches(it) }
+    private fun JSONObject.optRawString(key: String): String? {
+        if (isNull(key) || !has(key)) return null
+        return optString(key, null)
     }
 
-    private fun JSONObject.optStringValue(key: String): String? {
-        val value = optString(key).trim()
-        if (value.isBlank() || value.equals("N/A", ignoreCase = true)) return null
-        return value
+    private fun DomainOmdbDetails.toAppModel(): OmdbDetails {
+        return OmdbDetails(
+            ratings = ratings.map { OmdbRating(source = it.source, value = it.value) },
+            metascore = metascore,
+            imdbRating = imdbRating,
+            imdbVotes = imdbVotes,
+            type = type,
+        )
     }
 
     private companion object {
         private const val OMDB_BASE_URL = "https://www.omdbapi.com/"
-        private const val INTERNET_MOVIE_DATABASE_SOURCE = "Internet Movie Database"
-        private const val METACRITIC_SOURCE = "Metacritic"
-        private val IMDB_ID_REGEX = Regex("tt\\d+", RegexOption.IGNORE_CASE)
     }
 }

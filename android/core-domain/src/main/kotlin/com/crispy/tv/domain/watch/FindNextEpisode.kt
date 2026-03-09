@@ -46,6 +46,7 @@ fun findNextEpisode(
     episodes: List<EpisodeInfo>,
     watchedSet: Set<String>? = null,
     showId: String? = null,
+    nowMs: Long? = null,
 ): NextEpisodeResult? {
     if (episodes.isEmpty()) return null
 
@@ -65,7 +66,7 @@ fun findNextEpisode(
         }
 
         // Only return released episodes
-        if (!isEpisodeReleased(ep.released)) continue
+        if (!isEpisodeReleased(ep.released, nowMs)) continue
 
         return NextEpisodeResult(
             season = ep.season,
@@ -83,16 +84,18 @@ fun findNextEpisode(
  * Returns `true` if [released] is a valid date string that is <= now.
  * Returns `false` if null, blank, or unparseable.
  */
-private fun isEpisodeReleased(released: String?): Boolean {
+private fun isEpisodeReleased(released: String?, nowMs: Long?): Boolean {
     if (released.isNullOrBlank()) return false
     val trimmed = released.trim()
+    val nowInstant = nowMs?.let(Instant::ofEpochMilli) ?: Instant.now()
     return try {
         val releaseInstant = Instant.parse(trimmed)
-        !releaseInstant.isAfter(Instant.now())
+        !releaseInstant.isAfter(nowInstant)
     } catch (_: Exception) {
         try {
             val date = LocalDate.parse(trimmed.take(10))
-            !date.isAfter(LocalDate.now(ZoneOffset.UTC))
+            val nowDate = nowInstant.atZone(ZoneOffset.UTC).toLocalDate()
+            !date.isAfter(nowDate)
         } catch (_: Exception) {
             // Return false on parse errors
             false

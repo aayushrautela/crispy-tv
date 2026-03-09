@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "suite": "catalog_url_building",
+  "case_id": "coerces_paging_and_keeps_addon_query",
+  "input": {
+    "base_url": "https://catalog.example/addon///",
+    "encoded_query": "?token=1&skip=999",
+    "media_type": "movie",
+    "catalog_id": "popular now",
+    "skip": -5,
+    "limit": 0,
+    "filters": [
+      {
+        "key": "country",
+        "value": "United States"
+      },
+      {
+        "key": "genre",
+        "value": " "
+      }
+    ]
+  },
+  "expected": {
+    "urls": [
+      "https://catalog.example/addon/catalog/movie/popular%20now/skip=0/limit=1/country=United%20States.json?token=1&skip=999",
+      "https://catalog.example/addon/catalog/movie/popular%20now.json?token=1&skip=999&skip=0&limit=1&country=United%20States"
+    ]
+  }
+}

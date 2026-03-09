@@ -1,0 +1,146 @@
+{
+  "contract_version": 1,
+  "suite": "home_catalogs",
+  "case_id": "falls_back_to_first_list_and_coerces_minimum_limits",
+  "input": {
+    "snapshot": {
+      "profile_id": "p1",
+      "status_message": "",
+      "lists": [
+        {
+          "id": "featured",
+          "kind": "shelf",
+          "title": "Featured",
+          "subtitle": null,
+          "heading": "Staff picks",
+          "media_types": ["series"],
+          "items": [
+            {
+              "id": "show-1",
+              "title": "Severance",
+              "poster_url": "https://img/severance.jpg",
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "series",
+              "rating": null,
+              "year": "2022",
+              "description": null
+            },
+            {
+              "id": "show-2",
+              "title": "Silo",
+              "poster_url": "https://img/silo.jpg",
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "series",
+              "rating": null,
+              "year": "2023",
+              "description": null
+            }
+          ]
+        },
+        {
+          "id": "movies",
+          "kind": "row",
+          "title": "Movies",
+          "subtitle": "",
+          "heading": null,
+          "media_types": ["movie"],
+          "items": [
+            {
+              "id": "movie-1",
+              "title": "Arrival",
+              "poster_url": "https://img/arrival.jpg",
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": "8.0",
+              "year": "2016",
+              "description": "First contact"
+            }
+          ]
+        }
+      ]
+    },
+    "hero_limit": 0,
+    "section_limit": 0,
+    "global_section_limit": 0,
+    "discover": {
+      "media_type": null,
+      "limit": 0
+    },
+    "page": {
+      "catalog_id": "featured",
+      "page": 0,
+      "page_size": 0
+    }
+  },
+  "expected": {
+    "personal_feed": {
+      "hero_result": {
+        "items": [
+          {
+            "id": "show-1",
+            "title": "Severance",
+            "description": "Staff picks",
+            "rating": null,
+            "year": "2022",
+            "genres": [],
+            "backdrop_url": "https://img/severance.jpg",
+            "addon_id": "supabase",
+            "type": "series"
+          }
+        ],
+        "status_message": ""
+      },
+      "sections": [
+        {
+          "title": "Featured",
+          "catalog_id": "featured",
+          "subtitle": ""
+        }
+      ],
+      "sections_status_message": ""
+    },
+    "global_sections": [
+      {
+        "title": "Featured",
+        "catalog_id": "global:featured",
+        "subtitle": ""
+      }
+    ],
+    "discover": {
+      "catalogs": [
+        {
+          "section": {
+            "title": "Featured",
+            "catalog_id": "featured",
+            "subtitle": ""
+          },
+          "addon_name": "Supabase",
+          "genres": []
+        }
+      ],
+      "status_message": ""
+    },
+    "page": {
+      "items": [
+        {
+          "id": "show-1",
+          "title": "Severance",
+          "poster_url": "https://img/severance.jpg",
+          "backdrop_url": null,
+          "addon_id": "supabase",
+          "type": "series",
+          "rating": null,
+          "year": "2022",
+          "description": null
+        }
+      ],
+      "status_message": "",
+      "attempted_urls": [
+        "supabase:personal_home_feed:p1:featured:page=1"
+      ]
+    }
+  }
+}

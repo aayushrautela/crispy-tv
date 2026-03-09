@@ -1,0 +1,21 @@
+{
+  "contract_version": 1,
+  "suite": "catalog_url_building",
+  "case_id": "first_page_without_filters_tries_all_variants",
+  "input": {
+    "base_url": "https://catalog.example/addon/",
+    "encoded_query": "auth=abc&lang=en",
+    "media_type": "movie",
+    "catalog_id": "top",
+    "skip": 0,
+    "limit": 20,
+    "filters": []
+  },
+  "expected": {
+    "urls": [
+      "https://catalog.example/addon/catalog/movie/top.json?auth=abc&lang=en",
+      "https://catalog.example/addon/catalog/movie/top/skip=0/limit=20.json?auth=abc&lang=en",
+      "https://catalog.example/addon/catalog/movie/top.json?auth=abc&lang=en&skip=0&limit=20"
+    ]
+  }
+}

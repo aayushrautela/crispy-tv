@@ -1,0 +1,40 @@
+{
+  "contract_version": 1,
+  "suite": "metadata_tmdb_enhancer",
+  "case_id": "bridge_candidates_add_imdb_episode_suffix",
+  "input": {
+    "media_type": "movie",
+    "content_id": " tmdb:200 ",
+    "season": 2,
+    "episode": 3,
+    "meta": {
+      "id": "tmdb:200",
+      "imdb_id": null,
+      "cast": [],
+      "director": [],
+      "cast_with_details": [],
+      "similar": [],
+      "collection_items": [],
+      "seasons": [],
+      "videos": []
+    },
+    "tmdb_meta": {
+      "id": "tmdb:200",
+      "imdb_id": " tt12345 ",
+      "cast": [],
+      "director": [],
+      "cast_with_details": [],
+      "similar": [],
+      "collection_items": [],
+      "seasons": [],
+      "videos": []
+    }
+  },
+  "expected": {
+    "derived_seasons": [],
+    "bridge_candidate_ids": [
+      "tmdb:200:2:3",
+      "tt12345:2:3"
+    ]
+  }
+}

@@ -5,7 +5,14 @@ final class FixtureSanityTests: XCTestCase {
     func testFixtureDirectoriesAndRequiredFields() throws {
         let suites = [
             "player_machine",
+            "continue_watching",
+            "next_episode",
+            "trakt_scrobble_policy",
             "media_ids",
+            "metadata_tmdb_enhancer",
+            "omdb",
+            "home_catalogs",
+            "catalog_url_building",
             "id_prefixes",
             "search_ranking_and_dedup",
             "sync_planner",

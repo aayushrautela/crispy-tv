@@ -1,0 +1,75 @@
+{
+  "contract_version": 1,
+  "suite": "metadata_tmdb_enhancer",
+  "case_id": "derives_seasons_from_valid_videos_only",
+  "input": {
+    "media_type": "series",
+    "content_id": "",
+    "season": null,
+    "episode": null,
+    "meta": {
+      "id": "tmdb:100",
+      "imdb_id": null,
+      "cast": [],
+      "director": [],
+      "cast_with_details": [],
+      "similar": [],
+      "collection_items": [],
+      "seasons": [],
+      "videos": [
+        {
+          "season": 2,
+          "episode": 1,
+          "released": "2025-02-10"
+        },
+        {
+          "season": 1,
+          "episode": 1,
+          "released": "2025-01-01"
+        },
+        {
+          "season": 2,
+          "episode": 2,
+          "released": "2025-02-17"
+        },
+        {
+          "season": 1,
+          "episode": 2,
+          "released": ""
+        },
+        {
+          "season": 0,
+          "episode": 3,
+          "released": "2025-03-01"
+        },
+        {
+          "season": 3,
+          "episode": null,
+          "released": "2025-04-01"
+        }
+      ]
+    },
+    "tmdb_meta": null
+  },
+  "expected": {
+    "derived_seasons": [
+      {
+        "id": "tmdb:100:season:1",
+        "name": "Season 1",
+        "overview": "",
+        "season_number": 1,
+        "episode_count": 2,
+        "air_date": "2025-01-01"
+      },
+      {
+        "id": "tmdb:100:season:2",
+        "name": "Season 2",
+        "overview": "",
+        "season_number": 2,
+        "episode_count": 2,
+        "air_date": "2025-02-10"
+      }
+    ],
+    "bridge_candidate_ids": []
+  }
+}
