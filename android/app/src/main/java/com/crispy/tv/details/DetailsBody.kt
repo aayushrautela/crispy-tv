@@ -1,6 +1,7 @@
 package com.crispy.tv.details
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -53,12 +54,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.crispy.tv.R
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
@@ -599,27 +602,41 @@ private fun RatingPill(rating: DetailsRatingPill, modifier: Modifier = Modifier)
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
-                modifier = Modifier.size(36.dp),
-                shape = CircleShape,
-                color = rating.badgeColor,
-                contentColor = rating.badgeContentColor,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    val badgeText = rating.badgeText
-                    if (badgeText != null) {
-                        Text(
-                            text = badgeText,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = rating.badgeIcon ?: Icons.Filled.Star,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
+            val badgeLogoRes = rating.badgeLogoRes
+            if (badgeLogoRes != null) {
+                Box(
+                    modifier = Modifier.size(36.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        painter = painterResource(id = badgeLogoRes),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            } else {
+                Surface(
+                    modifier = Modifier.size(36.dp),
+                    shape = CircleShape,
+                    color = rating.badgeColor,
+                    contentColor = rating.badgeContentColor,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        val badgeText = rating.badgeText
+                        if (badgeText != null) {
+                            Text(
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = rating.badgeIcon ?: Icons.Filled.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -659,6 +676,7 @@ private data class DetailsRatingPill(
     val badgeColor: Color,
     val badgeContentColor: Color,
     val badgeIcon: ImageVector? = null,
+    val badgeLogoRes: Int? = null,
 )
 
 private fun buildRatings(
@@ -673,7 +691,7 @@ private fun buildRatings(
                 source = "TMDB",
                 score = formatTmdbRating(rating),
                 badgeText = "TMDB",
-                badgeColor = Color(0xFF0D253F),
+                badgeColor = Color(0xFF01B4E4),
                 badgeContentColor = Color.White,
             )
     }
@@ -701,9 +719,10 @@ private fun buildRatings(
                         key = "omdb-rt-$index",
                         source = "Rotten Tomatoes",
                         score = value,
-                        badgeText = "RT",
-                        badgeColor = Color(0xFFD32F2F),
-                        badgeContentColor = Color.White,
+                        badgeText = null,
+                        badgeColor = Color.Transparent,
+                        badgeContentColor = Color.Unspecified,
+                        badgeLogoRes = R.drawable.ic_rotten_tomatoes,
                     )
                 }
 
@@ -712,9 +731,10 @@ private fun buildRatings(
                         key = "omdb-mc-$index",
                         source = "Metacritic",
                         score = value,
-                        badgeText = "MC",
-                        badgeColor = Color(0xFF1B5E20),
-                        badgeContentColor = Color.White,
+                        badgeText = null,
+                        badgeColor = Color.Transparent,
+                        badgeContentColor = Color.Unspecified,
+                        badgeLogoRes = R.drawable.ic_metacritic,
                     )
                 }
 
