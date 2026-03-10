@@ -5,7 +5,7 @@ import com.crispy.tv.R
 
 enum class SearchGenreSuggestion(
     val label: String,
-    @DrawableRes val imageRes: Int,
+    @field:DrawableRes val imageRes: Int,
     val movieGenreId: Int,
     val tvGenreId: Int? = null,
 ) {

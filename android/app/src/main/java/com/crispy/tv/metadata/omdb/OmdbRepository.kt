@@ -83,7 +83,7 @@ class OmdbRepository internal constructor(
 
     private fun JSONObject.optRawString(key: String): String? {
         if (isNull(key) || !has(key)) return null
-        return optString(key, null)
+        return opt(key) as? String
     }
 
     private fun DomainOmdbDetails.toAppModel(): OmdbDetails {

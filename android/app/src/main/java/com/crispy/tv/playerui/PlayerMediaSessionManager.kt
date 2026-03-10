@@ -41,10 +41,6 @@ internal class PlayerMediaSessionManager(
 
     private val mediaSession =
         MediaSessionCompat(appContext, SESSION_TAG).apply {
-            setFlags(
-                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS,
-            )
             setCallback(
                 object : MediaSessionCompat.Callback() {
                     override fun onPlay() {
