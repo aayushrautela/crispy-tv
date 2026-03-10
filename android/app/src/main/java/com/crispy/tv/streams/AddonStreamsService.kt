@@ -11,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -197,7 +198,7 @@ class AddonStreamsService(
     private suspend fun resolveManifest(seed: AddonManifestSeed): JSONObject? {
         val networkManifest =
             manifestFetchSemaphore.withPermit {
-                httpClient.getJsonObject(seed.manifestUrl, callTimeoutMs = MANIFEST_TIMEOUT_MS)
+                httpClient.getJsonObject(seed.manifestUrl, MANIFEST_REQUEST_POLICY)
             }
 
         if (networkManifest != null) {
@@ -281,11 +282,7 @@ class AddonStreamsService(
         }
 
         val requestUrl = buildResourceUrl(endpoint, mediaType, formattedLookupId)
-        val payload =
-            httpClient.getJsonObject(
-                requestUrl,
-                callTimeoutMs = STREAM_TIMEOUT_MS,
-            )
+        val payload = httpClient.getJsonObject(requestUrl, STREAM_REQUEST_POLICY)
 
         if (payload == null) {
             return ProviderStreamsResult(
@@ -401,23 +398,75 @@ class AddonStreamsService(
 
     private suspend fun CrispyHttpClient.getJsonObject(
         url: String,
-        callTimeoutMs: Long,
+        requestPolicy: JsonRequestPolicy,
     ): JSONObject? {
-        val httpUrl = url.toHttpUrlOrNull() ?: return null
+        var attempt = 0
+        var backoffMs = requestPolicy.initialBackoffMs
+
+        while (true) {
+            when (
+                val result =
+                    getJsonObjectOnce(
+                        url = url,
+                        requestPolicy = requestPolicy,
+                    )
+            ) {
+                is JsonFetchResult.Success -> return result.payload
+                is JsonFetchResult.HttpFailure -> {
+                    if (!result.shouldRetry || attempt >= requestPolicy.maxRetries) {
+                        return null
+                    }
+                }
+
+                JsonFetchResult.EmptyBody,
+                JsonFetchResult.InvalidUrl,
+                JsonFetchResult.ParseFailure,
+                JsonFetchResult.RequestFailure,
+                -> {
+                    if (attempt >= requestPolicy.maxRetries) {
+                        return null
+                    }
+                }
+            }
+
+            attempt += 1
+            if (backoffMs > 0) {
+                delay(backoffMs)
+                backoffMs = (backoffMs * 2).coerceAtMost(MAX_RETRY_BACKOFF_MS)
+            }
+        }
+    }
+
+    private suspend fun CrispyHttpClient.getJsonObjectOnce(
+        url: String,
+        requestPolicy: JsonRequestPolicy,
+    ): JsonFetchResult {
+        val httpUrl = url.toHttpUrlOrNull() ?: return JsonFetchResult.InvalidUrl
         val response =
             runCatching {
                 get(
                     url = httpUrl,
-                    headers = Headers.headersOf("Accept", "application/json"),
-                    callTimeoutMs = callTimeoutMs,
+                    headers = requestPolicy.headers,
+                    callTimeoutMs = requestPolicy.callTimeoutMs,
                 )
-            }.getOrNull() ?: return null
+            }.getOrElse {
+                return JsonFetchResult.RequestFailure
+            }
 
-        if (response.code !in 200..299) return null
+        if (response.code !in 200..299) {
+            return JsonFetchResult.HttpFailure(
+                code = response.code,
+                shouldRetry = response.code != 404,
+            )
+        }
         val body = response.body.trim()
-        if (body.isEmpty()) return null
+        if (body.isEmpty()) return JsonFetchResult.EmptyBody
 
-        return runCatching { JSONObject(body) }.getOrNull()
+        return runCatching { JSONObject(body) }
+            .fold(
+                onSuccess = { JsonFetchResult.Success(it) },
+                onFailure = { JsonFetchResult.ParseFailure },
+            )
     }
 
     private fun buildStableKey(providerId: String, dedupeKey: String): String {
@@ -442,6 +491,32 @@ class AddonStreamsService(
         val types: Set<MetadataLabMediaType>,
         val idPrefixes: Map<MetadataLabMediaType, List<String>>,
     )
+
+    private data class JsonRequestPolicy(
+        val callTimeoutMs: Long,
+        val maxRetries: Int,
+        val initialBackoffMs: Long,
+        val headers: Headers,
+    )
+
+    private sealed interface JsonFetchResult {
+        data class Success(
+            val payload: JSONObject,
+        ) : JsonFetchResult
+
+        data class HttpFailure(
+            val code: Int,
+            val shouldRetry: Boolean,
+        ) : JsonFetchResult
+
+        data object InvalidUrl : JsonFetchResult
+
+        data object EmptyBody : JsonFetchResult
+
+        data object ParseFailure : JsonFetchResult
+
+        data object RequestFailure : JsonFetchResult
+    }
 
     private data class AddonEndpoint(
         val providerId: String,
@@ -470,7 +545,37 @@ class AddonStreamsService(
     }
 
     private companion object {
+        private const val INITIAL_RETRY_BACKOFF_MS = 1_000L
+        private const val MAX_RETRY_BACKOFF_MS = 8_000L
         private const val MANIFEST_TIMEOUT_MS = 6_000L
-        private const val STREAM_TIMEOUT_MS = 9_000L
+        private const val STREAM_TIMEOUT_MS = 10_000L
+        private const val MANIFEST_MAX_RETRIES = 1
+        private const val STREAM_MAX_RETRIES = 5
+        private const val STREAM_USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+
+        private val JSON_HEADERS =
+            Headers.headersOf(
+                "Accept",
+                "application/json",
+                "User-Agent",
+                STREAM_USER_AGENT,
+            )
+
+        private val MANIFEST_REQUEST_POLICY =
+            JsonRequestPolicy(
+                callTimeoutMs = MANIFEST_TIMEOUT_MS,
+                maxRetries = MANIFEST_MAX_RETRIES,
+                initialBackoffMs = INITIAL_RETRY_BACKOFF_MS,
+                headers = JSON_HEADERS,
+            )
+
+        private val STREAM_REQUEST_POLICY =
+            JsonRequestPolicy(
+                callTimeoutMs = STREAM_TIMEOUT_MS,
+                maxRetries = STREAM_MAX_RETRIES,
+                initialBackoffMs = INITIAL_RETRY_BACKOFF_MS,
+                headers = JSON_HEADERS,
+            )
     }
 }
