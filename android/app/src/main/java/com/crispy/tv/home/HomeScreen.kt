@@ -177,7 +177,6 @@ private fun HomeScreen(
                         sections = layoutState.collectionSections,
                         sectionState = catalogSectionState,
                         onCollectionClick = onCatalogSeeAllClick,
-                        onItemClick = onCatalogItemClick,
                     )
                 }
             }

@@ -654,7 +654,6 @@ internal fun HomeCollectionSectionRow(
     sections: List<CatalogSectionRef>,
     sectionState: (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
 ) {
     val sectionStates = mutableListOf<HomeCatalogSectionUi>()
     for (section in sections) {
@@ -697,7 +696,6 @@ internal fun HomeCollectionSectionRow(
                     sectionUi = sectionUi,
                     showSubtitle = sharedSubtitle.isBlank(),
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
-                    onItemClick = onItemClick
                 )
             }
         }
@@ -709,136 +707,89 @@ private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
     showSubtitle: Boolean,
     onCollectionClick: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
 ) {
-    val previewItems = remember(sectionUi.items) { sectionUi.items.take(2) }
     val artworkUrl =
         remember(sectionUi.items) {
             sectionUi.items.firstNotNullOfOrNull { item ->
-                item.posterUrl?.takeIf { it.isNotBlank() } ?: item.backdropUrl?.takeIf { it.isNotBlank() }
+                item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
             }
         }
+    val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size) ?: "0 movies"
 
-    Card(modifier = Modifier.width(220.dp).clickable(onClick = onCollectionClick)) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(4f / 5f)
-            ) {
-                if (!artworkUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = artworkUrl,
-                        contentDescription = sectionUi.section.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                }
-                
-                // Overlay gradient fading from top to bottom dark
+    Card(modifier = Modifier.width(236.dp).clickable(onClick = onCollectionClick)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(4f / 5f)
+        ) {
+            if (!artworkUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = artworkUrl,
+                    contentDescription = sectionUi.section.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.5f)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
-                                )
-                            )
-                        )
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 )
             }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.48f)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.16f),
+                                Color.Black.copy(alpha = 0.82f),
+                            )
+                        )
+                    )
+            )
 
             Column(
                 modifier = Modifier
+                    .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size) ?: "0 movies"
+                if (showSubtitle && sectionUi.section.subtitle.isNotBlank()) {
+                    Text(
+                        text = sectionUi.section.subtitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.82f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
                 Text(
-                    text = movieCountLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = sectionUi.section.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
 
-                if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
-                    repeat(2) {
-                        Box(modifier = Modifier.fillMaxWidth().height(16.dp).skeletonElement(pulse = false))
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-                } else if (previewItems.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        previewItems.forEach { item ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().clickable { onItemClick(item) },
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = item.title,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                if (!item.rating.isNullOrBlank()) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Star,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(12.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            text = item.rating!!,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        text = sectionUi.statusMessage.ifBlank { "No titles available yet." },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                FilledTonalButton(
-                    onClick = onCollectionClick,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                    modifier = Modifier.height(36.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                ) {
-                    Text(
-                        text = "Explore",
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
+                Text(
+                    text = if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
+                        "Loading collection"
+                    } else {
+                        movieCountLabel
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.82f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
