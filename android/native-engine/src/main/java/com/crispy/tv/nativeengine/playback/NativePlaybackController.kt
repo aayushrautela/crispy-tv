@@ -1,6 +1,8 @@
 package com.crispy.tv.nativeengine.playback
 
 import android.content.Context
+import android.net.Uri
+import android.util.Log
 import android.view.SurfaceView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -31,6 +33,10 @@ class NativePlaybackController(
 
     private val exoListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
+            Log.d(
+                TAG,
+                "Exo onPlaybackStateChanged state=${playbackStateName(playbackState)} playWhenReady=${exoPlayer.playWhenReady} isPlaying=${exoPlayer.isPlaying} currentPositionMs=${exoPlayer.currentPosition} durationMs=${exoPlayer.duration}",
+            )
             when (playbackState) {
                 Player.STATE_BUFFERING -> onEvent(NativePlaybackEvent.Buffering)
                 Player.STATE_READY -> onEvent(NativePlaybackEvent.Ready)
@@ -38,7 +44,26 @@ class NativePlaybackController(
             }
         }
 
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            Log.d(TAG, "Exo onIsPlayingChanged isPlaying=$isPlaying")
+        }
+
+        override fun onPlayWhenReadyChanged(
+            playWhenReady: Boolean,
+            reason: Int,
+        ) {
+            Log.d(
+                TAG,
+                "Exo onPlayWhenReadyChanged playWhenReady=$playWhenReady reason=$reason",
+            )
+        }
+
         override fun onPlayerError(error: PlaybackException) {
+            Log.w(
+                TAG,
+                "Exo onPlayerError code=${error.errorCodeName} message=${error.message} cause=${error.cause?.javaClass?.simpleName} fallbackToVlc=${shouldFallbackToVlc(error)}",
+                error,
+            )
             onEvent(
                 NativePlaybackEvent.Error(
                     message = error.message ?: "ExoPlayer error",
@@ -49,10 +74,15 @@ class NativePlaybackController(
     }
 
     init {
+        Log.d(TAG, "init created ExoPlayer and VLC runtime")
         exoPlayer.addListener(exoListener)
     }
 
     override fun play(url: String, engine: NativePlaybackEngine) {
+        Log.d(
+            TAG,
+            "play requested engine=$engine previousEngine=$currentEngine url=${debugUrl(url)}",
+        )
         currentEngine = engine
         when (engine) {
             NativePlaybackEngine.EXO -> {
@@ -70,6 +100,7 @@ class NativePlaybackController(
     }
 
     override fun setPlaying(isPlaying: Boolean) {
+        Log.d(TAG, "setPlaying isPlaying=$isPlaying engine=$currentEngine")
         when (currentEngine) {
             NativePlaybackEngine.EXO -> {
                 if (isPlaying) {
@@ -124,25 +155,30 @@ class NativePlaybackController(
     }
 
     override fun stop() {
+        Log.d(TAG, "stop currentEngine=$currentEngine")
         runCatching { exoPlayer.stop() }
         runCatching { vlcRuntime.stop() }
     }
 
     override fun release() {
+        Log.d(TAG, "release currentEngine=$currentEngine")
         runCatching { exoPlayer.removeListener(exoListener) }
         runCatching { exoPlayer.release() }
         runCatching { vlcRuntime.release() }
     }
 
     override fun bindExoPlayerView(playerView: PlayerView) {
+        Log.d(TAG, "bindExoPlayerView viewHash=${System.identityHashCode(playerView)}")
         playerView.player = exoPlayer
     }
 
     override fun createVlcSurfaceView(context: Context): SurfaceView {
+        Log.d(TAG, "createVlcSurfaceView")
         return vlcRuntime.createSurfaceView(context)
     }
 
     override fun attachVlcSurface(surfaceView: SurfaceView) {
+        Log.d(TAG, "attachVlcSurface viewHash=${System.identityHashCode(surfaceView)}")
         vlcRuntime.attach(surfaceView)
     }
 
@@ -154,5 +190,35 @@ class NativePlaybackController(
             message.contains("decoder") ||
             causeName.contains("codec") ||
             causeName.contains("decoder")
+    }
+
+    private fun debugUrl(url: String): String {
+        val uri = runCatching { Uri.parse(url) }.getOrNull()
+        val host = uri?.host?.ifBlank { null }
+        val scheme = uri?.scheme?.ifBlank { null }
+        return buildString {
+            append("hash=")
+            append(url.hashCode())
+            if (scheme != null || host != null) {
+                append(" scheme=")
+                append(scheme ?: "unknown")
+                append(" host=")
+                append(host ?: "unknown")
+            }
+        }
+    }
+
+    private fun playbackStateName(playbackState: Int): String {
+        return when (playbackState) {
+            Player.STATE_IDLE -> "IDLE"
+            Player.STATE_BUFFERING -> "BUFFERING"
+            Player.STATE_READY -> "READY"
+            Player.STATE_ENDED -> "ENDED"
+            else -> playbackState.toString()
+        }
+    }
+
+    companion object {
+        private const val TAG = "NativePlaybackCtrl"
     }
 }

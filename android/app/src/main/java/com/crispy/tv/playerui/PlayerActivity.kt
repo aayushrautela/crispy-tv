@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.util.Rational
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -61,6 +62,11 @@ class PlayerActivity : ComponentActivity() {
 
         val identity = parseIdentityFromIntent(intent, title)
 
+        Log.d(
+            TAG,
+            "onCreate savedInstanceState=${savedInstanceState != null} title=$title hasIdentity=${identity != null} isInPip=$isInPictureInPictureModeState",
+        )
+
         maybeRequestNotificationPermission()
         applyPlayerWindowPolicy()
         updatePictureInPictureConfig(PictureInPictureConfig())
@@ -90,8 +96,40 @@ class PlayerActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        Log.d(TAG, "onStart isInPip=$isInPictureInPictureModeState finishing=$isFinishing")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "onResume isInPip=$isInPictureInPictureModeState")
+    }
+
+    override fun onPause() {
+        Log.d(TAG, "onPause isInPip=$isInPictureInPictureModeState finishing=$isFinishing")
+        super.onPause()
+    }
+
+    override fun onStop() {
+        Log.d(
+            TAG,
+            "onStop isInPip=$isInPictureInPictureModeState finishing=$isFinishing changingConfigurations=$isChangingConfigurations",
+        )
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        Log.d(
+            TAG,
+            "onDestroy isInPip=$isInPictureInPictureModeState finishing=$isFinishing changingConfigurations=$isChangingConfigurations",
+        )
+        super.onDestroy()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        Log.d(TAG, "onWindowFocusChanged hasFocus=$hasFocus isInPip=$isInPictureInPictureModeState")
         if (hasFocus && !isInPictureInPictureModeState) {
             applyPlayerWindowPolicy()
         }
@@ -99,6 +137,10 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        Log.d(
+            TAG,
+            "onUserLeaveHint sdk=${Build.VERSION.SDK_INT} pipEnabled=$pipEnabled isInPip=$isInPictureInPictureModeState",
+        )
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             enterPictureInPictureIfPossible()
         }
@@ -109,6 +151,10 @@ class PlayerActivity : ComponentActivity() {
         newConfig: Configuration,
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        Log.d(
+            TAG,
+            "onPictureInPictureModeChanged isInPip=$isInPictureInPictureMode newConfig=$newConfig",
+        )
         isInPictureInPictureModeState = isInPictureInPictureMode
         if (!isInPictureInPictureMode) {
             applyPlayerWindowPolicy()
@@ -116,6 +162,7 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun applyPlayerWindowPolicy() {
+        Log.d(TAG, "applyPlayerWindowPolicy isInPip=$isInPictureInPictureModeState")
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -143,6 +190,11 @@ class PlayerActivity : ComponentActivity() {
         pipSourceRect = config.sourceRect
         pipAspectRatio = config.aspectRatio
 
+        Log.d(
+            TAG,
+            "updatePictureInPictureConfig enabled=${config.enabled} sourceRect=${config.sourceRect} aspectRatio=${config.aspectRatio}",
+        )
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             setPictureInPictureParams(buildPictureInPictureParams())
         }
@@ -163,13 +215,22 @@ class PlayerActivity : ComponentActivity() {
 
     private fun enterPictureInPictureIfPossible() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            Log.d(TAG, "enterPictureInPictureIfPossible skipped reason=sdk")
             return
         }
         if (!pipEnabled || isInPictureInPictureModeState || isFinishing || isDestroyed) {
+            Log.d(
+                TAG,
+                "enterPictureInPictureIfPossible skipped pipEnabled=$pipEnabled isInPip=$isInPictureInPictureModeState finishing=$isFinishing destroyed=$isDestroyed",
+            )
             return
         }
         runCatching {
             enterPictureInPictureMode(buildPictureInPictureParams())
+        }.onSuccess {
+            Log.d(TAG, "enterPictureInPictureIfPossible success")
+        }.onFailure { error ->
+            Log.w(TAG, "enterPictureInPictureIfPossible failed", error)
         }
     }
 
@@ -190,6 +251,7 @@ class PlayerActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val TAG = "PlayerActivity"
         private const val EXTRA_PLAYBACK_URL = "extra_playback_url"
         private const val EXTRA_TITLE = "extra_title"
         private const val EXTRA_SUBTITLE = "extra_subtitle"

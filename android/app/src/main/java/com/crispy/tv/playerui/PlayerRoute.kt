@@ -7,8 +7,9 @@ package com.crispy.tv.playerui
 
 import android.content.Intent
 import android.graphics.Rect
-import android.util.Rational
 import android.os.SystemClock
+import android.util.Log
+import android.util.Rational
 import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -99,8 +100,22 @@ fun PlayerRoute(
     val latestSubtitle by rememberUpdatedState(subtitle)
     val latestArtworkUrl by rememberUpdatedState(artworkUrl)
 
+    DisposableEffect(playbackUrl, title, identity) {
+        Log.d(
+            TAG,
+            "compose enter title=$title hasIdentity=${identity != null} playbackUrlHash=${playbackUrl.hashCode()}",
+        )
+        onDispose {
+            Log.d(TAG, "compose dispose title=$title playbackUrlHash=${playbackUrl.hashCode()}")
+        }
+    }
+
     DisposableEffect(playbackController, identity, watchHistoryService, mediaSessionManager) {
         onDispose {
+            Log.d(
+                TAG,
+                "player resources dispose engine=${latestUiState.activeEngine} isInPip=$isInPictureInPictureMode lastPositionMs=${lastMetrics.positionMs} lastDurationMs=${lastMetrics.durationMs} lastIsPlaying=${lastMetrics.isPlaying}",
+            )
             val lastDurationMs = lastMetrics.durationMs
             if (identity != null && lastDurationMs > 0L) {
                 coroutineScope.launch(Dispatchers.IO) {
@@ -120,8 +135,25 @@ fun PlayerRoute(
 
     LaunchedEffect(uiState.playbackRequestVersion, uiState.playbackUrl, uiState.activeEngine) {
         if (uiState.playbackUrl.isNotBlank()) {
+            Log.d(
+                TAG,
+                "play request version=${uiState.playbackRequestVersion} engine=${uiState.activeEngine} playbackUrlHash=${uiState.playbackUrl.hashCode()}",
+            )
             playbackController.play(uiState.playbackUrl, uiState.activeEngine)
         }
+    }
+
+    LaunchedEffect(
+        uiState.activeEngine,
+        uiState.isBuffering,
+        uiState.isPlaying,
+        uiState.statusMessage,
+        uiState.errorMessage,
+    ) {
+        Log.d(
+            TAG,
+            "uiState engine=${uiState.activeEngine} buffering=${uiState.isBuffering} playing=${uiState.isPlaying} status=${uiState.statusMessage} error=${uiState.errorMessage}",
+        )
     }
 
     LaunchedEffect(playbackController) {
@@ -194,6 +226,10 @@ fun PlayerRoute(
             videoBounds != null &&
                 uiState.errorMessage == null &&
                 (uiState.isPlaying || uiState.isBuffering || uiState.stableDurationMs > 0L)
+        Log.d(
+            TAG,
+            "pip config videoBounds=$videoBounds aspectRatio=$aspectRatio enabled=$pipEnabled isPlaying=${uiState.isPlaying} isBuffering=${uiState.isBuffering} stableDurationMs=${uiState.stableDurationMs} error=${uiState.errorMessage}",
+        )
         onPictureInPictureConfigChanged(
             PictureInPictureConfig(
                 enabled = pipEnabled,
@@ -228,10 +264,12 @@ fun PlayerRoute(
                     factory = { viewContext ->
                         PlayerView(viewContext).apply {
                             useController = false
+                            Log.d(TAG, "create Exo PlayerView viewHash=${System.identityHashCode(this)}")
                             playbackController.bindExoPlayerView(this)
                         }
                     },
                     update = { playerView ->
+                        Log.d(TAG, "update Exo PlayerView viewHash=${System.identityHashCode(playerView)}")
                         playbackController.bindExoPlayerView(playerView)
                     },
                 )
@@ -251,11 +289,14 @@ fun PlayerRoute(
                                         bounds.right.roundToInt(),
                                         bounds.bottom.roundToInt(),
                                     )
-                            },
+                    },
                     factory = { viewContext ->
-                        playbackController.createVlcSurfaceView(viewContext)
+                        playbackController.createVlcSurfaceView(viewContext).also { surfaceView ->
+                            Log.d(TAG, "create VLC SurfaceView viewHash=${System.identityHashCode(surfaceView)}")
+                        }
                     },
                     update = { surfaceView: SurfaceView ->
+                        Log.d(TAG, "update VLC SurfaceView viewHash=${System.identityHashCode(surfaceView)}")
                         playbackController.attachVlcSurface(surfaceView)
                     },
                 )
@@ -273,9 +314,13 @@ fun PlayerRoute(
                 durationMs = uiState.durationMs,
                 stableDurationMs = uiState.stableDurationMs,
                 activeEngine = uiState.activeEngine,
-                onBack = onBack,
+                onBack = {
+                    Log.d(TAG, "overlay back pressed")
+                    onBack()
+                },
                 onTogglePlayPause = {
                     val nextPlaying = !uiState.isPlaying
+                    Log.d(TAG, "toggle play requested nextPlaying=$nextPlaying engine=${uiState.activeEngine}")
                     playbackController.setPlaying(nextPlaying)
                     viewModel.onUserSetPlaying(nextPlaying)
                 },
@@ -293,4 +338,5 @@ private class PlaybackMetricsHolder {
     var isPlaying: Boolean = false
 }
 
+private const val TAG = "PlayerRoute"
 private const val PROGRESS_SYNC_INTERVAL_MS = 5_000L
