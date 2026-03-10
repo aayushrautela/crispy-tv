@@ -17,6 +17,8 @@ import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.player.PlaybackIdentity
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -24,7 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Immutable
@@ -260,7 +261,7 @@ class PlayerSessionViewModel(
     }
 
     private suspend fun pollPlaybackState() {
-        while (isActive) {
+        while (currentCoroutineContext().isActive) {
             val positionMs = playbackController.currentPositionMs()
             val durationMs = playbackController.durationMs()
             val isPlaying = playbackController.isPlaying()
@@ -357,6 +358,7 @@ class PlayerSessionViewModel(
 
     override fun onCleared() {
         reportPlaybackStopped()
+        backgroundScope.cancel()
         mediaSessionManager.release()
         playbackController.release()
         super.onCleared()
