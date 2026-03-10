@@ -49,7 +49,7 @@ fun PlayerRoute(
     identity: PlaybackIdentity?,
     restorePlaybackIntent: Intent,
     isInPictureInPictureMode: Boolean,
-    onPictureInPictureConfigChanged: (Boolean, Rect?, Rational?) -> Unit,
+    onPictureInPictureConfigChanged: (PictureInPictureConfig) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -112,7 +112,7 @@ fun PlayerRoute(
                 }
             }
 
-            onPictureInPictureConfigChanged(enabled = false, sourceRect = null, aspectRatio = null)
+            onPictureInPictureConfigChanged(PictureInPictureConfig())
             mediaSessionManager.release()
             playbackController.release()
         }
@@ -195,9 +195,11 @@ fun PlayerRoute(
                 uiState.errorMessage == null &&
                 (uiState.isPlaying || uiState.isBuffering || uiState.stableDurationMs > 0L)
         onPictureInPictureConfigChanged(
-            enabled = pipEnabled,
-            sourceRect = videoBounds,
-            aspectRatio = aspectRatio,
+            PictureInPictureConfig(
+                enabled = pipEnabled,
+                sourceRect = videoBounds,
+                aspectRatio = aspectRatio,
+            ),
         )
     }
 

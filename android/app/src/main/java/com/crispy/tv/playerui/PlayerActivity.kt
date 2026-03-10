@@ -63,11 +63,7 @@ class PlayerActivity : ComponentActivity() {
 
         maybeRequestNotificationPermission()
         applyPlayerWindowPolicy()
-        updatePictureInPictureConfig(
-            enabled = false,
-            sourceRect = null,
-            aspectRatio = null,
-        )
+        updatePictureInPictureConfig(PictureInPictureConfig())
 
         setContent {
             CrispyRewriteTheme {
@@ -142,14 +138,10 @@ class PlayerActivity : ComponentActivity() {
         controller.hide(WindowInsetsCompat.Type.systemBars())
     }
 
-    private fun updatePictureInPictureConfig(
-        enabled: Boolean,
-        sourceRect: Rect?,
-        aspectRatio: Rational?,
-    ) {
-        pipEnabled = enabled
-        pipSourceRect = sourceRect
-        pipAspectRatio = aspectRatio
+    private fun updatePictureInPictureConfig(config: PictureInPictureConfig) {
+        pipEnabled = config.enabled
+        pipSourceRect = config.sourceRect
+        pipAspectRatio = config.aspectRatio
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             setPictureInPictureParams(buildPictureInPictureParams())
