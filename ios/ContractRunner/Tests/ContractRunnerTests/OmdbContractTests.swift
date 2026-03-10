@@ -26,7 +26,11 @@ final class OmdbContractTests: XCTestCase {
             )
 
             XCTAssertEqual(optionalString(expected, "normalized_imdb_id"), actualNormalizedImdbId, "\(caseId): normalized_imdb_id")
-            XCTAssertEqual(try parseExpectedDetails(expected, fixture: fixtureURL), actualDetails, "\(caseId): details")
+            XCTAssertEqual(
+                try parseExpectedDetails(try requireObject(expected, "details", fixture: fixtureURL), fixture: fixtureURL),
+                actualDetails,
+                "\(caseId): details"
+            )
         }
     }
 
