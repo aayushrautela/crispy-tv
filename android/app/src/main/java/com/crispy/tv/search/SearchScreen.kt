@@ -56,13 +56,19 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.ui.components.PosterCard
-import com.crispy.tv.ui.components.StandardTopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.layout.height
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.brand.CrispyWordmark
 
 @Composable
 fun SearchRoute(
+    onProfileClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -82,6 +88,7 @@ fun SearchRoute(
         onFilterChange = viewModel::setFilter,
         onGenreSuggestionClick = viewModel::selectGenreSuggestion,
         onClearGenreSuggestion = viewModel::clearGenreSuggestion,
+        onProfileClick = onProfileClick,
         onItemClick = onItemClick
     )
 }
@@ -95,6 +102,7 @@ private fun SearchScreen(
     onFilterChange: (SearchTypeFilter) -> Unit,
     onGenreSuggestionClick: (SearchGenreSuggestion) -> Unit,
     onClearGenreSuggestion: () -> Unit,
+    onProfileClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val pageHorizontalPadding = responsivePageHorizontalPadding()
@@ -102,9 +110,20 @@ private fun SearchScreen(
     val filters = SearchTypeFilter.entries
     val genreSuggestions = SearchGenreSuggestion.entries
 
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            StandardTopAppBar(title = "Search")
+            StandardTopAppBar(
+                title = {
+                    CrispyWordmark(Modifier.height(36.dp))
+                },
+                actions = {
+                    ProfileIconButton(onClick = onProfileClick)
+                },
+                scrollBehavior = scrollBehavior
+            )
         }
     ) { innerPadding ->
         LazyVerticalGrid(

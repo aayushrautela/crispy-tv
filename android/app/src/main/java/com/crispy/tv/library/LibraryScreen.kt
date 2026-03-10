@@ -61,6 +61,8 @@ import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
@@ -251,6 +253,7 @@ class LibraryViewModel internal constructor(
 
 @Composable
 fun LibraryRoute(
+    onProfileClick: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
     onNavigateToCalendar: () -> Unit,
@@ -271,6 +274,7 @@ fun LibraryRoute(
         uiState = uiState,
         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
         onRefresh = viewModel::refresh,
+        onProfileClick = onProfileClick,
         onItemClick = onItemClick,
         onNavigateToDiscover = onNavigateToDiscover,
         onNavigateToCalendar = onNavigateToCalendar,
@@ -284,6 +288,7 @@ private fun LibraryScreen(
     uiState: LibraryUiState,
     tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     onRefresh: () -> Unit,
+    onProfileClick: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
     onNavigateToCalendar: () -> Unit,
@@ -311,46 +316,10 @@ private fun LibraryScreen(
         topBar = {
             StandardTopAppBar(
                 title = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Library",
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            IconButton(onClick = onNavigateToCalendar) {
-                                Icon(imageVector = Icons.Outlined.Event, contentDescription = "Calendar")
-                            }
-
-                            IconButton(onClick = onRefresh) {
-                                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                            }
-                        }
-
-                        if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(providerFolders, key = { it.id }) { folder ->
-                                    FilterChip(
-                                        selected = folder.id == selectedFolder,
-                                        onClick = { onSelectProviderFolder(folder.id) },
-                                        label = { Text("${folder.label} (${folder.itemCount})") }
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    CrispyWordmark(Modifier.height(36.dp))
+                },
+                actions = {
+                    ProfileIconButton(onClick = onProfileClick)
                 },
                 scrollBehavior = scrollBehavior
             )
@@ -368,6 +337,37 @@ private fun LibraryScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
+                        LazyRow(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(providerFolders, key = { it.id }) { folder ->
+                                FilterChip(
+                                    selected = folder.id == selectedFolder,
+                                    onClick = { onSelectProviderFolder(folder.id) },
+                                    label = { Text("${folder.label} (${folder.itemCount})") }
+                                )
+                            }
+                        }
+                    } else {
+                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    IconButton(onClick = onNavigateToCalendar) {
+                        Icon(imageVector = Icons.Outlined.Event, contentDescription = "Calendar")
+                    }
+
+                    IconButton(onClick = onRefresh) {
+                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
+                    }
+                }
+            }
             if (uiState.statusMessage.isNotBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(

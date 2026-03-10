@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -109,7 +110,7 @@ private fun HomeScreen(
                     CrispyWordmark(Modifier.height(36.dp))
                 },
                 actions = {
-                    HomeProfileSelector(onClick = onProfileClick)
+                    ProfileIconButton(onClick = onProfileClick)
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -338,12 +339,4 @@ private fun HomeHeaderSectionChips(
     }
 }
 
-@Composable
-private fun HomeProfileSelector(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(
-            imageVector = Icons.Outlined.Person,
-            contentDescription = "Profile",
-        )
-    }
-}
+// End of file

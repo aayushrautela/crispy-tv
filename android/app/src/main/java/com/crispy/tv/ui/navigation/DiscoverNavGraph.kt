@@ -8,6 +8,7 @@ import com.crispy.tv.discover.DiscoverRoute
 internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostController) {
     composable(AppRoutes.DiscoverRoute) {
         DiscoverRoute(
+            onProfileClick = { navController.navigate(AppRoutes.AccountsProfilesRoute) },
             onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
         )
     }

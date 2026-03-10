@@ -65,6 +65,8 @@ import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.ProfileIconButton
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -337,6 +339,7 @@ private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
 
 @Composable
 fun DiscoverRoute(
+    onProfileClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -356,6 +359,7 @@ fun DiscoverRoute(
         onCatalogClick = viewModel::selectCatalog,
         onGenreClick = viewModel::selectGenre,
         onLoadMore = viewModel::loadMore,
+        onProfileClick = onProfileClick,
         onItemClick = onItemClick
     )
 }
@@ -375,6 +379,7 @@ private fun DiscoverScreen(
     onCatalogClick: (DiscoverCatalogRef) -> Unit,
     onGenreClick: (String?) -> Unit,
     onLoadMore: () -> Unit,
+    onProfileClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
@@ -388,92 +393,15 @@ private fun DiscoverScreen(
         topBar = {
             StandardTopAppBar(
                 title = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Discover",
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            IconButton(onClick = onRefresh) {
-                                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                            }
-                        }
-
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            item {
-                                FilterChip(
-                                    selected = false,
-                                    onClick = { activeSheet = DiscoverSheet.Type },
-                                    label = { Text(uiState.typeFilter.label) },
-                                    trailingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.KeyboardArrowDown,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-
-                            item {
-                                FilterChip(
-                                    selected = false,
-                                    onClick = { activeSheet = DiscoverSheet.Catalog },
-                                    label = {
-                                        Text(
-                                            text = selectedCatalog?.section?.title ?: "Select catalog",
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.KeyboardArrowDown,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-
-                            if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
-                                item {
-                                    FilterChip(
-                                        selected = false,
-                                        onClick = { activeSheet = DiscoverSheet.Genre },
-                                        label = {
-                                            Text(
-                                                text = uiState.selectedGenre ?: "All genres",
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Outlined.KeyboardArrowDown,
-                                                contentDescription = null
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    CrispyWordmark(Modifier.height(36.dp))
+                },
+                actions = {
+                    ProfileIconButton(onClick = onProfileClick)
                 },
                 scrollBehavior = scrollBehavior
             )
         }
+
     ) { innerPadding ->
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 124.dp),
@@ -487,6 +415,77 @@ private fun DiscoverScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LazyRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = false,
+                                onClick = { activeSheet = DiscoverSheet.Type },
+                                label = { Text(uiState.typeFilter.label) },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+                        }
+
+                        item {
+                            FilterChip(
+                                selected = false,
+                                onClick = { activeSheet = DiscoverSheet.Catalog },
+                                label = {
+                                    Text(
+                                        text = selectedCatalog?.section?.title ?: "Select catalog",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+                        }
+
+                        if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
+                            item {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { activeSheet = DiscoverSheet.Genre },
+                                    label = {
+                                        Text(
+                                            text = uiState.selectedGenre ?: "All genres",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    IconButton(onClick = onRefresh) {
+                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
+                    }
+                }
+            }
             if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
