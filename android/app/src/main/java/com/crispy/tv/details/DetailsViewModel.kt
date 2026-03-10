@@ -122,6 +122,8 @@ sealed interface DetailsNavigationEvent {
         val playbackUrl: String,
         val title: String,
         val identity: PlaybackIdentity,
+        val subtitle: String?,
+        val artworkUrl: String?,
     ) : DetailsNavigationEvent
 }
 
@@ -906,14 +908,49 @@ class DetailsViewModel internal constructor(
                     showTitle = if (resolvedMediaType == MetadataLabMediaType.SERIES) enriched.title else null,
                     showYear = if (resolvedMediaType == MetadataLabMediaType.SERIES) yearInt else null,
                 )
+            val artworkUrl = enriched.backdropUrl?.trim()?.ifBlank { null } ?: enriched.posterUrl?.trim()?.ifBlank { null }
+            val subtitle = buildPlayerSubtitle(
+                mediaType = resolvedMediaType,
+                details = enriched,
+                season = season,
+                episode = episode,
+            )
 
             _navigationEvents.tryEmit(
                 DetailsNavigationEvent.OpenPlayer(
                     playbackUrl = playbackUrl,
                     title = title,
                     identity = identity,
+                    subtitle = subtitle,
+                    artworkUrl = artworkUrl,
                 )
             )
+        }
+    }
+
+    private fun buildPlayerSubtitle(
+        mediaType: MetadataLabMediaType,
+        details: MediaDetails,
+        season: Int?,
+        episode: Int?,
+    ): String? {
+        return when (mediaType) {
+            MetadataLabMediaType.SERIES -> {
+                val episodeLabel =
+                    when {
+                        season != null && episode != null -> {
+                            "S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
+                        }
+
+                        season != null -> "Season $season"
+                        else -> null
+                    }
+                listOfNotNull(details.title.trim().ifBlank { null }, episodeLabel)
+                    .joinToString(separator = " • ")
+                    .ifBlank { null }
+            }
+
+            MetadataLabMediaType.MOVIE -> details.year?.trim()?.ifBlank { null }
         }
     }
 

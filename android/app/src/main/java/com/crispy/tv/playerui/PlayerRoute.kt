@@ -5,6 +5,9 @@
 
 package com.crispy.tv.playerui
 
+import android.content.Intent
+import android.graphics.Rect
+import android.util.Rational
 import android.os.SystemClock
 import android.view.SurfaceView
 import androidx.compose.foundation.background
@@ -14,10 +17,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,6 +35,7 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackEvent
 import com.crispy.tv.player.PlaybackIdentity
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -35,7 +44,12 @@ import kotlinx.coroutines.launch
 fun PlayerRoute(
     playbackUrl: String,
     title: String,
+    subtitle: String?,
+    artworkUrl: String?,
     identity: PlaybackIdentity?,
+    restorePlaybackIntent: Intent,
+    isInPictureInPictureMode: Boolean,
+    onPictureInPictureConfigChanged: (Boolean, Rect?, Rational?) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -64,15 +78,28 @@ fun PlayerRoute(
                         viewModel.onNativeError(event.message, codecLikely = event.codecLikely)
                     }
                 }
+            }
         }
-    }
+
+    val mediaSessionManager =
+        remember(appContext, playbackController, restorePlaybackIntent) {
+            PlayerMediaSessionManager(
+                context = appContext,
+                playbackController = playbackController,
+                restorePlaybackIntent = restorePlaybackIntent,
+            )
+        }
 
     val lastMetrics =
         remember {
             PlaybackMetricsHolder()
         }
+    var videoBounds by remember { mutableStateOf<Rect?>(null) }
+    val latestUiState by rememberUpdatedState(uiState)
+    val latestSubtitle by rememberUpdatedState(subtitle)
+    val latestArtworkUrl by rememberUpdatedState(artworkUrl)
 
-    DisposableEffect(playbackController, identity, watchHistoryService) {
+    DisposableEffect(playbackController, identity, watchHistoryService, mediaSessionManager) {
         onDispose {
             val lastDurationMs = lastMetrics.durationMs
             if (identity != null && lastDurationMs > 0L) {
@@ -85,6 +112,8 @@ fun PlayerRoute(
                 }
             }
 
+            onPictureInPictureConfigChanged(enabled = false, sourceRect = null, aspectRatio = null)
+            mediaSessionManager.release()
             playbackController.release()
         }
     }
@@ -109,6 +138,15 @@ fun PlayerRoute(
             lastMetrics.isPlaying = isPlaying
 
             viewModel.onPlaybackMetrics(positionMs = positionMs, durationMs = durationMs, isPlaying = isPlaying)
+            mediaSessionManager.updatePlayback(
+                title = latestUiState.title,
+                subtitle = latestSubtitle,
+                artworkUrl = latestArtworkUrl,
+                isPlaying = isPlaying,
+                isBuffering = latestUiState.isBuffering,
+                positionMs = positionMs,
+                durationMs = durationMs,
+            )
 
             if (identity != null && durationMs > 0L) {
                 val nowElapsedMs = SystemClock.elapsedRealtime()
@@ -139,6 +177,30 @@ fun PlayerRoute(
         }
     }
 
+    LaunchedEffect(uiState.title, subtitle, artworkUrl) {
+        mediaSessionManager.updateMetadata(
+            title = uiState.title,
+            subtitle = subtitle,
+            artworkUrl = artworkUrl,
+        )
+    }
+
+    LaunchedEffect(videoBounds, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
+        val aspectRatio =
+            videoBounds
+                ?.takeIf { it.width() > 0 && it.height() > 0 }
+                ?.let { bounds -> Rational(bounds.width(), bounds.height()) }
+        val pipEnabled =
+            videoBounds != null &&
+                uiState.errorMessage == null &&
+                (uiState.isPlaying || uiState.isBuffering || uiState.stableDurationMs > 0L)
+        onPictureInPictureConfigChanged(
+            enabled = pipEnabled,
+            sourceRect = videoBounds,
+            aspectRatio = aspectRatio,
+        )
+    }
+
     Box(
         modifier =
             Modifier
@@ -148,7 +210,19 @@ fun PlayerRoute(
         when (uiState.activeEngine) {
             NativePlaybackEngine.EXO -> {
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coordinates ->
+                                val bounds = coordinates.boundsInWindow()
+                                videoBounds =
+                                    Rect(
+                                        bounds.left.roundToInt(),
+                                        bounds.top.roundToInt(),
+                                        bounds.right.roundToInt(),
+                                        bounds.bottom.roundToInt(),
+                                    )
+                            },
                     factory = { viewContext ->
                         PlayerView(viewContext).apply {
                             useController = false
@@ -163,7 +237,19 @@ fun PlayerRoute(
 
             NativePlaybackEngine.VLC -> {
                 AndroidView(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coordinates ->
+                                val bounds = coordinates.boundsInWindow()
+                                videoBounds =
+                                    Rect(
+                                        bounds.left.roundToInt(),
+                                        bounds.top.roundToInt(),
+                                        bounds.right.roundToInt(),
+                                        bounds.bottom.roundToInt(),
+                                    )
+                            },
                     factory = { viewContext ->
                         playbackController.createVlcSurfaceView(viewContext)
                     },
@@ -174,26 +260,28 @@ fun PlayerRoute(
             }
         }
 
-        PlayerOverlay(
-            title = uiState.title,
-            statusMessage = uiState.statusMessage,
-            errorMessage = uiState.errorMessage,
-            isBuffering = uiState.isBuffering,
-            isPlaying = uiState.isPlaying,
-            positionMs = uiState.positionMs,
-            durationMs = uiState.durationMs,
-            stableDurationMs = uiState.stableDurationMs,
-            activeEngine = uiState.activeEngine,
-            onBack = onBack,
-            onTogglePlayPause = {
-                val nextPlaying = !uiState.isPlaying
-                playbackController.setPlaying(nextPlaying)
-                viewModel.onUserSetPlaying(nextPlaying)
-            },
-            onSeekTo = playbackController::seekTo,
-            onEngineSelected = viewModel::onEngineSelected,
-            onRetry = viewModel::retryPlayback,
-        )
+        if (!isInPictureInPictureMode) {
+            PlayerOverlay(
+                title = uiState.title,
+                statusMessage = uiState.statusMessage,
+                errorMessage = uiState.errorMessage,
+                isBuffering = uiState.isBuffering,
+                isPlaying = uiState.isPlaying,
+                positionMs = uiState.positionMs,
+                durationMs = uiState.durationMs,
+                stableDurationMs = uiState.stableDurationMs,
+                activeEngine = uiState.activeEngine,
+                onBack = onBack,
+                onTogglePlayPause = {
+                    val nextPlaying = !uiState.isPlaying
+                    playbackController.setPlaying(nextPlaying)
+                    viewModel.onUserSetPlaying(nextPlaying)
+                },
+                onSeekTo = playbackController::seekTo,
+                onEngineSelected = viewModel::onEngineSelected,
+                onRetry = viewModel::retryPlayback,
+            )
+        }
     }
 }
 

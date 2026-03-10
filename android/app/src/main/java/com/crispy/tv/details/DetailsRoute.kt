@@ -22,7 +22,7 @@ fun DetailsRoute(
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit = { _, _ -> },
     onPersonClick: (String) -> Unit = {},
-    onOpenPlayer: (String, String, PlaybackIdentity) -> Unit = { _, _, _ -> },
+    onOpenPlayer: (String, String, PlaybackIdentity, String?, String?) -> Unit = { _, _, _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
 
@@ -58,7 +58,13 @@ fun DetailsRoute(
         viewModel.navigationEvents.collectLatest { event ->
             when (event) {
                 is DetailsNavigationEvent.OpenPlayer -> {
-                    onOpenPlayer(event.playbackUrl, event.title, event.identity)
+                    onOpenPlayer(
+                        event.playbackUrl,
+                        event.title,
+                        event.identity,
+                        event.subtitle,
+                        event.artworkUrl,
+                    )
                 }
             }
         }
