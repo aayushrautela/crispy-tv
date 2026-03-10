@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+import android.view.ViewGroup
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -46,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -228,12 +230,13 @@ internal fun HeroSection(
                 )
         )
 
-        if (shouldAttemptPlayback && trailerIsPlaying) {
+        if (showTrailer && hasTrailer) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
                     .padding(top = 20.dp, end = 16.dp)
+                    .zIndex(2f)
                     .clip(MaterialTheme.shapes.extraLarge)
                     .clickable { onToggleTrailerMute() },
                 color = Color.Black.copy(alpha = 0.34f),
@@ -438,9 +441,21 @@ private fun HeroYouTubeTrailerLayer(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
+                    controllerAutoShow = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    isClickable = false
+                    isLongClickable = false
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                     player = exoPlayer
+                    videoSurfaceView?.apply {
+                        isClickable = false
+                        isLongClickable = false
+                        isFocusable = false
+                        isFocusableInTouchMode = false
+                    }
                 }
             },
             update = { view ->

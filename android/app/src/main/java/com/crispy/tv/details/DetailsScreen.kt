@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.settings.AiInsightsMode
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val PALETTE_MAX_WAIT_MS = 450L
+private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
 
 @Composable
 internal fun DetailsScreen(
@@ -72,6 +74,7 @@ internal fun DetailsScreen(
     val details = uiState.details
     val imageUrl = details?.backdropUrl ?: details?.posterUrl
     val listState = rememberLazyListState()
+    val density = LocalDensity.current
     val theming = rememberDetailsTheming(imageUrl = imageUrl)
 
     val isSeedColorResolvedState = rememberUpdatedState(theming.isSeedColorResolved)
@@ -117,9 +120,14 @@ internal fun DetailsScreen(
 
     val trailerKey = selectedTrailer?.key?.trim().takeIf { !it.isNullOrBlank() }
 
-    val heroIsPinned by remember {
+    val trailerStopScrollThresholdPx = remember(density) {
+        with(density) { HERO_TRAILER_STOP_SCROLL_THRESHOLD.roundToPx() }
+    }
+
+    val heroAllowsTrailerPlayback by remember(listState, trailerStopScrollThresholdPx) {
         derivedStateOf {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 2
+            listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset <= trailerStopScrollThresholdPx
         }
     }
 
@@ -140,8 +148,7 @@ internal fun DetailsScreen(
 
     val isTrailerPlaying =
         showTrailer &&
-            heroIsPinned &&
-            !listState.isScrollInProgress &&
+            heroAllowsTrailerPlayback &&
             !userPausedTrailer
 
     val topBarAlpha by remember {

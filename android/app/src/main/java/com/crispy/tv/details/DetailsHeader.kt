@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -141,7 +142,7 @@ internal fun HeaderInfoSection(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                repeat(3) {
+                repeat(4) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -340,6 +341,17 @@ internal fun HeaderInfoSection(
             onRate = {
                 pendingRating = (userRating ?: 0).toFloat()
                 showRatingDialog = true
+            },
+            onShare = {
+                val title = details.title
+                val shareType = if (details.mediaType == "movie") "movie" else "tv"
+                val tmdbId = details.id.removePrefix("tmdb:")
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    val shareUrl = "https://www.themoviedb.org/$shareType/$tmdbId"
+                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy: $shareUrl")
+                }
+                context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
             }
         )
 
@@ -359,6 +371,7 @@ private fun DetailsQuickActionsRow(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onRate: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -396,6 +409,15 @@ private fun DetailsQuickActionsRow(
             selectedAccent = gold,
             icon = if (isRated) Icons.Filled.Star else Icons.Outlined.StarBorder,
             onClick = onRate
+        )
+
+        DetailsQuickAction(
+            label = "Share",
+            selected = false,
+            enabled = enabled,
+            palette = palette,
+            icon = Icons.Outlined.Share,
+            onClick = onShare
         )
     }
 }
