@@ -22,7 +22,7 @@ import androidx.media.app.NotificationCompat as MediaNotificationCompat
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.crispy.tv.R
-import com.crispy.tv.nativeengine.playback.PlaybackController
+import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,10 +33,11 @@ import kotlinx.coroutines.withContext
 
 internal class PlayerMediaSessionManager(
     context: Context,
-    private val playbackController: PlaybackController,
-    private val restorePlaybackIntent: Intent,
+    private val playbackController: PlaybackSessionController,
+    restorePlaybackIntent: Intent,
 ) {
     private val appContext = context.applicationContext
+    private val restorePlaybackIntent = Intent(restorePlaybackIntent)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val mediaSession =

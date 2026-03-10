@@ -19,7 +19,7 @@ sealed interface NativePlaybackEvent {
     ) : NativePlaybackEvent
 }
 
-interface PlaybackController {
+interface PlaybackSessionController {
     fun play(url: String, engine: NativePlaybackEngine)
     fun setPlaying(isPlaying: Boolean)
     fun isPlaying(): Boolean
@@ -28,7 +28,12 @@ interface PlaybackController {
     fun durationMs(): Long
     fun stop()
     fun release()
+}
+
+interface PlaybackSurfaceController {
     fun bindExoPlayerView(playerView: PlayerView)
     fun createVlcSurfaceView(context: Context): SurfaceView
     fun attachVlcSurface(surfaceView: SurfaceView)
 }
+
+interface PlaybackController : PlaybackSessionController, PlaybackSurfaceController

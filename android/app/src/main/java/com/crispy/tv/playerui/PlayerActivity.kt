@@ -29,6 +29,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.ViewModelProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.ui.theme.CrispyRewriteTheme
@@ -61,6 +62,23 @@ class PlayerActivity : ComponentActivity() {
         val artworkUrl = intent.getStringExtra(EXTRA_ARTWORK_URL)?.trim()?.ifBlank { null }
 
         val identity = parseIdentityFromIntent(intent, title)
+        val restorePlaybackIntent =
+            Intent(intent).addFlags(
+                Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
+            )
+        val sessionViewModel =
+            ViewModelProvider(
+                this,
+                PlayerSessionViewModel.factory(
+                    appContext = applicationContext,
+                    playbackUrl = playbackUrl,
+                    title = title,
+                    subtitle = subtitle,
+                    artworkUrl = artworkUrl,
+                    identity = identity,
+                    restorePlaybackIntent = restorePlaybackIntent,
+                ),
+            )[PlayerSessionViewModel::class.java]
 
         Log.d(
             TAG,
@@ -78,15 +96,7 @@ class PlayerActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     PlayerRoute(
-                        playbackUrl = playbackUrl,
-                        title = title,
-                        subtitle = subtitle,
-                        artworkUrl = artworkUrl,
-                        identity = identity,
-                        restorePlaybackIntent =
-                            Intent(intent).addFlags(
-                                Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
-                            ),
+                        session = sessionViewModel,
                         isInPictureInPictureMode = isInPictureInPictureModeState,
                         onPictureInPictureConfigChanged = ::updatePictureInPictureConfig,
                         onBack = { finish() },
