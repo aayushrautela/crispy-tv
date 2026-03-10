@@ -224,7 +224,10 @@ private fun LandscapeArtworkFrame(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     badgeLabel: String? = null,
+    badgeAlignment: Alignment = Alignment.TopStart,
     progressFraction: Float? = null,
+    scrimHeightFraction: Float = 0.52f,
+    scrimMaxAlpha: Float = 0.82f,
     topEndContent: (@Composable BoxScope.() -> Unit)? = null,
     bottomOverlayContent: @Composable BoxScope.() -> Unit = {},
 ) {
@@ -250,15 +253,15 @@ private fun LandscapeArtworkFrame(
         }
 
         HomeArtworkBottomScrim(
-            heightFraction = 0.52f,
-            maxAlpha = 0.82f,
+            heightFraction = scrimHeightFraction,
+            maxAlpha = scrimMaxAlpha,
         )
 
         if (!badgeLabel.isNullOrBlank()) {
             Surface(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 12.dp, top = 12.dp),
+                    .align(badgeAlignment)
+                    .padding(horizontal = 12.dp, top = 12.dp),
                 shape = RoundedCornerShape(999.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1133,38 +1136,32 @@ internal fun CalendarEpisodeCard(
             onClick = onClick,
             modifier = Modifier.aspectRatio(16f / 9f),
             badgeLabel = calendarBadgeLabel(item),
+            badgeAlignment = Alignment.TopEnd,
+            scrimHeightFraction = 0.68f,
+            scrimMaxAlpha = 0.92f,
             bottomOverlayContent = {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
                         .padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = item.seriesName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = calendarEpisodeLabel(item),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.84f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    calendarSupportingText(item)?.let { supportingText ->
-                        Text(
-                            text = supportingText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.72f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        text = calendarSecondaryText(item),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             },
         )
@@ -1235,12 +1232,19 @@ private fun calendarEpisodeLabel(item: CalendarEpisodeItem): String {
     }
 }
 
-private fun calendarSupportingText(item: CalendarEpisodeItem): String? {
-    return when {
+private fun calendarSecondaryText(item: CalendarEpisodeItem): String {
+    val supportingText = when {
         item.isGroup -> "${item.episodeCount} new episodes"
         !item.episodeTitle.isNullOrBlank() -> item.episodeTitle
         !item.overview.isNullOrBlank() -> item.overview
         else -> null
+    }?.trim()
+
+    val episodeLabel = calendarEpisodeLabel(item)
+    return if (supportingText.isNullOrBlank()) {
+        episodeLabel
+    } else {
+        "$episodeLabel - $supportingText"
     }
 }
 

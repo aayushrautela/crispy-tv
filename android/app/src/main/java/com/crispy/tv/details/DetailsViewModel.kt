@@ -108,6 +108,7 @@ data class StreamSelectorUiState(
     val visible: Boolean = false,
     val mediaType: MetadataLabMediaType? = null,
     val lookupId: String? = null,
+    val headerEpisode: MediaVideo? = null,
     val selectedProviderId: String? = null,
     val providers: List<StreamProviderUiState> = emptyList(),
     val isLoading: Boolean = false,
@@ -447,7 +448,13 @@ class DetailsViewModel internal constructor(
                     fallbackMediaType = requestedMediaType,
                 )
 
-        openStreamSelectorWithTarget(target, blankIdMessage = "Unable to resolve stream lookup id for this title.")
+        val headerEpisode = findEpisodeForLookupId(target.lookupId, state.seasonEpisodes)
+
+        openStreamSelectorWithTarget(
+            target = target,
+            headerEpisode = headerEpisode,
+            blankIdMessage = "Unable to resolve stream lookup id for this title.",
+        )
     }
 
     private fun loadEpisodesForSeason(
@@ -580,11 +587,16 @@ class DetailsViewModel internal constructor(
                 mediaType = requestedMediaType,
                 lookupId = videoId.trim(),
             )
-        openStreamSelectorWithTarget(target, blankIdMessage = "This episode does not have a stream lookup id.")
+        openStreamSelectorWithTarget(
+            target = target,
+            headerEpisode = findEpisodeForLookupId(target.lookupId, state.seasonEpisodes),
+            blankIdMessage = "This episode does not have a stream lookup id.",
+        )
     }
 
     private fun openStreamSelectorWithTarget(
         target: StreamLookupTarget,
+        headerEpisode: MediaVideo? = null,
         blankIdMessage: String,
     ) {
         if (target.lookupId.isBlank()) {
@@ -600,7 +612,7 @@ class DetailsViewModel internal constructor(
         ) {
             _uiState.update {
                 it.copy(
-                    streamSelector = current.copy(visible = true),
+                    streamSelector = current.copy(visible = true, headerEpisode = headerEpisode ?: current.headerEpisode),
                     statusMessage = "",
                 )
             }
@@ -615,6 +627,7 @@ class DetailsViewModel internal constructor(
                         visible = true,
                         mediaType = target.mediaType,
                         lookupId = target.lookupId,
+                        headerEpisode = headerEpisode,
                         isLoading = true,
                     ),
                 statusMessage = "Fetching streams...",
@@ -702,6 +715,18 @@ class DetailsViewModel internal constructor(
                     }
                 }
             }
+    }
+
+    private fun findEpisodeForLookupId(
+        lookupId: String,
+        currentEpisodes: List<MediaVideo>,
+    ): MediaVideo? {
+        val normalizedLookupId = lookupId.trim()
+        if (normalizedLookupId.isBlank()) return null
+
+        return sequenceOf(currentEpisodes.asSequence(), seasonEpisodesCache.values.asSequence().flatten())
+            .flatten()
+            .firstOrNull { episode -> episode.id.equals(normalizedLookupId, ignoreCase = true) }
     }
 
     fun onDismissStreamSelector() {
