@@ -669,10 +669,20 @@ internal fun HomeCollectionSectionRow(
         return
     }
 
+    val sharedSubtitle =
+        remember(visibleSections) {
+            visibleSections
+                .map { it.section.subtitle.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .singleOrNull()
+                .orEmpty()
+        }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = "Collections",
-            statusMessage = ""
+            statusMessage = sharedSubtitle,
         )
 
         LazyRow(
@@ -682,6 +692,7 @@ internal fun HomeCollectionSectionRow(
             items(visibleSections, key = { it.section.key }) { sectionUi ->
                 HomeCollectionCard(
                     sectionUi = sectionUi,
+                    showSubtitle = sharedSubtitle.isBlank(),
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
                     onItemClick = onItemClick
                 )
@@ -693,6 +704,7 @@ internal fun HomeCollectionSectionRow(
 @Composable
 private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
+    showSubtitle: Boolean,
     onCollectionClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
@@ -764,12 +776,12 @@ private fun HomeCollectionCard(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
-                ) {
-                    if (sectionUi.section.subtitle.isNotBlank()) {
+                if (showSubtitle && sectionUi.section.subtitle.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                    ) {
                         Text(
                             text = sectionUi.section.subtitle,
                             style = MaterialTheme.typography.bodyMedium,
@@ -778,9 +790,9 @@ private fun HomeCollectionCard(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                }
 
-                HorizontalDivider()
+                    HorizontalDivider()
+                }
 
                 when {
                     sectionUi.isLoading && sectionUi.items.isEmpty() -> {
