@@ -261,7 +261,7 @@ private fun LandscapeArtworkFrame(
             Surface(
                 modifier = Modifier
                     .align(badgeAlignment)
-                    .padding(horizontal = 12.dp, top = 12.dp),
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp),
                 shape = RoundedCornerShape(999.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
