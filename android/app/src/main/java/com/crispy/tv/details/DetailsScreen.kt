@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -37,6 +38,9 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
@@ -75,7 +79,25 @@ internal fun DetailsScreen(
     val imageUrl = details?.backdropUrl ?: details?.posterUrl
     val listState = rememberLazyListState()
     val density = LocalDensity.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val theming = rememberDetailsTheming(imageUrl = imageUrl)
+
+    var isScreenResumed by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, _ ->
+                isScreenResumed =
+                    lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val isSeedColorResolvedState = rememberUpdatedState(theming.isSeedColorResolved)
     val colorSchemeState = rememberUpdatedState(theming.colorScheme)
@@ -146,10 +168,14 @@ internal fun DetailsScreen(
         showTrailer = true
     }
 
+    val trailerPlaybackBlocked =
+        visibleUiState.streamSelector.visible || visibleUiState.aiStoryVisible || !isScreenResumed
+
     val isTrailerPlaying =
         showTrailer &&
             heroAllowsTrailerPlayback &&
-            !userPausedTrailer
+            !userPausedTrailer &&
+            !trailerPlaybackBlocked
 
     val topBarAlpha by remember {
         derivedStateOf {
