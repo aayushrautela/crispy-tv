@@ -35,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -62,12 +61,13 @@ import com.crispy.tv.catalog.DiscoverCatalogRef
 import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.ui.components.PosterCard
-import com.crispy.tv.ui.theme.Dimensions
-import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -392,7 +392,7 @@ private fun DiscoverScreen(
     val selectedCatalog = uiState.selectedCatalog
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior = appBarScrollBehavior()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),

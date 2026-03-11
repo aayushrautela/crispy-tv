@@ -1,6 +1,7 @@
 package com.crispy.tv.streams
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import com.crispy.tv.domain.metadata.formatIdForIdPrefixes
 import com.crispy.tv.metadata.AddonManifestSeed
 import com.crispy.tv.metadata.MetadataAddonRegistry
@@ -24,6 +25,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
+@Immutable
 data class AddonStream(
     val providerId: String,
     val providerName: String,
@@ -39,6 +41,7 @@ data class AddonStream(
         get() = url ?: externalUrl
 }
 
+@Immutable
 data class ProviderStreamsResult(
     val providerId: String,
     val providerName: String,
@@ -47,6 +50,7 @@ data class ProviderStreamsResult(
     val attemptedUrl: String? = null,
 )
 
+@Immutable
 data class StreamProviderDescriptor(
     val providerId: String,
     val providerName: String,

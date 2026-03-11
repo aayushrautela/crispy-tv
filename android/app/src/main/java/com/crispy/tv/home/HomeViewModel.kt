@@ -82,21 +82,15 @@ data class ThisWeekState(
 }
 
 @Immutable
-data class HomeLayoutState(
-    val headerSections: List<CatalogSectionRef> = emptyList(),
-    val collectionSections: List<CatalogSectionRef> = emptyList(),
-    val standardCatalogSections: List<CatalogSectionRef> = emptyList(),
-    val catalogStatusMessage: String = "",
-    val isRefreshing: Boolean = false,
-) {
-    val hasCatalogSections: Boolean
-        get() = collectionSections.isNotEmpty() || standardCatalogSections.isNotEmpty()
-}
-
-@Immutable
 private data class CatalogSectionsLayout(
     val collectionSections: List<CatalogSectionRef> = emptyList(),
     val standardCatalogSections: List<CatalogSectionRef> = emptyList(),
+)
+
+@Immutable
+data class HomeCatalogStatusState(
+    val statusMessage: String = "",
+    val hasCatalogSections: Boolean = false,
 )
 
 @Immutable
@@ -117,7 +111,7 @@ class HomeViewModel internal constructor(
     companion object {
         private const val TAG = "HomeViewModel"
         private const val CATALOG_CONCURRENCY_LIMIT = 6
-        private const val SECTION_SKELETON_MIN_DURATION_MS = 450L
+        private const val SECTION_SKELETON_MIN_DURATION_MS = 150L
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -167,8 +161,20 @@ class HomeViewModel internal constructor(
     private val _thisWeekState = MutableStateFlow(ThisWeekState())
     val thisWeekState: StateFlow<ThisWeekState> = _thisWeekState.asStateFlow()
 
-    private val _layoutState = MutableStateFlow(HomeLayoutState())
-    val layoutState: StateFlow<HomeLayoutState> = _layoutState.asStateFlow()
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _headerSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
+    val headerSections: StateFlow<List<CatalogSectionRef>> = _headerSections.asStateFlow()
+
+    private val _collectionSectionUis = MutableStateFlow<List<HomeCatalogSectionUi>>(emptyList())
+    val collectionSectionUis: StateFlow<List<HomeCatalogSectionUi>> = _collectionSectionUis.asStateFlow()
+
+    private val _standardCatalogSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
+    val standardCatalogSections: StateFlow<List<CatalogSectionRef>> = _standardCatalogSections.asStateFlow()
+
+    private val _catalogStatusState = MutableStateFlow(HomeCatalogStatusState())
+    val catalogStatusState: StateFlow<HomeCatalogStatusState> = _catalogStatusState.asStateFlow()
 
     private val catalogSectionStates = LinkedHashMap<String, MutableStateFlow<HomeCatalogSectionUi>>()
 
@@ -182,37 +188,40 @@ class HomeViewModel internal constructor(
     }
 
     fun refresh() {
+        if (refreshJob?.isActive == true) {
+            return
+        }
         val currentRefreshGeneration = beginRefresh()
         prepareForRefresh()
 
         refreshJob =
             viewModelScope.launch {
-                coroutineScope {
-                    val jobs = listOf(
-                        launch { refreshPersonalFeed(currentRefreshGeneration) },
-                        launch { refreshHeaderCatalogSections(currentRefreshGeneration) },
-                        launch { refreshWatchActivity(currentRefreshGeneration) },
-                        launch { refreshThisWeek(currentRefreshGeneration) },
-                    )
-                    jobs.joinAll()
+                try {
+                    coroutineScope {
+                        val jobs = listOf(
+                            launch { refreshPersonalFeed(currentRefreshGeneration) },
+                            launch { refreshHeaderCatalogSections(currentRefreshGeneration) },
+                            launch { refreshWatchActivity(currentRefreshGeneration) },
+                            launch { refreshThisWeek(currentRefreshGeneration) },
+                        )
+                        jobs.joinAll()
+                    }
+                } finally {
+                    if (isCurrentRefresh(currentRefreshGeneration)) {
+                        _isRefreshing.value = false
+                    }
                 }
-
-                if (!isCurrentRefresh(currentRefreshGeneration)) {
-                    return@launch
-                }
-                _layoutState.update { current -> current.copy(isRefreshing = false) }
             }
     }
 
     private fun beginRefresh(): Long {
         val nextGeneration = refreshGeneration + 1L
         refreshGeneration = nextGeneration
-        refreshJob?.cancel()
         return nextGeneration
     }
 
     private fun prepareForRefresh() {
-        _layoutState.update { current -> current.copy(isRefreshing = true) }
+        _isRefreshing.value = true
         _heroState.update { current ->
             current.copy(
                 isLoading = true,
@@ -240,6 +249,7 @@ class HomeViewModel internal constructor(
         catalogSectionStates.values.forEach { state ->
             state.update { current -> current.copy(isLoading = true) }
         }
+        refreshCollectionSectionUis(_collectionSectionUis.value.map { it.section })
     }
 
     private fun isCurrentRefresh(generation: Long): Boolean {
@@ -701,56 +711,61 @@ class HomeViewModel internal constructor(
     }
 
     private fun setHeaderSections(sections: List<CatalogSectionRef>) {
-        _layoutState.update { current ->
-            current.copy(
-                headerSections =
-                    sections
-                        .asSequence()
-                        .filter { it.title.trim().isNotEmpty() }
-                        .distinctBy { it.key }
-                        .toList(),
-            )
-        }
+        _headerSections.value =
+            sections
+                .asSequence()
+                .filter { it.title.trim().isNotEmpty() }
+                .distinctBy { it.key }
+                .toList()
     }
 
     private fun setCatalogSections(
         sections: List<CatalogSectionRef>,
         statusMessage: String,
     ) {
-        val retainedSectionStates = LinkedHashMap<String, MutableStateFlow<HomeCatalogSectionUi>>(sections.size)
+        val activeKeys = sections.mapTo(linkedSetOf()) { it.key }
         sections.forEach { section ->
-            val sectionState = catalogSectionStates.remove(section.key) ?: MutableStateFlow(HomeCatalogSectionUi(section = section))
-            sectionState.value =
-                sectionState.value.copy(
-                    section = section,
-                    isLoading = sectionState.value.isLoading,
-                )
-            retainedSectionStates[section.key] = sectionState
+            val sectionState = catalogSectionStates.getOrPut(section.key) {
+                MutableStateFlow(HomeCatalogSectionUi(section = section))
+            }
+            sectionState.value = sectionState.value.copy(section = section)
         }
-        catalogSectionStates.clear()
-        catalogSectionStates.putAll(retainedSectionStates)
+        catalogSectionStates.keys.retainAll(activeKeys)
 
         val catalogSectionsLayout = partitionCatalogSections(sections)
-        _layoutState.update { current ->
-            current.copy(
-                collectionSections = catalogSectionsLayout.collectionSections,
-                standardCatalogSections = catalogSectionsLayout.standardCatalogSections,
-                catalogStatusMessage = statusMessage,
+        _standardCatalogSections.value = catalogSectionsLayout.standardCatalogSections
+        refreshCollectionSectionUis(catalogSectionsLayout.collectionSections)
+        _catalogStatusState.value =
+            HomeCatalogStatusState(
+                statusMessage = statusMessage,
+                hasCatalogSections = sections.isNotEmpty(),
             )
-        }
     }
 
     private fun updateCatalogSectionState(
         section: CatalogSectionRef,
         pageResult: CatalogPageResult,
     ) {
-        catalogSectionStates[section.key]?.value =
+        val sectionState = catalogSectionStates.getOrPut(section.key) {
+            MutableStateFlow(HomeCatalogSectionUi(section = section))
+        }
+        sectionState.value =
             HomeCatalogSectionUi(
                 section = section,
                 items = pageResult.items,
                 isLoading = false,
                 statusMessage = pageResult.statusMessage,
             )
+        if (_collectionSectionUis.value.any { it.section.key == section.key }) {
+            refreshCollectionSectionUis(_collectionSectionUis.value.map { it.section })
+        }
+    }
+
+    private fun refreshCollectionSectionUis(sections: List<CatalogSectionRef>) {
+        _collectionSectionUis.value =
+            sections.map { section ->
+                catalogSectionStates[section.key]?.value ?: HomeCatalogSectionUi(section = section)
+            }
     }
 }
 

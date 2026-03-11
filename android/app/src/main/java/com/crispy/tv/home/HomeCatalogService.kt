@@ -60,6 +60,7 @@ data class HomePersonalFeedLoadResult(
     val sectionsStatusMessage: String = "",
 )
 
+@Immutable
 data class MediaDetails(
     val id: String,
     val imdbId: String?,
@@ -81,6 +82,7 @@ data class MediaDetails(
     val addonId: String?
 )
 
+@Immutable
 data class MediaVideo(
     val id: String,
     val title: String,

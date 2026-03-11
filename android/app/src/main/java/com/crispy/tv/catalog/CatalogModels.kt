@@ -9,8 +9,7 @@ data class CatalogSectionRef(
     val catalogId: String,
     val subtitle: String = ""
 ) {
-    val key: String
-        get() = catalogId.trim().lowercase(Locale.US)
+    val key: String = catalogId.trim().lowercase(Locale.US)
 }
 
 @Immutable

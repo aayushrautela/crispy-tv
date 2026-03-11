@@ -35,7 +35,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,11 +43,11 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.maskClip
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -65,13 +64,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.metadata.tmdb.TmdbApi
-import kotlinx.coroutines.flow.StateFlow
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 import com.crispy.tv.ui.components.skeletonElement
 
@@ -220,7 +218,7 @@ internal fun HomeRailHeader(
 @Composable
 private fun LandscapeArtworkFrame(
     title: String,
-    imageUrl: String?,
+    imageModel: Any?,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     badgeLabel: String? = null,
@@ -237,9 +235,9 @@ private fun LandscapeArtworkFrame(
                 .clip(RoundedCornerShape(20.dp))
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
-        if (!imageUrl.isNullOrBlank()) {
+        if (imageModel != null) {
             AsyncImage(
-                model = imageUrl,
+                model = imageModel,
                 contentDescription = title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -336,6 +334,8 @@ internal fun HomeRailCard(
     var menuExpanded by remember { mutableStateOf(false) }
     var bottomSheetVisible by remember { mutableStateOf(false) }
     val hasItemActions = onHideClick != null || onRemoveClick != null
+    val artworkModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, 260.dp)
+    val logoModel = rememberCrispyImageModel(item.logoUrl, width = 188.dp, height = 54.dp)
 
     val cardInteractionModifier = if (useBottomSheetActions && hasItemActions) {
         Modifier.combinedClickable(
@@ -348,10 +348,9 @@ internal fun HomeRailCard(
     }
 
     Column(modifier = Modifier.width(260.dp)) {
-        val imageUrl = item.backdropUrl ?: item.posterUrl
         LandscapeArtworkFrame(
             title = item.title,
-            imageUrl = imageUrl,
+            imageModel = artworkModel,
             onClick = null,
             modifier = Modifier
                 .aspectRatio(16f / 9f)
@@ -419,11 +418,11 @@ internal fun HomeRailCard(
                     }
                 } else {
                     null
-                },
+            },
             bottomOverlayContent = {
-                if (!item.logoUrl.isNullOrBlank()) {
+                if (logoModel != null) {
                     AsyncImage(
-                        model = item.logoUrl,
+                        model = logoModel,
                         contentDescription = "${item.title} logo",
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -651,18 +650,12 @@ internal fun HomeCatalogSectionRow(
 
 @Composable
 internal fun HomeCollectionSectionRow(
-    sections: List<CatalogSectionRef>,
-    sectionState: (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>,
+    sectionUis: List<HomeCatalogSectionUi>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
 ) {
-    val sectionStates = mutableListOf<HomeCatalogSectionUi>()
-    for (section in sections) {
-        val sectionUi by sectionState(section).collectAsStateWithLifecycle()
-        sectionStates += sectionUi
-    }
     val visibleSections =
-        remember(sectionStates) {
-            sectionStates.filter {
+        remember(sectionUis) {
+            sectionUis.filter {
                 it.isLoading || it.items.isNotEmpty() || it.statusMessage.isNotBlank()
             }
         }
@@ -714,6 +707,7 @@ private fun HomeCollectionCard(
                 item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
             }
         }
+    val artworkModel = rememberCrispyImageModel(artworkUrl, width = 236.dp, height = 295.dp, tmdbSize = "w500")
     val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size) ?: "0 movies"
 
     Card(modifier = Modifier.width(236.dp).clickable(onClick = onCollectionClick)) {
@@ -722,9 +716,9 @@ private fun HomeCollectionCard(
                 .fillMaxWidth()
                 .aspectRatio(4f / 5f)
         ) {
-            if (!artworkUrl.isNullOrBlank()) {
+            if (artworkModel != null) {
                 AsyncImage(
-                    model = artworkUrl,
+                    model = artworkModel,
                     contentDescription = sectionUi.section.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -795,118 +789,6 @@ private fun HomeCollectionCard(
     }
 }
 
-@Composable
-private fun HomeCollectionMovieRow(
-    item: CatalogItem,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(40.dp)
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(10.dp))
-            ) {
-                if (!item.posterUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = item.posterUrl,
-                        contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surface)
-                    )
-                }
-            }
-
-            Text(
-                text = item.title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            item.rating
-                ?.takeIf { it.isNotBlank() }
-                ?.let { rating ->
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = Color(0xFFFFC107)
-                            )
-                            Text(
-                                text = rating,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-                }
-        }
-    }
-}
-
-@Composable
-private fun HomeCollectionMovieSkeletonRow() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .width(40.dp)
-                .aspectRatio(2f / 3f)
-                .skeletonElement(shape = RoundedCornerShape(10.dp), pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(16.dp)
-                .skeletonElement(pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .width(48.dp)
-                .height(16.dp)
-                .skeletonElement(shape = RoundedCornerShape(999.dp), pulse = false)
-        )
-    }
-}
-
 private fun collectionMovieCountLabel(itemCount: Int): String? {
     return when {
         itemCount <= 0 -> null
@@ -917,15 +799,13 @@ private fun collectionMovieCountLabel(itemCount: Int): String? {
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
 private const val HOME_POSTER_SKELETON_COUNT = 5
-private const val HOME_COLLECTION_SKELETON_ROW_COUNT = 2
-private const val HOME_THIS_WEEK_SKELETON_COUNT = 5
-private const val COLLECTION_PREVIEW_ITEM_COUNT = 3
 
 @Composable
 private fun HomeRailPosterCard(
     item: ContinueWatchingItem,
     onClick: () -> Unit
 ) {
+    val imageModel = rememberPosterImageModel(item.posterUrl ?: item.backdropUrl)
     Column(modifier = Modifier.width(124.dp)) {
         Card(
             modifier = Modifier
@@ -933,13 +813,13 @@ private fun HomeRailPosterCard(
                 .clip(MaterialTheme.shapes.large)
                 .clickable(onClick = onClick)
         ) {
-            val imageUrl = item.posterUrl ?: item.backdropUrl
             Box(modifier = Modifier.fillMaxSize()) {
-                if (!imageUrl.isNullOrBlank()) {
+                if (imageModel != null) {
                     AsyncImage(
-                        model = imageUrl,
+                        model = imageModel,
                         contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
                     Box(
@@ -958,6 +838,7 @@ internal fun HomeCatalogPosterCard(
     item: CatalogItem,
     onClick: () -> Unit
 ) {
+    val imageModel = rememberPosterImageModel(item.posterUrl ?: item.backdropUrl)
     Column(modifier = Modifier.width(124.dp)) {
         Card(
             modifier = Modifier
@@ -965,13 +846,13 @@ internal fun HomeCatalogPosterCard(
                 .clip(MaterialTheme.shapes.large)
                 .clickable(onClick = onClick)
         ) {
-            val imageUrl = item.posterUrl ?: item.backdropUrl
             Box(modifier = Modifier.fillMaxSize()) {
-                if (!imageUrl.isNullOrBlank()) {
+                if (imageModel != null) {
                     AsyncImage(
-                        model = imageUrl,
+                        model = imageModel,
                         contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
                     Box(
@@ -1077,13 +958,14 @@ internal fun CalendarEpisodeCard(
     item: CalendarEpisodeItem,
     onClick: () -> Unit,
 ) {
+    val imageModel = rememberLandscapeImageModel(item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl, 280.dp)
     Column(
         modifier = Modifier.width(280.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LandscapeArtworkFrame(
             title = item.seriesName,
-            imageUrl = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
+            imageModel = imageModel,
             onClick = onClick,
             modifier = Modifier.aspectRatio(16f / 9f),
             badgeLabel = calendarBadgeLabel(item),
@@ -1124,13 +1006,14 @@ internal fun CalendarSeriesCard(
     item: CalendarSeriesItem,
     onClick: () -> Unit,
 ) {
+    val imageModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, 280.dp)
     Column(
         modifier = Modifier.width(280.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LandscapeArtworkFrame(
             title = item.title,
-            imageUrl = item.backdropUrl ?: item.posterUrl,
+            imageModel = imageModel,
             onClick = onClick,
             modifier = Modifier.aspectRatio(16f / 9f),
             badgeLabel = "No schedule",
@@ -1236,65 +1119,86 @@ internal fun HomeHeroCarousel(
             .fillMaxWidth()
             .height(320.dp)
     ) { index ->
-            val item = items[index]
-            val heroBackdropUrl = remember(item.backdropUrl) {
-                TmdbApi.resizedImageUrl(item.backdropUrl, size = "w1280")
-            }
+        val item = items[index]
+        val heroImageModel = rememberCrispyImageModel(item.backdropUrl, width = 320.dp, height = 320.dp, tmdbSize = "w780")
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .maskClip(RoundedCornerShape(28.dp))
-                    .clickable { onItemClick(item) }
-            ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .maskClip(RoundedCornerShape(28.dp))
+                .clickable { onItemClick(item) }
+        ) {
+            if (heroImageModel != null) {
                 AsyncImage(
-                    model = heroBackdropUrl ?: item.backdropUrl,
+                    model = heroImageModel,
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-
-                HomeArtworkBottomScrim(
-                    heightFraction = 0.46f,
-                    maxAlpha = 0.72f,
-                )
-
-                Column(
+            } else {
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    val subtitle = listOfNotNull(
-                        item.year,
-                        item.genres.firstOrNull()
-                    ).joinToString(" • ")
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            }
 
-                    if (subtitle.isNotEmpty()) {
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
+            HomeArtworkBottomScrim(
+                heightFraction = 0.46f,
+                maxAlpha = 0.72f,
+            )
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val subtitle = listOfNotNull(
+                    item.year,
+                    item.genres.firstOrNull()
+                ).joinToString(" • ")
+
+                if (subtitle.isNotEmpty()) {
                     Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.72f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
                 }
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.72f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
+}
+
+@Composable
+private fun rememberPosterImageModel(url: String?): Any? {
+    return rememberCrispyImageModel(url = url, width = 124.dp, height = 186.dp, tmdbSize = "w342")
+}
+
+@Composable
+private fun rememberLandscapeImageModel(url: String?, width: Dp): Any? {
+    return rememberCrispyImageModel(
+        url = url,
+        width = width,
+        height = width * (9f / 16f),
+        tmdbSize = "w500",
+    )
+}

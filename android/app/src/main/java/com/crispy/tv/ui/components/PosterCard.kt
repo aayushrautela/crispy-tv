@@ -43,6 +43,7 @@ fun PosterCard(
     onClick: () -> Unit
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
+    val imageModel = rememberCrispyImageModel(posterUrl ?: backdropUrl, width = 124.dp, height = 186.dp, tmdbSize = "w342")
     Column(modifier = modifier) {
         Card(
             modifier = Modifier
@@ -52,10 +53,9 @@ fun PosterCard(
             shape = MaterialTheme.shapes.large
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                val imageUrl = posterUrl ?: backdropUrl
-                if (!imageUrl.isNullOrBlank()) {
+                if (imageModel != null) {
                     AsyncImage(
-                        model = imageUrl,
+                        model = imageModel,
                         contentDescription = title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop

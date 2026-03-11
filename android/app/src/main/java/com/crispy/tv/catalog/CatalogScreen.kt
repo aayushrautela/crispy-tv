@@ -20,7 +20,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -38,6 +37,7 @@ import androidx.paging.compose.itemKey
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -52,7 +52,7 @@ fun CatalogRoute(
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior = appBarScrollBehavior()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),

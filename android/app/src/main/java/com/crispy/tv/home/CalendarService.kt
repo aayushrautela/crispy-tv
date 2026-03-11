@@ -1,6 +1,7 @@
 package com.crispy.tv.home
 
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbTvDetails
@@ -25,6 +26,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
+@Immutable
 data class CalendarEpisodeItem(
     val id: String,
     val seriesId: String,
@@ -45,6 +47,7 @@ data class CalendarEpisodeItem(
     val type: String = "series",
 )
 
+@Immutable
 data class CalendarSeriesItem(
     val id: String,
     val title: String,
@@ -61,6 +64,7 @@ enum class CalendarSectionKey {
     NO_SCHEDULED,
 }
 
+@Immutable
 data class CalendarSection(
     val key: CalendarSectionKey,
     val title: String,
@@ -68,12 +72,14 @@ data class CalendarSection(
     val seriesItems: List<CalendarSeriesItem> = emptyList(),
 )
 
+@Immutable
 data class CalendarSnapshot(
     val sections: List<CalendarSection>,
     val statusMessage: String? = null,
     val isError: Boolean = false,
 )
 
+@Immutable
 data class ThisWeekResult(
     val items: List<CalendarEpisodeItem>,
     val statusMessage: String?,
