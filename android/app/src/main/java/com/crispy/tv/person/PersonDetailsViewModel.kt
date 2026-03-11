@@ -11,6 +11,7 @@ import com.crispy.tv.metadata.tmdb.TmdbJsonClient
 import com.crispy.tv.metadata.tmdb.TmdbJsonClientProvider
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -48,14 +49,23 @@ class PersonDetailsViewModel internal constructor(
 
     private val _uiState = MutableStateFlow(PersonDetailsUiState())
     val uiState: StateFlow<PersonDetailsUiState> = _uiState
+    private var refreshJob: Job? = null
 
     init {
-        load()
+        refresh()
     }
 
-    private fun load() {
-        viewModelScope.launch {
-            _uiState.value = PersonDetailsUiState(isLoading = true)
+    fun refresh() {
+        if (refreshJob?.isActive == true) {
+            return
+        }
+        val current = _uiState.value
+        _uiState.value =
+            current.copy(
+                isLoading = true,
+                errorMessage = if (current.person != null) null else current.errorMessage,
+            )
+        refreshJob = viewModelScope.launch {
 
             val tmdbPersonId = extractTmdbId(personId)
             if (tmdbPersonId == null) {

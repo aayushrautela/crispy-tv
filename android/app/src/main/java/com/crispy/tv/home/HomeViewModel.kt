@@ -87,9 +87,7 @@ data class HomeLayoutState(
     val collectionSections: List<CatalogSectionRef> = emptyList(),
     val standardCatalogSections: List<CatalogSectionRef> = emptyList(),
     val catalogStatusMessage: String = "",
-    val showContinueWatching: Boolean = true,
-    val showUpNext: Boolean = true,
-    val showThisWeek: Boolean = true,
+    val isRefreshing: Boolean = false,
 ) {
     val hasCatalogSections: Boolean
         get() = collectionSections.isNotEmpty() || standardCatalogSections.isNotEmpty()
@@ -177,10 +175,7 @@ class HomeViewModel internal constructor(
     private var suppressedItemsByKey: MutableMap<String, Long>? = null
     @Volatile
     private var refreshGeneration: Long = 0L
-    private var personalFeedJob: Job? = null
-    private var headerCatalogSectionsJob: Job? = null
-    private var watchActivityJob: Job? = null
-    private var thisWeekJob: Job? = null
+    private var refreshJob: Job? = null
 
     init {
         refresh()
@@ -188,42 +183,63 @@ class HomeViewModel internal constructor(
 
     fun refresh() {
         val currentRefreshGeneration = beginRefresh()
+        prepareForRefresh()
 
-        _heroState.update { it.copy(isLoading = true, statusMessage = "Loading featured content...") }
-        _continueWatchingState.value = HomeWatchActivityRailState()
-        _upNextState.value = HomeWatchActivityRailState()
-        _thisWeekState.update { current ->
-            current.copy(isLoading = true, statusMessage = "", isError = false)
-        }
-        catalogSectionStates.clear()
-        _layoutState.value = HomeLayoutState()
+        refreshJob =
+            viewModelScope.launch {
+                coroutineScope {
+                    val jobs = listOf(
+                        launch { refreshPersonalFeed(currentRefreshGeneration) },
+                        launch { refreshHeaderCatalogSections(currentRefreshGeneration) },
+                        launch { refreshWatchActivity(currentRefreshGeneration) },
+                        launch { refreshThisWeek(currentRefreshGeneration) },
+                    )
+                    jobs.joinAll()
+                }
 
-        personalFeedJob = viewModelScope.launch {
-            refreshPersonalFeed(currentRefreshGeneration)
-        }
-        headerCatalogSectionsJob = viewModelScope.launch {
-            refreshHeaderCatalogSections(currentRefreshGeneration)
-        }
-        watchActivityJob = viewModelScope.launch {
-            refreshWatchActivity(currentRefreshGeneration)
-        }
-        thisWeekJob = viewModelScope.launch {
-            refreshThisWeek(currentRefreshGeneration)
-        }
+                if (!isCurrentRefresh(currentRefreshGeneration)) {
+                    return@launch
+                }
+                _layoutState.update { current -> current.copy(isRefreshing = false) }
+            }
     }
 
     private fun beginRefresh(): Long {
         val nextGeneration = refreshGeneration + 1L
         refreshGeneration = nextGeneration
-        cancelRefreshJobs()
+        refreshJob?.cancel()
         return nextGeneration
     }
 
-    private fun cancelRefreshJobs() {
-        personalFeedJob?.cancel()
-        headerCatalogSectionsJob?.cancel()
-        watchActivityJob?.cancel()
-        thisWeekJob?.cancel()
+    private fun prepareForRefresh() {
+        _layoutState.update { current -> current.copy(isRefreshing = true) }
+        _heroState.update { current ->
+            current.copy(
+                isLoading = true,
+                statusMessage = current.statusMessage.ifBlank { "Loading featured content..." },
+            )
+        }
+        _continueWatchingState.update { current ->
+            current.copy(
+                isLoading = true,
+                isError = false,
+            )
+        }
+        _upNextState.update { current ->
+            current.copy(
+                isLoading = true,
+                isError = false,
+            )
+        }
+        _thisWeekState.update { current ->
+            current.copy(
+                isLoading = true,
+                isError = false,
+            )
+        }
+        catalogSectionStates.values.forEach { state ->
+            state.update { current -> current.copy(isLoading = true) }
+        }
     }
 
     private fun isCurrentRefresh(generation: Long): Boolean {
@@ -667,12 +683,6 @@ class HomeViewModel internal constructor(
     ) {
         _continueWatchingState.value = continueWatching
         _upNextState.value = upNext
-        _layoutState.update { current ->
-            current.copy(
-                showContinueWatching = continueWatching.isVisible,
-                showUpNext = upNext.isVisible,
-            )
-        }
     }
 
     private fun updateWatchActivityRailState(
@@ -688,7 +698,6 @@ class HomeViewModel internal constructor(
 
     private fun setThisWeekState(state: ThisWeekState) {
         _thisWeekState.value = state
-        _layoutState.update { current -> current.copy(showThisWeek = state.isVisible) }
     }
 
     private fun setHeaderSections(sections: List<CatalogSectionRef>) {
@@ -711,7 +720,11 @@ class HomeViewModel internal constructor(
         val retainedSectionStates = LinkedHashMap<String, MutableStateFlow<HomeCatalogSectionUi>>(sections.size)
         sections.forEach { section ->
             val sectionState = catalogSectionStates.remove(section.key) ?: MutableStateFlow(HomeCatalogSectionUi(section = section))
-            sectionState.value = HomeCatalogSectionUi(section = section)
+            sectionState.value =
+                sectionState.value.copy(
+                    section = section,
+                    isLoading = sectionState.value.isLoading,
+                )
             retainedSectionStates[section.key] = sectionState
         }
         catalogSectionStates.clear()

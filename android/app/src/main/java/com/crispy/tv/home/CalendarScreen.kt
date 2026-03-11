@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,6 +24,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
@@ -35,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +48,7 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,22 +68,27 @@ private class CalendarViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
+    private var refreshJob: Job? = null
 
     init {
         refresh()
     }
 
     fun refresh() {
-        _uiState.update { current -> current.copy(isLoading = true, statusMessage = if (current.sections.isEmpty()) "" else current.statusMessage) }
-        viewModelScope.launch {
-            val snapshot = withContext(Dispatchers.IO) { calendarService.loadCalendar(System.currentTimeMillis()) }
-            _uiState.value =
-                CalendarUiState(
-                    isLoading = false,
-                    statusMessage = snapshot.statusMessage.orEmpty(),
-                    sections = snapshot.sections,
-                )
+        if (refreshJob?.isActive == true) {
+            return
         }
+        _uiState.update { current -> current.copy(isLoading = true, statusMessage = if (current.sections.isEmpty()) "" else current.statusMessage) }
+        refreshJob =
+            viewModelScope.launch {
+                val snapshot = withContext(Dispatchers.IO) { calendarService.loadCalendar(System.currentTimeMillis()) }
+                _uiState.value =
+                    CalendarUiState(
+                        isLoading = false,
+                        statusMessage = snapshot.statusMessage.orEmpty(),
+                        sections = snapshot.sections,
+                    )
+            }
     }
 
     companion object {
@@ -113,6 +122,7 @@ internal fun CalendarRoute(
     val viewModel: CalendarViewModel = viewModel(factory = remember(context) { CalendarViewModel.factory(context) })
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val horizontalPadding = responsivePageHorizontalPadding()
+    val pullToRefreshState = rememberPullToRefreshState()
 
     Scaffold(
         topBar = {
@@ -123,89 +133,97 @@ internal fun CalendarRoute(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                actions = {
-                    IconButton(onClick = viewModel::refresh) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         }
     ) { innerPadding ->
-        when {
-            uiState.isLoading && uiState.sections.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            uiState.sections.isEmpty() -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(horizontal = horizontalPadding),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = uiState.statusMessage.ifBlank { "No calendar items yet." },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = viewModel::refresh) {
-                        Text("Refresh")
+        PullToRefreshBox(
+            isRefreshing = uiState.isLoading && uiState.sections.isNotEmpty(),
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.fillMaxSize(),
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isLoading && uiState.sections.isNotEmpty(),
+                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+                )
+            },
+        ) {
+            when {
+                uiState.isLoading && uiState.sections.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
                     }
                 }
-            }
 
-            else -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(22.dp),
-                ) {
-                    if (uiState.statusMessage.isNotBlank()) {
-                        item {
-                            Text(
-                                text = uiState.statusMessage,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                uiState.sections.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .padding(horizontal = horizontalPadding),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = uiState.statusMessage.ifBlank { "No calendar items yet." },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = viewModel::refresh) {
+                            Text("Refresh")
                         }
                     }
+                }
 
-                    items(uiState.sections, key = { it.key.name }) { section ->
-                        when (section.key) {
-                            CalendarSectionKey.NO_SCHEDULED -> {
-                                CalendarSeriesSection(
-                                    title = section.title,
-                                    items = section.seriesItems,
-                                    onItemClick = onSeriesClick,
-                                )
-                            }
-
-                            else -> {
-                                CalendarEpisodeSection(
-                                    title = section.title,
-                                    items = section.episodeItems,
-                                    onItemClick = onEpisodeClick,
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = horizontalPadding,
+                            top = innerPadding.calculateTopPadding() + 16.dp,
+                            end = horizontalPadding,
+                            bottom = innerPadding.calculateBottomPadding() + 16.dp + Dimensions.PageBottomPadding,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(22.dp),
+                    ) {
+                        if (uiState.statusMessage.isNotBlank()) {
+                            item {
+                                Text(
+                                    text = uiState.statusMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                    }
 
-                    item {
-                        Spacer(modifier = Modifier.height(Dimensions.PageBottomPadding))
+                        items(uiState.sections, key = { it.key.name }) { section ->
+                            when (section.key) {
+                                CalendarSectionKey.NO_SCHEDULED -> {
+                                    CalendarSeriesSection(
+                                        title = section.title,
+                                        items = section.seriesItems,
+                                        onItemClick = onSeriesClick,
+                                    )
+                                }
+
+                                else -> {
+                                    CalendarEpisodeSection(
+                                        title = section.title,
+                                        items = section.episodeItems,
+                                        onItemClick = onEpisodeClick,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

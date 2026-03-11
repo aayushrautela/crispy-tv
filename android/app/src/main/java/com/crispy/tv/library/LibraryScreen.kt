@@ -1,8 +1,6 @@
 package com.crispy.tv.library
 
 import android.content.Context
-import android.text.format.DateUtils
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -22,29 +18,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
@@ -55,51 +45,100 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
-import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryEntry
-import com.crispy.tv.ui.theme.Dimensions
-import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.components.StandardTopAppBar
-import com.crispy.tv.ui.components.PosterCard
-import com.crispy.tv.ui.brand.CrispyWordmark
-import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
-import kotlinx.coroutines.Job
+import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 enum class LibrarySource {
     LOCAL,
     TRAKT,
-    SIMKL
+    SIMKL,
+}
+
+@Immutable
+private data class LibraryArtwork(
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+)
+
+@Immutable
+data class LibraryLocalItemUi(
+    val entry: WatchHistoryEntry,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+) {
+    val stableKey: String
+        get() = "local:${entry.contentType}:${entry.contentId}"
+}
+
+@Immutable
+data class LibraryProviderItemUi(
+    val item: ProviderLibraryItem,
+    val watchHistoryEntry: WatchHistoryEntry,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+) {
+    val stableKey: String
+        get() = "${item.provider.name}:${item.folderId}:${item.contentType}:${item.contentId}"
 }
 
 @Immutable
 data class LibraryUiState(
     val isRefreshing: Boolean = false,
     val statusMessage: String = "",
-    val localEntries: List<WatchHistoryEntry> = emptyList(),
+    val localItems: List<LibraryLocalItemUi> = emptyList(),
     val providerFolders: List<ProviderLibraryFolder> = emptyList(),
-    val providerItems: List<ProviderLibraryItem> = emptyList(),
+    val providerItems: List<LibraryProviderItemUi> = emptyList(),
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
     val selectedSource: LibrarySource = LibrarySource.LOCAL,
-    val selectedProviderFolderId: String? = null
+    val selectedProviderFolderId: String? = null,
+)
+
+private data class LibraryRefreshPayload(
+    val authState: WatchProviderAuthState,
+    val selectedSource: LibrarySource,
+    val localItems: List<LibraryLocalItemUi>,
+    val providerFolders: List<ProviderLibraryFolder>,
+    val providerItems: List<LibraryProviderItemUi>,
+    val statusMessage: String,
+)
+
+private data class ArtworkRequest(
+    val cacheKey: String,
+    val rawId: String,
+    val posterUrl: String?,
+    val backdropUrl: String?,
 )
 
 class LibraryViewModel internal constructor(
-    private val watchHistoryService: WatchHistoryService
+    private val watchHistoryService: WatchHistoryService,
+    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
 
+    private val artworkCache = LinkedHashMap<String, LibraryArtwork>()
     private var refreshJob: Job? = null
 
     init {
@@ -107,27 +146,20 @@ class LibraryViewModel internal constructor(
     }
 
     fun refresh() {
-        refreshJob?.cancel()
+        if (refreshJob?.isActive == true) {
+            return
+        }
         refreshJob =
             viewModelScope.launch {
-                _uiState.update {
-                    it.copy(
+                _uiState.update { current ->
+                    current.copy(
                         isRefreshing = true,
-                        statusMessage = "Loading library...",
+                        statusMessage = current.statusMessage.ifBlank { "Loading library..." },
                     )
                 }
 
                 val authState = watchHistoryService.authState()
-
-                val selectedSource =
-                    when {
-                        authState.traktAuthenticated -> LibrarySource.TRAKT
-                        authState.simklAuthenticated -> LibrarySource.SIMKL
-                        else -> LibrarySource.LOCAL
-                    }
-
-                _uiState.update { it.copy(selectedSource = selectedSource) }
-
+                val selectedSource = resolveSelectedSource(authState)
                 val selectedProvider = selectedSource.toProvider()
                 val providerAuthenticated =
                     when (selectedProvider) {
@@ -135,6 +167,7 @@ class LibraryViewModel internal constructor(
                         WatchProvider.SIMKL -> authState.simklAuthenticated
                         else -> false
                     }
+
                 val localResult =
                     if (selectedSource == LibrarySource.LOCAL) {
                         withContext(Dispatchers.IO) {
@@ -143,96 +176,285 @@ class LibraryViewModel internal constructor(
                     } else {
                         null
                     }
+
                 val cachedProviderResult =
                     if (selectedProvider != null && providerAuthenticated) {
-                        runCatching {
-                            watchHistoryService.getCachedProviderLibrary(
-                                limitPerFolder = 250,
-                                source = selectedProvider
-                            )
-                        }.getOrNull()?.takeIf { snapshot ->
-                            snapshot.folders.isNotEmpty() || snapshot.items.isNotEmpty()
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                watchHistoryService.getCachedProviderLibrary(
+                                    limitPerFolder = 250,
+                                    source = selectedProvider,
+                                )
+                            }.getOrNull()?.takeIf { snapshot ->
+                                snapshot.folders.isNotEmpty() || snapshot.items.isNotEmpty()
+                            }
                         }
                     } else {
                         null
                     }
 
-                if (cachedProviderResult != null) {
-                    _uiState.update { current ->
-                        val fallbackFolder = defaultFolderIdFor(selectedSource, cachedProviderResult.folders)
-                        current.copy(
-                            statusMessage = cachedProviderResult.statusMessage,
-                            providerFolders = cachedProviderResult.folders,
-                            providerItems = cachedProviderResult.items,
+                if (selectedSource != LibrarySource.LOCAL && cachedProviderResult != null) {
+                    val cachedPayload =
+                        buildRefreshPayload(
                             authState = authState,
                             selectedSource = selectedSource,
-                            selectedProviderFolderId =
-                                current.selectedProviderFolderId
-                                    ?.takeIf { selectedFolderId ->
-                                        cachedProviderResult.folders.any { folder -> folder.id == selectedFolderId }
-                                    }
-                                    ?: fallbackFolder
+                            localEntries = emptyList(),
+                            providerFolders = cachedProviderResult.folders,
+                            providerItems = cachedProviderResult.items,
+                            providerAuthenticated = providerAuthenticated,
+                            providerStatusMessage = cachedProviderResult.statusMessage,
                         )
-                    }
+                    applyPayload(cachedPayload, isRefreshing = true)
                 }
 
                 val providerResult =
                     if (selectedProvider != null && providerAuthenticated) {
-                        val network =
+                        val networkResult =
                             withContext(Dispatchers.IO) {
                                 runCatching {
                                     watchHistoryService.listProviderLibrary(
                                         limitPerFolder = 250,
-                                        source = selectedProvider
+                                        source = selectedProvider,
                                     )
                                 }.getOrNull()
                             }
-                        network ?: cachedProviderResult
+                        networkResult ?: cachedProviderResult
                     } else {
                         cachedProviderResult
                     }
-                val statusMessage =
-                    when (selectedSource) {
-                        LibrarySource.LOCAL -> localResult?.statusMessage ?: "No local history yet."
-                        LibrarySource.TRAKT,
-                        LibrarySource.SIMKL -> {
-                            providerResult?.statusMessage
-                                ?: if (!providerAuthenticated) {
-                                    "Connect ${selectedSource.displayName()} in Settings to load this provider."
-                                } else {
-                                    "No provider library data available."
-                                }
-                        }
-                    }
 
-                _uiState.update { current ->
-                    val fallbackFolder = defaultFolderIdFor(selectedSource, providerResult?.folders.orEmpty())
-                    current.copy(
-                        isRefreshing = false,
-                        statusMessage = statusMessage,
+                val finalPayload =
+                    buildRefreshPayload(
+                        authState = authState,
+                        selectedSource = selectedSource,
                         localEntries = localResult?.entries.orEmpty().sortedByDescending { it.watchedAtEpochMs },
                         providerFolders = providerResult?.folders.orEmpty(),
                         providerItems = providerResult?.items.orEmpty(),
-                        authState = authState,
-                        selectedSource = selectedSource,
-                        selectedProviderFolderId =
-                            current.selectedProviderFolderId
-                                ?.takeIf { selectedFolderId ->
-                                    providerResult?.folders.orEmpty().any { folder -> folder.id == selectedFolderId }
-                                }
-                                ?: fallbackFolder
+                        providerAuthenticated = providerAuthenticated,
+                        providerStatusMessage = providerResult?.statusMessage,
                     )
-                }
-     }
-}
-
-    fun selectProviderFolder(folderId: String) {
-        _uiState.update { it.copy(selectedProviderFolderId = folderId) }
+                applyPayload(finalPayload, isRefreshing = false)
+            }
     }
 
-    private fun defaultFolderIdFor(source: LibrarySource, folders: List<ProviderLibraryFolder>): String? {
-        val provider = source.toProvider() ?: return null
-        return folders.firstOrNull { it.provider == provider }?.id
+    fun selectProviderFolder(folderId: String) {
+        _uiState.update { current ->
+            val nextFolderId = if (current.selectedProviderFolderId == folderId) null else folderId
+            current.copy(selectedProviderFolderId = nextFolderId)
+        }
+    }
+
+    private suspend fun buildRefreshPayload(
+        authState: WatchProviderAuthState,
+        selectedSource: LibrarySource,
+        localEntries: List<WatchHistoryEntry>,
+        providerFolders: List<ProviderLibraryFolder>,
+        providerItems: List<ProviderLibraryItem>,
+        providerAuthenticated: Boolean,
+        providerStatusMessage: String?,
+    ): LibraryRefreshPayload {
+        val localUiItems = if (selectedSource == LibrarySource.LOCAL) enrichLocalItems(localEntries) else emptyList()
+        val providerUiItems =
+            if (selectedSource == LibrarySource.LOCAL) {
+                emptyList()
+            } else {
+                enrichProviderItems(providerItems)
+            }
+
+        val statusMessage =
+            when (selectedSource) {
+                LibrarySource.LOCAL -> {
+                    if (localUiItems.isEmpty()) {
+                        "No local history yet."
+                    } else {
+                        "Recently watched"
+                    }
+                }
+                LibrarySource.TRAKT,
+                LibrarySource.SIMKL -> {
+                    providerStatusMessage
+                        ?: if (!providerAuthenticated) {
+                            "Connect ${selectedSource.displayName()} in Settings to load this provider."
+                        } else {
+                            "No provider library data available."
+                        }
+                }
+            }
+
+        return LibraryRefreshPayload(
+            authState = authState,
+            selectedSource = selectedSource,
+            localItems = localUiItems,
+            providerFolders = providerFolders,
+            providerItems = providerUiItems,
+            statusMessage = statusMessage,
+        )
+    }
+
+    private fun applyPayload(payload: LibraryRefreshPayload, isRefreshing: Boolean) {
+        _uiState.update { current ->
+            val availableFolders = payload.providerFolders.filter { it.provider == payload.selectedSource.toProvider() }
+            current.copy(
+                isRefreshing = isRefreshing,
+                statusMessage = payload.statusMessage,
+                localItems = payload.localItems,
+                providerFolders = payload.providerFolders,
+                providerItems = payload.providerItems,
+                authState = payload.authState,
+                selectedSource = payload.selectedSource,
+                selectedProviderFolderId = resolveSelectedFolderId(
+                    current.selectedProviderFolderId,
+                    payload.selectedSource,
+                    availableFolders,
+                ),
+            )
+        }
+    }
+
+    private suspend fun enrichLocalItems(entries: List<WatchHistoryEntry>): List<LibraryLocalItemUi> {
+        if (entries.isEmpty()) {
+            return emptyList()
+        }
+        val artworkByKey =
+            resolveArtwork(
+                entries.map { entry ->
+                    ArtworkRequest(
+                        cacheKey = artworkCacheKey(entry.contentId, entry.contentType.name),
+                        rawId = entry.contentId,
+                        posterUrl = null,
+                        backdropUrl = null,
+                    )
+                },
+            )
+        return entries.map { entry ->
+            val artwork = artworkByKey[artworkCacheKey(entry.contentId, entry.contentType.name)] ?: LibraryArtwork()
+            LibraryLocalItemUi(
+                entry = entry,
+                posterUrl = artwork.posterUrl,
+                backdropUrl = artwork.backdropUrl,
+            )
+        }
+    }
+
+    private suspend fun enrichProviderItems(items: List<ProviderLibraryItem>): List<LibraryProviderItemUi> {
+        if (items.isEmpty()) {
+            return emptyList()
+        }
+        val artworkByKey =
+            resolveArtwork(
+                items.map { item ->
+                    ArtworkRequest(
+                        cacheKey = artworkCacheKey(item.contentId, item.contentType.name),
+                        rawId = item.contentId,
+                        posterUrl = item.posterUrl,
+                        backdropUrl = item.backdropUrl,
+                    )
+                },
+            )
+        return items.map { item ->
+            val artwork = artworkByKey[artworkCacheKey(item.contentId, item.contentType.name)] ?: LibraryArtwork()
+            LibraryProviderItemUi(
+                item = item,
+                watchHistoryEntry =
+                    WatchHistoryEntry(
+                        contentId = item.contentId,
+                        contentType = item.contentType,
+                        title = item.title,
+                        season = item.season,
+                        episode = item.episode,
+                        watchedAtEpochMs = item.addedAtEpochMs,
+                    ),
+                posterUrl = artwork.posterUrl,
+                backdropUrl = artwork.backdropUrl,
+            )
+        }
+    }
+
+    private suspend fun resolveArtwork(requests: List<ArtworkRequest>): Map<String, LibraryArtwork> {
+        if (requests.isEmpty()) {
+            return emptyMap()
+        }
+        val uniqueRequests = LinkedHashMap<String, ArtworkRequest>()
+        requests.forEach { request ->
+            val merged =
+                uniqueRequests[request.cacheKey]?.let { existing ->
+                    existing.copy(
+                        posterUrl = existing.posterUrl ?: request.posterUrl,
+                        backdropUrl = existing.backdropUrl ?: request.backdropUrl,
+                    )
+                } ?: request
+            uniqueRequests[request.cacheKey] = merged
+        }
+
+        val semaphore = Semaphore(6)
+        return coroutineScope {
+            uniqueRequests.values.map { request ->
+                async(Dispatchers.IO) {
+                    semaphore.withPermit {
+                        val artwork = resolveArtworkForRequest(request)
+                        request.cacheKey to artwork
+                    }
+                }
+            }.awaitAll().toMap()
+        }
+    }
+
+    private suspend fun resolveArtworkForRequest(request: ArtworkRequest): LibraryArtwork {
+        val providedArtwork =
+            LibraryArtwork(
+                posterUrl = request.posterUrl?.trim().takeIf { !it.isNullOrBlank() },
+                backdropUrl = request.backdropUrl?.trim().takeIf { !it.isNullOrBlank() },
+            )
+        if (providedArtwork.posterUrl != null && providedArtwork.backdropUrl != null) {
+            artworkCache[request.cacheKey] = providedArtwork
+            return providedArtwork
+        }
+
+        val cachedArtwork = artworkCache[request.cacheKey]
+        if (cachedArtwork != null) {
+            return LibraryArtwork(
+                posterUrl = providedArtwork.posterUrl ?: cachedArtwork.posterUrl,
+                backdropUrl = providedArtwork.backdropUrl ?: cachedArtwork.backdropUrl,
+            )
+        }
+
+        val rawId = request.rawId.trim()
+        val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
+        if (!canResolve) {
+            return providedArtwork
+        }
+
+        val details = runCatching { tmdbEnrichmentRepository.loadArtwork(rawId = rawId) }.getOrNull()
+        val resolvedArtwork =
+            LibraryArtwork(
+                posterUrl = providedArtwork.posterUrl ?: details?.posterUrl,
+                backdropUrl = providedArtwork.backdropUrl ?: details?.backdropUrl,
+            )
+        artworkCache[request.cacheKey] = resolvedArtwork
+        return resolvedArtwork
+    }
+
+    private fun resolveSelectedSource(authState: WatchProviderAuthState): LibrarySource {
+        return when {
+            authState.traktAuthenticated -> LibrarySource.TRAKT
+            authState.simklAuthenticated -> LibrarySource.SIMKL
+            else -> LibrarySource.LOCAL
+        }
+    }
+
+    private fun resolveSelectedFolderId(
+        currentFolderId: String?,
+        selectedSource: LibrarySource,
+        folders: List<ProviderLibraryFolder>,
+    ): String? {
+        val provider = selectedSource.toProvider() ?: return null
+        return currentFolderId
+            ?.takeIf { selectedId -> folders.any { folder -> folder.provider == provider && folder.id == selectedId } }
+            ?: folders.firstOrNull { folder -> folder.provider == provider }?.id
+    }
+
+    private fun artworkCacheKey(contentId: String, contentType: String): String {
+        return "${contentType.trim().lowercase()}:${contentId.trim().lowercase()}"
     }
 
     companion object {
@@ -244,6 +466,7 @@ class LibraryViewModel internal constructor(
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                            tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -262,43 +485,38 @@ fun LibraryRoute(
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
-
-    val tmdbEnrichmentRepository = remember(appContext) { TmdbEnrichmentRepositoryProvider.get(appContext) }
     val viewModel: LibraryViewModel =
         viewModel(
             factory = remember(appContext) {
                 LibraryViewModel.factory(appContext)
-            }
+            },
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LibraryScreen(
         uiState = uiState,
-        tmdbEnrichmentRepository = tmdbEnrichmentRepository,
         onRefresh = viewModel::refresh,
         onProfileClick = onProfileClick,
         onItemClick = onItemClick,
         onNavigateToDiscover = onNavigateToDiscover,
         onNavigateToCalendar = onNavigateToCalendar,
-        onSelectProviderFolder = viewModel::selectProviderFolder
+        onSelectProviderFolder = viewModel::selectProviderFolder,
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryScreen(
     uiState: LibraryUiState,
-    tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     onRefresh: () -> Unit,
     onProfileClick: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
     onNavigateToCalendar: () -> Unit,
-    onSelectProviderFolder: (String) -> Unit
+    onSelectProviderFolder: (String) -> Unit,
 ) {
     val selectedProvider = uiState.selectedSource.toProvider()
     val providerFolders = uiState.providerFolders.filter { folder -> folder.provider == selectedProvider }
-    val pullToRefreshState = rememberPullToRefreshState()
     val providerAuthenticated =
         when (uiState.selectedSource) {
             LibrarySource.LOCAL -> false
@@ -308,101 +526,93 @@ private fun LibraryScreen(
     val selectedFolder = uiState.selectedProviderFolderId
     val providerItems =
         uiState.providerItems
-            .filter { item -> item.provider == selectedProvider }
-            .filter { item -> selectedFolder == null || item.folderId == selectedFolder }
-
+            .filter { item -> item.item.provider == selectedProvider }
+            .filter { item -> selectedFolder == null || item.item.folderId == selectedFolder }
+    val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
-                title = {
-                    CrispyWordmark(Modifier.height(36.dp))
-                },
+                title = { CrispyWordmark(Modifier.height(36.dp)) },
                 actions = {
                     IconButton(onClick = onNavigateToCalendar) {
                         Icon(imageVector = Icons.Outlined.Event, contentDescription = "Calendar")
                     }
                     ProfileIconButton(onClick = onProfileClick)
                 },
-                scrollBehavior = scrollBehavior
             )
-        }
+        },
     ) { innerPadding ->
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
-            onRefresh = {
-                if (!uiState.isRefreshing) {
-                    onRefresh()
-                }
-            },
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize(),
             state = pullToRefreshState,
             indicator = {
                 PullToRefreshDefaults.LoadingIndicator(
                     state = pullToRefreshState,
                     isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f)
+                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
                 )
-            }
+            },
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 124.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = pageHorizontalPadding,
-                    top = 12.dp,
+                    top = innerPadding.calculateTopPadding() + 12.dp,
                     end = pageHorizontalPadding,
-                    bottom = 12.dp + Dimensions.PageBottomPadding
+                    bottom = innerPadding.calculateBottomPadding() + 12.dp + Dimensions.PageBottomPadding,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "filters") {
+                    if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             items(providerFolders, key = { it.id }) { folder ->
                                 FilterChip(
                                     selected = folder.id == selectedFolder,
                                     onClick = { onSelectProviderFolder(folder.id) },
-                                    label = { Text("${folder.label} (${folder.itemCount})") }
+                                    label = { Text("${folder.label} (${folder.itemCount})") },
                                 )
                             }
                         }
                     }
                 }
-                if (uiState.statusMessage.isNotBlank()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
+
+                item(span = { GridItemSpan(maxLineSpan) }, key = "status") {
+                    if (uiState.statusMessage.isNotBlank()) {
                         Text(
                             text = uiState.statusMessage,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
 
                 when (uiState.selectedSource) {
                     LibrarySource.LOCAL -> {
-                        if (uiState.localEntries.isEmpty()) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
+                        if (uiState.localItems.isEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }, key = "local-empty") {
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                                         androidx.compose.foundation.layout.Column(
-                                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                            verticalArrangement = Arrangement.spacedBy(10.dp),
                                         ) {
                                             Text(
                                                 text = "Nothing here yet",
-                                                style = MaterialTheme.typography.titleMedium
+                                                style = MaterialTheme.typography.titleMedium,
                                             )
                                             Text(
                                                 text = "Start watching from Discover or Home and your recent local history will appear here.",
                                                 style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                             FilledTonalButton(onClick = onNavigateToDiscover) {
                                                 Text("Go to Discover")
@@ -412,45 +622,19 @@ private fun LibraryScreen(
                                 }
                             }
                         } else {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                Text(text = "Recently watched", style = MaterialTheme.typography.titleMedium)
-                            }
                             gridItems(
-                                items = uiState.localEntries,
-                                key = { entry -> "local:${entry.contentType}:${entry.contentId}:${entry.watchedAtEpochMs}" }
-                            ) { entry ->
-                                val tmdbArtwork by
-                                    produceState(
-                                        initialValue = Pair<String?, String?>(null, null),
-                                        key1 = entry.contentId,
-                                        key2 = entry.contentType
-                                    ) {
-                                        val rawId = entry.contentId.trim()
-                                        val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
-                                        if (!canResolve) {
-                                            value = null to null
-                                            return@produceState
-                                        }
-
-                                        val details =
-                                            runCatching {
-                                                tmdbEnrichmentRepository.loadArtwork(
-                                                    rawId = rawId,
-                                                    mediaTypeHint = entry.contentType
-                                                )
-                                            }.getOrNull()
-                                        value = details?.posterUrl to details?.backdropUrl
-                                    }
-
+                                items = uiState.localItems,
+                                key = { item -> item.stableKey },
+                            ) { item ->
                                 PosterCard(
-                                    title = entry.title.ifBlank { entry.contentId },
-                                    posterUrl = tmdbArtwork.first,
-                                    backdropUrl = tmdbArtwork.second,
+                                    title = item.entry.title.ifBlank { item.entry.contentId },
+                                    posterUrl = item.posterUrl,
+                                    backdropUrl = item.backdropUrl,
                                     rating = null,
                                     year = null,
                                     genre = null,
                                     modifier = Modifier.fillMaxWidth(),
-                                    onClick = { onItemClick(entry) }
+                                    onClick = { onItemClick(item.entry) },
                                 )
                             }
                         }
@@ -459,97 +643,49 @@ private fun LibraryScreen(
                     LibrarySource.TRAKT,
                     LibrarySource.SIMKL -> {
                         if (!providerAuthenticated) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
+                            item(span = { GridItemSpan(maxLineSpan) }, key = "provider-auth") {
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                                         Text(
-                                            text = "Connect ${uiState.selectedSource.name.lowercase().replaceFirstChar { it.uppercase() }} in Settings to load this provider.",
-                                            style = MaterialTheme.typography.bodyMedium
+                                            text = "Connect ${uiState.selectedSource.displayName()} in Settings to load this provider.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (providerItems.isEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }, key = "provider-empty") {
+                                val emptyMessage =
+                                    if (providerFolders.isEmpty()) {
+                                        "No provider library data available."
+                                    } else {
+                                        val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
+                                        "No items in $label yet."
+                                    }
+                                Card(modifier = Modifier.fillMaxWidth()) {
+                                    Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                                        Text(
+                                            text = emptyMessage,
+                                            style = MaterialTheme.typography.bodyMedium,
                                         )
                                     }
                                 }
                             }
                         } else {
-                            if (providerItems.isEmpty()) {
-                                item(span = { GridItemSpan(maxLineSpan) }) {
-                                    val emptyMessage =
-                                        if (providerFolders.isEmpty()) {
-                                            "No provider library data available."
-                                        } else {
-                                            val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
-                                            "No items in $label yet."
-                                        }
-                                    Card(modifier = Modifier.fillMaxWidth()) {
-                                        Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                            Text(
-                                                text = emptyMessage,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
-                                gridItems(
-                                    items = providerItems,
-                                    key = { item -> "${item.provider.name}:${item.folderId}:${item.contentType}:${item.contentId}:${item.addedAtEpochMs}" }
-                                ) { item ->
-                                    val mapped =
-                                        WatchHistoryEntry(
-                                            contentId = item.contentId,
-                                            contentType = item.contentType,
-                                            title = item.title,
-                                            season = item.season,
-                                            episode = item.episode,
-                                            watchedAtEpochMs = item.addedAtEpochMs
-                                        )
-
-                                    val providerPoster = item.posterUrl?.trim().takeIf { !it.isNullOrBlank() }
-                                    val providerBackdrop = item.backdropUrl?.trim().takeIf { !it.isNullOrBlank() }
-
-                                    val artwork by
-                                        produceState(
-                                            providerPoster to providerBackdrop,
-                                            item.contentId,
-                                            item.contentType,
-                                            providerPoster,
-                                            providerBackdrop
-                                        ) {
-                                            if (!providerPoster.isNullOrBlank() && !providerBackdrop.isNullOrBlank()) {
-                                                value = providerPoster to providerBackdrop
-                                                return@produceState
-                                            }
-
-                                            val rawId = item.contentId.trim()
-                                            val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
-                                            if (!canResolve) {
-                                                value = providerPoster to providerBackdrop
-                                                return@produceState
-                                            }
-
-                                            val details =
-                                                runCatching {
-                                                    tmdbEnrichmentRepository.loadArtwork(
-                                                        rawId = rawId,
-                                                        mediaTypeHint = item.contentType
-                                                    )
-                                                }.getOrNull()
-
-                                            val poster = providerPoster ?: details?.posterUrl
-                                            val backdrop = providerBackdrop ?: details?.backdropUrl
-                                            value = poster to backdrop
-                                        }
-
-                                    PosterCard(
-                                        title = item.title.ifBlank { item.contentId },
-                                        posterUrl = artwork.first,
-                                        backdropUrl = artwork.second,
-                                        rating = null,
-                                        year = null,
-                                        genre = null,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        onClick = { onItemClick(mapped) }
-                                    )
-                                }
+                            gridItems(
+                                items = providerItems,
+                                key = { item -> item.stableKey },
+                            ) { item ->
+                                PosterCard(
+                                    title = item.item.title.ifBlank { item.item.contentId },
+                                    posterUrl = item.posterUrl,
+                                    backdropUrl = item.backdropUrl,
+                                    rating = null,
+                                    year = null,
+                                    genre = null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { onItemClick(item.watchHistoryEntry) },
+                                )
                             }
                         }
                     }
@@ -557,119 +693,6 @@ private fun LibraryScreen(
             }
         }
     }
-}
-
-@Composable
-private fun LocalHistoryCard(
-    entry: WatchHistoryEntry,
-    onItemClick: (WatchHistoryEntry) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = { onItemClick(entry) }
-    ) {
-        ListItem(
-            headlineContent = {
-                Text(
-                    text = entry.title.ifBlank { entry.contentId },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            supportingContent = {
-                Text(
-                    text = formatEntrySubtitle(entry),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            leadingContent = {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = MaterialTheme.shapes.small
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = entry.title.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            trailingContent = {
-                Text(
-                    text = entry.contentType.name.lowercase().replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        )
-    }
-}
-
-@Composable
-private fun ProviderHistoryCard(
-    item: ProviderLibraryItem,
-    onItemClick: (WatchHistoryEntry) -> Unit
-) {
-    val mapped =
-        WatchHistoryEntry(
-            contentId = item.contentId,
-            contentType = item.contentType,
-            title = item.title,
-            season = item.season,
-            episode = item.episode,
-            watchedAtEpochMs = item.addedAtEpochMs
-        )
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = { onItemClick(mapped) }
-    ) {
-        ListItem(
-            headlineContent = {
-                Text(
-                    text = item.title.ifBlank { item.contentId },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            supportingContent = {
-                Text(
-                    text = formatEntrySubtitle(mapped),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            trailingContent = {
-                Text(
-                    text = item.folderId,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        )
-    }
-}
-
-private fun formatEntrySubtitle(entry: WatchHistoryEntry): String {
-    val seasonEpisode =
-        when {
-            entry.season != null && entry.episode != null -> "S${entry.season}E${entry.episode}"
-            entry.season != null -> "S${entry.season}"
-            else -> ""
-        }
-    val relative =
-        DateUtils.getRelativeTimeSpanString(
-            entry.watchedAtEpochMs,
-            System.currentTimeMillis(),
-            DateUtils.MINUTE_IN_MILLIS
-        ).toString()
-
-    return listOf(seasonEpisode, relative).filter { it.isNotBlank() }.joinToString(separator = " - ")
 }
 
 private fun LibrarySource.toProvider(): WatchProvider? {

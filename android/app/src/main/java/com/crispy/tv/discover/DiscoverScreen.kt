@@ -18,28 +18,26 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -50,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -117,7 +116,7 @@ class DiscoverViewModel(
 
     fun setTypeFilter(filter: DiscoverTypeFilter) {
         _uiState.update { it.copy(typeFilter = filter) }
-        refresh()
+        refresh(preserveContent = false)
     }
 
     fun selectCatalog(catalog: DiscoverCatalogRef) {
@@ -127,15 +126,19 @@ class DiscoverViewModel(
                 selectedGenre = null
             )
         }
-        loadFirstPage()
+        loadFirstPage(clearResults = true, keepRefreshing = false)
     }
 
     fun selectGenre(genre: String?) {
         _uiState.update { it.copy(selectedGenre = genre) }
-        loadFirstPage()
+        loadFirstPage(clearResults = true, keepRefreshing = false)
     }
 
     fun refresh() {
+        refresh(preserveContent = true)
+    }
+
+    private fun refresh(preserveContent: Boolean) {
         refreshJob?.cancel()
         resultsJob?.cancel()
         loadMoreJob?.cancel()
@@ -148,15 +151,15 @@ class DiscoverViewModel(
                 _uiState.update {
                     it.copy(
                         isRefreshing = true,
-                        statusMessage = "Loading discover catalogs...",
-                        catalogs = emptyList(),
-                        selectedCatalogKey = null,
-                        selectedGenre = null,
-                        results = emptyList(),
-                        isLoadingResults = false,
+                        statusMessage = if (preserveContent && it.catalogs.isNotEmpty()) it.statusMessage else "Loading discover catalogs...",
+                        catalogs = if (preserveContent) it.catalogs else emptyList(),
+                        selectedCatalogKey = if (preserveContent) it.selectedCatalogKey else null,
+                        selectedGenre = if (preserveContent) it.selectedGenre else null,
+                        results = if (preserveContent) it.results else emptyList(),
+                        isLoadingResults = preserveContent && it.results.isNotEmpty(),
                         isLoadingMore = false,
-                        page = 1,
-                        hasMore = false
+                        page = if (preserveContent) it.page else 1,
+                        hasMore = if (preserveContent) it.hasMore else false,
                     )
                 }
 
@@ -182,11 +185,10 @@ class DiscoverViewModel(
                         selectedCatalogKey = selectedKey,
                         selectedGenre = selectedGenre,
                         statusMessage = statusMessage,
-                        isRefreshing = false
                     )
                 }
 
-                loadFirstPage()
+                loadFirstPage(clearResults = !preserveContent, keepRefreshing = true)
             }
     }
 
@@ -233,7 +235,7 @@ class DiscoverViewModel(
             }
     }
 
-    private fun loadFirstPage() {
+    private fun loadFirstPage(clearResults: Boolean, keepRefreshing: Boolean) {
         resultsJob?.cancel()
         resultsJob =
             viewModelScope.launch {
@@ -246,7 +248,8 @@ class DiscoverViewModel(
                             isLoadingResults = false,
                             isLoadingMore = false,
                             hasMore = false,
-                            page = 1
+                            page = 1,
+                            isRefreshing = false,
                         )
                     }
                     return@launch
@@ -256,10 +259,10 @@ class DiscoverViewModel(
                     it.copy(
                         isLoadingResults = true,
                         isLoadingMore = false,
-                        results = emptyList(),
+                        results = if (clearResults) emptyList() else it.results,
                         page = 1,
-                        hasMore = false,
-                        statusMessage = "Loading..."
+                        hasMore = if (clearResults) false else it.hasMore,
+                        statusMessage = if (clearResults || it.statusMessage.isBlank()) "Loading..." else it.statusMessage,
                     )
                 }
 
@@ -283,9 +286,10 @@ class DiscoverViewModel(
                     it.copy(
                         results = items,
                         isLoadingResults = false,
+                        isRefreshing = if (keepRefreshing) false else it.isRefreshing,
                         page = 1,
                         hasMore = hasMore,
-                        statusMessage = pageResult?.statusMessage ?: (result.exceptionOrNull()?.message ?: "Failed to load")
+                        statusMessage = pageResult?.statusMessage ?: (result.exceptionOrNull()?.message ?: "Failed to load"),
                     )
                 }
             }
@@ -385,11 +389,9 @@ private fun DiscoverScreen(
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
     val selectedCatalog = uiState.selectedCatalog
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val pullToRefreshState = rememberPullToRefreshState()
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
                 title = {
@@ -398,30 +400,38 @@ private fun DiscoverScreen(
                 actions = {
                     ProfileIconButton(onClick = onProfileClick)
                 },
-                scrollBehavior = scrollBehavior
             )
         }
 
     ) { innerPadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 124.dp),
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = pageHorizontalPadding,
-                top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
-                end = pageHorizontalPadding,
-                bottom = Dimensions.PageBottomPadding
-            ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+                )
+            },
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 124.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = pageHorizontalPadding,
+                    top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
+                    end = pageHorizontalPadding,
+                    bottom = innerPadding.calculateBottomPadding() + Dimensions.PageBottomPadding,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     LazyRow(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         item {
@@ -480,114 +490,110 @@ private fun DiscoverScreen(
                             }
                         }
                     }
-
-                    IconButton(onClick = onRefresh) {
-                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                    }
                 }
-            }
-            if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                         if (selectedCatalog != null) {
-                             val summaryGenre = uiState.selectedGenre ?: "All genres"
-                             Text(
-                                 text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label} | $summaryGenre",
-                                 style = MaterialTheme.typography.bodySmall,
-                                 color = MaterialTheme.colorScheme.onSurfaceVariant
-                             )
-                         }
+                if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                             if (selectedCatalog != null) {
+                                 val summaryGenre = uiState.selectedGenre ?: "All genres"
+                                 Text(
+                                     text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label} | $summaryGenre",
+                                     style = MaterialTheme.typography.bodySmall,
+                                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                                 )
+                             }
 
-                        if (uiState.statusMessage.isNotBlank()) {
-                            Text(
-                                text = uiState.statusMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (uiState.statusMessage.isNotBlank()) {
+                                Text(
+                                    text = uiState.statusMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            if (uiState.isLoadingResults && uiState.results.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                if (uiState.isLoadingResults && uiState.results.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            LoadingIndicator(modifier = Modifier.size(18.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                LoadingIndicator(modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = "Discovering...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else if (uiState.results.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = "Discovering...",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = if (selectedCatalog == null) "Select a catalog to start discovering" else "No content found",
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                }
-            } else if (uiState.results.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (selectedCatalog == null) "Select a catalog to start discovering" else "No content found",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    gridItems(
+                        items = uiState.results,
+                        key = { "${it.type}:${it.id}" }
+                    ) { item ->
+                        PosterCard(
+                            title = item.title,
+                            posterUrl = item.posterUrl,
+                            backdropUrl = item.backdropUrl,
+                            rating = item.rating,
+                            year = item.year,
+                            genre = item.genre,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onItemClick(item) }
                         )
                     }
                 }
-            } else {
-                items(
-                    items = uiState.results,
-                    key = { "${it.type}:${it.id}" }
-                ) { item ->
-                    PosterCard(
-                        title = item.title,
-                        posterUrl = item.posterUrl,
-                        backdropUrl = item.backdropUrl,
-                        rating = item.rating,
-                        year = item.year,
-                        genre = item.genre,
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onItemClick(item) }
-                    )
-                }
-            }
 
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Spacer(Modifier.height(4.dp))
-            }
-
-            if (uiState.isLoadingMore) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Dimensions.ListItemPadding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LoadingIndicator(modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                if (uiState.isLoadingMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Dimensions.ListItemPadding),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LoadingIndicator(modifier = Modifier.size(20.dp))
+                        }
                     }
-                }
-            } else if (uiState.hasMore && uiState.results.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        FilledTonalButton(onClick = onLoadMore) {
-                            Text("Load more")
+                } else if (uiState.hasMore && uiState.results.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            FilledTonalButton(onClick = onLoadMore) {
+                                Text("Load more")
+                            }
                         }
                     }
                 }
