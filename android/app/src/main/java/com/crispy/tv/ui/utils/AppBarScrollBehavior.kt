@@ -1,9 +1,9 @@
 package com.crispy.tv.ui.utils
 
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.DecayAnimationSpec
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.rememberSplineBasedDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarScrollBehavior
