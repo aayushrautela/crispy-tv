@@ -44,7 +44,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -98,7 +98,7 @@ private class CalendarViewModel(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext)
+                    val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
                     val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
                     return CalendarViewModel(
                         calendarService = CalendarService(

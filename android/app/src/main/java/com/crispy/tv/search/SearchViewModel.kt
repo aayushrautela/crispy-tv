@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -213,7 +214,7 @@ class SearchViewModel(
                         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                     }
 
-                    val repository = TmdbSearchRepositoryProvider.get(context)
+                    val repository = TmdbServicesProvider.searchRepository(context)
 
                     @Suppress("UNCHECKED_CAST")
                     return SearchViewModel(searchRepository = repository) as T

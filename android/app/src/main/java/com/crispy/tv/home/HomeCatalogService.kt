@@ -405,18 +405,19 @@ class HomeCatalogService(
 
     private fun parseSupabaseCatalogList(obj: JSONObject): SupabaseCatalogList? {
         val kind = nonBlank(obj.optString("kind"))
-        val id =
-            nonBlank(obj.optString("id"))
-                ?: nonBlank(obj.optString("name"))
-                ?: kind
-                ?: return null
+        val rawId = nonBlank(obj.optString("id"))
+        val name = nonBlank(obj.optString("name"))
+        val heading = nonBlank(obj.optString("heading"))
         val title =
             nonBlank(obj.optString("title"))
-                ?: nonBlank(obj.optString("name"))
-                ?: nonBlank(obj.optString("heading"))
-                ?: id
+                ?: name
+                ?: heading
+                ?: rawId
+                ?: kind
+                ?: return null
+        val id = normalizeSupabaseCatalogListId(rawId = rawId, kind = kind, title = title)
+            ?: return null
         val subtitle = nonBlank(obj.optString("subtitle"))
-        val heading = nonBlank(obj.optString("heading"))
         val results = obj.optJSONArray("results")
 
         val items =
@@ -443,6 +444,37 @@ class HomeCatalogService(
             items = items,
             mediaTypes = mediaTypes
         )
+    }
+
+    private fun normalizeSupabaseCatalogListId(rawId: String?, kind: String?, title: String): String? {
+        val fallbackId = rawId ?: title.takeIf { it.isNotBlank() }
+        val normalizedKind = kind?.trim()?.lowercase(Locale.US)
+        if (normalizedKind != "collection") {
+            return fallbackId
+        }
+
+        val normalizedRawId = rawId?.trim().orEmpty()
+        return when {
+            normalizedRawId.startsWith(COLLECTION_CATALOG_PREFIX, ignoreCase = true) -> normalizedRawId
+            normalizedRawId.startsWith("tmdb:collection:", ignoreCase = true) -> {
+                val suffix = normalizedRawId.substringAfterLast(':').trim()
+                suffix.takeIf { it.isNotEmpty() }?.let { "$COLLECTION_CATALOG_PREFIX$it" }
+            }
+            normalizedRawId.all(Char::isDigit) && normalizedRawId.isNotEmpty() -> {
+                "$COLLECTION_CATALOG_PREFIX$normalizedRawId"
+            }
+            else -> buildCollectionCatalogId(title)
+        }
+    }
+
+    private fun buildCollectionCatalogId(title: String): String? {
+        val slug =
+            title
+                .trim()
+                .lowercase(Locale.US)
+                .replace(Regex("[^a-z0-9]+"), ".")
+                .trim('.')
+        return slug.takeIf { it.isNotEmpty() }?.let { "$COLLECTION_CATALOG_PREFIX$it" }
     }
 
     private fun parseSupabaseCatalogItem(obj: JSONObject): CatalogItem? {
@@ -569,6 +601,7 @@ class HomeCatalogService(
 
     companion object {
         private const val TAG = "HomeCatalogService"
+        private const val COLLECTION_CATALOG_PREFIX = "tmdb.collection."
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
         private const val SUPABASE_GLOBAL_LISTS_LIMIT = 50
     }

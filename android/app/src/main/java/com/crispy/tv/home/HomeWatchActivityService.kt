@@ -3,7 +3,7 @@ package com.crispy.tv.home
 import android.content.Context
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
@@ -45,7 +45,7 @@ data class ContinueWatchingLoadResult(
 class HomeWatchActivityService(
     context: Context,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository =
-        TmdbEnrichmentRepositoryProvider.get(context.applicationContext),
+        TmdbServicesProvider.enrichmentRepository(context.applicationContext),
 ) {
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
     private val metaResolveSemaphore = Semaphore(6)

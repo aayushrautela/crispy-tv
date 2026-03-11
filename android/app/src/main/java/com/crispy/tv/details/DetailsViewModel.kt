@@ -15,13 +15,12 @@ import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.TmdbImdbIdResolver
-import com.crispy.tv.metadata.TmdbImdbIdResolverProvider
 import com.crispy.tv.metadata.omdb.OmdbDetails
 import com.crispy.tv.metadata.omdb.OmdbRepository
 import com.crispy.tv.metadata.omdb.OmdbRepositoryProvider
 import com.crispy.tv.metadata.tmdb.TmdbEnrichment
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.ContinueWatchingEntry
@@ -1647,8 +1646,8 @@ class DetailsViewModel internal constructor(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val httpClient = AppHttp.client(appContext)
-                    val tmdbImdbIdResolver = TmdbImdbIdResolverProvider.get(appContext)
-                    val tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext)
+                    val tmdbImdbIdResolver = TmdbServicesProvider.imdbIdResolver(appContext)
+                    val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
                     val omdbRepository = OmdbRepositoryProvider.get(appContext)
                     val addonStreamsService =
                         AddonStreamsService(

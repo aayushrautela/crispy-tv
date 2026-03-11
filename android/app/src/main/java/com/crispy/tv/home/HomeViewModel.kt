@@ -22,7 +22,9 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
+import com.crispy.tv.domain.home.normalizeHomeCatalogId
+import com.crispy.tv.domain.home.resolveHomeCatalogSource
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -120,7 +122,7 @@ class HomeViewModel internal constructor(
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                         val httpClient = AppHttp.client(appContext)
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
-                        val tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext)
+                        val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             homeCatalogService =
@@ -828,12 +830,18 @@ private fun continueWatchingContentKey(type: String, contentId: String): String 
 private fun partitionCatalogSections(sections: List<CatalogSectionRef>): CatalogSectionsLayout {
     val (collectionSections, standardCatalogSections) =
         sections.partition {
-            it.catalogId.startsWith(COLLECTION_CATALOG_PREFIX, ignoreCase = true)
+            it.isCollectionSection()
         }
     return CatalogSectionsLayout(
         collectionSections = collectionSections,
         standardCatalogSections = standardCatalogSections,
     )
+}
+
+private fun CatalogSectionRef.isCollectionSection(): Boolean {
+    val source = resolveHomeCatalogSource(catalogId)
+    val normalizedCatalogId = normalizeHomeCatalogId(catalogId, source)
+    return normalizedCatalogId.startsWith(COLLECTION_CATALOG_PREFIX, ignoreCase = true)
 }
 
 private fun ContinueWatchingItem.toHomeWatchActivityItemUi(nowMs: Long): HomeWatchActivityItemUi {

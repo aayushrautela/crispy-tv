@@ -45,7 +45,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryEntry
@@ -467,7 +467,7 @@ class LibraryViewModel internal constructor(
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                            tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext),
+                            tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

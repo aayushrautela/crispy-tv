@@ -73,6 +73,16 @@ internal fun JSONObject.optDoubleOrNull(key: String): Double? {
             is Number -> value.toDouble()
             is String -> value.toDoubleOrNull()
             else -> null
-        }
+    }
     return number?.takeIf { it.isFinite() }
+}
+
+internal fun JSONObject.optIntOrNull(key: String): Int? {
+    if (!has(key) || isNull(key)) return null
+    return optInt(key).takeIf { it > 0 }
+}
+
+internal fun JSONObject.optLongOrNull(key: String): Long? {
+    if (!has(key) || isNull(key)) return null
+    return optLong(key).takeIf { it > 0L }
 }
