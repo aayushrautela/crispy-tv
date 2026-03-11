@@ -34,8 +34,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
@@ -333,20 +333,24 @@ private fun LibraryScreen(
             )
         }
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            state = pullToRefreshState,
-            enabled = !uiState.isRefreshing,
-            indicator = {
-                LibraryPullToRefreshIndicator(
-                    state = pullToRefreshState,
-                    isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter)
-                )
-            }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .pullToRefresh(
+                        isRefreshing = uiState.isRefreshing,
+                        state = pullToRefreshState,
+                        enabled = !uiState.isRefreshing,
+                        onRefresh = onRefresh
+                    )
         ) {
+            LibraryPullToRefreshIndicator(
+                state = pullToRefreshState,
+                isRefreshing = uiState.isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 124.dp),
                 modifier = Modifier.fillMaxSize(),
