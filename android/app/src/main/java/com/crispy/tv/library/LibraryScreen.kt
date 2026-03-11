@@ -2,8 +2,6 @@ package com.crispy.tv.library
 
 import android.content.Context
 import android.text.format.DateUtils
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -29,13 +26,12 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshState
-import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
@@ -45,10 +41,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -286,7 +282,7 @@ fun LibraryRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LibraryScreen(
     uiState: LibraryUiState,
@@ -333,24 +329,20 @@ private fun LibraryScreen(
             )
         }
     ) { innerPadding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .pullToRefresh(
-                        isRefreshing = uiState.isRefreshing,
-                        state = pullToRefreshState,
-                        enabled = !uiState.isRefreshing,
-                        onRefresh = onRefresh
-                    )
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            state = pullToRefreshState,
+            enabled = !uiState.isRefreshing,
+            indicator = {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f)
+                )
+            }
         ) {
-            LibraryPullToRefreshIndicator(
-                state = pullToRefreshState,
-                isRefreshing = uiState.isRefreshing,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
-
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 124.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -558,43 +550,6 @@ private fun LibraryScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun LibraryPullToRefreshIndicator(
-    state: PullToRefreshState,
-    isRefreshing: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val progress = state.distanceFraction.coerceIn(0f, 1f)
-    val scale = 0.72f + (progress * 0.28f)
-
-    Box(
-        modifier =
-            modifier
-                .padding(top = 12.dp)
-                .graphicsLayer {
-                    alpha = if (isRefreshing) 1f else progress
-                    scaleX = if (isRefreshing) 1f else scale
-                    scaleY = if (isRefreshing) 1f else scale
-                }
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = CircleShape
-                )
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        if (isRefreshing) {
-            LoadingIndicator(modifier = Modifier.size(32.dp))
-        } else {
-            LoadingIndicator(
-                progress = { progress },
-                modifier = Modifier.size(32.dp)
-            )
         }
     }
 }
