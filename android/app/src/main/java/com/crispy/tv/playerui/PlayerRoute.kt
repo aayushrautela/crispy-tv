@@ -38,29 +38,20 @@ fun PlayerRoute(
 ) {
     val uiState by session.uiState.collectAsStateWithLifecycle()
     var videoBounds by remember { mutableStateOf<Rect?>(null) }
-
-    DisposableEffect(session) {
-        Log.d(
-            TAG,
-            "compose enter title=${uiState.title} engine=${uiState.activeEngine}",
-        )
-        onDispose {
-            Log.d(TAG, "compose dispose title=${uiState.title} engine=${uiState.activeEngine}")
-            onPictureInPictureConfigChanged(PictureInPictureConfig())
+    val updateVideoBounds: (Rect) -> Unit = { bounds ->
+        if (videoBounds != bounds) {
+            Log.d(
+                TAG,
+                "videoBounds changed engine=${uiState.activeEngine} isInPip=$isInPictureInPictureMode bounds=$bounds",
+            )
+            videoBounds = bounds
         }
     }
 
-    LaunchedEffect(
-        uiState.activeEngine,
-        uiState.isBuffering,
-        uiState.isPlaying,
-        uiState.statusMessage,
-        uiState.errorMessage,
-    ) {
-        Log.d(
-            TAG,
-            "uiState engine=${uiState.activeEngine} buffering=${uiState.isBuffering} playing=${uiState.isPlaying} status=${uiState.statusMessage} error=${uiState.errorMessage}",
-        )
+    DisposableEffect(session) {
+        onDispose {
+            onPictureInPictureConfigChanged(PictureInPictureConfig())
+        }
     }
 
     LaunchedEffect(videoBounds, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
@@ -99,23 +90,22 @@ fun PlayerRoute(
                             .fillMaxSize()
                             .onGloballyPositioned { coordinates ->
                                 val bounds = coordinates.boundsInWindow()
-                                videoBounds =
+                                updateVideoBounds(
                                     Rect(
                                         bounds.left.roundToInt(),
                                         bounds.top.roundToInt(),
                                         bounds.right.roundToInt(),
                                         bounds.bottom.roundToInt(),
-                                    )
+                                    ),
+                                )
                             },
                     factory = { viewContext ->
                         PlayerView(viewContext).apply {
                             useController = false
-                            Log.d(TAG, "create Exo PlayerView viewHash=${System.identityHashCode(this)}")
                             session.bindExoPlayerView(this)
                         }
                     },
                     update = { playerView ->
-                        Log.d(TAG, "update Exo PlayerView viewHash=${System.identityHashCode(playerView)}")
                         session.bindExoPlayerView(playerView)
                     },
                 )
@@ -128,21 +118,17 @@ fun PlayerRoute(
                             .fillMaxSize()
                             .onGloballyPositioned { coordinates ->
                                 val bounds = coordinates.boundsInWindow()
-                                videoBounds =
+                                updateVideoBounds(
                                     Rect(
                                         bounds.left.roundToInt(),
                                         bounds.top.roundToInt(),
                                         bounds.right.roundToInt(),
                                         bounds.bottom.roundToInt(),
-                                    )
+                                    ),
+                                )
                             },
-                    factory = { viewContext ->
-                        session.createVlcSurfaceView(viewContext).also { surfaceView ->
-                            Log.d(TAG, "create VLC SurfaceView viewHash=${System.identityHashCode(surfaceView)}")
-                        }
-                    },
+                    factory = { viewContext -> session.createVlcSurfaceView(viewContext) },
                     update = { surfaceView: SurfaceView ->
-                        Log.d(TAG, "update VLC SurfaceView viewHash=${System.identityHashCode(surfaceView)}")
                         session.attachVlcSurface(surfaceView)
                     },
                 )

@@ -3,7 +3,9 @@ package com.crispy.tv.nativeengine.playback
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.View
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -25,6 +27,42 @@ internal class VlcPlaybackRuntime(
     private var surfaceView: SurfaceView? = null
     private var viewsAttached: Boolean = false
     private var pendingUrl: String? = null
+    private val surfaceHolderCallback =
+        object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                Log.d(
+                    TAG,
+                    "surfaceCreated isCurrent=${surfaceView?.holder === holder} ${describeSurface(surfaceView)}",
+                )
+            }
+
+            override fun surfaceChanged(
+                holder: SurfaceHolder,
+                format: Int,
+                width: Int,
+                height: Int,
+            ) {
+                Log.d(
+                    TAG,
+                    "surfaceChanged isCurrent=${surfaceView?.holder === holder} format=$format size=${width}x$height ${describeSurface(surfaceView)}",
+                )
+            }
+
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                Log.d(
+                    TAG,
+                    "surfaceDestroyed isCurrent=${surfaceView?.holder === holder} ${describeSurface(surfaceView)}",
+                )
+            }
+        }
+    private val surfaceLayoutListener =
+        View.OnLayoutChangeListener { view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            val surface = view as? SurfaceView ?: return@OnLayoutChangeListener
+            Log.d(
+                TAG,
+                "surfaceLayoutChanged viewHash=${System.identityHashCode(surface)} bounds=[$left,$top,$right,$bottom] oldBounds=[$oldLeft,$oldTop,$oldRight,$oldBottom] ${describeSurface(surface)}",
+            )
+        }
 
     init {
         Log.d(TAG, "init networkCachingMs=1000 fileCachingMs=1000")
@@ -44,7 +82,7 @@ internal class VlcPlaybackRuntime(
                         }
                     Log.d(
                         TAG,
-                        "event=${eventName(event.type)}$bufferingSuffix isPlaying=${runCatching { mediaPlayer.isPlaying }.getOrDefault(false)} timeMs=${runCatching { mediaPlayer.time }.getOrDefault(-1L)} lengthMs=${runCatching { mediaPlayer.length }.getOrDefault(-1L)}",
+                        "event=${eventName(event.type)}$bufferingSuffix isPlaying=${runCatching { mediaPlayer.isPlaying }.getOrDefault(false)} timeMs=${runCatching { mediaPlayer.time }.getOrDefault(-1L)} lengthMs=${runCatching { mediaPlayer.length }.getOrDefault(-1L)} ${describeSurface(surfaceView)}",
                     )
                 }
             }
@@ -66,7 +104,7 @@ internal class VlcPlaybackRuntime(
 
     fun createSurfaceView(context: Context): SurfaceView {
         val created = SurfaceView(context)
-        Log.d(TAG, "createSurfaceView viewHash=${System.identityHashCode(created)}")
+        Log.d(TAG, "createSurfaceView ${describeSurface(created)}")
         attach(created)
         return created
     }
@@ -79,13 +117,15 @@ internal class VlcPlaybackRuntime(
 
         Log.d(
             TAG,
-            "attach viewHash=${System.identityHashCode(view)} replacingViewHash=${surfaceView?.let(System::identityHashCode)} pendingUrl=${pendingUrl?.hashCode()}",
+            "attach replacingViewHash=${surfaceView?.let(System::identityHashCode)} pendingUrl=${pendingUrl?.hashCode()} ${describeSurface(view)}",
         )
         detachViewsIfNeeded()
         surfaceView = view
+        registerSurfaceDiagnostics(view)
         mediaPlayer.vlcVout.setVideoView(view)
         mediaPlayer.vlcVout.attachViews()
         viewsAttached = true
+        Log.d(TAG, "attach complete ${describeSurface(view)}")
 
         pendingUrl?.let {
             pendingUrl = null
@@ -94,7 +134,7 @@ internal class VlcPlaybackRuntime(
     }
 
     fun play(url: String) {
-        Log.d(TAG, "play viewsAttached=$viewsAttached url=${debugUrl(url)}")
+        Log.d(TAG, "play viewsAttached=$viewsAttached url=${debugUrl(url)} ${describeSurface(surfaceView)}")
         if (!viewsAttached) {
             pendingUrl = url
             Log.d(TAG, "play deferred until surface attach url=${debugUrl(url)}")
@@ -125,7 +165,7 @@ internal class VlcPlaybackRuntime(
 
     fun stop() {
         pendingUrl = null
-        Log.d(TAG, "stop viewsAttached=$viewsAttached")
+        Log.d(TAG, "stop viewsAttached=$viewsAttached ${describeSurface(surfaceView)}")
         runCatching { mediaPlayer.stop() }
     }
 
@@ -145,7 +185,7 @@ internal class VlcPlaybackRuntime(
     }
 
     fun release() {
-        Log.d(TAG, "release viewsAttached=$viewsAttached")
+        Log.d(TAG, "release viewsAttached=$viewsAttached ${describeSurface(surfaceView)}")
         runCatching { mediaPlayer.stop() }
         detachViewsIfNeeded()
         runCatching { mediaPlayer.release() }
@@ -153,7 +193,7 @@ internal class VlcPlaybackRuntime(
     }
 
     private fun startPlayback(url: String) {
-        Log.d(TAG, "startPlayback url=${debugUrl(url)} viewsAttached=$viewsAttached")
+        Log.d(TAG, "startPlayback url=${debugUrl(url)} viewsAttached=$viewsAttached ${describeSurface(surfaceView)}")
         val media = Media(libVlc, Uri.parse(url)).apply {
             setHWDecoderEnabled(true, false)
         }
@@ -168,10 +208,60 @@ internal class VlcPlaybackRuntime(
             return
         }
 
-        Log.d(TAG, "detachViewsIfNeeded viewHash=${surfaceView?.let(System::identityHashCode)}")
+        val detachedSurface = surfaceView
+        Log.d(TAG, "detachViewsIfNeeded ${describeSurface(detachedSurface)}")
+        unregisterSurfaceDiagnostics(detachedSurface)
         runCatching { mediaPlayer.vlcVout.detachViews() }
         viewsAttached = false
         surfaceView = null
+    }
+
+    private fun registerSurfaceDiagnostics(view: SurfaceView) {
+        view.holder.addCallback(surfaceHolderCallback)
+        view.addOnLayoutChangeListener(surfaceLayoutListener)
+        Log.d(TAG, "surfaceDiagnostics attached ${describeSurface(view)}")
+    }
+
+    private fun unregisterSurfaceDiagnostics(view: SurfaceView?) {
+        if (view == null) {
+            return
+        }
+
+        runCatching { view.holder.removeCallback(surfaceHolderCallback) }
+        runCatching { view.removeOnLayoutChangeListener(surfaceLayoutListener) }
+        Log.d(TAG, "surfaceDiagnostics removed ${describeSurface(view)}")
+    }
+
+    private fun describeSurface(view: SurfaceView?): String {
+        if (view == null) {
+            return "surface=null"
+        }
+
+        val location = IntArray(2)
+        runCatching { view.getLocationOnScreen(location) }
+        val holderFrame = runCatching { view.holder.surfaceFrame }.getOrNull()
+        val surfaceValid = runCatching { view.holder.surface?.isValid }.getOrDefault(false)
+
+        return buildString {
+            append("viewHash=")
+            append(System.identityHashCode(view))
+            append(" size=")
+            append(view.width)
+            append('x')
+            append(view.height)
+            append(" screenPos=")
+            append(location[0])
+            append(',')
+            append(location[1])
+            append(" attached=")
+            append(view.isAttachedToWindow)
+            append(" laidOut=")
+            append(view.isLaidOut)
+            append(" holderFrame=")
+            append(holderFrame)
+            append(" surfaceValid=")
+            append(surfaceValid)
+        }
     }
 
     private fun debugUrl(url: String): String {

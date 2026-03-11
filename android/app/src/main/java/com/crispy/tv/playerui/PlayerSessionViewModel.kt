@@ -74,6 +74,7 @@ class PlayerSessionViewModel(
     private var hasReportedPlaybackStart = false
     private var hasReportedPlaybackStop = false
     private var lastProgressSyncAtElapsedMs = 0L
+    private var lastBufferingWhilePlayingLogAtElapsedMs = 0L
 
     init {
         mediaSessionManager.updateMetadata(
@@ -241,6 +242,10 @@ class PlayerSessionViewModel(
     }
 
     private fun onNativePlaybackEvent(event: NativePlaybackEvent) {
+        Log.d(
+            TAG,
+            "nativeEvent event=${eventName(event)} engine=${uiState.value.activeEngine} positionMs=${playbackMetrics.positionMs} durationMs=${playbackMetrics.durationMs}",
+        )
         when (event) {
             NativePlaybackEvent.Buffering -> onNativeBuffering()
             NativePlaybackEvent.Ready -> onNativeReady()
@@ -277,6 +282,12 @@ class PlayerSessionViewModel(
             )
 
             val snapshot = uiState.value
+            maybeLogBufferingWhilePlaying(
+                snapshot = snapshot,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                isPlaying = isPlaying,
+            )
             mediaSessionManager.updatePlayback(
                 title = snapshot.title,
                 subtitle = subtitle,
@@ -295,6 +306,28 @@ class PlayerSessionViewModel(
 
             delay(250)
         }
+    }
+
+    private fun maybeLogBufferingWhilePlaying(
+        snapshot: PlayerUiState,
+        positionMs: Long,
+        durationMs: Long,
+        isPlaying: Boolean,
+    ) {
+        if (!snapshot.isBuffering || !isPlaying) {
+            return
+        }
+
+        val nowElapsedMs = SystemClock.elapsedRealtime()
+        if (nowElapsedMs - lastBufferingWhilePlayingLogAtElapsedMs < BUFFERING_MISMATCH_LOG_INTERVAL_MS) {
+            return
+        }
+
+        lastBufferingWhilePlayingLogAtElapsedMs = nowElapsedMs
+        Log.d(
+            TAG,
+            "bufferingWhilePlaying engine=${snapshot.activeEngine} positionMs=$positionMs durationMs=$durationMs stableDurationMs=${snapshot.stableDurationMs} status=${snapshot.statusMessage}",
+        )
     }
 
     private fun syncWatchHistory(
@@ -393,6 +426,15 @@ class PlayerSessionViewModel(
     }
 }
 
+private fun eventName(event: NativePlaybackEvent): String {
+    return when (event) {
+        NativePlaybackEvent.Buffering -> "Buffering"
+        NativePlaybackEvent.Ready -> "Ready"
+        NativePlaybackEvent.Ended -> "Ended"
+        is NativePlaybackEvent.Error -> "Error"
+    }
+}
+
 private class PlaybackMetricsHolder {
     var positionMs: Long = 0L
     var durationMs: Long = 0L
@@ -400,3 +442,4 @@ private class PlaybackMetricsHolder {
 
 private const val TAG = "PlayerSessionViewModel"
 private const val PROGRESS_SYNC_INTERVAL_MS = 5_000L
+private const val BUFFERING_MISMATCH_LOG_INTERVAL_MS = 2_000L
