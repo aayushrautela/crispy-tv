@@ -25,8 +25,10 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
+import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import kotlin.math.roundToInt
 
 @Composable
@@ -54,11 +56,12 @@ fun PlayerRoute(
         }
     }
 
-    LaunchedEffect(videoBounds, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
+    LaunchedEffect(videoBounds, uiState.videoLayout, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
         val aspectRatio =
-            videoBounds
-                ?.takeIf { it.width() > 0 && it.height() > 0 }
-                ?.let { bounds -> Rational(bounds.width(), bounds.height()) }
+            uiState.videoLayout.toPictureInPictureAspectRatio()
+                ?: videoBounds
+                    ?.takeIf { it.width() > 0 && it.height() > 0 }
+                    ?.let { bounds -> Rational(bounds.width(), bounds.height()) }
         val pipEnabled =
             videoBounds != null &&
                 uiState.errorMessage == null &&
@@ -102,6 +105,7 @@ fun PlayerRoute(
                     factory = { viewContext ->
                         PlayerView(viewContext).apply {
                             useController = false
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                             session.bindExoPlayerView(this)
                         }
                     },
@@ -160,6 +164,18 @@ fun PlayerRoute(
                 onRetry = session::retryPlayback,
             )
         }
+    }
+}
+
+private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): Rational? {
+    val layout = this ?: return null
+    val aspectRatio = layout.aspectRatioValue() ?: return null
+    val denominator = 10_000
+    val numerator = (aspectRatio * denominator.toFloat()).roundToInt()
+    return if (numerator > 0) {
+        Rational(numerator, denominator)
+    } else {
+        null
     }
 }
 

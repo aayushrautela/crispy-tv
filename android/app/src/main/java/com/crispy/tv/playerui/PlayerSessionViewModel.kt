@@ -12,7 +12,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.ui.PlayerView
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
-import com.crispy.tv.nativeengine.playback.NativePlaybackEvent
+import com.crispy.tv.nativeengine.playback.NativePlaybackError
+import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
+import com.crispy.tv.nativeengine.playback.NativePlaybackState
+import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.player.PlaybackIdentity
 import kotlin.math.abs
@@ -40,6 +43,7 @@ data class PlayerUiState(
     val stableDurationMs: Long = 0L,
     val statusMessage: String = "Preparing playback...",
     val errorMessage: String? = null,
+    val videoLayout: NativeVideoLayout? = null,
 )
 
 class PlayerSessionViewModel(
@@ -62,8 +66,7 @@ class PlayerSessionViewModel(
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
-    private val playbackController: PlaybackController =
-        PlaybackDependencies.playbackControllerFactory(this.appContext, ::onNativePlaybackEvent)
+    private val playbackController: PlaybackController = PlaybackDependencies.playbackControllerFactory(this.appContext)
     private val mediaSessionManager =
         PlayerMediaSessionManager(
             context = this.appContext,
@@ -74,7 +77,7 @@ class PlayerSessionViewModel(
     private var hasReportedPlaybackStart = false
     private var hasReportedPlaybackStop = false
     private var lastProgressSyncAtElapsedMs = 0L
-    private var lastBufferingWhilePlayingLogAtElapsedMs = 0L
+    private var lastHandledErrorToken: Long? = null
 
     init {
         mediaSessionManager.updateMetadata(
@@ -100,76 +103,12 @@ class PlayerSessionViewModel(
 
     fun setPlaying(isPlaying: Boolean) {
         playbackController.setPlaying(isPlaying)
-        _uiState.update { state ->
-            if (state.isPlaying == isPlaying) {
-                state
-            } else {
-                state.copy(isPlaying = isPlaying)
-            }
-        }
+        syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun seekTo(positionMs: Long) {
         playbackController.seekTo(positionMs)
-    }
-
-    private fun onNativeReady() {
-        _uiState.update { state ->
-            state.copy(
-                isBuffering = false,
-                statusMessage = "Playing",
-                errorMessage = null,
-            )
-        }
-    }
-
-    private fun onNativeBuffering() {
-        _uiState.update { state ->
-            state.copy(
-                isBuffering = true,
-                statusMessage = "Buffering...",
-                errorMessage = null,
-            )
-        }
-    }
-
-    private fun onNativeEnded() {
-        _uiState.update { state ->
-            state.copy(
-                isBuffering = false,
-                isPlaying = false,
-                statusMessage = "Playback ended.",
-                errorMessage = null,
-            )
-        }
-    }
-
-    private fun onNativeError(message: String, codecLikely: Boolean) {
-        val shouldFallback = codecLikely && uiState.value.activeEngine == NativePlaybackEngine.EXO
-        if (shouldFallback) {
-            _uiState.update { state ->
-                state.copy(
-                    activeEngine = NativePlaybackEngine.VLC,
-                    isBuffering = true,
-                    isPlaying = false,
-                    positionMs = 0L,
-                    durationMs = 0L,
-                    stableDurationMs = 0L,
-                    statusMessage = "Codec issue detected, retrying with VLC...",
-                    errorMessage = null,
-                )
-            }
-            requestPlayback(engine = NativePlaybackEngine.VLC)
-        } else {
-            _uiState.update { state ->
-                state.copy(
-                    isBuffering = false,
-                    isPlaying = false,
-                    statusMessage = message,
-                    errorMessage = message,
-                )
-            }
-        }
+        syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun onEngineSelected(engine: NativePlaybackEngine) {
@@ -187,6 +126,7 @@ class PlayerSessionViewModel(
                 stableDurationMs = 0L,
                 statusMessage = "Switching playback engine...",
                 errorMessage = null,
+                videoLayout = null,
             )
         }
         requestPlayback(engine = engine)
@@ -202,18 +142,17 @@ class PlayerSessionViewModel(
                 stableDurationMs = 0L,
                 statusMessage = "Retrying playback...",
                 errorMessage = null,
+                videoLayout = null,
             )
         }
         requestPlayback(engine = uiState.value.activeEngine)
     }
 
     private fun onPlaybackMetrics(
-        positionMs: Long,
-        durationMs: Long,
-        isPlaying: Boolean,
+        snapshot: NativePlaybackSnapshot,
     ) {
-        val sanitizedPositionMs = positionMs.coerceAtLeast(0L)
-        val sanitizedDurationMs = durationMs.coerceAtLeast(0L)
+        val sanitizedPositionMs = snapshot.positionMs.coerceAtLeast(0L)
+        val sanitizedDurationMs = snapshot.durationMs.coerceAtLeast(0L)
 
         _uiState.update { state ->
             val nextStableDurationMs =
@@ -226,31 +165,31 @@ class PlayerSessionViewModel(
             val shouldUpdatePosition = abs(sanitizedPositionMs - state.positionMs) >= 500L
             val shouldUpdateDuration =
                 sanitizedDurationMs != state.durationMs || nextStableDurationMs != state.stableDurationMs
-            val shouldUpdatePlaying = isPlaying != state.isPlaying
+            val nextStatusMessage = statusMessage(snapshot)
+            val nextErrorMessage = snapshot.error?.message
+            val shouldUpdatePlaybackState =
+                snapshot.engine != state.activeEngine ||
+                    snapshot.isBuffering != state.isBuffering ||
+                    snapshot.isPlaying != state.isPlaying ||
+                    nextStatusMessage != state.statusMessage ||
+                    nextErrorMessage != state.errorMessage ||
+                    snapshot.videoLayout != state.videoLayout
 
-            if (!(shouldUpdatePosition || shouldUpdateDuration || shouldUpdatePlaying)) {
+            if (!(shouldUpdatePosition || shouldUpdateDuration || shouldUpdatePlaybackState)) {
                 state
             } else {
                 state.copy(
-                    isPlaying = isPlaying,
+                    activeEngine = snapshot.engine,
+                    isBuffering = snapshot.isBuffering,
+                    isPlaying = snapshot.isPlaying,
                     positionMs = sanitizedPositionMs,
                     durationMs = sanitizedDurationMs,
                     stableDurationMs = nextStableDurationMs,
+                    statusMessage = nextStatusMessage,
+                    errorMessage = nextErrorMessage,
+                    videoLayout = snapshot.videoLayout,
                 )
             }
-        }
-    }
-
-    private fun onNativePlaybackEvent(event: NativePlaybackEvent) {
-        Log.d(
-            TAG,
-            "nativeEvent event=${eventName(event)} engine=${uiState.value.activeEngine} positionMs=${playbackMetrics.positionMs} durationMs=${playbackMetrics.durationMs}",
-        )
-        when (event) {
-            NativePlaybackEvent.Buffering -> onNativeBuffering()
-            NativePlaybackEvent.Ready -> onNativeReady()
-            NativePlaybackEvent.Ended -> onNativeEnded()
-            is NativePlaybackEvent.Error -> onNativeError(event.message, codecLikely = event.codecLikely)
         }
     }
 
@@ -259,75 +198,100 @@ class PlayerSessionViewModel(
             return
         }
 
+        lastHandledErrorToken = null
+
         Log.d(
             TAG,
             "play request engine=$engine playbackUrlHash=${playbackUrl.hashCode()}",
         )
         playbackController.play(playbackUrl, engine)
+        syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     private suspend fun pollPlaybackState() {
         while (currentCoroutineContext().isActive) {
-            val positionMs = playbackController.currentPositionMs()
-            val durationMs = playbackController.durationMs()
-            val isPlaying = playbackController.isPlaying()
+            val snapshot = playbackController.snapshot()
 
-            playbackMetrics.positionMs = positionMs
-            playbackMetrics.durationMs = durationMs
+            if (maybeHandlePlaybackError(snapshot.error, snapshot.engine)) {
+                delay(250)
+                continue
+            }
 
-            onPlaybackMetrics(
-                positionMs = positionMs,
-                durationMs = durationMs,
-                isPlaying = isPlaying,
-            )
+            playbackMetrics.positionMs = snapshot.positionMs
+            playbackMetrics.durationMs = snapshot.durationMs
 
-            val snapshot = uiState.value
-            maybeLogBufferingWhilePlaying(
-                snapshot = snapshot,
-                positionMs = positionMs,
-                durationMs = durationMs,
-                isPlaying = isPlaying,
-            )
+            onPlaybackMetrics(snapshot)
+
+            val uiStateSnapshot = uiState.value
             mediaSessionManager.updatePlayback(
-                title = snapshot.title,
+                title = uiStateSnapshot.title,
                 subtitle = subtitle,
                 artworkUrl = artworkUrl,
-                isPlaying = isPlaying,
-                isBuffering = snapshot.isBuffering,
-                positionMs = positionMs,
-                durationMs = durationMs,
+                isPlaying = uiStateSnapshot.isPlaying,
+                isBuffering = uiStateSnapshot.isBuffering,
+                positionMs = uiStateSnapshot.positionMs,
+                durationMs = uiStateSnapshot.durationMs,
             )
 
             syncWatchHistory(
-                positionMs = positionMs,
-                durationMs = durationMs,
-                isPlaying = isPlaying,
+                positionMs = uiStateSnapshot.positionMs,
+                durationMs = uiStateSnapshot.durationMs,
+                isPlaying = uiStateSnapshot.isPlaying,
             )
 
             delay(250)
         }
     }
 
-    private fun maybeLogBufferingWhilePlaying(
-        snapshot: PlayerUiState,
-        positionMs: Long,
-        durationMs: Long,
-        isPlaying: Boolean,
-    ) {
-        if (!snapshot.isBuffering || !isPlaying) {
-            return
+    private fun maybeHandlePlaybackError(
+        error: NativePlaybackError?,
+        engine: NativePlaybackEngine,
+    ): Boolean {
+        if (error == null || lastHandledErrorToken == error.token) {
+            return false
         }
 
-        val nowElapsedMs = SystemClock.elapsedRealtime()
-        if (nowElapsedMs - lastBufferingWhilePlayingLogAtElapsedMs < BUFFERING_MISMATCH_LOG_INTERVAL_MS) {
-            return
+        lastHandledErrorToken = error.token
+        val shouldFallback = error.codecLikely && engine == NativePlaybackEngine.EXO
+        if (!shouldFallback) {
+            return false
         }
 
-        lastBufferingWhilePlayingLogAtElapsedMs = nowElapsedMs
-        Log.d(
-            TAG,
-            "bufferingWhilePlaying engine=${snapshot.activeEngine} positionMs=$positionMs durationMs=$durationMs stableDurationMs=${snapshot.stableDurationMs} status=${snapshot.statusMessage}",
-        )
+        Log.w(TAG, "Codec issue detected in EXO, retrying with VLC. message=${error.message}")
+        _uiState.update { state ->
+            state.copy(
+                activeEngine = NativePlaybackEngine.VLC,
+                isBuffering = true,
+                isPlaying = false,
+                positionMs = 0L,
+                durationMs = 0L,
+                stableDurationMs = 0L,
+                statusMessage = "Codec issue detected, retrying with VLC...",
+                errorMessage = null,
+                videoLayout = null,
+            )
+        }
+        requestPlayback(engine = NativePlaybackEngine.VLC)
+        return true
+    }
+
+    private fun syncPlaybackSnapshot(snapshot: NativePlaybackSnapshot) {
+        if (maybeHandlePlaybackError(snapshot.error, snapshot.engine)) {
+            return
+        }
+        onPlaybackMetrics(snapshot)
+    }
+
+    private fun statusMessage(snapshot: NativePlaybackSnapshot): String {
+        return when (snapshot.state) {
+            NativePlaybackState.IDLE,
+            NativePlaybackState.PREPARING -> "Preparing playback..."
+            NativePlaybackState.BUFFERING -> "Buffering..."
+            NativePlaybackState.PLAYING -> "Playing"
+            NativePlaybackState.PAUSED -> "Paused"
+            NativePlaybackState.ENDED -> "Playback ended."
+            NativePlaybackState.ERROR -> snapshot.error?.message ?: "Playback error"
+        }
     }
 
     private fun syncWatchHistory(
@@ -426,15 +390,6 @@ class PlayerSessionViewModel(
     }
 }
 
-private fun eventName(event: NativePlaybackEvent): String {
-    return when (event) {
-        NativePlaybackEvent.Buffering -> "Buffering"
-        NativePlaybackEvent.Ready -> "Ready"
-        NativePlaybackEvent.Ended -> "Ended"
-        is NativePlaybackEvent.Error -> "Error"
-    }
-}
-
 private class PlaybackMetricsHolder {
     var positionMs: Long = 0L
     var durationMs: Long = 0L
@@ -442,4 +397,3 @@ private class PlaybackMetricsHolder {
 
 private const val TAG = "PlayerSessionViewModel"
 private const val PROGRESS_SYNC_INTERVAL_MS = 5_000L
-private const val BUFFERING_MISMATCH_LOG_INTERVAL_MS = 2_000L

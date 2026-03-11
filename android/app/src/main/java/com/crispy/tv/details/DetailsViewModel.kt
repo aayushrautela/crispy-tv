@@ -852,12 +852,12 @@ class DetailsViewModel internal constructor(
             return
         }
 
-        val title =
-            stream.name
+        val currentState = _uiState.value
+        val selectedEpisodeTitle =
+            currentState.streamSelector.headerEpisode
+                ?.title
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?: _uiState.value.details?.title
-                ?: "Player"
 
         _uiState.update { state ->
             state.copy(
@@ -866,8 +866,8 @@ class DetailsViewModel internal constructor(
             )
         }
 
-        val initialDetails = _uiState.value.details
-        val lookupId = _uiState.value.streamSelector.lookupId
+        val initialDetails = currentState.details
+        val lookupId = currentState.streamSelector.lookupId
 
         viewModelScope.launch {
             val details = initialDetails
@@ -893,6 +893,8 @@ class DetailsViewModel internal constructor(
             val season = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.season else null
             val episode = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.episode else null
 
+            val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
+            val title = selectedEpisodeTitle ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
             val tmdbId = extractTmdbIdOrNull(enriched.id) ?: extractTmdbIdOrNull(lookupId)
 
@@ -912,6 +914,7 @@ class DetailsViewModel internal constructor(
             val subtitle = buildPlayerSubtitle(
                 mediaType = resolvedMediaType,
                 details = enriched,
+                playerTitle = title,
                 season = season,
                 episode = episode,
             )
@@ -931,11 +934,13 @@ class DetailsViewModel internal constructor(
     private fun buildPlayerSubtitle(
         mediaType: MetadataLabMediaType,
         details: MediaDetails,
+        playerTitle: String,
         season: Int?,
         episode: Int?,
     ): String? {
         return when (mediaType) {
             MetadataLabMediaType.SERIES -> {
+                val normalizedPlayerTitle = playerTitle.trim().ifBlank { null }
                 val episodeLabel =
                     when {
                         season != null && episode != null -> {
@@ -945,7 +950,12 @@ class DetailsViewModel internal constructor(
                         season != null -> "Season $season"
                         else -> null
                     }
-                listOfNotNull(details.title.trim().ifBlank { null }, episodeLabel)
+                val seriesTitle =
+                    details.title
+                        .trim()
+                        .ifBlank { null }
+                        ?.takeUnless { it == normalizedPlayerTitle }
+                listOfNotNull(seriesTitle, episodeLabel)
                     .joinToString(separator = " • ")
                     .ifBlank { null }
             }

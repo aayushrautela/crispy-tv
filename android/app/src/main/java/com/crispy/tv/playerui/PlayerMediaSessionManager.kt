@@ -66,15 +66,17 @@ internal class PlayerMediaSessionManager(
                     }
 
                     override fun onRewind() {
-                        val targetPositionMs = (playbackController.currentPositionMs() - REWIND_MS).coerceAtLeast(0L)
+                        val playbackSnapshot = playbackController.snapshot()
+                        val targetPositionMs = (playbackSnapshot.positionMs - REWIND_MS).coerceAtLeast(0L)
                         playbackController.seekTo(targetPositionMs)
                         currentPositionMs = targetPositionMs
                         publishPlaybackState()
                     }
 
                     override fun onFastForward() {
-                        val durationMs = playbackController.durationMs()
-                        val unclampedTargetMs = playbackController.currentPositionMs() + FAST_FORWARD_MS
+                        val playbackSnapshot = playbackController.snapshot()
+                        val durationMs = playbackSnapshot.durationMs
+                        val unclampedTargetMs = playbackSnapshot.positionMs + FAST_FORWARD_MS
                         val targetPositionMs =
                             if (durationMs > 0L) {
                                 unclampedTargetMs.coerceAtMost(durationMs)

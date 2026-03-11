@@ -8,6 +8,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -15,70 +16,79 @@ import androidx.media3.ui.PlayerView
 
 class NativePlaybackController(
     context: Context,
-    private val onEvent: (NativePlaybackEvent) -> Unit
 ) : PlaybackController {
     private val appContext = context.applicationContext
 
-    private val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-        .setAllowCrossProtocolRedirects(true)
+    private val httpDataSourceFactory =
+        DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
 
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(appContext)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
-        .build()
-        .apply {
-            playWhenReady = true
-        }
-    private val vlcRuntime = VlcPlaybackRuntime(appContext, onEvent)
+    private val exoPlayer: ExoPlayer =
+        ExoPlayer.Builder(appContext)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
+            .build()
+            .apply {
+                playWhenReady = true
+            }
+    private val vlcRuntime = VlcPlaybackRuntime(appContext)
     private var currentEngine: NativePlaybackEngine = NativePlaybackEngine.EXO
+    private var exoVideoLayout: NativeVideoLayout? = null
+    private var exoError: NativePlaybackError? = null
+    private var nextExoErrorToken: Long = 1L
 
-    private val exoListener = object : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            Log.d(
-                TAG,
-                "Exo onPlaybackStateChanged state=${playbackStateName(playbackState)} playWhenReady=${exoPlayer.playWhenReady} isPlaying=${exoPlayer.isPlaying} currentPositionMs=${exoPlayer.currentPosition} durationMs=${exoPlayer.duration}",
-            )
-            when (playbackState) {
-                Player.STATE_BUFFERING -> onEvent(NativePlaybackEvent.Buffering)
-                Player.STATE_READY -> onEvent(NativePlaybackEvent.Ready)
-                Player.STATE_ENDED -> onEvent(NativePlaybackEvent.Ended)
+    private val exoListener =
+        object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                Log.d(
+                    TAG,
+                    "Exo onPlaybackStateChanged state=${playbackStateName(playbackState)} playWhenReady=${exoPlayer.playWhenReady} isPlaying=${exoPlayer.isPlaying} currentPositionMs=${exoPlayer.currentPosition} durationMs=${exoPlayer.duration}",
+                )
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                Log.d(TAG, "Exo onIsPlayingChanged isPlaying=$isPlaying")
+            }
+
+            override fun onPlayWhenReadyChanged(
+                playWhenReady: Boolean,
+                reason: Int,
+            ) {
+                Log.d(
+                    TAG,
+                    "Exo onPlayWhenReadyChanged playWhenReady=$playWhenReady reason=$reason",
+                )
+            }
+
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                exoVideoLayout = videoSize.toNativeVideoLayout()
+                Log.d(TAG, "Exo onVideoSizeChanged videoSize=$videoSize layout=$exoVideoLayout")
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val codecLikely = shouldFallbackToVlc(error)
+                exoError =
+                    NativePlaybackError(
+                        token = nextExoErrorToken++,
+                        message = error.message ?: "ExoPlayer error",
+                        codecLikely = codecLikely,
+                    )
+                Log.w(
+                    TAG,
+                    "Exo onPlayerError code=${error.errorCodeName} message=${error.message} cause=${error.cause?.javaClass?.simpleName} fallbackToVlc=$codecLikely",
+                    error,
+                )
             }
         }
-
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            Log.d(TAG, "Exo onIsPlayingChanged isPlaying=$isPlaying")
-        }
-
-        override fun onPlayWhenReadyChanged(
-            playWhenReady: Boolean,
-            reason: Int,
-        ) {
-            Log.d(
-                TAG,
-                "Exo onPlayWhenReadyChanged playWhenReady=$playWhenReady reason=$reason",
-            )
-        }
-
-        override fun onPlayerError(error: PlaybackException) {
-            Log.w(
-                TAG,
-                "Exo onPlayerError code=${error.errorCodeName} message=${error.message} cause=${error.cause?.javaClass?.simpleName} fallbackToVlc=${shouldFallbackToVlc(error)}",
-                error,
-            )
-            onEvent(
-                NativePlaybackEvent.Error(
-                    message = error.message ?: "ExoPlayer error",
-                    codecLikely = shouldFallbackToVlc(error)
-                )
-            )
-        }
-    }
 
     init {
         Log.d(TAG, "init created ExoPlayer and VLC runtime")
         exoPlayer.addListener(exoListener)
     }
 
-    override fun play(url: String, engine: NativePlaybackEngine) {
+    override fun play(
+        url: String,
+        engine: NativePlaybackEngine,
+    ) {
         Log.d(
             TAG,
             "play requested engine=$engine previousEngine=$currentEngine url=${debugUrl(url)}",
@@ -86,6 +96,8 @@ class NativePlaybackController(
         currentEngine = engine
         when (engine) {
             NativePlaybackEngine.EXO -> {
+                exoError = null
+                exoVideoLayout = null
                 vlcRuntime.stop()
                 exoPlayer.setMediaItem(MediaItem.fromUri(url))
                 exoPlayer.prepare()
@@ -94,6 +106,7 @@ class NativePlaybackController(
 
             NativePlaybackEngine.VLC -> {
                 exoPlayer.stop()
+                exoPlayer.clearMediaItems()
                 vlcRuntime.play(url)
             }
         }
@@ -116,11 +129,10 @@ class NativePlaybackController(
         }
     }
 
-    override fun isPlaying(): Boolean {
+    override fun snapshot(): NativePlaybackSnapshot {
         return when (currentEngine) {
-            NativePlaybackEngine.EXO ->
-                exoPlayer.playWhenReady && exoPlayer.playbackState != Player.STATE_ENDED
-            NativePlaybackEngine.VLC -> vlcRuntime.isPlaying()
+            NativePlaybackEngine.EXO -> currentExoSnapshot()
+            NativePlaybackEngine.VLC -> vlcRuntime.snapshot()
         }
     }
 
@@ -132,39 +144,18 @@ class NativePlaybackController(
         }
     }
 
-    override fun currentPositionMs(): Long {
-        return when (currentEngine) {
-            NativePlaybackEngine.EXO -> exoPlayer.currentPosition.coerceAtLeast(0L)
-            NativePlaybackEngine.VLC -> vlcRuntime.currentPositionMs()
-        }
-    }
-
-    override fun durationMs(): Long {
-        return when (currentEngine) {
-            NativePlaybackEngine.EXO -> {
-                val duration = exoPlayer.duration
-                when {
-                    duration == C.TIME_UNSET -> 0L
-                    duration < 0L -> 0L
-                    else -> duration
-                }
-            }
-
-            NativePlaybackEngine.VLC -> vlcRuntime.durationMs()
-        }
-    }
-
     override fun stop() {
         Log.d(TAG, "stop currentEngine=$currentEngine")
-        runCatching { exoPlayer.stop() }
-        runCatching { vlcRuntime.stop() }
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        vlcRuntime.stop()
     }
 
     override fun release() {
         Log.d(TAG, "release currentEngine=$currentEngine")
-        runCatching { exoPlayer.removeListener(exoListener) }
-        runCatching { exoPlayer.release() }
-        runCatching { vlcRuntime.release() }
+        exoPlayer.removeListener(exoListener)
+        exoPlayer.release()
+        vlcRuntime.release()
     }
 
     override fun bindExoPlayerView(playerView: PlayerView) {
@@ -182,6 +173,50 @@ class NativePlaybackController(
         vlcRuntime.attach(surfaceView)
     }
 
+    private fun currentExoSnapshot(): NativePlaybackSnapshot {
+        val positionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+        val durationMs = exoDurationMs()
+        val state =
+            when {
+                exoError != null -> NativePlaybackState.ERROR
+                exoPlayer.playbackState == Player.STATE_ENDED -> NativePlaybackState.ENDED
+                exoPlayer.playbackState == Player.STATE_BUFFERING -> {
+                    if (positionMs <= 0L && durationMs <= 0L) {
+                        NativePlaybackState.PREPARING
+                    } else {
+                        NativePlaybackState.BUFFERING
+                    }
+                }
+                exoPlayer.playbackState == Player.STATE_READY -> {
+                    if (exoPlayer.isPlaying) {
+                        NativePlaybackState.PLAYING
+                    } else {
+                        NativePlaybackState.PAUSED
+                    }
+                }
+                exoPlayer.currentMediaItem != null || exoPlayer.playWhenReady -> NativePlaybackState.PREPARING
+                else -> NativePlaybackState.IDLE
+            }
+
+        return NativePlaybackSnapshot(
+            engine = NativePlaybackEngine.EXO,
+            state = state,
+            positionMs = positionMs,
+            durationMs = durationMs,
+            videoLayout = exoVideoLayout,
+            error = exoError,
+        )
+    }
+
+    private fun exoDurationMs(): Long {
+        val duration = exoPlayer.duration
+        return when {
+            duration == C.TIME_UNSET -> 0L
+            duration < 0L -> 0L
+            else -> duration
+        }
+    }
+
     private fun shouldFallbackToVlc(error: PlaybackException): Boolean {
         val message = error.message.orEmpty().lowercase()
         val causeName = error.cause?.javaClass?.simpleName.orEmpty().lowercase()
@@ -193,9 +228,9 @@ class NativePlaybackController(
     }
 
     private fun debugUrl(url: String): String {
-        val uri = runCatching { Uri.parse(url) }.getOrNull()
-        val host = uri?.host?.ifBlank { null }
-        val scheme = uri?.scheme?.ifBlank { null }
+        val uri = Uri.parse(url)
+        val host = uri.host?.ifBlank { null }
+        val scheme = uri.scheme?.ifBlank { null }
         return buildString {
             append("hash=")
             append(url.hashCode())
@@ -216,6 +251,20 @@ class NativePlaybackController(
             Player.STATE_ENDED -> "ENDED"
             else -> playbackState.toString()
         }
+    }
+
+    private fun VideoSize.toNativeVideoLayout(): NativeVideoLayout? {
+        if (width <= 0 || height <= 0) {
+            return null
+        }
+
+        return NativeVideoLayout(
+            width = width,
+            height = height,
+            visibleWidth = width,
+            visibleHeight = height,
+            pixelWidthHeightRatio = pixelWidthHeightRatio.takeIf { it > 0f } ?: 1f,
+        )
     }
 
     companion object {

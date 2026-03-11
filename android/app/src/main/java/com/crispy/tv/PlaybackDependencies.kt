@@ -11,7 +11,6 @@ import com.crispy.tv.watchhistory.RemoteWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.nativeengine.playback.NativePlaybackController
-import com.crispy.tv.nativeengine.playback.NativePlaybackEvent
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.torrent.TorrentEngineClient
 import com.crispy.tv.player.CoreDomainMetadataLabResolver
@@ -94,9 +93,9 @@ private fun newSupabaseSyncService(
 
 object PlaybackDependencies {
     @Volatile
-    var playbackControllerFactory: (Context, (NativePlaybackEvent) -> Unit) -> PlaybackController =
-        { context, callback ->
-            NativePlaybackController(context, callback)
+    var playbackControllerFactory: (Context) -> PlaybackController =
+        { context ->
+            NativePlaybackController(context)
         }
 
     @Volatile
@@ -132,8 +131,8 @@ object PlaybackDependencies {
     }
 
     fun reset() {
-        playbackControllerFactory = { context, callback ->
-            NativePlaybackController(context, callback)
+        playbackControllerFactory = { context ->
+            NativePlaybackController(context)
         }
         torrentResolverFactory = { context -> NativeTorrentResolver(context) }
         metadataResolverFactory = { context ->
