@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
 
 package com.crispy.tv.person
 
@@ -56,7 +59,10 @@ import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.woowla.compose.icon.collections.simpleicons.Imdb
+import com.woowla.compose.icon.collections.simpleicons.Instagram
 import com.woowla.compose.icon.collections.simpleicons.Simpleicons
+import com.woowla.compose.icon.collections.simpleicons.X
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
