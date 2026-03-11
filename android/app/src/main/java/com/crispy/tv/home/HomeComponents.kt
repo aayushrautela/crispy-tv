@@ -74,6 +74,7 @@ import coil.compose.AsyncImage
 import com.crispy.tv.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.ratings.normalizeRatingText
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 import com.crispy.tv.ui.components.skeletonElement
@@ -932,7 +933,7 @@ private fun collectionMovieDetailText(item: CatalogItem): String {
     return buildList {
         item.year?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
         item.genre?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
-        item.rating?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+        normalizeRatingText(item.rating)?.let(::add)
     }.joinToString(separator = " • ")
 }
 
@@ -1012,7 +1013,7 @@ internal fun HomeCatalogPosterCard(
                     )
                 }
 
-                if (!item.rating.isNullOrBlank()) {
+                normalizeRatingText(item.rating)?.let { rating ->
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -1032,7 +1033,7 @@ internal fun HomeCatalogPosterCard(
                                 tint = Color(0xFFFFC107)
                             )
                             Text(
-                                text = item.rating,
+                                text = rating,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White
                             )

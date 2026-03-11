@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.crispy.tv.ratings.formatRating
 import coil.compose.AsyncImage
 
 @Composable
@@ -76,35 +77,33 @@ fun PosterCard(
                     }
                 }
 
-                rating?.toDoubleOrNull()?.let { parsedRating ->
-                    if (parsedRating > 0) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(6.dp)
-                                .background(
-                                    color = Color.Black.copy(alpha = 0.7f),
-                                    shape = MaterialTheme.shapes.small
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                formatRating(rating?.toDoubleOrNull())?.let { formattedRating ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .background(
+                                color = Color.Black.copy(alpha = 0.7f),
+                                shape = MaterialTheme.shapes.small
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = Color(0xFFFFC107)
-                                )
-                                Text(
-                                    text = String.format("%.1f", parsedRating),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    fontSize = 11.sp
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFFFC107)
+                            )
+                            Text(
+                                text = formattedRating,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontSize = 11.sp
+                            )
                         }
                     }
                 }

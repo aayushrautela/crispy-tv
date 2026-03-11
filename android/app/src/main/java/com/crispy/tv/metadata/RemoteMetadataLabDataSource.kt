@@ -1,12 +1,10 @@
 package com.crispy.tv.metadata
 
 import android.content.Context
-import android.net.Uri
 import com.crispy.tv.domain.metadata.AddonMetadataCandidate
 import com.crispy.tv.domain.metadata.MetadataRecord
-import com.crispy.tv.domain.metadata.MetadataSeason
-import com.crispy.tv.domain.metadata.MetadataVideo
 import com.crispy.tv.domain.metadata.formatIdForIdPrefixes
+import com.crispy.tv.metadata.tmdb.TmdbMetadataRecordRepository
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabDataSource
 import com.crispy.tv.player.MetadataLabMediaType
@@ -14,25 +12,18 @@ import com.crispy.tv.player.MetadataLabPayload
 import com.crispy.tv.player.MetadataLabRequest
 import com.crispy.tv.player.MetadataTransportStat
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import okhttp3.Headers
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import org.json.JSONArray
-import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 class RemoteMetadataLabDataSource(
     context: Context,
     addonManifestUrlsCsv: String,
-    tmdbApiKey: String,
+    private val tmdbRepository: TmdbMetadataRecordRepository,
     private val httpClient: CrispyHttpClient,
 ) : MetadataLabDataSource {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
     private val addonClient = AddonMetadataClient(addonRegistry, httpClient)
-    private val tmdbClient = TmdbMetadataClient(tmdbApiKey, httpClient)
 
     override suspend fun load(
         request: MetadataLabRequest,
@@ -41,7 +32,7 @@ class RemoteMetadataLabDataSource(
         val contentId = normalizedId.contentId
         val streamLookupId = normalizedId.videoId ?: contentId
         val subtitleLookupId = normalizedId.videoId ?: contentId
-        val tmdbResult = tmdbClient.fetchMeta(request.mediaType, contentId)
+        val tmdbResult = tmdbRepository.fetchMeta(request.mediaType, contentId)
         val tmdbMeta = tmdbResult?.record
         var transportStats = addonClient.fetchTransportStats(
             mediaType = request.mediaType,
@@ -614,296 +605,6 @@ private class AddonMetadataClient(
     private fun MetadataLabMediaType.asApiPath(): String {
         return if (this == MetadataLabMediaType.SERIES) "series" else "movie"
     }
-}
-
-private class TmdbMetadataClient(
-    private val apiKey: String,
-    private val httpClient: CrispyHttpClient,
-) {
-    data class TmdbMetaResult(
-        val title: String,
-        val record: MetadataRecord,
-    )
-
-    suspend fun fetchMeta(mediaType: MetadataLabMediaType, contentId: String): TmdbMetaResult? {
-        if (apiKey.isBlank()) {
-            return null
-        }
-
-        val tmdbId = resolveTmdbId(mediaType, contentId) ?: return null
-        val details = fetchDetails(mediaType, tmdbId) ?: return null
-        val (credits, recommendations, externalIds) =
-            coroutineScope {
-                val creditsDeferred = async { fetchCredits(mediaType, tmdbId) }
-                val recommendationsDeferred = async { fetchRecommendations(mediaType, tmdbId) }
-                val externalIdsDeferred =
-                    if (mediaType == MetadataLabMediaType.SERIES) {
-                        async { fetchExternalIds(mediaType, tmdbId) }
-                    } else {
-                        null
-                    }
-
-                Triple(
-                    creditsDeferred.await(),
-                    recommendationsDeferred.await(),
-                    externalIdsDeferred?.await(),
-                )
-            }
-
-        val imdbId =
-            nonBlank(details.optString("imdb_id"))
-                ?: nonBlank(externalIds?.optString("imdb_id"))
-
-        val castPairs = parseCast(credits)
-        val castNames = castPairs.map { it.first }
-        val castWithDetails = castPairs.mapNotNull { (name, character) ->
-            if (character != null) "$name as $character" else name
-        }
-
-        val directors =
-            if (mediaType == MetadataLabMediaType.MOVIE) {
-                parseMovieDirectors(credits)
-            } else {
-                parseSeriesCreators(details)
-            }
-
-        val similar = parseRecommendations(recommendations)
-        val collectionItems = if (mediaType == MetadataLabMediaType.MOVIE) {
-            parseMovieCollection(details)
-        } else {
-            emptyList()
-        }
-        val seasons = if (mediaType == MetadataLabMediaType.SERIES) {
-            parseSeriesSeasons(details, tmdbId)
-        } else {
-            emptyList()
-        }
-
-        val title =
-            when (mediaType) {
-                MetadataLabMediaType.MOVIE ->
-                    nonBlank(details.optString("title"))
-                        ?: nonBlank(details.optString("original_title"))
-
-                MetadataLabMediaType.SERIES ->
-                    nonBlank(details.optString("name"))
-                        ?: nonBlank(details.optString("original_name"))
-            } ?: "tmdb:$tmdbId"
-
-        val record = MetadataRecord(
-            id = "tmdb:$tmdbId",
-            imdbId = imdbId,
-            cast = castNames,
-            director = directors,
-            castWithDetails = castWithDetails,
-            similar = similar,
-            collectionItems = collectionItems,
-            seasons = seasons,
-            videos = emptyList()
-        )
-
-        return TmdbMetaResult(
-            title = title,
-            record = record,
-        )
-    }
-
-    private suspend fun resolveTmdbId(mediaType: MetadataLabMediaType, contentId: String): Int? {
-        val normalized = contentId.trim()
-        if (normalized.startsWith("tmdb:", ignoreCase = true)) {
-            return normalized.substringAfter("tmdb:").substringBefore(':').toIntOrNull()
-        }
-
-        if (normalized.startsWith("tt", ignoreCase = true)) {
-            return findTmdbIdByImdb(mediaType, normalized)
-        }
-
-        return null
-    }
-
-    private suspend fun findTmdbIdByImdb(mediaType: MetadataLabMediaType, imdbId: String): Int? {
-        val response = getJson(
-            path = "find/$imdbId",
-            query = mapOf(
-                "api_key" to apiKey,
-                "external_source" to "imdb_id"
-            )
-        ) ?: return null
-
-        val preferredKey = if (mediaType == MetadataLabMediaType.SERIES) "tv_results" else "movie_results"
-        val preferredId = response.optJSONArray(preferredKey)?.optJSONObject(0)?.optInt("id", -1)
-        if (preferredId != null && preferredId > 0) {
-            return preferredId
-        }
-
-        val fallbackMovie = response.optJSONArray("movie_results")?.optJSONObject(0)?.optInt("id", -1)
-        if (fallbackMovie != null && fallbackMovie > 0) {
-            return fallbackMovie
-        }
-
-        val fallbackTv = response.optJSONArray("tv_results")?.optJSONObject(0)?.optInt("id", -1)
-        if (fallbackTv != null && fallbackTv > 0) {
-            return fallbackTv
-        }
-
-        return null
-    }
-
-    private suspend fun fetchDetails(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
-        return getJson(
-            path = "${mediaPath(mediaType)}/$tmdbId",
-            query = mapOf(
-                "api_key" to apiKey,
-                "language" to "en-US"
-            )
-        )
-    }
-
-    private suspend fun fetchCredits(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
-        return getJson(
-            path = "${mediaPath(mediaType)}/$tmdbId/credits",
-            query = mapOf(
-                "api_key" to apiKey,
-                "language" to "en-US"
-            )
-        )
-    }
-
-    private suspend fun fetchRecommendations(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
-        return getJson(
-            path = "${mediaPath(mediaType)}/$tmdbId/recommendations",
-            query = mapOf(
-                "api_key" to apiKey,
-                "language" to "en-US",
-                "page" to "1"
-            )
-        )
-    }
-
-    private suspend fun fetchExternalIds(mediaType: MetadataLabMediaType, tmdbId: Int): JSONObject? {
-        return getJson(
-            path = "${mediaPath(mediaType)}/$tmdbId/external_ids",
-            query = mapOf("api_key" to apiKey)
-        )
-    }
-
-    private fun parseCast(credits: JSONObject?): List<Pair<String, String?>> {
-        val castArray = credits?.optJSONArray("cast") ?: return emptyList()
-        val output = mutableListOf<Pair<String, String?>>()
-        for (index in 0 until minOf(castArray.length(), 12)) {
-            val actor = castArray.optJSONObject(index) ?: continue
-            val name = nonBlank(actor.optString("name")) ?: continue
-            val character = nonBlank(actor.optString("character"))
-            output += name to character
-        }
-        return output
-    }
-
-    private fun parseMovieDirectors(credits: JSONObject?): List<String> {
-        val crewArray = credits?.optJSONArray("crew") ?: return emptyList()
-        val output = mutableListOf<String>()
-        for (index in 0 until crewArray.length()) {
-            val member = crewArray.optJSONObject(index) ?: continue
-            val job = nonBlank(member.optString("job"))
-            if (!job.equals("Director", ignoreCase = true)) {
-                continue
-            }
-            val name = nonBlank(member.optString("name")) ?: continue
-            output += name
-        }
-        return output.distinct()
-    }
-
-    private fun parseSeriesCreators(details: JSONObject): List<String> {
-        val creators = details.optJSONArray("created_by") ?: return emptyList()
-        val output = mutableListOf<String>()
-        for (index in 0 until creators.length()) {
-            val name = nonBlank(creators.optJSONObject(index)?.optString("name")) ?: continue
-            output += name
-        }
-        return output.distinct()
-    }
-
-    private fun parseRecommendations(recommendations: JSONObject?): List<String> {
-        val results = recommendations?.optJSONArray("results") ?: return emptyList()
-        val output = mutableListOf<String>()
-        for (index in 0 until minOf(results.length(), 20)) {
-            val entry = results.optJSONObject(index) ?: continue
-            val id = entry.optInt("id", -1)
-            if (id > 0) {
-                output += "tmdb:$id"
-            }
-        }
-        return output
-    }
-
-    private fun parseMovieCollection(details: JSONObject): List<String> {
-        val collection = details.optJSONObject("belongs_to_collection") ?: return emptyList()
-        val collectionId = collection.optInt("id", -1)
-        return if (collectionId > 0) {
-            listOf("tmdb:collection:$collectionId")
-        } else {
-            emptyList()
-        }
-    }
-
-    private fun parseSeriesSeasons(details: JSONObject, tmdbId: Int): List<MetadataSeason> {
-        val seasons = details.optJSONArray("seasons") ?: return emptyList()
-        val output = mutableListOf<MetadataSeason>()
-        for (index in 0 until seasons.length()) {
-            val seasonObject = seasons.optJSONObject(index) ?: continue
-            val seasonNumber = seasonObject.optInt("season_number", -1)
-            if (seasonNumber <= 0) {
-                continue
-            }
-            val episodeCount = seasonObject.optInt("episode_count", -1)
-            if (episodeCount <= 0) {
-                continue
-            }
-
-            output += MetadataSeason(
-                id = "tmdb:$tmdbId:season:$seasonNumber",
-                name = nonBlank(seasonObject.optString("name")) ?: "Season $seasonNumber",
-                overview = nonBlank(seasonObject.optString("overview")) ?: "",
-                seasonNumber = seasonNumber,
-                episodeCount = episodeCount,
-                airDate = nonBlank(seasonObject.optString("air_date"))
-            )
-        }
-        return output
-    }
-
-    private fun mediaPath(mediaType: MetadataLabMediaType): String {
-        return if (mediaType == MetadataLabMediaType.SERIES) "tv" else "movie"
-    }
-
-    private suspend fun getJson(path: String, query: Map<String, String>): JSONObject? {
-        val uriBuilder = Uri.parse("https://api.themoviedb.org/3/$path").buildUpon()
-        query.forEach { (key, value) ->
-            uriBuilder.appendQueryParameter(key, value)
-        }
-        return httpClient.getJsonObject(uriBuilder.build().toString(), callTimeoutMs = 12_000L)
-    }
-}
-
-private suspend fun CrispyHttpClient.getJsonObject(url: String, callTimeoutMs: Long = 12_000L): JSONObject? {
-    val response =
-        runCatching {
-            get(
-                url = url.toHttpUrl(),
-                headers = Headers.headersOf("Accept", "application/json"),
-                callTimeoutMs = callTimeoutMs,
-            )
-        }.getOrNull() ?: return null
-
-    if (response.code !in 200..299) {
-        return null
-    }
-    val body = response.body
-    if (body.isBlank()) {
-        return null
-    }
-    return runCatching { JSONObject(body) }.getOrNull()
 }
 
 private fun nonBlank(value: String?): String? {

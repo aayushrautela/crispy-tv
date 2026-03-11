@@ -5,6 +5,7 @@ import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.network.CrispyHttpClient
+import com.crispy.tv.ratings.formatRating
 import java.util.Locale
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -46,6 +47,7 @@ data class TmdbEnrichmentResult(
 
 class TmdbEnrichmentRepository internal constructor(
     private val client: TmdbJsonClient,
+    private val identityService: TmdbIdentityService = TmdbIdentityService(client),
 ) {
     constructor(apiKey: String, httpClient: CrispyHttpClient) : this(
         TmdbJsonClient(apiKey = apiKey, httpClient = httpClient)
@@ -61,7 +63,7 @@ class TmdbEnrichmentRepository internal constructor(
 
         val language = locale.toTmdbLanguageTag()
 
-        val resolved = resolveTmdbIdAndType(normalizedContentId, imdbId, mediaTypeHint, language) ?: return null
+        val resolved = identityService.resolveTmdb(normalizedContentId, mediaTypeHint, language) ?: return null
         val tmdbId = resolved.tmdbId
         val mediaType = resolved.mediaType
 
@@ -148,7 +150,7 @@ class TmdbEnrichmentRepository internal constructor(
 
         val language = locale.toTmdbLanguageTag()
 
-        val resolved = resolveTmdbIdAndType(normalizedContentId, imdbId, mediaTypeHint, language) ?: return null
+        val resolved = identityService.resolveTmdb(normalizedContentId, mediaTypeHint, language) ?: return null
         val tmdbId = resolved.tmdbId
         val mediaType = resolved.mediaType
 
@@ -474,151 +476,9 @@ class TmdbEnrichmentRepository internal constructor(
         }
     }
 
-    private suspend fun resolveTmdbIdAndType(
-        normalizedContentId: String,
-        imdbId: String?,
-        hint: MetadataLabMediaType?,
-        language: String
-    ): ResolvedTmdb? {
-        val tmdbIdFromId = extractTmdbId(normalizedContentId)
-        if (tmdbIdFromId != null) {
-            if (hint != null) {
-                val details = fetchDetails(hint, tmdbIdFromId, language)
-                if (details != null) return ResolvedTmdb(tmdbIdFromId, hint)
-
-                val other =
-                    if (hint == MetadataLabMediaType.MOVIE) MetadataLabMediaType.SERIES else MetadataLabMediaType.MOVIE
-                val otherDetails = fetchDetails(other, tmdbIdFromId, language)
-                if (otherDetails != null) return ResolvedTmdb(tmdbIdFromId, other)
-                return null
-            }
-
-            // Suspenders: tmdb:<id> is ambiguous without a type hint (movie vs tv IDs can collide).
-            // Only accept the ID if exactly one namespace resolves.
-            val movieDetails = fetchDetails(MetadataLabMediaType.MOVIE, tmdbIdFromId, language)
-            val tvDetails = fetchDetails(MetadataLabMediaType.SERIES, tmdbIdFromId, language)
-            return when {
-                movieDetails != null && tvDetails == null -> ResolvedTmdb(tmdbIdFromId, MetadataLabMediaType.MOVIE)
-                tvDetails != null && movieDetails == null -> ResolvedTmdb(tmdbIdFromId, MetadataLabMediaType.SERIES)
-                else -> null
-            }
-        }
-
-        val imdb = imdbId ?: return null
-        val find =
-            client.getJson(
-                path = "find/$imdb",
-                query = mapOf(
-                    "external_source" to "imdb_id",
-                    "language" to language
-                )
-            ) ?: return null
-
-        fun firstId(arrayName: String): Int? {
-            val arr = find.optJSONArray(arrayName) ?: return null
-            return arr.optJSONObject(0)?.optInt("id")?.takeIf { it > 0 }
-        }
-
-        val movieId = firstId("movie_results")
-        val tvId = firstId("tv_results")
-        return when (hint) {
-            MetadataLabMediaType.MOVIE ->
-                movieId?.let { ResolvedTmdb(it, MetadataLabMediaType.MOVIE) }
-                    ?: tvId?.let { ResolvedTmdb(it, MetadataLabMediaType.SERIES) }
-            MetadataLabMediaType.SERIES ->
-                tvId?.let { ResolvedTmdb(it, MetadataLabMediaType.SERIES) }
-                    ?: movieId?.let { ResolvedTmdb(it, MetadataLabMediaType.MOVIE) }
-            null -> {
-                when {
-                    movieId != null && tvId == null -> ResolvedTmdb(movieId, MetadataLabMediaType.MOVIE)
-                    tvId != null && movieId == null -> ResolvedTmdb(tvId, MetadataLabMediaType.SERIES)
-                    else -> null
-                }
-            }
-        }
-    }
-
-    private data class ResolvedTmdb(
-        val tmdbId: Int,
-        val mediaType: MetadataLabMediaType
-    )
 }
 
-private fun MetadataLabMediaType.pathSegment(): String {
-    return when (this) {
-        MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES -> "tv"
-    }
-}
-
-private fun MetadataLabMediaType.toCatalogType(): String {
-    return when (this) {
-        MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES -> "series"
-    }
-}
-
-private fun Locale.toTmdbLanguageTag(): String {
-    val lang = language.trim().ifBlank { "en" }
-    val country = country.trim().takeIf { it.isNotBlank() }
-    return if (country != null) {
-        "$lang-${country.uppercase(Locale.US)}"
-    } else {
-        lang
-    }
-}
-
-private fun extractImdbId(input: String?): String? {
-    val raw = input?.trim().orEmpty()
-    if (raw.isBlank()) return null
-    if (raw.startsWith("tt", ignoreCase = true)) {
-        return raw.lowercase(Locale.US).takeIf { it.length >= 4 }
-    }
-    val match = Regex("tt\\d{4,}", RegexOption.IGNORE_CASE).find(raw) ?: return null
-    return match.value.lowercase(Locale.US)
-}
-
-private fun extractTmdbId(input: String?): Int? {
-    val raw = input?.trim().orEmpty()
-    if (raw.isBlank()) return null
-    val match =
-        Regex("\\btmdb:(?:movie:|tv:|show:)?(\\d+)", RegexOption.IGNORE_CASE)
-            .find(raw)
-            ?: return null
-    return match.groupValues.getOrNull(1)?.toIntOrNull()?.takeIf { it > 0 }
-}
-
-private fun JSONArray.toJsonObjectList(): List<JSONObject> {
-    if (length() == 0) return emptyList()
-    val out = ArrayList<JSONObject>(length())
-    for (i in 0 until length()) {
-        optJSONObject(i)?.let(out::add)
-    }
-    return out
-}
-
-private fun JSONObject.optStringNonBlank(key: String): String? {
-    if (!has(key) || isNull(key)) return null
-    val value = optString(key)
-    val trimmed = value.trim()
-    return trimmed.takeIf { it.isNotBlank() }
-}
-
-private fun JSONObject.optDoubleOrNull(key: String): Double? {
-    if (!has(key) || isNull(key)) return null
-    val value = opt(key)
-    return when (value) {
-        is Number -> value.toDouble()
-        is String -> value.toDoubleOrNull()
-        else -> null
-    }
-}
-
-private fun Double.formatVoteAverage(): String? {
-    if (!isFinite() || this <= 0.0) return null
-    val formatted = String.format(Locale.US, "%.1f", this)
-    return formatted.removeSuffix(".0")
-}
+private fun Double.formatVoteAverage(): String? = formatRating(this)
 
 private fun JSONObject.optIntOrNull(key: String): Int? {
     if (!has(key) || isNull(key)) return null

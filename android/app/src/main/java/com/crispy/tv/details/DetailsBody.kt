@@ -71,6 +71,7 @@ import com.crispy.tv.metadata.tmdb.TmdbProductionEntity
 import com.crispy.tv.metadata.tmdb.TmdbReview
 import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.metadata.tmdb.TmdbTitleDetails
+import com.crispy.tv.ratings.formatRatingOutOfTen
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -755,9 +756,7 @@ private fun buildRatings(
 }
 
 private fun formatTmdbRating(value: String): String {
-    val trimmed = value.trim()
-    if (trimmed.contains('/')) return trimmed
-    return "$trimmed/10"
+    return formatRatingOutOfTen(value) ?: value.trim()
 }
 
 @Composable

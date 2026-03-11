@@ -19,7 +19,8 @@ object TmdbEnrichmentRepositoryProvider {
             } else {
                 val appContext = context.applicationContext
                 val tmdbClient = TmdbJsonClientProvider.get(appContext)
-                TmdbEnrichmentRepository(tmdbClient).also { created ->
+                val identityService = TmdbServicesProvider.identityService(appContext)
+                TmdbEnrichmentRepository(tmdbClient, identityService).also { created ->
                     instance = created
                 }
             }

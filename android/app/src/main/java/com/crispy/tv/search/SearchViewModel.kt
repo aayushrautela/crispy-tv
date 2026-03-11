@@ -154,7 +154,7 @@ class SearchViewModel(
 
                 _uiState.value = state.copy(isLoading = true)
 
-                val languageTag = localeProvider().toTmdbLanguageTag()
+                val locale = localeProvider()
                 val results =
                     withContext(Dispatchers.IO) {
                         runCatching {
@@ -163,14 +163,14 @@ class SearchViewModel(
                                     searchRepository.search(
                                         query = request.query,
                                         filter = state.filter,
-                                        languageTag = languageTag
+                                        locale = locale,
                                     )
                                 }
                                 is SearchRequest.Genre -> {
                                     searchRepository.discoverByGenre(
                                         genreSuggestion = request.genreSuggestion,
                                         filter = state.filter,
-                                        languageTag = languageTag
+                                        locale = locale,
                                     )
                                 }
                                 SearchRequest.Idle -> emptyList()
@@ -200,12 +200,6 @@ class SearchViewModel(
         data class Text(val query: String) : SearchRequest
 
         data class Genre(val genreSuggestion: SearchGenreSuggestion) : SearchRequest
-    }
-
-    private fun Locale.toTmdbLanguageTag(): String? {
-        val language = language.trim().takeIf { it.isNotBlank() } ?: return null
-        val country = country.trim().takeIf { it.isNotBlank() }
-        return if (country == null) language else "$language-$country"
     }
 
     companion object {

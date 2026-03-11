@@ -28,6 +28,7 @@ import com.crispy.tv.domain.home.resolveHomeCatalogSource
 import com.crispy.tv.metadata.tmdb.TmdbApi
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
+import com.crispy.tv.ratings.formatRating
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
@@ -468,7 +469,7 @@ class HomeCatalogService(
 
         val posterUrl = TmdbApi.imageUrl(posterPath, size = "w500")
         val backdropUrl = TmdbApi.imageUrl(backdropPath, size = "w780")
-        val rating = formatVoteAverage(obj.optDoubleOrNull("vote_average"))
+        val rating = formatRating(obj.optDoubleOrNull("vote_average"))
 
         return CatalogItem(
             id = id,
@@ -510,13 +511,6 @@ class HomeCatalogService(
             is String -> raw.trim().toDoubleOrNull()
             else -> null
         }
-    }
-
-    private fun formatVoteAverage(value: Double?): String? {
-        val v = value ?: return null
-        if (!v.isFinite() || v <= 0.0) return null
-        val formatted = String.format(Locale.US, "%.1f", v)
-        return if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
     }
 
     private fun catalogCache(source: HomeCatalogSource): SupabaseCatalogCache {

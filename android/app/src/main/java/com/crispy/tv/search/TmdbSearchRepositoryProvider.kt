@@ -1,7 +1,7 @@
 package com.crispy.tv.search
 
 import android.content.Context
-import com.crispy.tv.metadata.tmdb.TmdbJsonClientProvider
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 
 object TmdbSearchRepositoryProvider {
     @Volatile
@@ -19,8 +19,8 @@ object TmdbSearchRepositoryProvider {
                 synchronizedExisting
             } else {
                 val appContext = context.applicationContext
-                val tmdbClient = TmdbJsonClientProvider.get(appContext)
-                TmdbSearchRepository(tmdbClient).also { created ->
+                val remoteDataSource = TmdbServicesProvider.searchRemoteDataSource(appContext)
+                TmdbSearchRepository(remoteDataSource).also { created ->
                     instance = created
                 }
             }

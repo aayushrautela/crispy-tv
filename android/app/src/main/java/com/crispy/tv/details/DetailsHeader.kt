@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.ratings.normalizeRatingText
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Date
@@ -472,7 +473,7 @@ private fun HeaderMetaRow(
     details: MediaDetails,
     palette: DetailsPaletteColors
 ) {
-    val rating = details.rating?.trim().takeIf { !it.isNullOrBlank() }
+    val rating = normalizeRatingText(details.rating)
     val certification = details.certification?.trim().takeIf { !it.isNullOrBlank() }
     val year = details.year?.trim().takeIf { !it.isNullOrBlank() }
     val runtime = formatRuntimeForHeader(details.runtime)

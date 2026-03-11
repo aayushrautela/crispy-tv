@@ -1,8 +1,7 @@
 package com.crispy.tv.metadata
 
 import android.content.Context
-import com.crispy.tv.BuildConfig
-import com.crispy.tv.network.AppHttp
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 
 object TmdbImdbIdResolverProvider {
     @Volatile
@@ -20,8 +19,8 @@ object TmdbImdbIdResolverProvider {
                 synchronizedExisting
             } else {
                 val appContext = context.applicationContext
-                val httpClient = AppHttp.client(appContext)
-                TmdbImdbIdResolver(apiKey = BuildConfig.TMDB_API_KEY, httpClient = httpClient).also { created ->
+                val identityService = TmdbServicesProvider.identityService(appContext)
+                TmdbImdbIdResolver(identityService = identityService).also { created ->
                     instance = created
                 }
             }
