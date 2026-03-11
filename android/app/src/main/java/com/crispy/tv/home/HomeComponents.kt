@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
@@ -62,6 +61,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -70,6 +71,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.crispy.tv.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.ui.components.rememberCrispyImageModel
@@ -707,7 +709,6 @@ private fun HomeCollectionCard(
     onCollectionClick: () -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
-    val firstMovie = sectionUi.items.firstOrNull()
     val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
     val artworkUrl =
         remember(sectionUi.items) {
@@ -715,9 +716,9 @@ private fun HomeCollectionCard(
                 item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
             }
         }
-    val artworkModel = rememberCrispyImageModel(artworkUrl, width = 320.dp, height = 152.dp, tmdbSize = "w780")
-    val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size) ?: "0 movies"
-    val supportingLabel =
+    val artworkModel = rememberCrispyImageModel(artworkUrl, width = 320.dp, height = 180.dp, tmdbSize = "w780")
+    val collectionTitle = remember(sectionUi.section.title) { collectionDisplayTitle(sectionUi.section.title) }
+    val fallbackText =
         when {
             sectionUi.isLoading && sectionUi.items.isEmpty() -> "Loading"
             showSubtitle && sectionUi.section.subtitle.isNotBlank() -> sectionUi.section.subtitle
@@ -727,32 +728,23 @@ private fun HomeCollectionCard(
 
     Card(
         modifier = Modifier
-            .width(320.dp)
-            .height(452.dp),
+            .width(320.dp),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .clickable(onClick = onCollectionClick)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(152.dp)
+                    .height(180.dp)
                     .clip(RoundedCornerShape(22.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                MaterialTheme.colorScheme.secondaryContainer,
-                                MaterialTheme.colorScheme.primaryContainer,
-                            )
-                        )
-                    )
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 if (artworkModel != null) {
                     AsyncImage(
@@ -769,73 +761,37 @@ private fun HomeCollectionCard(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color.Black.copy(alpha = 0.2f),
-                                    Color.Black.copy(alpha = 0.42f),
-                                    Color.Black.copy(alpha = 0.74f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.14f),
+                                    Color.Black.copy(alpha = 0.68f),
                                 )
                             )
                         )
                 )
 
-                Surface(
+                Text(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 20.dp),
-                    shape = RoundedCornerShape(26.dp),
-                    color = Color.Black.copy(alpha = 0.26f),
-                    shadowElevation = 8.dp,
-                ) {
-                    Text(
-                        text = sectionUi.section.title,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontFamily = FontFamily.Serif,
-                            lineHeight = 36.sp,
-                            letterSpacing = (-0.4).sp,
-                        ),
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp),
-                    shape = RoundedCornerShape(999.dp),
-                    color = Color.Black.copy(alpha = 0.24f),
-                ) {
-                    Text(
-                        text = movieCountLabel,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        maxLines = 1,
-                    )
-                }
+                        .align(Alignment.BottomStart)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    text = collectionTitle,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = homeCollectionTitleFontFamily,
+                        lineHeight = 26.sp,
+                    ),
+                    fontWeight = FontWeight.Normal,
+                    color = Color.White,
+                    textAlign = TextAlign.Start,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (supportingLabel.isNotBlank()) {
-                    Text(
-                        text = supportingLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                when {
-                    previewMovies.isNotEmpty() -> {
+            when {
+                previewMovies.isNotEmpty() -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         previewMovies.forEach { item ->
                             HomeCollectionMovieRow(
                                 item = item,
@@ -843,51 +799,26 @@ private fun HomeCollectionCard(
                             )
                         }
                     }
+                }
 
-                    sectionUi.isLoading -> {
+                sectionUi.isLoading -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         repeat(3) {
                             HomeCollectionMovieSkeletonRow()
                         }
                     }
-
-                    else -> {
-                        Text(
-                            text = supportingLabel.ifBlank { movieCountLabel },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-            ) {
-                FilledIconButton(
-                    onClick = { firstMovie?.let(onCollectionMovieClick) },
-                    enabled = firstMovie != null,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = "Play ${firstMovie?.title ?: sectionUi.section.title}",
-                    )
                 }
 
-                FilledIconButton(
-                    onClick = onCollectionClick,
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    ),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = "About ${sectionUi.section.title}",
+                else -> {
+                    Text(
+                        text = fallbackText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -907,10 +838,9 @@ private fun HomeCollectionMovieRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(12.dp))
             .combinedClickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.48f))
-            .padding(8.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -937,9 +867,10 @@ private fun HomeCollectionMovieRow(
         ) {
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
 
@@ -961,9 +892,7 @@ private fun HomeCollectionMovieSkeletonRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.28f))
-            .padding(8.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -993,12 +922,10 @@ private fun HomeCollectionMovieSkeletonRow() {
     }
 }
 
-private fun collectionMovieCountLabel(itemCount: Int): String? {
-    return when {
-        itemCount <= 0 -> null
-        itemCount == 1 -> "1 movie"
-        else -> "$itemCount movies"
-    }
+private fun collectionDisplayTitle(title: String): String {
+    val trimmedTitle = title.trim()
+    val simplifiedTitle = trimmedTitle.replace(Regex("\\s+collection$", RegexOption.IGNORE_CASE), "")
+    return simplifiedTitle.ifBlank { trimmedTitle }
 }
 
 private fun collectionMovieDetailText(item: CatalogItem): String {
@@ -1011,6 +938,17 @@ private fun collectionMovieDetailText(item: CatalogItem): String {
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
 private const val HOME_POSTER_SKELETON_COUNT = 5
+
+private val homeCollectionTitleFontFamily = FontFamily(
+    Font(
+        googleFont = GoogleFont("Roboto Flex"),
+        fontProvider = GoogleFont.Provider(
+            providerAuthority = "com.google.android.gms.fonts",
+            providerPackage = "com.google.android.gms",
+            certificates = R.array.com_google_android_gms_fonts_certs,
+        ),
+    )
+)
 
 @Composable
 private fun HomeRailPosterCard(

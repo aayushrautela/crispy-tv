@@ -189,6 +189,7 @@ dependencies {
 
     implementation(platform("androidx.compose:compose-bom:2026.01.00"))
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.5.0-alpha14")
     implementation("androidx.compose.material:material-icons-extended")
