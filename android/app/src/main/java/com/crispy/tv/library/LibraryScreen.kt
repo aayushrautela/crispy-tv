@@ -3,11 +3,10 @@ package com.crispy.tv.library
 import android.content.Context
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,27 +21,31 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Event
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -297,6 +300,7 @@ private fun LibraryScreen(
 ) {
     val selectedProvider = uiState.selectedSource.toProvider()
     val providerFolders = uiState.providerFolders.filter { folder -> folder.provider == selectedProvider }
+    val pullToRefreshState = rememberPullToRefreshState()
     val providerAuthenticated =
         when (uiState.selectedSource) {
             LibrarySource.LOCAL -> false
@@ -320,32 +324,45 @@ private fun LibraryScreen(
                     CrispyWordmark(Modifier.height(36.dp))
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToCalendar) {
+                        Icon(imageVector = Icons.Outlined.Event, contentDescription = "Calendar")
+                    }
                     ProfileIconButton(onClick = onProfileClick)
                 },
                 scrollBehavior = scrollBehavior
             )
         }
     ) { innerPadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 124.dp),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = pageHorizontalPadding,
-                top = innerPadding.calculateTopPadding() + 12.dp,
-                end = pageHorizontalPadding,
-                bottom = 12.dp + Dimensions.PageBottomPadding
-            ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            state = pullToRefreshState,
+            enabled = !uiState.isRefreshing,
+            indicator = {
+                LibraryPullToRefreshIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 124.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = pageHorizontalPadding,
+                    top = 12.dp,
+                    end = pageHorizontalPadding,
+                    bottom = 12.dp + Dimensions.PageBottomPadding
+                ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
                         LazyRow(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(providerFolders, key = { it.id }) { folder ->
@@ -356,166 +373,61 @@ private fun LibraryScreen(
                                 )
                             }
                         }
-                    } else {
-                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
-                    }
-
-                    IconButton(onClick = onNavigateToCalendar) {
-                        Icon(imageVector = Icons.Outlined.Event, contentDescription = "Calendar")
-                    }
-
-                    IconButton(onClick = onRefresh) {
-                        Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
                     }
                 }
-            }
-            if (uiState.statusMessage.isNotBlank()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = uiState.statusMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            when (uiState.selectedSource) {
-                LibrarySource.LOCAL -> {
-                    if (uiState.localEntries.isEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                    androidx.compose.foundation.layout.Column(
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Text(
-                                            text = "Nothing here yet",
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
-                                        Text(
-                                            text = "Start watching from Discover or Home and your recent local history will appear here.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        FilledTonalButton(onClick = onNavigateToDiscover) {
-                                            Text("Go to Discover")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            Text(text = "Recently watched", style = MaterialTheme.typography.titleMedium)
-                        }
-                        gridItems(
-                            items = uiState.localEntries,
-                            key = { entry -> "local:${entry.contentType}:${entry.contentId}:${entry.watchedAtEpochMs}" }
-                        ) { entry ->
-                            val tmdbArtwork by
-                                produceState(
-                                    initialValue = Pair<String?, String?>(null, null),
-                                    key1 = entry.contentId,
-                                    key2 = entry.contentType
-                                ) {
-                                    val rawId = entry.contentId.trim()
-                                    val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
-                                    if (!canResolve) {
-                                        value = null to null
-                                        return@produceState
-                                    }
-
-                                    val details =
-                                        runCatching {
-                                            tmdbEnrichmentRepository.loadArtwork(
-                                                rawId = rawId,
-                                                mediaTypeHint = entry.contentType
-                                            )
-                                        }.getOrNull()
-                                    value = details?.posterUrl to details?.backdropUrl
-                                }
-
-                            PosterCard(
-                                title = entry.title.ifBlank { entry.contentId },
-                                posterUrl = tmdbArtwork.first,
-                                backdropUrl = tmdbArtwork.second,
-                                rating = null,
-                                year = null,
-                                genre = null,
-                                modifier = Modifier.fillMaxWidth(),
-                                onClick = { onItemClick(entry) }
-                            )
-                        }
+                if (uiState.statusMessage.isNotBlank()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = uiState.statusMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 
-                LibrarySource.TRAKT,
-                LibrarySource.SIMKL -> {
-                    if (!providerAuthenticated) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                    Text(
-                                        text = "Connect ${uiState.selectedSource.name.lowercase().replaceFirstChar { it.uppercase() }} in Settings to load this provider.",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        if (providerItems.isEmpty()) {
+                when (uiState.selectedSource) {
+                    LibrarySource.LOCAL -> {
+                        if (uiState.localEntries.isEmpty()) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                val emptyMessage =
-                                    if (providerFolders.isEmpty()) {
-                                        "No provider library data available."
-                                    } else {
-                                        val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
-                                        "No items in $label yet."
-                                    }
                                 Card(modifier = Modifier.fillMaxWidth()) {
                                     Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                        Text(
-                                            text = emptyMessage,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
+                                        androidx.compose.foundation.layout.Column(
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Text(
+                                                text = "Nothing here yet",
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                            Text(
+                                                text = "Start watching from Discover or Home and your recent local history will appear here.",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            FilledTonalButton(onClick = onNavigateToDiscover) {
+                                                Text("Go to Discover")
+                                            }
+                                        }
                                     }
                                 }
                             }
                         } else {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Text(text = "Recently watched", style = MaterialTheme.typography.titleMedium)
+                            }
                             gridItems(
-                                items = providerItems,
-                                key = { item -> "${item.provider.name}:${item.folderId}:${item.contentType}:${item.contentId}:${item.addedAtEpochMs}" }
-                            ) { item ->
-                                val mapped =
-                                    WatchHistoryEntry(
-                                        contentId = item.contentId,
-                                        contentType = item.contentType,
-                                        title = item.title,
-                                        season = item.season,
-                                        episode = item.episode,
-                                        watchedAtEpochMs = item.addedAtEpochMs
-                                    )
-
-                                val providerPoster = item.posterUrl?.trim().takeIf { !it.isNullOrBlank() }
-                                val providerBackdrop = item.backdropUrl?.trim().takeIf { !it.isNullOrBlank() }
-
-                                val artwork by
+                                items = uiState.localEntries,
+                                key = { entry -> "local:${entry.contentType}:${entry.contentId}:${entry.watchedAtEpochMs}" }
+                            ) { entry ->
+                                val tmdbArtwork by
                                     produceState(
-                                        providerPoster to providerBackdrop,
-                                        item.contentId,
-                                        item.contentType,
-                                        providerPoster,
-                                        providerBackdrop
+                                        initialValue = Pair<String?, String?>(null, null),
+                                        key1 = entry.contentId,
+                                        key2 = entry.contentType
                                     ) {
-                                        if (!providerPoster.isNullOrBlank() && !providerBackdrop.isNullOrBlank()) {
-                                            value = providerPoster to providerBackdrop
-                                            return@produceState
-                                        }
-
-                                        val rawId = item.contentId.trim()
+                                        val rawId = entry.contentId.trim()
                                         val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
                                         if (!canResolve) {
-                                            value = providerPoster to providerBackdrop
+                                            value = null to null
                                             return@produceState
                                         }
 
@@ -523,30 +435,162 @@ private fun LibraryScreen(
                                             runCatching {
                                                 tmdbEnrichmentRepository.loadArtwork(
                                                     rawId = rawId,
-                                                    mediaTypeHint = item.contentType
+                                                    mediaTypeHint = entry.contentType
                                                 )
                                             }.getOrNull()
-
-                                        val poster = providerPoster ?: details?.posterUrl
-                                        val backdrop = providerBackdrop ?: details?.backdropUrl
-                                        value = poster to backdrop
+                                        value = details?.posterUrl to details?.backdropUrl
                                     }
 
                                 PosterCard(
-                                    title = item.title.ifBlank { item.contentId },
-                                    posterUrl = artwork.first,
-                                    backdropUrl = artwork.second,
+                                    title = entry.title.ifBlank { entry.contentId },
+                                    posterUrl = tmdbArtwork.first,
+                                    backdropUrl = tmdbArtwork.second,
                                     rating = null,
                                     year = null,
                                     genre = null,
                                     modifier = Modifier.fillMaxWidth(),
-                                    onClick = { onItemClick(mapped) }
+                                    onClick = { onItemClick(entry) }
                                 )
+                            }
+                        }
+                    }
+
+                    LibrarySource.TRAKT,
+                    LibrarySource.SIMKL -> {
+                        if (!providerAuthenticated) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Card(modifier = Modifier.fillMaxWidth()) {
+                                    Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                                        Text(
+                                            text = "Connect ${uiState.selectedSource.name.lowercase().replaceFirstChar { it.uppercase() }} in Settings to load this provider.",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            if (providerItems.isEmpty()) {
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    val emptyMessage =
+                                        if (providerFolders.isEmpty()) {
+                                            "No provider library data available."
+                                        } else {
+                                            val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
+                                            "No items in $label yet."
+                                        }
+                                    Card(modifier = Modifier.fillMaxWidth()) {
+                                        Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                                            Text(
+                                                text = emptyMessage,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                gridItems(
+                                    items = providerItems,
+                                    key = { item -> "${item.provider.name}:${item.folderId}:${item.contentType}:${item.contentId}:${item.addedAtEpochMs}" }
+                                ) { item ->
+                                    val mapped =
+                                        WatchHistoryEntry(
+                                            contentId = item.contentId,
+                                            contentType = item.contentType,
+                                            title = item.title,
+                                            season = item.season,
+                                            episode = item.episode,
+                                            watchedAtEpochMs = item.addedAtEpochMs
+                                        )
+
+                                    val providerPoster = item.posterUrl?.trim().takeIf { !it.isNullOrBlank() }
+                                    val providerBackdrop = item.backdropUrl?.trim().takeIf { !it.isNullOrBlank() }
+
+                                    val artwork by
+                                        produceState(
+                                            providerPoster to providerBackdrop,
+                                            item.contentId,
+                                            item.contentType,
+                                            providerPoster,
+                                            providerBackdrop
+                                        ) {
+                                            if (!providerPoster.isNullOrBlank() && !providerBackdrop.isNullOrBlank()) {
+                                                value = providerPoster to providerBackdrop
+                                                return@produceState
+                                            }
+
+                                            val rawId = item.contentId.trim()
+                                            val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
+                                            if (!canResolve) {
+                                                value = providerPoster to providerBackdrop
+                                                return@produceState
+                                            }
+
+                                            val details =
+                                                runCatching {
+                                                    tmdbEnrichmentRepository.loadArtwork(
+                                                        rawId = rawId,
+                                                        mediaTypeHint = item.contentType
+                                                    )
+                                                }.getOrNull()
+
+                                            val poster = providerPoster ?: details?.posterUrl
+                                            val backdrop = providerBackdrop ?: details?.backdropUrl
+                                            value = poster to backdrop
+                                        }
+
+                                    PosterCard(
+                                        title = item.title.ifBlank { item.contentId },
+                                        posterUrl = artwork.first,
+                                        backdropUrl = artwork.second,
+                                        rating = null,
+                                        year = null,
+                                        genre = null,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = { onItemClick(mapped) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun LibraryPullToRefreshIndicator(
+    state: PullToRefreshState,
+    isRefreshing: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val progress = state.distanceFraction.coerceIn(0f, 1f)
+    val scale = 0.72f + (progress * 0.28f)
+
+    Box(
+        modifier =
+            modifier
+                .padding(top = 12.dp)
+                .graphicsLayer {
+                    alpha = if (isRefreshing) 1f else progress
+                    scaleX = if (isRefreshing) 1f else scale
+                    scaleY = if (isRefreshing) 1f else scale
+                }
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = CircleShape
+                )
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isRefreshing) {
+            LoadingIndicator(modifier = Modifier.size(32.dp))
+        } else {
+            LoadingIndicator(
+                progress = { progress },
+                modifier = Modifier.size(32.dp)
+            )
         }
     }
 }
