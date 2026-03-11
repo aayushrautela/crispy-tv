@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -62,11 +63,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -653,7 +656,7 @@ internal fun HomeCatalogSectionRow(
 internal fun HomeCollectionSectionRow(
     sectionUis: List<HomeCatalogSectionUi>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
-    onCollectionPlayClick: (CatalogItem) -> Unit,
+    onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
     val visibleSections =
         remember(sectionUis) {
@@ -691,7 +694,7 @@ internal fun HomeCollectionSectionRow(
                     sectionUi = sectionUi,
                     showSubtitle = sharedSubtitle.isBlank(),
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
-                    onCollectionPlayClick = onCollectionPlayClick,
+                    onCollectionMovieClick = onCollectionMovieClick,
                 )
             }
         }
@@ -703,33 +706,36 @@ private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
     showSubtitle: Boolean,
     onCollectionClick: () -> Unit,
-    onCollectionPlayClick: (CatalogItem) -> Unit,
+    onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
     val firstMovie = sectionUi.items.firstOrNull()
+    val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
     val artworkUrl =
         remember(sectionUi.items) {
             sectionUi.items.firstNotNullOfOrNull { item ->
                 item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
             }
         }
-    val artworkModel = rememberCrispyImageModel(artworkUrl, width = 320.dp, height = 180.dp, tmdbSize = "w780")
+    val artworkModel = rememberCrispyImageModel(artworkUrl, width = 320.dp, height = 152.dp, tmdbSize = "w780")
     val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size) ?: "0 movies"
     val supportingLabel =
         when {
-            sectionUi.isLoading && sectionUi.items.isEmpty() -> "Loading collection"
+            sectionUi.isLoading && sectionUi.items.isEmpty() -> "Loading"
             showSubtitle && sectionUi.section.subtitle.isNotBlank() -> sectionUi.section.subtitle
             sectionUi.statusMessage.isNotBlank() -> sectionUi.statusMessage
-            else -> movieCountLabel
+            else -> ""
         }
 
     Card(
-        modifier = Modifier.width(320.dp),
+        modifier = Modifier
+            .width(320.dp)
+            .height(452.dp),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .clickable(onClick = onCollectionClick)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -737,7 +743,7 @@ private fun HomeCollectionCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(152.dp)
                     .clip(RoundedCornerShape(22.dp))
                     .background(
                         Brush.linearGradient(
@@ -772,74 +778,218 @@ private fun HomeCollectionCard(
                         )
                 )
 
-                Text(
-                    text = sectionUi.section.title,
+                Surface(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(horizontal = 20.dp),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    color = Color.Black.copy(alpha = 0.26f),
+                    shadowElevation = 8.dp,
                 ) {
-                    if (supportingLabel != movieCountLabel) {
-                        Text(
-                            text = supportingLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        text = sectionUi.section.title,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                        style = MaterialTheme.typography.displaySmall.copy(
+                            fontFamily = FontFamily.Serif,
+                            lineHeight = 36.sp,
+                            letterSpacing = (-0.4).sp,
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp),
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color.Black.copy(alpha = 0.24f),
+                ) {
                     Text(
                         text = movieCountLabel,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (supportingLabel.isNotBlank()) {
+                    Text(
+                        text = supportingLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FilledIconButton(
-                        onClick = { firstMovie?.let(onCollectionPlayClick) },
-                        enabled = firstMovie != null,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = "Open ${firstMovie?.title ?: sectionUi.section.title}",
-                        )
+                when {
+                    previewMovies.isNotEmpty() -> {
+                        previewMovies.forEach { item ->
+                            HomeCollectionMovieRow(
+                                item = item,
+                                onClick = { onCollectionMovieClick(item) },
+                            )
+                        }
                     }
 
-                    FilledIconButton(
-                        onClick = onCollectionClick,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Info,
-                            contentDescription = "View ${sectionUi.section.title}",
+                    sectionUi.isLoading -> {
+                        repeat(3) {
+                            HomeCollectionMovieSkeletonRow()
+                        }
+                    }
+
+                    else -> {
+                        Text(
+                            text = supportingLabel.ifBlank { movieCountLabel },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            ) {
+                FilledIconButton(
+                    onClick = { firstMovie?.let(onCollectionMovieClick) },
+                    enabled = firstMovie != null,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Play ${firstMovie?.title ?: sectionUi.section.title}",
+                    )
+                }
+
+                FilledIconButton(
+                    onClick = onCollectionClick,
+                    modifier = Modifier.size(48.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = "About ${sectionUi.section.title}",
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCollectionMovieRow(
+    item: CatalogItem,
+    onClick: () -> Unit,
+) {
+    val posterUrl = item.posterUrl?.takeIf { it.isNotBlank() } ?: item.backdropUrl?.takeIf { it.isNotBlank() }
+    val imageModel = rememberCrispyImageModel(posterUrl, width = 56.dp, height = 56.dp, tmdbSize = "w185")
+    val detailText = collectionMovieDetailText(item)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .combinedClickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.48f))
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (imageModel != null) {
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = item.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            if (detailText.isNotBlank()) {
+                Text(
+                    text = detailText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCollectionMovieSkeletonRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.28f))
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .skeletonElement(shape = RoundedCornerShape(12.dp), pulse = false)
+        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.72f)
+                    .height(16.dp)
+                    .skeletonElement(pulse = false)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.45f)
+                    .height(12.dp)
+                    .skeletonElement(pulse = false)
+            )
         }
     }
 }
@@ -850,6 +1000,14 @@ private fun collectionMovieCountLabel(itemCount: Int): String? {
         itemCount == 1 -> "1 movie"
         else -> "$itemCount movies"
     }
+}
+
+private fun collectionMovieDetailText(item: CatalogItem): String {
+    return buildList {
+        item.year?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+        item.genre?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+        item.rating?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+    }.joinToString(separator = " • ")
 }
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
