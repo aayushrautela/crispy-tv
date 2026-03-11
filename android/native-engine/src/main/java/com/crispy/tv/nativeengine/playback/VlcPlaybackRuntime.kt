@@ -89,8 +89,10 @@ internal class VlcPlaybackRuntime(
             override fun onSurfacesDestroyed(vlcVout: IVLCVout) {
                 Log.d(TAG, "vout surfacesDestroyed ${describeSurface(surfaceView)}")
             }
-
-            override fun onNewLayout(
+        }
+    private val videoLayoutListener =
+        object : IVLCVout.OnNewVideoLayoutListener {
+            override fun onNewVideoLayout(
                 vlcVout: IVLCVout,
                 width: Int,
                 height: Int,
@@ -151,7 +153,7 @@ internal class VlcPlaybackRuntime(
         applyBestFitScaling()
         mediaPlayer.vlcVout.setVideoView(view)
         mediaPlayer.vlcVout.addCallback(voutCallback)
-        mediaPlayer.vlcVout.attachViews()
+        mediaPlayer.vlcVout.attachViews(videoLayoutListener)
         viewsAttached = true
         updateWindowSize(view)
         Log.d(TAG, "attach complete ${describeSurface(view)}")
