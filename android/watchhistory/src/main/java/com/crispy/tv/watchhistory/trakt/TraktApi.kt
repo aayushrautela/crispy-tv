@@ -1,11 +1,6 @@
 package com.crispy.tv.watchhistory.trakt
 
-import android.content.SharedPreferences
 import android.util.Log
-import com.crispy.tv.watchhistory.KEY_TRAKT_EXPIRES_AT
-import com.crispy.tv.watchhistory.KEY_TRAKT_REFRESH_TOKEN
-import com.crispy.tv.watchhistory.KEY_TRAKT_TOKEN
-import com.crispy.tv.watchhistory.TRAKT_TOKEN_URL
 import com.crispy.tv.watchhistory.WatchHistoryHttp
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,36 +10,30 @@ import org.json.JSONObject
 
 internal class TraktApi(
     private val http: WatchHistoryHttp,
-    private val prefs: SharedPreferences,
     private val traktClientId: String,
-    private val traktClientSecret: String,
-    private val traktRedirectUri: String,
-    private val readSecret: (String) -> String,
-    private val writeEncrypted: (String, String?) -> Unit,
+    private val readAccessToken: () -> String?,
+    private val onTokenExpired: (suspend () -> String?)? = null,
     private val logTag: String = "TraktApi",
 ) {
-    private val refreshMutex = Mutex()
+    private val tokenRecoveryMutex = Mutex()
 
-    suspend fun ensureAccessToken(forceRefresh: Boolean = false): String? {
-        val currentToken = readSecret(KEY_TRAKT_TOKEN).trim().ifBlank { null } ?: return null
-        val refreshToken = readSecret(KEY_TRAKT_REFRESH_TOKEN).trim().ifBlank { null }
-        val expiresAt = prefs.getLong(KEY_TRAKT_EXPIRES_AT, -1L).takeIf { it > 0L }
-        val nowMs = System.currentTimeMillis()
-        val shouldRefresh =
-            forceRefresh ||
-                (expiresAt != null && refreshToken != null && nowMs >= (expiresAt - 60_000L))
+    private fun currentToken(): String? = readAccessToken()?.trim()?.ifBlank { null }
 
-        if (!shouldRefresh) return currentToken
+    /**
+     * Returns a valid access token, or null if no token is available.
+     * If [forceCloudPull] is true, delegates to [onTokenExpired] to pull a
+     * fresh token from the cloud (the server handles refresh).
+     */
+    suspend fun ensureAccessToken(forceCloudPull: Boolean = false): String? {
+        val token = currentToken() ?: return null
+        if (!forceCloudPull) return token
 
-        return refreshMutex.withLock {
-            val tokenAgain = readSecret(KEY_TRAKT_TOKEN).trim().ifBlank { null } ?: return@withLock null
-            val refreshAgain = readSecret(KEY_TRAKT_REFRESH_TOKEN).trim().ifBlank { null } ?: return@withLock tokenAgain
-            val expiresAgain = prefs.getLong(KEY_TRAKT_EXPIRES_AT, -1L).takeIf { it > 0L }
-            val refreshNow = forceRefresh || (expiresAgain != null && nowMs >= (expiresAgain - 60_000L))
-            if (!refreshNow) return@withLock tokenAgain
-
-            val refreshed = refreshAccessToken(refreshAgain)
-            refreshed ?: tokenAgain
+        return tokenRecoveryMutex.withLock {
+            // Re-check after acquiring the lock — another coroutine may have already recovered.
+            val recheck = currentToken() ?: return@withLock null
+            val callback = onTokenExpired ?: return@withLock recheck
+            val fresh = callback() ?: return@withLock recheck
+            fresh.trim().ifBlank { null } ?: recheck
         }
     }
 
@@ -54,9 +43,9 @@ internal class TraktApi(
         val response = http.getRaw(url = url, headers = headers(token)) ?: return null
 
         if (response.code == 401) {
-            val refreshed = ensureAccessToken(forceRefresh = true)
-            if (refreshed != null) {
-                val retry = http.getRaw(url = url, headers = headers(refreshed)) ?: return null
+            val recovered = ensureAccessToken(forceCloudPull = true)
+            if (recovered != null) {
+                val retry = http.getRaw(url = url, headers = headers(recovered)) ?: return null
                 if (retry.code in 200..299) return JSONArray(retry.body)
                 Log.w(logTag, "Trakt search retry failed: ${retry.code} $url")
                 return null
@@ -76,9 +65,9 @@ internal class TraktApi(
         val response = http.getRaw(url = url, headers = headers(token)) ?: return null
 
         if (response.code == 401) {
-            val refreshed = ensureAccessToken(forceRefresh = true)
-            if (refreshed != null) {
-                val retry = http.getRaw(url = url, headers = headers(refreshed)) ?: return null
+            val recovered = ensureAccessToken(forceCloudPull = true)
+            if (recovered != null) {
+                val retry = http.getRaw(url = url, headers = headers(recovered)) ?: return null
                 if (retry.code in 200..299) return JSONArray(retry.body)
                 Log.w(logTag, "Trakt GET retry failed: ${retry.code} $url")
                 return null
@@ -98,9 +87,9 @@ internal class TraktApi(
         val response = http.getRaw(url = url, headers = headers(token)) ?: return null
 
         if (response.code == 401) {
-            val refreshed = ensureAccessToken(forceRefresh = true)
-            if (refreshed != null) {
-                val retry = http.getRaw(url = url, headers = headers(refreshed)) ?: return null
+            val recovered = ensureAccessToken(forceCloudPull = true)
+            if (recovered != null) {
+                val retry = http.getRaw(url = url, headers = headers(recovered)) ?: return null
                 if (retry.code in 200..299) return JSONObject(retry.body)
                 Log.w(logTag, "Trakt GET retry failed: ${retry.code} $url")
                 return null
@@ -120,9 +109,9 @@ internal class TraktApi(
         val response = http.postJsonRaw(url = url, headers = jsonHeaders(token), payload = payload) ?: return false
 
         if (response.code == 401) {
-            val refreshed = ensureAccessToken(forceRefresh = true)
-            if (refreshed != null) {
-                val retry = http.postJsonRaw(url = url, headers = jsonHeaders(refreshed), payload = payload) ?: return false
+            val recovered = ensureAccessToken(forceCloudPull = true)
+            if (recovered != null) {
+                val retry = http.postJsonRaw(url = url, headers = jsonHeaders(recovered), payload = payload) ?: return false
                 return retry.code in 200..299
             }
         }
@@ -131,7 +120,7 @@ internal class TraktApi(
     }
 
     suspend fun postRaw(path: String, payload: JSONObject): CrispyHttpResponse? {
-        return postRawInternal(path = path, payload = payload, forceRefreshToken = false)
+        return postRawInternal(path = path, payload = payload, forceCloudPull = false)
     }
 
     suspend fun delete(path: String): Boolean {
@@ -140,9 +129,9 @@ internal class TraktApi(
         val response = http.deleteRaw(url = url, headers = headers(token)) ?: return false
 
         if (response.code == 401) {
-            val refreshed = ensureAccessToken(forceRefresh = true)
-            if (refreshed != null) {
-                val retry = http.deleteRaw(url = url, headers = headers(refreshed)) ?: return false
+            val recovered = ensureAccessToken(forceCloudPull = true)
+            if (recovered != null) {
+                val retry = http.deleteRaw(url = url, headers = headers(recovered)) ?: return false
                 return retry.code in 200..299 || retry.code == 404
             }
         }
@@ -150,13 +139,13 @@ internal class TraktApi(
         return response.code in 200..299 || response.code == 404
     }
 
-    private suspend fun postRawInternal(path: String, payload: JSONObject, forceRefreshToken: Boolean): CrispyHttpResponse? {
-        val token = ensureAccessToken(forceRefresh = forceRefreshToken) ?: return null
+    private suspend fun postRawInternal(path: String, payload: JSONObject, forceCloudPull: Boolean): CrispyHttpResponse? {
+        val token = ensureAccessToken(forceCloudPull = forceCloudPull) ?: return null
         val url = "https://api.trakt.tv$path"
         val response = http.postJsonRaw(url = url, headers = jsonHeaders(token), payload = payload) ?: return null
 
-        if (response.code == 401 && !forceRefreshToken) {
-            return postRawInternal(path = path, payload = payload, forceRefreshToken = true)
+        if (response.code == 401 && !forceCloudPull) {
+            return postRawInternal(path = path, payload = payload, forceCloudPull = true)
         }
 
         return response
@@ -180,45 +169,5 @@ internal class TraktApi(
         val base = headers(accessToken).toMutableMap()
         base["Content-Type"] = "application/json"
         return base
-    }
-
-    private suspend fun refreshAccessToken(refreshToken: String): String? {
-        val payload =
-            JSONObject()
-                .put("refresh_token", refreshToken)
-                .put("client_id", traktClientId)
-                .put("client_secret", traktClientSecret)
-                .put("redirect_uri", traktRedirectUri)
-                .put("grant_type", "refresh_token")
-
-        val response =
-            http.postJsonForObject(
-                url = TRAKT_TOKEN_URL,
-                headers = mapOf("Content-Type" to "application/json", "Accept" to "application/json"),
-                payload = payload
-            ) ?: return null
-
-        val accessToken = response.optString("access_token").trim()
-        if (accessToken.isBlank()) {
-            Log.w(logTag, "Trakt token refresh response missing access_token")
-            return null
-        }
-
-        val newRefreshToken = response.optString("refresh_token").trim().ifBlank { null }
-        val expiresInSeconds = response.optLong("expires_in", -1L)
-        val expiresAtEpochMs =
-            if (expiresInSeconds > 0L) System.currentTimeMillis() + (expiresInSeconds * 1000L) else null
-
-        writeEncrypted(KEY_TRAKT_TOKEN, accessToken)
-        writeEncrypted(KEY_TRAKT_REFRESH_TOKEN, newRefreshToken)
-        prefs.edit().apply {
-            if (expiresAtEpochMs != null && expiresAtEpochMs > 0L) {
-                putLong(KEY_TRAKT_EXPIRES_AT, expiresAtEpochMs)
-            } else {
-                remove(KEY_TRAKT_EXPIRES_AT)
-            }
-        }.apply()
-
-        return accessToken
     }
 }

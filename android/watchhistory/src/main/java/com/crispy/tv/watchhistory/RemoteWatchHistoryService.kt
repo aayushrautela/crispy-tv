@@ -54,6 +54,7 @@ class RemoteWatchHistoryService(
     private val simklClientId: String,
     private val episodeListProvider: EpisodeListProvider,
     private val config: WatchHistoryConfig = WatchHistoryConfig(),
+    private val onTraktTokenExpired: (suspend () -> String?)? = null,
 ) : WatchHistoryService {
     private val appContext = context.applicationContext
     private val traktClientSecret = config.traktClientSecret
@@ -83,12 +84,9 @@ class RemoteWatchHistoryService(
     private val traktApi =
         TraktApi(
             http = http,
-            prefs = sessionStore.prefs,
             traktClientId = traktClientId,
-            traktClientSecret = traktClientSecret,
-            traktRedirectUri = traktRedirectUri,
-            readSecret = sessionStore::readSecret,
-            writeEncrypted = sessionStore::writeEncryptedSecret,
+            readAccessToken = { sessionStore.traktAccessToken() },
+            onTokenExpired = onTraktTokenExpired,
         )
     private val traktScrobbleService = TraktScrobbleService(traktApi = traktApi)
 

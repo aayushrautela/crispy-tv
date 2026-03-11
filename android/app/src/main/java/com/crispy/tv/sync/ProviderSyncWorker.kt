@@ -4,7 +4,10 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.WatchProvider
 
 class ProviderSyncWorker(
@@ -14,6 +17,25 @@ class ProviderSyncWorker(
 
     override suspend fun doWork(): Result {
         val watchHistory = PlaybackDependencies.watchHistoryServiceFactory(applicationContext)
+
+        // Pull cloud profile data (including provider auth) so this device has
+        // the latest Trakt/Simkl tokens before checking auth state.
+        try {
+            val supabase = SupabaseAccountClient(
+                appContext = applicationContext,
+                httpClient = AppHttp.client(applicationContext),
+                supabaseUrl = BuildConfig.SUPABASE_URL,
+                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
+            )
+            val cloudSync = ProfileDataCloudSync(
+                context = applicationContext,
+                supabase = supabase,
+                watchHistoryService = watchHistory
+            )
+            cloudSync.pullForActiveProfile()
+        } catch (e: Exception) {
+            Log.w(TAG, "Profile data pull failed, continuing with local auth", e)
+        }
 
         val auth = runCatching { watchHistory.authState() }
             .onFailure { Log.w(TAG, "Provider sync: authState failed", it) }

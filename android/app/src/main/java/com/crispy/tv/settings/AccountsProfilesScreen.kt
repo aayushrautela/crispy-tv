@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.metadata.MetadataAddonRegistry
@@ -572,11 +573,13 @@ internal class AccountsProfilesViewModel(
                             supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
                         )
                     val profileStore = ActiveProfileStore(safeContext)
+                    val watchHistory = PlaybackDependencies.watchHistoryServiceFactory(safeContext)
                     val profileDataCloudSync =
                         ProfileDataCloudSync(
                             context = safeContext,
                             supabase = supabase,
-                            activeProfileStore = profileStore
+                            activeProfileStore = profileStore,
+                            watchHistoryService = watchHistory
                         )
                     val addonRegistry = MetadataAddonRegistry(safeContext, BuildConfig.METADATA_ADDON_URLS)
                     val householdAddonsCloudSync = HouseholdAddonsCloudSync(supabase, addonRegistry)

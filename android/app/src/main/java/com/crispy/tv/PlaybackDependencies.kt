@@ -1,6 +1,7 @@
 package com.crispy.tv
 
 import android.content.Context
+import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.metadata.TmdbEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
@@ -17,6 +18,7 @@ import com.crispy.tv.player.CoreDomainMetadataLabResolver
 import com.crispy.tv.player.MetadataLabResolver
 import com.crispy.tv.player.SupabaseSyncLabService
 import com.crispy.tv.player.WatchHistoryService
+import com.crispy.tv.sync.ProfileDataCloudSync
 
 interface TorrentResolver {
     suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String
@@ -59,7 +61,8 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val episodeListProvider = TmdbEpisodeListProvider(
         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
     )
-    return RemoteWatchHistoryService(
+    lateinit var service: RemoteWatchHistoryService
+    service = RemoteWatchHistoryService(
         context = appContext,
         httpClient = httpClient,
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
@@ -72,8 +75,28 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
                 simklClientSecret = BuildConfig.SIMKL_CLIENT_SECRET,
                 simklRedirectUri = BuildConfig.SIMKL_REDIRECT_URI,
                 appVersion = BuildConfig.VERSION_NAME,
-            )
+            ),
+        onTraktTokenExpired = {
+            try {
+                val supabase = SupabaseAccountClient(
+                    appContext = appContext,
+                    httpClient = AppHttp.client(appContext),
+                    supabaseUrl = BuildConfig.SUPABASE_URL,
+                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
+                )
+                val cloudSync = ProfileDataCloudSync(
+                    context = appContext,
+                    supabase = supabase,
+                    watchHistoryService = service
+                )
+                cloudSync.pullForActiveProfile()
+                service.authState().traktSession?.accessToken
+            } catch (_: Exception) {
+                null
+            }
+        },
     )
+    return service
 }
 
 private fun newSupabaseSyncService(
