@@ -25,12 +25,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -651,6 +653,7 @@ internal fun HomeCatalogSectionRow(
 internal fun HomeCollectionSectionRow(
     sectionUis: List<HomeCatalogSectionUi>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
 ) {
     val visibleSections =
         remember(sectionUis) {
@@ -688,6 +691,7 @@ internal fun HomeCollectionSectionRow(
                     sectionUi = sectionUi,
                     showSubtitle = sharedSubtitle.isBlank(),
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
+                    onCollectionPlayClick = onCollectionPlayClick,
                 )
             }
         }
@@ -699,90 +703,142 @@ private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
     showSubtitle: Boolean,
     onCollectionClick: () -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
 ) {
+    val firstMovie = sectionUi.items.firstOrNull()
     val artworkUrl =
         remember(sectionUi.items) {
             sectionUi.items.firstNotNullOfOrNull { item ->
                 item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
             }
         }
-    val artworkModel = rememberCrispyImageModel(artworkUrl, width = 236.dp, height = 295.dp, tmdbSize = "w500")
+    val artworkModel = rememberCrispyImageModel(artworkUrl, width = 320.dp, height = 180.dp, tmdbSize = "w780")
     val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size) ?: "0 movies"
+    val supportingLabel =
+        when {
+            sectionUi.isLoading && sectionUi.items.isEmpty() -> "Loading collection"
+            showSubtitle && sectionUi.section.subtitle.isNotBlank() -> sectionUi.section.subtitle
+            sectionUi.statusMessage.isNotBlank() -> sectionUi.statusMessage
+            else -> movieCountLabel
+        }
 
-    Card(modifier = Modifier.width(236.dp).clickable(onClick = onCollectionClick)) {
-        Box(
+    Card(
+        modifier = Modifier.width(320.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(4f / 5f)
+                .clickable(onClick = onCollectionClick)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (artworkModel != null) {
-                AsyncImage(
-                    model = artworkModel,
-                    contentDescription = sectionUi.section.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            }
-
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .fillMaxHeight(0.48f)
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(22.dp))
                     .background(
-                        Brush.verticalGradient(
+                        Brush.linearGradient(
                             colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.16f),
-                                Color.Black.copy(alpha = 0.82f),
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                MaterialTheme.colorScheme.secondaryContainer,
+                                MaterialTheme.colorScheme.primaryContainer,
                             )
                         )
                     )
-            )
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (showSubtitle && sectionUi.section.subtitle.isNotBlank()) {
+                if (artworkModel != null) {
+                    AsyncImage(
+                        model = artworkModel,
+                        contentDescription = sectionUi.section.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.2f),
+                                    Color.Black.copy(alpha = 0.42f),
+                                    Color.Black.copy(alpha = 0.74f),
+                                )
+                            )
+                        )
+                )
+
+                Text(
+                    text = sectionUi.section.title,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 20.dp),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (supportingLabel != movieCountLabel) {
+                        Text(
+                            text = supportingLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
                     Text(
-                        text = sectionUi.section.subtitle,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.82f),
+                        text = movieCountLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
 
-                Text(
-                    text = sectionUi.section.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilledIconButton(
+                        onClick = { firstMovie?.let(onCollectionPlayClick) },
+                        enabled = firstMovie != null,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = "Open ${firstMovie?.title ?: sectionUi.section.title}",
+                        )
+                    }
 
-                Text(
-                    text = if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
-                        "Loading collection"
-                    } else {
-                        movieCountLabel
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.82f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                    FilledIconButton(
+                        onClick = onCollectionClick,
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = "View ${sectionUi.section.title}",
+                        )
+                    }
+                }
             }
         }
     }

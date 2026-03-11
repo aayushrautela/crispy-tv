@@ -49,6 +49,7 @@ internal fun HomeRoute(
     onThisWeekSeeAllClick: () -> Unit,
     onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
 ) {
     val context = LocalContext.current
@@ -82,6 +83,7 @@ internal fun HomeRoute(
         onThisWeekSeeAllClick = onThisWeekSeeAllClick,
         onProfileClick = onProfileClick,
         onCatalogItemClick = onCatalogItemClick,
+        onCollectionPlayClick = onCollectionPlayClick,
         onCatalogSeeAllClick = onCatalogSeeAllClick,
     )
 }
@@ -108,6 +110,7 @@ private fun HomeScreen(
     onThisWeekSeeAllClick: () -> Unit,
     onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -193,6 +196,7 @@ private fun HomeScreen(
                     HomeCollectionSectionsItem(
                         collectionSectionUisState = collectionSectionUisState,
                         onCollectionClick = onCatalogSeeAllClick,
+                        onCollectionPlayClick = onCollectionPlayClick,
                     )
                 }
 
@@ -361,11 +365,13 @@ private fun HomeCatalogSectionItem(
 private fun HomeCollectionSectionsItem(
     collectionSectionUisState: StateFlow<List<HomeCatalogSectionUi>>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
 ) {
     val sectionUis by collectionSectionUisState.collectAsStateWithLifecycle()
     HomeCollectionSectionRow(
         sectionUis = sectionUis,
         onCollectionClick = onCollectionClick,
+        onCollectionPlayClick = onCollectionPlayClick,
     )
 }
 
