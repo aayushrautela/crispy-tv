@@ -21,7 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,13 +29,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 
@@ -72,15 +72,15 @@ fun CatalogRoute(
         }
     ) { innerPadding ->
         PullToRefreshBox(
-            isRefreshing = pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount > 0,
+            isRefreshing = pagingItems.loadState.refresh is LoadState.Loading,
             onRefresh = { pagingItems.refresh() },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
             state = pullToRefreshState,
             indicator = {
-                PullToRefreshDefaults.LoadingIndicator(
+                Indicator(
                     state = pullToRefreshState,
-                    isRefreshing = pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount > 0,
-                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+                    isRefreshing = pagingItems.loadState.refresh is LoadState.Loading,
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             },
         ) {
@@ -92,9 +92,9 @@ fun CatalogRoute(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding,
-                        top = 12.dp + innerPadding.calculateTopPadding(),
+                        top = 12.dp,
                         end = pageHorizontalPadding,
-                        bottom = 12.dp + innerPadding.calculateBottomPadding(),
+                        bottom = 12.dp + Dimensions.PageBottomPadding,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)

@@ -32,9 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,7 +49,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -85,7 +81,6 @@ fun PersonDetailsRoute(
         uiState = uiState,
         onBack = onBack,
         onItemClick = onItemClick,
-        onRefresh = viewModel::refresh,
     )
 }
 
@@ -94,10 +89,8 @@ private fun PersonDetailsScreen(
     uiState: PersonDetailsUiState,
     onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
-    onRefresh: () -> Unit,
 ) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val pullToRefreshState = rememberPullToRefreshState()
     val scrollTopBarAlpha by remember {
         androidx.compose.runtime.derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) {
@@ -117,39 +110,25 @@ private fun PersonDetailsScreen(
         )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        PullToRefreshBox(
-            isRefreshing = uiState.isLoading && uiState.person != null,
-            onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize(),
-            state = pullToRefreshState,
-            indicator = {
-                PullToRefreshDefaults.LoadingIndicator(
-                    state = pullToRefreshState,
-                    isRefreshing = uiState.isLoading && uiState.person != null,
-                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+        when {
+            uiState.isLoading && uiState.person == null -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator()
+                }
+            }
+
+            uiState.person != null -> {
+                PersonDetailsContent(
+                    person = uiState.person,
+                    onItemClick = onItemClick,
+                    listState = listState,
+                    modifier = Modifier.fillMaxSize(),
                 )
-            },
-        ) {
-            when {
-                uiState.isLoading && uiState.person == null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        androidx.compose.material3.CircularProgressIndicator()
-                    }
-                }
+            }
 
-                uiState.person != null -> {
-                    PersonDetailsContent(
-                        person = uiState.person,
-                        onItemClick = onItemClick,
-                        listState = listState,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                else -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(uiState.errorMessage ?: "Something went wrong")
-                    }
+            else -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(uiState.errorMessage ?: "Something went wrong")
                 }
             }
         }

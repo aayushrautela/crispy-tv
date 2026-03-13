@@ -36,7 +36,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -49,7 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -412,13 +411,13 @@ private fun DiscoverScreen(
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
             state = pullToRefreshState,
             indicator = {
-                PullToRefreshDefaults.LoadingIndicator(
+                Indicator(
                     state = pullToRefreshState,
                     isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             },
         ) {
@@ -427,9 +426,9 @@ private fun DiscoverScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = pageHorizontalPadding,
-                    top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
+                    top = Dimensions.SmallSpacing,
                     end = pageHorizontalPadding,
-                    bottom = innerPadding.calculateBottomPadding() + Dimensions.PageBottomPadding,
+                    bottom = Dimensions.PageBottomPadding,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),

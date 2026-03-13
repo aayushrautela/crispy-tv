@@ -23,9 +23,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,7 +41,6 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -135,7 +131,6 @@ internal fun DetailsScreen(
 
     val detailsScheme = lockedScheme ?: theming.colorScheme
     val palette = remember(detailsScheme) { detailsPaletteFromScheme(detailsScheme) }
-    val pullToRefreshState = rememberPullToRefreshState()
 
     val selectedTrailer =
         uiState.tmdbEnrichment
@@ -212,86 +207,68 @@ internal fun DetailsScreen(
 
     MaterialTheme(colorScheme = detailsScheme) {
         Box(modifier = Modifier.fillMaxSize()) {
-            PullToRefreshBox(
-                isRefreshing = visibleUiState.isLoading && visibleDetails != null,
-                onRefresh = {
-                    if (!visibleUiState.isLoading) {
-                        onRetry()
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-                state = pullToRefreshState,
-                indicator = {
-                    PullToRefreshDefaults.LoadingIndicator(
-                        state = pullToRefreshState,
-                        isRefreshing = visibleUiState.isLoading && visibleDetails != null,
-                        modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
-                    )
-                },
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .navigationBarsPadding(),
+                state = listState,
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .navigationBarsPadding(),
-                    state = listState
-                ) {
-                    item {
-                        HeroSection(
-                            details = details,
-                            palette = palette,
-                            trailerKey = trailerKey,
-                            showTrailer = showTrailer,
-                            isTrailerPlaying = isTrailerPlaying,
-                            isTrailerMuted = userMutedTrailer,
-                            onToggleTrailer = {
-                                if (!trailerKey.isNullOrBlank()) {
-                                    if (!showTrailer) {
-                                        showTrailer = true
-                                        userPausedTrailer = false
-                                    } else {
-                                        userPausedTrailer = !userPausedTrailer
-                                    }
+                item {
+                    HeroSection(
+                        details = details,
+                        palette = palette,
+                        trailerKey = trailerKey,
+                        showTrailer = showTrailer,
+                        isTrailerPlaying = isTrailerPlaying,
+                        isTrailerMuted = userMutedTrailer,
+                        onToggleTrailer = {
+                            if (!trailerKey.isNullOrBlank()) {
+                                if (!showTrailer) {
+                                    showTrailer = true
+                                    userPausedTrailer = false
+                                } else {
+                                    userPausedTrailer = !userPausedTrailer
                                 }
-                            },
-                            onToggleTrailerMute = {
-                                onTrailerMutedChanged(!userMutedTrailer)
                             }
-                        )
-                    }
+                        },
+                        onToggleTrailerMute = {
+                            onTrailerMutedChanged(!userMutedTrailer)
+                        },
+                    )
+                }
 
-                    item {
-                        HeaderInfoSection(
-                            details = visibleDetails,
-                            isInWatchlist = visibleUiState.isInWatchlist,
-                            isWatched = visibleUiState.isWatched,
-                            isRated = visibleUiState.isRated,
-                            userRating = visibleUiState.userRating,
-                            isMutating = visibleUiState.isMutating,
-                            palette = palette,
-                            watchCta = visibleUiState.watchCta,
-                            showAiInsights = visibleUiState.aiMode != AiInsightsMode.OFF,
-                            aiInsightsEnabled = visibleUiState.aiConfigured,
-                            aiInsightsIsLoading = visibleUiState.aiIsLoading,
-                            onAiInsightsClick = onAiInsightsClick,
-                            onWatchNow = onOpenStreamSelector,
-                            onToggleWatchlist = onToggleWatchlist,
-                            onToggleWatched = onToggleWatched,
-                            onSetRating = onSetRating
-                        )
-                    }
+                item {
+                    HeaderInfoSection(
+                        details = visibleDetails,
+                        isInWatchlist = visibleUiState.isInWatchlist,
+                        isWatched = visibleUiState.isWatched,
+                        isRated = visibleUiState.isRated,
+                        userRating = visibleUiState.userRating,
+                        isMutating = visibleUiState.isMutating,
+                        palette = palette,
+                        watchCta = visibleUiState.watchCta,
+                        showAiInsights = visibleUiState.aiMode != AiInsightsMode.OFF,
+                        aiInsightsEnabled = visibleUiState.aiConfigured,
+                        aiInsightsIsLoading = visibleUiState.aiIsLoading,
+                        onAiInsightsClick = onAiInsightsClick,
+                        onWatchNow = onOpenStreamSelector,
+                        onToggleWatchlist = onToggleWatchlist,
+                        onToggleWatched = onToggleWatched,
+                        onSetRating = onSetRating,
+                    )
+                }
 
-                    item {
-                        DetailsBody(
-                            uiState = visibleUiState,
-                            onRetry = onRetry,
-                            onSeasonSelected = onSeasonSelected,
-                            onItemClick = onItemClick,
-                            onPersonClick = onPersonClick,
-                            onEpisodeClick = onEpisodeClick,
-                            onToggleEpisodeWatched = onToggleEpisodeWatched,
-                        )
-                    }
+                item {
+                    DetailsBody(
+                        uiState = visibleUiState,
+                        onRetry = onRetry,
+                        onSeasonSelected = onSeasonSelected,
+                        onItemClick = onItemClick,
+                        onPersonClick = onPersonClick,
+                        onEpisodeClick = onEpisodeClick,
+                        onToggleEpisodeWatched = onToggleEpisodeWatched,
+                    )
                 }
             }
 

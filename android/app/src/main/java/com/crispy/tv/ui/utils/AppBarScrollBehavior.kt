@@ -3,6 +3,7 @@ package com.crispy.tv.ui.utils
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,7 +20,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 fun appBarScrollBehavior(
     state: TopAppBarState = rememberTopAppBarState(),
     canScroll: () -> Boolean = { true },
-    snapAnimationSpec: AnimationSpec<Float>? = spring(),
+    snapAnimationSpec: AnimationSpec<Float>? = spring(stiffness = Spring.StiffnessMediumLow),
     flingAnimationSpec: DecayAnimationSpec<Float>? = rememberSplineBasedDecay(),
 ): TopAppBarScrollBehavior {
     return PostScrollTopAppBarScrollBehavior(

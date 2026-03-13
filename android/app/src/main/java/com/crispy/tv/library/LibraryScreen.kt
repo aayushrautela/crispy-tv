@@ -27,7 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -35,9 +35,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +58,7 @@ import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -531,8 +532,10 @@ private fun LibraryScreen(
             .filter { item -> selectedFolder == null || item.item.folderId == selectedFolder }
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
+    val scrollBehavior = appBarScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
                 title = { CrispyWordmark(Modifier.height(36.dp)) },
@@ -542,19 +545,20 @@ private fun LibraryScreen(
                     }
                     ProfileIconButton(onClick = onProfileClick)
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { innerPadding ->
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
             state = pullToRefreshState,
             indicator = {
-                PullToRefreshDefaults.LoadingIndicator(
+                Indicator(
                     state = pullToRefreshState,
                     isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             },
         ) {
@@ -563,9 +567,9 @@ private fun LibraryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = pageHorizontalPadding,
-                    top = innerPadding.calculateTopPadding() + 12.dp,
+                    top = 12.dp,
                     end = pageHorizontalPadding,
-                    bottom = innerPadding.calculateBottomPadding() + 12.dp + Dimensions.PageBottomPadding,
+                    bottom = 12.dp + Dimensions.PageBottomPadding,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),

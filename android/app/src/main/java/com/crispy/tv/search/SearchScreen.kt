@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -30,45 +31,36 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.foundation.layout.height
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.PosterCard
-import com.crispy.tv.ui.components.ProfileIconButton
-import com.crispy.tv.ui.brand.CrispyWordmark
 
 @Composable
 fun SearchRoute(
-    onProfileClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -88,13 +80,12 @@ fun SearchRoute(
         onFilterChange = viewModel::setFilter,
         onGenreSuggestionClick = viewModel::selectGenreSuggestion,
         onClearGenreSuggestion = viewModel::clearGenreSuggestion,
-        onProfileClick = onProfileClick,
         onItemClick = onItemClick
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun SearchScreen(
     uiState: SearchUiState,
     onQueryChange: (String) -> Unit,
@@ -102,128 +93,158 @@ private fun SearchScreen(
     onFilterChange: (SearchTypeFilter) -> Unit,
     onGenreSuggestionClick: (SearchGenreSuggestion) -> Unit,
     onClearGenreSuggestion: () -> Unit,
-    onProfileClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val activeGenreSuggestion = uiState.activeGenreSuggestion
     val filters = SearchTypeFilter.entries
     val genreSuggestions = SearchGenreSuggestion.entries
+    var expanded by rememberSaveable { mutableStateOf(true) }
 
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = {
-                    CrispyWordmark(Modifier.height(36.dp))
-                },
-                actions = {
-                    ProfileIconButton(onClick = onProfileClick)
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
-    ) { innerPadding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 124.dp),
-            modifier = Modifier.fillMaxSize().imePadding(),
-            contentPadding =
-                PaddingValues(
-                    start = pageHorizontalPadding,
-                    end = pageHorizontalPadding,
-                    top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
-                    bottom = Dimensions.PageBottomPadding
-                ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                CustomSearchBar(
-                    query = uiState.query,
-                    onQueryChange = onQueryChange,
-                    onClearQuery = onClearQuery
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics { isTraversalGroup = true }
+    ) {
+        SearchBar(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter),
+            query = uiState.query,
+            onQueryChange = {
+                expanded = true
+                onQueryChange(it)
+            },
+            onSearch = { expanded = true },
+            active = expanded,
+            onActiveChange = { expanded = it },
+            placeholder = {
+                Text("Search movies, shows, and people")
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null
                 )
-            }
-
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filters, key = { it.name }) { filter ->
-                        FilterChip(
-                            selected = uiState.filter == filter,
-                            onClick = { onFilterChange(filter) },
-                            label = { Text(filter.label) }
+            },
+            trailingIcon = {
+                if (uiState.query.isNotEmpty() || activeGenreSuggestion != null) {
+                    IconButton(
+                        onClick = {
+                            expanded = true
+                            if (uiState.query.isNotEmpty()) {
+                                onClearQuery()
+                            } else {
+                                onClearGenreSuggestion()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Clear,
+                            contentDescription = "Clear search"
                         )
                     }
                 }
-            }
-
-            if (activeGenreSuggestion != null) {
+            },
+            colors = SearchBarDefaults.colors()
+        ) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 124.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = true)
+                    .imePadding(),
+                contentPadding =
+                    PaddingValues(
+                        start = pageHorizontalPadding,
+                        end = pageHorizontalPadding,
+                        top = Dimensions.SmallSpacing,
+                        bottom = Dimensions.PageBottomPadding
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    ActiveGenreSuggestionHeader(
-                        genreSuggestion = activeGenreSuggestion,
-                        onClear = onClearGenreSuggestion
-                    )
-                }
-            }
-
-            when {
-                uiState.showGenreSuggestions -> {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "Explore genres",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
-                        )
-                    }
-                    items(genreSuggestions, key = { it.name }) { genre ->
-                        GenreCard(
-                            genre = genre,
-                            onClick = { onGenreSuggestionClick(genre) }
-                        )
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(filters, key = { it.name }) { filter ->
+                            FilterChip(
+                                selected = uiState.filter == filter,
+                                onClick = { onFilterChange(filter) },
+                                label = { Text(filter.label) }
+                            )
+                        }
                     }
                 }
 
-                uiState.showBlankSearchHint -> {
+                if (activeGenreSuggestion != null) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        SearchEmptyState(text = "Search for people by name")
-                    }
-                }
-
-                uiState.isLoading -> {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        SearchLoadingIndicator()
-                    }
-                }
-
-                uiState.results.isEmpty() -> {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        SearchEmptyState(
-                            text = activeGenreSuggestion?.let { "No ${it.label} titles found" } ?: "No results"
+                        ActiveGenreSuggestionHeader(
+                            genreSuggestion = activeGenreSuggestion,
+                            onClear = onClearGenreSuggestion
                         )
                     }
                 }
 
-                else -> {
-                    items(
-                        items = uiState.results,
-                        key = { "${it.type}:${it.id}" }
-                    ) { item ->
-                        PosterCard(
-                            title = item.title,
-                            posterUrl = item.posterUrl,
-                            backdropUrl = item.backdropUrl,
-                            rating = item.rating,
-                            year = item.year,
-                            genre = item.genre,
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { onItemClick(item) }
-                        )
+                when {
+                    uiState.showGenreSuggestions -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = "Explore genres",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
+                            )
+                        }
+                        items(genreSuggestions, key = { it.name }) { genre ->
+                            GenreCard(
+                                genre = genre,
+                                onClick = {
+                                    expanded = true
+                                    onGenreSuggestionClick(genre)
+                                }
+                            )
+                        }
+                    }
+
+                    uiState.showBlankSearchHint -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            SearchEmptyState(text = "Search for people by name")
+                        }
+                    }
+
+                    uiState.isLoading -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            SearchLoadingIndicator()
+                        }
+                    }
+
+                    uiState.results.isEmpty() -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            SearchEmptyState(
+                                text = activeGenreSuggestion?.let { "No ${it.label} titles found" } ?: "No results"
+                            )
+                        }
+                    }
+
+                    else -> {
+                        items(
+                            items = uiState.results,
+                            key = { "${it.type}:${it.id}" }
+                        ) { item ->
+                            PosterCard(
+                                title = item.title,
+                                posterUrl = item.posterUrl,
+                                backdropUrl = item.backdropUrl,
+                                rating = item.rating,
+                                year = item.year,
+                                genre = item.genre,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { onItemClick(item) }
+                            )
+                        }
                     }
                 }
             }
@@ -323,78 +344,5 @@ private fun GenreCard(
                 .align(Alignment.BottomStart)
                 .padding(12.dp)
         )
-    }
-}
-
-@Composable
-private fun CustomSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClearQuery: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(56.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (query.isEmpty()) {
-                    Text(
-                        text = "Search movies, shows, and people",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                BasicTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            
-            if (query.isNotEmpty()) {
-                Spacer(modifier = Modifier.width(16.dp))
-                IconButton(
-                    onClick = onClearQuery,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .background(
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), 
-                            CircleShape
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Clear,
-                        contentDescription = "Clear search",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
     }
 }
