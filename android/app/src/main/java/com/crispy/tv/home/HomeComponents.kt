@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
@@ -658,6 +659,7 @@ internal fun HomeCatalogSectionRow(
 internal fun HomeCollectionSectionRow(
     sectionUis: List<HomeCatalogSectionUi>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
     val visibleSections =
@@ -696,6 +698,7 @@ internal fun HomeCollectionSectionRow(
                     sectionUi = sectionUi,
                     showSubtitle = sharedSubtitle.isBlank(),
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
+                    onPlayClick = { onCollectionPlayClick(it) },
                     onCollectionMovieClick = onCollectionMovieClick,
                 )
             }
@@ -708,9 +711,11 @@ private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
     showSubtitle: Boolean,
     onCollectionClick: () -> Unit,
+    onPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
     val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
+    val featuredMovie = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
     val artworkUrl =
         remember(sectionUi.items) {
             sectionUi.items.firstNotNullOfOrNull { item ->
@@ -820,6 +825,42 @@ private fun HomeCollectionCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilledIconButton(
+                    onClick = { featuredMovie?.let(onPlayClick) },
+                    enabled = featuredMovie != null,
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Play collection",
+                    )
+                }
+
+                FilledIconButton(
+                    onClick = onCollectionClick,
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = "Collection info",
                     )
                 }
             }

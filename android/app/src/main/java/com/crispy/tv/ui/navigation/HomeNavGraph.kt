@@ -37,6 +37,9 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onCatalogItemClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
             },
+            onCollectionPlayClick = { item ->
+                navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
+            },
             onCollectionMovieClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
             },
