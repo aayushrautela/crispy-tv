@@ -14,7 +14,7 @@ data class TmdbIdResult(
     val mediaType: MetadataLabMediaType,
 )
 
-class TmdbImdbIdResolver(
+internal class TmdbImdbIdResolver(
     private val identityService: TmdbIdentityService,
 ) {
     constructor(apiKey: String, httpClient: CrispyHttpClient) : this(

@@ -13,10 +13,14 @@ import com.crispy.tv.player.MetadataLabRequest
 import com.crispy.tv.player.MetadataTransportStat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import org.json.JSONArray
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-class RemoteMetadataLabDataSource(
+internal class RemoteMetadataLabDataSource(
     context: Context,
     addonManifestUrlsCsv: String,
     private val tmdbRepository: TmdbMetadataRecordRepository,
@@ -614,4 +618,26 @@ private fun nonBlank(value: String?): String? {
 
 private fun MetadataLabMediaType.asIdKind(): String {
     return if (this == MetadataLabMediaType.SERIES) "series" else "movie"
+}
+
+private suspend fun CrispyHttpClient.getJsonObject(url: String): JSONObject? {
+    val httpUrl = url.toHttpUrlOrNull() ?: return null
+    val response =
+        runCatching {
+            get(
+                url = httpUrl,
+                headers = Headers.Builder().add("Accept", "application/json").build()
+            )
+        }.getOrNull() ?: return null
+
+    if (response.code !in 200..299) {
+        return null
+    }
+
+    val body = response.body.trim()
+    if (body.isBlank()) {
+        return null
+    }
+
+    return runCatching { JSONObject(body) }.getOrNull()
 }
