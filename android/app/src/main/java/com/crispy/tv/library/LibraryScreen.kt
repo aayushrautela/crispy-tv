@@ -34,13 +34,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
@@ -473,37 +471,9 @@ class LibraryViewModel internal constructor(
     }
 }
 
-@Composable
-fun LibraryRoute(
-    onItemClick: (WatchHistoryEntry) -> Unit,
-    onNavigateToDiscover: () -> Unit,
-    scrollToTopRequests: StateFlow<Int>,
-    onScrollToTopConsumed: () -> Unit,
-) {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: LibraryViewModel =
-        viewModel(
-            factory = remember(appContext) {
-                LibraryViewModel.factory(appContext)
-            },
-        )
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    LibraryScreen(
-        uiState = uiState,
-        onRefresh = viewModel::refresh,
-        onItemClick = onItemClick,
-        onNavigateToDiscover = onNavigateToDiscover,
-        onSelectProviderFolder = viewModel::selectProviderFolder,
-        scrollToTopRequests = scrollToTopRequests,
-        onScrollToTopConsumed = onScrollToTopConsumed,
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun LibraryScreen(
+internal fun LibraryRouteContent(
     uiState: LibraryUiState,
     onRefresh: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
