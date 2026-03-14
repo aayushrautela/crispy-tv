@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.weight
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Event
@@ -26,12 +27,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.crispy.tv.search.SearchTopBar
+import com.crispy.tv.search.rememberSearchViewModel
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.navigation.AppNavHost
 import com.crispy.tv.ui.navigation.AppNavigationBar
@@ -65,25 +70,34 @@ fun AppRoot() {
             }
         }
     }
-    val inSearchResults by remember(currentRoute) {
-        derivedStateOf { currentRoute?.startsWith("${AppRoutes.SearchRoute}/") == true }
-    }
-    val shouldShowNavigationBar by remember(currentRoute, topLevelRoutes, inSearchResults) {
+    val shouldShowNavigationBar by remember(currentRoute, topLevelRoutes) {
         derivedStateOf {
             currentRoute == null ||
-                topLevelRoutes.contains(currentRoute) ||
-                inSearchResults
+                topLevelRoutes.contains(currentRoute)
         }
     }
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val showRail = shouldShowNavigationBar && isLandscape && !inSearchResults
+    val showRail = shouldShowNavigationBar && isLandscape
     val shouldShowTopBar by remember(currentRoute, currentDestination) {
         derivedStateOf {
             currentDestination?.showInRootTopBar == true && currentRoute == currentDestination?.route
         }
     }
     val bottomSystemInset = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
-    val topAppBarScrollBehavior = appBarScrollBehavior(canScroll = { shouldShowTopBar })
+    val shouldUseScrollableTopBar by remember(currentDestination, shouldShowTopBar) {
+        derivedStateOf {
+            shouldShowTopBar && currentDestination != TopLevelDestination.Search
+        }
+    }
+    val topAppBarScrollBehavior = appBarScrollBehavior(canScroll = { shouldUseScrollableTopBar })
+    val searchViewModelStoreOwner =
+        remember(currentRoute, navController) {
+            if (currentRoute == AppRoutes.SearchRoute) {
+                navController.getBackStackEntry(AppRoutes.SearchRoute)
+            } else {
+                null
+            }
+        }
 
     LaunchedEffect(currentRoute) {
         topAppBarScrollBehavior.state.heightOffset = 0f
@@ -133,6 +147,7 @@ fun AppRoot() {
                     currentDestination = currentDestination,
                     showRail = showRail,
                     scrollBehavior = topAppBarScrollBehavior,
+                    searchViewModelStoreOwner = searchViewModelStoreOwner,
                     onOpenCalendar = {
                         navController.navigate(AppRoutes.CalendarRoute) {
                             launchSingleTop = true
@@ -183,10 +198,25 @@ private fun RootTopAppBar(
     currentDestination: TopLevelDestination?,
     showRail: Boolean,
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
+    searchViewModelStoreOwner: ViewModelStoreOwner?,
     onOpenCalendar: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
 ) {
     if (currentDestination == null) {
+        return
+    }
+
+    if (currentDestination == TopLevelDestination.Search && searchViewModelStoreOwner != null) {
+        val searchViewModel = rememberSearchViewModel(viewModelStoreOwner = searchViewModelStoreOwner)
+        val searchUiState by searchViewModel.uiState.collectAsStateWithLifecycle()
+        SearchTopBar(
+            query = searchUiState.query,
+            onQueryChange = searchViewModel::updateQuery,
+            onSearch = searchViewModel::submitSearch,
+            onClear = searchViewModel::clearSearch,
+            onOpenAccountsProfiles = onOpenAccountsProfiles,
+            modifier = Modifier.padding(start = if (showRail) NavigationRailWidth else 0.dp),
+        )
         return
     }
 

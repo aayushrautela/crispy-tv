@@ -34,13 +34,23 @@ enum class SearchTypeFilter {
 @Immutable
 data class SearchUiState(
     val query: String = "",
+    val appliedQuery: String = "",
+    val selectedGenre: SearchGenreSuggestion? = null,
     val filter: SearchTypeFilter = SearchTypeFilter.ALL,
     val isLoading: Boolean = false,
     val recentSearches: List<String> = emptyList(),
     val results: List<CatalogItem> = emptyList(),
 ) {
-    val trimmedQuery: String
-        get() = query.trim()
+    val hasActiveResults: Boolean
+        get() = appliedQuery.isNotBlank() || selectedGenre != null
+
+    val availableFilters: List<SearchTypeFilter>
+        get() =
+            if (selectedGenre == null) {
+                SearchTypeFilter.entries
+            } else {
+                listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES)
+            }
 }
 
 class SearchViewModel(
@@ -55,35 +65,54 @@ class SearchViewModel(
     private var searchJob: Job? = null
     private var searchToken: Long = 0L
 
-    fun showQuery(query: String, saveToHistory: Boolean = false) {
-        val normalizedQuery = query.trim()
-        val recentSearches =
-            if (saveToHistory) {
-                searchHistoryStore.record(normalizedQuery)
-            } else {
-                _uiState.value.recentSearches
-            }
-
-        _uiState.value =
-            _uiState.value.copy(
-                query = normalizedQuery,
-                recentSearches = recentSearches,
-            )
-
-        if (normalizedQuery.isBlank()) {
-            clearResults()
-            return
-        }
-
-        loadResults(query = normalizedQuery, filter = _uiState.value.filter)
+    fun updateQuery(query: String) {
+        _uiState.value = _uiState.value.copy(query = query)
     }
 
-    fun recordQuery(query: String) {
+    fun submitSearch(query: String = _uiState.value.query) {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
             return
         }
-        _uiState.value = _uiState.value.copy(recentSearches = searchHistoryStore.record(normalizedQuery))
+
+        val snapshot = _uiState.value
+        if (snapshot.selectedGenre != null && normalizedQuery == snapshot.selectedGenre.label) {
+            return
+        }
+
+        _uiState.value =
+            snapshot.copy(
+                query = normalizedQuery,
+                appliedQuery = normalizedQuery,
+                selectedGenre = null,
+                recentSearches = searchHistoryStore.record(normalizedQuery),
+            )
+        loadQueryResults(query = normalizedQuery, filter = _uiState.value.filter)
+    }
+
+    fun clearSearch() {
+        searchToken += 1
+        searchJob?.cancel()
+        _uiState.value =
+            _uiState.value.copy(
+                query = "",
+                appliedQuery = "",
+                selectedGenre = null,
+                isLoading = false,
+                results = emptyList(),
+            )
+    }
+
+    fun selectGenre(genreSuggestion: SearchGenreSuggestion) {
+        val resolvedFilter = normalizeFilterForGenre(_uiState.value.filter)
+        _uiState.value =
+            _uiState.value.copy(
+                query = genreSuggestion.label,
+                appliedQuery = "",
+                selectedGenre = genreSuggestion,
+                filter = resolvedFilter,
+            )
+        loadGenreResults(genreSuggestion = genreSuggestion, filter = resolvedFilter)
     }
 
     fun removeRecentSearch(query: String) {
@@ -95,31 +124,52 @@ class SearchViewModel(
     }
 
     fun setFilter(filter: SearchTypeFilter) {
-        if (_uiState.value.filter == filter) {
+        val resolvedFilter =
+            _uiState.value.selectedGenre?.let { normalizeFilterForGenre(filter) } ?: filter
+        if (_uiState.value.filter == resolvedFilter) {
             return
         }
 
-        _uiState.value = _uiState.value.copy(filter = filter)
-        val query = _uiState.value.trimmedQuery
-        if (query.isBlank()) {
-            clearResults()
-            return
-        }
+        _uiState.value = _uiState.value.copy(filter = resolvedFilter)
+        val snapshot = _uiState.value
+        when {
+            snapshot.selectedGenre != null -> {
+                loadGenreResults(
+                    genreSuggestion = snapshot.selectedGenre,
+                    filter = resolvedFilter,
+                )
+            }
 
-        loadResults(query = query, filter = filter)
+            snapshot.appliedQuery.isNotBlank() -> {
+                loadQueryResults(
+                    query = snapshot.appliedQuery,
+                    filter = resolvedFilter,
+                )
+            }
+
+            else -> clearResultsOnly()
+        }
     }
 
-    private fun clearResults() {
+    private fun clearResultsOnly() {
         searchToken += 1
         searchJob?.cancel()
         _uiState.value = _uiState.value.copy(isLoading = false, results = emptyList())
     }
 
-    private fun loadResults(query: String, filter: SearchTypeFilter) {
+    private fun loadQueryResults(query: String, filter: SearchTypeFilter) {
         searchToken += 1
         val token = searchToken
         searchJob?.cancel()
-        _uiState.value = _uiState.value.copy(query = query, filter = filter, isLoading = true, results = emptyList())
+        _uiState.value =
+            _uiState.value.copy(
+                query = query,
+                appliedQuery = query,
+                selectedGenre = null,
+                filter = filter,
+                isLoading = true,
+                results = emptyList(),
+            )
 
         searchJob =
             viewModelScope.launch {
@@ -141,6 +191,48 @@ class SearchViewModel(
 
                 _uiState.value = _uiState.value.copy(isLoading = false, results = results)
             }
+    }
+
+    private fun loadGenreResults(
+        genreSuggestion: SearchGenreSuggestion,
+        filter: SearchTypeFilter,
+    ) {
+        searchToken += 1
+        val token = searchToken
+        searchJob?.cancel()
+        _uiState.value =
+            _uiState.value.copy(
+                selectedGenre = genreSuggestion,
+                appliedQuery = "",
+                filter = filter,
+                isLoading = true,
+                results = emptyList(),
+            )
+
+        searchJob =
+            viewModelScope.launch {
+                val locale = localeProvider()
+                val results =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            searchRepository.discoverByGenre(
+                                genreSuggestion = genreSuggestion,
+                                filter = filter,
+                                locale = locale,
+                            )
+                        }.getOrElse { emptyList() }
+                    }
+
+                if (token != searchToken) {
+                    return@launch
+                }
+
+                _uiState.value = _uiState.value.copy(isLoading = false, results = results)
+            }
+    }
+
+    private fun normalizeFilterForGenre(filter: SearchTypeFilter): SearchTypeFilter {
+        return if (filter == SearchTypeFilter.PEOPLE) SearchTypeFilter.ALL else filter
     }
 
     companion object {

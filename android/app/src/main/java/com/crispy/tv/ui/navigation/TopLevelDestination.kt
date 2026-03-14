@@ -31,7 +31,6 @@ enum class TopLevelDestination(
         label = "Search",
         inactiveIcon = Icons.Outlined.Search,
         activeIcon = Icons.Filled.Search,
-        showInRootTopBar = false,
     ),
     Discover(
         route = AppRoutes.DiscoverRoute,

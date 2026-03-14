@@ -9,13 +9,10 @@ object AppRoutes {
 
     const val HomeRoute = "home"
     const val SearchRoute = "search"
-    const val SearchQueryArg = "query"
     const val DiscoverRoute = "discover"
     const val LibraryRoute = "library"
     const val CalendarRoute = "calendar"
     const val SettingsRoute = "settings"
-
-    const val SearchResultsRoutePattern = "$SearchRoute/{$SearchQueryArg}"
 
     const val HomeDetailsRoute = "home/details"
     const val HomeDetailsItemIdArg = "itemId"
@@ -67,10 +64,6 @@ object AppRoutes {
             "?$HomeDetailsSeasonArg=${initialSeason ?: -1}" +
             "&$HomeDetailsEpisodeArg=${initialEpisode ?: -1}" +
             "&$HomeDetailsAutoOpenEpisodeArg=${autoOpenEpisode}"
-    }
-
-    fun searchResultsRoute(query: String): String {
-        return "$SearchRoute/${Uri.encode(query.trim())}"
     }
 
     fun catalogListRoute(section: CatalogSectionRef): String {
