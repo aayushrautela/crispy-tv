@@ -43,6 +43,14 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))
             },
+            onOpenSearch = {
+                navController.navigate(AppRoutes.SearchRoute) {
+                    launchSingleTop = true
+                }
+            },
+            onOpenAccountsProfiles = {
+                navController.navigate(AppRoutes.AccountsProfilesRoute)
+            },
             scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
             onScrollToTopConsumed = {
                 entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0

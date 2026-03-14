@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.StateFlow
 fun LibraryRoute(
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
@@ -31,6 +34,9 @@ fun LibraryRoute(
         onItemClick = onItemClick,
         onNavigateToDiscover = onNavigateToDiscover,
         onSelectProviderFolder = viewModel::selectProviderFolder,
+        onOpenSearch = onOpenSearch,
+        onOpenCalendar = onOpenCalendar,
+        onOpenAccountsProfiles = onOpenAccountsProfiles,
         scrollToTopRequests = scrollToTopRequests,
         onScrollToTopConsumed = onScrollToTopConsumed,
     )

@@ -12,7 +12,6 @@ enum class TopLevelDestination(
     val label: String,
     val icon: ImageVector,
     val showInBottomBar: Boolean = true,
-    val showTopBar: Boolean = true,
 ) {
     Home(route = AppRoutes.HomeRoute, label = "Home", icon = Icons.Outlined.Home),
     Discover(route = AppRoutes.DiscoverRoute, label = "Discover", icon = Icons.Outlined.Explore),

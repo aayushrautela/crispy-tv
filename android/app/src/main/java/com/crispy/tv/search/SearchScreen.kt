@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.calculateBottomPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -63,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.ui.LocalAppChromeInsets
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -120,8 +120,7 @@ private fun SearchScreen(
     onItemClick: (CatalogItem) -> Unit
 ) {
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val chromePadding = LocalAppChromeInsets.current.asPaddingValues()
-    val bottomInset = chromePadding.calculateBottomPadding()
+    val bottomInset = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
     val activeGenreSuggestion = uiState.activeGenreSuggestion
     val filters =
         remember(activeGenreSuggestion) {

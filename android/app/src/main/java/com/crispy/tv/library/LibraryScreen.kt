@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateBottomPadding
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,12 +19,17 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
@@ -34,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -48,11 +56,13 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
-import com.crispy.tv.ui.LocalAppChromeInsets
-import com.crispy.tv.ui.rememberInsetPadding
+import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -481,6 +491,9 @@ internal fun LibraryRouteContent(
     onItemClick: (WatchHistoryEntry) -> Unit,
     onNavigateToDiscover: () -> Unit,
     onSelectProviderFolder: (String) -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
@@ -499,8 +512,8 @@ internal fun LibraryRouteContent(
             .filter { item -> selectedFolder == null || item.item.folderId == selectedFolder }
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val appChromeInsets = LocalAppChromeInsets.current
     val gridState = rememberLazyGridState()
+    val scrollBehavior = appBarScrollBehavior()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTopRequest) {
@@ -510,32 +523,57 @@ internal fun LibraryRouteContent(
         }
     }
 
-    PullToRefreshBox(
-        isRefreshing = uiState.isRefreshing,
-        onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize(),
-        state = pullToRefreshState,
-        indicator = {
-            Indicator(
-                state = pullToRefreshState,
-                isRefreshing = uiState.isRefreshing,
-                modifier = Modifier.align(Alignment.TopCenter).padding(appChromeInsets.asPaddingValues()),
+    Scaffold(
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            StandardTopAppBar(
+                title = { CrispyWordmark() },
+                actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Search",
+                        )
+                    }
+                    IconButton(onClick = onOpenCalendar) {
+                        Icon(
+                            imageVector = Icons.Outlined.Event,
+                            contentDescription = "Calendar",
+                        )
+                    }
+                    ProfileIconButton(onClick = onOpenAccountsProfiles)
+                },
+                scrollBehavior = scrollBehavior,
             )
         },
-    ) {
-        LazyVerticalGrid(
-            state = gridState,
-            columns = GridCells.Adaptive(minSize = 124.dp),
+    ) { innerPadding ->
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = rememberInsetPadding(
-                windowInsets = appChromeInsets,
-                horizontal = pageHorizontalPadding,
-                top = 12.dp,
-                bottom = 12.dp + Dimensions.PageBottomPadding,
-            ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            state = pullToRefreshState,
+            indicator = {
+                Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = innerPadding.calculateTopPadding()),
+                )
+            },
         ) {
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Adaptive(minSize = 124.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = pageHorizontalPadding,
+                    top = innerPadding.calculateTopPadding() + 12.dp,
+                    end = pageHorizontalPadding,
+                    bottom = innerPadding.calculateBottomPadding() + 12.dp + Dimensions.PageBottomPadding,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 item(span = { GridItemSpan(maxLineSpan) }, key = "filters") {
                     if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
                         LazyRow(
@@ -660,6 +698,9 @@ internal fun LibraryRouteContent(
             }
         }
     }
+
+}
+
 private fun LibrarySource.toProvider(): WatchProvider? {
     return when (this) {
         LibrarySource.LOCAL -> null

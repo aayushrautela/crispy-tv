@@ -2,7 +2,10 @@ package com.crispy.tv.catalog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateBottomPadding
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
@@ -31,8 +35,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import com.crispy.tv.ui.rememberInsetPadding
-import com.crispy.tv.ui.rememberStandaloneTopBarInsets
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
@@ -53,11 +55,25 @@ fun CatalogRoute(
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = appBarScrollBehavior()
-    val topBarInsets = rememberStandaloneTopBarInsets()
 
-    Box(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection)
-    ) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            StandardTopAppBar(
+                title = section.title,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { innerPadding ->
         PullToRefreshBox(
             isRefreshing = pagingItems.loadState.refresh is LoadState.Loading,
             onRefresh = { pagingItems.refresh() },
@@ -67,7 +83,7 @@ fun CatalogRoute(
                 Indicator(
                     state = pullToRefreshState,
                     isRefreshing = pagingItems.loadState.refresh is LoadState.Loading,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(topBarInsets.asPaddingValues()),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = innerPadding.calculateTopPadding()),
                 )
             },
         ) {
@@ -77,11 +93,11 @@ fun CatalogRoute(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 124.dp),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = rememberInsetPadding(
-                        windowInsets = topBarInsets,
-                        horizontal = pageHorizontalPadding,
-                        top = 12.dp,
-                        bottom = 12.dp + Dimensions.PageBottomPadding,
+                    contentPadding = PaddingValues(
+                        start = pageHorizontalPadding,
+                        top = innerPadding.calculateTopPadding() + 12.dp,
+                        end = pageHorizontalPadding,
+                        bottom = innerPadding.calculateBottomPadding() + 12.dp + Dimensions.PageBottomPadding,
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -127,18 +143,5 @@ fun CatalogRoute(
                 }
             }
         }
-
-        StandardTopAppBar(
-            title = section.title,
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-            },
-            scrollBehavior = scrollBehavior,
-        )
     }
 }
