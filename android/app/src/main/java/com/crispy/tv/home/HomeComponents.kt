@@ -15,12 +15,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -784,10 +782,10 @@ private fun HomeCollectionCard(
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     text = collectionTitle,
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontFamily = homeExpressiveFontFamily,
+                        fontFamily = homeCollectionTitleFontFamily,
                         lineHeight = 26.sp,
                     ),
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Normal,
                     color = Color.White,
                     textAlign = TextAlign.Start,
                     maxLines = 2,
@@ -851,7 +849,8 @@ private fun HomeCollectionCard(
             }
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 FilledIconButton(
@@ -869,11 +868,10 @@ private fun HomeCollectionCard(
                     Icon(
                         imageVector = Icons.Filled.PlayArrow,
                         contentDescription = "Play collection",
-                        modifier = Modifier
-                            .size(22.dp)
-                            .offset(x = 1.dp),
                     )
                 }
+
+                Spacer(modifier = Modifier.width(10.dp))
 
                 FilledIconButton(
                     onClick = onCollectionClick,
@@ -887,7 +885,6 @@ private fun HomeCollectionCard(
                     Icon(
                         imageVector = Icons.Outlined.Info,
                         contentDescription = "Collection info",
-                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -935,14 +932,21 @@ private fun HomeCollectionMovieRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
             if (detailText.isNotBlank() || ratingText != null) {
                 Row(
@@ -959,12 +963,13 @@ private fun HomeCollectionMovieRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
 
                     ratingText?.let { rating ->
-                        HomeRatingBadge(
+                        HomeCollectionRatingBadge(
                             rating = rating,
-                            compact = true,
                         )
                     }
                 }
@@ -1031,33 +1036,14 @@ private fun collectionItemCountLabel(count: Int): String {
 private const val HOME_WIDE_SKELETON_COUNT = 3
 private const val HOME_POSTER_SKELETON_COUNT = 5
 
-private val homeExpressiveFontFamily = FontFamily(
+private val homeCollectionTitleFontFamily = FontFamily(
     Font(
-        googleFont = GoogleFont("Nunito Sans"),
+        googleFont = GoogleFont("Roboto Flex"),
         fontProvider = GoogleFont.Provider(
             providerAuthority = "com.google.android.gms.fonts",
             providerPackage = "com.google.android.gms",
             certificates = R.array.com_google_android_gms_fonts_certs,
         ),
-        weight = FontWeight.Normal,
-    ),
-    Font(
-        googleFont = GoogleFont("Nunito Sans"),
-        fontProvider = GoogleFont.Provider(
-            providerAuthority = "com.google.android.gms.fonts",
-            providerPackage = "com.google.android.gms",
-            certificates = R.array.com_google_android_gms_fonts_certs,
-        ),
-        weight = FontWeight.Bold,
-    ),
-    Font(
-        googleFont = GoogleFont("Nunito Sans"),
-        fontProvider = GoogleFont.Provider(
-            providerAuthority = "com.google.android.gms.fonts",
-            providerPackage = "com.google.android.gms",
-            certificates = R.array.com_google_android_gms_fonts_certs,
-        ),
-        weight = FontWeight.ExtraBold,
     )
 )
 
@@ -1124,12 +1110,31 @@ internal fun HomeCatalogPosterCard(
                 }
 
                 normalizeRatingText(item.rating)?.let { rating ->
-                    HomeRatingBadge(
-                        rating = rating,
+                    Surface(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(6.dp),
-                    )
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color.Black.copy(alpha = 0.7f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = null,
+                                modifier = Modifier.height(12.dp),
+                                tint = Color(0xFFFFC107)
+                            )
+                            Text(
+                                text = rating,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1330,7 +1335,7 @@ internal fun HomeHeroSkeleton() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(homeHeroHeight)
+            .height(320.dp)
             .skeletonElement(shape = RoundedCornerShape(28.dp), pulse = false)
     )
 }
@@ -1359,10 +1364,10 @@ internal fun HomeHeroCarousel(
         itemSpacing = 16.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .height(homeHeroHeight)
+            .height(320.dp)
     ) { index ->
         val item = items[index]
-        val heroImageModel = rememberCrispyImageModel(item.backdropUrl, width = 320.dp, height = homeHeroHeight, tmdbSize = "w780")
+        val heroImageModel = rememberCrispyImageModel(item.backdropUrl, width = 320.dp, height = 320.dp, tmdbSize = "w780")
 
         Box(
             modifier = Modifier
@@ -1385,37 +1390,23 @@ internal fun HomeHeroCarousel(
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.16f),
-                                Color.Black.copy(alpha = 0.36f),
-                                Color.Black.copy(alpha = 0.46f),
-                                Color.Black.copy(alpha = 0.62f),
-                            ),
-                        ),
-                    ),
+            HomeArtworkBottomScrim(
+                heightFraction = 0.46f,
+                maxAlpha = 0.72f,
             )
 
             Column(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth(0.82f)
-                    .widthIn(max = 240.dp)
-                    .padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.headlineSmall,
-                    fontFamily = homeExpressiveFontFamily,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1428,18 +1419,15 @@ internal fun HomeHeroCarousel(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.labelLarge,
-                        fontFamily = homeExpressiveFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.88f),
-                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
                 }
                 Text(
                     text = item.description,
                     style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
                     color = Color.White.copy(alpha = 0.72f),
-                    maxLines = 3,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -1448,43 +1436,34 @@ internal fun HomeHeroCarousel(
 }
 
 @Composable
-private fun HomeRatingBadge(
+private fun HomeCollectionRatingBadge(
     rating: String,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
-    val shape = if (compact) RoundedCornerShape(999.dp) else RoundedCornerShape(4.dp)
-    val horizontalPadding = if (compact) 6.dp else 4.dp
-    val verticalPadding = if (compact) 3.dp else 2.dp
-    val iconSize = if (compact) 12.dp else 12.dp
-    val textStyle = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall
-
     Surface(
         modifier = modifier,
-        shape = shape,
+        shape = RoundedCornerShape(999.dp),
         color = Color.Black.copy(alpha = 0.7f),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Star,
                 contentDescription = null,
-                modifier = Modifier.size(iconSize),
-                tint = Color(0xFFFFC107),
+                modifier = Modifier.size(12.dp),
+                tint = Color.White,
             )
             Text(
                 text = rating,
-                style = textStyle,
+                style = MaterialTheme.typography.labelSmall,
                 color = Color.White,
             )
         }
     }
 }
-
-private val homeHeroHeight = 292.dp
 
 @Composable
 private fun rememberPosterImageModel(url: String?): Any? {
