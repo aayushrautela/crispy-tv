@@ -173,7 +173,7 @@ fun SettingsScreen(
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
     Scaffold(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             StandardTopAppBar(
@@ -185,6 +185,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(scrollState)
                 .padding(
                     top = innerPadding.calculateTopPadding(),

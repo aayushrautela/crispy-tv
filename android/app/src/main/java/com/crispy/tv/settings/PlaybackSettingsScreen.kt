@@ -41,7 +41,7 @@ fun PlaybackSettingsScreen(
 ) {
     val scrollBehavior = appBarScrollBehavior()
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier,
         topBar = {
             StandardTopAppBar(
                 title = "Playback",
@@ -61,6 +61,7 @@ fun PlaybackSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(Dimensions.ListItemPadding)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),

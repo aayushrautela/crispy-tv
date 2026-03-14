@@ -151,7 +151,7 @@ private fun AiInsightsSettingsScreen(
     var showKey by remember { mutableStateOf(false) }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier,
         topBar = {
             StandardTopAppBar(
                 title = "AI Insights",
@@ -171,6 +171,7 @@ private fun AiInsightsSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(Dimensions.ListItemPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp)

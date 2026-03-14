@@ -13,7 +13,7 @@ fun appBarScrollBehavior(
     state: TopAppBarState = rememberTopAppBarState(),
     canScroll: () -> Boolean = { true },
 ): TopAppBarScrollBehavior {
-    return TopAppBarDefaults.pinnedScrollBehavior(
+    return TopAppBarDefaults.enterAlwaysScrollBehavior(
         state = state,
         canScroll = canScroll,
     )

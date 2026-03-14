@@ -128,7 +128,7 @@ internal fun CalendarRoute(
     val scrollBehavior = appBarScrollBehavior()
 
     Scaffold(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             StandardTopAppBar(
@@ -195,7 +195,7 @@ internal fun CalendarRoute(
 
                 else -> {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
                         contentPadding = contentPadding,
                         verticalArrangement = Arrangement.spacedBy(22.dp),
                     ) {
