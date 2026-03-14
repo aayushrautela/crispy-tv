@@ -12,7 +12,7 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                 val type = when (entry.contentType) {
                     com.crispy.tv.player.MetadataLabMediaType.MOVIE -> "movie"
                     com.crispy.tv.player.MetadataLabMediaType.SERIES -> "series"
-                }
+            }
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
                         itemId = entry.contentId,
@@ -23,13 +23,6 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                 )
             },
             onNavigateToDiscover = { navController.navigate(AppRoutes.DiscoverRoute) },
-            onOpenSearch = {
-                navController.navigate(AppRoutes.SearchRoute) {
-                    launchSingleTop = true
-                }
-            },
-            onOpenCalendar = { navController.navigate(AppRoutes.CalendarRoute) },
-            onOpenAccountsProfiles = { navController.navigate(AppRoutes.AccountsProfilesRoute) },
             scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
             onScrollToTopConsumed = {
                 entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0

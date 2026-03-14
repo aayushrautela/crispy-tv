@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +32,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,14 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
 
 data class SettingsItem(
@@ -78,7 +73,6 @@ fun SettingsScreen(
     onScrollToTopConsumed: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
-    val scrollBehavior = appBarScrollBehavior()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTopRequest) {
@@ -169,42 +163,28 @@ fun SettingsScreen(
                     )
             )
         )
-
+    
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            StandardTopAppBar(
-                title = "Settings",
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(
-                    top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding() + Dimensions.ListItemPadding,
-                ),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
-        ) {
-            Text(
-                text = "Customize your experience",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = pageHorizontalPadding)
-            )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(bottom = Dimensions.ListItemPadding),
+        verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
+    ) {
+        Text(
+            text = "Customize your experience",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = pageHorizontalPadding)
+        )
 
-            settingsGroups.forEach { group ->
-                SettingsGroupCard(group = group)
-            }
-
-            Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
+        settingsGroups.forEach { group ->
+            SettingsGroupCard(group = group)
         }
+
+        Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
     }
 }
 

@@ -20,7 +20,7 @@ private val topLevelRouteIndices = TopLevelDestination.entries.mapIndexed { inde
 @Composable
 fun AppNavHost(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     NavHost(
         navController = navController,
@@ -85,7 +85,7 @@ fun AppNavHost(
                     targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
                 ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
             }
-        }
+        },
     ) {
         addHomeNavGraph(navController)
         addSearchNavGraph(navController)

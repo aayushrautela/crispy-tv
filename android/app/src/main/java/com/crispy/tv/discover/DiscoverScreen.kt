@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,22 +21,18 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
@@ -51,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -65,13 +59,9 @@ import com.crispy.tv.catalog.DiscoverCatalogRef
 import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.PosterCard
-import com.crispy.tv.ui.components.ProfileIconButton
-import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -349,8 +339,6 @@ private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
 
 @Composable
 fun DiscoverRoute(
-    onOpenSearch: () -> Unit,
-    onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
@@ -373,8 +361,6 @@ fun DiscoverRoute(
         onGenreClick = viewModel::selectGenre,
         onLoadMore = viewModel::loadMore,
         onItemClick = onItemClick,
-        onOpenSearch = onOpenSearch,
-        onOpenAccountsProfiles = onOpenAccountsProfiles,
         scrollToTopRequests = scrollToTopRequests,
         onScrollToTopConsumed = onScrollToTopConsumed,
     )
@@ -396,8 +382,6 @@ private fun DiscoverScreen(
     onGenreClick: (String?) -> Unit,
     onLoadMore: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
-    onOpenSearch: () -> Unit,
-    onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
@@ -406,7 +390,6 @@ private fun DiscoverScreen(
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
     val gridState = rememberLazyGridState()
-    val scrollBehavior = appBarScrollBehavior()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTopRequest) {
@@ -416,51 +399,32 @@ private fun DiscoverScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            StandardTopAppBar(
-                title = { CrispyWordmark() },
-                actions = {
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = "Search",
-                        )
-                    }
-                    ProfileIconButton(onClick = onOpenAccountsProfiles)
-                },
-                scrollBehavior = scrollBehavior,
+    PullToRefreshBox(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            Indicator(
+                state = pullToRefreshState,
+                isRefreshing = uiState.isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         },
-    ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh,
+    ) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Adaptive(minSize = 124.dp),
             modifier = Modifier.fillMaxSize(),
-            state = pullToRefreshState,
-            indicator = {
-                Indicator(
-                    state = pullToRefreshState,
-                    isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = innerPadding.calculateTopPadding()),
-                )
-            },
+            contentPadding = PaddingValues(
+                start = pageHorizontalPadding,
+                top = Dimensions.SmallSpacing,
+                end = pageHorizontalPadding,
+                bottom = Dimensions.PageBottomPadding,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Adaptive(minSize = 124.dp),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = pageHorizontalPadding,
-                    top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
-                    end = pageHorizontalPadding,
-                    bottom = innerPadding.calculateBottomPadding() + Dimensions.PageBottomPadding,
-                ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),

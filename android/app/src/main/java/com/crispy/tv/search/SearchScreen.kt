@@ -1,7 +1,6 @@
 package com.crispy.tv.search
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,56 +9,53 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,228 +63,287 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
 @Composable
 fun SearchRoute(
     onBack: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onSearchRequested: (String) -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
-    val viewModel: SearchViewModel =
-        viewModel(
-            factory = remember(appContext) {
-                SearchViewModel.factory(appContext)
-            }
-        )
+    val viewModel = rememberSearchViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    SearchScreen(
-        uiState = uiState,
-        onBack = onBack,
-        onQueryChange = viewModel::updateQuery,
-        onClearQuery = viewModel::clearQuery,
-        onSearch = viewModel::submitQuery,
-        onFilterChange = viewModel::setFilter,
-        onGenreSuggestionClick = viewModel::selectGenreSuggestion,
-        onClearGenreSuggestion = viewModel::clearGenreSuggestion,
-        onRecentSearchClick = viewModel::selectRecentSearch,
-        onRemoveRecentSearch = viewModel::removeRecentSearch,
-        onClearRecentSearches = viewModel::clearRecentSearches,
-        onItemClick = { item ->
-            viewModel.rememberCurrentQuery()
-            onItemClick(item)
-        }
-    )
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun SearchScreen(
-    uiState: SearchUiState,
-    onBack: () -> Unit,
-    onQueryChange: (String) -> Unit,
-    onClearQuery: () -> Unit,
-    onSearch: () -> Unit,
-    onFilterChange: (SearchTypeFilter) -> Unit,
-    onGenreSuggestionClick: (SearchGenreSuggestion) -> Unit,
-    onClearGenreSuggestion: () -> Unit,
-    onRecentSearchClick: (String) -> Unit,
-    onRemoveRecentSearch: (String) -> Unit,
-    onClearRecentSearches: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
-) {
+    val listState = rememberLazyListState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val bottomInset = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
-    val activeGenreSuggestion = uiState.activeGenreSuggestion
-    val filters =
-        remember(activeGenreSuggestion) {
-            SearchTypeFilter.entries.filter {
-                activeGenreSuggestion == null || it.supportsGenreSuggestions
-            }
-        }
-    val hasTypedQuery = uiState.trimmedQuery.isNotBlank()
-    val hasGenreResults = activeGenreSuggestion != null
-    val showResultFilters = hasTypedQuery || hasGenreResults
-    var isSearchActive by rememberSaveable { mutableStateOf(true) }
-    val showRecentSearches = isSearchActive && !showResultFilters
-    val showInactiveResults = !isSearchActive && showResultFilters
-    val searchBarModifier =
-        Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .then(
-                if (isSearchActive) {
-                    Modifier
-                } else {
-                    Modifier.padding(horizontal = pageHorizontalPadding, vertical = 12.dp)
-                }
-            )
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf("") }
 
-    BackHandler {
-        onBack()
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            listState.animateScrollToItem(0)
+            onScrollToTopConsumed()
+        }
     }
+
+    BackHandler(onBack = onBack)
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            SearchBar(
-                modifier = searchBarModifier,
-                query = uiState.query,
-                onQueryChange = {
-                    isSearchActive = true
-                    onQueryChange(it)
-                },
+            SearchInputTopBar(
+                query = query,
+                onQueryChange = { query = it },
+                onBack = onBack,
+                onClear = { query = "" },
                 onSearch = {
-                    onSearch()
-                    isSearchActive = false
-                },
-                active = isSearchActive,
-                onActiveChange = { isSearchActive = it },
-                placeholder = {
-                    Text("Search movies, shows, and people")
-                },
-                leadingIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                    val normalizedQuery = query.trim()
+                    if (normalizedQuery.isNotBlank()) {
+                        viewModel.recordQuery(normalizedQuery)
+                        onSearchRequested(normalizedQuery)
                     }
                 },
-                trailingIcon = {
-                    if (uiState.query.isNotEmpty()) {
-                        IconButton(onClick = onClearQuery) {
-                            Icon(
-                                imageVector = Icons.Outlined.Clear,
-                                contentDescription = "Clear search"
+            )
+        },
+    ) { innerPadding ->
+        RecentSearchesContent(
+            recentSearches = uiState.recentSearches,
+            listState = listState,
+            pageHorizontalPadding = pageHorizontalPadding,
+            topPadding = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
+            onRecentSearchClick = { recentQuery ->
+                viewModel.recordQuery(recentQuery)
+                onSearchRequested(recentQuery)
+            },
+            onRemoveRecentSearch = viewModel::removeRecentSearch,
+            onClearRecentSearches = viewModel::clearRecentSearches,
+            modifier = Modifier.fillMaxSize().imePadding(),
+        )
+    }
+}
+
+@Composable
+fun SearchResultsRoute(
+    initialQuery: String,
+    onBack: () -> Unit,
+    onSearchRequested: (String) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
+) {
+    val viewModel = rememberSearchViewModel()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val gridState = rememberLazyGridState()
+    val pageHorizontalPadding = responsivePageHorizontalPadding()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }
+
+    LaunchedEffect(initialQuery) {
+        query = initialQuery
+        viewModel.showQuery(initialQuery)
+    }
+
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            gridState.animateScrollToItem(0)
+            onScrollToTopConsumed()
+        }
+    }
+
+    BackHandler(onBack = onBack)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding(),
+    ) {
+        SearchResultsBar(
+            query = query,
+            onQueryChange = { query = it },
+            onBack = onBack,
+            onClear = { query = "" },
+            onSearch = {
+                val normalizedQuery = query.trim()
+                if (normalizedQuery.isNotBlank()) {
+                    viewModel.recordQuery(normalizedQuery)
+                    if (normalizedQuery == uiState.trimmedQuery) {
+                        viewModel.showQuery(normalizedQuery)
+                    } else {
+                        onSearchRequested(normalizedQuery)
+                    }
+                }
+            },
+        )
+        SearchResultsContent(
+            uiState = uiState,
+            gridState = gridState,
+            pageHorizontalPadding = pageHorizontalPadding,
+            onFilterChange = viewModel::setFilter,
+            onItemClick = onItemClick,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun rememberSearchViewModel(): SearchViewModel {
+    val context = LocalContext.current
+    val appContext = remember(context) { context.applicationContext }
+    return viewModel(
+        factory = remember(appContext) {
+            SearchViewModel.factory(appContext)
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchInputTopBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onClear: () -> Unit,
+    onSearch: () -> Unit,
+) {
+    TopAppBar(
+        title = {
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.titleMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                modifier = Modifier.fillMaxWidth(),
+                decorationBox = { innerTextField ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp),
+                    ) {
+                        if (query.isBlank()) {
+                            Text(
+                                text = "Search movies, shows, and people",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        innerTextField()
                     }
                 },
-                colors = SearchBarDefaults.colors()
-            ) {
-                if (showRecentSearches) {
-                    RecentSearchesContent(
-                        recentSearches = uiState.recentSearches,
-                        pageHorizontalPadding = pageHorizontalPadding,
-                        bottomInset = bottomInset,
-                        onRecentSearchClick = onRecentSearchClick,
-                        onRemoveRecentSearch = onRemoveRecentSearch,
-                        onClearRecentSearches = onClearRecentSearches,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .imePadding()
-                    )
-                } else {
-                    SearchResultsContent(
-                        uiState = uiState,
-                        filters = filters,
-                        showFilters = showResultFilters,
-                        pageHorizontalPadding = pageHorizontalPadding,
-                        bottomInset = bottomInset,
-                        onFilterChange = onFilterChange,
-                        onClearGenreSuggestion = onClearGenreSuggestion,
-                        onItemClick = onItemClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .imePadding()
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "Back",
+                )
+            }
+        },
+        actions = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = onClear) {
+                    Icon(
+                        imageVector = Icons.Outlined.Clear,
+                        contentDescription = "Clear search",
                     )
                 }
             }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            if (showInactiveResults) {
-                SearchResultsContent(
-                    uiState = uiState,
-                    filters = filters,
-                    showFilters = true,
-                    pageHorizontalPadding = pageHorizontalPadding,
-                    bottomInset = bottomInset,
-                    onFilterChange = onFilterChange,
-                    onClearGenreSuggestion = onClearGenreSuggestion,
-                    onItemClick = onItemClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                )
-            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    )
+}
 
-            if (!isSearchActive && !showResultFilters) {
-                BrowseContent(
-                    genreSuggestions = SearchGenreSuggestion.entries,
-                    pageHorizontalPadding = pageHorizontalPadding,
-                    bottomInset = bottomInset,
-                    onGenreSuggestionClick = {
-                        isSearchActive = false
-                        onGenreSuggestionClick(it)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                )
-            }
-        }
+@Composable
+private fun SearchResultsBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onClear: () -> Unit,
+    onSearch: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge,
+            shape = RoundedCornerShape(28.dp),
+            placeholder = {
+                Text("Search movies, shows, and people")
+            },
+            leadingIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Back",
+                    )
+                }
+            },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = onClear) {
+                        Icon(
+                            imageVector = Icons.Outlined.Clear,
+                            contentDescription = "Clear search",
+                        )
+                    }
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+        )
     }
 }
 
 @Composable
 private fun RecentSearchesContent(
     recentSearches: List<String>,
-    pageHorizontalPadding: Dp,
-    bottomInset: Dp,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    pageHorizontalPadding: androidx.compose.ui.unit.Dp,
+    topPadding: androidx.compose.ui.unit.Dp,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
     onClearRecentSearches: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(
+        state = listState,
         modifier = modifier,
-        contentPadding =
-            PaddingValues(
-                start = pageHorizontalPadding,
-                end = pageHorizontalPadding,
-                top = Dimensions.SmallSpacing,
-                bottom = bottomInset + Dimensions.PageBottomPadding
-            ),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(
+            start = pageHorizontalPadding,
+            top = topPadding,
+            end = pageHorizontalPadding,
+            bottom = Dimensions.PageBottomPadding,
+        ),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (recentSearches.isEmpty()) {
             item {
-                SearchEmptyState(text = "Your recent searches appear here")
+                SearchEmptyState(text = "Recent searches show up here")
             }
         } else {
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onClearRecentSearches) {
                         Text("Clear all")
@@ -298,52 +353,14 @@ private fun RecentSearchesContent(
 
             items(
                 items = recentSearches,
-                key = { it.lowercase(Locale.ROOT) }
+                key = { it.lowercase(Locale.ROOT) },
             ) { query ->
                 RecentSearchRow(
                     query = query,
                     onClick = { onRecentSearchClick(query) },
-                    onRemoveClick = { onRemoveRecentSearch(query) }
+                    onRemoveClick = { onRemoveRecentSearch(query) },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun BrowseContent(
-    genreSuggestions: List<SearchGenreSuggestion>,
-    pageHorizontalPadding: Dp,
-    bottomInset: Dp,
-    onGenreSuggestionClick: (SearchGenreSuggestion) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 124.dp),
-        modifier = modifier,
-        contentPadding =
-            PaddingValues(
-                start = pageHorizontalPadding,
-                end = pageHorizontalPadding,
-                top = Dimensions.SmallSpacing,
-                bottom = bottomInset + Dimensions.PageBottomPadding
-            ),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Text(
-                text = "Explore genres",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
-            )
-        }
-        items(genreSuggestions, key = { it.name }) { genre ->
-            GenreCard(
-                genre = genre,
-                onClick = { onGenreSuggestionClick(genre) }
-            )
         }
     }
 }
@@ -351,53 +368,37 @@ private fun BrowseContent(
 @Composable
 private fun SearchResultsContent(
     uiState: SearchUiState,
-    filters: List<SearchTypeFilter>,
-    showFilters: Boolean,
-    pageHorizontalPadding: Dp,
-    bottomInset: Dp,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    pageHorizontalPadding: androidx.compose.ui.unit.Dp,
     onFilterChange: (SearchTypeFilter) -> Unit,
-    onClearGenreSuggestion: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val activeGenreSuggestion = uiState.activeGenreSuggestion
-
     LazyVerticalGrid(
+        state = gridState,
         columns = GridCells.Adaptive(minSize = 124.dp),
         modifier = modifier,
-        contentPadding =
-            PaddingValues(
-                start = pageHorizontalPadding,
-                end = pageHorizontalPadding,
-                top = Dimensions.SmallSpacing,
-                bottom = bottomInset + Dimensions.PageBottomPadding
-            ),
+        contentPadding = PaddingValues(
+            start = pageHorizontalPadding,
+            top = Dimensions.SmallSpacing,
+            end = pageHorizontalPadding,
+            bottom = Dimensions.PageBottomPadding,
+        ),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (showFilters) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filters, key = { it.name }) { filter ->
-                        FilterChip(
-                            selected = uiState.filter == filter,
-                            onClick = { onFilterChange(filter) },
-                            label = { Text(filter.label) }
-                        )
-                    }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(SearchTypeFilter.entries, key = { it.name }) { filter ->
+                    FilterChip(
+                        selected = uiState.filter == filter,
+                        onClick = { onFilterChange(filter) },
+                        label = { Text(filter.label) },
+                    )
                 }
-            }
-        }
-
-        if (activeGenreSuggestion != null) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                ActiveGenreSuggestionHeader(
-                    genreSuggestion = activeGenreSuggestion,
-                    onClear = onClearGenreSuggestion
-                )
             }
         }
 
@@ -408,18 +409,22 @@ private fun SearchResultsContent(
                 }
             }
 
+            uiState.trimmedQuery.isBlank() -> {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SearchEmptyState(text = "Search movies, shows, and people")
+                }
+            }
+
             uiState.results.isEmpty() -> {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    SearchEmptyState(
-                        text = activeGenreSuggestion?.let { "No ${it.label} titles found" } ?: "No results"
-                    )
+                    SearchEmptyState(text = "No results")
                 }
             }
 
             else -> {
                 items(
                     items = uiState.results,
-                    key = { "${it.type}:${it.id}" }
+                    key = { "${it.type}:${it.id}" },
                 ) { item ->
                     PosterCard(
                         title = item.title,
@@ -429,7 +434,7 @@ private fun SearchResultsContent(
                         year = item.year,
                         genre = item.genre,
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { onItemClick(item) }
+                        onClick = { onItemClick(item) },
                     )
                 }
             }
@@ -441,56 +446,34 @@ private fun SearchResultsContent(
 private fun RecentSearchRow(
     query: String,
     onClick: () -> Unit,
-    onRemoveClick: () -> Unit
+    onRemoveClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(16.dp),
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Outlined.History,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = query,
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onRemoveClick) {
             Icon(
                 imageVector = Icons.Outlined.Clear,
-                contentDescription = "Remove recent search"
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActiveGenreSuggestionHeader(
-    genreSuggestion: SearchGenreSuggestion,
-    onClear: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Showing ${genreSuggestion.label}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        IconButton(onClick = onClear) {
-            Icon(
-                imageVector = Icons.Outlined.Clear,
-                contentDescription = "Clear genre suggestion"
+                contentDescription = "Remove recent search",
             )
         }
     }
@@ -502,71 +485,25 @@ private fun SearchEmptyState(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 24.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun SearchLoadingIndicator() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 24.dp),
         horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        LoadingIndicator(modifier = Modifier.size(36.dp))
-    }
-}
-
-@Composable
-private fun GenreCard(
-    genre: SearchGenreSuggestion,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-    ) {
-        Image(
-            painter = painterResource(id = genre.imageRes),
-            contentDescription = genre.label,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.8f)
-                        ),
-                        startY = 0f,
-                        endY = Float.POSITIVE_INFINITY
-                    )
-                )
-        )
-        Text(
-            text = genre.label,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(12.dp)
-        )
+        CircularProgressIndicator()
     }
 }

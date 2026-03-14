@@ -2,7 +2,6 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,15 +9,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
@@ -29,19 +23,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.ui.brand.CrispyWordmark
-import com.crispy.tv.ui.components.ProfileIconButton
-import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
 
 private typealias HomeCatalogSectionStateProvider = (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>
@@ -56,8 +45,6 @@ internal fun HomeRoute(
     onCollectionPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
-    onOpenSearch: () -> Unit,
-    onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
@@ -94,8 +81,6 @@ internal fun HomeRoute(
         onCollectionPlayClick = onCollectionPlayClick,
         onCollectionMovieClick = onCollectionMovieClick,
         onCatalogSeeAllClick = onCatalogSeeAllClick,
-        onOpenSearch = onOpenSearch,
-        onOpenAccountsProfiles = onOpenAccountsProfiles,
         scrollToTopRequests = scrollToTopRequests,
         onScrollToTopConsumed = onScrollToTopConsumed,
     )
@@ -125,15 +110,12 @@ private fun HomeScreen(
     onCollectionPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
-    onOpenSearch: () -> Unit,
-    onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
     val lazyListState = rememberLazyListState()
-    val scrollBehavior = appBarScrollBehavior()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTopRequest) {
@@ -143,49 +125,30 @@ private fun HomeScreen(
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            StandardTopAppBar(
-                title = { CrispyWordmark() },
-                actions = {
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = "Search",
-                        )
-                    }
-                    ProfileIconButton(onClick = onOpenAccountsProfiles)
-                },
-                scrollBehavior = scrollBehavior,
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            Indicator(
+                state = pullToRefreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         },
-    ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
+    ) {
+        LazyColumn(
+            state = lazyListState,
             modifier = Modifier.fillMaxSize(),
-            state = pullToRefreshState,
-            indicator = {
-                Indicator(
-                    state = pullToRefreshState,
-                    isRefreshing = isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = innerPadding.calculateTopPadding()),
-                )
-            },
+            contentPadding = PaddingValues(
+                start = horizontalPadding,
+                top = 0.dp,
+                end = horizontalPadding,
+                bottom = Dimensions.PageBottomPadding,
+            ),
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing),
         ) {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = horizontalPadding,
-                    top = innerPadding.calculateTopPadding(),
-                    end = horizontalPadding,
-                    bottom = innerPadding.calculateBottomPadding() + Dimensions.PageBottomPadding,
-                ),
-                verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing),
-            ) {
                 item(key = "headerSections", contentType = "headerSections") {
                     HomeHeaderSectionsItem(
                         headerSectionsState = headerSectionsState,

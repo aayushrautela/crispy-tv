@@ -8,14 +8,6 @@ import com.crispy.tv.discover.DiscoverRoute
 internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostController) {
     composable(AppRoutes.DiscoverRoute) { entry ->
         DiscoverRoute(
-            onOpenSearch = {
-                navController.navigate(AppRoutes.SearchRoute) {
-                    launchSingleTop = true
-                }
-            },
-            onOpenAccountsProfiles = {
-                navController.navigate(AppRoutes.AccountsProfilesRoute)
-            },
             scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
             onScrollToTopConsumed = {
                 entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
