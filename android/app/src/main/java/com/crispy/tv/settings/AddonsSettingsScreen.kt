@@ -484,7 +484,7 @@ private fun AddonsSettingsScreen(
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollBehavior = appBarScrollBehavior()
     Scaffold(
-        modifier = Modifier,
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
                 title = "Addons",
@@ -505,7 +505,6 @@ private fun AddonsSettingsScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection)
                     .verticalScroll(scrollState)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)

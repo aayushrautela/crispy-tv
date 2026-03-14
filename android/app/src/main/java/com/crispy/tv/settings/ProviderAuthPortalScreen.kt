@@ -230,7 +230,7 @@ private fun ProviderAuthPortalScreen(
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     Scaffold(
-        modifier = Modifier,
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
                 title = "Providers",
@@ -257,8 +257,7 @@ private fun ProviderAuthPortalScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .padding(innerPadding),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
                 top = 12.dp,

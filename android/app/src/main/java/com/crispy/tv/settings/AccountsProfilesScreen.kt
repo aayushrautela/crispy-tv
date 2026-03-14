@@ -90,7 +90,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
     Scaffold(
-        modifier = Modifier,
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
                 title = "Accounts & Profiles",
@@ -109,8 +109,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .padding(innerPadding),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
                 end = pageHorizontalPadding,

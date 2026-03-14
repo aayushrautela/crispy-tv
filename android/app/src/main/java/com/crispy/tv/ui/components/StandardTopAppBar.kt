@@ -2,6 +2,7 @@ package com.crispy.tv.ui.components
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,12 +35,12 @@ fun StandardTopAppBar(
     actions: @Composable RowScope.() -> Unit = {},
     scrollBehavior: TopAppBarScrollBehavior? = null,
     colors: TopAppBarColors? = null,
-    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets
+    windowInsets: WindowInsets = WindowInsets(0, 0, 0, 0)
 ) {
     val resolvedColors = colors ?: standardTopAppBarColors()
     TopAppBar(
         title = title,
-        modifier = modifier,
+        modifier = modifier.statusBarsPadding(),
         navigationIcon = navigationIcon,
         actions = actions,
         scrollBehavior = scrollBehavior,
@@ -57,7 +58,7 @@ fun StandardTopAppBar(
     actions: @Composable RowScope.() -> Unit = {},
     scrollBehavior: TopAppBarScrollBehavior? = null,
     colors: TopAppBarColors? = null,
-    windowInsets: WindowInsets = TopAppBarDefaults.windowInsets
+    windowInsets: WindowInsets = WindowInsets(0, 0, 0, 0)
 ) {
     StandardTopAppBar(
         title = {

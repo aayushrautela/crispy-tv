@@ -417,7 +417,7 @@ private fun DiscoverScreen(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             StandardTopAppBar(
@@ -451,7 +451,7 @@ private fun DiscoverScreen(
             LazyVerticalGrid(
                 state = gridState,
                 columns = GridCells.Adaptive(minSize = 124.dp),
-                modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = pageHorizontalPadding,
                     top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
