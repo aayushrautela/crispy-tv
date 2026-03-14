@@ -146,7 +146,6 @@ class LibraryViewModel internal constructor(
                 _uiState.update { current ->
                     current.copy(
                         isRefreshing = true,
-                        statusMessage = current.statusMessage.ifBlank { "Loading library..." },
                     )
                 }
 
