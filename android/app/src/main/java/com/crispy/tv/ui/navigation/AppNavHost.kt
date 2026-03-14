@@ -1,25 +1,21 @@
 package com.crispy.tv.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 
-private const val NavigationSlideDurationMillis = 320
-private const val NavigationFadeDurationMillis = 120
+private const val TopLevelNavigationDurationMillis = 200
+private const val TopLevelNavigationOffsetDivisor = 8
 
-private val topLevelRoutes = TopLevelDestination.entries.map { it.route }.toSet()
+private val topLevelRouteIndices = TopLevelDestination.entries.mapIndexed { index, destination -> destination.route to index }.toMap()
 
 @Composable
 fun AppNavHost(
@@ -31,48 +27,63 @@ fun AppNavHost(
         startDestination = TopLevelDestination.Home.route,
         modifier = modifier,
         enterTransition = {
-            if (isTopLevelSwitch()) {
-                EnterTransition.None
+            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+            if (targetRouteIndex == -1 || targetRouteIndex > initialRouteIndex) {
+                slideInHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
             } else {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                    animationSpec = tween(
-                        durationMillis = NavigationSlideDurationMillis,
-                        easing = FastOutSlowInEasing
-                    )
-                ) +
-                    fadeIn(
-                        animationSpec = tween(
-                            durationMillis = NavigationFadeDurationMillis,
-                            delayMillis = NavigationFadeDurationMillis / 3
-                        )
-                    )
+                slideInHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
             }
         },
         exitTransition = {
-            if (isTopLevelSwitch()) {
-                ExitTransition.None
+            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+            if (targetRouteIndex == -1 || targetRouteIndex > initialRouteIndex) {
+                slideOutHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
             } else {
-                fadeOut(
-                    animationSpec = tween(
-                        durationMillis = NavigationFadeDurationMillis,
-                        easing = LinearOutSlowInEasing
-                    )
-                )
+                slideOutHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
             }
         },
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = {
-            if (isTopLevelSwitch()) {
-                ExitTransition.None
+        popEnterTransition = {
+            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+            if (initialRouteIndex != -1 && initialRouteIndex < targetRouteIndex) {
+                slideInHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
             } else {
-                scaleOut(
-                    targetScale = 0.9f,
-                    transformOrigin = TransformOrigin(
-                        pivotFractionX = 0.5f,
-                        pivotFractionY = 0.5f
-                    )
-                )
+                slideInHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+            }
+        },
+        popExitTransition = {
+            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+            if (initialRouteIndex != -1 && initialRouteIndex < targetRouteIndex) {
+                slideOutHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+            } else {
+                slideOutHorizontally(
+                    animationSpec = tween(TopLevelNavigationDurationMillis),
+                    targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
             }
         }
     ) {
@@ -84,8 +95,6 @@ fun AppNavHost(
     }
 }
 
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTopLevelSwitch(): Boolean {
-    val initialRoute = initialState.destination.route
-    val targetRoute = targetState.destination.route
-    return initialRoute in topLevelRoutes && targetRoute in topLevelRoutes
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelRouteIndex(route: String?): Int {
+    return topLevelRouteIndices[route] ?: -1
 }

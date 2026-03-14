@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
@@ -146,67 +148,92 @@ private fun SearchScreen(
         isSearchActive = false
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        SearchBar(
-            modifier = searchBarModifier,
-            query = uiState.query,
-            onQueryChange = {
-                isSearchActive = true
-                onQueryChange(it)
-            },
-            onSearch = {
-                onSearch()
-                isSearchActive = false
-            },
-            active = isSearchActive,
-            onActiveChange = { isSearchActive = it },
-            placeholder = {
-                Text("Search movies, shows, and people")
-            },
-            leadingIcon = {
-                if (isSearchActive) {
-                    IconButton(onClick = { isSearchActive = false }) {
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            SearchBar(
+                modifier = searchBarModifier,
+                query = uiState.query,
+                onQueryChange = {
+                    isSearchActive = true
+                    onQueryChange(it)
+                },
+                onSearch = {
+                    onSearch()
+                    isSearchActive = false
+                },
+                active = isSearchActive,
+                onActiveChange = { isSearchActive = it },
+                placeholder = {
+                    Text("Search movies, shows, and people")
+                },
+                leadingIcon = {
+                    if (isSearchActive) {
+                        IconButton(onClick = { isSearchActive = false }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = "Close search"
+                            )
+                        }
+                    } else {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Close search"
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = null
                         )
                     }
+                },
+                trailingIcon = {
+                    if (uiState.query.isNotEmpty()) {
+                        IconButton(onClick = onClearQuery) {
+                            Icon(
+                                imageVector = Icons.Outlined.Clear,
+                                contentDescription = "Clear search"
+                            )
+                        }
+                    }
+                },
+                colors = SearchBarDefaults.colors()
+            ) {
+                if (showRecentSearches) {
+                    RecentSearchesContent(
+                        recentSearches = uiState.recentSearches,
+                        pageHorizontalPadding = pageHorizontalPadding,
+                        bottomInset = bottomInset,
+                        onRecentSearchClick = onRecentSearchClick,
+                        onRemoveRecentSearch = onRemoveRecentSearch,
+                        onClearRecentSearches = onClearRecentSearches,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .imePadding()
+                    )
                 } else {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null
+                    SearchResultsContent(
+                        uiState = uiState,
+                        filters = filters,
+                        showFilters = showResultFilters,
+                        pageHorizontalPadding = pageHorizontalPadding,
+                        bottomInset = bottomInset,
+                        onFilterChange = onFilterChange,
+                        onClearGenreSuggestion = onClearGenreSuggestion,
+                        onItemClick = onItemClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .imePadding()
                     )
                 }
-            },
-            trailingIcon = {
-                if (uiState.query.isNotEmpty()) {
-                    IconButton(onClick = onClearQuery) {
-                        Icon(
-                            imageVector = Icons.Outlined.Clear,
-                            contentDescription = "Clear search"
-                        )
-                    }
-                }
-            },
-            colors = SearchBarDefaults.colors()
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
-            if (showRecentSearches) {
-                RecentSearchesContent(
-                    recentSearches = uiState.recentSearches,
-                    pageHorizontalPadding = pageHorizontalPadding,
-                    bottomInset = bottomInset,
-                    onRecentSearchClick = onRecentSearchClick,
-                    onRemoveRecentSearch = onRemoveRecentSearch,
-                    onClearRecentSearches = onClearRecentSearches,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .imePadding()
-                )
-            } else {
+            if (showInactiveResults) {
                 SearchResultsContent(
                     uiState = uiState,
                     filters = filters,
-                    showFilters = showResultFilters,
+                    showFilters = true,
                     pageHorizontalPadding = pageHorizontalPadding,
                     bottomInset = bottomInset,
                     onFilterChange = onFilterChange,
@@ -214,40 +241,24 @@ private fun SearchScreen(
                     onItemClick = onItemClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .imePadding()
+                        .weight(1f)
                 )
             }
-        }
 
-        if (showInactiveResults) {
-            SearchResultsContent(
-                uiState = uiState,
-                filters = filters,
-                showFilters = true,
-                pageHorizontalPadding = pageHorizontalPadding,
-                bottomInset = bottomInset,
-                onFilterChange = onFilterChange,
-                onClearGenreSuggestion = onClearGenreSuggestion,
-                onItemClick = onItemClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
-        }
-
-        if (!isSearchActive && !showResultFilters) {
-            BrowseContent(
-                genreSuggestions = SearchGenreSuggestion.entries,
-                pageHorizontalPadding = pageHorizontalPadding,
-                bottomInset = bottomInset,
-                onGenreSuggestionClick = {
-                    isSearchActive = false
-                    onGenreSuggestionClick(it)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
+            if (!isSearchActive && !showResultFilters) {
+                BrowseContent(
+                    genreSuggestions = SearchGenreSuggestion.entries,
+                    pageHorizontalPadding = pageHorizontalPadding,
+                    bottomInset = bottomInset,
+                    onGenreSuggestionClick = {
+                        isSearchActive = false
+                        onGenreSuggestionClick(it)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+            }
         }
     }
 }

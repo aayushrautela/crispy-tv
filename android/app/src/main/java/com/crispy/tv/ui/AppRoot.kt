@@ -1,6 +1,7 @@
 package com.crispy.tv.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,8 +43,12 @@ import kotlinx.coroutines.launch
 fun AppRoot() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-    val currentDestination = TopLevelDestination.entries.firstOrNull { it.route == currentRoute }
+    val currentRoute by remember(navBackStackEntry) {
+        derivedStateOf { navBackStackEntry?.destination?.route }
+    }
+    val currentDestination by remember(currentRoute) {
+        derivedStateOf { TopLevelDestination.entries.firstOrNull { it.route == currentRoute } }
+    }
     val bottomBarDestinations = remember { TopLevelDestination.entries.filter { it.showInBottomBar } }
     val showBottomBar = currentDestination?.showInBottomBar == true
     val showTopBar = currentDestination?.showTopBar == true
@@ -64,8 +70,8 @@ fun AppRoot() {
             topBar = {
                 AnimatedVisibility(
                     visible = showTopBar,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                    enter = fadeIn(animationSpec = tween(durationMillis = 300)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 200)),
                 ) {
                     when (currentDestination) {
                         TopLevelDestination.Home,
@@ -116,7 +122,9 @@ fun AppRoot() {
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     ) {
                         bottomBarDestinations.forEach { destination ->
-                            val selected = currentRoute == destination.route
+                            val selected =
+                                currentRoute == destination.route ||
+                                    currentRoute?.startsWith("${destination.route}/") == true
                             NavigationBarItem(
                                 selected = selected,
                                 onClick = {
