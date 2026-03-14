@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +56,11 @@ fun AppRoot() {
     val appChromeInsets = rememberAppChromeInsets(showTopBar = showTopBar, showBottomBar = showBottomBar)
     val topAppBarScrollBehavior = appBarScrollBehavior(canScroll = { showTopBar })
     val coroutineScope = rememberCoroutineScope()
+    val openSearch: () -> Unit = {
+        navController.navigate(AppRoutes.SearchRoute) {
+            launchSingleTop = true
+        }
+    }
 
     LaunchedEffect(currentRoute) {
         topAppBarScrollBehavior.state.resetHeightOffset()
@@ -79,6 +85,12 @@ fun AppRoot() {
                             StandardTopAppBar(
                                 title = { CrispyWordmark() },
                                 actions = {
+                                    IconButton(onClick = openSearch) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Search,
+                                            contentDescription = "Search",
+                                        )
+                                    }
                                     ProfileIconButton(
                                         onClick = { navController.navigate(AppRoutes.AccountsProfilesRoute) }
                                     )
@@ -91,6 +103,12 @@ fun AppRoot() {
                             StandardTopAppBar(
                                 title = { CrispyWordmark() },
                                 actions = {
+                                    IconButton(onClick = openSearch) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Search,
+                                            contentDescription = "Search",
+                                        )
+                                    }
                                     IconButton(onClick = { navController.navigate(AppRoutes.CalendarRoute) }) {
                                         Icon(
                                             imageVector = Icons.Outlined.Event,

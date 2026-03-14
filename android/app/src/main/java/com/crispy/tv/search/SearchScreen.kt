@@ -71,6 +71,7 @@ import java.util.Locale
 
 @Composable
 fun SearchRoute(
+    onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -85,6 +86,7 @@ fun SearchRoute(
 
     SearchScreen(
         uiState = uiState,
+        onBack = onBack,
         onQueryChange = viewModel::updateQuery,
         onClearQuery = viewModel::clearQuery,
         onSearch = viewModel::submitQuery,
@@ -105,6 +107,7 @@ fun SearchRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun SearchScreen(
     uiState: SearchUiState,
+    onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
     onClearQuery: () -> Unit,
     onSearch: () -> Unit,
@@ -129,7 +132,7 @@ private fun SearchScreen(
     val hasTypedQuery = uiState.trimmedQuery.isNotBlank()
     val hasGenreResults = activeGenreSuggestion != null
     val showResultFilters = hasTypedQuery || hasGenreResults
-    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var isSearchActive by rememberSaveable { mutableStateOf(true) }
     val showRecentSearches = isSearchActive && !showResultFilters
     val showInactiveResults = !isSearchActive && showResultFilters
     val searchBarModifier =
@@ -144,8 +147,8 @@ private fun SearchScreen(
                 }
             )
 
-    BackHandler(enabled = isSearchActive) {
-        isSearchActive = false
+    BackHandler {
+        onBack()
     }
 
     Scaffold(
@@ -168,17 +171,10 @@ private fun SearchScreen(
                     Text("Search movies, shows, and people")
                 },
                 leadingIcon = {
-                    if (isSearchActive) {
-                        IconButton(onClick = { isSearchActive = false }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = "Close search"
-                            )
-                        }
-                    } else {
+                    IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = null
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back"
                         )
                     }
                 },
