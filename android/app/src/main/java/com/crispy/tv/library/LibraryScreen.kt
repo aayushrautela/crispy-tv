@@ -654,8 +654,6 @@ internal fun LibraryRouteContent(
                 }
             }
         }
-    }
-
 }
 
 private fun LibrarySource.toProvider(): WatchProvider? {

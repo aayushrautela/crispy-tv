@@ -215,7 +215,6 @@ private fun HomeScreen(
                 }
             }
         }
-    }
 }
 
 @Composable

@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.Card
@@ -595,8 +596,6 @@ private fun DiscoverScreen(
                 }
             }
         }
-    }
-
     if (activeSheet != null) {
         ModalBottomSheet(
             onDismissRequest = { activeSheet = null }
@@ -746,7 +745,7 @@ private fun DiscoverScreen(
                                         }
                                 )
                             }
-                            items(genres) { genre ->
+                            items(items = genres, key = { it }) { genre ->
                                 ListItem(
                                     headlineContent = { Text(genre) },
                                     trailingContent =
