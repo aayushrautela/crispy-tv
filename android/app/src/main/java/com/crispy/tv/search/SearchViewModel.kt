@@ -41,24 +41,20 @@ data class SearchUiState(
     val filter: SearchTypeFilter = SearchTypeFilter.ALL,
     val activeGenreSuggestion: SearchGenreSuggestion? = null,
     val isLoading: Boolean = false,
+    val recentSearches: List<String> = emptyList(),
     val results: List<CatalogItem> = emptyList()
 ) {
     val trimmedQuery: String
         get() = query.trim()
-
-    val showGenreSuggestions: Boolean
-        get() = trimmedQuery.isBlank() && activeGenreSuggestion == null && filter.supportsGenreSuggestions
-
-    val showBlankSearchHint: Boolean
-        get() = trimmedQuery.isBlank() && activeGenreSuggestion == null && !filter.supportsGenreSuggestions
 }
 
 class SearchViewModel(
     private val searchRepository: TmdbSearchRepository,
+    private val searchHistoryStore: SearchHistoryStore,
     private val localeProvider: () -> Locale = { Locale.getDefault() }
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SearchUiState())
+    private val _uiState = MutableStateFlow(SearchUiState(recentSearches = searchHistoryStore.load()))
     val uiState: StateFlow<SearchUiState> = _uiState
 
     private var searchJob: Job? = null
@@ -89,6 +85,17 @@ class SearchViewModel(
         clearResults()
     }
 
+    fun submitQuery() {
+        saveCurrentQueryToHistory()
+        if (_uiState.value.trimmedQuery.isNotBlank()) {
+            loadResults()
+        }
+    }
+
+    fun rememberCurrentQuery() {
+        saveCurrentQueryToHistory()
+    }
+
     fun selectGenreSuggestion(genreSuggestion: SearchGenreSuggestion) {
         if (!_uiState.value.filter.supportsGenreSuggestions) {
             return
@@ -105,6 +112,29 @@ class SearchViewModel(
     fun clearGenreSuggestion() {
         _uiState.value = _uiState.value.copy(activeGenreSuggestion = null)
         clearResults()
+    }
+
+    fun selectRecentSearch(query: String) {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isEmpty()) {
+            return
+        }
+
+        _uiState.value =
+            _uiState.value.copy(
+                query = normalizedQuery,
+                activeGenreSuggestion = null,
+                recentSearches = searchHistoryStore.record(normalizedQuery)
+            )
+        loadResults()
+    }
+
+    fun removeRecentSearch(query: String) {
+        updateRecentSearches(searchHistoryStore.remove(query))
+    }
+
+    fun clearRecentSearches() {
+        updateRecentSearches(searchHistoryStore.clear())
     }
 
     fun setFilter(filter: SearchTypeFilter) {
@@ -130,6 +160,14 @@ class SearchViewModel(
         searchToken += 1
         searchJob?.cancel()
         _uiState.value = _uiState.value.copy(isLoading = false, results = emptyList())
+    }
+
+    private fun updateRecentSearches(recentSearches: List<String>) {
+        _uiState.value = _uiState.value.copy(recentSearches = recentSearches)
+    }
+
+    private fun saveCurrentQueryToHistory() {
+        updateRecentSearches(searchHistoryStore.record(_uiState.value.trimmedQuery))
     }
 
     private fun loadResults(debounceMs: Long = 0L) {
@@ -215,9 +253,13 @@ class SearchViewModel(
                     }
 
                     val repository = TmdbServicesProvider.searchRepository(context)
+                    val historyStore = SearchHistoryStore(context)
 
                     @Suppress("UNCHECKED_CAST")
-                    return SearchViewModel(searchRepository = repository) as T
+                    return SearchViewModel(
+                        searchRepository = repository,
+                        searchHistoryStore = historyStore
+                    ) as T
                 }
             }
         }
