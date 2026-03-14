@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateBottomPadding
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,20 +35,21 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.crispy.tv.ui.LocalAppChromeInsets
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.components.StandardTopAppBar
-import com.crispy.tv.ui.utils.appBarScrollBehavior
+import kotlinx.coroutines.flow.StateFlow
 
 data class SettingsItem(
     val label: String,
@@ -68,10 +72,21 @@ fun SettingsScreen(
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToAiInsightsSettings: () -> Unit = {},
     onNavigateToProviderPortal: () -> Unit = {},
-    onNavigateToAccountsProfiles: () -> Unit = {}
+    onNavigateToAccountsProfiles: () -> Unit = {},
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
-    val scrollBehavior = appBarScrollBehavior()
+    val appChromeInsets = LocalAppChromeInsets.current
+    val chromePadding = appChromeInsets.asPaddingValues()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            scrollState.animateScrollTo(0)
+            onScrollToTopConsumed()
+        }
+    }
 
     val settingsGroups =
         listOf(
@@ -157,36 +172,28 @@ fun SettingsScreen(
 
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = "Settings",
-                scrollBehavior = scrollBehavior
-            )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(
+                top = chromePadding.calculateTopPadding(),
+                bottom = chromePadding.calculateBottomPadding() + Dimensions.ListItemPadding,
+            ),
+        verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
+    ) {
+        Text(
+            text = "Customize your experience",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = pageHorizontalPadding)
+        )
+
+        settingsGroups.forEach { group ->
+            SettingsGroupCard(group = group)
         }
-    ) { innerPadding ->
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
-        ) {
-            Text(
-                text = "Customize your experience",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = pageHorizontalPadding)
-            )
-
-            settingsGroups.forEach { group ->
-                SettingsGroupCard(group = group)
-            }
-
-            Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
-        }
+        Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
     }
 }
 

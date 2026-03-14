@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,7 +22,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
@@ -44,6 +44,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.ui.rememberInsetPadding
+import com.crispy.tv.ui.rememberStandaloneTopBarInsets
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -125,40 +127,34 @@ internal fun CalendarRoute(
     val horizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
     val scrollBehavior = appBarScrollBehavior()
+    val topBarInsets = rememberStandaloneTopBarInsets()
+    val contentPadding = rememberInsetPadding(
+        windowInsets = topBarInsets,
+        horizontal = horizontalPadding,
+        top = 16.dp,
+        bottom = 16.dp + Dimensions.PageBottomPadding,
+    )
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = { Text("Calendar") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection)
+    ) {
         PullToRefreshBox(
             isRefreshing = uiState.isLoading,
             onRefresh = viewModel::refresh,
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             state = pullToRefreshState,
             indicator = {
                 Indicator(
                     state = pullToRefreshState,
                     isRefreshing = uiState.isLoading,
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(topBarInsets.asPaddingValues()),
                 )
             },
         ) {
             when {
                 uiState.isLoading && uiState.sections.isEmpty() -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator()
@@ -169,8 +165,7 @@ internal fun CalendarRoute(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
-                            .padding(horizontal = horizontalPadding),
+                            .padding(contentPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
@@ -190,12 +185,7 @@ internal fun CalendarRoute(
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = horizontalPadding,
-                            top = 16.dp,
-                            end = horizontalPadding,
-                            bottom = 16.dp + Dimensions.PageBottomPadding,
-                        ),
+                        contentPadding = contentPadding,
                         verticalArrangement = Arrangement.spacedBy(22.dp),
                     ) {
                         if (uiState.statusMessage.isNotBlank()) {
@@ -231,6 +221,16 @@ internal fun CalendarRoute(
                 }
             }
         }
+
+        StandardTopAppBar(
+            title = { Text("Calendar") },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            scrollBehavior = scrollBehavior,
+        )
     }
 }
 

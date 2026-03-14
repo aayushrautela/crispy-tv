@@ -5,6 +5,8 @@ import com.crispy.tv.catalog.CatalogSectionRef
 import java.util.Locale
 
 object AppRoutes {
+    const val TopLevelScrollToTopRequestKey = "topLevelScrollToTopRequest"
+
     const val HomeRoute = "home"
     const val SearchRoute = "search"
     const val DiscoverRoute = "discover"

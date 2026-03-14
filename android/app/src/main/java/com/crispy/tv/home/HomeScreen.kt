@@ -2,40 +2,38 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.ui.brand.CrispyWordmark
-import com.crispy.tv.ui.components.ProfileIconButton
-import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.LocalAppChromeInsets
+import com.crispy.tv.ui.rememberInsetPadding
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
 
 private typealias HomeCatalogSectionStateProvider = (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>
@@ -46,11 +44,12 @@ internal fun HomeRoute(
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
-    onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
     onCollectionPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -81,11 +80,12 @@ internal fun HomeRoute(
         onContinueWatchingClick = onContinueWatchingClick,
         onThisWeekClick = onThisWeekClick,
         onThisWeekSeeAllClick = onThisWeekSeeAllClick,
-        onProfileClick = onProfileClick,
         onCatalogItemClick = onCatalogItemClick,
         onCollectionPlayClick = onCollectionPlayClick,
         onCollectionMovieClick = onCollectionMovieClick,
         onCatalogSeeAllClick = onCatalogSeeAllClick,
+        scrollToTopRequests = scrollToTopRequests,
+        onScrollToTopConsumed = onScrollToTopConsumed,
     )
 }
 
@@ -109,52 +109,49 @@ private fun HomeScreen(
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
-    onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
     onCollectionPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
-    val scrollBehavior = appBarScrollBehavior()
+    val appChromeInsets = LocalAppChromeInsets.current
+    val lazyListState = rememberLazyListState()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = {
-                    CrispyWordmark(Modifier.height(36.dp))
-                },
-                actions = {
-                    ProfileIconButton(onClick = onProfileClick)
-                },
-                scrollBehavior = scrollBehavior,
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            lazyListState.animateScrollToItem(0)
+            onScrollToTopConsumed()
+        }
+    }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            Indicator(
+                state = pullToRefreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter).padding(appChromeInsets.asPaddingValues()),
             )
         },
-    ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            state = pullToRefreshState,
-            indicator = {
-                Indicator(
-                    state = pullToRefreshState,
-                    isRefreshing = isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter),
-                )
-            },
+    ) {
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = rememberInsetPadding(
+                windowInsets = appChromeInsets,
+                horizontal = horizontalPadding,
+                bottom = Dimensions.PageBottomPadding,
+            ),
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing),
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = horizontalPadding,
-                    end = horizontalPadding,
-                    bottom = Dimensions.PageBottomPadding,
-                ),
-                verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing),
-            ) {
                 item(key = "headerSections", contentType = "headerSections") {
                     HomeHeaderSectionsItem(
                         headerSectionsState = headerSectionsState,
@@ -220,7 +217,6 @@ private fun HomeScreen(
                     }
                 }
             }
-        }
     }
 }
 

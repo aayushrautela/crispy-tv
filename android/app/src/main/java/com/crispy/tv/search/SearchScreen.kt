@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.calculateBottomPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.ui.LocalAppChromeInsets
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -113,6 +116,8 @@ private fun SearchScreen(
     onItemClick: (CatalogItem) -> Unit
 ) {
     val pageHorizontalPadding = responsivePageHorizontalPadding()
+    val chromePadding = LocalAppChromeInsets.current.asPaddingValues()
+    val bottomInset = chromePadding.calculateBottomPadding()
     val activeGenreSuggestion = uiState.activeGenreSuggestion
     val filters =
         remember(activeGenreSuggestion) {
@@ -190,6 +195,7 @@ private fun SearchScreen(
                 RecentSearchesContent(
                     recentSearches = uiState.recentSearches,
                     pageHorizontalPadding = pageHorizontalPadding,
+                    bottomInset = bottomInset,
                     onRecentSearchClick = onRecentSearchClick,
                     onRemoveRecentSearch = onRemoveRecentSearch,
                     onClearRecentSearches = onClearRecentSearches,
@@ -203,6 +209,7 @@ private fun SearchScreen(
                     filters = filters,
                     showFilters = showResultFilters,
                     pageHorizontalPadding = pageHorizontalPadding,
+                    bottomInset = bottomInset,
                     onFilterChange = onFilterChange,
                     onClearGenreSuggestion = onClearGenreSuggestion,
                     onItemClick = onItemClick,
@@ -219,6 +226,7 @@ private fun SearchScreen(
                 filters = filters,
                 showFilters = true,
                 pageHorizontalPadding = pageHorizontalPadding,
+                bottomInset = bottomInset,
                 onFilterChange = onFilterChange,
                 onClearGenreSuggestion = onClearGenreSuggestion,
                 onItemClick = onItemClick,
@@ -232,6 +240,7 @@ private fun SearchScreen(
             BrowseContent(
                 genreSuggestions = SearchGenreSuggestion.entries,
                 pageHorizontalPadding = pageHorizontalPadding,
+                bottomInset = bottomInset,
                 onGenreSuggestionClick = {
                     isSearchActive = false
                     onGenreSuggestionClick(it)
@@ -248,6 +257,7 @@ private fun SearchScreen(
 private fun RecentSearchesContent(
     recentSearches: List<String>,
     pageHorizontalPadding: Dp,
+    bottomInset: Dp,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
     onClearRecentSearches: () -> Unit,
@@ -260,7 +270,7 @@ private fun RecentSearchesContent(
                 start = pageHorizontalPadding,
                 end = pageHorizontalPadding,
                 top = Dimensions.SmallSpacing,
-                bottom = Dimensions.PageBottomPadding
+                bottom = bottomInset + Dimensions.PageBottomPadding
             ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -299,6 +309,7 @@ private fun RecentSearchesContent(
 private fun BrowseContent(
     genreSuggestions: List<SearchGenreSuggestion>,
     pageHorizontalPadding: Dp,
+    bottomInset: Dp,
     onGenreSuggestionClick: (SearchGenreSuggestion) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -310,7 +321,7 @@ private fun BrowseContent(
                 start = pageHorizontalPadding,
                 end = pageHorizontalPadding,
                 top = Dimensions.SmallSpacing,
-                bottom = Dimensions.PageBottomPadding
+                bottom = bottomInset + Dimensions.PageBottomPadding
             ),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -338,6 +349,7 @@ private fun SearchResultsContent(
     filters: List<SearchTypeFilter>,
     showFilters: Boolean,
     pageHorizontalPadding: Dp,
+    bottomInset: Dp,
     onFilterChange: (SearchTypeFilter) -> Unit,
     onClearGenreSuggestion: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
@@ -353,7 +365,7 @@ private fun SearchResultsContent(
                 start = pageHorizontalPadding,
                 end = pageHorizontalPadding,
                 top = Dimensions.SmallSpacing,
-                bottom = Dimensions.PageBottomPadding
+                bottom = bottomInset + Dimensions.PageBottomPadding
             ),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)

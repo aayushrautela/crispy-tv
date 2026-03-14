@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -33,20 +35,19 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -60,13 +61,11 @@ import com.crispy.tv.catalog.DiscoverCatalogRef
 import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.ui.components.StandardTopAppBar
-import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.LocalAppChromeInsets
+import com.crispy.tv.ui.rememberInsetPadding
 import com.crispy.tv.ui.components.PosterCard
-import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -344,7 +343,8 @@ private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
 
 @Composable
 fun DiscoverRoute(
-    onProfileClick: () -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -364,8 +364,9 @@ fun DiscoverRoute(
         onCatalogClick = viewModel::selectCatalog,
         onGenreClick = viewModel::selectGenre,
         onLoadMore = viewModel::loadMore,
-        onProfileClick = onProfileClick,
-        onItemClick = onItemClick
+        onItemClick = onItemClick,
+        scrollToTopRequests = scrollToTopRequests,
+        onScrollToTopConsumed = onScrollToTopConsumed,
     )
 }
 
@@ -384,55 +385,51 @@ private fun DiscoverScreen(
     onCatalogClick: (DiscoverCatalogRef) -> Unit,
     onGenreClick: (String?) -> Unit,
     onLoadMore: () -> Unit,
-    onProfileClick: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem) -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
     val selectedCatalog = uiState.selectedCatalog
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
-    val scrollBehavior = appBarScrollBehavior()
+    val appChromeInsets = LocalAppChromeInsets.current
+    val gridState = rememberLazyGridState()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = {
-                    CrispyWordmark(Modifier.height(36.dp))
-                },
-                actions = {
-                    ProfileIconButton(onClick = onProfileClick)
-                },
-                scrollBehavior = scrollBehavior,
-            )
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            gridState.animateScrollToItem(0)
+            onScrollToTopConsumed()
         }
+    }
 
-    ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            state = pullToRefreshState,
-            indicator = {
-                Indicator(
-                    state = pullToRefreshState,
-                    isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter),
-                )
-            },
+    PullToRefreshBox(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            Indicator(
+                state = pullToRefreshState,
+                isRefreshing = uiState.isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter).padding(appChromeInsets.asPaddingValues()),
+            )
+        },
+    ) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Adaptive(minSize = 124.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = rememberInsetPadding(
+                windowInsets = appChromeInsets,
+                horizontal = pageHorizontalPadding,
+                top = Dimensions.SmallSpacing,
+                bottom = Dimensions.PageBottomPadding,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 124.dp),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = pageHorizontalPadding,
-                    top = Dimensions.SmallSpacing,
-                    end = pageHorizontalPadding,
-                    bottom = Dimensions.PageBottomPadding,
-                ),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -602,7 +599,6 @@ private fun DiscoverScreen(
                     }
                 }
             }
-        }
     }
 
     if (activeSheet != null) {

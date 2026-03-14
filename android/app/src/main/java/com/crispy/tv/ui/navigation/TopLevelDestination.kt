@@ -12,11 +12,12 @@ enum class TopLevelDestination(
     val route: String,
     val label: String,
     val icon: ImageVector,
-    val showInBottomBar: Boolean = true
+    val showInBottomBar: Boolean = true,
+    val showTopBar: Boolean = true,
 ) {
     Home(route = AppRoutes.HomeRoute, label = "Home", icon = Icons.Outlined.Home),
     Discover(route = AppRoutes.DiscoverRoute, label = "Discover", icon = Icons.Outlined.Explore),
-    Search(route = AppRoutes.SearchRoute, label = "Search", icon = Icons.Outlined.Search),
+    Search(route = AppRoutes.SearchRoute, label = "Search", icon = Icons.Outlined.Search, showTopBar = false),
     Library(route = AppRoutes.LibraryRoute, label = "Library", icon = Icons.Outlined.VideoLibrary),
     Settings(route = AppRoutes.SettingsRoute, label = "Settings", icon = Icons.Outlined.Settings)
 }

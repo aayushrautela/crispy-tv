@@ -23,7 +23,7 @@ import com.crispy.tv.sync.ProfileDataCloudSync
 import kotlinx.coroutines.launch
 
 internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostController) {
-    composable(AppRoutes.SettingsRoute) {
+    composable(AppRoutes.SettingsRoute) { entry ->
         SettingsScreen(
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
@@ -42,7 +42,11 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             },
             onNavigateToAccountsProfiles = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
-            }
+            },
+            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+            onScrollToTopConsumed = {
+                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+            },
         )
     }
 

@@ -6,9 +6,8 @@ import androidx.navigation.compose.composable
 import com.crispy.tv.library.LibraryRoute
 
 internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController) {
-    composable(AppRoutes.LibraryRoute) {
+    composable(AppRoutes.LibraryRoute) { entry ->
         LibraryRoute(
-            onProfileClick = { navController.navigate(AppRoutes.AccountsProfilesRoute) },
             onItemClick = { entry ->
                 val type = when (entry.contentType) {
                     com.crispy.tv.player.MetadataLabMediaType.MOVIE -> "movie"
@@ -24,7 +23,10 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                 )
             },
             onNavigateToDiscover = { navController.navigate(AppRoutes.DiscoverRoute) },
-            onNavigateToCalendar = { navController.navigate(AppRoutes.CalendarRoute) },
+            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+            onScrollToTopConsumed = {
+                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+            },
         )
     }
 }

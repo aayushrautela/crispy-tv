@@ -6,9 +6,12 @@ import androidx.navigation.compose.composable
 import com.crispy.tv.discover.DiscoverRoute
 
 internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostController) {
-    composable(AppRoutes.DiscoverRoute) {
+    composable(AppRoutes.DiscoverRoute) { entry ->
         DiscoverRoute(
-            onProfileClick = { navController.navigate(AppRoutes.AccountsProfilesRoute) },
+            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+            onScrollToTopConsumed = {
+                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+            },
             onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
         )
     }

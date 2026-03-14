@@ -17,7 +17,7 @@ import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
-    composable(AppRoutes.HomeRoute) {
+    composable(AppRoutes.HomeRoute) { entry ->
         HomeRoute(
             onHeroClick = { hero ->
                 navController.navigate(AppRoutes.homeDetailsRoute(hero.id, hero.type))
@@ -31,9 +31,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onThisWeekSeeAllClick = {
                 navController.navigate(AppRoutes.CalendarRoute)
             },
-            onProfileClick = {
-                navController.navigate(AppRoutes.AccountsProfilesRoute)
-            },
             onCatalogItemClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
             },
@@ -45,7 +42,11 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             },
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))
-            }
+            },
+            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+            onScrollToTopConsumed = {
+                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+            },
         )
     }
 
