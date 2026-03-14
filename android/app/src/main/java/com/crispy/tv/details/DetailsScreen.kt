@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ColorScheme
@@ -232,9 +234,6 @@ internal fun DetailsScreen(
                                 }
                             }
                         },
-                        onToggleTrailerMute = {
-                            onTrailerMutedChanged(!userMutedTrailer)
-                        },
                     )
                 }
 
@@ -289,6 +288,17 @@ internal fun DetailsScreen(
                             contentDescription = "Back",
                             tint = contentColor
                         )
+                    }
+                },
+                actions = {
+                    if (showTrailer && !trailerKey.isNullOrBlank()) {
+                        IconButton(onClick = { onTrailerMutedChanged(!userMutedTrailer) }) {
+                            Icon(
+                                imageVector = if (userMutedTrailer) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = if (userMutedTrailer) "Unmute trailer" else "Mute trailer",
+                                tint = contentColor,
+                            )
+                        }
                     }
                 },
                 colors =

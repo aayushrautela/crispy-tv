@@ -23,10 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.animation.core.animateFloatAsState
@@ -58,7 +55,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.crispy.tv.R
@@ -80,7 +76,6 @@ internal fun HeroSection(
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
     onToggleTrailer: () -> Unit,
-    onToggleTrailerMute: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -231,26 +226,6 @@ internal fun HeroSection(
                     )
                 )
         )
-
-        if (showTrailer && hasTrailer) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 20.dp, end = 16.dp)
-                    .zIndex(2f)
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .clickable { onToggleTrailerMute() },
-                color = Color.Black.copy(alpha = 0.34f),
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = if (isTrailerMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = if (isTrailerMuted) "Unmute trailer" else "Mute trailer",
-                    modifier = Modifier.padding(10.dp)
-                )
-            }
-        }
 
         if (hasTrailer) {
             val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
