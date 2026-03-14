@@ -660,8 +660,6 @@ internal fun LibraryRouteContent(
             }
         }
     }
-}
-
 private fun LibrarySource.toProvider(): WatchProvider? {
     return when (this) {
         LibrarySource.LOCAL -> null
