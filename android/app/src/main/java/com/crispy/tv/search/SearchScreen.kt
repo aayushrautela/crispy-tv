@@ -264,31 +264,23 @@ private fun RecentSearchesContent(
             ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Recent searches",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                if (recentSearches.isNotEmpty()) {
-                    TextButton(onClick = onClearRecentSearches) {
-                        Text("Clear all")
-                    }
-                }
-            }
-        }
-
         if (recentSearches.isEmpty()) {
             item {
                 SearchEmptyState(text = "Your recent searches appear here")
             }
         } else {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onClearRecentSearches) {
+                        Text("Clear all")
+                    }
+                }
+            }
+
             items(
                 items = recentSearches,
                 key = { it.lowercase(Locale.ROOT) }

@@ -97,13 +97,14 @@ class SearchViewModel(
     }
 
     fun selectGenreSuggestion(genreSuggestion: SearchGenreSuggestion) {
-        if (!_uiState.value.filter.supportsGenreSuggestions) {
-            return
-        }
+        val supportedFilter =
+            _uiState.value.filter.takeIf(SearchTypeFilter::supportsGenreSuggestions)
+                ?: SearchTypeFilter.ALL
 
         _uiState.value =
             _uiState.value.copy(
                 query = "",
+                filter = supportedFilter,
                 activeGenreSuggestion = genreSuggestion
             )
         loadResults()

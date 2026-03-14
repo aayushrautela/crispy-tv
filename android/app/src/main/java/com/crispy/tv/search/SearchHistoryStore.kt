@@ -39,7 +39,7 @@ class SearchHistoryStore(context: Context) {
     }
 
     fun clear(): List<String> {
-        prefs.edit().remove(KEY_RECENT_SEARCHES).apply()
+        prefs.edit().remove(KEY_RECENT_SEARCHES).commit()
         return emptyList()
     }
 
@@ -70,13 +70,13 @@ class SearchHistoryStore(context: Context) {
 
     private fun persist(queries: List<String>) {
         if (queries.isEmpty()) {
-            prefs.edit().remove(KEY_RECENT_SEARCHES).apply()
+            prefs.edit().remove(KEY_RECENT_SEARCHES).commit()
             return
         }
 
         val payload = JSONArray()
         queries.forEach(payload::put)
-        prefs.edit().putString(KEY_RECENT_SEARCHES, payload.toString()).apply()
+        prefs.edit().putString(KEY_RECENT_SEARCHES, payload.toString()).commit()
     }
 
     private fun normalize(query: String): String? = query.trim().takeIf(String::isNotEmpty)
