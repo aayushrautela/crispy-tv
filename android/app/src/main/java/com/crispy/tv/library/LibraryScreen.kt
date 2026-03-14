@@ -468,6 +468,8 @@ class LibraryViewModel internal constructor(
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
             }
+        }
+
     }
 }
 
