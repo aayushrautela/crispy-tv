@@ -230,22 +230,22 @@ private fun RootTopAppBar(
     TopAppBar(
         title = {
             when (currentDestination) {
-                TopLevelDestination.Home -> {
-                    CrispyWordmark(
-                        modifier = Modifier
-                            .width(125.dp)
-                            .height(28.dp),
-                    )
-                }
+                 TopLevelDestination.Home -> {
+                     CrispyWordmark(
+                         modifier = Modifier
+                            .width(118.dp)
+                            .height(26.dp),
+                     )
+                 }
 
                 TopLevelDestination.Discover,
                 TopLevelDestination.Library -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CrispyMark(
-                            modifier = Modifier
-                                .width(23.dp)
-                                .height(28.dp),
-                        )
+                     Row(verticalAlignment = Alignment.CenterVertically) {
+                         CrispyMark(
+                             modifier = Modifier
+                                .width(21.dp)
+                                .height(25.dp),
+                         )
                         Text(
                             text = currentDestination.label,
                             style = MaterialTheme.typography.titleLarge,
