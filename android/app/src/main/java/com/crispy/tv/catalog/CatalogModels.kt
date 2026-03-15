@@ -1,15 +1,25 @@
 package com.crispy.tv.catalog
 
 import androidx.compose.runtime.Immutable
+import com.crispy.tv.domain.home.HomeCatalogPresentation
+import com.crispy.tv.domain.home.HomeCatalogSource
 import java.util.Locale
 
 @Immutable
 data class CatalogSectionRef(
-    val title: String,
     val catalogId: String,
-    val subtitle: String = ""
+    val source: HomeCatalogSource,
+    val presentation: HomeCatalogPresentation,
+    val variantKey: String = "default",
+    val name: String = "",
+    val heading: String = "",
+    val title: String = "",
+    val subtitle: String = "",
 ) {
     val key: String = catalogId.trim().lowercase(Locale.US)
+
+    val displayTitle: String
+        get() = heading.ifBlank { title.ifBlank { name.ifBlank { catalogId } } }
 }
 
 @Immutable

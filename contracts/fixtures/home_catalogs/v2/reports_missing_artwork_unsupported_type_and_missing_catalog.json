@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "home_catalogs",
   "case_id": "reports_missing_artwork_unsupported_type_and_missing_catalog",
   "input": {
@@ -8,11 +8,14 @@
       "status_message": "",
       "lists": [
         {
-          "id": "hero.recommendations",
-          "kind": "hero",
+          "kind": "hero-recommendations",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "hero",
+          "name": "hero-recommendations",
+          "heading": "",
           "title": "Featured",
-          "subtitle": null,
-          "heading": null,
+          "subtitle": "",
           "media_types": ["movie"],
           "items": [
             {
@@ -29,11 +32,14 @@
           ]
         },
         {
-          "id": "drama",
-          "kind": "row",
+          "kind": "drama",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "rail",
+          "name": "drama",
+          "heading": "",
           "title": "Drama",
           "subtitle": "Tense stories",
-          "heading": null,
           "media_types": ["series"],
           "items": [
             {
@@ -53,13 +59,12 @@
     },
     "hero_limit": 3,
     "section_limit": 5,
-    "member_shared_section_limit": 5,
     "discover": {
       "media_type": "anime",
       "limit": 2
     },
     "page": {
-      "catalog_id": "member:unknown",
+      "catalog_id": "personal:unknown:default",
       "page": 1,
       "page_size": 5
     }
@@ -72,20 +77,18 @@
       },
       "sections": [
         {
+          "catalog_id": "personal:drama:default",
+          "source": "personal",
+          "presentation": "rail",
+          "variant_key": "default",
+          "name": "drama",
+          "heading": "",
           "title": "Drama",
-          "catalog_id": "drama",
           "subtitle": "Tense stories"
         }
       ],
       "sections_status_message": ""
     },
-    "member_shared_sections": [
-      {
-        "title": "Drama",
-        "catalog_id": "member:drama",
-        "subtitle": "Tense stories"
-      }
-    ],
     "discover": {
       "catalogs": [],
       "status_message": "Unsupported media type: anime"

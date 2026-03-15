@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "home_catalogs",
   "case_id": "falls_back_to_first_list_and_coerces_minimum_limits",
   "input": {
@@ -8,11 +8,14 @@
       "status_message": "",
       "lists": [
         {
-          "id": "featured",
-          "kind": "shelf",
-          "title": "Featured",
-          "subtitle": null,
+          "kind": "featured",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "rail",
+          "name": "featured",
           "heading": "Staff picks",
+          "title": "Featured",
+          "subtitle": "",
           "media_types": ["series"],
           "items": [
             {
@@ -40,11 +43,14 @@
           ]
         },
         {
-          "id": "movies",
-          "kind": "row",
+          "kind": "movies",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "rail",
+          "name": "movies",
+          "heading": "",
           "title": "Movies",
           "subtitle": "",
-          "heading": null,
           "media_types": ["movie"],
           "items": [
             {
@@ -64,13 +70,12 @@
     },
     "hero_limit": 0,
     "section_limit": 0,
-    "member_shared_section_limit": 0,
     "discover": {
       "media_type": null,
       "limit": 0
     },
     "page": {
-      "catalog_id": "featured",
+      "catalog_id": "personal:featured:default",
       "page": 0,
       "page_size": 0
     }
@@ -95,26 +100,29 @@
       },
       "sections": [
         {
+          "catalog_id": "personal:featured:default",
+          "source": "personal",
+          "presentation": "rail",
+          "variant_key": "default",
+          "name": "featured",
+          "heading": "Staff picks",
           "title": "Featured",
-          "catalog_id": "featured",
           "subtitle": ""
         }
       ],
       "sections_status_message": ""
     },
-    "member_shared_sections": [
-      {
-        "title": "Featured",
-        "catalog_id": "member:featured",
-        "subtitle": ""
-      }
-    ],
     "discover": {
       "catalogs": [
         {
           "section": {
+            "catalog_id": "personal:featured:default",
+            "source": "personal",
+            "presentation": "rail",
+            "variant_key": "default",
+            "name": "featured",
+            "heading": "Staff picks",
             "title": "Featured",
-            "catalog_id": "featured",
             "subtitle": ""
           },
           "addon_name": "Supabase",
@@ -139,7 +147,7 @@
       ],
       "status_message": "",
       "attempted_urls": [
-        "supabase:personal_home_feed:p1:featured:page=1"
+        "supabase:personal:p1:featured:default:page=1"
       ]
     }
   }

@@ -13,6 +13,7 @@ import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ContinueWatchingEntry
@@ -22,8 +23,6 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.domain.home.normalizeHomeCatalogId
-import com.crispy.tv.domain.home.resolveHomeCatalogSource
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -82,12 +81,6 @@ data class ThisWeekState(
     val isVisible: Boolean
         get() = isLoading || items.isNotEmpty() || isError
 }
-
-@Immutable
-private data class CatalogSectionsLayout(
-    val collectionSections: List<CatalogSectionRef> = emptyList(),
-    val standardCatalogSections: List<CatalogSectionRef> = emptyList(),
-)
 
 @Immutable
 data class HomeCatalogStatusState(
@@ -166,14 +159,11 @@ class HomeViewModel internal constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
-    private val _headerSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
-    val headerSections: StateFlow<List<CatalogSectionRef>> = _headerSections.asStateFlow()
+    private val _pillSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
+    val pillSections: StateFlow<List<CatalogSectionRef>> = _pillSections.asStateFlow()
 
-    private val _collectionSectionUis = MutableStateFlow<List<HomeCatalogSectionUi>>(emptyList())
-    val collectionSectionUis: StateFlow<List<HomeCatalogSectionUi>> = _collectionSectionUis.asStateFlow()
-
-    private val _standardCatalogSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
-    val standardCatalogSections: StateFlow<List<CatalogSectionRef>> = _standardCatalogSections.asStateFlow()
+    private val _railSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
+    val railSections: StateFlow<List<CatalogSectionRef>> = _railSections.asStateFlow()
 
     private val _catalogStatusState = MutableStateFlow(HomeCatalogStatusState())
     val catalogStatusState: StateFlow<HomeCatalogStatusState> = _catalogStatusState.asStateFlow()
@@ -202,7 +192,6 @@ class HomeViewModel internal constructor(
                     coroutineScope {
                         val jobs = listOf(
                             launch { refreshPrimaryFeed(currentRefreshGeneration) },
-                            launch { refreshHeaderCatalogSections(currentRefreshGeneration) },
                             launch { refreshWatchActivity(currentRefreshGeneration) },
                             launch { refreshThisWeek(currentRefreshGeneration) },
                         )
@@ -251,7 +240,6 @@ class HomeViewModel internal constructor(
         catalogSectionStates.values.forEach { state ->
             state.update { current -> current.copy(isLoading = true) }
         }
-        refreshCollectionSectionUis(_collectionSectionUis.value.map { it.section })
     }
 
     private fun isCurrentRefresh(generation: Long): Boolean {
@@ -297,7 +285,8 @@ class HomeViewModel internal constructor(
             statusMessage = primaryFeedResult.sectionsStatusMessage,
         )
 
-        if (personalFeedResult.sections.isEmpty()) {
+        val railSections = primaryFeedResult.sections.filter { it.presentation == HomeCatalogPresentation.RAIL }
+        if (railSections.isEmpty()) {
             return
         }
 
@@ -305,7 +294,7 @@ class HomeViewModel internal constructor(
         val semaphore = Semaphore(CATALOG_CONCURRENCY_LIMIT)
 
         coroutineScope {
-            personalFeedResult.sections.map { section ->
+            railSections.map { section ->
                 launch {
                     val pageResult =
                         try {
@@ -334,22 +323,6 @@ class HomeViewModel internal constructor(
                 }
             }.joinAll()
         }
-    }
-
-    private suspend fun refreshHeaderCatalogSections(generation: Long) {
-        val sections =
-            try {
-                withContext(Dispatchers.IO) {
-                    homeCatalogService.loadSharedHeaderSections()
-                }
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                Log.w(TAG, "Shared header sections refresh failed", error)
-                emptyList()
-            }
-
-        if (!isCurrentRefresh(generation)) return
-        setHeaderSections(sections)
     }
 
     private suspend fun refreshWatchActivity(generation: Long) {
@@ -712,15 +685,6 @@ class HomeViewModel internal constructor(
         _thisWeekState.value = state
     }
 
-    private fun setHeaderSections(sections: List<CatalogSectionRef>) {
-        _headerSections.value =
-            sections
-                .asSequence()
-                .filter { it.title.trim().isNotEmpty() }
-                .distinctBy { it.key }
-                .toList()
-    }
-
     private fun setCatalogSections(
         sections: List<CatalogSectionRef>,
         statusMessage: String,
@@ -734,9 +698,14 @@ class HomeViewModel internal constructor(
         }
         catalogSectionStates.keys.retainAll(activeKeys)
 
-        val catalogSectionsLayout = partitionCatalogSections(sections)
-        _standardCatalogSections.value = catalogSectionsLayout.standardCatalogSections
-        refreshCollectionSectionUis(catalogSectionsLayout.collectionSections)
+        _pillSections.value =
+            sections
+                .asSequence()
+                .filter { it.presentation == HomeCatalogPresentation.PILL }
+                .filter { it.displayTitle.trim().isNotEmpty() }
+                .distinctBy { it.key }
+                .toList()
+        _railSections.value = sections.filter { it.presentation == HomeCatalogPresentation.RAIL }
         _catalogStatusState.value =
             HomeCatalogStatusState(
                 statusMessage = statusMessage,
@@ -758,16 +727,6 @@ class HomeViewModel internal constructor(
                 isLoading = false,
                 statusMessage = pageResult.statusMessage,
             )
-        if (_collectionSectionUis.value.any { it.section.key == section.key }) {
-            refreshCollectionSectionUis(_collectionSectionUis.value.map { it.section })
-        }
-    }
-
-    private fun refreshCollectionSectionUis(sections: List<CatalogSectionRef>) {
-        _collectionSectionUis.value =
-            sections.map { section ->
-                catalogSectionStates[section.key]?.value ?: HomeCatalogSectionUi(section = section)
-            }
     }
 }
 
@@ -827,23 +786,6 @@ private fun continueWatchingContentKey(type: String, contentId: String): String 
     return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
 }
 
-private fun partitionCatalogSections(sections: List<CatalogSectionRef>): CatalogSectionsLayout {
-    val (collectionSections, standardCatalogSections) =
-        sections.partition {
-            it.isCollectionSection()
-        }
-    return CatalogSectionsLayout(
-        collectionSections = collectionSections,
-        standardCatalogSections = standardCatalogSections,
-    )
-}
-
-private fun CatalogSectionRef.isCollectionSection(): Boolean {
-    val source = resolveHomeCatalogSource(catalogId)
-    val normalizedCatalogId = normalizeHomeCatalogId(catalogId, source)
-    return normalizedCatalogId.startsWith(COLLECTION_CATALOG_PREFIX, ignoreCase = true)
-}
-
 private fun ContinueWatchingItem.toHomeWatchActivityItemUi(nowMs: Long): HomeWatchActivityItemUi {
     return HomeWatchActivityItemUi(
         item = this,
@@ -885,5 +827,3 @@ private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
         MetadataLabMediaType.MOVIE
     }
 }
-
-private const val COLLECTION_CATALOG_PREFIX = "tmdb.collection."

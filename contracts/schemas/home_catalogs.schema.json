@@ -17,7 +17,7 @@
     },
     "input": {
       "type": "object",
-      "required": ["snapshot", "hero_limit", "section_limit", "member_shared_section_limit", "discover", "page"],
+      "required": ["snapshot", "hero_limit", "section_limit", "discover", "page"],
       "additionalProperties": false,
       "properties": {
         "snapshot": {
@@ -27,9 +27,6 @@
           "type": "integer"
         },
         "section_limit": {
-          "type": "integer"
-        },
-        "member_shared_section_limit": {
           "type": "integer"
         },
         "discover": {
@@ -65,7 +62,7 @@
     },
     "expected": {
       "type": "object",
-      "required": ["personal_feed", "member_shared_sections", "discover", "page"],
+      "required": ["personal_feed", "discover", "page"],
       "additionalProperties": false,
       "properties": {
         "personal_feed": {
@@ -98,12 +95,6 @@
             "sections_status_message": {
               "type": "string"
             }
-          }
-        },
-        "member_shared_sections": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/section"
           }
         },
         "discover": {
@@ -169,23 +160,34 @@
     },
     "list": {
       "type": "object",
-      "required": ["id", "kind", "title", "subtitle", "heading", "media_types", "items"],
+      "required": ["kind", "variant_key", "source", "presentation", "name", "heading", "title", "subtitle", "media_types", "items"],
       "additionalProperties": false,
       "properties": {
-        "id": {
+        "kind": {
           "type": "string"
         },
-        "kind": {
-          "type": ["string", "null"]
+        "variant_key": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["personal", "public", "personal_home_feed", "public_home_feed"]
+        },
+        "presentation": {
+          "type": "string",
+          "enum": ["hero", "pill", "rail"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string"
         },
         "title": {
           "type": "string"
         },
         "subtitle": {
-          "type": ["string", "null"]
-        },
-        "heading": {
-          "type": ["string", "null"]
+          "type": "string"
         },
         "media_types": {
           "type": "array",
@@ -274,13 +276,30 @@
     },
     "section": {
       "type": "object",
-      "required": ["title", "catalog_id", "subtitle"],
+      "required": ["catalog_id", "source", "presentation", "variant_key", "name", "heading", "title", "subtitle"],
       "additionalProperties": false,
       "properties": {
-        "title": {
+        "catalog_id": {
           "type": "string"
         },
-        "catalog_id": {
+        "source": {
+          "type": "string",
+          "enum": ["personal", "public", "personal_home_feed", "public_home_feed"]
+        },
+        "presentation": {
+          "type": "string",
+          "enum": ["hero", "pill", "rail"]
+        },
+        "variant_key": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string"
+        },
+        "title": {
           "type": "string"
         },
         "subtitle": {

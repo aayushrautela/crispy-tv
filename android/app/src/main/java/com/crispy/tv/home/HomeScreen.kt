@@ -62,8 +62,6 @@ internal fun HomeRoute(
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
-    onCollectionPlayClick: (CatalogItem) -> Unit,
-    onCollectionMovieClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
@@ -77,7 +75,7 @@ internal fun HomeRoute(
         },
     )
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-    val standardCatalogSections by viewModel.standardCatalogSections.collectAsStateWithLifecycle()
+    val railSections by viewModel.railSections.collectAsStateWithLifecycle()
     val catalogSectionState = remember(viewModel) { viewModel::catalogSectionState }
     val scrollBehavior = appBarScrollBehavior()
 
@@ -111,9 +109,8 @@ internal fun HomeRoute(
         ) {
             HomeScreen(
                 isRefreshing = isRefreshing,
-                headerSectionsState = viewModel.headerSections,
-                collectionSectionUisState = viewModel.collectionSectionUis,
-                standardCatalogSections = standardCatalogSections,
+                pillSectionsState = viewModel.pillSections,
+                railSections = railSections,
                 catalogStatusState = viewModel.catalogStatusState,
                 heroState = viewModel.heroState,
                 continueWatchingState = viewModel.continueWatchingState,
@@ -128,8 +125,6 @@ internal fun HomeRoute(
                 onThisWeekClick = onThisWeekClick,
                 onThisWeekSeeAllClick = onThisWeekSeeAllClick,
                 onCatalogItemClick = onCatalogItemClick,
-                onCollectionPlayClick = onCollectionPlayClick,
-                onCollectionMovieClick = onCollectionMovieClick,
                 onCatalogSeeAllClick = onCatalogSeeAllClick,
                 scrollToTopRequests = scrollToTopRequests,
                 onScrollToTopConsumed = onScrollToTopConsumed,
@@ -142,9 +137,8 @@ internal fun HomeRoute(
 @Composable
 private fun HomeScreen(
     isRefreshing: Boolean,
-    headerSectionsState: StateFlow<List<CatalogSectionRef>>,
-    collectionSectionUisState: StateFlow<List<HomeCatalogSectionUi>>,
-    standardCatalogSections: List<CatalogSectionRef>,
+    pillSectionsState: StateFlow<List<CatalogSectionRef>>,
+    railSections: List<CatalogSectionRef>,
     catalogStatusState: StateFlow<HomeCatalogStatusState>,
     heroState: StateFlow<HeroState>,
     continueWatchingState: StateFlow<HomeWatchActivityRailState>,
@@ -159,8 +153,6 @@ private fun HomeScreen(
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
-    onCollectionPlayClick: (CatalogItem) -> Unit,
-    onCollectionMovieClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
@@ -204,7 +196,7 @@ private fun HomeScreen(
                 item(key = "topHeader", contentType = "topHeader") {
                     Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
                         HomeHeaderSectionsItem(
-                            headerSectionsState = headerSectionsState,
+                            headerSectionsState = pillSectionsState,
                             onSectionClick = onCatalogSeeAllClick,
                         )
                         HomeHeroSection(
@@ -238,22 +230,13 @@ private fun HomeScreen(
                     )
                 }
 
-                item(key = "collections", contentType = "collections") {
-                    HomeCollectionSectionsItem(
-                        collectionSectionUisState = collectionSectionUisState,
-                        onCollectionClick = onCatalogSeeAllClick,
-                        onCollectionPlayClick = onCollectionPlayClick,
-                        onCollectionMovieClick = onCollectionMovieClick,
-                    )
-                }
-
                 item(key = "catalogStatus", contentType = "catalogStatus") {
                     HomeCatalogStatusItem(catalogStatusState = catalogStatusState)
                 }
 
-                if (standardCatalogSections.isNotEmpty()) {
+                if (railSections.isNotEmpty()) {
                     items(
-                        items = standardCatalogSections,
+                        items = railSections,
                         key = { it.key },
                         contentType = { "catalogSection" },
                     ) { section ->
@@ -408,22 +391,6 @@ private fun HomeCatalogSectionItem(
 }
 
 @Composable
-private fun HomeCollectionSectionsItem(
-    collectionSectionUisState: StateFlow<List<HomeCatalogSectionUi>>,
-    onCollectionClick: (CatalogSectionRef) -> Unit,
-    onCollectionPlayClick: (CatalogItem) -> Unit,
-    onCollectionMovieClick: (CatalogItem) -> Unit,
-) {
-    val sectionUis by collectionSectionUisState.collectAsStateWithLifecycle()
-    HomeCollectionSectionRow(
-        sectionUis = sectionUis,
-        onCollectionClick = onCollectionClick,
-        onCollectionPlayClick = onCollectionPlayClick,
-        onCollectionMovieClick = onCollectionMovieClick,
-    )
-}
-
-@Composable
 private fun HomeHeaderSectionChips(
     sections: List<CatalogSectionRef>,
     onSectionClick: (CatalogSectionRef) -> Unit,
@@ -437,7 +404,7 @@ private fun HomeHeaderSectionChips(
             FilterChip(
                 selected = false,
                 onClick = { onSectionClick(section) },
-                label = { Text(section.title) },
+                label = { Text(section.displayTitle) },
                 shape = RoundedCornerShape(16.dp),
                 border = null,
                 colors = FilterChipDefaults.filterChipColors(

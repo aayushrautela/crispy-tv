@@ -68,7 +68,7 @@ object AppRoutes {
 
     fun catalogListRoute(section: CatalogSectionRef): String {
         return "$CatalogListRoute/${Uri.encode(section.catalogId)}" +
-            "?$CatalogTitleArg=${Uri.encode(section.title)}"
+            "?$CatalogTitleArg=${Uri.encode(section.displayTitle)}"
     }
 
     fun personDetailsRoute(personId: String): String {

@@ -23,10 +23,6 @@ final class HomeCatalogsContractTests: XCTestCase {
                 heroLimit: try requireInt(input, "hero_limit", fixture: fixtureURL),
                 sectionLimit: try requireInt(input, "section_limit", fixture: fixtureURL)
             )
-            let actualMemberSharedSections = buildMemberSharedHeaderSections(
-                snapshot: snapshot,
-                limit: try requireInt(input, "member_shared_section_limit", fixture: fixtureURL)
-            )
             let actualDiscover = listDiscoverCatalogs(
                 snapshot: snapshot,
                 mediaType: optionalString(discoverInput, "media_type"),
@@ -40,7 +36,6 @@ final class HomeCatalogsContractTests: XCTestCase {
             )
 
             XCTAssertEqual(try parsePersonalFeed(try requireObject(expected, "personal_feed", fixture: fixtureURL), fixture: fixtureURL), actualPersonalFeed, "\(caseId): personal_feed")
-            XCTAssertEqual(try requireArray(expected, "member_shared_sections", fixture: fixtureURL).map { try parseSection($0, fixture: fixtureURL) }, actualMemberSharedSections, "\(caseId): member_shared_sections")
             let expectedDiscover = try parseDiscover(try requireObject(expected, "discover", fixture: fixtureURL), fixture: fixtureURL)
             XCTAssertEqual(expectedDiscover.catalogs, actualDiscover.0, "\(caseId): discover catalogs")
             XCTAssertEqual(expectedDiscover.statusMessage, actualDiscover.1, "\(caseId): discover status")
@@ -61,12 +56,19 @@ final class HomeCatalogsContractTests: XCTestCase {
             throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): list must be an object")
         }
 
+        guard let source = HomeCatalogSource.fromRaw(try requireString(object, "source", fixture: fixture)) else {
+            throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): invalid source")
+        }
+
         return HomeCatalogList(
-            id: try requireString(object, "id", fixture: fixture),
-            kind: optionalString(object, "kind"),
-            title: try requireString(object, "title", fixture: fixture),
-            subtitle: optionalString(object, "subtitle"),
-            heading: optionalString(object, "heading"),
+            kind: try requireString(object, "kind", fixture: fixture),
+            variantKey: optionalString(object, "variant_key") ?? "default",
+            source: source,
+            presentation: HomeCatalogPresentation.fromRaw(optionalString(object, "presentation")),
+            name: optionalString(object, "name") ?? "",
+            heading: optionalString(object, "heading") ?? "",
+            title: optionalString(object, "title") ?? "",
+            subtitle: optionalString(object, "subtitle") ?? "",
             items: try requireArray(object, "items", fixture: fixture).map { try parseItem($0, fixture: fixture) },
             mediaTypes: Set(try stringArrayValue(try requireArray(object, "media_types", fixture: fixture), fixture: fixture, field: "media_types"))
         )
@@ -128,10 +130,19 @@ final class HomeCatalogsContractTests: XCTestCase {
             throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): section must be an object")
         }
 
+        guard let source = HomeCatalogSource.fromRaw(try requireString(object, "source", fixture: fixture)) else {
+            throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): invalid section source")
+        }
+
         return HomeCatalogSection(
-            title: try requireString(object, "title", fixture: fixture),
             catalogId: try requireString(object, "catalog_id", fixture: fixture),
-            subtitle: try requireString(object, "subtitle", fixture: fixture)
+            source: source,
+            presentation: HomeCatalogPresentation.fromRaw(optionalString(object, "presentation")),
+            variantKey: optionalString(object, "variant_key") ?? "default",
+            name: optionalString(object, "name") ?? "",
+            heading: optionalString(object, "heading") ?? "",
+            title: optionalString(object, "title") ?? "",
+            subtitle: optionalString(object, "subtitle") ?? ""
         )
     }
 

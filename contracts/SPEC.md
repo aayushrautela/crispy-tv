@@ -47,9 +47,12 @@ The spec version documents the contract surface. Each suite owns its own
   - Append synthetic `Internet Movie Database` and `Metacritic` ratings from top-level OMDb fields only when those sources are otherwise absent.
 - `home_catalogs`
   - Plan home-screen hero shelves, header sections, discover catalog refs, and paged catalog results from deterministic snapshot input.
-  - Hero selection prefers the first explicit hero list; otherwise it falls back to the first list.
+  - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
+  - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
+  - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
-  - Personal sections keep raw ids, member-shared sections prefix ids with `member:`, discover filtering accepts only `movie` and `series`, and page results use canonical attempted-url keys.
+  - Non-hero sections remain in feed order; `presentation` drives downstream `hero | pill | rail` UI decisions and unknown values normalize to `rail`.
+  - Discover filtering accepts only `movie` and `series`, includes only `presentation = rail` sections, and page results use canonical attempted-url keys with source + kind + variant.
 - `catalog_url_building`
   - Build deterministic addon catalog request URL variants from addon `base_url`, preserved manifest query params, media type, catalog id, pagination, and filters.
   - For first-page requests with no filters, try simple path first, then path-style extras, then legacy query style.

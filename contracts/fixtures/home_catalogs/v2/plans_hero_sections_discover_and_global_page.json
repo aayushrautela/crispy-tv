@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "home_catalogs",
   "case_id": "plans_hero_sections_discover_and_global_page",
   "input": {
@@ -8,11 +8,14 @@
       "status_message": "",
       "lists": [
         {
-          "id": "hero.shelf",
-          "kind": "curated.hero",
+          "kind": "hero_similar",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "hero",
+          "name": "hero_similar",
+          "heading": "",
           "title": "Hero Shelf",
           "subtitle": "Because you watched sci-fi",
-          "heading": null,
           "media_types": ["movie"],
           "items": [
             {
@@ -51,11 +54,14 @@
           ]
         },
         {
-          "id": "trending-series",
-          "kind": "rail",
+          "kind": "trending-series",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "rail",
+          "name": "trending-series",
+          "heading": "",
           "title": "Trending Series",
           "subtitle": "Binge now",
-          "heading": null,
           "media_types": ["series"],
           "items": [
             {
@@ -83,11 +89,14 @@
           ]
         },
         {
-          "id": "popular-movies",
-          "kind": "rail",
+          "kind": "popular-movies",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "rail",
+          "name": "popular-movies",
+          "heading": "",
           "title": "Popular Movies",
           "subtitle": "Blockbusters",
-          "heading": null,
           "media_types": ["movie"],
           "items": [
             {
@@ -107,13 +116,12 @@
     },
     "hero_limit": 2,
     "section_limit": 2,
-    "member_shared_section_limit": 2,
     "discover": {
       "media_type": "series",
       "limit": 3
     },
     "page": {
-      "catalog_id": "member:trending-series",
+      "catalog_id": "personal:trending-series:default",
       "page": 2,
       "page_size": 1
     }
@@ -149,36 +157,39 @@
       },
       "sections": [
         {
+          "catalog_id": "personal:trending-series:default",
+          "source": "personal",
+          "presentation": "rail",
+          "variant_key": "default",
+          "name": "trending-series",
+          "heading": "",
           "title": "Trending Series",
-          "catalog_id": "trending-series",
           "subtitle": "Binge now"
         },
         {
+          "catalog_id": "personal:popular-movies:default",
+          "source": "personal",
+          "presentation": "rail",
+          "variant_key": "default",
+          "name": "popular-movies",
+          "heading": "",
           "title": "Popular Movies",
-          "catalog_id": "popular-movies",
           "subtitle": "Blockbusters"
         }
       ],
       "sections_status_message": ""
     },
-    "member_shared_sections": [
-      {
-        "title": "Trending Series",
-        "catalog_id": "member:trending-series",
-        "subtitle": "Binge now"
-      },
-      {
-        "title": "Popular Movies",
-        "catalog_id": "member:popular-movies",
-        "subtitle": "Blockbusters"
-      }
-    ],
     "discover": {
       "catalogs": [
         {
           "section": {
+            "catalog_id": "personal:trending-series:default",
+            "source": "personal",
+            "presentation": "rail",
+            "variant_key": "default",
+            "name": "trending-series",
+            "heading": "",
             "title": "Trending Series",
-            "catalog_id": "trending-series",
             "subtitle": "Binge now"
           },
           "addon_name": "Supabase",
@@ -203,8 +214,8 @@
       ],
       "status_message": "",
       "attempted_urls": [
-          "supabase:member_shared_home_feed:profile-123:trending-series:page=2"
-        ]
-      }
+        "supabase:personal:profile-123:trending-series:default:page=2"
+      ]
     }
+  }
 }

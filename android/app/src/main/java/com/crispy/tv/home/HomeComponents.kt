@@ -575,7 +575,7 @@ internal fun HomeCatalogSectionRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = sectionUi.section.title,
+                    text = sectionUi.section.displayTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -724,7 +724,7 @@ private fun HomeCollectionCard(
             }
         }
     val artworkModel = rememberCrispyImageModel(artworkUrl, width = 320.dp, height = 180.dp, tmdbSize = "w780")
-    val collectionTitle = remember(sectionUi.section.title) { collectionDisplayTitle(sectionUi.section.title) }
+    val collectionTitle = remember(sectionUi.section.displayTitle) { collectionDisplayTitle(sectionUi.section.displayTitle) }
     val fallbackText =
         when {
             sectionUi.isLoading && sectionUi.items.isEmpty() -> "Loading"
@@ -756,7 +756,7 @@ private fun HomeCollectionCard(
                 if (artworkModel != null) {
                     AsyncImage(
                         model = artworkModel,
-                        contentDescription = sectionUi.section.title,
+                        contentDescription = sectionUi.section.displayTitle,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                     )

@@ -34,12 +34,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onCatalogItemClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
             },
-            onCollectionPlayClick = { item ->
-                navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
-            },
-            onCollectionMovieClick = { item ->
-                navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
-            },
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))
             },
@@ -74,8 +68,10 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         val args = entry.arguments
         val section =
             CatalogSectionRef(
+                catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty(),
+                source = com.crispy.tv.domain.home.resolveHomeCatalogSource(args?.getString(AppRoutes.CatalogIdArg).orEmpty()),
+                presentation = com.crispy.tv.domain.home.HomeCatalogPresentation.RAIL,
                 title = args?.getString(AppRoutes.CatalogTitleArg).orEmpty(),
-                catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty()
             )
         CatalogRoute(
             section = section,

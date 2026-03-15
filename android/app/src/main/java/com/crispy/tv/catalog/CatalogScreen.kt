@@ -59,7 +59,7 @@ fun CatalogRoute(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             StandardTopAppBar(
-                title = section.title,
+                title = section.displayTitle,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(

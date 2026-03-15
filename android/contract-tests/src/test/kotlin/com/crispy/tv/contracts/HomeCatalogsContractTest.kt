@@ -6,11 +6,12 @@ import com.crispy.tv.domain.home.HomeCatalogHeroResult
 import com.crispy.tv.domain.home.HomeCatalogItem
 import com.crispy.tv.domain.home.HomeCatalogList
 import com.crispy.tv.domain.home.HomeCatalogPageResult
+import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.domain.home.HomeCatalogFeedPlan
 import com.crispy.tv.domain.home.HomeCatalogSection
 import com.crispy.tv.domain.home.HomeCatalogSnapshot
+import com.crispy.tv.domain.home.HomeCatalogSource
 import com.crispy.tv.domain.home.buildCatalogPage
-import com.crispy.tv.domain.home.buildMemberSharedHeaderSections
 import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
 import java.nio.file.Path
@@ -42,10 +43,6 @@ class HomeCatalogsContractTest {
                 heroLimit = input.requireInt("hero_limit", path),
                 sectionLimit = input.requireInt("section_limit", path),
             )
-            val actualMemberSharedSections = buildMemberSharedHeaderSections(
-                snapshot = snapshot,
-                limit = input.requireInt("member_shared_section_limit", path),
-            )
             val actualDiscover = listDiscoverCatalogs(
                 snapshot = snapshot,
                 mediaType = discoverInput.optionalString("media_type", path),
@@ -62,11 +59,6 @@ class HomeCatalogsContractTest {
                 parsePersonalFeed(expected.requireJsonObject("personal_feed", path), path),
                 actualPersonalFeed,
                 "$caseId: personal_feed",
-            )
-            assertEquals(
-                expected.requireJsonArray("member_shared_sections", path).map { parseSection(it.jsonObject, path) },
-                actualMemberSharedSections,
-                "$caseId: member_shared_sections",
             )
             assertEquals(
                 parseDiscover(expected.requireJsonObject("discover", path), path),
@@ -91,11 +83,15 @@ class HomeCatalogsContractTest {
 
     private fun parseList(json: JsonObject, path: Path): HomeCatalogList {
         return HomeCatalogList(
-            id = json.requireString("id", path),
-            kind = json.optionalString("kind", path),
-            title = json.requireString("title", path),
-            subtitle = json.optionalString("subtitle", path),
-            heading = json.optionalString("heading", path),
+            kind = json.requireString("kind", path),
+            variantKey = json.optionalString("variant_key", path) ?: "default",
+            source = HomeCatalogSource.fromRaw(json.requireString("source", path))
+                ?: error("${path.fileName}: invalid source"),
+            presentation = HomeCatalogPresentation.fromRaw(json.optionalString("presentation", path)),
+            name = json.optionalString("name", path).orEmpty(),
+            heading = json.optionalString("heading", path).orEmpty(),
+            title = json.optionalString("title", path).orEmpty(),
+            subtitle = json.optionalString("subtitle", path).orEmpty(),
             items = json.requireJsonArray("items", path).map { parseItem(it.jsonObject, path) },
             mediaTypes = json.requireJsonArray("media_types", path).toStringList(path).toSet(),
         )
@@ -146,9 +142,15 @@ class HomeCatalogsContractTest {
 
     private fun parseSection(json: JsonObject, path: Path): HomeCatalogSection {
         return HomeCatalogSection(
-            title = json.requireString("title", path),
             catalogId = json.requireString("catalog_id", path),
-            subtitle = json.requireString("subtitle", path),
+            source = HomeCatalogSource.fromRaw(json.requireString("source", path))
+                ?: error("${path.fileName}: invalid section source"),
+            presentation = HomeCatalogPresentation.fromRaw(json.optionalString("presentation", path)),
+            variantKey = json.optionalString("variant_key", path) ?: "default",
+            name = json.optionalString("name", path).orEmpty(),
+            heading = json.optionalString("heading", path).orEmpty(),
+            title = json.optionalString("title", path).orEmpty(),
+            subtitle = json.optionalString("subtitle", path).orEmpty(),
         )
     }
 

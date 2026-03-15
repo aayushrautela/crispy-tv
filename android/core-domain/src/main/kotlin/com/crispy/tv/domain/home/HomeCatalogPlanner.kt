@@ -14,36 +14,67 @@ data class HomeCatalogItem(
     val description: String? = null,
 )
 
+enum class HomeCatalogSource(val key: String) {
+    PERSONAL("personal"),
+    PUBLIC("public");
+
+    companion object {
+        fun fromRaw(raw: String?): HomeCatalogSource? {
+            return when (raw?.trim()?.lowercase(Locale.US)) {
+                PERSONAL.key,
+                "personal_home_feed",
+                -> PERSONAL
+
+                PUBLIC.key,
+                "public_home_feed",
+                -> PUBLIC
+
+                else -> null
+            }
+        }
+    }
+}
+
+enum class HomeCatalogPresentation(val key: String) {
+    HERO("hero"),
+    PILL("pill"),
+    RAIL("rail");
+
+    companion object {
+        fun fromRaw(raw: String?): HomeCatalogPresentation {
+            return when (raw?.trim()?.lowercase(Locale.US)) {
+                HERO.key -> HERO
+                PILL.key -> PILL
+                else -> RAIL
+            }
+        }
+    }
+}
+
 data class HomeCatalogList(
-    val id: String,
-    val kind: String?,
-    val title: String,
-    val subtitle: String?,
-    val heading: String?,
+    val kind: String,
+    val variantKey: String = DEFAULT_VARIANT_KEY,
+    val source: HomeCatalogSource,
+    val presentation: HomeCatalogPresentation = HomeCatalogPresentation.RAIL,
+    val name: String = "",
+    val heading: String = "",
+    val title: String = "",
+    val subtitle: String = "",
     val items: List<HomeCatalogItem>,
     val mediaTypes: Set<String> = emptySet(),
-)
+) {
+    val catalogId: String
+        get() = buildHomeCatalogId(source = source, kind = kind, variantKey = variantKey)
+
+    val displayTitle: String
+        get() = heading.ifBlank { title.ifBlank { name.ifBlank { kind } } }
+}
 
 data class HomeCatalogSnapshot(
     val profileId: String?,
     val lists: List<HomeCatalogList>,
     val statusMessage: String,
 )
-
-enum class HomeCatalogSource(val key: String) {
-    PERSONAL("personal_home_feed"),
-    MEMBER_SHARED("member_shared_home_feed"),
-    PUBLIC("public_home_feed");
-
-    fun catalogId(rawCatalogId: String): String {
-        val normalizedId = rawCatalogId.trim()
-        return when (this) {
-            PERSONAL -> normalizedId
-            MEMBER_SHARED -> "$MEMBER_SHARED_CATALOG_ID_PREFIX$normalizedId"
-            PUBLIC -> "$PUBLIC_CATALOG_ID_PREFIX$normalizedId"
-        }
-    }
-}
 
 data class HomeCatalogHeroItem(
     val id: String,
@@ -63,10 +94,18 @@ data class HomeCatalogHeroResult(
 )
 
 data class HomeCatalogSection(
-    val title: String,
     val catalogId: String,
+    val source: HomeCatalogSource,
+    val presentation: HomeCatalogPresentation,
+    val variantKey: String = DEFAULT_VARIANT_KEY,
+    val name: String = "",
+    val heading: String = "",
+    val title: String = "",
     val subtitle: String = "",
-)
+) {
+    val displayTitle: String
+        get() = heading.ifBlank { title.ifBlank { name.ifBlank { catalogId } } }
+}
 
 data class HomeCatalogDiscoverRef(
     val section: HomeCatalogSection,
@@ -86,9 +125,14 @@ data class HomeCatalogPageResult(
     val attemptedUrls: List<String> = emptyList(),
 )
 
+data class HomeCatalogIdentifier(
+    val source: HomeCatalogSource,
+    val kind: String,
+    val variantKey: String,
+)
+
 fun planHomeFeed(
     snapshot: HomeCatalogSnapshot,
-    source: HomeCatalogSource,
     heroLimit: Int = 10,
     sectionLimit: Int = Int.MAX_VALUE,
 ): HomeCatalogFeedPlan {
@@ -102,7 +146,7 @@ fun planHomeFeed(
 
     return HomeCatalogFeedPlan(
         heroResult = buildHeroResult(snapshot, heroLimit),
-        sections = buildHomeCatalogSections(snapshot.lists, source, sectionLimit),
+        sections = buildHomeCatalogSections(snapshot.lists, sectionLimit),
         sectionsStatusMessage = "",
     )
 }
@@ -114,43 +158,9 @@ fun planPersonalHomeFeed(
 ): HomeCatalogFeedPlan {
     return planHomeFeed(
         snapshot = snapshot,
-        source = HomeCatalogSource.PERSONAL,
         heroLimit = heroLimit,
         sectionLimit = sectionLimit,
     )
-}
-
-fun buildMemberSharedHeaderSections(
-    snapshot: HomeCatalogSnapshot,
-    limit: Int = Int.MAX_VALUE,
-): List<HomeCatalogSection> {
-    return buildSharedHeaderSections(
-        snapshot = snapshot,
-        source = HomeCatalogSource.MEMBER_SHARED,
-        limit = limit,
-    )
-}
-
-fun buildPublicHeaderSections(
-    snapshot: HomeCatalogSnapshot,
-    limit: Int = Int.MAX_VALUE,
-): List<HomeCatalogSection> {
-    return buildSharedHeaderSections(
-        snapshot = snapshot,
-        source = HomeCatalogSource.PUBLIC,
-        limit = limit,
-    )
-}
-
-fun buildSharedHeaderSections(
-    snapshot: HomeCatalogSnapshot,
-    source: HomeCatalogSource,
-    limit: Int = Int.MAX_VALUE,
-): List<HomeCatalogSection> {
-    if (snapshot.lists.isEmpty()) {
-        return emptyList()
-    }
-    return buildHomeCatalogSections(snapshot.lists, source, limit)
 }
 
 fun listDiscoverCatalogs(
@@ -169,7 +179,8 @@ fun listDiscoverCatalogs(
 
     val filteredLists =
         snapshot.lists.filter { list ->
-            !list.isHeroList() && (normalizedType == null || list.supportsMediaType(normalizedType))
+            list.presentation == HomeCatalogPresentation.RAIL &&
+                (normalizedType == null || list.supportsMediaType(normalizedType))
         }
 
     if (filteredLists.isEmpty()) {
@@ -181,11 +192,7 @@ fun listDiscoverCatalogs(
     val limitedLists = if (targetCount >= filteredLists.size) filteredLists else filteredLists.take(targetCount)
     return limitedLists.map { list ->
         HomeCatalogDiscoverRef(
-            section = HomeCatalogSection(
-                title = list.title,
-                catalogId = list.id,
-                subtitle = list.subtitle.orEmpty(),
-            ),
+            section = list.toSection(),
             addonName = "Supabase",
             genres = emptyList(),
         )
@@ -209,16 +216,28 @@ fun buildCatalogPage(
         )
     }
 
-    val source = resolveHomeCatalogSource(sectionCatalogId)
-    val catalogId = normalizeHomeCatalogId(sectionCatalogId, source)
-    val list = snapshot.lists.firstOrNull { it.id.equals(catalogId, ignoreCase = true) }
+    val identifier = parseHomeCatalogId(sectionCatalogId)
         ?: return HomeCatalogPageResult(
             items = emptyList(),
             statusMessage = "Catalog not found.",
             attemptedUrls = emptyList(),
         )
 
-    val attempted = listOf("supabase:${source.key}:${snapshot.profileId.orEmpty()}:${list.id}:page=$targetPage")
+    val list =
+        snapshot.lists.firstOrNull {
+            it.source == identifier.source &&
+                it.kind.equals(identifier.kind, ignoreCase = true) &&
+                it.variantKey.equals(identifier.variantKey, ignoreCase = true)
+        } ?: return HomeCatalogPageResult(
+            items = emptyList(),
+            statusMessage = "Catalog not found.",
+            attemptedUrls = emptyList(),
+        )
+
+    val attempted =
+        listOf(
+            "supabase:${identifier.source.key}:${snapshot.profileId.orEmpty()}:${identifier.kind}:${identifier.variantKey}:page=$targetPage"
+        )
     val allItems = list.items
     val startIndexLong = (targetPage.toLong() - 1L) * targetSize.toLong()
     if (startIndexLong >= allItems.size.toLong()) {
@@ -243,39 +262,33 @@ fun buildCatalogPage(
     )
 }
 
-fun resolveHomeCatalogSource(catalogId: String): HomeCatalogSource {
-    val trimmed = catalogId.trim()
-    return when {
-        trimmed.startsWith(MEMBER_SHARED_CATALOG_ID_PREFIX, ignoreCase = true) ||
-            trimmed.startsWith(LEGACY_GLOBAL_CATALOG_ID_PREFIX, ignoreCase = true) -> {
-            HomeCatalogSource.MEMBER_SHARED
-        }
-
-        trimmed.startsWith(PUBLIC_CATALOG_ID_PREFIX, ignoreCase = true) -> {
-            HomeCatalogSource.PUBLIC
-        }
-
-        else -> HomeCatalogSource.PERSONAL
-    }
+fun buildHomeCatalogId(
+    source: HomeCatalogSource,
+    kind: String,
+    variantKey: String = DEFAULT_VARIANT_KEY,
+): String {
+    return "${source.key}:${kind.trim()}:${variantKey.trim().ifBlank { DEFAULT_VARIANT_KEY }}"
 }
 
-fun normalizeHomeCatalogId(catalogId: String, source: HomeCatalogSource): String {
+fun parseHomeCatalogId(catalogId: String): HomeCatalogIdentifier? {
     val trimmed = catalogId.trim()
-    return when {
-        source == HomeCatalogSource.MEMBER_SHARED && trimmed.startsWith(MEMBER_SHARED_CATALOG_ID_PREFIX, ignoreCase = true) -> {
-            trimmed.substring(MEMBER_SHARED_CATALOG_ID_PREFIX.length)
-        }
+    if (trimmed.isEmpty()) return null
 
-        source == HomeCatalogSource.MEMBER_SHARED && trimmed.startsWith(LEGACY_GLOBAL_CATALOG_ID_PREFIX, ignoreCase = true) -> {
-            trimmed.substring(LEGACY_GLOBAL_CATALOG_ID_PREFIX.length)
-        }
+    val parts = trimmed.split(':', limit = 3)
+    if (parts.size < 3) return null
 
-        source == HomeCatalogSource.PUBLIC && trimmed.startsWith(PUBLIC_CATALOG_ID_PREFIX, ignoreCase = true) -> {
-            trimmed.substring(PUBLIC_CATALOG_ID_PREFIX.length)
-        }
+    val source = HomeCatalogSource.fromRaw(parts[0]) ?: return null
+    val kind = parts[1].trim().takeIf { it.isNotEmpty() } ?: return null
+    val variantKey = parts[2].trim().ifBlank { DEFAULT_VARIANT_KEY }
+    return HomeCatalogIdentifier(
+        source = source,
+        kind = kind,
+        variantKey = variantKey,
+    )
+}
 
-        else -> trimmed
-    }
+fun resolveHomeCatalogSource(catalogId: String): HomeCatalogSource {
+    return parseHomeCatalogId(catalogId)?.source ?: HomeCatalogSource.PERSONAL
 }
 
 private fun buildHeroResult(
@@ -283,11 +296,15 @@ private fun buildHeroResult(
     limit: Int,
 ): HomeCatalogHeroResult {
     val targetCount = limit.coerceAtLeast(1)
-    val heroList = snapshot.lists.firstOrNull { it.isHeroList() } ?: snapshot.lists.first()
+    val heroList = snapshot.lists.firstOrNull { it.presentation == HomeCatalogPresentation.HERO } ?: snapshot.lists.first()
     val fallbackDescription =
-        heroList.subtitle
-            ?: heroList.heading
-            ?: heroList.title.ifBlank { "Recommended for you." }
+        heroList.subtitle.ifBlank {
+            heroList.heading.ifBlank {
+                heroList.title.ifBlank {
+                    heroList.name.ifBlank { "Recommended for you." }
+                }
+            }
+        }
     val heroItems =
         heroList.items
             .asSequence()
@@ -321,31 +338,29 @@ private fun buildHeroResult(
 
 private fun buildHomeCatalogSections(
     lists: List<HomeCatalogList>,
-    source: HomeCatalogSource,
     limit: Int,
 ): List<HomeCatalogSection> {
     val targetCount = limit.coerceAtLeast(1)
-    val filteredLists = lists.filterNot { it.isHeroList() }
+    val filteredLists = lists.filterNot { it.presentation == HomeCatalogPresentation.HERO }
     if (filteredLists.isEmpty()) {
         return emptyList()
     }
 
     val limitedLists = if (targetCount >= filteredLists.size) filteredLists else filteredLists.take(targetCount)
-    return limitedLists.map { list ->
-        HomeCatalogSection(
-            title = list.title,
-            catalogId = source.catalogId(list.id),
-            subtitle = list.subtitle.orEmpty(),
-        )
-    }
+    return limitedLists.map { it.toSection() }
 }
 
-private fun HomeCatalogList.isHeroList(): Boolean {
-    val normalizedId = id.trim().lowercase(Locale.US)
-    val normalizedKind = kind?.trim()?.lowercase(Locale.US)
-    return normalizedId == HERO_LIST_ID ||
-        normalizedId.startsWith("hero.") ||
-        normalizedKind?.contains("hero") == true
+private fun HomeCatalogList.toSection(): HomeCatalogSection {
+    return HomeCatalogSection(
+        catalogId = catalogId,
+        source = source,
+        presentation = presentation,
+        variantKey = variantKey,
+        name = name,
+        heading = heading,
+        title = title,
+        subtitle = subtitle,
+    )
 }
 
 private fun HomeCatalogList.supportsMediaType(mediaType: String): Boolean {
@@ -353,7 +368,4 @@ private fun HomeCatalogList.supportsMediaType(mediaType: String): Boolean {
         items.any { it.type.equals(mediaType, ignoreCase = true) }
 }
 
-private const val HERO_LIST_ID = "hero.shelf"
-private const val MEMBER_SHARED_CATALOG_ID_PREFIX = "member:"
-private const val PUBLIC_CATALOG_ID_PREFIX = "public:"
-private const val LEGACY_GLOBAL_CATALOG_ID_PREFIX = "global:"
+private const val DEFAULT_VARIANT_KEY = "default"
