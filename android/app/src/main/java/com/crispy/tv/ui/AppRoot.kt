@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
@@ -232,18 +233,25 @@ private fun RootTopAppBar(
                 TopLevelDestination.Home -> {
                     CrispyWordmark(
                         modifier = Modifier
-                            .width(105.dp)
+                            .width(125.dp)
                             .height(28.dp),
                     )
                 }
 
                 TopLevelDestination.Discover,
                 TopLevelDestination.Library -> {
-                    CrispyMark(
-                        modifier = Modifier
-                            .width(23.dp)
-                            .height(28.dp),
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CrispyMark(
+                            modifier = Modifier
+                                .width(23.dp)
+                                .height(28.dp),
+                        )
+                        Text(
+                            text = currentDestination.label,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(start = 10.dp),
+                        )
+                    }
                 }
 
                 else -> {
