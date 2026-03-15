@@ -38,6 +38,7 @@ enum class HomeCatalogSource(val key: String) {
 enum class HomeCatalogPresentation(val key: String) {
     HERO("hero"),
     PILL("pill"),
+    COLLECTION_SHELF("collection_shelf"),
     RAIL("rail");
 
     companion object {
@@ -45,6 +46,7 @@ enum class HomeCatalogPresentation(val key: String) {
             return when (raw?.trim()?.lowercase(Locale.US)) {
                 HERO.key -> HERO
                 PILL.key -> PILL
+                COLLECTION_SHELF.key -> COLLECTION_SHELF
                 else -> RAIL
             }
         }

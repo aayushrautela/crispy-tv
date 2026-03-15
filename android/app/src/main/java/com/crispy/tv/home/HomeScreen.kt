@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -50,6 +51,22 @@ import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
 
 private typealias HomeCatalogSectionStateProvider = (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>
+
+private sealed interface HomeSectionBlock {
+    val key: String
+
+    data class CatalogRow(
+        val section: CatalogSectionRef,
+    ) : HomeSectionBlock {
+        override val key: String = section.key
+    }
+
+    data class CollectionShelf(
+        val sections: List<CatalogSectionRef>,
+    ) : HomeSectionBlock {
+        override val key: String = sections.joinToString(separator = ":", prefix = "collections:") { it.key }
+    }
+}
 
 private val HomeContentSectionSpacing = 24.dp
 private val HomeTopSectionSpacing = 16.dp
@@ -75,7 +92,7 @@ internal fun HomeRoute(
         },
     )
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-    val railSections by viewModel.railSections.collectAsStateWithLifecycle()
+    val contentSections by viewModel.contentSections.collectAsStateWithLifecycle()
     val catalogSectionState = remember(viewModel) { viewModel::catalogSectionState }
     val scrollBehavior = appBarScrollBehavior()
 
@@ -110,7 +127,7 @@ internal fun HomeRoute(
             HomeScreen(
                 isRefreshing = isRefreshing,
                 pillSectionsState = viewModel.pillSections,
-                railSections = railSections,
+                contentSections = contentSections,
                 catalogStatusState = viewModel.catalogStatusState,
                 heroState = viewModel.heroState,
                 continueWatchingState = viewModel.continueWatchingState,
@@ -138,7 +155,7 @@ internal fun HomeRoute(
 private fun HomeScreen(
     isRefreshing: Boolean,
     pillSectionsState: StateFlow<List<CatalogSectionRef>>,
-    railSections: List<CatalogSectionRef>,
+    contentSections: List<CatalogSectionRef>,
     catalogStatusState: StateFlow<HomeCatalogStatusState>,
     heroState: StateFlow<HeroState>,
     continueWatchingState: StateFlow<HomeWatchActivityRailState>,
@@ -161,6 +178,7 @@ private fun HomeScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val lazyListState = rememberLazyListState()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val sectionBlocks = remember(contentSections) { buildHomeSectionBlocks(contentSections) }
 
     LaunchedEffect(scrollToTopRequest) {
         if (scrollToTopRequest > 0) {
@@ -193,62 +211,105 @@ private fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
         ) {
-                item(key = "topHeader", contentType = "topHeader") {
-                    Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
-                        HomeHeaderSectionsItem(
-                            headerSectionsState = pillSectionsState,
-                            onSectionClick = onCatalogSeeAllClick,
-                        )
-                        HomeHeroSection(
-                            heroState = heroState,
-                            onHeroClick = onHeroClick,
-                        )
-                    }
-                }
-
-                item(key = "continueWatching", contentType = "continueWatching") {
-                    HomeContinueWatchingSection(
-                        continueWatchingState = continueWatchingState,
-                        onItemClick = onContinueWatchingClick,
-                        onHideItem = onHideContinueWatchingItem,
-                        onRemoveItem = onRemoveContinueWatchingItem,
+            item(key = "topHeader", contentType = "topHeader") {
+                Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
+                    HomeHeaderSectionsItem(
+                        headerSectionsState = pillSectionsState,
+                        onSectionClick = onCatalogSeeAllClick,
+                    )
+                    HomeHeroSection(
+                        heroState = heroState,
+                        onHeroClick = onHeroClick,
                     )
                 }
+            }
 
-                item(key = "upNext", contentType = "upNext") {
-                    HomeUpNextSection(
-                        upNextState = upNextState,
-                        onItemClick = onContinueWatchingClick,
-                    )
-                }
+            item(key = "continueWatching", contentType = "continueWatching") {
+                HomeContinueWatchingSection(
+                    continueWatchingState = continueWatchingState,
+                    onItemClick = onContinueWatchingClick,
+                    onHideItem = onHideContinueWatchingItem,
+                    onRemoveItem = onRemoveContinueWatchingItem,
+                )
+            }
 
-                item(key = "thisWeek", contentType = "thisWeek") {
-                    HomeThisWeekRail(
-                        thisWeekState = thisWeekState,
-                        onItemClick = onThisWeekClick,
-                        onViewAllClick = onThisWeekSeeAllClick,
-                    )
-                }
+            item(key = "upNext", contentType = "upNext") {
+                HomeUpNextSection(
+                    upNextState = upNextState,
+                    onItemClick = onContinueWatchingClick,
+                )
+            }
 
-                item(key = "catalogStatus", contentType = "catalogStatus") {
-                    HomeCatalogStatusItem(catalogStatusState = catalogStatusState)
-                }
+            item(key = "thisWeek", contentType = "thisWeek") {
+                HomeThisWeekRail(
+                    thisWeekState = thisWeekState,
+                    onItemClick = onThisWeekClick,
+                    onViewAllClick = onThisWeekSeeAllClick,
+                )
+            }
 
-                if (railSections.isNotEmpty()) {
-                    items(
-                        items = railSections,
-                        key = { it.key },
-                        contentType = { "catalogSection" },
-                    ) { section ->
-                        HomeCatalogSectionItem(
-                            sectionState = catalogSectionState(section),
-                            onSeeAllClick = onCatalogSeeAllClick,
-                            onItemClick = onCatalogItemClick,
-                        )
+            item(key = "catalogStatus", contentType = "catalogStatus") {
+                HomeCatalogStatusItem(catalogStatusState = catalogStatusState)
+            }
+
+            if (sectionBlocks.isNotEmpty()) {
+                items(
+                    items = sectionBlocks,
+                    key = { it.key },
+                    contentType = {
+                        when (it) {
+                            is HomeSectionBlock.CatalogRow -> "catalogSection"
+                            is HomeSectionBlock.CollectionShelf -> "collectionShelf"
+                        }
+                    },
+                ) { block ->
+                    when (block) {
+                        is HomeSectionBlock.CatalogRow -> {
+                            HomeCatalogSectionItem(
+                                sectionState = catalogSectionState(block.section),
+                                onSeeAllClick = onCatalogSeeAllClick,
+                                onItemClick = onCatalogItemClick,
+                            )
+                        }
+
+                        is HomeSectionBlock.CollectionShelf -> {
+                            HomeCollectionSectionItem(
+                                sectionStates = block.sections.map(catalogSectionState),
+                                onCollectionClick = onCatalogSeeAllClick,
+                                onCollectionPlayClick = onCatalogItemClick,
+                                onCollectionMovieClick = onCatalogItemClick,
+                            )
+                        }
                     }
                 }
             }
         }
+}
+
+}
+
+private fun buildHomeSectionBlocks(sections: List<CatalogSectionRef>): List<HomeSectionBlock> {
+    if (sections.isEmpty()) {
+        return emptyList()
+    }
+
+    val blocks = mutableListOf<HomeSectionBlock>()
+    var index = 0
+    while (index < sections.size) {
+        val section = sections[index]
+        if (section.presentation == HomeCatalogPresentation.COLLECTION_SHELF) {
+            val groupedSections = mutableListOf<CatalogSectionRef>()
+            while (index < sections.size && sections[index].presentation == HomeCatalogPresentation.COLLECTION_SHELF) {
+                groupedSections += sections[index]
+                index += 1
+            }
+            blocks += HomeSectionBlock.CollectionShelf(groupedSections)
+        } else {
+            blocks += HomeSectionBlock.CatalogRow(section)
+            index += 1
+        }
+    }
+    return blocks
 }
 
 @Composable
@@ -387,6 +448,26 @@ private fun HomeCatalogSectionItem(
         sectionUi = sectionUi,
         onSeeAllClick = { onSeeAllClick(sectionUi.section) },
         onItemClick = onItemClick,
+    )
+}
+
+@Composable
+private fun HomeCollectionSectionItem(
+    sectionStates: List<StateFlow<HomeCatalogSectionUi>>,
+    onCollectionClick: (CatalogSectionRef) -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
+    onCollectionMovieClick: (CatalogItem) -> Unit,
+) {
+    val sectionUis = ArrayList<HomeCatalogSectionUi>(sectionStates.size)
+    for (sectionState in sectionStates) {
+        sectionUis += sectionState.collectAsStateWithLifecycle().value
+    }
+
+    HomeCollectionSectionRow(
+        sectionUis = sectionUis,
+        onCollectionClick = onCollectionClick,
+        onCollectionPlayClick = onCollectionPlayClick,
+        onCollectionMovieClick = onCollectionMovieClick,
     )
 }
 

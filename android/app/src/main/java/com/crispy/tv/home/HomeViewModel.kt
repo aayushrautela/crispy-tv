@@ -162,8 +162,8 @@ class HomeViewModel internal constructor(
     private val _pillSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
     val pillSections: StateFlow<List<CatalogSectionRef>> = _pillSections.asStateFlow()
 
-    private val _railSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
-    val railSections: StateFlow<List<CatalogSectionRef>> = _railSections.asStateFlow()
+    private val _contentSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
+    val contentSections: StateFlow<List<CatalogSectionRef>> = _contentSections.asStateFlow()
 
     private val _catalogStatusState = MutableStateFlow(HomeCatalogStatusState())
     val catalogStatusState: StateFlow<HomeCatalogStatusState> = _catalogStatusState.asStateFlow()
@@ -285,8 +285,12 @@ class HomeViewModel internal constructor(
             statusMessage = primaryFeedResult.sectionsStatusMessage,
         )
 
-        val railSections = primaryFeedResult.sections.filter { it.presentation == HomeCatalogPresentation.RAIL }
-        if (railSections.isEmpty()) {
+        val loadableSections =
+            primaryFeedResult.sections.filter {
+                it.presentation == HomeCatalogPresentation.RAIL ||
+                    it.presentation == HomeCatalogPresentation.COLLECTION_SHELF
+            }
+        if (loadableSections.isEmpty()) {
             return
         }
 
@@ -294,7 +298,7 @@ class HomeViewModel internal constructor(
         val semaphore = Semaphore(CATALOG_CONCURRENCY_LIMIT)
 
         coroutineScope {
-            railSections.map { section ->
+            loadableSections.map { section ->
                 launch {
                     val pageResult =
                         try {
@@ -705,7 +709,7 @@ class HomeViewModel internal constructor(
                 .filter { it.displayTitle.trim().isNotEmpty() }
                 .distinctBy { it.key }
                 .toList()
-        _railSections.value = sections.filter { it.presentation == HomeCatalogPresentation.RAIL }
+        _contentSections.value = sections.filter { it.presentation != HomeCatalogPresentation.PILL }
         _catalogStatusState.value =
             HomeCatalogStatusState(
                 statusMessage = statusMessage,
