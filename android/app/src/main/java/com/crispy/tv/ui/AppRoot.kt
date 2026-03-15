@@ -23,10 +23,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
@@ -34,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.crispy.tv.search.SearchTopBar
 import com.crispy.tv.search.rememberSearchViewModel
@@ -46,7 +48,6 @@ import com.crispy.tv.ui.navigation.AppNavigationBar
 import com.crispy.tv.ui.navigation.AppNavigationRail
 import com.crispy.tv.ui.navigation.AppRoutes
 import com.crispy.tv.ui.navigation.TopLevelDestination
-import com.crispy.tv.ui.navigation.isRouteSelected
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 
 private val NavigationRailWidth = 80.dp
@@ -55,22 +56,24 @@ private val NavigationRailWidth = 80.dp
 @Composable
 fun AppRoot() {
     val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
     val configuration = LocalConfiguration.current
     val topLevelDestinations = remember { TopLevelDestination.entries }
     val topLevelRoutes = remember(topLevelDestinations) { topLevelDestinations.map { it.route }.toSet() }
-    val currentRoute by remember(navBackStackEntry) {
-        derivedStateOf { navBackStackEntry?.destination?.route }
-    }
-    val currentDestination by remember(currentRoute, topLevelDestinations) {
-        derivedStateOf {
-            topLevelDestinations.firstOrNull { destination ->
-                isRouteSelected(
-                    currentRoute = currentRoute,
-                    screenRoute = destination.route,
-                    topLevelRoutes = topLevelRoutes,
-                )
+    var currentRoute by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(navController) {
+        val listener =
+            androidx.navigation.NavController.OnDestinationChangedListener { _, destination, _ ->
+                currentRoute = destination.route
             }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose {
+            navController.removeOnDestinationChangedListener(listener)
+        }
+    }
+
+    val rootTopBarDestination by remember(currentRoute, topLevelDestinations) {
+        derivedStateOf {
+            topLevelDestinations.firstOrNull { destination -> destination.route == currentRoute }
         }
     }
     val shouldShowNavigationBar by remember(currentRoute, topLevelRoutes) {
@@ -81,15 +84,15 @@ fun AppRoot() {
     }
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val showRail = shouldShowNavigationBar && isLandscape
-    val shouldShowTopBar by remember(currentRoute, currentDestination) {
+    val shouldShowTopBar by remember(rootTopBarDestination) {
         derivedStateOf {
-            currentDestination?.showInRootTopBar == true && currentRoute == currentDestination?.route
+            rootTopBarDestination?.showInRootTopBar == true
         }
     }
     val bottomSystemInset = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
-    val shouldUseScrollableTopBar by remember(currentDestination, shouldShowTopBar) {
+    val shouldUseScrollableTopBar by remember(rootTopBarDestination, shouldShowTopBar) {
         derivedStateOf {
-            shouldShowTopBar && currentDestination != TopLevelDestination.Search
+            shouldShowTopBar && rootTopBarDestination != TopLevelDestination.Search
         }
     }
     val topAppBarScrollBehavior = appBarScrollBehavior(canScroll = { shouldUseScrollableTopBar })
@@ -147,7 +150,7 @@ fun AppRoot() {
                 exit = fadeOut(),
             ) {
                 RootTopAppBar(
-                    currentDestination = currentDestination,
+                    currentDestination = rootTopBarDestination,
                     showRail = showRail,
                     scrollBehavior = topAppBarScrollBehavior,
                     searchViewModelStoreOwner = searchViewModelStoreOwner,
