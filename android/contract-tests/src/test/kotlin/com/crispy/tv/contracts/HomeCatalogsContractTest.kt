@@ -6,11 +6,11 @@ import com.crispy.tv.domain.home.HomeCatalogHeroResult
 import com.crispy.tv.domain.home.HomeCatalogItem
 import com.crispy.tv.domain.home.HomeCatalogList
 import com.crispy.tv.domain.home.HomeCatalogPageResult
-import com.crispy.tv.domain.home.HomeCatalogPersonalFeedPlan
+import com.crispy.tv.domain.home.HomeCatalogFeedPlan
 import com.crispy.tv.domain.home.HomeCatalogSection
 import com.crispy.tv.domain.home.HomeCatalogSnapshot
 import com.crispy.tv.domain.home.buildCatalogPage
-import com.crispy.tv.domain.home.buildGlobalHeaderSections
+import com.crispy.tv.domain.home.buildMemberSharedHeaderSections
 import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
 import java.nio.file.Path
@@ -42,9 +42,9 @@ class HomeCatalogsContractTest {
                 heroLimit = input.requireInt("hero_limit", path),
                 sectionLimit = input.requireInt("section_limit", path),
             )
-            val actualGlobalSections = buildGlobalHeaderSections(
+            val actualMemberSharedSections = buildMemberSharedHeaderSections(
                 snapshot = snapshot,
-                limit = input.requireInt("global_section_limit", path),
+                limit = input.requireInt("member_shared_section_limit", path),
             )
             val actualDiscover = listDiscoverCatalogs(
                 snapshot = snapshot,
@@ -64,9 +64,9 @@ class HomeCatalogsContractTest {
                 "$caseId: personal_feed",
             )
             assertEquals(
-                expected.requireJsonArray("global_sections", path).map { parseSection(it.jsonObject, path) },
-                actualGlobalSections,
-                "$caseId: global_sections",
+                expected.requireJsonArray("member_shared_sections", path).map { parseSection(it.jsonObject, path) },
+                actualMemberSharedSections,
+                "$caseId: member_shared_sections",
             )
             assertEquals(
                 parseDiscover(expected.requireJsonObject("discover", path), path),
@@ -115,8 +115,8 @@ class HomeCatalogsContractTest {
         )
     }
 
-    private fun parsePersonalFeed(json: JsonObject, path: Path): HomeCatalogPersonalFeedPlan {
-        return HomeCatalogPersonalFeedPlan(
+    private fun parsePersonalFeed(json: JsonObject, path: Path): HomeCatalogFeedPlan {
+        return HomeCatalogFeedPlan(
             heroResult = parseHeroResult(json.requireJsonObject("hero_result", path), path),
             sections = json.requireJsonArray("sections", path).map { parseSection(it.jsonObject, path) },
             sectionsStatusMessage = json.requireString("sections_status_message", path),

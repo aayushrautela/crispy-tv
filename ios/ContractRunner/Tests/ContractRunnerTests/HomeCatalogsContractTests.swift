@@ -23,9 +23,9 @@ final class HomeCatalogsContractTests: XCTestCase {
                 heroLimit: try requireInt(input, "hero_limit", fixture: fixtureURL),
                 sectionLimit: try requireInt(input, "section_limit", fixture: fixtureURL)
             )
-            let actualGlobalSections = buildGlobalHeaderSections(
+            let actualMemberSharedSections = buildMemberSharedHeaderSections(
                 snapshot: snapshot,
-                limit: try requireInt(input, "global_section_limit", fixture: fixtureURL)
+                limit: try requireInt(input, "member_shared_section_limit", fixture: fixtureURL)
             )
             let actualDiscover = listDiscoverCatalogs(
                 snapshot: snapshot,
@@ -40,7 +40,7 @@ final class HomeCatalogsContractTests: XCTestCase {
             )
 
             XCTAssertEqual(try parsePersonalFeed(try requireObject(expected, "personal_feed", fixture: fixtureURL), fixture: fixtureURL), actualPersonalFeed, "\(caseId): personal_feed")
-            XCTAssertEqual(try requireArray(expected, "global_sections", fixture: fixtureURL).map { try parseSection($0, fixture: fixtureURL) }, actualGlobalSections, "\(caseId): global_sections")
+            XCTAssertEqual(try requireArray(expected, "member_shared_sections", fixture: fixtureURL).map { try parseSection($0, fixture: fixtureURL) }, actualMemberSharedSections, "\(caseId): member_shared_sections")
             let expectedDiscover = try parseDiscover(try requireObject(expected, "discover", fixture: fixtureURL), fixture: fixtureURL)
             XCTAssertEqual(expectedDiscover.catalogs, actualDiscover.0, "\(caseId): discover catalogs")
             XCTAssertEqual(expectedDiscover.statusMessage, actualDiscover.1, "\(caseId): discover status")
@@ -90,8 +90,8 @@ final class HomeCatalogsContractTests: XCTestCase {
         )
     }
 
-    private func parsePersonalFeed(_ object: [String: Any], fixture: URL) throws -> HomeCatalogPersonalFeedPlan {
-        return HomeCatalogPersonalFeedPlan(
+    private func parsePersonalFeed(_ object: [String: Any], fixture: URL) throws -> HomeCatalogFeedPlan {
+        return HomeCatalogFeedPlan(
             heroResult: try parseHeroResult(try requireObject(object, "hero_result", fixture: fixture), fixture: fixture),
             sections: try requireArray(object, "sections", fixture: fixture).map { try parseSection($0, fixture: fixture) },
             sectionsStatusMessage: try requireString(object, "sections_status_message", fixture: fixture)

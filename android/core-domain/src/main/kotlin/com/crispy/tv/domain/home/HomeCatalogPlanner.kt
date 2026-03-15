@@ -32,13 +32,15 @@ data class HomeCatalogSnapshot(
 
 enum class HomeCatalogSource(val key: String) {
     PERSONAL("personal_home_feed"),
-    GLOBAL("global_home_feed");
+    MEMBER_SHARED("member_shared_home_feed"),
+    PUBLIC("public_home_feed");
 
     fun catalogId(rawCatalogId: String): String {
         val normalizedId = rawCatalogId.trim()
         return when (this) {
             PERSONAL -> normalizedId
-            GLOBAL -> "$GLOBAL_CATALOG_ID_PREFIX$normalizedId"
+            MEMBER_SHARED -> "$MEMBER_SHARED_CATALOG_ID_PREFIX$normalizedId"
+            PUBLIC -> "$PUBLIC_CATALOG_ID_PREFIX$normalizedId"
         }
     }
 }
@@ -72,7 +74,7 @@ data class HomeCatalogDiscoverRef(
     val genres: List<String> = emptyList(),
 )
 
-data class HomeCatalogPersonalFeedPlan(
+data class HomeCatalogFeedPlan(
     val heroResult: HomeCatalogHeroResult = HomeCatalogHeroResult(),
     val sections: List<HomeCatalogSection> = emptyList(),
     val sectionsStatusMessage: String = "",
@@ -84,34 +86,71 @@ data class HomeCatalogPageResult(
     val attemptedUrls: List<String> = emptyList(),
 )
 
-fun planPersonalHomeFeed(
+fun planHomeFeed(
     snapshot: HomeCatalogSnapshot,
+    source: HomeCatalogSource,
     heroLimit: Int = 10,
     sectionLimit: Int = Int.MAX_VALUE,
-): HomeCatalogPersonalFeedPlan {
+): HomeCatalogFeedPlan {
     if (snapshot.lists.isEmpty()) {
-        return HomeCatalogPersonalFeedPlan(
+        return HomeCatalogFeedPlan(
             heroResult = HomeCatalogHeroResult(statusMessage = snapshot.statusMessage),
             sections = emptyList(),
             sectionsStatusMessage = snapshot.statusMessage,
         )
     }
 
-    return HomeCatalogPersonalFeedPlan(
+    return HomeCatalogFeedPlan(
         heroResult = buildHeroResult(snapshot, heroLimit),
-        sections = buildHomeCatalogSections(snapshot.lists, HomeCatalogSource.PERSONAL, sectionLimit),
+        sections = buildHomeCatalogSections(snapshot.lists, source, sectionLimit),
         sectionsStatusMessage = "",
     )
 }
 
-fun buildGlobalHeaderSections(
+fun planPersonalHomeFeed(
     snapshot: HomeCatalogSnapshot,
+    heroLimit: Int = 10,
+    sectionLimit: Int = Int.MAX_VALUE,
+): HomeCatalogFeedPlan {
+    return planHomeFeed(
+        snapshot = snapshot,
+        source = HomeCatalogSource.PERSONAL,
+        heroLimit = heroLimit,
+        sectionLimit = sectionLimit,
+    )
+}
+
+fun buildMemberSharedHeaderSections(
+    snapshot: HomeCatalogSnapshot,
+    limit: Int = Int.MAX_VALUE,
+): List<HomeCatalogSection> {
+    return buildSharedHeaderSections(
+        snapshot = snapshot,
+        source = HomeCatalogSource.MEMBER_SHARED,
+        limit = limit,
+    )
+}
+
+fun buildPublicHeaderSections(
+    snapshot: HomeCatalogSnapshot,
+    limit: Int = Int.MAX_VALUE,
+): List<HomeCatalogSection> {
+    return buildSharedHeaderSections(
+        snapshot = snapshot,
+        source = HomeCatalogSource.PUBLIC,
+        limit = limit,
+    )
+}
+
+fun buildSharedHeaderSections(
+    snapshot: HomeCatalogSnapshot,
+    source: HomeCatalogSource,
     limit: Int = Int.MAX_VALUE,
 ): List<HomeCatalogSection> {
     if (snapshot.lists.isEmpty()) {
         return emptyList()
     }
-    return buildHomeCatalogSections(snapshot.lists, HomeCatalogSource.GLOBAL, limit)
+    return buildHomeCatalogSections(snapshot.lists, source, limit)
 }
 
 fun listDiscoverCatalogs(
@@ -205,18 +244,34 @@ fun buildCatalogPage(
 }
 
 fun resolveHomeCatalogSource(catalogId: String): HomeCatalogSource {
-    return if (catalogId.trim().startsWith(GLOBAL_CATALOG_ID_PREFIX, ignoreCase = true)) {
-        HomeCatalogSource.GLOBAL
-    } else {
-        HomeCatalogSource.PERSONAL
+    val trimmed = catalogId.trim()
+    return when {
+        trimmed.startsWith(MEMBER_SHARED_CATALOG_ID_PREFIX, ignoreCase = true) ||
+            trimmed.startsWith(LEGACY_GLOBAL_CATALOG_ID_PREFIX, ignoreCase = true) -> {
+            HomeCatalogSource.MEMBER_SHARED
+        }
+
+        trimmed.startsWith(PUBLIC_CATALOG_ID_PREFIX, ignoreCase = true) -> {
+            HomeCatalogSource.PUBLIC
+        }
+
+        else -> HomeCatalogSource.PERSONAL
     }
 }
 
 fun normalizeHomeCatalogId(catalogId: String, source: HomeCatalogSource): String {
     val trimmed = catalogId.trim()
     return when {
-        source == HomeCatalogSource.GLOBAL && trimmed.startsWith(GLOBAL_CATALOG_ID_PREFIX, ignoreCase = true) -> {
-            trimmed.substring(GLOBAL_CATALOG_ID_PREFIX.length)
+        source == HomeCatalogSource.MEMBER_SHARED && trimmed.startsWith(MEMBER_SHARED_CATALOG_ID_PREFIX, ignoreCase = true) -> {
+            trimmed.substring(MEMBER_SHARED_CATALOG_ID_PREFIX.length)
+        }
+
+        source == HomeCatalogSource.MEMBER_SHARED && trimmed.startsWith(LEGACY_GLOBAL_CATALOG_ID_PREFIX, ignoreCase = true) -> {
+            trimmed.substring(LEGACY_GLOBAL_CATALOG_ID_PREFIX.length)
+        }
+
+        source == HomeCatalogSource.PUBLIC && trimmed.startsWith(PUBLIC_CATALOG_ID_PREFIX, ignoreCase = true) -> {
+            trimmed.substring(PUBLIC_CATALOG_ID_PREFIX.length)
         }
 
         else -> trimmed
@@ -299,4 +354,6 @@ private fun HomeCatalogList.supportsMediaType(mediaType: String): Boolean {
 }
 
 private const val HERO_LIST_ID = "hero.shelf"
-private const val GLOBAL_CATALOG_ID_PREFIX = "global:"
+private const val MEMBER_SHARED_CATALOG_ID_PREFIX = "member:"
+private const val PUBLIC_CATALOG_ID_PREFIX = "public:"
+private const val LEGACY_GLOBAL_CATALOG_ID_PREFIX = "global:"

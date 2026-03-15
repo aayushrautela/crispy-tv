@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "home_catalogs",
   "case_id": "falls_back_to_first_list_and_coerces_minimum_limits",
   "input": {
@@ -64,7 +64,7 @@
     },
     "hero_limit": 0,
     "section_limit": 0,
-    "global_section_limit": 0,
+    "member_shared_section_limit": 0,
     "discover": {
       "media_type": null,
       "limit": 0
@@ -102,10 +102,10 @@
       ],
       "sections_status_message": ""
     },
-    "global_sections": [
+    "member_shared_sections": [
       {
         "title": "Featured",
-        "catalog_id": "global:featured",
+        "catalog_id": "member:featured",
         "subtitle": ""
       }
     ],

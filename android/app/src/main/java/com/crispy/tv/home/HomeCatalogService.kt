@@ -16,14 +16,14 @@ import com.crispy.tv.domain.home.HomeCatalogHeroResult as DomainHomeHeroResult
 import com.crispy.tv.domain.home.HomeCatalogItem as DomainHomeCatalogItem
 import com.crispy.tv.domain.home.HomeCatalogList as DomainHomeCatalogList
 import com.crispy.tv.domain.home.HomeCatalogPageResult as DomainHomeCatalogPageResult
-import com.crispy.tv.domain.home.HomeCatalogPersonalFeedPlan
+import com.crispy.tv.domain.home.HomeCatalogFeedPlan
 import com.crispy.tv.domain.home.HomeCatalogSection as DomainHomeCatalogSection
 import com.crispy.tv.domain.home.HomeCatalogSnapshot as DomainHomeCatalogSnapshot
 import com.crispy.tv.domain.home.HomeCatalogSource
 import com.crispy.tv.domain.home.buildCatalogPage as planCatalogPage
-import com.crispy.tv.domain.home.buildGlobalHeaderSections
+import com.crispy.tv.domain.home.buildSharedHeaderSections
 import com.crispy.tv.domain.home.listDiscoverCatalogs as planDiscoverCatalogs
-import com.crispy.tv.domain.home.planPersonalHomeFeed
+import com.crispy.tv.domain.home.planHomeFeed
 import com.crispy.tv.domain.home.resolveHomeCatalogSource
 import com.crispy.tv.metadata.tmdb.TmdbApi
 import com.crispy.tv.network.CrispyHttpClient
@@ -55,7 +55,7 @@ data class HomeHeroLoadResult(
 )
 
 @Immutable
-data class HomePersonalFeedLoadResult(
+data class HomePrimaryFeedLoadResult(
     val heroResult: HomeHeroLoadResult = HomeHeroLoadResult(),
     val sections: List<CatalogSectionRef> = emptyList(),
     val sectionsStatusMessage: String = "",
@@ -116,27 +116,25 @@ class HomeCatalogService(
 
     private val catalogCacheLock = Any()
     private val personalCatalogCache = SupabaseCatalogCache()
-    private val globalHomeFeedCache = SupabaseCatalogCache()
+    private val memberSharedCatalogCache = SupabaseCatalogCache()
+    private val publicCatalogCache = SupabaseCatalogCache()
 
-    suspend fun loadPersonalHomeFeed(
+    suspend fun loadPrimaryHomeFeed(
         heroLimit: Int = 10,
         sectionLimit: Int = Int.MAX_VALUE,
-    ): HomePersonalFeedLoadResult {
-        val snapshot =
-            loadSupabaseCatalogSnapshot(
-                forceRefresh = false,
-                source = HomeCatalogSource.PERSONAL,
-            )
-        return planPersonalHomeFeed(snapshot.toDomain(), heroLimit = heroLimit, sectionLimit = sectionLimit).toAppModel()
+    ): HomePrimaryFeedLoadResult {
+        val (snapshot, source) = selectPrimaryFeedSnapshot()
+        return planHomeFeed(
+            snapshot = snapshot.toDomain(),
+            source = source,
+            heroLimit = heroLimit,
+            sectionLimit = sectionLimit,
+        ).toAppModel()
     }
 
-    suspend fun loadGlobalHeaderSections(limit: Int = Int.MAX_VALUE): List<CatalogSectionRef> {
-        val snapshot =
-            loadSupabaseCatalogSnapshot(
-                forceRefresh = false,
-                source = HomeCatalogSource.GLOBAL,
-            )
-        return buildGlobalHeaderSections(snapshot.toDomain(), limit).map { it.toAppModel() }
+    suspend fun loadSharedHeaderSections(limit: Int = Int.MAX_VALUE): List<CatalogSectionRef> {
+        val (snapshot, source) = selectSharedHeaderSnapshot()
+        return buildSharedHeaderSections(snapshot.toDomain(), source = source, limit = limit).map { it.toAppModel() }
     }
 
     suspend fun listDiscoverCatalogs(
@@ -178,6 +176,7 @@ class HomeCatalogService(
     private suspend fun loadSupabaseCatalogSnapshot(
         forceRefresh: Boolean,
         source: HomeCatalogSource,
+        memberAccessResult: MemberAccessResult? = null,
     ): SupabaseCatalogSnapshot {
         if (!supabaseAccountClient.isConfigured()) {
             return SupabaseCatalogSnapshot(
@@ -187,32 +186,50 @@ class HomeCatalogService(
             )
         }
 
-        val session =
-            runCatching { supabaseAccountClient.ensureValidSession() }.getOrNull()
-                ?: return SupabaseCatalogSnapshot(
-                    profileId = null,
-                    lists = emptyList(),
-                    statusMessage = "Sign in to Supabase to load catalogs."
-                )
+        val memberAccess =
+            when (source) {
+                HomeCatalogSource.PERSONAL,
+                HomeCatalogSource.MEMBER_SHARED,
+                -> {
+                    when (val access = memberAccessResult ?: resolveMemberAccess()) {
+                        is MemberAccessResult.Ready -> access
+                        is MemberAccessResult.Unavailable -> {
+                            return SupabaseCatalogSnapshot(
+                                profileId = null,
+                                lists = emptyList(),
+                                statusMessage = access.statusMessage,
+                            )
+                        }
+                    }
+                }
 
-        val profileId = activeProfileStore.getActiveProfileId(session.userId)
-        if (profileId.isNullOrBlank()) {
-            return SupabaseCatalogSnapshot(
-                profileId = null,
-                lists = emptyList(),
-                statusMessage = "Select a profile to load catalogs."
-            )
-        }
+                HomeCatalogSource.PUBLIC -> null
+            }
+
+        val cacheKey =
+            when (source) {
+                HomeCatalogSource.PUBLIC -> publicCatalogCacheKey()
+                HomeCatalogSource.PERSONAL,
+                HomeCatalogSource.MEMBER_SHARED,
+                -> memberAccess?.profileId
+            }
+        val snapshotProfileId =
+            when (source) {
+                HomeCatalogSource.PUBLIC -> null
+                HomeCatalogSource.PERSONAL,
+                HomeCatalogSource.MEMBER_SHARED,
+                -> memberAccess?.profileId
+            }
 
         val cache = catalogCache(source)
         val now = System.currentTimeMillis()
         synchronized(catalogCacheLock) {
             val cachedLists = cache.lists
-            val cachedProfileId = cache.profileId
+            val cachedKey = cache.key
             val cacheAgeMs = now - cache.timestampMs
-            if (!forceRefresh && cachedLists != null && cachedProfileId == profileId && cacheAgeMs < SUPABASE_CATALOGS_CACHE_TTL_MS) {
+            if (!forceRefresh && cachedLists != null && cachedKey == cacheKey && cacheAgeMs < SUPABASE_CATALOGS_CACHE_TTL_MS) {
                 return SupabaseCatalogSnapshot(
-                    profileId = profileId,
+                    profileId = snapshotProfileId,
                     lists = cachedLists,
                     statusMessage = ""
                 )
@@ -223,29 +240,107 @@ class HomeCatalogService(
             when (source) {
                 HomeCatalogSource.PERSONAL -> {
                     fetchProfileRecommendationsCatalogLists(
-                        accessToken = session.accessToken,
-                        profileId = profileId
+                        accessToken = memberAccess?.accessToken.orEmpty(),
+                        profileId = memberAccess?.profileId.orEmpty(),
                     )
                 }
 
-                HomeCatalogSource.GLOBAL -> {
-                    fetchGlobalHomeFeed(
-                        accessToken = session.accessToken,
-                        profileId = profileId
+                HomeCatalogSource.MEMBER_SHARED -> {
+                    fetchMemberSharedHomeFeed(
+                        accessToken = memberAccess?.accessToken.orEmpty(),
+                        profileId = memberAccess?.profileId.orEmpty(),
                     )
+                }
+
+                HomeCatalogSource.PUBLIC -> {
+                    fetchPublicHomeFeed(languageTag = publicCatalogLanguageTag())
                 }
             }
 
         synchronized(catalogCacheLock) {
-            cache.profileId = profileId
+            cache.key = cacheKey
             cache.lists = lists
             cache.timestampMs = System.currentTimeMillis()
         }
 
         return SupabaseCatalogSnapshot(
-            profileId = profileId,
+            profileId = snapshotProfileId,
             lists = lists,
             statusMessage = statusMessage
+        )
+    }
+
+    private suspend fun selectPrimaryFeedSnapshot(): Pair<SupabaseCatalogSnapshot, HomeCatalogSource> {
+        val memberAccess = resolveMemberAccess()
+        if (memberAccess is MemberAccessResult.Ready) {
+            val personalSnapshot =
+                loadSupabaseCatalogSnapshot(
+                    forceRefresh = false,
+                    source = HomeCatalogSource.PERSONAL,
+                    memberAccessResult = memberAccess,
+                )
+            if (personalSnapshot.lists.isNotEmpty()) {
+                return personalSnapshot to HomeCatalogSource.PERSONAL
+            }
+
+            val memberSharedSnapshot =
+                loadSupabaseCatalogSnapshot(
+                    forceRefresh = false,
+                    source = HomeCatalogSource.MEMBER_SHARED,
+                    memberAccessResult = memberAccess,
+                )
+            if (memberSharedSnapshot.lists.isNotEmpty()) {
+                return memberSharedSnapshot to HomeCatalogSource.MEMBER_SHARED
+            }
+        }
+
+        val publicSnapshot =
+            loadSupabaseCatalogSnapshot(
+                forceRefresh = false,
+                source = HomeCatalogSource.PUBLIC,
+            )
+        return publicSnapshot to HomeCatalogSource.PUBLIC
+    }
+
+    private suspend fun selectSharedHeaderSnapshot(): Pair<SupabaseCatalogSnapshot, HomeCatalogSource> {
+        val memberAccess = resolveMemberAccess()
+        if (memberAccess is MemberAccessResult.Ready) {
+            val memberSharedSnapshot =
+                loadSupabaseCatalogSnapshot(
+                    forceRefresh = false,
+                    source = HomeCatalogSource.MEMBER_SHARED,
+                    memberAccessResult = memberAccess,
+                )
+            if (memberSharedSnapshot.lists.isNotEmpty()) {
+                return memberSharedSnapshot to HomeCatalogSource.MEMBER_SHARED
+            }
+        }
+
+        val publicSnapshot =
+            loadSupabaseCatalogSnapshot(
+                forceRefresh = false,
+                source = HomeCatalogSource.PUBLIC,
+            )
+        return publicSnapshot to HomeCatalogSource.PUBLIC
+    }
+
+    private suspend fun resolveMemberAccess(): MemberAccessResult {
+        if (!supabaseAccountClient.isConfigured()) {
+            return MemberAccessResult.Unavailable("Supabase is not configured.")
+        }
+
+        val session =
+            runCatching { supabaseAccountClient.ensureValidSession() }.getOrNull()
+                ?: return MemberAccessResult.Unavailable("Sign in to Supabase to load catalogs.")
+
+        val profileId = activeProfileStore.getActiveProfileId(session.userId)?.trim()
+        if (profileId.isNullOrBlank()) {
+            return MemberAccessResult.Unavailable("Select a profile to load catalogs.")
+        }
+
+        return MemberAccessResult.Ready(
+            accessToken = session.accessToken,
+            profileId = profileId,
         )
     }
 
@@ -255,23 +350,22 @@ class HomeCatalogService(
     ): Pair<List<SupabaseCatalogList>, String> {
         val url =
             runCatching {
-                "$supabaseBaseUrl/rest/v1/profile_recommendations"
-                    .toHttpUrl()
-                    .newBuilder()
-                    .addQueryParameter("select", "lists")
-                    .addQueryParameter("profile_id", "eq.${profileId.trim()}")
-                    .addQueryParameter("order", "generated_at.desc")
-                    .addQueryParameter("limit", "1")
-                    .build()
+                "$supabaseBaseUrl/rest/v1/rpc/get_profile_recommendations".toHttpUrl()
             }.getOrElse { error ->
                 return emptyList<SupabaseCatalogList>() to (error.message ?: "Invalid Supabase URL.")
             }
 
+        val payload =
+            JSONObject()
+                .put("p_profile_id", profileId.trim())
+                .toString()
+
         val response =
             runCatching {
-                httpClient.get(
+                httpClient.postJson(
                     url = url,
-                    headers = supabaseAuthHeaders(accessToken),
+                    jsonBody = payload,
+                    headers = supabaseJsonHeaders(accessToken),
                     callTimeoutMs = 12_000L,
                 )
             }.getOrElse { error ->
@@ -282,13 +376,13 @@ class HomeCatalogService(
         return parseSupabaseCatalogResponse(response)
     }
 
-    private suspend fun fetchGlobalHomeFeed(
+    private suspend fun fetchMemberSharedHomeFeed(
         accessToken: String,
         profileId: String,
     ): Pair<List<SupabaseCatalogList>, String> {
         val url =
             runCatching {
-                "$supabaseBaseUrl/rest/v1/rpc/get_home_feed".toHttpUrl()
+                "$supabaseBaseUrl/rest/v1/rpc/get_member_home_feed".toHttpUrl()
             }.getOrElse { error ->
                 return emptyList<SupabaseCatalogList>() to (error.message ?: "Invalid Supabase URL.")
             }
@@ -304,11 +398,43 @@ class HomeCatalogService(
                 httpClient.postJson(
                     url = url,
                     jsonBody = payload,
-                    headers = supabaseAuthHeaders(accessToken),
+                    headers = supabaseJsonHeaders(accessToken),
                     callTimeoutMs = 12_000L,
                 )
             }.getOrElse { error ->
-                Log.w(TAG, "Supabase home feed fetch failed", error)
+                Log.w(TAG, "Supabase member shared home feed fetch failed", error)
+                return emptyList<SupabaseCatalogList>() to (error.message ?: "Failed to load catalogs.")
+            }
+
+        return parseSupabaseCatalogResponse(response)
+    }
+
+    private suspend fun fetchPublicHomeFeed(
+        languageTag: String,
+    ): Pair<List<SupabaseCatalogList>, String> {
+        val url =
+            runCatching {
+                "$supabaseBaseUrl/rest/v1/rpc/get_public_home_feed".toHttpUrl()
+            }.getOrElse { error ->
+                return emptyList<SupabaseCatalogList>() to (error.message ?: "Invalid Supabase URL.")
+            }
+
+        val payload =
+            JSONObject()
+                .put("p_language", languageTag)
+                .put("p_limit", SUPABASE_HOME_FEED_LIMIT)
+                .toString()
+
+        val response =
+            runCatching {
+                httpClient.postJson(
+                    url = url,
+                    jsonBody = payload,
+                    headers = supabaseJsonHeaders(),
+                    callTimeoutMs = 12_000L,
+                )
+            }.getOrElse { error ->
+                Log.w(TAG, "Supabase public home feed fetch failed", error)
                 return emptyList<SupabaseCatalogList>() to (error.message ?: "Failed to load catalogs.")
             }
 
@@ -341,18 +467,16 @@ class HomeCatalogService(
         return lists to ""
     }
 
-    private fun supabaseAuthHeaders(accessToken: String): Headers {
-        val token = accessToken.trim()
-        return Headers.headersOf(
-            "apikey",
-            supabaseAnonKeyValue,
-            "Authorization",
-            "Bearer $token",
-            "Accept",
-            "application/json",
-            "Content-Type",
-            "application/json",
-        )
+    private fun supabaseJsonHeaders(accessToken: String? = null): Headers {
+        val builder = Headers.Builder()
+            .add("apikey", supabaseAnonKeyValue)
+            .add("Accept", "application/json")
+            .add("Content-Type", "application/json")
+        val token = accessToken?.trim().orEmpty()
+        if (token.isNotEmpty()) {
+            builder.add("Authorization", "Bearer $token")
+        }
+        return builder.build()
     }
 
     private fun extractSupabaseErrorMessage(body: String): String? {
@@ -376,20 +500,14 @@ class HomeCatalogService(
                     val arr = JSONArray(trimmed)
                     val nested =
                         arr.optJSONObject(0)?.let { first ->
-                            first.optJSONArray("lists")
-                                ?: first.optJSONArray("get_home_feed")
-                                ?: first.optJSONArray("get_global_lists_feed")
-                                ?: first.optJSONArray("feed")
+                            extractSupabaseCatalogArray(first)
                         }
                     nested ?: arr
                 }
 
                 trimmed.startsWith("{") -> {
                     val obj = JSONObject(trimmed)
-                    obj.optJSONArray("lists")
-                        ?: obj.optJSONArray("get_home_feed")
-                        ?: obj.optJSONArray("get_global_lists_feed")
-                        ?: obj.optJSONArray("feed")
+                    extractSupabaseCatalogArray(obj)
                         ?: JSONArray().apply { put(obj) }
                 }
 
@@ -403,6 +521,16 @@ class HomeCatalogService(
             parsed += list
         }
         return parsed
+    }
+
+    private fun extractSupabaseCatalogArray(obj: JSONObject): JSONArray? {
+        return obj.optJSONArray("lists")
+            ?: obj.optJSONArray("get_member_home_feed")
+            ?: obj.optJSONArray("get_public_home_feed")
+            ?: obj.optJSONArray("get_home_feed")
+            ?: obj.optJSONArray("get_global_lists_feed")
+            ?: obj.optJSONArray("feed")
+            ?: obj.optJSONObject("get_profile_recommendations")?.optJSONArray("lists")
     }
 
     private fun parseSupabaseCatalogList(obj: JSONObject): SupabaseCatalogList? {
@@ -550,7 +678,8 @@ class HomeCatalogService(
     private fun catalogCache(source: HomeCatalogSource): SupabaseCatalogCache {
         return when (source) {
             HomeCatalogSource.PERSONAL -> personalCatalogCache
-            HomeCatalogSource.GLOBAL -> globalHomeFeedCache
+            HomeCatalogSource.MEMBER_SHARED -> memberSharedCatalogCache
+            HomeCatalogSource.PUBLIC -> publicCatalogCache
         }
     }
 
@@ -562,7 +691,7 @@ class HomeCatalogService(
 
     private class SupabaseCatalogCache {
         @Volatile
-        var profileId: String? = null
+        var key: String? = null
 
         @Volatile
         var lists: List<SupabaseCatalogList>? = null
@@ -607,6 +736,31 @@ class HomeCatalogService(
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
         private const val SUPABASE_HOME_FEED_LIMIT = 50
     }
+
+    private sealed interface MemberAccessResult {
+        data class Ready(
+            val accessToken: String,
+            val profileId: String,
+        ) : MemberAccessResult
+
+        data class Unavailable(
+            val statusMessage: String,
+        ) : MemberAccessResult
+    }
+
+    private fun publicCatalogCacheKey(): String {
+        return "public:${publicCatalogLanguageTag()}"
+    }
+
+    private fun publicCatalogLanguageTag(): String {
+        val locale = Locale.getDefault()
+        val languageTag = locale.toLanguageTag().trim()
+        return when {
+            languageTag.isNotEmpty() && !languageTag.equals("und", ignoreCase = true) -> languageTag
+            locale.language.isNotBlank() -> locale.language
+            else -> "all"
+        }
+    }
 }
 
 private fun CatalogItem.toDomain(): DomainHomeCatalogItem {
@@ -623,8 +777,8 @@ private fun CatalogItem.toDomain(): DomainHomeCatalogItem {
     )
 }
 
-private fun HomeCatalogPersonalFeedPlan.toAppModel(): HomePersonalFeedLoadResult {
-    return HomePersonalFeedLoadResult(
+private fun HomeCatalogFeedPlan.toAppModel(): HomePrimaryFeedLoadResult {
+    return HomePrimaryFeedLoadResult(
         heroResult = heroResult.toAppModel(),
         sections = sections.map { it.toAppModel() },
         sectionsStatusMessage = sectionsStatusMessage,

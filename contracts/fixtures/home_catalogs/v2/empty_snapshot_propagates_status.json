@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "home_catalogs",
   "case_id": "empty_snapshot_propagates_status",
   "input": {
@@ -10,13 +10,13 @@
     },
     "hero_limit": 10,
     "section_limit": 10,
-    "global_section_limit": 10,
+    "member_shared_section_limit": 10,
     "discover": {
       "media_type": "series",
       "limit": 10
     },
     "page": {
-      "catalog_id": "global:anything",
+      "catalog_id": "member:anything",
       "page": 1,
       "page_size": 10
     }
@@ -30,7 +30,7 @@
       "sections": [],
       "sections_status_message": "Sign in to Supabase to load catalogs."
     },
-    "global_sections": [],
+    "member_shared_sections": [],
     "discover": {
       "catalogs": [],
       "status_message": "Sign in to Supabase to load catalogs."

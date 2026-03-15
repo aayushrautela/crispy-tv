@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "home_catalogs",
   "case_id": "plans_hero_sections_discover_and_global_page",
   "input": {
@@ -107,13 +107,13 @@
     },
     "hero_limit": 2,
     "section_limit": 2,
-    "global_section_limit": 2,
+    "member_shared_section_limit": 2,
     "discover": {
       "media_type": "series",
       "limit": 3
     },
     "page": {
-      "catalog_id": "global:trending-series",
+      "catalog_id": "member:trending-series",
       "page": 2,
       "page_size": 1
     }
@@ -161,15 +161,15 @@
       ],
       "sections_status_message": ""
     },
-    "global_sections": [
+    "member_shared_sections": [
       {
         "title": "Trending Series",
-        "catalog_id": "global:trending-series",
+        "catalog_id": "member:trending-series",
         "subtitle": "Binge now"
       },
       {
         "title": "Popular Movies",
-        "catalog_id": "global:popular-movies",
+        "catalog_id": "member:popular-movies",
         "subtitle": "Blockbusters"
       }
     ],
@@ -203,8 +203,8 @@
       ],
       "status_message": "",
       "attempted_urls": [
-        "supabase:global_home_feed:profile-123:trending-series:page=2"
-      ]
+          "supabase:member_shared_home_feed:profile-123:trending-series:page=2"
+        ]
+      }
     }
-  }
 }

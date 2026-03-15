@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "home_catalogs",
   "case_id": "reports_missing_artwork_unsupported_type_and_missing_catalog",
   "input": {
@@ -53,13 +53,13 @@
     },
     "hero_limit": 3,
     "section_limit": 5,
-    "global_section_limit": 5,
+    "member_shared_section_limit": 5,
     "discover": {
       "media_type": "anime",
       "limit": 2
     },
     "page": {
-      "catalog_id": "global:unknown",
+      "catalog_id": "member:unknown",
       "page": 1,
       "page_size": 5
     }
@@ -79,10 +79,10 @@
       ],
       "sections_status_message": ""
     },
-    "global_sections": [
+    "member_shared_sections": [
       {
         "title": "Drama",
-        "catalog_id": "global:drama",
+        "catalog_id": "member:drama",
         "subtitle": "Tense stories"
       }
     ],

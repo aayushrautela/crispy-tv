@@ -76,15 +76,18 @@ public struct HomeCatalogSnapshot: Equatable {
 
 public enum HomeCatalogSource: String, Equatable {
     case personal = "personal_home_feed"
-    case global = "global_home_feed"
+    case memberShared = "member_shared_home_feed"
+    case publicFeed = "public_home_feed"
 
     public func catalogId(_ rawCatalogId: String) -> String {
         let normalizedId = rawCatalogId.trimmingCharacters(in: .whitespacesAndNewlines)
         switch self {
         case .personal:
             return normalizedId
-        case .global:
-            return "\(globalCatalogIdPrefix)\(normalizedId)"
+        case .memberShared:
+            return "\(memberSharedCatalogIdPrefix)\(normalizedId)"
+        case .publicFeed:
+            return "\(publicCatalogIdPrefix)\(normalizedId)"
         }
     }
 }
@@ -157,7 +160,7 @@ public struct HomeCatalogDiscoverRef: Equatable {
     }
 }
 
-public struct HomeCatalogPersonalFeedPlan: Equatable {
+public struct HomeCatalogFeedPlan: Equatable {
     public let heroResult: HomeCatalogHeroResult
     public let sections: [HomeCatalogSection]
     public let sectionsStatusMessage: String
@@ -185,31 +188,57 @@ public struct HomeCatalogPageResult: Equatable {
     }
 }
 
-public func planPersonalHomeFeed(
+public func planHomeFeed(
     snapshot: HomeCatalogSnapshot,
+    source: HomeCatalogSource,
     heroLimit: Int = 10,
     sectionLimit: Int = .max
-) -> HomeCatalogPersonalFeedPlan {
+) -> HomeCatalogFeedPlan {
     guard !snapshot.lists.isEmpty else {
-        return HomeCatalogPersonalFeedPlan(
+        return HomeCatalogFeedPlan(
             heroResult: HomeCatalogHeroResult(statusMessage: snapshot.statusMessage),
             sections: [],
             sectionsStatusMessage: snapshot.statusMessage
         )
     }
 
-    return HomeCatalogPersonalFeedPlan(
+    return HomeCatalogFeedPlan(
         heroResult: buildHeroResult(snapshot: snapshot, limit: heroLimit),
-        sections: buildHomeCatalogSections(lists: snapshot.lists, source: .personal, limit: sectionLimit),
+        sections: buildHomeCatalogSections(lists: snapshot.lists, source: source, limit: sectionLimit),
         sectionsStatusMessage: ""
     )
 }
 
-public func buildGlobalHeaderSections(snapshot: HomeCatalogSnapshot, limit: Int = .max) -> [HomeCatalogSection] {
+public func planPersonalHomeFeed(
+    snapshot: HomeCatalogSnapshot,
+    heroLimit: Int = 10,
+    sectionLimit: Int = .max
+) -> HomeCatalogFeedPlan {
+    return planHomeFeed(
+        snapshot: snapshot,
+        source: .personal,
+        heroLimit: heroLimit,
+        sectionLimit: sectionLimit
+    )
+}
+
+public func buildMemberSharedHeaderSections(snapshot: HomeCatalogSnapshot, limit: Int = .max) -> [HomeCatalogSection] {
+    return buildSharedHeaderSections(snapshot: snapshot, source: .memberShared, limit: limit)
+}
+
+public func buildPublicHeaderSections(snapshot: HomeCatalogSnapshot, limit: Int = .max) -> [HomeCatalogSection] {
+    return buildSharedHeaderSections(snapshot: snapshot, source: .publicFeed, limit: limit)
+}
+
+public func buildSharedHeaderSections(
+    snapshot: HomeCatalogSnapshot,
+    source: HomeCatalogSource,
+    limit: Int = .max
+) -> [HomeCatalogSection] {
     guard !snapshot.lists.isEmpty else {
         return []
     }
-    return buildHomeCatalogSections(lists: snapshot.lists, source: .global, limit: limit)
+    return buildHomeCatalogSections(lists: snapshot.lists, source: source, limit: limit)
 }
 
 public func listDiscoverCatalogs(
@@ -296,18 +325,36 @@ public func buildCatalogPage(
 }
 
 public func resolveHomeCatalogSource(catalogId: String) -> HomeCatalogSource {
-    if catalogId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix(globalCatalogIdPrefix) {
-        return .global
+    let trimmed = catalogId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    if trimmed.hasPrefix(memberSharedCatalogIdPrefix) || trimmed.hasPrefix(legacyGlobalCatalogIdPrefix) {
+        return .memberShared
+    }
+    if trimmed.hasPrefix(publicCatalogIdPrefix) {
+        return .publicFeed
     }
     return .personal
 }
 
 public func normalizeHomeCatalogId(catalogId: String, source: HomeCatalogSource) -> String {
     let trimmed = catalogId.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard source == .global, trimmed.lowercased().hasPrefix(globalCatalogIdPrefix) else {
+    let normalizedTrimmed = trimmed.lowercased()
+    switch source {
+    case .memberShared:
+        if normalizedTrimmed.hasPrefix(memberSharedCatalogIdPrefix) {
+            return String(trimmed.dropFirst(memberSharedCatalogIdPrefix.count))
+        }
+        if normalizedTrimmed.hasPrefix(legacyGlobalCatalogIdPrefix) {
+            return String(trimmed.dropFirst(legacyGlobalCatalogIdPrefix.count))
+        }
+        return trimmed
+    case .publicFeed:
+        guard normalizedTrimmed.hasPrefix(publicCatalogIdPrefix) else {
+            return trimmed
+        }
+        return String(trimmed.dropFirst(publicCatalogIdPrefix.count))
+    case .personal:
         return trimmed
     }
-    return String(trimmed.dropFirst(globalCatalogIdPrefix.count))
 }
 
 private func buildHeroResult(snapshot: HomeCatalogSnapshot, limit: Int) -> HomeCatalogHeroResult {
@@ -375,4 +422,6 @@ private extension String {
 }
 
 private let heroListId = "hero.shelf"
-private let globalCatalogIdPrefix = "global:"
+private let memberSharedCatalogIdPrefix = "member:"
+private let publicCatalogIdPrefix = "public:"
+private let legacyGlobalCatalogIdPrefix = "global:"

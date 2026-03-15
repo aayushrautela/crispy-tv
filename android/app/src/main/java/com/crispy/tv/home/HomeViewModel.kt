@@ -201,7 +201,7 @@ class HomeViewModel internal constructor(
                 try {
                     coroutineScope {
                         val jobs = listOf(
-                            launch { refreshPersonalFeed(currentRefreshGeneration) },
+                            launch { refreshPrimaryFeed(currentRefreshGeneration) },
                             launch { refreshHeaderCatalogSections(currentRefreshGeneration) },
                             launch { refreshWatchActivity(currentRefreshGeneration) },
                             launch { refreshThisWeek(currentRefreshGeneration) },
@@ -258,16 +258,16 @@ class HomeViewModel internal constructor(
         return refreshGeneration == generation
     }
 
-    private suspend fun refreshPersonalFeed(generation: Long) {
+    private suspend fun refreshPrimaryFeed(generation: Long) {
         val feedLoadStartedAt = System.currentTimeMillis()
-        val personalFeedResult =
+        val primaryFeedResult =
             try {
                 withContext(Dispatchers.IO) {
-                    homeCatalogService.loadPersonalHomeFeed(heroLimit = 10)
+                    homeCatalogService.loadPrimaryHomeFeed(heroLimit = 10)
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
-                Log.w(TAG, "Personal home feed refresh failed", error)
+                Log.w(TAG, "Primary home feed refresh failed", error)
                 delayForMinimumSkeletonVisibility(feedLoadStartedAt)
                 if (!isCurrentRefresh(generation)) return
                 val message = error.message ?: "Failed to load home feed."
@@ -282,19 +282,19 @@ class HomeViewModel internal constructor(
         _heroState.update { current ->
             val selectedId =
                 current.selectedId?.takeIf { id ->
-                    personalFeedResult.heroResult.items.any { it.id == id }
-                } ?: personalFeedResult.heroResult.items.firstOrNull()?.id
+                    primaryFeedResult.heroResult.items.any { it.id == id }
+                } ?: primaryFeedResult.heroResult.items.firstOrNull()?.id
             current.copy(
-                items = personalFeedResult.heroResult.items,
+                items = primaryFeedResult.heroResult.items,
                 selectedId = selectedId,
                 isLoading = false,
-                statusMessage = personalFeedResult.heroResult.statusMessage,
+                statusMessage = primaryFeedResult.heroResult.statusMessage,
             )
         }
 
         setCatalogSections(
-            sections = personalFeedResult.sections,
-            statusMessage = personalFeedResult.sectionsStatusMessage,
+            sections = primaryFeedResult.sections,
+            statusMessage = primaryFeedResult.sectionsStatusMessage,
         )
 
         if (personalFeedResult.sections.isEmpty()) {
@@ -340,11 +340,11 @@ class HomeViewModel internal constructor(
         val sections =
             try {
                 withContext(Dispatchers.IO) {
-                    homeCatalogService.loadGlobalHeaderSections()
+                    homeCatalogService.loadSharedHeaderSections()
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
-                Log.w(TAG, "Global header sections refresh failed", error)
+                Log.w(TAG, "Shared header sections refresh failed", error)
                 emptyList()
             }
 

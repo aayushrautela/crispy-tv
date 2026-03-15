@@ -17,7 +17,7 @@
     },
     "input": {
       "type": "object",
-      "required": ["snapshot", "hero_limit", "section_limit", "global_section_limit", "discover", "page"],
+      "required": ["snapshot", "hero_limit", "section_limit", "member_shared_section_limit", "discover", "page"],
       "additionalProperties": false,
       "properties": {
         "snapshot": {
@@ -29,7 +29,7 @@
         "section_limit": {
           "type": "integer"
         },
-        "global_section_limit": {
+        "member_shared_section_limit": {
           "type": "integer"
         },
         "discover": {
@@ -65,7 +65,7 @@
     },
     "expected": {
       "type": "object",
-      "required": ["personal_feed", "global_sections", "discover", "page"],
+      "required": ["personal_feed", "member_shared_sections", "discover", "page"],
       "additionalProperties": false,
       "properties": {
         "personal_feed": {
@@ -100,7 +100,7 @@
             }
           }
         },
-        "global_sections": {
+        "member_shared_sections": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/section"
