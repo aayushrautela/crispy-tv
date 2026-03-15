@@ -12,6 +12,11 @@ internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostControlle
             onScrollToTopConsumed = {
                 entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
             },
+            onOpenAccountsProfiles = {
+                navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    launchSingleTop = true
+                }
+            },
             onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
         )
     }

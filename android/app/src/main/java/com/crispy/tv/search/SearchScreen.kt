@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -29,6 +31,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,6 +55,7 @@ import kotlinx.coroutines.flow.StateFlow
 fun SearchRoute(
     onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
+    onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
@@ -75,30 +79,51 @@ fun SearchRoute(
 
     BackHandler(onBack = onBack)
 
-    if (uiState.hasActiveResults) {
-        SearchResultsContent(
-            uiState = uiState,
-            gridState = resultsGridState,
-            pageHorizontalPadding = pageHorizontalPadding,
-            onFilterChange = viewModel::setFilter,
-            onItemClick = onItemClick,
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            SearchTopBar(
+                query = uiState.query,
+                onQueryChange = viewModel::updateQuery,
+                onSearch = viewModel::submitSearch,
+                onClear = viewModel::clearSearch,
+                onOpenAccountsProfiles = onOpenAccountsProfiles,
+            )
+        },
+    ) { paddingValues ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .imePadding(),
-        )
-    } else {
-        SearchBrowseContent(
-            uiState = uiState,
-            listState = browseListState,
-            pageHorizontalPadding = pageHorizontalPadding,
-            onGenreClick = viewModel::selectGenre,
-            onRecentSearchClick = viewModel::submitSearch,
-            onRemoveRecentSearch = viewModel::removeRecentSearch,
-            onClearRecentSearches = viewModel::clearRecentSearches,
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding(),
-        )
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues),
+        ) {
+            if (uiState.hasActiveResults) {
+                SearchResultsContent(
+                    uiState = uiState,
+                    gridState = resultsGridState,
+                    pageHorizontalPadding = pageHorizontalPadding,
+                    onFilterChange = viewModel::setFilter,
+                    onItemClick = onItemClick,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .imePadding(),
+                )
+            } else {
+                SearchBrowseContent(
+                    uiState = uiState,
+                    listState = browseListState,
+                    pageHorizontalPadding = pageHorizontalPadding,
+                    onGenreClick = viewModel::selectGenre,
+                    onRecentSearchClick = viewModel::submitSearch,
+                    onRemoveRecentSearch = viewModel::removeRecentSearch,
+                    onClearRecentSearches = viewModel::clearRecentSearches,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .imePadding(),
+                )
+            }
+        }
     }
 }
 

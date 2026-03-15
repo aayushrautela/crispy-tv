@@ -116,7 +116,7 @@ class HomeCatalogService(
 
     private val catalogCacheLock = Any()
     private val personalCatalogCache = SupabaseCatalogCache()
-    private val globalCatalogCache = SupabaseCatalogCache()
+    private val globalHomeFeedCache = SupabaseCatalogCache()
 
     suspend fun loadPersonalHomeFeed(
         heroLimit: Int = 10,
@@ -229,7 +229,7 @@ class HomeCatalogService(
                 }
 
                 HomeCatalogSource.GLOBAL -> {
-                    fetchGlobalCatalogLists(
+                    fetchGlobalHomeFeed(
                         accessToken = session.accessToken,
                         profileId = profileId
                     )
@@ -282,13 +282,13 @@ class HomeCatalogService(
         return parseSupabaseCatalogResponse(response)
     }
 
-    private suspend fun fetchGlobalCatalogLists(
+    private suspend fun fetchGlobalHomeFeed(
         accessToken: String,
         profileId: String,
     ): Pair<List<SupabaseCatalogList>, String> {
         val url =
             runCatching {
-                "$supabaseBaseUrl/rest/v1/rpc/get_global_lists_feed".toHttpUrl()
+                "$supabaseBaseUrl/rest/v1/rpc/get_home_feed".toHttpUrl()
             }.getOrElse { error ->
                 return emptyList<SupabaseCatalogList>() to (error.message ?: "Invalid Supabase URL.")
             }
@@ -296,7 +296,7 @@ class HomeCatalogService(
         val payload =
             JSONObject()
                 .put("p_profile_id", profileId.trim())
-                .put("p_limit", SUPABASE_GLOBAL_LISTS_LIMIT)
+                .put("p_limit", SUPABASE_HOME_FEED_LIMIT)
                 .toString()
 
         val response =
@@ -308,7 +308,7 @@ class HomeCatalogService(
                     callTimeoutMs = 12_000L,
                 )
             }.getOrElse { error ->
-                Log.w(TAG, "Supabase global catalogs fetch failed", error)
+                Log.w(TAG, "Supabase home feed fetch failed", error)
                 return emptyList<SupabaseCatalogList>() to (error.message ?: "Failed to load catalogs.")
             }
 
@@ -377,6 +377,7 @@ class HomeCatalogService(
                     val nested =
                         arr.optJSONObject(0)?.let { first ->
                             first.optJSONArray("lists")
+                                ?: first.optJSONArray("get_home_feed")
                                 ?: first.optJSONArray("get_global_lists_feed")
                                 ?: first.optJSONArray("feed")
                         }
@@ -386,6 +387,7 @@ class HomeCatalogService(
                 trimmed.startsWith("{") -> {
                     val obj = JSONObject(trimmed)
                     obj.optJSONArray("lists")
+                        ?: obj.optJSONArray("get_home_feed")
                         ?: obj.optJSONArray("get_global_lists_feed")
                         ?: obj.optJSONArray("feed")
                         ?: JSONArray().apply { put(obj) }
@@ -548,7 +550,7 @@ class HomeCatalogService(
     private fun catalogCache(source: HomeCatalogSource): SupabaseCatalogCache {
         return when (source) {
             HomeCatalogSource.PERSONAL -> personalCatalogCache
-            HomeCatalogSource.GLOBAL -> globalCatalogCache
+            HomeCatalogSource.GLOBAL -> globalHomeFeedCache
         }
     }
 
@@ -603,7 +605,7 @@ class HomeCatalogService(
         private const val TAG = "HomeCatalogService"
         private const val COLLECTION_CATALOG_PREFIX = "tmdb.collection."
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
-        private const val SUPABASE_GLOBAL_LISTS_LIMIT = 50
+        private const val SUPABASE_HOME_FEED_LIMIT = 50
     }
 }
 

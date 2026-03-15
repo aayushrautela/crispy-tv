@@ -16,6 +16,11 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
                     navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
                 }
             },
+            onOpenAccountsProfiles = {
+                navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    launchSingleTop = true
+                }
+            },
             scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
             onScrollToTopConsumed = {
                 entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0

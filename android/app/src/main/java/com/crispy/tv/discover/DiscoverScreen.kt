@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +36,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
@@ -47,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -61,8 +65,13 @@ import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.CrispySectionAppBarTitle
+import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -338,10 +347,12 @@ private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
     return output
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverRoute(
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
+    onOpenAccountsProfiles: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -353,18 +364,45 @@ fun DiscoverRoute(
             }
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scrollBehavior = appBarScrollBehavior()
 
-    DiscoverScreen(
-        uiState = uiState,
-        onRefresh = viewModel::refresh,
-        onTypeFilterClick = viewModel::setTypeFilter,
-        onCatalogClick = viewModel::selectCatalog,
-        onGenreClick = viewModel::selectGenre,
-        onLoadMore = viewModel::loadMore,
-        onItemClick = onItemClick,
-        scrollToTopRequests = scrollToTopRequests,
-        onScrollToTopConsumed = onScrollToTopConsumed,
-    )
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            StandardTopAppBar(
+                title = {
+                    CrispySectionAppBarTitle(label = "Discover")
+                },
+                actions = {
+                    ProfileIconButton(onClick = onOpenAccountsProfiles)
+                },
+                scrollBehavior = scrollBehavior,
+                colors = topLevelAppBarColors(),
+            )
+        },
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues),
+        ) {
+            DiscoverScreen(
+                uiState = uiState,
+                onRefresh = viewModel::refresh,
+                onTypeFilterClick = viewModel::setTypeFilter,
+                onCatalogClick = viewModel::selectCatalog,
+                onGenreClick = viewModel::selectGenre,
+                onLoadMore = viewModel::loadMore,
+                onItemClick = onItemClick,
+                scrollToTopRequests = scrollToTopRequests,
+                onScrollToTopConsumed = onScrollToTopConsumed,
+            )
+        }
+    }
 }
 
 private enum class DiscoverSheet {

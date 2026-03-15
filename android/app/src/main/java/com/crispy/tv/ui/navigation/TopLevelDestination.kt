@@ -18,7 +18,6 @@ enum class TopLevelDestination(
     val label: String,
     val inactiveIcon: ImageVector,
     val activeIcon: ImageVector,
-    val showInRootTopBar: Boolean = true,
 ) {
     Home(
         route = AppRoutes.HomeRoute,

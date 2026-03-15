@@ -23,6 +23,16 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                 )
             },
             onNavigateToDiscover = { navController.navigate(AppRoutes.DiscoverRoute) },
+            onOpenCalendar = {
+                navController.navigate(AppRoutes.CalendarRoute) {
+                    launchSingleTop = true
+                }
+            },
+            onOpenAccountsProfiles = {
+                navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    launchSingleTop = true
+                }
+            },
             scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
             onScrollToTopConsumed = {
                 entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +34,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,12 +42,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
 
 data class SettingsItem(
@@ -74,6 +81,7 @@ fun SettingsScreen(
 ) {
     val scrollState = rememberScrollState()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val scrollBehavior = appBarScrollBehavior()
 
     LaunchedEffect(scrollToTopRequest) {
         if (scrollToTopRequest > 0) {
@@ -166,25 +174,41 @@ fun SettingsScreen(
     
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
-    Column(
+    Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(bottom = Dimensions.ListItemPadding),
-        verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
-    ) {
-        Text(
-            text = "Customize your experience",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = pageHorizontalPadding)
-        )
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            StandardTopAppBar(
+                title = "Settings",
+                scrollBehavior = scrollBehavior,
+                colors = topLevelAppBarColors(),
+            )
+        },
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues)
+                .verticalScroll(scrollState)
+                .padding(bottom = Dimensions.ListItemPadding),
+            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
+        ) {
+            Text(
+                text = "Customize your experience",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = pageHorizontalPadding)
+            )
 
-        settingsGroups.forEach { group ->
-            SettingsGroupCard(group = group)
+            settingsGroups.forEach { group ->
+                SettingsGroupCard(group = group)
+            }
+
+            Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
         }
-
-        Spacer(modifier = Modifier.height(Dimensions.ListItemPadding))
     }
 }
 

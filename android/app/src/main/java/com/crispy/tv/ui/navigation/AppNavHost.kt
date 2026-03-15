@@ -29,7 +29,9 @@ fun AppNavHost(
         enterTransition = {
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-            if (targetRouteIndex == -1 || targetRouteIndex > initialRouteIndex) {
+            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                null
+            } else if (targetRouteIndex > initialRouteIndex) {
                 slideInHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
                     initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
@@ -44,7 +46,9 @@ fun AppNavHost(
         exitTransition = {
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-            if (targetRouteIndex == -1 || targetRouteIndex > initialRouteIndex) {
+            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                null
+            } else if (targetRouteIndex > initialRouteIndex) {
                 slideOutHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
                     targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
@@ -59,7 +63,9 @@ fun AppNavHost(
         popEnterTransition = {
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-            if (initialRouteIndex != -1 && initialRouteIndex < targetRouteIndex) {
+            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                null
+            } else if (initialRouteIndex < targetRouteIndex) {
                 slideInHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
                     initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
@@ -74,7 +80,9 @@ fun AppNavHost(
         popExitTransition = {
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-            if (initialRouteIndex != -1 && initialRouteIndex < targetRouteIndex) {
+            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                null
+            } else if (initialRouteIndex < targetRouteIndex) {
                 slideOutHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
                     targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
