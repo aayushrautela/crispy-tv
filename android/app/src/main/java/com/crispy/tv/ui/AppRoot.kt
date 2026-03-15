@@ -8,9 +8,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,16 +27,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.crispy.tv.search.SearchTopBar
 import com.crispy.tv.search.rememberSearchViewModel
+import com.crispy.tv.ui.brand.CrispyMark
+import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.navigation.AppNavHost
 import com.crispy.tv.ui.navigation.AppNavigationBar
@@ -221,10 +225,31 @@ private fun RootTopAppBar(
 
     TopAppBar(
         title = {
-            Text(
-                text = currentDestination.label,
-                style = MaterialTheme.typography.titleLarge,
-            )
+            when (currentDestination) {
+                TopLevelDestination.Home -> {
+                    CrispyWordmark(
+                        modifier = Modifier
+                            .width(105.dp)
+                            .height(28.dp),
+                    )
+                }
+
+                TopLevelDestination.Discover,
+                TopLevelDestination.Library -> {
+                    CrispyMark(
+                        modifier = Modifier
+                            .width(23.dp)
+                            .height(28.dp),
+                    )
+                }
+
+                else -> {
+                    Text(
+                        text = currentDestination.label,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+            }
         },
         actions = {
             when (currentDestination) {

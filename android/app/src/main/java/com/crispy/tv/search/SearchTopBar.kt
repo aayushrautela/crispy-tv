@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,8 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.theme.Dimensions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,12 +50,18 @@ fun SearchTopBar(
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = Dimensions.SearchBarPillHeight),
             singleLine = true,
             shape = RoundedCornerShape(28.dp),
             textStyle = MaterialTheme.typography.bodyLarge,
             placeholder = {
-                Text("Search movies, shows, and people")
+                Text(
+                    text = "Find movies and shows",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             },
             leadingIcon = {
                 Icon(
