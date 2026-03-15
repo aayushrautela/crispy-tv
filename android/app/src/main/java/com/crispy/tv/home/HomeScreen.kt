@@ -1,6 +1,7 @@
 package com.crispy.tv.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,10 +10,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
@@ -34,6 +38,9 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.flow.StateFlow
 
 private typealias HomeCatalogSectionStateProvider = (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>
+
+private val HomeContentSectionSpacing = 24.dp
+private val HomeTopSectionSpacing = 16.dp
 
 @Composable
 internal fun HomeRoute(
@@ -143,24 +150,23 @@ private fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = horizontalPadding,
-                top = 0.dp,
+                top = Dimensions.PageTopPadding,
                 end = horizontalPadding,
                 bottom = Dimensions.PageBottomPadding,
             ),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing),
+            verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
         ) {
-                item(key = "headerSections", contentType = "headerSections") {
-                    HomeHeaderSectionsItem(
-                        headerSectionsState = headerSectionsState,
-                        onSectionClick = onCatalogSeeAllClick,
-                    )
-                }
-
-                item(key = "hero", contentType = "hero") {
-                    HomeHeroSection(
-                        heroState = heroState,
-                        onHeroClick = onHeroClick,
-                    )
+                item(key = "topHeader", contentType = "topHeader") {
+                    Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
+                        HomeHeaderSectionsItem(
+                            headerSectionsState = headerSectionsState,
+                            onSectionClick = onCatalogSeeAllClick,
+                        )
+                        HomeHeroSection(
+                            heroState = heroState,
+                            onHeroClick = onHeroClick,
+                        )
+                    }
                 }
 
                 item(key = "continueWatching", contentType = "continueWatching") {
@@ -380,12 +386,19 @@ private fun HomeHeaderSectionChips(
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 2.dp),
     ) {
         items(sections, key = { it.key }) { section ->
             FilterChip(
                 selected = false,
                 onClick = { onSectionClick(section) },
                 label = { Text(section.title) },
+                shape = RoundedCornerShape(16.dp),
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    labelColor = MaterialTheme.colorScheme.onSurface,
+                ),
             )
         }
     }
