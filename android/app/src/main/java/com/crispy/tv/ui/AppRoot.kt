@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,7 +36,7 @@ fun AppRoot() {
     val showRail = shouldShowNavigationBar && isLandscape
     val bottomSystemInset = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
-    val onTopLevelDestinationClick = remember(navController) {
+    val onTopLevelDestinationClick: (TopLevelDestination, Boolean) -> Unit = remember(navController) {
         { destination: TopLevelDestination, isSelected: Boolean ->
             if (isSelected) {
                 val currentEntry = navController.currentBackStackEntry
@@ -50,6 +49,7 @@ fun AppRoot() {
                     AppRoutes.TopLevelScrollToTopRequestKey,
                     currentRequest + 1,
                 )
+                Unit
             } else {
                 navController.navigate(destination.route) {
                     popUpTo(navController.graph.findStartDestination().id) {
@@ -58,6 +58,7 @@ fun AppRoot() {
                     launchSingleTop = true
                     restoreState = true
                 }
+                Unit
             }
         }
     }

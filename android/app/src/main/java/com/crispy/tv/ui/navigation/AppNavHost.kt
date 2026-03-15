@@ -1,6 +1,8 @@
 package com.crispy.tv.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -30,7 +32,7 @@ fun AppNavHost(
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
             if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                null
+                EnterTransition.None
             } else if (targetRouteIndex > initialRouteIndex) {
                 slideInHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
@@ -47,7 +49,7 @@ fun AppNavHost(
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
             if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                null
+                ExitTransition.None
             } else if (targetRouteIndex > initialRouteIndex) {
                 slideOutHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
@@ -64,7 +66,7 @@ fun AppNavHost(
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
             if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                null
+                EnterTransition.None
             } else if (initialRouteIndex < targetRouteIndex) {
                 slideInHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
@@ -81,7 +83,7 @@ fun AppNavHost(
             val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
             if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                null
+                ExitTransition.None
             } else if (initialRouteIndex < targetRouteIndex) {
                 slideOutHorizontally(
                     animationSpec = tween(TopLevelNavigationDurationMillis),
