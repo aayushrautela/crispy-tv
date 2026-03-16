@@ -81,7 +81,7 @@ public struct HomeCatalogList: Equatable {
 
     public init(
         kind: String,
-        variantKey: String = defaultVariantKey,
+        variantKey: String = "default",
         source: HomeCatalogSource,
         presentation: HomeCatalogPresentation = .rail,
         name: String = "",
@@ -182,7 +182,7 @@ public struct HomeCatalogSection: Equatable {
         catalogId: String,
         source: HomeCatalogSource,
         presentation: HomeCatalogPresentation,
-        variantKey: String = defaultVariantKey,
+        variantKey: String = "default",
         name: String = "",
         heading: String = "",
         title: String = "",
@@ -371,7 +371,7 @@ public func buildCatalogPage(
 public func buildHomeCatalogId(
     source: HomeCatalogSource,
     kind: String,
-    variantKey: String = defaultVariantKey
+    variantKey: String = "default"
 ) -> String {
     let normalizedVariantKey = variantKey.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank() ?? defaultVariantKey
     return "\(source.rawValue):\(kind.trimmingCharacters(in: .whitespacesAndNewlines)):\(normalizedVariantKey)"
