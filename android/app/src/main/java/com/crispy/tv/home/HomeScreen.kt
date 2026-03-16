@@ -36,6 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
@@ -86,6 +89,7 @@ internal fun HomeRoute(
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val viewModel: HomeViewModel = viewModel(
         factory = remember(appContext) {
             HomeViewModel.factory(appContext)
@@ -95,6 +99,19 @@ internal fun HomeRoute(
     val contentSections by viewModel.contentSections.collectAsStateWithLifecycle()
     val catalogSectionState = remember(viewModel) { viewModel::catalogSectionState }
     val scrollBehavior = appBarScrollBehavior()
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    viewModel.refresh()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         modifier = Modifier

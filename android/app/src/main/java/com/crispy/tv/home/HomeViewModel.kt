@@ -174,6 +174,7 @@ class HomeViewModel internal constructor(
     @Volatile
     private var refreshGeneration: Long = 0L
     private var refreshJob: Job? = null
+    private var refreshPending: Boolean = false
 
     init {
         refresh()
@@ -181,8 +182,10 @@ class HomeViewModel internal constructor(
 
     fun refresh() {
         if (refreshJob?.isActive == true) {
+            refreshPending = true
             return
         }
+        refreshPending = false
         val currentRefreshGeneration = beginRefresh()
         prepareForRefresh()
 
@@ -200,6 +203,11 @@ class HomeViewModel internal constructor(
                 } finally {
                     if (isCurrentRefresh(currentRefreshGeneration)) {
                         _isRefreshing.value = false
+                    }
+                    refreshJob = null
+                    if (refreshPending) {
+                        refreshPending = false
+                        refresh()
                     }
                 }
             }
