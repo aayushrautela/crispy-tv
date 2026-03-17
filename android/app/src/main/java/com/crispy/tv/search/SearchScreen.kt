@@ -92,8 +92,10 @@ fun SearchRoute(
                 query = uiState.query,
                 onQueryChange = viewModel::updateQuery,
                 onSearch = viewModel::submitSearch,
+                onAiSearch = viewModel::submitAiSearch,
                 onClear = viewModel::clearSearch,
                 onOpenAccountsProfiles = onOpenAccountsProfiles,
+                isAiActive = uiState.searchMode == SearchMode.AI && uiState.hasActiveResults,
             )
         },
     ) { paddingValues ->
@@ -111,6 +113,7 @@ fun SearchRoute(
                 pageHorizontalPadding = pageHorizontalPadding,
                 onFilterChange = viewModel::setFilter,
                 onItemClick = onItemClick,
+                emptyMessage = uiState.statusMessage,
                 modifier = contentModifier,
             )
         } else {
@@ -245,6 +248,7 @@ private fun SearchResultsContent(
     pageHorizontalPadding: Dp,
     onFilterChange: (SearchTypeFilter) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
+    emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
     SearchGrid(
@@ -270,7 +274,9 @@ private fun SearchResultsContent(
 
             uiState.results.isEmpty() -> {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    SearchEmptyState(text = "No results")
+                    SearchEmptyState(
+                        text = emptyMessage ?: if (uiState.searchMode == SearchMode.AI) "No AI matches found." else "No results",
+                    )
                 }
             }
 
@@ -284,8 +290,6 @@ private fun SearchResultsContent(
                         posterUrl = item.posterUrl,
                         backdropUrl = item.backdropUrl,
                         rating = item.rating,
-                        year = item.year,
-                        genre = item.genre,
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onItemClick(item) },
                     )

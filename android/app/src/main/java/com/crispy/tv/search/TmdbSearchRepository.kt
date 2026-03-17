@@ -8,6 +8,11 @@ import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.ratings.formatRating
 import java.util.Locale
 
+data class SearchResultsPayload(
+    val items: List<CatalogItem> = emptyList(),
+    val message: String? = null,
+)
+
 class TmdbSearchRepository internal constructor(
     private val remoteDataSource: TmdbSearchRemoteDataSource,
 ) {
@@ -19,18 +24,18 @@ class TmdbSearchRepository internal constructor(
         query: String,
         filter: SearchTypeFilter,
         locale: Locale = Locale.getDefault(),
-    ): List<CatalogItem> {
+    ): SearchResultsPayload {
         val inputs = remoteDataSource.searchInputs(query = query, filter = filter, locale = locale)
-        return inputs.toCatalogItems()
+        return SearchResultsPayload(items = inputs.toCatalogItems())
     }
 
     suspend fun discoverByGenre(
         genreSuggestion: SearchGenreSuggestion,
         filter: SearchTypeFilter,
         locale: Locale = Locale.getDefault(),
-    ): List<CatalogItem> {
+    ): SearchResultsPayload {
         val inputs = remoteDataSource.discoverInputs(genreSuggestion = genreSuggestion, filter = filter, locale = locale)
-        return inputs.toCatalogItems(genreLabel = genreSuggestion.label)
+        return SearchResultsPayload(items = inputs.toCatalogItems(genreLabel = genreSuggestion.label))
     }
 
     private fun List<TmdbSearchResultInput>.toCatalogItems(genreLabel: String? = null): List<CatalogItem> {

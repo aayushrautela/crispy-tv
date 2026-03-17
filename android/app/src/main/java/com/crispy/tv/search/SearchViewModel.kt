@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
+import com.crispy.tv.network.AppHttp
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,15 +32,22 @@ enum class SearchTypeFilter {
             }
 }
 
+enum class SearchMode {
+    STANDARD,
+    AI,
+}
+
 @Immutable
 data class SearchUiState(
     val query: String = "",
     val appliedQuery: String = "",
     val selectedGenre: SearchGenreSuggestion? = null,
     val filter: SearchTypeFilter = SearchTypeFilter.ALL,
+    val searchMode: SearchMode = SearchMode.STANDARD,
     val isLoading: Boolean = false,
     val recentSearches: List<String> = emptyList(),
     val results: List<CatalogItem> = emptyList(),
+    val statusMessage: String? = null,
 ) {
     val hasActiveResults: Boolean
         get() = appliedQuery.isNotBlank() || selectedGenre != null
@@ -47,7 +55,11 @@ data class SearchUiState(
     val availableFilters: List<SearchTypeFilter>
         get() =
             if (selectedGenre == null) {
-                SearchTypeFilter.entries
+                if (searchMode == SearchMode.AI) {
+                    listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES)
+                } else {
+                    SearchTypeFilter.entries
+                }
             } else {
                 listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES)
             }
@@ -55,6 +67,7 @@ data class SearchUiState(
 
 class SearchViewModel(
     private val searchRepository: TmdbSearchRepository,
+    private val aiSearchRepository: AiSearchRepository,
     private val searchHistoryStore: SearchHistoryStore,
     private val localeProvider: () -> Locale = { Locale.getDefault() },
 ) : ViewModel() {
@@ -80,6 +93,7 @@ class SearchViewModel(
             return
         }
 
+        val resolvedFilter = normalizeFilterForMode(snapshot.filter, SearchMode.STANDARD)
         val updatedRecentSearches = searchHistoryStore.record(normalizedQuery)
         launchSearch(
             updateState = {
@@ -88,15 +102,49 @@ class SearchViewModel(
                     appliedQuery = normalizedQuery,
                     selectedGenre = null,
                     recentSearches = updatedRecentSearches,
-                    filter = snapshot.filter,
+                    filter = resolvedFilter,
+                    searchMode = SearchMode.STANDARD,
                     isLoading = true,
                     results = emptyList(),
+                    statusMessage = null,
                 )
             },
         ) { locale ->
             searchRepository.search(
                 query = normalizedQuery,
-                filter = snapshot.filter,
+                filter = resolvedFilter,
+                locale = locale,
+            )
+        }
+    }
+
+    fun submitAiSearch(query: String = _uiState.value.query) {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) {
+            return
+        }
+
+        val snapshot = _uiState.value
+        val resolvedFilter = normalizeFilterForMode(snapshot.filter, SearchMode.AI)
+        val updatedRecentSearches = searchHistoryStore.record(normalizedQuery)
+        launchSearch(
+            updateState = {
+                copy(
+                    query = normalizedQuery,
+                    appliedQuery = normalizedQuery,
+                    selectedGenre = null,
+                    recentSearches = updatedRecentSearches,
+                    filter = resolvedFilter,
+                    searchMode = SearchMode.AI,
+                    isLoading = true,
+                    results = emptyList(),
+                    statusMessage = null,
+                )
+            },
+        ) { locale ->
+            aiSearchRepository.search(
+                query = normalizedQuery,
+                filter = resolvedFilter,
                 locale = locale,
             )
         }
@@ -110,13 +158,15 @@ class SearchViewModel(
                 query = "",
                 appliedQuery = "",
                 selectedGenre = null,
+                searchMode = SearchMode.STANDARD,
                 isLoading = false,
                 results = emptyList(),
+                statusMessage = null,
             )
     }
 
     fun selectGenre(genreSuggestion: SearchGenreSuggestion) {
-        val resolvedFilter = normalizeFilterForGenre(_uiState.value.filter)
+        val resolvedFilter = normalizeFilterForMode(_uiState.value.filter, SearchMode.STANDARD)
         loadGenreResults(genreSuggestion = genreSuggestion, filter = resolvedFilter)
     }
 
@@ -129,8 +179,13 @@ class SearchViewModel(
     }
 
     fun setFilter(filter: SearchTypeFilter) {
+        val mode = _uiState.value.searchMode
         val resolvedFilter =
-            _uiState.value.selectedGenre?.let { normalizeFilterForGenre(filter) } ?: filter
+            if (_uiState.value.selectedGenre != null) {
+                normalizeFilterForMode(filter, SearchMode.STANDARD)
+            } else {
+                normalizeFilterForMode(filter, mode)
+            }
         if (_uiState.value.filter == resolvedFilter) {
             return
         }
@@ -146,10 +201,17 @@ class SearchViewModel(
             }
 
             snapshot.appliedQuery.isNotBlank() -> {
-                loadQueryResults(
-                    query = snapshot.appliedQuery,
-                    filter = resolvedFilter,
-                )
+                if (snapshot.searchMode == SearchMode.AI) {
+                    loadAiResults(
+                        query = snapshot.appliedQuery,
+                        filter = resolvedFilter,
+                    )
+                } else {
+                    loadQueryResults(
+                        query = snapshot.appliedQuery,
+                        filter = resolvedFilter,
+                    )
+                }
             }
 
             else -> clearResultsOnly()
@@ -159,25 +221,52 @@ class SearchViewModel(
     private fun clearResultsOnly() {
         searchToken += 1
         cancelActiveSearch()
-        _uiState.value = _uiState.value.copy(isLoading = false, results = emptyList())
+        _uiState.value = _uiState.value.copy(isLoading = false, results = emptyList(), statusMessage = null)
     }
 
     private fun loadQueryResults(query: String, filter: SearchTypeFilter) {
+        val resolvedFilter = normalizeFilterForMode(filter, SearchMode.STANDARD)
         launchSearch(
             updateState = {
                 copy(
                     query = query,
                     appliedQuery = query,
                     selectedGenre = null,
-                    filter = filter,
+                    filter = resolvedFilter,
+                    searchMode = SearchMode.STANDARD,
                     isLoading = true,
                     results = emptyList(),
+                    statusMessage = null,
                 )
             },
         ) { locale ->
             searchRepository.search(
                 query = query,
-                filter = filter,
+                filter = resolvedFilter,
+                locale = locale,
+            )
+        }
+    }
+
+    private fun loadAiResults(query: String, filter: SearchTypeFilter) {
+        val resolvedFilter = normalizeFilterForMode(filter, SearchMode.AI)
+        launchSearch(
+            updateState = {
+                copy(
+                    query = query,
+                    appliedQuery = query,
+                    selectedGenre = null,
+                    filter = resolvedFilter,
+                    searchMode = SearchMode.AI,
+                    isLoading = true,
+                    results = emptyList(),
+                    statusMessage = null,
+                )
+            },
+        ) { locale ->
+            aiSearchRepository.search(
+                query = query,
+                filter = resolvedFilter,
                 locale = locale,
             )
         }
@@ -187,21 +276,24 @@ class SearchViewModel(
         genreSuggestion: SearchGenreSuggestion,
         filter: SearchTypeFilter,
     ) {
+        val resolvedFilter = normalizeFilterForMode(filter, SearchMode.STANDARD)
         launchSearch(
             updateState = {
                 copy(
                     query = genreSuggestion.label,
                     selectedGenre = genreSuggestion,
                     appliedQuery = "",
-                    filter = filter,
+                    filter = resolvedFilter,
+                    searchMode = SearchMode.STANDARD,
                     isLoading = true,
                     results = emptyList(),
+                    statusMessage = null,
                 )
             },
         ) { locale ->
             searchRepository.discoverByGenre(
                 genreSuggestion = genreSuggestion,
-                filter = filter,
+                filter = resolvedFilter,
                 locale = locale,
             )
         }
@@ -209,7 +301,7 @@ class SearchViewModel(
 
     private fun launchSearch(
         updateState: SearchUiState.() -> SearchUiState,
-        request: suspend (Locale) -> List<CatalogItem>,
+        request: suspend (Locale) -> SearchResultsPayload,
     ) {
         searchToken += 1
         val token = searchToken
@@ -219,16 +311,24 @@ class SearchViewModel(
         searchJob =
             viewModelScope.launch {
                 val locale = localeProvider()
-                val results =
+                val payload =
                     withContext(Dispatchers.IO) {
-                        runCatching { request(locale) }.getOrElse { emptyList() }
+                        runCatching { request(locale) }
+                            .getOrElse {
+                                SearchResultsPayload(message = it.message ?: "Search is unavailable right now.")
+                            }
                     }
 
                 if (token != searchToken) {
                     return@launch
                 }
 
-                _uiState.value = _uiState.value.copy(isLoading = false, results = results)
+                _uiState.value =
+                    _uiState.value.copy(
+                        isLoading = false,
+                        results = payload.items,
+                        statusMessage = payload.message,
+                    )
             }
     }
 
@@ -241,6 +341,15 @@ class SearchViewModel(
         return if (filter == SearchTypeFilter.PEOPLE) SearchTypeFilter.ALL else filter
     }
 
+    private fun normalizeFilterForMode(filter: SearchTypeFilter, mode: SearchMode): SearchTypeFilter {
+        val genreResolved = normalizeFilterForGenre(filter)
+        return if (mode == SearchMode.AI && genreResolved == SearchTypeFilter.PEOPLE) {
+            SearchTypeFilter.ALL
+        } else {
+            genreResolved
+        }
+    }
+
     companion object {
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext
@@ -251,8 +360,10 @@ class SearchViewModel(
                     }
 
                     @Suppress("UNCHECKED_CAST")
+                    val httpClient = AppHttp.client(context)
                     return SearchViewModel(
                         searchRepository = TmdbServicesProvider.searchRepository(context),
+                        aiSearchRepository = AiSearchRepository.create(context, httpClient),
                         searchHistoryStore = SearchHistoryStore(context),
                     ) as T
                 }
