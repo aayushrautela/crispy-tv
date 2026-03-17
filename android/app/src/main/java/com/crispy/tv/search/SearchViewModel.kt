@@ -88,7 +88,7 @@ class SearchViewModel(
                     appliedQuery = normalizedQuery,
                     selectedGenre = null,
                     recentSearches = updatedRecentSearches,
-                    filter = filter,
+                    filter = snapshot.filter,
                     isLoading = true,
                     results = emptyList(),
                 )
@@ -96,7 +96,7 @@ class SearchViewModel(
         ) { locale ->
             searchRepository.search(
                 query = normalizedQuery,
-                filter = filter,
+                filter = snapshot.filter,
                 locale = locale,
             )
         }
