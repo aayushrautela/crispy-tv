@@ -34,10 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.LinkedHashMap
@@ -105,8 +102,8 @@ class HomeViewModel internal constructor(
 ) : ViewModel() {
     companion object {
         private const val TAG = "HomeViewModel"
-        private const val CATALOG_CONCURRENCY_LIMIT = 6
         private const val SECTION_SKELETON_MIN_DURATION_MS = 150L
+        private const val BACKGROUND_REFRESH_DEBOUNCE_MS = 60_000L
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -168,26 +165,33 @@ class HomeViewModel internal constructor(
     private val _catalogStatusState = MutableStateFlow(HomeCatalogStatusState())
     val catalogStatusState: StateFlow<HomeCatalogStatusState> = _catalogStatusState.asStateFlow()
 
+    private val _isForegroundLoading = MutableStateFlow(true)
+    val isForegroundLoading: StateFlow<Boolean> = _isForegroundLoading.asStateFlow()
+
     private val catalogSectionStates = LinkedHashMap<String, MutableStateFlow<HomeCatalogSectionUi>>()
 
     private var suppressedItemsByKey: MutableMap<String, Long>? = null
     @Volatile
     private var refreshGeneration: Long = 0L
     private var refreshJob: Job? = null
+    private var backgroundRefreshJob: Job? = null
     private var refreshPending: Boolean = false
+    private var lastRefreshCompletedAtMs: Long = 0L
 
     init {
-        refresh()
+        refresh(forceForegroundLoading = true)
     }
 
-    fun refresh() {
+    fun refresh(forceForegroundLoading: Boolean = false) {
+        backgroundRefreshJob?.cancel()
         if (refreshJob?.isActive == true) {
             refreshPending = true
             return
         }
         refreshPending = false
         val currentRefreshGeneration = beginRefresh()
-        prepareForRefresh()
+        val showForegroundLoading = forceForegroundLoading || !hasLoadedHomeContent()
+        prepareForRefresh(showForegroundLoading = showForegroundLoading)
 
         refreshJob =
             viewModelScope.launch {
@@ -196,18 +200,28 @@ class HomeViewModel internal constructor(
                         val jobs = listOf(
                             launch { refreshPrimaryFeed(currentRefreshGeneration) },
                             launch { refreshWatchActivity(currentRefreshGeneration) },
-                            launch { refreshThisWeek(currentRefreshGeneration) },
                         )
-                        jobs.joinAll()
+                        jobs.forEach { it.join() }
                     }
                 } finally {
                     if (isCurrentRefresh(currentRefreshGeneration)) {
                         _isRefreshing.value = false
+                        _isForegroundLoading.value = false
+                        lastRefreshCompletedAtMs = System.currentTimeMillis()
                     }
                     refreshJob = null
                     if (refreshPending) {
                         refreshPending = false
                         refresh()
+                    } else if (isCurrentRefresh(currentRefreshGeneration)) {
+                        backgroundRefreshJob =
+                            viewModelScope.launch {
+                                refreshWatchActivity(
+                                    generation = currentRefreshGeneration,
+                                    enrichMetadata = true,
+                                )
+                                refreshThisWeek(currentRefreshGeneration)
+                            }
                     }
                 }
             }
@@ -219,8 +233,24 @@ class HomeViewModel internal constructor(
         return nextGeneration
     }
 
-    private fun prepareForRefresh() {
+    fun refreshIfStale() {
+        if (refreshJob?.isActive == true) return
+        val now = System.currentTimeMillis()
+        if (lastRefreshCompletedAtMs <= 0L) return
+        if (now - lastRefreshCompletedAtMs < BACKGROUND_REFRESH_DEBOUNCE_MS) return
+        refresh(forceForegroundLoading = false)
+    }
+
+    private fun prepareForRefresh(showForegroundLoading: Boolean) {
         _isRefreshing.value = true
+        _isForegroundLoading.value = showForegroundLoading
+        if (!showForegroundLoading) {
+            _continueWatchingState.update { current -> current.copy(isError = false) }
+            _upNextState.update { current -> current.copy(isError = false) }
+            _thisWeekState.update { current -> current.copy(isError = false) }
+            return
+        }
+
         _heroState.update { current ->
             current.copy(
                 isLoading = true,
@@ -246,8 +276,22 @@ class HomeViewModel internal constructor(
             )
         }
         catalogSectionStates.values.forEach { state ->
-            state.update { current -> current.copy(isLoading = true) }
+            state.update { current ->
+                current.copy(
+                    items = if (current.items.isEmpty()) current.section.previewItems else current.items,
+                    isLoading = true,
+                )
+            }
         }
+    }
+
+    private fun hasLoadedHomeContent(): Boolean {
+        return _heroState.value.items.isNotEmpty() ||
+            _continueWatchingState.value.items.isNotEmpty() ||
+            _upNextState.value.items.isNotEmpty() ||
+            _thisWeekState.value.items.isNotEmpty() ||
+            _contentSections.value.isNotEmpty() ||
+            _pillSections.value.isNotEmpty()
     }
 
     private fun isCurrentRefresh(generation: Long): Boolean {
@@ -293,51 +337,22 @@ class HomeViewModel internal constructor(
             statusMessage = primaryFeedResult.sectionsStatusMessage,
         )
 
-        val loadableSections =
-            primaryFeedResult.sections.filter {
-                it.presentation == HomeCatalogPresentation.RAIL ||
-                    it.presentation == HomeCatalogPresentation.COLLECTION_SHELF
-            }
-        if (loadableSections.isEmpty()) {
-            return
-        }
-
-        val sectionLoadStartedAt = System.currentTimeMillis()
-        val semaphore = Semaphore(CATALOG_CONCURRENCY_LIMIT)
-
-        coroutineScope {
-            loadableSections.map { section ->
-                launch {
-                    val pageResult =
-                        try {
-                            withContext(Dispatchers.IO) {
-                                semaphore.withPermit {
-                                    homeCatalogService.fetchCatalogPage(
-                                        section = section,
-                                        page = 1,
-                                        pageSize = 12,
-                                    )
-                                }
-                            }
-                        } catch (error: Throwable) {
-                            if (error is CancellationException) throw error
-                            Log.w(TAG, "Home catalog section refresh failed for ${section.key}", error)
-                            CatalogPageResult(
-                                items = emptyList(),
-                                statusMessage = error.message ?: "Failed to load catalog.",
-                                attemptedUrls = emptyList(),
-                            )
-                        }
-
-                    delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-                    if (!isCurrentRefresh(generation)) return@launch
-                    updateCatalogSectionState(section = section, pageResult = pageResult)
-                }
-            }.joinAll()
+        primaryFeedResult.sections.forEach { section ->
+            updateCatalogSectionState(
+                section = section,
+                pageResult = CatalogPageResult(items = section.previewItems),
+            )
         }
     }
 
     private suspend fun refreshWatchActivity(generation: Long) {
+        refreshWatchActivity(generation = generation, enrichMetadata = !_isForegroundLoading.value)
+    }
+
+    private suspend fun refreshWatchActivity(
+        generation: Long,
+        enrichMetadata: Boolean,
+    ) {
         val sectionLoadStartedAt = System.currentTimeMillis()
         val continueWatchingResult =
             try {
@@ -376,6 +391,7 @@ class HomeViewModel internal constructor(
                             localEntries = filteredEntries,
                             providerResult = filteredProviderResult,
                             limit = 20,
+                            enrichMetadata = enrichMetadata,
                         )
                     }
                 }
@@ -462,7 +478,13 @@ class HomeViewModel internal constructor(
 
     fun catalogSectionState(section: CatalogSectionRef): StateFlow<HomeCatalogSectionUi> {
         return catalogSectionStates.getOrPut(section.key) {
-            MutableStateFlow(HomeCatalogSectionUi(section = section))
+            MutableStateFlow(
+                HomeCatalogSectionUi(
+                    section = section,
+                    items = section.previewItems,
+                    isLoading = false,
+                )
+            )
         }
     }
 
@@ -704,9 +726,19 @@ class HomeViewModel internal constructor(
         val activeKeys = sections.mapTo(linkedSetOf()) { it.key }
         sections.forEach { section ->
             val sectionState = catalogSectionStates.getOrPut(section.key) {
-                MutableStateFlow(HomeCatalogSectionUi(section = section))
+                MutableStateFlow(
+                    HomeCatalogSectionUi(
+                        section = section,
+                        items = section.previewItems,
+                        isLoading = false,
+                    )
+                )
             }
-            sectionState.value = sectionState.value.copy(section = section)
+            val current = sectionState.value
+            sectionState.value = current.copy(
+                section = section,
+                items = section.previewItems.ifEmpty { current.items },
+            )
         }
         catalogSectionStates.keys.retainAll(activeKeys)
 
@@ -730,12 +762,18 @@ class HomeViewModel internal constructor(
         pageResult: CatalogPageResult,
     ) {
         val sectionState = catalogSectionStates.getOrPut(section.key) {
-            MutableStateFlow(HomeCatalogSectionUi(section = section))
+            MutableStateFlow(
+                HomeCatalogSectionUi(
+                    section = section,
+                    items = section.previewItems,
+                    isLoading = false,
+                )
+            )
         }
         sectionState.value =
             HomeCatalogSectionUi(
                 section = section,
-                items = pageResult.items,
+                items = pageResult.items.ifEmpty { section.previewItems },
                 isLoading = false,
                 statusMessage = pageResult.statusMessage,
             )

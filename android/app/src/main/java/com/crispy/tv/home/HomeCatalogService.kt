@@ -20,6 +20,7 @@ import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.domain.home.HomeCatalogSection as DomainHomeCatalogSection
 import com.crispy.tv.domain.home.HomeCatalogSnapshot as DomainHomeCatalogSnapshot
 import com.crispy.tv.domain.home.HomeCatalogSource
+import com.crispy.tv.domain.home.buildHomeCatalogId
 import com.crispy.tv.domain.home.listDiscoverCatalogs as planDiscoverCatalogs
 import com.crispy.tv.domain.home.parseHomeCatalogId
 import com.crispy.tv.domain.home.planHomeFeed
@@ -121,11 +122,20 @@ class HomeCatalogService(
         sectionLimit: Int = Int.MAX_VALUE,
     ): HomePrimaryFeedLoadResult {
         val snapshot = selectPrimaryFeedSnapshot()
+        val domainSnapshot = snapshot.toDomain()
+        val previewItemsByCatalogId =
+            snapshot.lists.associate { list ->
+                buildHomeCatalogId(
+                    source = list.source,
+                    kind = list.kind,
+                    variantKey = list.variantKey,
+                ).trim().lowercase(Locale.US) to list.items.take(HOME_SECTION_PREVIEW_ITEM_LIMIT)
+            }
         return planHomeFeed(
-            snapshot = snapshot.toDomain(),
+            snapshot = domainSnapshot,
             heroLimit = heroLimit,
             sectionLimit = sectionLimit,
-        ).toAppModel()
+        ).toAppModel(previewItemsByCatalogId)
     }
 
     suspend fun listDiscoverCatalogs(
@@ -650,6 +660,7 @@ class HomeCatalogService(
     companion object {
         private const val TAG = "HomeCatalogService"
         private const val DEFAULT_VARIANT_KEY = "default"
+        private const val HOME_SECTION_PREVIEW_ITEM_LIMIT = 12
         private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
         private const val SUPABASE_HOME_FEED_LIMIT = 50
         private const val SUPABASE_SECTION_LIMIT_CAP = 200
@@ -695,10 +706,16 @@ private fun CatalogItem.toDomain(): DomainHomeCatalogItem {
     )
 }
 
-private fun HomeCatalogFeedPlan.toAppModel(): HomePrimaryFeedLoadResult {
+private fun HomeCatalogFeedPlan.toAppModel(
+    previewItemsByCatalogId: Map<String, List<CatalogItem>>,
+): HomePrimaryFeedLoadResult {
     return HomePrimaryFeedLoadResult(
         heroResult = heroResult.toAppModel(),
-        sections = sections.map { it.toAppModel() },
+        sections =
+            sections.map { section ->
+                val previewItems = previewItemsByCatalogId[section.catalogId.trim().lowercase(Locale.US)].orEmpty()
+                section.toAppModel(previewItems)
+            },
         sectionsStatusMessage = sectionsStatusMessage,
     )
 }
@@ -724,7 +741,7 @@ private fun DomainHomeHeroItem.toAppModel(): HomeHeroItem {
     )
 }
 
-private fun DomainHomeCatalogSection.toAppModel(): CatalogSectionRef {
+private fun DomainHomeCatalogSection.toAppModel(previewItems: List<CatalogItem>): CatalogSectionRef {
     return CatalogSectionRef(
         catalogId = catalogId,
         source = source,
@@ -734,12 +751,13 @@ private fun DomainHomeCatalogSection.toAppModel(): CatalogSectionRef {
         heading = heading,
         title = title,
         subtitle = subtitle,
+        previewItems = previewItems,
     )
 }
 
 private fun HomeCatalogDiscoverRef.toAppModel(): DiscoverCatalogRef {
     return DiscoverCatalogRef(
-        section = section.toAppModel(),
+        section = section.toAppModel(previewItems = emptyList()),
         addonName = addonName,
         genres = genres,
     )

@@ -104,7 +104,7 @@ internal fun HomeRoute(
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    viewModel.refresh()
+                    viewModel.refreshIfStale()
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)

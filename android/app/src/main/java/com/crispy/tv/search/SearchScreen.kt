@@ -1,27 +1,30 @@
 package com.crispy.tv.search
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
@@ -29,10 +32,8 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,7 +41,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,7 +68,7 @@ fun SearchRoute(
 ) {
     val viewModel = rememberSearchViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val browseListState = rememberLazyListState()
+    val browseGridState = rememberLazyGridState()
     val resultsGridState = rememberLazyGridState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
@@ -71,7 +78,7 @@ fun SearchRoute(
             if (uiState.hasActiveResults) {
                 resultsGridState.animateScrollToItem(0)
             } else {
-                browseListState.animateScrollToItem(0)
+                browseGridState.animateScrollToItem(0)
             }
             onScrollToTopConsumed()
         }
@@ -112,7 +119,7 @@ fun SearchRoute(
             } else {
                 SearchBrowseContent(
                     uiState = uiState,
-                    listState = browseListState,
+                    gridState = browseGridState,
                     pageHorizontalPadding = pageHorizontalPadding,
                     onGenreClick = viewModel::selectGenre,
                     onRecentSearchClick = viewModel::submitSearch,
@@ -130,7 +137,7 @@ fun SearchRoute(
 @Composable
 private fun SearchBrowseContent(
     uiState: SearchUiState,
-    listState: androidx.compose.foundation.lazy.LazyListState,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
     pageHorizontalPadding: Dp,
     onGenreClick: (SearchGenreSuggestion) -> Unit,
     onRecentSearchClick: (String) -> Unit,
@@ -138,8 +145,11 @@ private fun SearchBrowseContent(
     onClearRecentSearches: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        state = listState,
+    val quickPickTiles = quickPickTiles()
+
+    LazyVerticalGrid(
+        state = gridState,
+        columns = GridCells.Fixed(3),
         modifier = modifier,
         contentPadding = PaddingValues(
             start = pageHorizontalPadding,
@@ -147,43 +157,62 @@ private fun SearchBrowseContent(
             end = pageHorizontalPadding,
             bottom = Dimensions.PageBottomPadding,
         ),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            SearchSectionHeader(
-                title = "Genres",
-                subtitle = "Pick a genre to browse instantly, or type a title above.",
-            )
-        }
-        item {
-            GenreSuggestionsRow(onGenreClick = onGenreClick)
-        }
-
-        if (uiState.recentSearches.isEmpty()) {
-            item {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (uiState.recentSearches.isNotEmpty()) {
+                    RecentSearchStrip(
+                        recentSearches = uiState.recentSearches,
+                        onRecentSearchClick = onRecentSearchClick,
+                        onRemoveRecentSearch = onRemoveRecentSearch,
+                        onClearRecentSearches = onClearRecentSearches,
+                    )
+                }
                 SearchSectionHeader(
-                    title = "Recent searches",
-                    subtitle = "Your recent searches will show up here.",
+                    title = "Quick picks",
+                    subtitle = "Browse a genre instantly with compact visual tiles.",
                 )
             }
-        } else {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SearchSectionTitle(text = "Recent searches")
-                    TextButton(onClick = onClearRecentSearches) {
-                        Text("Clear all")
-                    }
-                }
+        }
+        gridItems(
+            items = quickPickTiles,
+            key = { it.genre.name },
+            span = { tile -> GridItemSpan(tile.span) },
+        ) { tile ->
+            QuickPickTile(
+                tile = tile,
+                onClick = { onGenreClick(tile.genre) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentSearchStrip(
+    recentSearches: List<String>,
+    onRecentSearchClick: (String) -> Unit,
+    onRemoveRecentSearch: (String) -> Unit,
+    onClearRecentSearches: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SearchSectionTitle(text = "History")
+            TextButton(onClick = onClearRecentSearches) {
+                Text("Clear")
             }
+        }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(
-                items = uiState.recentSearches,
+                items = recentSearches,
                 key = { it.lowercase(Locale.ROOT) },
             ) { query ->
-                RecentSearchRow(
+                RecentSearchChip(
                     query = query,
                     onClick = { onRecentSearchClick(query) },
                     onRemoveClick = { onRemoveRecentSearch(query) },
@@ -194,24 +223,41 @@ private fun SearchBrowseContent(
 }
 
 @Composable
-private fun GenreSuggestionsRow(
-    onGenreClick: (SearchGenreSuggestion) -> Unit,
+private fun RecentSearchChip(
+    query: String,
+    onClick: () -> Unit,
+    onRemoveClick: () -> Unit,
 ) {
-    LazyRow(
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clickable(onClick = onClick)
+            .padding(start = 12.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(SearchGenreSuggestion.entries, key = { it.name }) { genre ->
-            SuggestionChip(
-                onClick = { onGenreClick(genre) },
-                icon = {
-                    Icon(
-                        painter = painterResource(id = genre.imageRes),
-                        contentDescription = null,
-                    )
-                },
-                label = {
-                    Text(genre.label)
-                },
+        Icon(
+            imageVector = Icons.Outlined.History,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = query,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+        )
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(onClick = onRemoveClick)
+                .padding(2.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Clear,
+                contentDescription = "Remove recent search",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -285,8 +331,10 @@ private fun SearchResultsHeader(
     uiState: SearchUiState,
     onFilterChange: (SearchTypeFilter) -> Unit,
 ) {
-    val resultLabel = uiState.selectedGenre?.let { "Popular in ${it.label}" } ?: uiState.appliedQuery.let { "Results for \"$it\"" }
-    androidx.compose.foundation.layout.Column(
+    val resultLabel =
+        uiState.selectedGenre?.let { "Popular in ${it.label}" }
+            ?: uiState.appliedQuery.let { "Results for \"$it\"" }
+    Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SearchSectionHeader(
@@ -313,7 +361,7 @@ private fun SearchSectionHeader(
     title: String,
     subtitle: String,
 ) {
-    androidx.compose.foundation.layout.Column(
+    Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         SearchSectionTitle(text = title)
@@ -335,40 +383,46 @@ private fun SearchSectionTitle(text: String) {
 }
 
 @Composable
-private fun RecentSearchRow(
-    query: String,
+private fun QuickPickTile(
+    tile: QuickPickTileModel,
     onClick: () -> Unit,
-    onRemoveClick: () -> Unit,
 ) {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = RoundedCornerShape(16.dp),
-            )
+            .aspectRatio(if (tile.span == 2) 1.85f else 1f)
+            .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .background(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Icon(
-            imageVector = Icons.Outlined.History,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        Image(
+            painter = painterResource(id = tile.genre.imageRes),
+            contentDescription = tile.genre.label,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
         )
-        Text(
-            text = query,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(tile.overlayBrush),
         )
-        IconButton(onClick = onRemoveClick) {
-            Icon(
-                imageVector = Icons.Outlined.Clear,
-                contentDescription = "Remove recent search",
-            )
-        }
+        QuickPickLabel(tile = tile)
     }
+}
+
+@Composable
+private fun BoxScope.QuickPickLabel(tile: QuickPickTileModel) {
+    val isCentered = tile.textPlacement == QuickPickTextPlacement.CENTER
+    Text(
+        text = tile.genre.label,
+        modifier = Modifier
+            .align(if (isCentered) Alignment.Center else Alignment.BottomStart)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        style = if (isCentered) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = Color.White,
+        textAlign = if (isCentered) TextAlign.Center else TextAlign.Start,
+    )
 }
 
 @Composable
@@ -398,4 +452,52 @@ private fun SearchLoadingIndicator() {
     ) {
         CircularProgressIndicator()
     }
+}
+
+private data class QuickPickTileModel(
+    val genre: SearchGenreSuggestion,
+    val span: Int,
+    val textPlacement: QuickPickTextPlacement,
+) {
+    val overlayBrush: Brush
+        get() =
+            if (textPlacement == QuickPickTextPlacement.CENTER) {
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.5f),
+                        Color.Black.copy(alpha = 0.22f),
+                        Color.Black.copy(alpha = 0.58f),
+                    ),
+                )
+            } else {
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.18f),
+                        Color.Black.copy(alpha = 0.78f),
+                    ),
+                )
+            }
+}
+
+private enum class QuickPickTextPlacement {
+    CENTER,
+    BOTTOM_START,
+}
+
+private fun quickPickTiles(): List<QuickPickTileModel> {
+    return listOf(
+        QuickPickTileModel(SearchGenreSuggestion.ACTION, span = 2, textPlacement = QuickPickTextPlacement.BOTTOM_START),
+        QuickPickTileModel(SearchGenreSuggestion.ANIMATED, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
+        QuickPickTileModel(SearchGenreSuggestion.COMEDY, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
+        QuickPickTileModel(SearchGenreSuggestion.DOCUMENTARY, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
+        QuickPickTileModel(SearchGenreSuggestion.DRAMA, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
+        QuickPickTileModel(SearchGenreSuggestion.FAMILY, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
+        QuickPickTileModel(SearchGenreSuggestion.FANTASY, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
+        QuickPickTileModel(SearchGenreSuggestion.HORROR, span = 2, textPlacement = QuickPickTextPlacement.BOTTOM_START),
+        QuickPickTileModel(SearchGenreSuggestion.MYSTERY, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
+        QuickPickTileModel(SearchGenreSuggestion.ROMANCE, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
+        QuickPickTileModel(SearchGenreSuggestion.SCI_FI, span = 2, textPlacement = QuickPickTextPlacement.CENTER),
+        QuickPickTileModel(SearchGenreSuggestion.THRILLER, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
+    )
 }

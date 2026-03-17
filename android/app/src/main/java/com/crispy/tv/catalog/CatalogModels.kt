@@ -15,6 +15,7 @@ data class CatalogSectionRef(
     val heading: String = "",
     val title: String = "",
     val subtitle: String = "",
+    val previewItems: List<CatalogItem> = emptyList(),
 ) {
     val key: String = catalogId.trim().lowercase(Locale.US)
 
