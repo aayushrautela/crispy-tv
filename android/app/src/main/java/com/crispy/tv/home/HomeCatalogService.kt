@@ -91,7 +91,7 @@ data class MediaVideo(
     val thumbnailUrl: String?,
 )
 
-class HomeCatalogService(
+class HomeCatalogService internal constructor(
     private val supabaseAccountClient: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore,
     private val httpClient: CrispyHttpClient,
@@ -644,7 +644,7 @@ class HomeCatalogService(
                 .put("kind", kind)
                 .put("variant_key", variantKey)
                 .put("source", source.key)
-                .put("presentation", presentation.rawValue)
+                .put("presentation", presentation.key)
                 .put("name", name)
                 .put("heading", heading)
                 .put("title", title)

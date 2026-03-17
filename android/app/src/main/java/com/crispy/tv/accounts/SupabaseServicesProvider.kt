@@ -79,7 +79,7 @@ object SupabaseServicesProvider {
         )
     }
 
-    fun createHouseholdAddonsCloudSync(
+    internal fun createHouseholdAddonsCloudSync(
         context: Context,
         addonRegistry: MetadataAddonRegistry,
     ): HouseholdAddonsCloudSync {
