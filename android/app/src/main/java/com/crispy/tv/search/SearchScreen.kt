@@ -1,6 +1,7 @@
 package com.crispy.tv.search
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,8 +44,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -168,18 +172,12 @@ private fun SearchBrowseHeader(
     onRemoveRecentSearch: (String) -> Unit,
     onClearRecentSearches: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (recentSearches.isNotEmpty()) {
-            RecentSearchStrip(
-                recentSearches = recentSearches,
-                onRecentSearchClick = onRecentSearchClick,
-                onRemoveRecentSearch = onRemoveRecentSearch,
-                onClearRecentSearches = onClearRecentSearches,
-            )
-        }
-        SearchSectionHeader(
-            title = "Genres",
-            subtitle = "Small genre tabs for quick browsing.",
+    if (recentSearches.isNotEmpty()) {
+        RecentSearchStrip(
+            recentSearches = recentSearches,
+            onRecentSearchClick = onRecentSearchClick,
+            onRemoveRecentSearch = onRemoveRecentSearch,
+            onClearRecentSearches = onClearRecentSearches,
         )
     }
 }
@@ -336,23 +334,6 @@ private fun SearchFilterRow(
 }
 
 @Composable
-private fun SearchSectionHeader(
-    title: String,
-    subtitle: String,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        SearchSectionTitle(text = title)
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
 private fun SearchSectionTitle(text: String) {
     Text(
         text = text,
@@ -369,24 +350,38 @@ private fun GenreTab(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(88.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(14.dp),
             ),
-        contentAlignment = Alignment.Center,
     ) {
+        Image(
+            painter = painterResource(id = genre.imageResId),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color(0xB3000000)),
+                    ),
+                ),
+        )
         Text(
             text = genre.label,
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
         )
     }
 }
