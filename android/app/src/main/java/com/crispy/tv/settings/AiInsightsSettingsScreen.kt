@@ -39,9 +39,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.BuildConfig
-import com.crispy.tv.accounts.SupabaseAccountClient
-import com.crispy.tv.network.AppHttp
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
@@ -119,17 +117,9 @@ private class AiInsightsSettingsViewModel(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val httpClient = AppHttp.client(appContext)
-                    val supabase =
-                        SupabaseAccountClient(
-                            appContext = appContext,
-                            httpClient = httpClient,
-                            supabaseUrl = BuildConfig.SUPABASE_URL,
-                            supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-                        )
                     return AiInsightsSettingsViewModel(
                         settingsStore = AiInsightsSettingsStore(appContext),
-                        cloudSync = ProfileDataCloudSync(appContext, supabase),
+                        cloudSync = SupabaseServicesProvider.createProfileDataCloudSync(appContext),
                     ) as T
                 }
             }

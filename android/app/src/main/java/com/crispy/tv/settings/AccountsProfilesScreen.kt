@@ -46,8 +46,8 @@ import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.metadata.MetadataAddonRegistry
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -403,7 +403,7 @@ internal class AccountsProfilesViewModel(
                 storedActive?.takeIf { id -> profiles.any { it.id == id } }
                     ?: profiles.firstOrNull()?.id
 
-            if (storedActive == null && resolvedActive != null) {
+            if (resolvedActive != null && resolvedActive != storedActive) {
                 profileStore.setActiveProfileId(session.userId, resolvedActive)
             }
 
@@ -564,25 +564,17 @@ internal class AccountsProfilesViewModel(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val httpClient = AppHttp.client(safeContext)
-                    val supabase =
-                        SupabaseAccountClient(
-                            appContext = safeContext,
-                            httpClient = httpClient,
-                            supabaseUrl = BuildConfig.SUPABASE_URL,
-                            supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-                        )
-                    val profileStore = ActiveProfileStore(safeContext)
+                    val supabase = SupabaseServicesProvider.accountClient(safeContext)
+                    val profileStore = SupabaseServicesProvider.activeProfileStore(safeContext)
                     val watchHistory = PlaybackDependencies.watchHistoryServiceFactory(safeContext)
                     val profileDataCloudSync =
-                        ProfileDataCloudSync(
+                        SupabaseServicesProvider.createProfileDataCloudSync(
                             context = safeContext,
-                            supabase = supabase,
-                            activeProfileStore = profileStore,
-                            watchHistoryService = watchHistory
+                            watchHistoryService = watchHistory,
                         )
                     val addonRegistry = MetadataAddonRegistry(safeContext, BuildConfig.METADATA_ADDON_URLS)
-                    val householdAddonsCloudSync = HouseholdAddonsCloudSync(supabase, addonRegistry)
+                    val householdAddonsCloudSync =
+                        SupabaseServicesProvider.createHouseholdAddonsCloudSync(safeContext, addonRegistry)
 
                     return AccountsProfilesViewModel(
                         supabase = supabase,

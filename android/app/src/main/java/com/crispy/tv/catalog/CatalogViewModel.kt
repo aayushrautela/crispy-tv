@@ -8,9 +8,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.crispy.tv.BuildConfig
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.home.HomeCatalogService
-import com.crispy.tv.network.AppHttp
 import kotlinx.coroutines.flow.Flow
 
 class CatalogViewModel(
@@ -39,12 +38,7 @@ class CatalogViewModel(
                     if (modelClass.isAssignableFrom(CatalogViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return CatalogViewModel(
-                            homeCatalogService = HomeCatalogService(
-                                context = appContext,
-                                httpClient = AppHttp.client(appContext),
-                                supabaseUrl = BuildConfig.SUPABASE_URL,
-                                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
-                            ),
+                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
                             section = section
                         ) as T
                     }

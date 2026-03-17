@@ -4,6 +4,7 @@ import android.content.Context
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.network.CrispyHttpClient
 import okhttp3.Headers
@@ -149,16 +150,9 @@ class AiSearchRepository(
 
         fun create(context: Context, httpClient: CrispyHttpClient): AiSearchRepository {
             val appContext = context.applicationContext
-            val supabase =
-                SupabaseAccountClient(
-                    appContext = appContext,
-                    httpClient = httpClient,
-                    supabaseUrl = BuildConfig.SUPABASE_URL,
-                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
-                )
             return AiSearchRepository(
-                supabase = supabase,
-                activeProfileStore = ActiveProfileStore(appContext),
+                supabase = SupabaseServicesProvider.accountClient(appContext),
+                activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                 httpClient = httpClient,
                 supabaseUrl = BuildConfig.SUPABASE_URL,
                 supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,

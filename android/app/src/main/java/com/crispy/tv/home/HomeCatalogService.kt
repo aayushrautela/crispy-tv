@@ -1,6 +1,5 @@
 package com.crispy.tv.home
 
-import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.accounts.ActiveProfileStore
@@ -9,7 +8,6 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.domain.home.HomeCatalogDiscoverRef
 import com.crispy.tv.domain.home.HomeCatalogFeedPlan
 import com.crispy.tv.domain.home.HomeCatalogHeroItem as DomainHomeHeroItem
@@ -94,24 +92,15 @@ data class MediaVideo(
 )
 
 class HomeCatalogService(
-    context: Context,
+    private val supabaseAccountClient: SupabaseAccountClient,
+    private val activeProfileStore: ActiveProfileStore,
     private val httpClient: CrispyHttpClient,
     supabaseUrl: String,
     supabaseAnonKey: String,
+    private val diskCacheStore: HomeCatalogDiskCacheStore,
 ) {
-    private val appContext = context.applicationContext
-
     private val supabaseBaseUrl: String = supabaseUrl.trim().trimEnd('/')
     private val supabaseAnonKeyValue: String = supabaseAnonKey.trim()
-
-    private val supabaseAccountClient =
-        SupabaseAccountClient(
-            appContext = appContext,
-            httpClient = httpClient,
-            supabaseUrl = supabaseBaseUrl,
-            supabaseAnonKey = supabaseAnonKeyValue,
-        )
-    private val activeProfileStore = ActiveProfileStore(appContext)
 
     private val catalogCacheLock = Any()
     private val personalCatalogCache = SupabaseCatalogCache()
@@ -142,11 +131,7 @@ class HomeCatalogService(
         mediaType: String? = null,
         limit: Int = Int.MAX_VALUE,
     ): Pair<List<DiscoverCatalogRef>, String> {
-        val snapshot =
-            loadSupabaseCatalogSnapshot(
-                forceRefresh = false,
-                source = HomeCatalogSource.PERSONAL,
-            )
+        val snapshot = selectPrimaryFeedSnapshot()
         val (catalogs, statusMessage) = planDiscoverCatalogs(snapshot.toDomain(), mediaType = mediaType, limit = limit)
         return catalogs.map { it.toAppModel() } to statusMessage
     }
@@ -155,7 +140,6 @@ class HomeCatalogService(
         section: CatalogSectionRef,
         page: Int,
         pageSize: Int,
-        filters: List<CatalogFilter> = emptyList(),
     ): CatalogPageResult {
         val targetPage = page.coerceAtLeast(1)
         val targetSize = pageSize.coerceAtLeast(1)
@@ -279,6 +263,24 @@ class HomeCatalogService(
             }
         }
 
+        if (!forceRefresh) {
+            diskCacheStore.read(cacheStorageKey(source, cacheKey), maxAgeMs = DISK_CACHE_TTL_MS)?.let { cached ->
+                val diskLists = parseSupabaseCatalogLists(cached.payload, defaultSource = source)
+                if (diskLists.isNotEmpty()) {
+                    synchronized(catalogCacheLock) {
+                        cache.key = cacheKey
+                        cache.lists = diskLists
+                        cache.timestampMs = cached.timestampMs
+                    }
+                    return SupabaseCatalogSnapshot(
+                        profileId = snapshotProfileId,
+                        lists = diskLists,
+                        statusMessage = "",
+                    )
+                }
+            }
+        }
+
         val response =
             when (source) {
                 HomeCatalogSource.PERSONAL -> {
@@ -306,6 +308,10 @@ class HomeCatalogService(
             }
 
         val (lists, statusMessage) = parseSupabaseFeedResponse(response, defaultSource = source)
+        if (lists.isNotEmpty()) {
+            val payload = JSONArray().apply { lists.forEach { put(it.toJson()) } }.toString()
+            diskCacheStore.write(cacheStorageKey(source, cacheKey), payload)
+        }
         synchronized(catalogCacheLock) {
             cache.key = cacheKey
             cache.lists = lists
@@ -632,7 +638,36 @@ class HomeCatalogService(
         val subtitle: String,
         val items: List<CatalogItem>,
         val mediaTypes: Set<String>,
-    )
+    ) {
+        fun toJson(): JSONObject {
+            return JSONObject()
+                .put("kind", kind)
+                .put("variant_key", variantKey)
+                .put("source", source.key)
+                .put("presentation", presentation.rawValue)
+                .put("name", name)
+                .put("heading", heading)
+                .put("title", title)
+                .put("subtitle", subtitle)
+                .put(
+                    "results",
+                    JSONArray().apply {
+                        items.forEach { item ->
+                            put(
+                                JSONObject()
+                                    .put("id", item.id.removePrefix("tmdb:"))
+                                    .put("media_type", item.type)
+                                    .put("title", item.title)
+                                    .put("poster_path", tmdbPathFromUrl(item.posterUrl))
+                                    .put("backdrop_path", tmdbPathFromUrl(item.backdropUrl))
+                                    .put("vote_average", item.rating?.toDoubleOrNull())
+                                    .put("reason", item.description)
+                            )
+                        }
+                    },
+                )
+        }
+    }
 
     private fun SupabaseCatalogSnapshot.toDomain(): DomainHomeCatalogSnapshot {
         return DomainHomeCatalogSnapshot(
@@ -661,7 +696,8 @@ class HomeCatalogService(
         private const val TAG = "HomeCatalogService"
         private const val DEFAULT_VARIANT_KEY = "default"
         private const val HOME_SECTION_PREVIEW_ITEM_LIMIT = 12
-        private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 60_000L
+        private const val SUPABASE_CATALOGS_CACHE_TTL_MS = 5 * 60_000L
+        private const val DISK_CACHE_TTL_MS = 24 * 60 * 60_000L
         private const val SUPABASE_HOME_FEED_LIMIT = 50
         private const val SUPABASE_SECTION_LIMIT_CAP = 200
     }
@@ -679,6 +715,10 @@ class HomeCatalogService(
 
     private fun publicCatalogCacheKey(): String {
         return "public:${publicCatalogLanguageTag()}"
+    }
+
+    private fun cacheStorageKey(source: HomeCatalogSource, cacheKey: String?): String {
+        return "${source.key}:${cacheKey.orEmpty()}"
     }
 
     private fun publicCatalogLanguageTag(): String {
@@ -776,6 +816,23 @@ private fun DomainHomeCatalogItem.toAppModel(): CatalogItem {
         genre = null,
         description = description,
     )
+}
+
+private fun tmdbPathFromUrl(url: String?): String? {
+    val normalized = url?.trim().orEmpty()
+    if (normalized.isEmpty()) {
+        return null
+    }
+    val marker = "/t/p/"
+    val markerIndex = normalized.indexOf(marker)
+    if (markerIndex < 0) {
+        return null
+    }
+    val pathStart = normalized.indexOf('/', startIndex = markerIndex + marker.length)
+    if (pathStart < 0 || pathStart >= normalized.length) {
+        return null
+    }
+    return normalized.substring(pathStart).trim().ifEmpty { null }
 }
 
 private fun nonBlank(value: String?): String? {

@@ -58,12 +58,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.BuildConfig
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.home.HomeCatalogService
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -94,7 +92,6 @@ data class DiscoverUiState(
     val statusMessage: String = "",
     val catalogs: List<DiscoverCatalogRef> = emptyList(),
     val selectedCatalogKey: String? = null,
-    val selectedGenre: String? = null,
     val results: List<CatalogItem> = emptyList(),
     val isLoadingResults: Boolean = false,
     val isLoadingMore: Boolean = false,
@@ -126,17 +123,7 @@ class DiscoverViewModel(
     }
 
     fun selectCatalog(catalog: DiscoverCatalogRef) {
-        _uiState.update {
-            it.copy(
-                selectedCatalogKey = catalog.key,
-                selectedGenre = null
-            )
-        }
-        loadFirstPage(clearResults = true, keepRefreshing = false)
-    }
-
-    fun selectGenre(genre: String?) {
-        _uiState.update { it.copy(selectedGenre = genre) }
+        _uiState.update { it.copy(selectedCatalogKey = catalog.key) }
         loadFirstPage(clearResults = true, keepRefreshing = false)
     }
 
@@ -152,7 +139,6 @@ class DiscoverViewModel(
             viewModelScope.launch {
                 val filterSnapshot = uiState.value.typeFilter
                 val priorSelected = uiState.value.selectedCatalogKey
-                val priorGenre = uiState.value.selectedGenre
 
                 _uiState.update {
                     it.copy(
@@ -160,7 +146,6 @@ class DiscoverViewModel(
                         statusMessage = if (preserveContent && it.catalogs.isNotEmpty()) it.statusMessage else "Loading discover catalogs...",
                         catalogs = if (preserveContent) it.catalogs else emptyList(),
                         selectedCatalogKey = if (preserveContent) it.selectedCatalogKey else null,
-                        selectedGenre = if (preserveContent) it.selectedGenre else null,
                         results = if (preserveContent) it.results else emptyList(),
                         isLoadingResults = preserveContent && it.results.isNotEmpty(),
                         isLoadingMore = false,
@@ -180,16 +165,11 @@ class DiscoverViewModel(
                 val selectedKey =
                     priorSelected?.takeIf { key -> catalogs.any { it.key == key } }
                         ?: catalogs.firstOrNull()?.key
-                val selectedCatalog = catalogs.firstOrNull { it.key == selectedKey }
-                val normalizedGenre = priorGenre?.trim()?.takeIf { it.isNotBlank() }
-                val selectedGenre =
-                    normalizedGenre?.takeIf { genre -> selectedCatalog?.genres?.any { it.equals(genre, ignoreCase = true) } == true }
 
                 _uiState.update {
                     it.copy(
                         catalogs = catalogs,
                         selectedCatalogKey = selectedKey,
-                        selectedGenre = selectedGenre,
                         statusMessage = statusMessage,
                     )
                 }
@@ -219,7 +199,6 @@ class DiscoverViewModel(
                                 section = catalog.section,
                                 page = nextPage,
                                 pageSize = pageSize,
-                                filters = buildGenreFilters(snapshot.selectedGenre)
                             )
                         }
                     }
@@ -280,7 +259,6 @@ class DiscoverViewModel(
                                 section = catalog.section,
                                 page = 1,
                                 pageSize = pageSize,
-                                filters = buildGenreFilters(snapshot.selectedGenre)
                             )
                         }
                     }
@@ -309,13 +287,7 @@ class DiscoverViewModel(
                     if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
-                            homeCatalogService =
-                                  HomeCatalogService(
-                                      context = appContext,
-                                      httpClient = AppHttp.client(appContext),
-                                      supabaseUrl = BuildConfig.SUPABASE_URL,
-                                      supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
-                                  )
+                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -326,11 +298,6 @@ class DiscoverViewModel(
 }
 
 private const val PAGE_SIZE = 60
-
-private fun buildGenreFilters(selectedGenre: String?): List<CatalogFilter> {
-    val normalized = selectedGenre?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
-    return listOf(CatalogFilter(key = "genre", value = normalized))
-}
 
 private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
     if (items.isEmpty()) {
@@ -395,7 +362,6 @@ fun DiscoverRoute(
                 onRefresh = viewModel::refresh,
                 onTypeFilterClick = viewModel::setTypeFilter,
                 onCatalogClick = viewModel::selectCatalog,
-                onGenreClick = viewModel::selectGenre,
                 onLoadMore = viewModel::loadMore,
                 onItemClick = onItemClick,
                 scrollToTopRequests = scrollToTopRequests,
@@ -407,8 +373,7 @@ fun DiscoverRoute(
 
 private enum class DiscoverSheet {
     Type,
-    Catalog,
-    Genre
+    Catalog
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -418,7 +383,6 @@ private fun DiscoverScreen(
     onRefresh: () -> Unit,
     onTypeFilterClick: (DiscoverTypeFilter) -> Unit,
     onCatalogClick: (DiscoverCatalogRef) -> Unit,
-    onGenreClick: (String?) -> Unit,
     onLoadMore: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
@@ -503,40 +467,18 @@ private fun DiscoverScreen(
                             )
                         }
 
-                        if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
-                            item {
-                                FilterChip(
-                                    selected = false,
-                                    onClick = { activeSheet = DiscoverSheet.Genre },
-                                    label = {
-                                        Text(
-                                            text = uiState.selectedGenre ?: "All genres",
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.KeyboardArrowDown,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-                        }
                     }
                 }
                 if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                             if (selectedCatalog != null) {
-                                 val summaryGenre = uiState.selectedGenre ?: "All genres"
-                                 Text(
-                                     text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label} | $summaryGenre",
-                                     style = MaterialTheme.typography.bodySmall,
-                                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                                 )
-                             }
+                            if (selectedCatalog != null) {
+                                Text(
+                                    text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
                             if (uiState.statusMessage.isNotBlank()) {
                                 Text(
@@ -744,66 +686,6 @@ private fun DiscoverScreen(
                                             .padding(horizontal = 4.dp)
                                     )
                                 }
-                            }
-                        }
-                    }
-
-                    DiscoverSheet.Genre -> {
-                        val genres = selectedCatalog?.genres.orEmpty()
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding)
-                        ) {
-                            item {
-                                Text(
-                                    text = "Genre",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
-                                )
-                            }
-                            item {
-                                ListItem(
-                                    headlineContent = { Text("All genres") },
-                                    trailingContent =
-                                        if (uiState.selectedGenre == null) {
-                                            {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Check,
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onGenreClick(null)
-                                            activeSheet = null
-                                        }
-                                )
-                            }
-                            items(items = genres, key = { it }) { genre ->
-                                ListItem(
-                                    headlineContent = { Text(genre) },
-                                    trailingContent =
-                                        if (uiState.selectedGenre == genre) {
-                                            {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Check,
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onGenreClick(genre)
-                                            activeSheet = null
-                                        }
-                                )
                             }
                         }
                     }

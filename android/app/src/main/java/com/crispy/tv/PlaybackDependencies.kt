@@ -1,7 +1,7 @@
 package com.crispy.tv
 
 import android.content.Context
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.metadata.TmdbEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
@@ -18,7 +18,6 @@ import com.crispy.tv.player.CoreDomainMetadataLabResolver
 import com.crispy.tv.player.MetadataLabResolver
 import com.crispy.tv.player.SupabaseSyncLabService
 import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.sync.ProfileDataCloudSync
 
 interface TorrentResolver {
     suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String
@@ -79,17 +78,11 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
             ),
         onTraktTokenExpired = {
             try {
-                val supabase = SupabaseAccountClient(
-                    appContext = appContext,
-                    httpClient = AppHttp.client(appContext),
-                    supabaseUrl = BuildConfig.SUPABASE_URL,
-                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-                )
-                val cloudSync = ProfileDataCloudSync(
-                    context = appContext,
-                    supabase = supabase,
-                    watchHistoryService = service
-                )
+                val cloudSync =
+                    SupabaseServicesProvider.createProfileDataCloudSync(
+                        context = appContext,
+                        watchHistoryService = service,
+                    )
                 cloudSync.pullForActiveProfile()
                 service.authState().traktSession?.accessToken
             } catch (_: Exception) {
@@ -100,6 +93,7 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
     return service
 }
 
+@Suppress("UNUSED_PARAMETER")
 private fun newSupabaseSyncService(
     context: Context,
     watchHistoryService: WatchHistoryService
@@ -107,11 +101,8 @@ private fun newSupabaseSyncService(
     val appContext = context.applicationContext
     return RemoteSupabaseSyncLabService(
         context = appContext,
-        httpClient = AppHttp.client(appContext),
-        supabaseUrl = BuildConfig.SUPABASE_URL,
-        supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
+        supabase = SupabaseServicesProvider.accountClient(appContext),
         addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-        watchHistoryService = watchHistoryService
     )
 }
 

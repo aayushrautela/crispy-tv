@@ -62,7 +62,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.crispy.tv.BuildConfig
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -423,18 +423,12 @@ internal class AddonsSettingsViewModel(
                                 context = appContext,
                                 configuredManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
                             )
-                        val supabase =
-                            SupabaseAccountClient(
-                                appContext = appContext,
-                                httpClient = httpClient,
-                                supabaseUrl = BuildConfig.SUPABASE_URL,
-                                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-                            )
                         @Suppress("UNCHECKED_CAST")
                         return AddonsSettingsViewModel(
                             addonRegistry = addonRegistry,
                             httpClient = httpClient,
-                            householdAddonsCloudSync = HouseholdAddonsCloudSync(supabase, addonRegistry),
+                            householdAddonsCloudSync =
+                                SupabaseServicesProvider.createHouseholdAddonsCloudSync(appContext, addonRegistry),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

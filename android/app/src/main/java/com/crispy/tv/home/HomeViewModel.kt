@@ -12,9 +12,8 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.BuildConfig
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.domain.home.HomeCatalogPresentation
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
@@ -110,18 +109,11 @@ class HomeViewModel internal constructor(
             return object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-                        val httpClient = AppHttp.client(appContext)
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
                         val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
-                            homeCatalogService =
-                                HomeCatalogService(
-                                    context = appContext,
-                                    httpClient = httpClient,
-                                    supabaseUrl = BuildConfig.SUPABASE_URL,
-                                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
-                                ),
+                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
                             homeWatchActivityService =
                                 HomeWatchActivityService(
                                     context = appContext,

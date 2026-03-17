@@ -10,12 +10,9 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.accounts.SupabaseAccountClient
-import com.crispy.tv.network.AppHttp
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.sync.ProviderSyncScheduler
 import java.util.concurrent.TimeUnit
 
@@ -81,17 +78,11 @@ class OAuthCompletionWorker(
             store.setPendingErrorMessage(null)
 
             try {
-                val supabase = SupabaseAccountClient(
-                    appContext = applicationContext,
-                    httpClient = AppHttp.client(applicationContext),
-                    supabaseUrl = BuildConfig.SUPABASE_URL,
-                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-                )
-                val cloudSync = ProfileDataCloudSync(
-                    context = applicationContext,
-                    supabase = supabase,
-                    watchHistoryService = watchHistory
-                )
+                val cloudSync =
+                    SupabaseServicesProvider.createProfileDataCloudSync(
+                        context = applicationContext,
+                        watchHistoryService = watchHistory,
+                    )
                 cloudSync.pushProviderAuthForActiveProfile()
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to push provider auth to cloud after OAuth", e)

@@ -3,6 +3,8 @@ package com.crispy.tv.accounts
 import android.content.Context
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
@@ -16,6 +18,10 @@ class SupabaseAccountClient(
 ) {
     private val baseUrl: String = supabaseUrl.trim().trimEnd('/')
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val sessionMutex = Mutex()
+
+    @Volatile
+    private var cachedSession: Session? = null
 
     data class Session(
         val accessToken: String,
@@ -67,26 +73,40 @@ class SupabaseAccountClient(
         saveSession(null)
     }
 
+    fun currentSession(): Session? {
+        return loadSession()
+    }
+
     suspend fun ensureValidSession(): Session? {
         val existing = loadSession() ?: return null
-        val expiresAt = existing.expiresAtEpochSec
-        if (expiresAt == null) return existing
-
-        val nowEpochSec = System.currentTimeMillis() / 1000L
-        if (expiresAt > nowEpochSec + SESSION_EXPIRY_SKEW_SEC) return existing
-
-        if (existing.refreshToken.isBlank()) {
-            saveSession(null)
-            return null
+        if (!shouldRefresh(existing)) {
+            return existing
         }
 
-        val refreshed = runCatching { refreshSession(existing.refreshToken) }.getOrNull()
-        if (refreshed == null) {
-            saveSession(null)
-            return null
+        return sessionMutex.withLock {
+            val latest = loadSession() ?: return@withLock null
+            if (!shouldRefresh(latest)) {
+                return@withLock latest
+            }
+            if (latest.refreshToken.isBlank()) {
+                saveSession(null)
+                return@withLock null
+            }
+
+            when (val refreshResult = refreshSession(latest.refreshToken)) {
+                is RefreshResult.Success -> {
+                    saveSession(refreshResult.session)
+                    refreshResult.session
+                }
+
+                RefreshResult.InvalidSession -> {
+                    saveSession(null)
+                    null
+                }
+
+                is RefreshResult.TransientFailure -> latest
+            }
         }
-        saveSession(refreshed)
-        return refreshed
     }
 
     suspend fun signInWithEmail(email: String, password: String): Session {
@@ -353,13 +373,27 @@ class SupabaseAccountClient(
         if (!isConfigured()) throw IllegalStateException("Supabase is not configured.")
     }
 
-    private suspend fun refreshSession(refreshToken: String): Session {
+    private suspend fun refreshSession(refreshToken: String): RefreshResult {
         val url = "$baseUrl/auth/v1/token?grant_type=refresh_token".toHttpUrl()
         val payload = JSONObject().put("refresh_token", refreshToken).toString()
-        val response = httpClient.postJson(url, payload, baseHeaders(), callTimeoutMs = CALL_TIMEOUT_MS)
-        val body = requireSuccess(response)
-        return parseSession(JSONObject(body))
-            ?: throw IllegalStateException("Refresh did not return a session.")
+        val response =
+            runCatching {
+                httpClient.postJson(url, payload, baseHeaders(), callTimeoutMs = CALL_TIMEOUT_MS)
+            }.getOrElse { error ->
+                return RefreshResult.TransientFailure(error.message)
+            }
+
+        if (response.code !in 200..299) {
+            return if (isInvalidRefreshResponse(response)) {
+                RefreshResult.InvalidSession
+            } else {
+                RefreshResult.TransientFailure(extractErrorMessage(response.body))
+            }
+        }
+
+        val session = parseSession(JSONObject(response.body))
+            ?: return RefreshResult.TransientFailure("Refresh did not return a session.")
+        return RefreshResult.Success(session)
     }
 
     private fun parseSession(json: JSONObject): Session? {
@@ -492,8 +526,9 @@ class SupabaseAccountClient(
     }
 
     private fun loadSession(): Session? {
+        cachedSession?.let { return it }
         val raw = prefs.getString(KEY_SESSION, null) ?: return null
-        return runCatching {
+        val parsed = runCatching {
             val json = JSONObject(raw)
             val accessToken = json.optString("access_token").trim()
             if (accessToken.isBlank()) return null
@@ -511,9 +546,12 @@ class SupabaseAccountClient(
                 anonymous = anonymous
             )
         }.getOrNull()
+        cachedSession = parsed
+        return parsed
     }
 
     private fun saveSession(session: Session?) {
+        cachedSession = session
         if (session == null) {
             prefs.edit().remove(KEY_SESSION).apply()
             return
@@ -529,6 +567,35 @@ class SupabaseAccountClient(
                 .toString()
 
         prefs.edit().putString(KEY_SESSION, json).apply()
+    }
+
+    private fun shouldRefresh(session: Session): Boolean {
+        val expiresAt = session.expiresAtEpochSec ?: return false
+        val nowEpochSec = System.currentTimeMillis() / 1000L
+        return expiresAt <= nowEpochSec + SESSION_EXPIRY_SKEW_SEC
+    }
+
+    private fun isInvalidRefreshResponse(response: CrispyHttpResponse): Boolean {
+        if (response.code !in 400..401) {
+            return false
+        }
+        val message = extractErrorMessage(response.body)?.lowercase().orEmpty()
+        if (message.isBlank()) {
+            return false
+        }
+        return message.contains("invalid refresh token") ||
+            message.contains("invalid grant") ||
+            message.contains("refresh token") && message.contains("invalid") ||
+            message.contains("refresh token") && message.contains("expired") ||
+            message.contains("session_not_found")
+    }
+
+    private sealed interface RefreshResult {
+        data class Success(val session: Session) : RefreshResult
+
+        data class TransientFailure(val message: String?) : RefreshResult
+
+        data object InvalidSession : RefreshResult
     }
 
     private companion object {
