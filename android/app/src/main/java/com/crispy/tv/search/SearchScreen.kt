@@ -37,7 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -121,7 +121,6 @@ fun SearchRoute(
                 onGenreClick = viewModel::selectGenre,
                 onRecentSearchClick = viewModel::submitSearch,
                 onRemoveRecentSearch = viewModel::removeRecentSearch,
-                onClearRecentSearches = viewModel::clearRecentSearches,
                 modifier = contentModifier,
             )
         }
@@ -136,7 +135,6 @@ private fun SearchBrowseContent(
     onGenreClick: (SearchGenreSuggestion) -> Unit,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
-    onClearRecentSearches: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SearchGrid(
@@ -150,7 +148,6 @@ private fun SearchBrowseContent(
                 recentSearches = uiState.recentSearches,
                 onRecentSearchClick = onRecentSearchClick,
                 onRemoveRecentSearch = onRemoveRecentSearch,
-                onClearRecentSearches = onClearRecentSearches,
             )
         }
         gridItems(
@@ -170,14 +167,12 @@ private fun SearchBrowseHeader(
     recentSearches: List<String>,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
-    onClearRecentSearches: () -> Unit,
 ) {
     if (recentSearches.isNotEmpty()) {
         RecentSearchStrip(
             recentSearches = recentSearches,
             onRecentSearchClick = onRecentSearchClick,
             onRemoveRecentSearch = onRemoveRecentSearch,
-            onClearRecentSearches = onClearRecentSearches,
         )
     }
 }
@@ -187,30 +182,17 @@ private fun RecentSearchStrip(
     recentSearches: List<String>,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
-    onClearRecentSearches: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SearchSectionTitle(text = "History")
-            TextButton(onClick = onClearRecentSearches) {
-                Text("Clear")
-            }
-        }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(
-                items = recentSearches,
-                key = { it.lowercase(Locale.ROOT) },
-            ) { query ->
-                RecentSearchChip(
-                    query = query,
-                    onClick = { onRecentSearchClick(query) },
-                    onRemoveClick = { onRemoveRecentSearch(query) },
-                )
-            }
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(
+            items = recentSearches,
+            key = { it.lowercase(Locale.ROOT) },
+        ) { query ->
+            RecentSearchChip(
+                query = query,
+                onClick = { onRecentSearchClick(query) },
+                onRemoveClick = { onRemoveRecentSearch(query) },
+            )
         }
     }
 }
@@ -334,15 +316,6 @@ private fun SearchFilterRow(
 }
 
 @Composable
-private fun SearchSectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-}
-
-@Composable
 private fun GenreTab(
     genre: SearchGenreSuggestion,
     onClick: () -> Unit,
@@ -370,18 +343,19 @@ private fun GenreTab(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color(0xB3000000)),
+                        colors = listOf(Color(0x3D000000), Color(0x99000000)),
                     ),
                 ),
         )
         Text(
             text = genre.label,
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
+                .align(Alignment.Center)
+                .padding(horizontal = 12.dp),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
             color = Color.White,
+            textAlign = TextAlign.Center,
         )
     }
 }
