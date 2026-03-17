@@ -1,26 +1,27 @@
 package com.crispy.tv.search
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -42,10 +43,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -75,11 +72,8 @@ fun SearchRoute(
 
     LaunchedEffect(scrollToTopRequest, uiState.hasActiveResults) {
         if (scrollToTopRequest > 0) {
-            if (uiState.hasActiveResults) {
-                resultsGridState.animateScrollToItem(0)
-            } else {
-                browseGridState.animateScrollToItem(0)
-            }
+            val targetGridState = if (uiState.hasActiveResults) resultsGridState else browseGridState
+            targetGridState.animateScrollToItem(0)
             onScrollToTopConsumed()
         }
     }
@@ -99,37 +93,33 @@ fun SearchRoute(
             )
         },
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
+        val contentModifier =
+            Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .consumeWindowInsets(paddingValues),
-        ) {
-            if (uiState.hasActiveResults) {
-                SearchResultsContent(
-                    uiState = uiState,
-                    gridState = resultsGridState,
-                    pageHorizontalPadding = pageHorizontalPadding,
-                    onFilterChange = viewModel::setFilter,
-                    onItemClick = onItemClick,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .imePadding(),
-                )
-            } else {
-                SearchBrowseContent(
-                    uiState = uiState,
-                    gridState = browseGridState,
-                    pageHorizontalPadding = pageHorizontalPadding,
-                    onGenreClick = viewModel::selectGenre,
-                    onRecentSearchClick = viewModel::submitSearch,
-                    onRemoveRecentSearch = viewModel::removeRecentSearch,
-                    onClearRecentSearches = viewModel::clearRecentSearches,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .imePadding(),
-                )
-            }
+                .consumeWindowInsets(paddingValues)
+                .imePadding()
+
+        if (uiState.hasActiveResults) {
+            SearchResultsContent(
+                uiState = uiState,
+                gridState = resultsGridState,
+                pageHorizontalPadding = pageHorizontalPadding,
+                onFilterChange = viewModel::setFilter,
+                onItemClick = onItemClick,
+                modifier = contentModifier,
+            )
+        } else {
+            SearchBrowseContent(
+                uiState = uiState,
+                gridState = browseGridState,
+                pageHorizontalPadding = pageHorizontalPadding,
+                onGenreClick = viewModel::selectGenre,
+                onRecentSearchClick = viewModel::submitSearch,
+                onRemoveRecentSearch = viewModel::removeRecentSearch,
+                onClearRecentSearches = viewModel::clearRecentSearches,
+                modifier = contentModifier,
+            )
         }
     }
 }
@@ -137,7 +127,7 @@ fun SearchRoute(
 @Composable
 private fun SearchBrowseContent(
     uiState: SearchUiState,
-    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    gridState: LazyGridState,
     pageHorizontalPadding: Dp,
     onGenreClick: (SearchGenreSuggestion) -> Unit,
     onRecentSearchClick: (String) -> Unit,
@@ -145,47 +135,52 @@ private fun SearchBrowseContent(
     onClearRecentSearches: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val quickPickTiles = quickPickTiles()
-
-    LazyVerticalGrid(
+    SearchGrid(
         state = gridState,
-        columns = GridCells.Fixed(3),
+        columns = GridCells.Fixed(2),
+        pageHorizontalPadding = pageHorizontalPadding,
         modifier = modifier,
-        contentPadding = PaddingValues(
-            start = pageHorizontalPadding,
-            top = Dimensions.SmallSpacing,
-            end = pageHorizontalPadding,
-            bottom = Dimensions.PageBottomPadding,
-        ),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (uiState.recentSearches.isNotEmpty()) {
-                    RecentSearchStrip(
-                        recentSearches = uiState.recentSearches,
-                        onRecentSearchClick = onRecentSearchClick,
-                        onRemoveRecentSearch = onRemoveRecentSearch,
-                        onClearRecentSearches = onClearRecentSearches,
-                    )
-                }
-                SearchSectionHeader(
-                    title = "Quick picks",
-                    subtitle = "Browse a genre instantly with compact visual tiles.",
-                )
-            }
-        }
-        gridItems(
-            items = quickPickTiles,
-            key = { it.genre.name },
-            span = { tile -> GridItemSpan(tile.span) },
-        ) { tile ->
-            QuickPickTile(
-                tile = tile,
-                onClick = { onGenreClick(tile.genre) },
+            SearchBrowseHeader(
+                recentSearches = uiState.recentSearches,
+                onRecentSearchClick = onRecentSearchClick,
+                onRemoveRecentSearch = onRemoveRecentSearch,
+                onClearRecentSearches = onClearRecentSearches,
             )
         }
+        gridItems(
+            items = SearchGenreSuggestion.entries,
+            key = { it.name },
+        ) { genre ->
+            GenreTab(
+                genre = genre,
+                onClick = { onGenreClick(genre) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchBrowseHeader(
+    recentSearches: List<String>,
+    onRecentSearchClick: (String) -> Unit,
+    onRemoveRecentSearch: (String) -> Unit,
+    onClearRecentSearches: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (recentSearches.isNotEmpty()) {
+            RecentSearchStrip(
+                recentSearches = recentSearches,
+                onRecentSearchClick = onRecentSearchClick,
+                onRemoveRecentSearch = onRemoveRecentSearch,
+                onClearRecentSearches = onClearRecentSearches,
+            )
+        }
+        SearchSectionHeader(
+            title = "Genres",
+            subtitle = "Small genre tabs for quick browsing.",
+        )
     }
 }
 
@@ -266,28 +261,22 @@ private fun RecentSearchChip(
 @Composable
 private fun SearchResultsContent(
     uiState: SearchUiState,
-    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    gridState: LazyGridState,
     pageHorizontalPadding: Dp,
     onFilterChange: (SearchTypeFilter) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyVerticalGrid(
+    SearchGrid(
         state = gridState,
         columns = GridCells.Adaptive(minSize = 124.dp),
+        pageHorizontalPadding = pageHorizontalPadding,
         modifier = modifier,
-        contentPadding = PaddingValues(
-            start = pageHorizontalPadding,
-            top = Dimensions.SmallSpacing,
-            end = pageHorizontalPadding,
-            bottom = Dimensions.PageBottomPadding,
-        ),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            SearchResultsHeader(
-                uiState = uiState,
+            SearchFilterRow(
+                availableFilters = uiState.availableFilters,
+                selectedFilter = uiState.filter,
                 onFilterChange = onFilterChange,
             )
         }
@@ -327,31 +316,21 @@ private fun SearchResultsContent(
 }
 
 @Composable
-private fun SearchResultsHeader(
-    uiState: SearchUiState,
+private fun SearchFilterRow(
+    availableFilters: List<SearchTypeFilter>,
+    selectedFilter: SearchTypeFilter,
     onFilterChange: (SearchTypeFilter) -> Unit,
 ) {
-    val resultLabel =
-        uiState.selectedGenre?.let { "Popular in ${it.label}" }
-            ?: uiState.appliedQuery.let { "Results for \"$it\"" }
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SearchSectionHeader(
-            title = "Search",
-            subtitle = resultLabel,
-        )
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(uiState.availableFilters, key = { it.name }) { filter ->
-                FilterChip(
-                    selected = uiState.filter == filter,
-                    onClick = { onFilterChange(filter) },
-                    label = { Text(filter.label) },
-                )
-            }
+        items(availableFilters, key = { it.name }) { filter ->
+            FilterChip(
+                selected = selectedFilter == filter,
+                onClick = { onFilterChange(filter) },
+                label = { Text(filter.label) },
+            )
         }
     }
 }
@@ -383,45 +362,56 @@ private fun SearchSectionTitle(text: String) {
 }
 
 @Composable
-private fun QuickPickTile(
-    tile: QuickPickTileModel,
+private fun GenreTab(
+    genre: SearchGenreSuggestion,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(if (tile.span == 2) 1.85f else 1f)
-            .clip(RoundedCornerShape(18.dp))
+            .height(46.dp)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(14.dp),
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Image(
-            painter = painterResource(id = tile.genre.imageRes),
-            contentDescription = tile.genre.label,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
+        Text(
+            text = genre.label,
+            modifier = Modifier.padding(horizontal = 10.dp),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
         )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(tile.overlayBrush),
-        )
-        QuickPickLabel(tile = tile)
     }
 }
 
 @Composable
-private fun BoxScope.QuickPickLabel(tile: QuickPickTileModel) {
-    val isCentered = tile.textPlacement == QuickPickTextPlacement.CENTER
-    Text(
-        text = tile.genre.label,
-        modifier = Modifier
-            .align(if (isCentered) Alignment.Center else Alignment.BottomStart)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        style = if (isCentered) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = Color.White,
-        textAlign = if (isCentered) TextAlign.Center else TextAlign.Start,
+private fun SearchGrid(
+    state: LazyGridState,
+    columns: GridCells,
+    pageHorizontalPadding: Dp,
+    modifier: Modifier = Modifier,
+    content: LazyGridScope.() -> Unit,
+) {
+    LazyVerticalGrid(
+        state = state,
+        columns = columns,
+        modifier = modifier,
+        contentPadding = PaddingValues(
+            start = pageHorizontalPadding,
+            top = Dimensions.SmallSpacing,
+            end = pageHorizontalPadding,
+            bottom = Dimensions.PageBottomPadding,
+        ),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
     )
 }
 
@@ -452,52 +442,4 @@ private fun SearchLoadingIndicator() {
     ) {
         CircularProgressIndicator()
     }
-}
-
-private data class QuickPickTileModel(
-    val genre: SearchGenreSuggestion,
-    val span: Int,
-    val textPlacement: QuickPickTextPlacement,
-) {
-    val overlayBrush: Brush
-        get() =
-            if (textPlacement == QuickPickTextPlacement.CENTER) {
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = 0.5f),
-                        Color.Black.copy(alpha = 0.22f),
-                        Color.Black.copy(alpha = 0.58f),
-                    ),
-                )
-            } else {
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.18f),
-                        Color.Black.copy(alpha = 0.78f),
-                    ),
-                )
-            }
-}
-
-private enum class QuickPickTextPlacement {
-    CENTER,
-    BOTTOM_START,
-}
-
-private fun quickPickTiles(): List<QuickPickTileModel> {
-    return listOf(
-        QuickPickTileModel(SearchGenreSuggestion.ACTION, span = 2, textPlacement = QuickPickTextPlacement.BOTTOM_START),
-        QuickPickTileModel(SearchGenreSuggestion.ANIMATED, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
-        QuickPickTileModel(SearchGenreSuggestion.COMEDY, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
-        QuickPickTileModel(SearchGenreSuggestion.DOCUMENTARY, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
-        QuickPickTileModel(SearchGenreSuggestion.DRAMA, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
-        QuickPickTileModel(SearchGenreSuggestion.FAMILY, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
-        QuickPickTileModel(SearchGenreSuggestion.FANTASY, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
-        QuickPickTileModel(SearchGenreSuggestion.HORROR, span = 2, textPlacement = QuickPickTextPlacement.BOTTOM_START),
-        QuickPickTileModel(SearchGenreSuggestion.MYSTERY, span = 1, textPlacement = QuickPickTextPlacement.CENTER),
-        QuickPickTileModel(SearchGenreSuggestion.ROMANCE, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
-        QuickPickTileModel(SearchGenreSuggestion.SCI_FI, span = 2, textPlacement = QuickPickTextPlacement.CENTER),
-        QuickPickTileModel(SearchGenreSuggestion.THRILLER, span = 1, textPlacement = QuickPickTextPlacement.BOTTOM_START),
-    )
 }

@@ -80,19 +80,31 @@ class SearchViewModel(
             return
         }
 
-        _uiState.value =
-            snapshot.copy(
+        val updatedRecentSearches = searchHistoryStore.record(normalizedQuery)
+        launchSearch(
+            updateState = {
+                copy(
+                    query = normalizedQuery,
+                    appliedQuery = normalizedQuery,
+                    selectedGenre = null,
+                    recentSearches = updatedRecentSearches,
+                    filter = filter,
+                    isLoading = true,
+                    results = emptyList(),
+                )
+            },
+        ) { locale ->
+            searchRepository.search(
                 query = normalizedQuery,
-                appliedQuery = normalizedQuery,
-                selectedGenre = null,
-                recentSearches = searchHistoryStore.record(normalizedQuery),
+                filter = filter,
+                locale = locale,
             )
-        loadQueryResults(query = normalizedQuery, filter = _uiState.value.filter)
+        }
     }
 
     fun clearSearch() {
         searchToken += 1
-        searchJob?.cancel()
+        cancelActiveSearch()
         _uiState.value =
             _uiState.value.copy(
                 query = "",
@@ -105,13 +117,6 @@ class SearchViewModel(
 
     fun selectGenre(genreSuggestion: SearchGenreSuggestion) {
         val resolvedFilter = normalizeFilterForGenre(_uiState.value.filter)
-        _uiState.value =
-            _uiState.value.copy(
-                query = genreSuggestion.label,
-                appliedQuery = "",
-                selectedGenre = genreSuggestion,
-                filter = resolvedFilter,
-            )
         loadGenreResults(genreSuggestion = genreSuggestion, filter = resolvedFilter)
     }
 
@@ -153,74 +158,70 @@ class SearchViewModel(
 
     private fun clearResultsOnly() {
         searchToken += 1
-        searchJob?.cancel()
+        cancelActiveSearch()
         _uiState.value = _uiState.value.copy(isLoading = false, results = emptyList())
     }
 
     private fun loadQueryResults(query: String, filter: SearchTypeFilter) {
-        searchToken += 1
-        val token = searchToken
-        searchJob?.cancel()
-        _uiState.value =
-            _uiState.value.copy(
+        launchSearch(
+            updateState = {
+                copy(
+                    query = query,
+                    appliedQuery = query,
+                    selectedGenre = null,
+                    filter = filter,
+                    isLoading = true,
+                    results = emptyList(),
+                )
+            },
+        ) { locale ->
+            searchRepository.search(
                 query = query,
-                appliedQuery = query,
-                selectedGenre = null,
                 filter = filter,
-                isLoading = true,
-                results = emptyList(),
+                locale = locale,
             )
-
-        searchJob =
-            viewModelScope.launch {
-                val locale = localeProvider()
-                val results =
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            searchRepository.search(
-                                query = query,
-                                filter = filter,
-                                locale = locale,
-                            )
-                        }.getOrElse { emptyList() }
-                    }
-
-                if (token != searchToken) {
-                    return@launch
-                }
-
-                _uiState.value = _uiState.value.copy(isLoading = false, results = results)
-            }
+        }
     }
 
     private fun loadGenreResults(
         genreSuggestion: SearchGenreSuggestion,
         filter: SearchTypeFilter,
     ) {
+        launchSearch(
+            updateState = {
+                copy(
+                    query = genreSuggestion.label,
+                    selectedGenre = genreSuggestion,
+                    appliedQuery = "",
+                    filter = filter,
+                    isLoading = true,
+                    results = emptyList(),
+                )
+            },
+        ) { locale ->
+            searchRepository.discoverByGenre(
+                genreSuggestion = genreSuggestion,
+                filter = filter,
+                locale = locale,
+            )
+        }
+    }
+
+    private fun launchSearch(
+        updateState: SearchUiState.() -> SearchUiState,
+        request: suspend (Locale) -> List<CatalogItem>,
+    ) {
         searchToken += 1
         val token = searchToken
-        searchJob?.cancel()
-        _uiState.value =
-            _uiState.value.copy(
-                selectedGenre = genreSuggestion,
-                appliedQuery = "",
-                filter = filter,
-                isLoading = true,
-                results = emptyList(),
-            )
+        cancelActiveSearch()
+        _uiState.value = _uiState.value.updateState()
 
         searchJob =
             viewModelScope.launch {
                 val locale = localeProvider()
                 val results =
                     withContext(Dispatchers.IO) {
-                        runCatching {
-                            searchRepository.discoverByGenre(
-                                genreSuggestion = genreSuggestion,
-                                filter = filter,
-                                locale = locale,
-                            )
-                        }.getOrElse { emptyList() }
+                        runCatching { request(locale) }.getOrElse { emptyList() }
                     }
 
                 if (token != searchToken) {
@@ -229,6 +230,11 @@ class SearchViewModel(
 
                 _uiState.value = _uiState.value.copy(isLoading = false, results = results)
             }
+    }
+
+    private fun cancelActiveSearch() {
+        searchJob?.cancel()
+        searchJob = null
     }
 
     private fun normalizeFilterForGenre(filter: SearchTypeFilter): SearchTypeFilter {
