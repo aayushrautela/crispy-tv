@@ -195,6 +195,10 @@ private fun HomeScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val lazyListState = rememberLazyListState()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val continueWatching by continueWatchingState.collectAsStateWithLifecycle()
+    val upNext by upNextState.collectAsStateWithLifecycle()
+    val thisWeek by thisWeekState.collectAsStateWithLifecycle()
+    val catalogStatus by catalogStatusState.collectAsStateWithLifecycle()
     val sectionBlocks = remember(contentSections) { buildHomeSectionBlocks(contentSections) }
 
     LaunchedEffect(scrollToTopRequest) {
@@ -241,32 +245,40 @@ private fun HomeScreen(
                 }
             }
 
-            item(key = "continueWatching", contentType = "continueWatching") {
-                HomeContinueWatchingSection(
-                    continueWatchingState = continueWatchingState,
-                    onItemClick = onContinueWatchingClick,
-                    onHideItem = onHideContinueWatchingItem,
-                    onRemoveItem = onRemoveContinueWatchingItem,
-                )
+            if (continueWatching.isVisible) {
+                item(key = "continueWatching", contentType = "continueWatching") {
+                    HomeContinueWatchingSection(
+                        state = continueWatching,
+                        onItemClick = onContinueWatchingClick,
+                        onHideItem = onHideContinueWatchingItem,
+                        onRemoveItem = onRemoveContinueWatchingItem,
+                    )
+                }
             }
 
-            item(key = "upNext", contentType = "upNext") {
-                HomeUpNextSection(
-                    upNextState = upNextState,
-                    onItemClick = onContinueWatchingClick,
-                )
+            if (upNext.isVisible) {
+                item(key = "upNext", contentType = "upNext") {
+                    HomeUpNextSection(
+                        state = upNext,
+                        onItemClick = onContinueWatchingClick,
+                    )
+                }
             }
 
-            item(key = "thisWeek", contentType = "thisWeek") {
-                HomeThisWeekRail(
-                    thisWeekState = thisWeekState,
-                    onItemClick = onThisWeekClick,
-                    onViewAllClick = onThisWeekSeeAllClick,
-                )
+            if (thisWeek.isVisible) {
+                item(key = "thisWeek", contentType = "thisWeek") {
+                    HomeThisWeekRail(
+                        state = thisWeek,
+                        onItemClick = onThisWeekClick,
+                        onViewAllClick = onThisWeekSeeAllClick,
+                    )
+                }
             }
 
-            item(key = "catalogStatus", contentType = "catalogStatus") {
-                HomeCatalogStatusItem(catalogStatusState = catalogStatusState)
+            if (!catalogStatus.hasCatalogSections && catalogStatus.statusMessage.isNotBlank()) {
+                item(key = "catalogStatus", contentType = "catalogStatus") {
+                    HomeCatalogStatusCard(statusMessage = catalogStatus.statusMessage)
+                }
             }
 
             if (sectionBlocks.isNotEmpty()) {
@@ -377,13 +389,11 @@ private fun HomeHeroSection(
 
 @Composable
 private fun HomeContinueWatchingSection(
-    continueWatchingState: StateFlow<HomeWatchActivityRailState>,
+    state: HomeWatchActivityRailState,
     onItemClick: (ContinueWatchingItem) -> Unit,
     onHideItem: (ContinueWatchingItem) -> Unit,
     onRemoveItem: (ContinueWatchingItem) -> Unit,
 ) {
-    val state by continueWatchingState.collectAsStateWithLifecycle()
-
     HomeRailSection(
         title = "Continue Watching",
         items = state.items,
@@ -393,19 +403,17 @@ private fun HomeContinueWatchingSection(
         onHideItem = onHideItem,
         onRemoveItem = onRemoveItem,
         showProgressBarFor = { item -> item.progressPercent > 0 },
-        showTitleFallbackWhenNoLogo = true,
         useBottomSheetActions = true,
+        useOverlayCardStyle = true,
         isLoading = state.isLoading,
     )
 }
 
 @Composable
 private fun HomeUpNextSection(
-    upNextState: StateFlow<HomeWatchActivityRailState>,
+    state: HomeWatchActivityRailState,
     onItemClick: (ContinueWatchingItem) -> Unit,
 ) {
-    val state by upNextState.collectAsStateWithLifecycle()
-
     HomeRailSection(
         title = "Up Next",
         items = state.items,
@@ -419,12 +427,10 @@ private fun HomeUpNextSection(
 
 @Composable
 private fun HomeThisWeekRail(
-    thisWeekState: StateFlow<ThisWeekState>,
+    state: ThisWeekState,
     onItemClick: (CalendarEpisodeItem) -> Unit,
     onViewAllClick: () -> Unit,
 ) {
-    val state by thisWeekState.collectAsStateWithLifecycle()
-
     ThisWeekSection(
         items = state.items,
         isLoading = state.isLoading,
@@ -442,15 +448,6 @@ private fun HomeCatalogStatusCard(statusMessage: String) {
             modifier = Modifier.padding(Dimensions.CardInternalPadding),
         )
     }
-}
-
-@Composable
-private fun HomeCatalogStatusItem(catalogStatusState: StateFlow<HomeCatalogStatusState>) {
-    val state by catalogStatusState.collectAsStateWithLifecycle()
-    if (state.hasCatalogSections || state.statusMessage.isBlank()) {
-        return
-    }
-    HomeCatalogStatusCard(statusMessage = state.statusMessage)
 }
 
 @Composable

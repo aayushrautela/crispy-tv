@@ -94,6 +94,7 @@ internal fun HomeRailSection(
     showTitleFallbackWhenNoLogo: Boolean = false,
     useBottomSheetActions: Boolean = false,
     usePosterCardStyle: Boolean = false,
+    useOverlayCardStyle: Boolean = false,
     isLoading: Boolean = false
 ) {
     if (items.isEmpty() && !isLoading && statusMessage.isBlank()) {
@@ -116,6 +117,10 @@ internal fun HomeRailSection(
                         items(HOME_POSTER_SKELETON_COUNT) {
                             HomeRailPosterSkeletonCard()
                         }
+                    } else if (useOverlayCardStyle) {
+                        items(HOME_WIDE_SKELETON_COUNT) {
+                            HomeRailOverlaySkeletonCard()
+                        }
                     } else {
                         items(HOME_WIDE_SKELETON_COUNT) {
                             HomeRailSkeletonCard()
@@ -128,6 +133,19 @@ internal fun HomeRailSection(
                             HomeRailPosterCard(
                                 item = item,
                                 onClick = { onItemClick(item) }
+                            )
+                        } else if (useOverlayCardStyle) {
+                            HomeRailOverlayCard(
+                                item = item,
+                                subtitle = railItem.subtitle,
+                                actionMenuContentDescription = actionMenuContentDescription,
+                                onClick = { onItemClick(item) },
+                                onHideClick = onHideItem?.let { { it(item) } },
+                                onRemoveClick = onRemoveItem?.let { { it(item) } },
+                                onDetailsClick = { onItemClick(item) },
+                                badgeLabel = badgeLabelFor(item),
+                                showProgressBar = showProgressBarFor(item),
+                                useBottomSheetActions = useBottomSheetActions,
                             )
                         } else {
                             HomeRailCard(
@@ -186,6 +204,16 @@ private fun HomeRailPosterSkeletonCard() {
             .width(124.dp)
             .aspectRatio(2f / 3f)
             .skeletonElement(shape = RoundedCornerShape(8.dp), pulse = false)
+    )
+}
+
+@Composable
+private fun HomeRailOverlaySkeletonCard() {
+    Box(
+        modifier = Modifier
+            .width(280.dp)
+            .aspectRatio(16f / 9f)
+            .skeletonElement(shape = RoundedCornerShape(20.dp), pulse = false)
     )
 }
 
@@ -1151,6 +1179,168 @@ internal fun HomeCatalogPosterCard(
                 .padding(top = 8.dp)
                 .fillMaxWidth()
                 .height(40.dp)
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+private fun HomeRailOverlayCard(
+    item: ContinueWatchingItem,
+    subtitle: String,
+    actionMenuContentDescription: String,
+    onClick: () -> Unit,
+    onHideClick: (() -> Unit)? = null,
+    onRemoveClick: (() -> Unit)? = null,
+    onDetailsClick: () -> Unit,
+    badgeLabel: String? = null,
+    showProgressBar: Boolean = false,
+    useBottomSheetActions: Boolean = false,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var bottomSheetVisible by remember { mutableStateOf(false) }
+    val hasItemActions = onHideClick != null || onRemoveClick != null
+    val artworkModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, 280.dp)
+
+    val cardInteractionModifier = if (useBottomSheetActions && hasItemActions) {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClickLabel = actionMenuContentDescription,
+            onLongClick = { bottomSheetVisible = true }
+        )
+    } else {
+        Modifier.clickable(onClick = onClick)
+    }
+
+    Column(
+        modifier = Modifier.width(280.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LandscapeArtworkFrame(
+            title = item.title,
+            imageModel = artworkModel,
+            onClick = null,
+            modifier = Modifier
+                .aspectRatio(16f / 9f)
+                .then(cardInteractionModifier),
+            badgeLabel = badgeLabel,
+            progressFraction =
+                if (showProgressBar && item.progressPercent > 0) {
+                    (item.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
+                } else {
+                    null
+                },
+            badgeAlignment = Alignment.TopEnd,
+            scrimHeightFraction = 0.68f,
+            scrimMaxAlpha = 0.92f,
+            topEndContent =
+                if (!useBottomSheetActions && hasItemActions) {
+                    {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp),
+                        ) {
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                modifier = Modifier.background(
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                                    shape = CircleShape,
+                                ),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.MoreVert,
+                                    contentDescription = actionMenuContentDescription,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Details") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onDetailsClick()
+                                    },
+                                )
+                                onRemoveClick?.let { removeAction ->
+                                    DropdownMenuItem(
+                                        text = { Text("Remove") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            removeAction()
+                                        },
+                                    )
+                                }
+                                onHideClick?.let { hideAction ->
+                                    DropdownMenuItem(
+                                        text = { Text("Hide") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            hideAction()
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    null
+                },
+            bottomOverlayContent = {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            },
+        )
+    }
+
+    if (useBottomSheetActions && hasItemActions && bottomSheetVisible) {
+        HomeRailActionBottomSheet(
+            title = item.title,
+            subtitle = subtitle,
+            onDismiss = { bottomSheetVisible = false },
+            onDetailsClick = {
+                bottomSheetVisible = false
+                onDetailsClick()
+            },
+            onRemoveClick = onRemoveClick?.let {
+                {
+                    bottomSheetVisible = false
+                    it()
+                }
+            },
+            onHideClick = onHideClick?.let {
+                {
+                    bottomSheetVisible = false
+                    it()
+                }
+            }
         )
     }
 }
