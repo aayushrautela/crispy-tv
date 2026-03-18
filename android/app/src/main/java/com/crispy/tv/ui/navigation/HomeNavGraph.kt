@@ -105,15 +105,17 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onBack = { navController.popBackStack() },
             onItemClick = { nextId, nextType -> navController.navigate(AppRoutes.homeDetailsRoute(nextId, nextType)) },
             onPersonClick = { personId -> navController.navigate(AppRoutes.personDetailsRoute(personId)) },
-            onOpenPlayer = { playbackUrl, title, identity, subtitle, artworkUrl ->
+            onOpenPlayer = { playbackUrl, playbackHeaders, title, identity, subtitle, artworkUrl, launchSnapshot ->
                 context.startActivity(
                     PlayerActivity.intent(
                         context = context,
                         playbackUrl = playbackUrl,
+                        playbackHeaders = playbackHeaders,
                         title = title,
                         identity = identity,
                         subtitle = subtitle,
                         artworkUrl = artworkUrl,
+                        launchSnapshot = launchSnapshot,
                     )
                 )
             },

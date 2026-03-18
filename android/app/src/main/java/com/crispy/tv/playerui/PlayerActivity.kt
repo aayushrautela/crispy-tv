@@ -30,9 +30,11 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelProvider
+import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.ui.theme.CrispyRewriteTheme
+import org.json.JSONObject
 
 class PlayerActivity : ComponentActivity() {
     private var isInPictureInPictureModeState by mutableStateOf(false)
@@ -60,6 +62,8 @@ class PlayerActivity : ComponentActivity() {
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val subtitle = intent.getStringExtra(EXTRA_SUBTITLE)?.trim()?.ifBlank { null }
         val artworkUrl = intent.getStringExtra(EXTRA_ARTWORK_URL)?.trim()?.ifBlank { null }
+        val launchSnapshot = PlayerLaunchSnapshot.fromJsonString(intent.getStringExtra(EXTRA_LAUNCH_SNAPSHOT))
+        val playbackSource = parsePlaybackSourceFromIntent(intent)
 
         val identity = parseIdentityFromIntent(intent, title)
         val restorePlaybackIntent =
@@ -71,11 +75,12 @@ class PlayerActivity : ComponentActivity() {
                 this,
                 PlayerSessionViewModel.factory(
                     appContext = applicationContext,
-                    playbackUrl = playbackUrl,
+                    playbackSource = playbackSource,
                     title = title,
                     subtitle = subtitle,
                     artworkUrl = artworkUrl,
                     identity = identity,
+                    launchSnapshot = launchSnapshot,
                     restorePlaybackIntent = restorePlaybackIntent,
                 ),
             )[PlayerSessionViewModel::class.java]
@@ -266,6 +271,8 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_TITLE = "extra_title"
         private const val EXTRA_SUBTITLE = "extra_subtitle"
         private const val EXTRA_ARTWORK_URL = "extra_artwork_url"
+        private const val EXTRA_LAUNCH_SNAPSHOT = "extra_launch_snapshot"
+        private const val EXTRA_PLAYBACK_HEADERS_JSON = "extra_playback_headers_json"
 
         private const val EXTRA_IMDB_ID = "extra_imdb_id"
         private const val EXTRA_TMDB_ID = "extra_tmdb_id"
@@ -279,16 +286,20 @@ class PlayerActivity : ComponentActivity() {
         fun intent(
             context: Context,
             playbackUrl: String,
+            playbackHeaders: Map<String, String> = emptyMap(),
             title: String,
             identity: PlaybackIdentity,
             subtitle: String? = null,
             artworkUrl: String? = null,
+            launchSnapshot: PlayerLaunchSnapshot? = null,
         ): Intent {
             return Intent(context, PlayerActivity::class.java)
                 .putExtra(EXTRA_PLAYBACK_URL, playbackUrl)
+                .putExtra(EXTRA_PLAYBACK_HEADERS_JSON, headersToJson(playbackHeaders))
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_SUBTITLE, subtitle)
                 .putExtra(EXTRA_ARTWORK_URL, artworkUrl)
+                .putExtra(EXTRA_LAUNCH_SNAPSHOT, launchSnapshot?.toJsonString())
                 .putExtra(EXTRA_IMDB_ID, identity.imdbId)
                 .putExtra(EXTRA_TMDB_ID, identity.tmdbId ?: -1)
                 .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
@@ -323,6 +334,41 @@ class PlayerActivity : ComponentActivity() {
                 showTitle = showTitle,
                 showYear = showYear,
             )
+        }
+
+        private fun parsePlaybackSourceFromIntent(intent: Intent): PlaybackSource {
+            val url = intent.getStringExtra(EXTRA_PLAYBACK_URL).orEmpty()
+            val headersJson = intent.getStringExtra(EXTRA_PLAYBACK_HEADERS_JSON).orEmpty().trim()
+            if (headersJson.isBlank()) {
+                return PlaybackSource(url = url)
+            }
+
+            val headers =
+                runCatching {
+                    val json = JSONObject(headersJson)
+                    buildMap {
+                        val iterator = json.keys()
+                        while (iterator.hasNext()) {
+                            val key = iterator.next()?.trim().orEmpty()
+                            if (key.isBlank()) continue
+                            val value = json.optString(key).trim()
+                            if (value.isBlank()) continue
+                            put(key, value)
+                        }
+                    }
+                }.getOrDefault(emptyMap())
+            return PlaybackSource(url = url, headers = headers)
+        }
+
+        private fun headersToJson(headers: Map<String, String>): String? {
+            if (headers.isEmpty()) return null
+            return JSONObject().apply {
+                headers.forEach { (key, value) ->
+                    if (key.isNotBlank() && value.isNotBlank()) {
+                        put(key, value)
+                    }
+                }
+            }.takeIf { it.length() > 0 }?.toString()
         }
     }
 }

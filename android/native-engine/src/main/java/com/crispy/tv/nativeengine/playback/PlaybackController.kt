@@ -3,6 +3,7 @@ package com.crispy.tv.nativeengine.playback
 import android.content.Context
 import android.view.SurfaceView
 import androidx.media3.ui.PlayerView
+import okhttp3.Headers
 
 enum class NativePlaybackEngine {
     EXO,
@@ -60,8 +61,23 @@ data class NativePlaybackSnapshot(
         get() = state == NativePlaybackState.PREPARING || state == NativePlaybackState.BUFFERING
 }
 
+data class PlaybackSource(
+    val url: String,
+    val headers: Map<String, String> = emptyMap(),
+)
+
+fun PlaybackSource.toOkHttpHeaders(): Headers {
+    val builder = Headers.Builder()
+    headers.forEach { (name, value) ->
+        if (name.isNotBlank() && value.isNotBlank()) {
+            builder.add(name, value)
+        }
+    }
+    return builder.build()
+}
+
 interface PlaybackSessionController {
-    fun play(url: String, engine: NativePlaybackEngine)
+    fun play(source: PlaybackSource, engine: NativePlaybackEngine)
     fun setPlaying(isPlaying: Boolean)
     fun snapshot(): NativePlaybackSnapshot
     fun seekTo(positionMs: Long)

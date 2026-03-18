@@ -8,6 +8,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -85,10 +86,9 @@ class NativePlaybackController(
         exoPlayer.addListener(exoListener)
     }
 
-    override fun play(
-        url: String,
-        engine: NativePlaybackEngine,
-    ) {
+    @OptIn(UnstableApi::class)
+    override fun play(source: PlaybackSource, engine: NativePlaybackEngine) {
+        val url = source.url
         Log.d(
             TAG,
             "play requested engine=$engine previousEngine=$currentEngine url=${debugUrl(url)}",
@@ -99,6 +99,7 @@ class NativePlaybackController(
                 exoError = null
                 exoVideoLayout = null
                 vlcRuntime.stop()
+                httpDataSourceFactory.setDefaultRequestProperties(source.headers)
                 exoPlayer.setMediaItem(MediaItem.fromUri(url))
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
@@ -107,7 +108,7 @@ class NativePlaybackController(
             NativePlaybackEngine.VLC -> {
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
-                vlcRuntime.play(url)
+                vlcRuntime.play(source)
             }
         }
     }

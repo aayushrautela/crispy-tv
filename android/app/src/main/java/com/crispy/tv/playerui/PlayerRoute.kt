@@ -1,7 +1,4 @@
-@file:OptIn(
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
-    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
-)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.crispy.tv.playerui
 
@@ -12,8 +9,9 @@ import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +25,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.crispy.tv.details.detailsPaletteFromScheme
+import com.crispy.tv.details.rememberDetailsTheming
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import kotlin.math.roundToInt
@@ -39,6 +39,10 @@ fun PlayerRoute(
     onBack: () -> Unit,
 ) {
     val uiState by session.uiState.collectAsStateWithLifecycle()
+    val imageUrl = uiState.backdropUrl ?: uiState.artworkUrl
+    val theming = rememberDetailsTheming(imageUrl = imageUrl)
+    val colorScheme = if (theming.isSeedColorResolved || !imageUrl.isNullOrBlank()) theming.colorScheme else MaterialTheme.colorScheme
+    val palette = remember(colorScheme) { detailsPaletteFromScheme(colorScheme) }
     var videoBounds by remember { mutableStateOf<Rect?>(null) }
     val updateVideoBounds: (Rect) -> Unit = { bounds ->
         if (videoBounds != bounds) {
@@ -141,15 +145,8 @@ fun PlayerRoute(
 
         if (!isInPictureInPictureMode) {
             PlayerOverlay(
-                title = uiState.title,
-                statusMessage = uiState.statusMessage,
-                errorMessage = uiState.errorMessage,
-                isBuffering = uiState.isBuffering,
-                isPlaying = uiState.isPlaying,
-                positionMs = uiState.positionMs,
-                durationMs = uiState.durationMs,
-                stableDurationMs = uiState.stableDurationMs,
-                activeEngine = uiState.activeEngine,
+                uiState = uiState,
+                palette = palette,
                 onBack = {
                     Log.d(TAG, "overlay back pressed")
                     onBack()
@@ -160,8 +157,15 @@ fun PlayerRoute(
                     session.setPlaying(nextPlaying)
                 },
                 onSeekTo = session::seekTo,
-                onEngineSelected = session::onEngineSelected,
-                onRetry = session::retryPlayback,
+                onShowInfo = session::showInfo,
+                onShowStreams = session::showStreams,
+                onCloseSurface = session::closeActiveSurface,
+                onSeasonSelected = session::onSeasonSelected,
+                onEpisodeSelected = session::showStreamsForEpisode,
+                onProviderSelected = session::onProviderSelected,
+                onRetryProvider = session::onRetryProvider,
+                onStreamSelected = session::onStreamSelected,
+                onRetryPlayback = session::retryPlayback,
             )
         }
     }

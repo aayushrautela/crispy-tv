@@ -7,10 +7,12 @@ import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
 import com.crispy.tv.metadata.RemoteSupabaseSyncLabService
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
+import com.crispy.tv.network.AppHttp
+import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.watchhistory.RemoteWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.torrent.TorrentEngineClient
@@ -93,6 +95,22 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
     return service
 }
 
+private fun newAddonStreamsService(context: Context): AddonStreamsService {
+    val appContext = context.applicationContext
+    return AddonStreamsService(
+        context = appContext,
+        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+        httpClient = AppHttp.client(appContext),
+    )
+}
+
+private fun newEpisodeListProvider(context: Context): TmdbEpisodeListProvider {
+    val appContext = context.applicationContext
+    return TmdbEpisodeListProvider(
+        tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext),
+    )
+}
+
 @Suppress("UNUSED_PARAMETER")
 private fun newSupabaseSyncService(
     context: Context,
@@ -145,6 +163,21 @@ object PlaybackDependencies {
         )
     }
 
+    @Volatile
+    var addonStreamsServiceFactory: (Context) -> AddonStreamsService = { context ->
+        newAddonStreamsService(context)
+    }
+
+    @Volatile
+    var episodeListProviderFactory: (Context) -> TmdbEpisodeListProvider = { context ->
+        newEpisodeListProvider(context)
+    }
+
+    @Volatile
+    var tmdbEnrichmentRepositoryFactory: (Context) -> TmdbEnrichmentRepository = { context ->
+        TmdbServicesProvider.enrichmentRepository(context.applicationContext)
+    }
+
     fun reset() {
         playbackControllerFactory = { context ->
             NativePlaybackController(context)
@@ -168,6 +201,11 @@ object PlaybackDependencies {
                 httpClient = AppHttp.client(appContext),
                 introDbBaseUrl = BuildConfig.INTRODB_API_URL,
             )
+        }
+        addonStreamsServiceFactory = { context -> newAddonStreamsService(context) }
+        episodeListProviderFactory = { context -> newEpisodeListProvider(context) }
+        tmdbEnrichmentRepositoryFactory = { context ->
+            TmdbServicesProvider.enrichmentRepository(context.applicationContext)
         }
     }
 }

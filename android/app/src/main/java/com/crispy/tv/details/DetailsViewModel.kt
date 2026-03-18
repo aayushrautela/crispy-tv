@@ -24,6 +24,8 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.playerui.PlayerEpisodeSnapshot
+import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
@@ -117,10 +119,12 @@ data class StreamSelectorUiState(
 sealed interface DetailsNavigationEvent {
     data class OpenPlayer(
         val playbackUrl: String,
+        val playbackHeaders: Map<String, String> = emptyMap(),
         val title: String,
         val identity: PlaybackIdentity,
         val subtitle: String?,
         val artworkUrl: String?,
+        val launchSnapshot: PlayerLaunchSnapshot?,
     ) : DetailsNavigationEvent
 }
 
@@ -916,10 +920,42 @@ class DetailsViewModel internal constructor(
             _navigationEvents.tryEmit(
                 DetailsNavigationEvent.OpenPlayer(
                     playbackUrl = playbackUrl,
+                    playbackHeaders = stream.requestHeaders,
                     title = title,
                     identity = identity,
                     subtitle = subtitle,
                     artworkUrl = artworkUrl,
+                    launchSnapshot =
+                        PlayerLaunchSnapshot(
+                            contentId = enriched.id,
+                            imdbId = enriched.imdbId,
+                            mediaType = enriched.mediaType,
+                            title = enriched.title,
+                            posterUrl = enriched.posterUrl,
+                            backdropUrl = enriched.backdropUrl,
+                            description = enriched.description,
+                            genres = enriched.genres,
+                            year = enriched.year,
+                            runtime = enriched.runtime,
+                            certification = enriched.certification,
+                            rating = enriched.rating,
+                            cast = enriched.cast,
+                            seasons = currentState.seasons,
+                            selectedSeason = currentState.selectedSeasonOrFirst,
+                            seasonEpisodes =
+                                currentState.seasonEpisodes.map { episodeItem ->
+                                    PlayerEpisodeSnapshot(
+                                        id = episodeItem.id,
+                                        title = episodeItem.title,
+                                        season = episodeItem.season,
+                                        episode = episodeItem.episode,
+                                        released = episodeItem.released,
+                                        overview = episodeItem.overview,
+                                        thumbnailUrl = episodeItem.thumbnailUrl,
+                                    )
+                                },
+                            currentEpisodeId = lookupId,
+                        ),
                 )
             )
         }

@@ -28,7 +28,7 @@ internal class VlcPlaybackRuntime(
     private val mediaPlayer: MediaPlayer = MediaPlayer(libVlc)
     private var surfaceView: SurfaceView? = null
     private var viewsAttached: Boolean = false
-    private var pendingUrl: String? = null
+    private var pendingSource: PlaybackSource? = null
     private var state: NativePlaybackState = NativePlaybackState.IDLE
     private var lastBufferingPercent: Float? = null
     private var lastBufferingEventAtElapsedMs: Long = 0L
@@ -145,7 +145,7 @@ internal class VlcPlaybackRuntime(
 
         Log.d(
             TAG,
-            "attach replacingViewHash=${surfaceView?.let(System::identityHashCode)} pendingUrl=${pendingUrl?.hashCode()} ${describeSurface(view)}",
+            "attach replacingViewHash=${surfaceView?.let(System::identityHashCode)} pendingUrl=${pendingSource?.url?.hashCode()} ${describeSurface(view)}",
         )
         detachViewsIfNeeded()
         surfaceView = view
@@ -158,24 +158,25 @@ internal class VlcPlaybackRuntime(
         updateWindowSize(view)
         Log.d(TAG, "attach complete ${describeSurface(view)}")
 
-        pendingUrl?.let { pendingPlaybackUrl ->
-            pendingUrl = null
-            startPlayback(pendingPlaybackUrl)
+        pendingSource?.let { pendingPlaybackSource ->
+            pendingSource = null
+            startPlayback(pendingPlaybackSource)
         }
     }
 
-    fun play(url: String) {
+    fun play(source: PlaybackSource) {
         resetPlaybackStateForNewMedia()
         playRequested = true
         state = NativePlaybackState.PREPARING
+        val url = source.url
         Log.d(TAG, "play viewsAttached=$viewsAttached url=${debugUrl(url)} ${describeSurface(surfaceView)}")
         if (!viewsAttached) {
-            pendingUrl = url
+            pendingSource = source
             Log.d(TAG, "play deferred until surface attach url=${debugUrl(url)}")
             return
         }
 
-        startPlayback(url)
+        startPlayback(source)
     }
 
     fun setPlaying(isPlaying: Boolean) {
@@ -209,7 +210,7 @@ internal class VlcPlaybackRuntime(
     }
 
     fun stop() {
-        pendingUrl = null
+        pendingSource = null
         playRequested = false
         state = NativePlaybackState.IDLE
         lastBufferingPercent = null
@@ -346,7 +347,7 @@ internal class VlcPlaybackRuntime(
 
         return when (state) {
             NativePlaybackState.IDLE -> {
-                if (playRequested || pendingUrl != null) {
+                if (playRequested || pendingSource != null) {
                     NativePlaybackState.PREPARING
                 } else {
                     NativePlaybackState.IDLE
@@ -373,12 +374,19 @@ internal class VlcPlaybackRuntime(
         }
     }
 
-    private fun startPlayback(url: String) {
+    private fun startPlayback(source: PlaybackSource) {
+        val url = source.url
         Log.d(TAG, "startPlayback url=${debugUrl(url)} viewsAttached=$viewsAttached ${describeSurface(surfaceView)}")
         applyBestFitScaling()
         val media =
             Media(libVlc, Uri.parse(url)).apply {
                 setHWDecoderEnabled(true, false)
+                source.headers.forEach { (name, value) ->
+                    when (name.lowercase()) {
+                        "user-agent" -> addOption(":http-user-agent=$value")
+                        "referer" -> addOption(":http-referrer=$value")
+                    }
+                }
             }
         mediaPlayer.media = media
         media.release()
@@ -438,7 +446,7 @@ internal class VlcPlaybackRuntime(
     }
 
     private fun resetPlaybackStateForNewMedia() {
-        pendingUrl = null
+        pendingSource = null
         state = NativePlaybackState.IDLE
         lastBufferingPercent = null
         lastBufferingEventAtElapsedMs = 0L

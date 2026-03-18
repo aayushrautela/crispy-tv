@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import kotlinx.coroutines.flow.collectLatest
 import java.util.Locale
@@ -22,7 +23,7 @@ fun DetailsRoute(
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit = { _, _ -> },
     onPersonClick: (String) -> Unit = {},
-    onOpenPlayer: (String, String, PlaybackIdentity, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onOpenPlayer: (String, Map<String, String>, String, PlaybackIdentity, String?, String?, PlayerLaunchSnapshot?) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
 
@@ -60,10 +61,12 @@ fun DetailsRoute(
                 is DetailsNavigationEvent.OpenPlayer -> {
                     onOpenPlayer(
                         event.playbackUrl,
+                        event.playbackHeaders,
                         event.title,
                         event.identity,
                         event.subtitle,
                         event.artworkUrl,
+                        event.launchSnapshot,
                     )
                 }
             }

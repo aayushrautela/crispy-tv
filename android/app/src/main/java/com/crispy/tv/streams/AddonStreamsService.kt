@@ -34,6 +34,7 @@ data class AddonStream(
     val description: String?,
     val url: String?,
     val externalUrl: String?,
+    val requestHeaders: Map<String, String> = emptyMap(),
     val cached: Boolean,
     val stableKey: String,
 ) {
@@ -331,7 +332,9 @@ class AddonStreamsService(
             val dedupeKey = listOf(url.orEmpty(), externalUrl.orEmpty(), name.orEmpty(), title.orEmpty()).joinToString("|")
             if (!dedupe.add(dedupeKey)) continue
 
-            val cached = streamObject.optJSONObject("behaviorHints")?.optBoolean("cached", false) ?: false
+            val behaviorHints = streamObject.optJSONObject("behaviorHints")
+            val cached = behaviorHints?.optBoolean("cached", false) ?: false
+            val requestHeaders = parseRequestHeaders(behaviorHints?.optJSONObject("headers"))
             val stableKey = buildStableKey(providerId, dedupeKey)
 
             out +=
@@ -343,6 +346,7 @@ class AddonStreamsService(
                     description = description,
                     url = url,
                     externalUrl = externalUrl,
+                    requestHeaders = requestHeaders,
                     cached = cached,
                     stableKey = stableKey,
                 )
@@ -394,6 +398,21 @@ class AddonStreamsService(
         for (index in 0 until array.length()) {
             val value = nonBlank(array.optString(index)) ?: continue
             out += value
+        }
+        return out
+    }
+
+    private fun parseRequestHeaders(headersObject: JSONObject?): Map<String, String> {
+        if (headersObject == null || headersObject.length() == 0) return emptyMap()
+
+        val out = linkedMapOf<String, String>()
+        val iterator = headersObject.keys()
+        while (iterator.hasNext()) {
+            val key = iterator.next()?.trim().orEmpty()
+            if (key.isBlank()) continue
+            val value = headersObject.optString(key).trim()
+            if (value.isBlank()) continue
+            out[key] = value
         }
         return out
     }
