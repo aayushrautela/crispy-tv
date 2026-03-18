@@ -255,6 +255,47 @@ internal fun parseReviews(reviews: JSONObject?): List<TmdbReview> {
     }
 }
 
+internal fun parseBackdropUrls(
+    images: JSONObject?,
+    preferredLanguage: String,
+): List<String> {
+    val backdrops = images?.optJSONArray("backdrops")?.toJsonObjectList() ?: return emptyList()
+    if (backdrops.isEmpty()) return emptyList()
+
+    val language = preferredLanguage.substringBefore('-').trim().ifBlank { "en" }
+
+    fun languageScore(iso6391: String?): Int {
+        return when {
+            iso6391.equals(language, ignoreCase = true) -> 0
+            iso6391.equals("en", ignoreCase = true) -> 1
+            iso6391 == null -> 2
+            else -> 3
+        }
+    }
+
+    return backdrops
+        .mapNotNull { backdrop ->
+            val filePath = backdrop.optStringNonBlank("file_path") ?: return@mapNotNull null
+            BackdropCandidate(
+                filePath = filePath,
+                languageScore = languageScore(backdrop.optStringNonBlank("iso_639_1")),
+                voteAverage = backdrop.optDoubleOrNull("vote_average") ?: 0.0,
+                voteCount = backdrop.optInt("vote_count", 0),
+                width = backdrop.optInt("width", 0),
+                height = backdrop.optInt("height", 0),
+            )
+        }.sortedWith(
+            compareBy<BackdropCandidate> { it.languageScore }
+                .thenByDescending { it.voteAverage }
+                .thenByDescending { it.voteCount }
+                .thenByDescending { it.width }
+                .thenByDescending { it.height }
+                .thenBy { it.filePath.lowercase(Locale.US) }
+        ).mapNotNull { candidate ->
+            TmdbApi.imageUrl(candidate.filePath, "w780")
+        }.distinct()
+}
+
 internal fun parseTitleDetails(
     details: JSONObject,
     mediaType: MetadataLabMediaType,
@@ -393,3 +434,12 @@ internal fun resolveTitle(
         MetadataLabMediaType.SERIES -> details.optStringNonBlank("name") ?: details.optStringNonBlank("original_name")
     }
 }
+
+private data class BackdropCandidate(
+    val filePath: String,
+    val languageScore: Int,
+    val voteAverage: Double,
+    val voteCount: Int,
+    val width: Int,
+    val height: Int,
+)

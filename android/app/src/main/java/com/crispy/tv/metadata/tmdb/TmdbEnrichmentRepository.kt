@@ -50,6 +50,7 @@ class TmdbEnrichmentRepository internal constructor(
             }?.let(::extractImdbId)
 
         val cast = parseCastMembers(credits)
+        val backdropUrls = parseBackdropUrls(detailsJson.optJSONObject("images"), language)
         val production = parseProductionEntities(detailsJson, resolved.mediaType)
         val trailers = parseTrailers(videos)
         val parsedReviews = parseReviews(reviews)
@@ -73,6 +74,7 @@ class TmdbEnrichmentRepository internal constructor(
                 tmdbId = resolved.tmdbId,
                 imdbId = resolvedImdbId ?: imdbId,
                 mediaType = resolved.mediaType,
+                backdropUrls = backdropUrls,
                 cast = cast,
                 production = production,
                 trailers = trailers,

@@ -11,7 +11,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -67,7 +68,7 @@ import com.crispy.tv.ai.AiInsightsResult
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 internal fun AiInsightsStoryOverlay(
     result: AiInsightsResult,
-    imageUrl: String?,
+    backdropUrls: List<String>,
     onDismiss: () -> Unit,
 ) {
     val slides: List<AiInsightCard> =
@@ -81,15 +82,26 @@ internal fun AiInsightsStoryOverlay(
             }
         }
 
+    val slideBackdrops =
+        remember(slides, backdropUrls) {
+            val cleaned = backdropUrls.mapNotNull(String::normalizedUrl).distinct()
+            if (cleaned.isEmpty()) {
+                List(slides.size) { null }
+            } else {
+                List(slides.size) { index -> cleaned[index % cleaned.size] }
+            }
+        }
+
     var index by remember { mutableIntStateOf(0) }
     LaunchedEffect(slides.size) {
         index = 0
     }
 
     val currentSlide = slides.getOrNull(index)
+    val currentBackdropUrl = slideBackdrops.getOrNull(index)
     val accentColor by animateColorAsState(
         targetValue = accentColorForType(currentSlide?.type.orEmpty()),
-        animationSpec = tween(durationMillis = 350),
+        animationSpec = tween(durationMillis = 320),
         label = "ai_insights_accent",
     )
 
@@ -101,7 +113,7 @@ internal fun AiInsightsStoryOverlay(
         if (index >= slides.lastIndex) {
             onDismiss()
         } else {
-            index = index + 1
+            index += 1
         }
     }
 
@@ -120,21 +132,19 @@ internal fun AiInsightsStoryOverlay(
                     }
                 },
     ) {
-        AiInsightsBackdropCollage(imageUrl = imageUrl, accentColor = accentColor)
-
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to accentColor.copy(alpha = 0.18f),
-                            0.28f to Color(0xFF0A121B).copy(alpha = 0.38f),
-                            0.68f to Color(0xFF09111A).copy(alpha = 0.82f),
-                            1f to Color(0xFF05080E).copy(alpha = 0.98f),
-                        ),
-                    ),
-        )
+        AnimatedContent(
+            targetState = currentBackdropUrl,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(280)) togetherWith fadeOut(animationSpec = tween(220))
+            },
+            label = "ai_insights_backdrop",
+            modifier = Modifier.fillMaxSize(),
+        ) { targetBackdropUrl ->
+            AiInsightsBackdrop(
+                imageUrl = targetBackdropUrl,
+                accentColor = accentColor,
+            )
+        }
 
         Column(
             modifier =
@@ -152,22 +162,36 @@ internal fun AiInsightsStoryOverlay(
                 accentColor = accentColor,
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
-
             AnimatedContent(
                 targetState = index,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(220))
+                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
                 },
                 label = "ai_insights_slide",
                 modifier = Modifier.weight(1f, fill = true),
             ) { target ->
                 val slide = slides[target]
-                AiInsightsSlideCard(
-                    slide = slide,
-                    accentColor = accentColorForType(slide.type),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                val slideAccent = accentColorForType(slide.type)
+                val slideBackdrop = slideBackdrops.getOrNull(target)
+
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    AiInsightsStageImage(
+                        imageUrl = slideBackdrop,
+                        accentColor = slideAccent,
+                        shape = imageShapeForIndex(target),
+                    )
+
+                    AiInsightsSlideCard(
+                        slide = slide,
+                        accentColor = slideAccent,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f, fill = true))
+                }
             }
 
             Column(
@@ -184,7 +208,7 @@ internal fun AiInsightsStoryOverlay(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = Color.White.copy(alpha = 0.08f),
-                    shape = DisclaimerShape,
+                    shape = MaterialTheme.shapes.large,
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -210,8 +234,7 @@ internal fun AiInsightsStoryOverlay(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun AiInsightsBackdropCollage(
+private fun AiInsightsBackdrop(
     imageUrl: String?,
     accentColor: Color,
 ) {
@@ -219,46 +242,70 @@ private fun AiInsightsBackdropCollage(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFF081019)),
+                .background(Color(0xFF05080E)),
     ) {
         if (!imageUrl.isNullOrBlank()) {
-            BackdropPanel(
-                imageUrl = imageUrl,
-                shape = BackdropHeroShape,
-                alignment = Alignment.TopEnd,
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
                 modifier =
                     Modifier
-                        .fillMaxWidth(0.82f)
-                        .align(Alignment.TopEnd)
-                        .padding(top = 38.dp, end = 16.dp)
-                        .height(244.dp),
-                accentColor = accentColor,
+                        .fillMaxSize()
+                        .alpha(0.54f),
+                contentScale = ContentScale.Crop,
             )
+        }
 
-            BackdropPanel(
-                imageUrl = imageUrl,
-                shape = BackdropSideShape,
-                alignment = Alignment.CenterStart,
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.48f)
-                        .align(Alignment.CenterStart)
-                        .padding(start = 16.dp)
-                        .height(188.dp),
-                accentColor = accentColor,
-            )
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(accentColor.copy(alpha = 0.24f), Color.Transparent),
+                            radius = 900f,
+                        ),
+                    ),
+        )
 
-            BackdropPanel(
-                imageUrl = imageUrl,
-                shape = BackdropFooterShape,
-                alignment = Alignment.BottomCenter,
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.56f)
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 18.dp, bottom = 132.dp)
-                        .height(128.dp),
-                accentColor = accentColor,
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color(0xFF08111B).copy(alpha = 0.30f),
+                            0.36f to Color(0xFF09111A).copy(alpha = 0.48f),
+                            0.7f to Color(0xFF071018).copy(alpha = 0.86f),
+                            1f to Color(0xFF05080E),
+                        ),
+                    ),
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun AiInsightsStageImage(
+    imageUrl: String?,
+    accentColor: Color,
+    shape: Shape,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(232.dp)
+                .clip(shape)
+                .border(width = 1.dp, color = Color.White.copy(alpha = 0.14f), shape = shape)
+                .background(Color.White.copy(alpha = 0.06f)),
+    ) {
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
             )
         }
 
@@ -268,46 +315,9 @@ private fun AiInsightsBackdropCollage(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.45f to Color(0xFF081019).copy(alpha = 0.22f),
-                            1f to Color(0xFF081019).copy(alpha = 0.68f),
-                        ),
-                    ),
-        )
-    }
-}
-
-@Composable
-private fun BoxScope.BackdropPanel(
-    imageUrl: String,
-    shape: Shape,
-    alignment: Alignment,
-    modifier: Modifier = Modifier,
-    accentColor: Color,
-) {
-    Box(
-        modifier =
-            modifier
-                .clip(shape)
-                .border(width = 1.dp, color = Color.White.copy(alpha = 0.10f), shape = shape),
-    ) {
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-            alignment = alignment,
-        )
-
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to accentColor.copy(alpha = 0.16f),
+                            0f to accentColor.copy(alpha = 0.10f),
                             0.55f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.36f),
+                            1f to Color.Black.copy(alpha = 0.28f),
                         ),
                     ),
         )
@@ -315,7 +325,6 @@ private fun BoxScope.BackdropPanel(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AiInsightsHeader(
     slides: List<AiInsightCard>,
     index: Int,
@@ -347,8 +356,8 @@ private fun AiInsightsHeader(
         }
 
         Surface(
-            color = Color.Black.copy(alpha = 0.24f),
-            shape = ControlChipShape,
+            color = Color.Black.copy(alpha = 0.28f),
+            shape = MaterialTheme.shapes.extraLarge,
         ) {
             Row(
                 modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
@@ -373,7 +382,6 @@ private fun AiInsightsHeader(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun AiInsightsSlideCard(
     slide: AiInsightCard,
     accentColor: Color,
@@ -381,8 +389,8 @@ private fun AiInsightsSlideCard(
 ) {
     Surface(
         modifier = modifier,
-        color = Color(0xFF101926).copy(alpha = 0.88f),
-        shape = InsightCardShape,
+        color = Color(0xFF101926).copy(alpha = 0.90f),
+        shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
@@ -396,7 +404,7 @@ private fun AiInsightsSlideCard(
                     modifier =
                         Modifier
                             .size(48.dp)
-                            .clip(IconBadgeShape)
+                            .clip(RoundedCornerShape(16.dp))
                             .background(accentColor.copy(alpha = 0.20f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -413,7 +421,7 @@ private fun AiInsightsSlideCard(
                 ) {
                     Surface(
                         color = Color.White.copy(alpha = 0.08f),
-                        shape = CategoryChipShape,
+                        shape = MaterialTheme.shapes.small,
                     ) {
                         Text(
                             text = slide.category,
@@ -470,34 +478,14 @@ private fun accentColorForType(type: String): Color {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val BackdropHeroShape: Shape
-    @Composable get() = MaterialShapes.Arch.toShape()
+private fun String?.normalizedUrl(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val BackdropSideShape: Shape
-    @Composable get() = MaterialShapes.Slanted.toShape()
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val BackdropFooterShape: Shape
-    @Composable get() = MaterialShapes.Bun.toShape()
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val InsightCardShape: Shape
-    @Composable get() = MaterialShapes.Arch.toShape()
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val IconBadgeShape: Shape
-    @Composable get() = MaterialShapes.SoftBurst.toShape()
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val CategoryChipShape: Shape
-    @Composable get() = MaterialShapes.Slanted.toShape()
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val ControlChipShape: Shape
-    @Composable get() = MaterialShapes.Bun.toShape()
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val DisclaimerShape: Shape
-    @Composable get() = MaterialShapes.Bun.toShape()
+@Composable
+private fun imageShapeForIndex(index: Int): Shape {
+    return when (index % 3) {
+        0 -> MaterialShapes.Arch.toShape()
+        1 -> MaterialShapes.Slanted.toShape()
+        else -> MaterialShapes.Bun.toShape()
+    }
+}

@@ -98,6 +98,7 @@ data class TmdbEnrichment(
     val tmdbId: Int,
     val imdbId: String?,
     val mediaType: MetadataLabMediaType,
+    val backdropUrls: List<String> = emptyList(),
     val cast: List<TmdbCastMember>,
     val production: List<TmdbProductionEntity>,
     val trailers: List<TmdbTrailer>,

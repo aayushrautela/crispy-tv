@@ -82,6 +82,14 @@ internal fun DetailsScreen(
 ) {
     val details = uiState.details
     val imageUrl = details?.backdropUrl ?: details?.posterUrl
+    val aiBackdropUrls =
+        remember(details, uiState.tmdbEnrichment) {
+            buildList {
+                addAll(uiState.tmdbEnrichment?.backdropUrls.orEmpty())
+                details?.backdropUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
+                details?.posterUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
+            }.distinct()
+        }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -330,7 +338,7 @@ internal fun DetailsScreen(
             if (visibleUiState.aiStoryVisible && visibleUiState.aiInsights != null) {
                 AiInsightsStoryOverlay(
                     result = visibleUiState.aiInsights,
-                    imageUrl = visibleDetails?.backdropUrl ?: visibleDetails?.posterUrl,
+                    backdropUrls = aiBackdropUrls,
                     onDismiss = onDismissAiInsights,
                 )
             }
