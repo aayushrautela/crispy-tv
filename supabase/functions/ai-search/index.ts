@@ -67,20 +67,35 @@ Deno.serve(async (request) => {
     }
 
     const supabaseUrl = requireEnv("SUPABASE_URL");
-    const supabaseAnonKey = requireEnv("SUPABASE_ANON_KEY");
     const tmdbApiKey = requireEnv("TMDB_API_KEY");
+    const requestApiKey = request.headers.get("apikey")?.trim() ?? "";
+    const publishableApiKey = configuredPublicApiKey();
+
+    if (!requestApiKey) {
+      return jsonResponse(401, { error: "Missing API key." });
+    }
+    if (requestApiKey !== publishableApiKey) {
+      return jsonResponse(401, { error: "Invalid API key." });
+    }
 
     const token = authorization.replace(/^Bearer\s+/i, "").trim();
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    const supabase = createClient(supabaseUrl, requestApiKey, {
       global: {
         headers: {
+          apikey: requestApiKey,
           Authorization: authorization,
         },
       },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
     });
 
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) {
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const userId = normalizeString(claimsData?.claims?.sub);
+    if (claimsError || !userId) {
       return jsonResponse(401, { error: "Invalid session." });
     }
 
@@ -150,6 +165,10 @@ function requireEnv(name: string): string {
     throw new Error(`Missing ${name}.`);
   }
   return value;
+}
+
+function configuredPublicApiKey(): string {
+  return requireEnv("SB_PUBLISHABLE_KEY");
 }
 
 function normalizeString(value: unknown): string {

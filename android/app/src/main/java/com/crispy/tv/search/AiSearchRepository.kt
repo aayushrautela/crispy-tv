@@ -18,7 +18,7 @@ class AiSearchRepository(
     private val activeProfileStore: ActiveProfileStore,
     private val httpClient: CrispyHttpClient,
     private val supabaseUrl: String,
-    private val supabaseAnonKey: String,
+    private val supabasePublishableKey: String,
 ) {
     suspend fun search(
         query: String,
@@ -42,8 +42,8 @@ class AiSearchRepository(
         }
 
         val baseUrl = supabaseUrl.trim().trimEnd('/')
-        val anonKey = supabaseAnonKey.trim()
-        if (baseUrl.isBlank() || anonKey.isBlank()) {
+        val publishableKey = supabasePublishableKey.trim()
+        if (baseUrl.isBlank() || publishableKey.isBlank()) {
             return SearchResultsPayload(message = "Supabase is not configured.")
         }
 
@@ -57,7 +57,7 @@ class AiSearchRepository(
 
         val headers =
             Headers.Builder()
-                .add("apikey", anonKey)
+                .add("apikey", publishableKey)
                 .add("Authorization", "Bearer ${session.accessToken.trim()}")
                 .add("Content-Type", "application/json")
                 .add("Accept", "application/json")
@@ -155,7 +155,7 @@ class AiSearchRepository(
                 activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                 httpClient = httpClient,
                 supabaseUrl = BuildConfig.SUPABASE_URL,
-                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
+                supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
             )
         }
     }

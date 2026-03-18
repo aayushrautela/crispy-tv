@@ -17,7 +17,7 @@ class RemoteSupabaseSyncLabService(
 
     override suspend fun initialize(): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
         if (!supabase.isConfigured()) {
-            return@withContext result("Supabase sync is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.")
+            return@withContext result("Supabase sync is not configured. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.")
         }
 
         val session = supabase.ensureValidSession()

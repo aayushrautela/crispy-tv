@@ -26,10 +26,8 @@ internal const val CONTINUE_WATCHING_PLAYBACK_LIMIT = 30
 internal const val CONTINUE_WATCHING_UPNEXT_SHOW_LIMIT = 30
 
 internal const val TRAKT_AUTHORIZE_BASE = "https://trakt.tv/oauth/authorize"
-internal const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/token"
 
 internal const val SIMKL_AUTHORIZE_BASE = "https://simkl.com/oauth/authorize"
-internal const val SIMKL_TOKEN_URL = "https://api.simkl.com/oauth/token"
 internal const val SIMKL_API_BASE = "https://api.simkl.com"
 
 internal const val SIMKL_APP_NAME = "crispytv"

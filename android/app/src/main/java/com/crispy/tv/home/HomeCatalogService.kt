@@ -96,11 +96,11 @@ class HomeCatalogService internal constructor(
     private val activeProfileStore: ActiveProfileStore,
     private val httpClient: CrispyHttpClient,
     supabaseUrl: String,
-    supabaseAnonKey: String,
+    supabasePublishableKey: String,
     private val diskCacheStore: HomeCatalogDiskCacheStore,
 ) {
     private val supabaseBaseUrl: String = supabaseUrl.trim().trimEnd('/')
-    private val supabaseAnonKeyValue: String = supabaseAnonKey.trim()
+    private val supabasePublishableKeyValue: String = supabasePublishableKey.trim()
 
     private val catalogCacheLock = Any()
     private val personalCatalogCache = SupabaseCatalogCache()
@@ -437,7 +437,7 @@ class HomeCatalogService internal constructor(
 
     private fun supabaseJsonHeaders(accessToken: String? = null): Headers {
         val builder = Headers.Builder()
-            .add("apikey", supabaseAnonKeyValue)
+            .add("apikey", supabasePublishableKeyValue)
             .add("Accept", "application/json")
             .add("Content-Type", "application/json")
         val token = accessToken?.trim().orEmpty()

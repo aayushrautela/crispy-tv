@@ -8,11 +8,13 @@ import com.crispy.tv.watchhistory.oauth.OAuthCallbackParseResult
 import com.crispy.tv.watchhistory.oauth.OAuthCallbackParser
 import com.crispy.tv.watchhistory.oauth.OAuthStateStore
 import com.crispy.tv.watchhistory.oauth.Pkce
+import com.crispy.tv.watchhistory.oauth.SupabaseFunctionExchangeClient
+import org.json.JSONObject
 
 internal class SimklOAuthClient(
     private val simklClientId: String,
-    private val simklClientSecret: String,
     private val simklRedirectUri: String,
+    private val oauthExchangeClient: SupabaseFunctionExchangeClient,
     private val simklService: SimklService,
     private val sessionStore: ProviderSessionStore,
     private val stateStore: OAuthStateStore,
@@ -57,6 +59,13 @@ internal class SimklOAuthClient(
             return ProviderAuthActionResult(
                 success = false,
                 statusMessage = "Simkl redirect URI missing. Set SIMKL_REDIRECT_URI in gradle.properties.",
+                authState = sessionStore.authState(),
+            )
+        }
+        if (!oauthExchangeClient.isConfigured()) {
+            return ProviderAuthActionResult(
+                success = false,
+                statusMessage = "Provider OAuth requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.",
                 authState = sessionStore.authState(),
             )
         }
@@ -109,12 +118,18 @@ internal class SimklOAuthClient(
             )
         }
 
-        val tokenObject = simklService.exchangeToken(code = payload.code, codeVerifier = expected.codeVerifier)
+        val tokenPayload =
+            JSONObject()
+                .put("code", payload.code)
+                .put("codeVerifier", expected.codeVerifier)
+                .put("redirectUri", simklRedirectUri)
+        val exchange = oauthExchangeClient.post(functionName = "simkl-oauth-exchange", payload = tokenPayload)
+        val tokenObject = exchange.payload
         if (tokenObject == null) {
             stateStore.clearSimkl()
             return ProviderAuthActionResult(
                 success = false,
-                statusMessage = "Simkl token exchange failed.",
+                statusMessage = exchange.errorMessage ?: "Simkl token exchange failed.",
                 authState = sessionStore.authState(),
             )
         }
@@ -130,7 +145,10 @@ internal class SimklOAuthClient(
             )
         }
 
-        val userHandle = simklService.fetchUserHandle(accessToken)
+        val userHandle =
+            tokenObject.optString("providerUsername").trim().ifBlank {
+                tokenObject.optString("providerUserId").trim()
+            }.ifBlank { null }
         sessionStore.connectProvider(
             provider = WatchProvider.SIMKL,
             accessToken = accessToken,

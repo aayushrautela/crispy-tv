@@ -98,7 +98,7 @@ internal class ProviderPortalViewModel(
             val start = watchHistoryService.beginTraktOAuth()
             if (start == null) {
                 _uiState.update {
-                    it.copy(statusMessage = "Trakt OAuth is not configured. Set TRAKT_CLIENT_ID and TRAKT_REDIRECT_URI.")
+                    it.copy(statusMessage = "Trakt OAuth is not configured. Set TRAKT_CLIENT_ID, TRAKT_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.")
                 }
                 return@launch
             }
@@ -134,7 +134,7 @@ internal class ProviderPortalViewModel(
             val start = watchHistoryService.beginSimklOAuth()
             if (start == null) {
                 _uiState.update {
-                    it.copy(statusMessage = "Simkl OAuth is not configured. Set SIMKL_CLIENT_ID and SIMKL_REDIRECT_URI.")
+                    it.copy(statusMessage = "Simkl OAuth is not configured. Set SIMKL_CLIENT_ID, SIMKL_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.")
                 }
                 return@launch
             }

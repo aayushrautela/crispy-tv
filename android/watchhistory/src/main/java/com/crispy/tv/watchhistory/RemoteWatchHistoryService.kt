@@ -29,6 +29,7 @@ import com.crispy.tv.watchhistory.local.LocalWatchHistoryStore
 import com.crispy.tv.watchhistory.oauth.OAuthCallbackParser
 import com.crispy.tv.watchhistory.oauth.OAuthStateStore
 import com.crispy.tv.watchhistory.oauth.Pkce
+import com.crispy.tv.watchhistory.oauth.SupabaseFunctionExchangeClient
 import com.crispy.tv.watchhistory.provider.ProviderRouter
 import com.crispy.tv.watchhistory.provider.ContinueWatchingNormalizer
 import com.crispy.tv.watchhistory.simkl.SimklOAuthClient
@@ -57,9 +58,7 @@ class RemoteWatchHistoryService(
     private val onTraktTokenExpired: (suspend () -> String?)? = null,
 ) : WatchHistoryService {
     private val appContext = context.applicationContext
-    private val traktClientSecret = config.traktClientSecret
     private val traktRedirectUri = config.traktRedirectUri
-    private val simklClientSecret = config.simklClientSecret
     private val simklRedirectUri = config.simklRedirectUri
     private val appVersion = config.appVersion.trim().ifEmpty { "dev" }
 
@@ -72,12 +71,17 @@ class RemoteWatchHistoryService(
         )
 
     private val http = WatchHistoryHttp(httpClient = httpClient, tag = TAG)
+    private val oauthExchangeClient =
+        SupabaseFunctionExchangeClient(
+            http = http,
+            supabaseUrl = config.supabaseUrl,
+            supabasePublishableKey = config.supabasePublishableKey,
+        )
     private val simklService =
         SimklService(
             http = http,
             sessionStore = sessionStore,
             simklClientId = simklClientId,
-            simklClientSecret = simklClientSecret,
             simklRedirectUri = simklRedirectUri,
             appVersion = appVersion,
         )
@@ -96,9 +100,8 @@ class RemoteWatchHistoryService(
     private val traktOAuthClient =
         TraktOAuthClient(
             traktClientId = traktClientId,
-            traktClientSecret = traktClientSecret,
             traktRedirectUri = traktRedirectUri,
-            http = http,
+            oauthExchangeClient = oauthExchangeClient,
             sessionStore = sessionStore,
             stateStore = oauthStateStore,
             callbackParser = callbackParser,
@@ -107,8 +110,8 @@ class RemoteWatchHistoryService(
     private val simklOAuthClient =
         SimklOAuthClient(
             simklClientId = simklClientId,
-            simklClientSecret = simklClientSecret,
             simklRedirectUri = simklRedirectUri,
+            oauthExchangeClient = oauthExchangeClient,
             simklService = simklService,
             sessionStore = sessionStore,
             stateStore = oauthStateStore,
@@ -157,6 +160,7 @@ class RemoteWatchHistoryService(
     override suspend fun beginTraktOAuth(): ProviderAuthStartResult? {
         if (traktClientId.isBlank()) return null
         if (traktRedirectUri.isBlank()) return null
+        if (!oauthExchangeClient.isConfigured()) return null
         return traktOAuthClient.begin()
     }
 
@@ -164,8 +168,11 @@ class RemoteWatchHistoryService(
         if (traktClientId.isBlank()) {
             return ProviderAuthActionResult(success = false, statusMessage = "Missing TRAKT_CLIENT_ID.")
         }
-        if (traktClientSecret.isBlank()) {
-            return ProviderAuthActionResult(success = false, statusMessage = "Missing TRAKT_CLIENT_SECRET.")
+        if (config.supabaseUrl.trim().isBlank()) {
+            return ProviderAuthActionResult(success = false, statusMessage = "Missing SUPABASE_URL.")
+        }
+        if (config.supabasePublishableKey.trim().isBlank()) {
+            return ProviderAuthActionResult(success = false, statusMessage = "Missing SUPABASE_PUBLISHABLE_KEY.")
         }
         return traktOAuthClient.complete(callbackUri)
     }
@@ -173,6 +180,7 @@ class RemoteWatchHistoryService(
     override suspend fun beginSimklOAuth(): ProviderAuthStartResult? {
         if (simklClientId.isBlank()) return null
         if (simklRedirectUri.isBlank()) return null
+        if (!oauthExchangeClient.isConfigured()) return null
         return simklOAuthClient.begin()
     }
 
@@ -180,8 +188,11 @@ class RemoteWatchHistoryService(
         if (simklClientId.isBlank()) {
             return ProviderAuthActionResult(success = false, statusMessage = "Missing SIMKL_CLIENT_ID.")
         }
-        if (simklClientSecret.isBlank()) {
-            return ProviderAuthActionResult(success = false, statusMessage = "Missing SIMKL_CLIENT_SECRET.")
+        if (config.supabaseUrl.trim().isBlank()) {
+            return ProviderAuthActionResult(success = false, statusMessage = "Missing SUPABASE_URL.")
+        }
+        if (config.supabasePublishableKey.trim().isBlank()) {
+            return ProviderAuthActionResult(success = false, statusMessage = "Missing SUPABASE_PUBLISHABLE_KEY.")
         }
         return simklOAuthClient.complete(callbackUri)
     }

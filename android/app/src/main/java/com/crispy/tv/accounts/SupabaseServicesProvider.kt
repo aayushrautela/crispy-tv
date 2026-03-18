@@ -30,7 +30,7 @@ object SupabaseServicesProvider {
                     appContext = appContext,
                     httpClient = AppHttp.client(appContext),
                     supabaseUrl = BuildConfig.SUPABASE_URL,
-                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
+                    supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
                 )
             supabaseAccountClient = created
             return created
@@ -58,7 +58,7 @@ object SupabaseServicesProvider {
                     activeProfileStore = activeProfileStore(appContext),
                     httpClient = AppHttp.client(appContext),
                     supabaseUrl = BuildConfig.SUPABASE_URL,
-                    supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
+                    supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
                     diskCacheStore = HomeCatalogDiskCacheStore(appContext),
                 )
             homeCatalogService = created

@@ -14,7 +14,7 @@ class SupabaseAccountClient(
     appContext: Context,
     private val httpClient: CrispyHttpClient,
     supabaseUrl: String,
-    private val supabaseAnonKey: String,
+    private val supabasePublishableKey: String,
 ) {
     private val baseUrl: String = supabaseUrl.trim().trimEnd('/')
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -66,7 +66,7 @@ class SupabaseAccountClient(
     )
 
     fun isConfigured(): Boolean {
-        return baseUrl.isNotBlank() && supabaseAnonKey.isNotBlank()
+        return baseUrl.isNotBlank() && supabasePublishableKey.isNotBlank()
     }
 
     fun clearLocalSession() {
@@ -424,7 +424,7 @@ class SupabaseAccountClient(
 
     private fun baseHeaders(): Headers {
         return Headers.Builder()
-            .add("apikey", supabaseAnonKey)
+            .add("apikey", supabasePublishableKey)
             .add("Content-Type", "application/json")
             .add("Accept", "application/json")
             .build()

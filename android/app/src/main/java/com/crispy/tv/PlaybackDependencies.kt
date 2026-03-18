@@ -70,10 +70,10 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
         episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(
-                traktClientSecret = BuildConfig.TRAKT_CLIENT_SECRET,
                 traktRedirectUri = BuildConfig.TRAKT_REDIRECT_URI,
-                simklClientSecret = BuildConfig.SIMKL_CLIENT_SECRET,
                 simklRedirectUri = BuildConfig.SIMKL_REDIRECT_URI,
+                supabaseUrl = BuildConfig.SUPABASE_URL,
+                supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
                 appVersion = BuildConfig.VERSION_NAME,
             ),
         onTraktTokenExpired = {

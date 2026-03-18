@@ -5,7 +5,6 @@ import android.util.Log
 import com.crispy.tv.watchhistory.SIMKL_API_BASE
 import com.crispy.tv.watchhistory.SIMKL_APP_NAME
 import com.crispy.tv.watchhistory.SIMKL_AUTHORIZE_BASE
-import com.crispy.tv.watchhistory.SIMKL_TOKEN_URL
 import com.crispy.tv.watchhistory.WatchHistoryHttp
 import com.crispy.tv.watchhistory.auth.ProviderSessionStore
 import kotlinx.coroutines.CompletableDeferred
@@ -21,7 +20,6 @@ internal class SimklService(
     private val http: WatchHistoryHttp,
     private val sessionStore: ProviderSessionStore,
     private val simklClientId: String,
-    private val simklClientSecret: String,
     private val simklRedirectUri: String,
     private val appName: String = SIMKL_APP_NAME,
     private val appVersion: String = "dev",
@@ -98,41 +96,6 @@ internal class SimklService(
         return builder.build().toString()
     }
 
-    suspend fun exchangeToken(code: String, codeVerifier: String?): JSONObject? {
-        val payload =
-            JSONObject()
-                .put("grant_type", "authorization_code")
-                .put("code", code)
-                .put("client_id", simklClientId)
-                .put("client_secret", simklClientSecret)
-                .put("redirect_uri", simklRedirectUri)
-
-        if (!codeVerifier.isNullOrBlank()) {
-            payload.put("code_verifier", codeVerifier)
-        }
-
-        val response =
-            http.postJsonRaw(
-                url = SIMKL_TOKEN_URL,
-                headers =
-                    mapOf(
-                        "Content-Type" to "application/json",
-                        "Accept" to "application/json",
-                        "User-Agent" to userAgent(),
-                    ),
-                payload = payload,
-            ) ?: return null
-
-        if (response.code !in 200..299) {
-            Log.w(logTag, "Simkl token exchange non-2xx: ${response.code}")
-            return null
-        }
-
-        return runCatching { JSONObject(response.body) }
-            .onFailure { Log.w(logTag, "Simkl token exchange JSON parse failed", it) }
-            .getOrNull()
-    }
-
     suspend fun scrobbleStart(content: SimklScrobbleContent, progressPercent: Double): Boolean {
         val token = sessionStore.simklAccessToken()
         if (token.isBlank()) return false
@@ -183,18 +146,6 @@ internal class SimklService(
         }
 
         return response?.code == 409
-    }
-
-    suspend fun fetchUserHandle(accessToken: String): String? {
-        val settings = fetchUserSettings(accessToken) ?: return null
-
-        val user = settings.optJSONObject("user")
-        val name = user?.optString("name")?.trim().orEmpty()
-        if (name.isNotBlank()) return name
-
-        val account = settings.optJSONObject("account")
-        val accountId = account?.opt("id")?.toString()?.trim().orEmpty()
-        return accountId.ifBlank { null }
     }
 
     suspend fun getPlaybackStatus(forceRefresh: Boolean = false): JSONArray {

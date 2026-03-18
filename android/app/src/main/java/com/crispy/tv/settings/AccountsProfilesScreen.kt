@@ -128,7 +128,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Set SUPABASE_URL and SUPABASE_ANON_KEY in your Gradle properties.",
+                                text = "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in your Gradle properties.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
