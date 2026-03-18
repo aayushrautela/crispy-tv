@@ -62,7 +62,7 @@ class AiInsightsCacheStore(context: Context) {
     }
 
     private fun keyFor(mediaType: MetadataLabMediaType, tmdbId: Int, locale: Locale): String =
-        "$CACHE_PREFIX${mediaType.name}_$tmdbId_${locale.toLanguageTag().ifBlank { DEFAULT_LOCALE_TAG }}"
+        "$CACHE_PREFIX${mediaType.name}_${tmdbId}_${locale.toLanguageTag().ifBlank { DEFAULT_LOCALE_TAG }}"
 
     companion object {
         private const val PREFS_NAME = "ai_insights_cache"
