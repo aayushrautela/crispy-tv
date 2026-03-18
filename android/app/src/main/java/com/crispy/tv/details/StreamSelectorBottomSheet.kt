@@ -83,8 +83,6 @@ internal fun StreamSelectorBottomSheet(
                 }
             }
         }
-    val showInitialSkeleton = state.isLoading && state.providers.isEmpty()
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -114,32 +112,6 @@ internal fun StreamSelectorBottomSheet(
                             state = state,
                             onProviderSelected = onProviderSelected,
                         )
-                    }
-
-                    if (showInitialSkeleton) {
-                        items(6) {
-                            ElevatedCard {
-                                Column(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                ) {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth(0.72f)
-                                                .height(14.dp)
-                                                .skeletonElement(color = DetailsSkeletonColors.Base)
-                                    )
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth(0.5f)
-                                                .height(12.dp)
-                                                .skeletonElement(color = DetailsSkeletonColors.Base)
-                                    )
-                                }
-                            }
-                        }
                     }
 
                     if (
@@ -181,7 +153,7 @@ internal fun StreamSelectorBottomSheet(
                         }
                     }
 
-                    if (!showInitialSkeleton && state.isLoading) {
+                    if (state.isLoading) {
                         item {
                             LoadingMoreStreamsRow()
                         }
@@ -321,6 +293,35 @@ private fun ProviderChipsRow(
     state: StreamSelectorUiState,
     onProviderSelected: (String?) -> Unit,
 ) {
+    if (state.isLoading && state.providers.isEmpty()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .testTag("stream_provider_chips"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            repeat(4) { index ->
+                val chipWidth = when (index) {
+                    0 -> 68.dp
+                    1 -> 92.dp
+                    2 -> 84.dp
+                    else -> 100.dp
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .width(chipWidth)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .skeletonElement(color = DetailsSkeletonColors.Base)
+                )
+            }
+        }
+        return
+    }
+
     Row(
         modifier =
             Modifier
