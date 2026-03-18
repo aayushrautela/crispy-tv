@@ -8,7 +8,6 @@ import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderSession
 import com.crispy.tv.settings.AiInsightsMode
-import com.crispy.tv.settings.AiInsightsModelType
 import com.crispy.tv.settings.AiInsightsSettings
 import com.crispy.tv.settings.AiInsightsSettingsStore
 import com.crispy.tv.settings.OmdbSettingsStore
@@ -274,12 +273,6 @@ class ProfileDataCloudSync(
                 mode =
                     settings[KEY_AI_INSIGHTS_MODE]?.let { AiInsightsMode.fromRaw(it) }
                         ?: currentSettings.mode,
-                modelType =
-                    settings[KEY_AI_INSIGHTS_MODEL_TYPE]?.let { AiInsightsModelType.fromRaw(it) }
-                        ?: currentSettings.modelType,
-                customModelName =
-                    settings[KEY_AI_INSIGHTS_CUSTOM_MODEL_NAME]?.trim()
-                        ?: currentSettings.customModelName,
             )
 
         if (nextSettings != currentSettings) {
@@ -304,14 +297,8 @@ class ProfileDataCloudSync(
 
         val aiSettings: AiInsightsSettings = aiInsightsSettingsStore.loadSettings()
         result[KEY_AI_INSIGHTS_MODE] = aiSettings.mode.raw
-        result[KEY_AI_INSIGHTS_MODEL_TYPE] = aiSettings.modelType.raw
-
-        val customModelName = aiSettings.customModelName.trim()
-        if (customModelName.isBlank()) {
-            result.remove(KEY_AI_INSIGHTS_CUSTOM_MODEL_NAME)
-        } else {
-            result[KEY_AI_INSIGHTS_CUSTOM_MODEL_NAME] = customModelName
-        }
+        result.remove("ai.insights.model_type")
+        result.remove("ai.insights.custom_model_name")
 
         val openRouterKey = aiInsightsSettingsStore.loadOpenRouterKey().trim()
         if (openRouterKey.isBlank()) {
@@ -350,9 +337,6 @@ class ProfileDataCloudSync(
         private const val KEY_PLAYBACK_TRAILER_MUTED = "playback.trailer_muted"
 
         private const val KEY_AI_INSIGHTS_MODE = "ai.insights.mode"
-        private const val KEY_AI_INSIGHTS_MODEL_TYPE = "ai.insights.model_type"
-        private const val KEY_AI_INSIGHTS_CUSTOM_MODEL_NAME = "ai.insights.custom_model_name"
-
         private const val KEY_AI_OPENROUTER_KEY = "ai.openrouter_key"
         private const val KEY_METADATA_OMDB_KEY = "metadata.omdb_key"
     }

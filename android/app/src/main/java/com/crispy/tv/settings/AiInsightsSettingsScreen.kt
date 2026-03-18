@@ -12,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Key
-import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -62,8 +61,6 @@ fun AiInsightsSettingsRoute(onBack: () -> Unit) {
         uiState = uiState,
         onBack = onBack,
         onModeSelected = vm::setMode,
-        onModelTypeSelected = vm::setModelType,
-        onCustomModelNameChanged = vm::setCustomModelName,
         onOpenRouterKeyChanged = vm::setOpenRouterKey,
     )
 }
@@ -84,14 +81,6 @@ private class AiInsightsSettingsViewModel(
 
     fun setMode(mode: AiInsightsMode) {
         updateSnapshot { it.copy(settings = it.settings.copy(mode = mode)) }
-    }
-
-    fun setModelType(type: AiInsightsModelType) {
-        updateSnapshot { it.copy(settings = it.settings.copy(modelType = type)) }
-    }
-
-    fun setCustomModelName(name: String) {
-        updateSnapshot { it.copy(settings = it.settings.copy(customModelName = name)) }
     }
 
     fun setOpenRouterKey(key: String) {
@@ -133,8 +122,6 @@ private fun AiInsightsSettingsScreen(
     uiState: AiInsightsSettingsUiState,
     onBack: () -> Unit,
     onModeSelected: (AiInsightsMode) -> Unit,
-    onModelTypeSelected: (AiInsightsModelType) -> Unit,
-    onCustomModelNameChanged: (String) -> Unit,
     onOpenRouterKeyChanged: (String) -> Unit,
 ) {
     val scrollBehavior = appBarScrollBehavior()
@@ -195,48 +182,6 @@ private fun AiInsightsSettingsScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = uiState.snapshot.settings.modelType == AiInsightsModelType.DEEPSEEK_R1,
-                            onClick = { onModelTypeSelected(AiInsightsModelType.DEEPSEEK_R1) },
-                            label = { Text("DeepSeek") },
-                            leadingIcon = {
-                                Icon(imageVector = Icons.Outlined.Psychology, contentDescription = null)
-                            }
-                        )
-                        FilterChip(
-                            selected = uiState.snapshot.settings.modelType == AiInsightsModelType.NVIDIA_NEMOTRON,
-                            onClick = { onModelTypeSelected(AiInsightsModelType.NVIDIA_NEMOTRON) },
-                            label = { Text("Nemotron") },
-                            leadingIcon = {
-                                Icon(imageVector = Icons.Outlined.Psychology, contentDescription = null)
-                            }
-                        )
-                        FilterChip(
-                            selected = uiState.snapshot.settings.modelType == AiInsightsModelType.CUSTOM,
-                            onClick = { onModelTypeSelected(AiInsightsModelType.CUSTOM) },
-                            label = { Text("Custom") },
-                            leadingIcon = {
-                                Icon(imageVector = Icons.Outlined.Psychology, contentDescription = null)
-                            }
-                        )
-                    }
-
-                    if (uiState.snapshot.settings.modelType == AiInsightsModelType.CUSTOM) {
-                        OutlinedTextField(
-                            value = uiState.snapshot.settings.customModelName,
-                            onValueChange = onCustomModelNameChanged,
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("OpenRouter model") },
-                            placeholder = { Text("e.g. anthropic/claude-3.7-sonnet") },
-                        )
-                    }
-                }
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = uiState.snapshot.openRouterKey,
                         onValueChange = onOpenRouterKeyChanged,
@@ -247,7 +192,7 @@ private fun AiInsightsSettingsScreen(
                         visualTransformation =
                             if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                         supportingText = {
-                            Text("Stored locally and synced to your profile when signed in.")
+                            Text("Stored locally and synced to your profile when signed in. The server chooses the model.")
                         }
                     )
 

@@ -7,10 +7,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.ai.AiInsightsCacheStore
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
-import com.crispy.tv.ai.OpenRouterClient
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
@@ -283,16 +281,16 @@ class DetailsViewModel internal constructor(
             val detailsForAi = enrichedDetails
             val aiMode = aiSnapshot.settings.mode
             val aiConfigured = aiSnapshot.openRouterKey.isNotBlank()
+            val aiLocale = Locale.getDefault()
 
             if (tmdbId != null && detailsForAi != null && aiMode != AiInsightsMode.OFF) {
-                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId, requestedMediaType) }
+                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId, requestedMediaType, aiLocale) }
                 if (cached != null) {
                     _uiState.update { it.copy(aiInsights = cached) }
                 } else if (aiMode == AiInsightsMode.ALWAYS && aiConfigured) {
                     startAiGeneration(
                         tmdbId = tmdbId,
-                        details = detailsForAi,
-                        reviews = tmdbEnrichment.reviews.orEmpty(),
+                        locale = aiLocale,
                         showStory = false,
                         announce = false,
                     )
@@ -329,8 +327,7 @@ class DetailsViewModel internal constructor(
 
         startAiGeneration(
             tmdbId = tmdbId,
-            details = details,
-            reviews = state.tmdbEnrichment.reviews.orEmpty(),
+            locale = Locale.getDefault(),
             showStory = true,
             announce = true,
         )
@@ -342,8 +339,7 @@ class DetailsViewModel internal constructor(
 
     private fun startAiGeneration(
         tmdbId: Int,
-        details: MediaDetails,
-        reviews: List<com.crispy.tv.metadata.tmdb.TmdbReview>,
+        locale: Locale,
         showStory: Boolean,
         announce: Boolean,
     ) {
@@ -361,8 +357,7 @@ class DetailsViewModel internal constructor(
                         aiRepository.generate(
                             tmdbId = tmdbId,
                             mediaType = requestedMediaType,
-                            details = details,
-                            reviews = reviews,
+                            locale = locale,
                         )
                     }
                 }.onSuccess { result ->
@@ -1657,12 +1652,7 @@ class DetailsViewModel internal constructor(
                         )
 
                     val aiSettingsStore = AiInsightsSettingsStore(appContext)
-                    val aiRepository =
-                        AiInsightsRepository(
-                            openRouterClient = OpenRouterClient(httpClient = httpClient, xTitle = "Crispy Rewrite Android"),
-                            settingsStore = aiSettingsStore,
-                            cacheStore = AiInsightsCacheStore(appContext),
-                        )
+                    val aiRepository = AiInsightsRepository.create(appContext, httpClient)
                     return DetailsViewModel(
                         itemId = itemId,
                         mediaType = mediaType,

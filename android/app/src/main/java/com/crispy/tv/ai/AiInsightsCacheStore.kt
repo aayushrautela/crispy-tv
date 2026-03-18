@@ -5,13 +5,18 @@ import android.content.SharedPreferences
 import com.crispy.tv.player.MetadataLabMediaType
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 class AiInsightsCacheStore(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun load(tmdbId: Int, mediaType: MetadataLabMediaType): AiInsightsResult? {
-        val raw = prefs.getString(keyFor(mediaType, tmdbId), null) ?: return null
+    fun load(
+        tmdbId: Int,
+        mediaType: MetadataLabMediaType,
+        locale: Locale = Locale.getDefault(),
+    ): AiInsightsResult? {
+        val raw = prefs.getString(keyFor(mediaType, tmdbId, locale), null) ?: return null
         val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
 
         val trivia = json.optString("trivia", "").trim()
@@ -33,7 +38,12 @@ class AiInsightsCacheStore(context: Context) {
         return AiInsightsResult(insights = insights, trivia = trivia)
     }
 
-    fun save(tmdbId: Int, mediaType: MetadataLabMediaType, result: AiInsightsResult) {
+    fun save(
+        tmdbId: Int,
+        mediaType: MetadataLabMediaType,
+        locale: Locale = Locale.getDefault(),
+        result: AiInsightsResult,
+    ) {
         val json = JSONObject()
         val insightsArray = JSONArray()
         result.insights.forEach { card ->
@@ -48,14 +58,15 @@ class AiInsightsCacheStore(context: Context) {
         json.put("insights", insightsArray)
         json.put("trivia", result.trivia)
 
-        prefs.edit().putString(keyFor(mediaType, tmdbId), json.toString()).apply()
+        prefs.edit().putString(keyFor(mediaType, tmdbId, locale), json.toString()).apply()
     }
 
-    private fun keyFor(mediaType: MetadataLabMediaType, tmdbId: Int): String =
-        "$CACHE_PREFIX${mediaType.name}_$tmdbId"
+    private fun keyFor(mediaType: MetadataLabMediaType, tmdbId: Int, locale: Locale): String =
+        "$CACHE_PREFIX${mediaType.name}_$tmdbId_${locale.toLanguageTag().ifBlank { DEFAULT_LOCALE_TAG }}"
 
     companion object {
         private const val PREFS_NAME = "ai_insights_cache"
-        private const val CACHE_PREFIX = "ai_ins_"
+        private const val CACHE_PREFIX = "ai_ins_v2_"
+        private const val DEFAULT_LOCALE_TAG = "en-US"
     }
 }

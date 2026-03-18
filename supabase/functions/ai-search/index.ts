@@ -187,7 +187,7 @@ function configuredPublicApiKey(): string {
 }
 
 function configuredOpenRouterModel(): string {
-  return Deno.env.get("AI_SEARCH_OPENROUTER_MODEL")?.trim() || "arcee-ai/trinity-large-preview:free";
+  return requireEnv("AI_SEARCH_OPENROUTER_MODEL");
 }
 
 function errorMessage(error: unknown, fallback: string): string {
