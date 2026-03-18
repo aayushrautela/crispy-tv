@@ -73,6 +73,7 @@ fun SearchRoute(
     val resultsGridState = rememberLazyGridState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val isAiMode = uiState.searchMode == SearchMode.AI
 
     LaunchedEffect(scrollToTopRequest, uiState.hasActiveResults) {
         if (scrollToTopRequest > 0) {
@@ -95,7 +96,8 @@ fun SearchRoute(
                 onAiSearch = viewModel::submitAiSearch,
                 onClear = viewModel::clearSearch,
                 onOpenAccountsProfiles = onOpenAccountsProfiles,
-                isAiActive = uiState.searchMode == SearchMode.AI && uiState.hasActiveResults,
+                isAiActive = isAiMode && uiState.hasActiveResults,
+                isAiLoading = isAiMode && uiState.isLoading,
             )
         },
     ) { paddingValues ->

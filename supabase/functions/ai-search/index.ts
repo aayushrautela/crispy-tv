@@ -12,10 +12,9 @@ type SearchRequest = {
   locale?: unknown;
 };
 
-type SearchCandidate = {
-  media_type?: unknown;
-  title?: unknown;
-  year?: unknown;
+type QueryAnalysis = {
+  isRecommendation: boolean;
+  anchorHint: string | null;
 };
 
 type TmdbItem = {
@@ -29,8 +28,30 @@ type TmdbItem = {
   overview: string | null;
 };
 
+type ResolvedSuggestion = {
+  sourceTitle: string;
+  item: TmdbItem;
+};
+
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/";
+const FINAL_RESULT_LIMIT = 12;
+const RAW_SUGGESTION_LIMIT = 16;
+const TITLE_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "at",
+  "for",
+  "from",
+  "in",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+  "with",
+]);
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -58,6 +79,7 @@ Deno.serve(async (request) => {
     const profileId = normalizeString(body.profileId);
     const filter = normalizeFilter(body.filter);
     const locale = normalizeLocale(body.locale);
+    const analysis = analyzeQuery(query);
 
     if (!query) {
       return jsonResponse(400, { error: "Query is required." });
@@ -121,37 +143,30 @@ Deno.serve(async (request) => {
       });
     }
 
-    const model = selectModel(
-      settings["ai.insights.model_type"],
-      settings["ai.insights.custom_model_name"],
-    );
+    const model = configuredOpenRouterModel();
 
-    const seedItems = await fetchSeedItems(query, filter, locale, tmdbApiKey);
-    let aiCandidates: Array<{ mediaType: CandidateMediaType; title: string; year: number | null }> = [];
+    let suggestedTitles: string[] = [];
     try {
-      aiCandidates = await generateCandidates({
+      suggestedTitles = await generateSuggestions({
+        analysis,
         query,
         filter,
         locale,
         model,
         openRouterKey,
-        seedItems,
       });
     } catch (error) {
-      console.error("OpenRouter candidate generation failed", error);
+      console.error("OpenRouter title suggestion failed", error);
+      return jsonResponse(502, {
+        error: errorMessage(error, "AI search is unavailable right now."),
+      });
     }
 
-    let resolvedItems: TmdbItem[] = [];
-    try {
-      resolvedItems = await resolveCandidates(aiCandidates, locale, tmdbApiKey);
-    } catch (error) {
-      console.error("TMDB candidate resolution failed", error);
-    }
-    const mergedItems = dedupeItems([...resolvedItems, ...seedItems]).slice(0, 12);
+    const resolvedSuggestions = await resolveSuggestions(suggestedTitles, filter, locale, tmdbApiKey);
+    const finalItems = finalizeResolvedItems(resolvedSuggestions, analysis);
 
     return jsonResponse(200, {
-      items: mergedItems,
-      fallbackUsed: resolvedItems.length === 0,
+      items: finalItems,
     });
   } catch (error) {
     console.error("ai-search failed", error);
@@ -169,6 +184,20 @@ function requireEnv(name: string): string {
 
 function configuredPublicApiKey(): string {
   return requireEnv("SB_PUBLISHABLE_KEY");
+}
+
+function configuredOpenRouterModel(): string {
+  return Deno.env.get("AI_SEARCH_OPENROUTER_MODEL")?.trim() || "arcee-ai/trinity-large-preview:free";
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    if (message) {
+      return message;
+    }
+  }
+  return fallback;
 }
 
 function normalizeString(value: unknown): string {
@@ -216,74 +245,47 @@ function toStringMap(value: unknown): Record<string, string> {
   return result;
 }
 
-function selectModel(rawType: string | undefined, rawCustomModel: string | undefined): string {
-  const modelType = (rawType ?? "").trim().toLowerCase();
-  const customModel = (rawCustomModel ?? "").trim();
-  switch (modelType) {
-    case "nvidia-nemotron":
-      return "nvidia/nemotron-3-nano-30b-a3b:free";
-    case "custom":
-      return customModel || "deepseek/deepseek-r1-0528:free";
-    case "deepseek-r1":
-    default:
-      return "deepseek/deepseek-r1-0528:free";
-  }
-}
-
-async function fetchSeedItems(
-  query: string,
-  filter: SearchFilter,
-  locale: string,
-  tmdbApiKey: string,
-): Promise<TmdbItem[]> {
-  const params = {
-    query,
-    page: "1",
-    include_adult: "false",
-    language: locale,
-  };
-
-  if (filter === "movies") {
-    return searchTmdb("movie", params, tmdbApiKey);
-  }
-  if (filter === "series") {
-    return searchTmdb("tv", params, tmdbApiKey);
-  }
-
-  const [movies, series] = await Promise.all([
-    searchTmdb("movie", params, tmdbApiKey),
-    searchTmdb("tv", params, tmdbApiKey),
-  ]);
-  return interleave(movies, series);
-}
-
-async function generateCandidates(args: {
+async function generateSuggestions(args: {
+  analysis: QueryAnalysis;
   query: string;
   filter: SearchFilter;
   locale: string;
   model: string;
   openRouterKey: string;
-  seedItems: TmdbItem[];
-}): Promise<Array<{ mediaType: CandidateMediaType; title: string; year: number | null }>> {
-  const seedLines = args.seedItems
-    .slice(0, 8)
-    .map((item, index) => `${index + 1}. ${item.mediaType}|${item.title}|${item.year ?? "unknown"}`)
-    .join("\n");
-
-  const prompt = [
-    "You help a streaming app turn natural-language search into concrete TMDB titles.",
+}): Promise<string[]> {
+  const promptLines = [
+    "You help a streaming app answer what-to-watch questions like a smart friend.",
     `User query: ${args.query}`,
-    `Requested filter: ${args.filter}`,
-    `Locale: ${args.locale}`,
-    "If the query looks like an exact title search, keep the exact title first.",
-    "If the query is descriptive, suggest the strongest matching real titles.",
-    "Allowed media_type values: movie, tv.",
-    "Return at most 8 items.",
-    "Return ONLY a JSON object with this shape:",
-    '{"items":[{"media_type":"movie","title":"Title","year":2024}]}',
-    "TMDB seed matches:",
-    seedLines || "No direct TMDB seed matches.",
-  ].join("\n\n");
+    `Catalog scope: ${catalogScopeInstruction(args.filter)}`,
+    `Preferred locale: ${args.locale}`,
+    "Suggest real released titles only.",
+    "Prefer canonical English title names that TMDB is likely to recognize.",
+  ];
+
+  if (args.analysis.isRecommendation) {
+    promptLines.push("This is a recommendation query, not a direct title lookup.");
+    if (args.analysis.anchorHint) {
+      promptLines.push(`Anchor phrase: ${args.analysis.anchorHint}`);
+    }
+    promptLines.push(`Return up to ${RAW_SUGGESTION_LIMIT} genuinely diverse titles.`);
+    promptLines.push("Do not include the exact title or closest obvious match the user already asked about.");
+    promptLines.push("Include at most one title from the same franchise, collection, series, or shared universe.");
+    promptLines.push(
+      "Avoid sequels, prequels, spinoffs, reboots, or multiple entries from the same property unless the user explicitly asks for that property.",
+    );
+    promptLines.push(
+      "If you include one franchise-adjacent pick, use the rest of the list for broader nearby recommendations with similar tone, audience, world, genre, or premise.",
+    );
+  } else {
+    promptLines.push("If the query sounds like a direct title lookup, include that title first.");
+    promptLines.push(`Return up to ${RAW_SUGGESTION_LIMIT} distinct titles.`);
+  }
+
+  promptLines.push("Do not include years, media types, numbering, commentary, or markdown.");
+  promptLines.push("Return ONLY a JSON object with this shape:");
+  promptLines.push('{"items":["Title One","Title Two"]}');
+
+  const prompt = promptLines.join("\n\n");
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
@@ -314,7 +316,7 @@ async function generateCandidates(args: {
   if (!response.ok) {
     const errorBody = await response.text();
     console.error("OpenRouter request failed", response.status, errorBody);
-    throw new Error("OpenRouter request failed.");
+    throw new Error(extractProviderMessage(errorBody) ?? "OpenRouter request failed.");
   }
 
   const payload = await response.json().catch(() => ({}));
@@ -328,69 +330,247 @@ async function generateCandidates(args: {
     parsed = JSON.parse(extractJsonObject(content)) as Record<string, unknown>;
   } catch (error) {
     console.error("OpenRouter returned invalid JSON", error, content);
-    return [];
+    throw new Error("AI search returned invalid data.");
   }
   const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  return items
-    .map((item: SearchCandidate) => normalizeCandidate(item, args.filter))
-    .filter((item): item is { mediaType: CandidateMediaType; title: string; year: number | null } => item !== null);
-}
-
-function normalizeCandidate(
-  candidate: SearchCandidate,
-  requestedFilter: SearchFilter,
-): { mediaType: CandidateMediaType; title: string; year: number | null } | null {
-  const title = typeof candidate.title === "string" ? candidate.title.trim() : "";
-  if (!title) {
-    return null;
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const title = normalizeSuggestedTitle(item);
+    if (!title) {
+      continue;
+    }
+    const key = normalizeTitle(title);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    titles.push(title);
   }
-
-  const rawMediaType = typeof candidate.media_type === "string"
-    ? candidate.media_type.trim().toLowerCase()
-    : "";
-
-  const mediaType = requestedFilter === "movies"
-    ? "movie"
-    : requestedFilter === "series"
-    ? "tv"
-    : rawMediaType === "tv"
-    ? "tv"
-    : "movie";
-
-  const rawYear = typeof candidate.year === "number"
-    ? candidate.year
-    : typeof candidate.year === "string"
-    ? Number.parseInt(candidate.year, 10)
-    : Number.NaN;
-  const year = Number.isInteger(rawYear) && rawYear >= 1800 && rawYear <= 3000 ? rawYear : null;
-
-  return { mediaType, title, year };
+  return titles;
 }
 
-async function resolveCandidates(
-  candidates: Array<{ mediaType: CandidateMediaType; title: string; year: number | null }>,
+function catalogScopeInstruction(filter: SearchFilter): string {
+  switch (filter) {
+    case "movies":
+      return "Only suggest movies.";
+    case "series":
+      return "Only suggest TV shows.";
+    default:
+      return "You may suggest movies or TV shows.";
+  }
+}
+
+function normalizeSuggestedTitle(value: unknown): string | null {
+  const raw = typeof value === "string"
+    ? value
+    : value && typeof value === "object" && typeof (value as Record<string, unknown>).title === "string"
+    ? String((value as Record<string, unknown>).title)
+    : "";
+  const normalized = raw
+    .trim()
+    .replace(/^\d+[.)\-:\s]+/, "")
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
+  return normalized || null;
+}
+
+async function resolveSuggestions(
+  titles: string[],
+  filter: SearchFilter,
   locale: string,
   tmdbApiKey: string,
-): Promise<TmdbItem[]> {
-  const resolved: TmdbItem[] = [];
-  for (const candidate of candidates) {
-    const params: Record<string, string> = {
-      query: candidate.title,
-      page: "1",
-      include_adult: "false",
-      language: locale,
-    };
-    if (candidate.year != null) {
-      params[candidate.mediaType === "movie" ? "year" : "first_air_date_year"] = String(candidate.year);
-    }
+): Promise<ResolvedSuggestion[]> {
+  const resolved = await Promise.all(
+    titles.map(async (title) => {
+      const item = await resolveSuggestion(title, filter, locale, tmdbApiKey);
+      return item ? { sourceTitle: title, item } : null;
+    }),
+  );
+  return resolved.filter((item): item is ResolvedSuggestion => item !== null);
+}
 
-    const results = await searchTmdb(candidate.mediaType, params, tmdbApiKey);
-    const best = selectBestTmdbMatch(results, candidate.title, candidate.year);
-    if (best) {
-      resolved.push(best);
+function finalizeResolvedItems(resolved: ResolvedSuggestion[], analysis: QueryAnalysis): TmdbItem[] {
+  const unique = dedupeResolvedSuggestions(resolved);
+  if (!analysis.isRecommendation) {
+    return unique.map(({ item }) => item).slice(0, FINAL_RESULT_LIMIT);
+  }
+
+  const kept: ResolvedSuggestion[] = [];
+  let skippedAnchor = false;
+
+  for (const suggestion of unique) {
+    if (!skippedAnchor && matchesAnchorSuggestion(suggestion, analysis.anchorHint)) {
+      skippedAnchor = true;
+      continue;
+    }
+    if (kept.some((existing) => isSameTitleFamily(existing.item.title, suggestion.item.title))) {
+      continue;
+    }
+    kept.push(suggestion);
+    if (kept.length >= FINAL_RESULT_LIMIT) {
+      break;
     }
   }
-  return resolved;
+
+  return kept.map(({ item }) => item);
+}
+
+function dedupeResolvedSuggestions(items: ResolvedSuggestion[]): ResolvedSuggestion[] {
+  const seen = new Set<string>();
+  const result: ResolvedSuggestion[] = [];
+  for (const suggestion of items) {
+    const key = `${suggestion.item.mediaType}:${suggestion.item.id}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(suggestion);
+  }
+  return result;
+}
+
+function analyzeQuery(query: string): QueryAnalysis {
+  return {
+    isRecommendation: isRecommendationQuery(query),
+    anchorHint: extractAnchorHint(query),
+  };
+}
+
+function isRecommendationQuery(query: string): boolean {
+  const normalized = normalizeTitle(query);
+  if (!normalized) {
+    return false;
+  }
+  return [
+    /\blike\b/,
+    /\bsimilar\b/,
+    /\bother than\b/,
+    /\bmore like\b/,
+    /\bsomething like\b/,
+    /\banything like\b/,
+    /\bif i like\b/,
+    /\bif i liked\b/,
+    /\brecommend\b/,
+    /\bwhat should i watch\b/,
+    /\bwhat to watch\b/,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function extractAnchorHint(query: string): string | null {
+  const quoted = [...query.matchAll(/["“”'`](.+?)["“”'`]/g)]
+    .map((match) => cleanAnchorHint(match[1]))
+    .filter((value): value is string => Boolean(value));
+  if (quoted.length > 0) {
+    return quoted.sort((left, right) => right.length - left.length)[0] ?? null;
+  }
+
+  const patterns = [
+    /(?:^|\b)(?:other\s+)?(?:movies?|shows?|series|tv\s+shows?)?\s*(?:like|similar to|more like)\s+(.+)$/i,
+    /(?:^|\b)(?:something|anything)\s+like\s+(.+)$/i,
+    /(?:^|\b)(?:other than|except)\s+(.+)$/i,
+    /(?:^|\b)(?:if i like|if i liked)\s+(.+)$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = query.match(pattern);
+    const anchor = cleanAnchorHint(match?.[1] ?? "");
+    if (anchor) {
+      return anchor;
+    }
+  }
+  return null;
+}
+
+function cleanAnchorHint(value: string): string | null {
+  const withoutQualifiers = value
+    .replace(/[?!.,]+$/g, "")
+    .split(/\b(?:but|except|without)\b/i)[0]
+    ?.trim() ?? "";
+  const cleaned = withoutQualifiers
+    .replace(/^(?:movies?|shows?|series|tv\s+shows?)\s+/i, "")
+    .trim();
+  return cleaned || null;
+}
+
+function matchesAnchorSuggestion(suggestion: ResolvedSuggestion, anchorHint: string | null): boolean {
+  if (!anchorHint) {
+    return false;
+  }
+  const normalizedAnchor = normalizeTitle(anchorHint);
+  if (!normalizedAnchor) {
+    return false;
+  }
+  return titleMatchesAnchor(suggestion.sourceTitle, normalizedAnchor) ||
+    titleMatchesAnchor(suggestion.item.title, normalizedAnchor);
+}
+
+function titleMatchesAnchor(title: string, normalizedAnchor: string): boolean {
+  const normalizedTitle = normalizeTitle(title);
+  if (!normalizedTitle) {
+    return false;
+  }
+  if (normalizedTitle === normalizedAnchor) {
+    return true;
+  }
+
+  const anchorTokens = titleTokens(normalizedAnchor);
+  if (anchorTokens.length <= 1) {
+    return false;
+  }
+
+  const shared = sharedTitleTokenCount(normalizedTitle, normalizedAnchor);
+  if (shared >= anchorTokens.length) {
+    return true;
+  }
+  return anchorTokens.length >= 3 &&
+    (normalizedTitle.startsWith(normalizedAnchor) || normalizedAnchor.startsWith(normalizedTitle));
+}
+
+function isSameTitleFamily(leftTitle: string, rightTitle: string): boolean {
+  const leftKey = titleFamilyKey(leftTitle);
+  const rightKey = titleFamilyKey(rightTitle);
+  return Boolean(leftKey && rightKey && leftKey === rightKey);
+}
+
+function titleFamilyKey(title: string): string | null {
+  const prefix = title.split(/[:\-]/, 1)[0] ?? title;
+  const tokens = titleTokens(normalizeTitle(prefix)).filter((token) => !TITLE_STOP_WORDS.has(token));
+  if (tokens.length === 0) {
+    return null;
+  }
+  return tokens.slice(0, Math.min(2, tokens.length)).join(" ");
+}
+
+async function resolveSuggestion(
+  title: string,
+  filter: SearchFilter,
+  locale: string,
+  tmdbApiKey: string,
+): Promise<TmdbItem | null> {
+  const params: Record<string, string> = {
+    query: title,
+    page: "1",
+    include_adult: "false",
+    language: locale,
+  };
+
+  try {
+    if (filter === "movies") {
+      return selectBestTmdbMatch(await searchTmdb("movie", params, tmdbApiKey), title);
+    }
+    if (filter === "series") {
+      return selectBestTmdbMatch(await searchTmdb("tv", params, tmdbApiKey), title);
+    }
+
+    const [movies, series] = await Promise.all([
+      searchTmdb("movie", params, tmdbApiKey),
+      searchTmdb("tv", params, tmdbApiKey),
+    ]);
+    return selectBestTmdbMatch([...movies, ...series], title);
+  } catch (error) {
+    console.error("TMDB suggestion resolution failed", { title, error });
+    return null;
+  }
 }
 
 async function searchTmdb(
@@ -450,32 +630,47 @@ function toTmdbItem(item: Record<string, unknown>, mediaType: CandidateMediaType
   };
 }
 
-function selectBestTmdbMatch(items: TmdbItem[], title: string, year: number | null): TmdbItem | null {
+function selectBestTmdbMatch(items: TmdbItem[], title: string): TmdbItem | null {
   const normalizedTarget = normalizeTitle(title);
   const sorted = [...items].sort((left, right) => {
-    const leftScore = scoreTmdbMatch(left, normalizedTarget, year);
-    const rightScore = scoreTmdbMatch(right, normalizedTarget, year);
+    const leftScore = scoreTmdbMatch(left, normalizedTarget);
+    const rightScore = scoreTmdbMatch(right, normalizedTarget);
     return rightScore - leftScore;
   });
   return sorted[0] ?? null;
 }
 
-function scoreTmdbMatch(item: TmdbItem, normalizedTarget: string, year: number | null): number {
+function scoreTmdbMatch(item: TmdbItem, normalizedTarget: string): number {
   let score = 0;
   const normalizedTitle = normalizeTitle(item.title);
   if (normalizedTitle === normalizedTarget) {
-    score += 100;
+    score += 120;
   } else if (normalizedTitle.startsWith(normalizedTarget) || normalizedTarget.startsWith(normalizedTitle)) {
-    score += 60;
-  }
-
-  if (year != null && item.year === String(year)) {
+    score += 80;
+  } else if (normalizedTitle.includes(normalizedTarget) || normalizedTarget.includes(normalizedTitle)) {
     score += 40;
   }
+
+  score += Math.min(sharedTitleTokenCount(normalizedTitle, normalizedTarget) * 12, 36);
   if (item.posterUrl) {
     score += 10;
   }
   return score;
+}
+
+function sharedTitleTokenCount(left: string, right: string): number {
+  const leftTokens = new Set(titleTokens(left));
+  let shared = 0;
+  for (const token of titleTokens(right)) {
+    if (leftTokens.has(token)) {
+      shared += 1;
+    }
+  }
+  return shared;
+}
+
+function titleTokens(value: string): string[] {
+  return value.split(" ").filter((token) => token.length >= 3);
 }
 
 function normalizeTitle(value: string): string {
@@ -492,34 +687,6 @@ function tmdbImageUrl(path: string | null, size: string): string | null {
     return null;
   }
   return `${TMDB_IMAGE_BASE_URL}${size}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function dedupeItems(items: TmdbItem[]): TmdbItem[] {
-  const seen = new Set<string>();
-  const result: TmdbItem[] = [];
-  for (const item of items) {
-    const key = `${item.mediaType}:${item.id}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(item);
-  }
-  return result;
-}
-
-function interleave<T>(first: T[], second: T[]): T[] {
-  const output: T[] = [];
-  const maxLength = Math.max(first.length, second.length);
-  for (let index = 0; index < maxLength; index += 1) {
-    if (index < first.length) {
-      output.push(first[index]);
-    }
-    if (index < second.length) {
-      output.push(second[index]);
-    }
-  }
-  return output;
 }
 
 function extractJsonObject(text: string): string {

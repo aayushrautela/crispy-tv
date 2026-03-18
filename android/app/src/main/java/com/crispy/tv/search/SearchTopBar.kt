@@ -1,5 +1,11 @@
 package com.crispy.tv.search
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -24,15 +30,34 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.theme.Dimensions
+
+private val SearchAiLoadingColors =
+    listOf(
+        Color(0xFF4285F4),
+        Color(0xFF34A853),
+        Color(0xFFFBBC05),
+        Color(0xFFEA4335),
+        Color(0xFF4285F4),
+    )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,8 +69,11 @@ fun SearchTopBar(
     onClear: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     isAiActive: Boolean,
+    isAiLoading: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val searchFieldShape = RoundedCornerShape(28.dp)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -64,9 +92,10 @@ fun SearchTopBar(
             onValueChange = onQueryChange,
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = Dimensions.SearchBarPillHeight),
+                .heightIn(min = Dimensions.SearchBarPillHeight)
+                .then(rememberAiSearchBorderModifier(isAiLoading)),
             singleLine = true,
-            shape = RoundedCornerShape(28.dp),
+            shape = searchFieldShape,
             textStyle = MaterialTheme.typography.bodyLarge,
             placeholder = {
                 Text(
@@ -82,39 +111,124 @@ fun SearchTopBar(
                 )
             },
             trailingIcon = {
-                if (query.isNotBlank()) {
-                    IconButton(onClick = onClear) {
-                        Icon(
-                            imageVector = Icons.Outlined.Clear,
-                            contentDescription = "Clear search",
-                        )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    AiSearchAction(
+                        onClick = onAiSearch,
+                        isHighlighted = isAiActive || isAiLoading,
+                    )
+
+                    if (query.isNotBlank()) {
+                        IconButton(onClick = onClear) {
+                            Icon(
+                                imageVector = Icons.Outlined.Clear,
+                                contentDescription = "Clear search",
+                            )
+                        }
                     }
                 }
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        )
-        IconButton(
-            onClick = onAiSearch,
-            modifier = Modifier.background(
-                color = if (isAiActive) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-                shape = CircleShape,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
             ),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
-                contentDescription = "AI search",
-                tint = if (isAiActive) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
+        )
         ProfileIconButton(onClick = onOpenAccountsProfiles)
+    }
+}
+
+@Composable
+private fun AiSearchAction(
+    onClick: () -> Unit,
+    isHighlighted: Boolean,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.background(
+            color = if (isHighlighted) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            shape = CircleShape,
+        ),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.AutoAwesome,
+            contentDescription = "AI search",
+            tint = if (isHighlighted) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+}
+
+@Composable
+private fun rememberAiSearchBorderModifier(isAiLoading: Boolean): Modifier {
+    if (!isAiLoading) return Modifier
+
+    val borderSweepTransition = rememberInfiniteTransition(label = "ai_search_border")
+    val borderSweepProgress by borderSweepTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "ai_search_border_progress",
+    )
+    val glowAlpha by borderSweepTransition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 0.42f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "ai_search_border_glow_alpha",
+    )
+
+    return Modifier.drawWithContent {
+        drawContent()
+
+        val strokeWidth = 2.5.dp.toPx()
+        val glowStrokeWidth = 10.dp.toPx()
+        val inset = strokeWidth / 2f
+        val glowInset = glowStrokeWidth / 2f
+        val cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
+        val brush =
+            Brush.linearGradient(
+                colors = SearchAiLoadingColors,
+                start = Offset(x = size.width * (borderSweepProgress - 1f), y = 0f),
+                end = Offset(x = size.width * borderSweepProgress, y = size.height),
+            )
+
+        drawRoundRect(
+            brush = brush,
+            topLeft = Offset(glowInset, glowInset),
+            size = Size(
+                width = size.width - glowStrokeWidth,
+                height = size.height - glowStrokeWidth,
+            ),
+            cornerRadius = cornerRadius,
+            style = Stroke(width = glowStrokeWidth, cap = StrokeCap.Round),
+            alpha = glowAlpha,
+        )
+
+        drawRoundRect(
+            brush = brush,
+            topLeft = Offset(inset, inset),
+            size = Size(
+                width = size.width - strokeWidth,
+                height = size.height - strokeWidth,
+            ),
+            cornerRadius = cornerRadius,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+        )
     }
 }

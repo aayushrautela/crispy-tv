@@ -359,13 +359,13 @@ class SearchViewModel(
                         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                     }
 
-                    @Suppress("UNCHECKED_CAST")
                     val httpClient = AppHttp.client(context)
-                    return SearchViewModel(
+                    val viewModel = SearchViewModel(
                         searchRepository = TmdbServicesProvider.searchRepository(context),
                         aiSearchRepository = AiSearchRepository.create(context, httpClient),
                         searchHistoryStore = SearchHistoryStore(context),
-                    ) as T
+                    )
+                    return modelClass.cast(viewModel)
                 }
             }
         }
