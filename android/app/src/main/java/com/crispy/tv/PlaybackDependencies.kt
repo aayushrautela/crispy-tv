@@ -17,6 +17,7 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.torrent.TorrentEngineClient
 import com.crispy.tv.player.CoreDomainMetadataLabResolver
+import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabResolver
 import com.crispy.tv.player.SupabaseSyncLabService
 import com.crispy.tv.player.WatchHistoryService
@@ -104,7 +105,7 @@ private fun newAddonStreamsService(context: Context): AddonStreamsService {
     )
 }
 
-private fun newEpisodeListProvider(context: Context): TmdbEpisodeListProvider {
+private fun newEpisodeListProvider(context: Context): EpisodeListProvider {
     val appContext = context.applicationContext
     return TmdbEpisodeListProvider(
         tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext),
@@ -169,7 +170,7 @@ object PlaybackDependencies {
     }
 
     @Volatile
-    var episodeListProviderFactory: (Context) -> TmdbEpisodeListProvider = { context ->
+    var episodeListProviderFactory: (Context) -> EpisodeListProvider = { context ->
         newEpisodeListProvider(context)
     }
 

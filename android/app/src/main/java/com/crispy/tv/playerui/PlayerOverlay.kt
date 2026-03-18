@@ -836,7 +836,6 @@ private fun episodeRowMeta(episode: MediaVideo): String? {
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun PlayerStreamsSheet(
     visible: Boolean,

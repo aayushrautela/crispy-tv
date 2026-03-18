@@ -45,7 +45,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal enum class PlayerSurface {
+enum class PlayerSurface {
     NONE,
     INFO,
     STREAMS,
