@@ -41,6 +41,7 @@ import java.util.Locale
 @Immutable
 data class HeroState(
     val items: List<HomeHeroItem> = emptyList(),
+    val selectedId: String? = null,
     val isLoading: Boolean = true,
     val statusMessage: String = "Loading featured content..."
 )
@@ -281,9 +282,15 @@ class HomeViewModel internal constructor(
                 }
                 .toList()
 
+        val selectedId =
+            primarySnapshot.hero.selectedId?.takeIf { id ->
+                heroItems.any { it.id == id }
+            } ?: heroItems.firstOrNull()?.id
+
         return HomePrimarySnapshot(
             hero = HeroState(
                 items = heroItems,
+                selectedId = selectedId,
                 isLoading = false,
                 statusMessage = primaryFeedResult.heroResult.statusMessage,
             ),

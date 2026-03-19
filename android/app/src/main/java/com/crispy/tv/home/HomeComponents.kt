@@ -1016,6 +1016,7 @@ private val homeCollectionTitleFontFamily = FontFamily(
     )
 )
 
+@Composable
 internal fun HomeCatalogPosterCard(
     item: CatalogItem,
     onClick: () -> Unit
@@ -1234,13 +1235,19 @@ internal fun HomeHeroSkeleton() {
 @Composable
 internal fun HomeHeroCarousel(
     items: List<HomeHeroItem>,
+    selectedId: String?,
     onItemClick: (HomeHeroItem) -> Unit
 ) {
     if (items.isEmpty()) {
         return
     }
 
-    val state = rememberCarouselState { items.size }
+    val initialIndex = remember(selectedId, items) {
+        selectedId?.let { id ->
+            items.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: 0
+        } ?: 0
+    }
+    val state = rememberCarouselState(initialItem = initialIndex) { items.size }
 
     HorizontalMultiBrowseCarousel(
         state = state,

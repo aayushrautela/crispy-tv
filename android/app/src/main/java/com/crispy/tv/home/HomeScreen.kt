@@ -291,6 +291,7 @@ private fun HomeHeroSection(
         else -> {
             HomeHeroCarousel(
                 items = state.items,
+                selectedId = state.selectedId,
                 onItemClick = onHeroClick,
             )
         }
