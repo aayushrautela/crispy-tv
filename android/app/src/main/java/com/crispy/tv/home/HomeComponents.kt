@@ -696,10 +696,7 @@ private fun HomeCollectionCard(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(128.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
                 if (logoModel != null) {
@@ -708,8 +705,8 @@ private fun HomeCollectionCard(
                         contentDescription = sectionUi.section.displayTitle,
                         modifier = Modifier
                             .fillMaxWidth(0.82f)
-                            .height(80.dp)
-                            .padding(horizontal = 12.dp),
+                            .height(72.dp)
+                            .padding(vertical = 4.dp),
                         contentScale = ContentScale.Fit,
                         alignment = Alignment.Center,
                     )

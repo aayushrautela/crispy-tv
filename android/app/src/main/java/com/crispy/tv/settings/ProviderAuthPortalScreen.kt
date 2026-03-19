@@ -39,6 +39,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.oauth.PendingOAuthStore
+import com.crispy.tv.player.ProviderAuthActionResult
+import com.crispy.tv.player.ProviderAuthStartResult
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
@@ -56,52 +59,37 @@ data class ProviderPortalUiState(
     val simklRedirectUri: String = BuildConfig.SIMKL_REDIRECT_URI,
     val statusMessage: String = "Connect providers to enable sync, continue watching, library, and comments.",
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
-    val pendingExternalUrl: String? = null
+    val pendingExternalUrl: String? = null,
 )
 
 private data class ProviderPortalAction(
     val label: String,
-    val onClick: () -> Unit
+    val onClick: () -> Unit,
 )
 
 internal class ProviderPortalViewModel(
-    private val watchHistoryService: WatchHistoryService
+    private val watchHistoryService: WatchHistoryService,
+    private val pendingOAuthStore: PendingOAuthStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProviderPortalUiState())
     val uiState: StateFlow<ProviderPortalUiState> = _uiState
 
     init {
         refreshAuthState(
-            message = "Connect providers to enable sync, continue watching, library, and comments.",
+            message = consumePendingStatusMessage(),
             forceRefresh = false,
         )
     }
 
     fun connectTrakt() {
-        viewModelScope.launch {
-            val start = watchHistoryService.beginTraktOAuth()
-            if (start == null) {
-                _uiState.update {
-                    it.copy(statusMessage = "Trakt OAuth is not configured. Set TRAKT_CLIENT_ID, TRAKT_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.")
-                }
-                return@launch
-            }
-            _uiState.update {
-                it.copy(
-                    statusMessage = start.statusMessage,
-                    pendingExternalUrl = start.authorizationUrl
-                )
-            }
-        }
+        launchProviderOAuth(
+            begin = { watchHistoryService.beginTraktOAuth() },
+            missingConfigMessage = "Trakt OAuth is not configured. Set TRAKT_CLIENT_ID, TRAKT_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.",
+        )
     }
 
     fun disconnectTrakt() {
-        viewModelScope.launch {
-            val result = watchHistoryService.disconnectProvider(WatchProvider.TRAKT)
-            _uiState.update {
-                it.copy(authState = result.authState, statusMessage = result.statusMessage)
-            }
-        }
+        disconnectProvider(WatchProvider.TRAKT)
     }
 
     fun consumePendingExternalUrl() {
@@ -112,48 +100,66 @@ internal class ProviderPortalViewModel(
         _uiState.update {
             it.copy(
                 pendingExternalUrl = null,
-                statusMessage = message
+                statusMessage = message,
             )
         }
     }
 
     fun connectSimkl() {
-        viewModelScope.launch {
-            val start = watchHistoryService.beginSimklOAuth()
-            if (start == null) {
-                _uiState.update {
-                    it.copy(statusMessage = "Simkl OAuth is not configured. Set SIMKL_CLIENT_ID, SIMKL_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.")
-                }
-                return@launch
-            }
-            _uiState.update {
-                it.copy(
-                    statusMessage = start.statusMessage,
-                    pendingExternalUrl = start.authorizationUrl
-                )
-            }
-        }
+        launchProviderOAuth(
+            begin = { watchHistoryService.beginSimklOAuth() },
+            missingConfigMessage = "Simkl OAuth is not configured. Set SIMKL_CLIENT_ID, SIMKL_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.",
+        )
     }
 
     fun disconnectSimkl() {
-        viewModelScope.launch {
-            val result = watchHistoryService.disconnectProvider(WatchProvider.SIMKL)
-            _uiState.update {
-                it.copy(authState = result.authState, statusMessage = result.statusMessage)
-            }
-        }
+        disconnectProvider(WatchProvider.SIMKL)
     }
 
     fun refreshAuthState(message: String? = null, forceRefresh: Boolean = true) {
         viewModelScope.launch {
             val result = watchHistoryService.refreshProviderAuthState(forceRefresh = forceRefresh)
+            applyActionResult(result, message)
+        }
+    }
+
+    private fun disconnectProvider(provider: WatchProvider) {
+        viewModelScope.launch {
+            applyActionResult(watchHistoryService.disconnectProvider(provider))
+        }
+    }
+
+    private fun launchProviderOAuth(
+        begin: suspend () -> ProviderAuthStartResult?,
+        missingConfigMessage: String,
+    ) {
+        viewModelScope.launch {
+            val start = begin()
+            if (start == null) {
+                _uiState.update { it.copy(statusMessage = missingConfigMessage) }
+                return@launch
+            }
             _uiState.update {
                 it.copy(
-                    authState = result.authState,
-                    statusMessage = message ?: result.statusMessage.ifBlank { it.statusMessage }
+                    statusMessage = start.statusMessage,
+                    pendingExternalUrl = start.authorizationUrl,
                 )
             }
         }
+    }
+
+    private fun applyActionResult(result: ProviderAuthActionResult, messageOverride: String? = null) {
+        _uiState.update { current ->
+            current.copy(
+                authState = result.authState,
+                statusMessage = messageOverride ?: result.statusMessage.ifBlank { current.statusMessage },
+            )
+        }
+    }
+
+    private fun consumePendingStatusMessage(): String {
+        return pendingOAuthStore.consumePendingErrorMessage()
+            ?: "Connect providers to enable sync, continue watching, library, and comments."
     }
 
     companion object {
@@ -165,6 +171,7 @@ internal class ProviderPortalViewModel(
                         @Suppress("UNCHECKED_CAST")
                         return ProviderPortalViewModel(
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                            pendingOAuthStore = PendingOAuthStore(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -205,7 +212,7 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
         onConnectSimkl = viewModel::connectSimkl,
         onDisconnectSimkl = viewModel::disconnectSimkl,
         onRefresh = { viewModel.refreshAuthState(forceRefresh = true) },
-        onBack = onBack
+        onBack = onBack,
     )
 }
 
@@ -218,7 +225,7 @@ private fun ProviderAuthPortalScreen(
     onConnectSimkl: () -> Unit,
     onDisconnectSimkl: () -> Unit,
     onRefresh: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
@@ -231,7 +238,7 @@ private fun ProviderAuthPortalScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
                         )
                     }
                 },
@@ -239,7 +246,7 @@ private fun ProviderAuthPortalScreen(
                     IconButton(onClick = onRefresh) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
-                            contentDescription = "Refresh"
+                            contentDescription = "Refresh",
                         )
                     }
                 },
@@ -255,15 +262,15 @@ private fun ProviderAuthPortalScreen(
                 start = pageHorizontalPadding,
                 top = 12.dp,
                 end = pageHorizontalPadding,
-                bottom = 12.dp
+                bottom = 12.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 Text(
                     text = uiState.statusMessage,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -274,7 +281,7 @@ private fun ProviderAuthPortalScreen(
                     userHandle = uiState.authState.traktSession?.userHandle,
                     expiresAtEpochMs = uiState.authState.traktSession?.expiresAtEpochMs,
                     connectAction = ProviderPortalAction("Connect Trakt OAuth", onConnectTrakt),
-                    disconnectAction = ProviderPortalAction("Disconnect Trakt", onDisconnectTrakt)
+                    disconnectAction = ProviderPortalAction("Disconnect Trakt", onDisconnectTrakt),
                 )
             }
 
@@ -282,7 +289,7 @@ private fun ProviderAuthPortalScreen(
                 Text(
                     text = "Trakt redirect URI: ${uiState.traktRedirectUri}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -293,7 +300,7 @@ private fun ProviderAuthPortalScreen(
                     userHandle = uiState.authState.simklSession?.userHandle,
                     expiresAtEpochMs = null,
                     connectAction = ProviderPortalAction("Connect Simkl OAuth", onConnectSimkl),
-                    disconnectAction = ProviderPortalAction("Disconnect Simkl", onDisconnectSimkl)
+                    disconnectAction = ProviderPortalAction("Disconnect Simkl", onDisconnectSimkl),
                 )
             }
 
@@ -301,7 +308,7 @@ private fun ProviderAuthPortalScreen(
                 Text(
                     text = "Simkl redirect URI: ${uiState.simklRedirectUri}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -316,37 +323,37 @@ private fun ProviderCard(
     userHandle: String?,
     expiresAtEpochMs: Long?,
     connectAction: ProviderPortalAction,
-    disconnectAction: ProviderPortalAction
+    disconnectAction: ProviderPortalAction,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = if (connected) "Connected" else "Disconnected",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (!userHandle.isNullOrBlank()) {
                 Text(
                     text = "User: $userHandle",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (expiresAtEpochMs != null) {
                 Text(
                     text = "Token expiry: $expiresAtEpochMs",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 

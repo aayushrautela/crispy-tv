@@ -76,6 +76,14 @@ internal class PendingOAuthStore(context: Context) {
         editor.apply()
     }
 
+    fun consumePendingErrorMessage(): String? {
+        val message = prefs.getString(KEY_PENDING_ERROR_MESSAGE, null)?.trim()?.ifBlank { null }
+        if (message != null) {
+            prefs.edit().remove(KEY_PENDING_ERROR_MESSAGE).apply()
+        }
+        return message
+    }
+
     private fun parseProvider(raw: String?): WatchProvider? {
         val normalized = raw?.trim().orEmpty()
         return when {

@@ -107,20 +107,6 @@ internal class ProviderSessionStore(
         )
     }
 
-    fun clearPendingTraktOAuth() {
-        prefs.edit().apply {
-            remove(KEY_TRAKT_OAUTH_STATE)
-            remove(KEY_TRAKT_OAUTH_CODE_VERIFIER)
-        }.apply()
-    }
-
-    fun clearPendingSimklOAuth() {
-        prefs.edit().apply {
-            remove(KEY_SIMKL_OAUTH_STATE)
-            remove(KEY_SIMKL_OAUTH_CODE_VERIFIER)
-        }.apply()
-    }
-
     fun readSecret(key: String): String {
         val stored = prefs.getString(key, null)?.trim().orEmpty()
         if (stored.isBlank()) return ""
@@ -138,17 +124,6 @@ internal class ProviderSessionStore(
             prefs.edit().putString(key, KeystoreSecretStore.encryptForPrefs(stored)).apply()
         }
         return stored
-    }
-
-    fun writeEncryptedSecret(key: String, plaintext: String?) {
-        val normalized = plaintext?.trim()?.ifBlank { null }
-        prefs.edit().apply {
-            if (normalized == null) {
-                remove(key)
-            } else {
-                putString(key, KeystoreSecretStore.encryptForPrefs(normalized))
-            }
-        }.apply()
     }
 
     fun traktAccessToken(): String {
