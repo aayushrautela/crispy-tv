@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.domain.home.HomeCatalogPresentation
@@ -21,6 +22,7 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.network.AppHttp
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import kotlinx.coroutines.CancellationException
@@ -80,6 +82,7 @@ class HomeViewModel internal constructor(
         private const val TAG = "HomeViewModel"
         private const val SECTION_SKELETON_MIN_DURATION_MS = 150L
         private const val BACKGROUND_REFRESH_DEBOUNCE_MS = 60_000L
+        private const val HOME_PROVIDER_CONTINUE_WATCHING_LIMIT = 30
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -88,6 +91,12 @@ class HomeViewModel internal constructor(
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
                         val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
+                        val calendarMetaEpisodeService =
+                            CalendarMetaEpisodeService(
+                                context = appContext,
+                                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                                httpClient = AppHttp.client(appContext),
+                            )
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
@@ -100,6 +109,7 @@ class HomeViewModel internal constructor(
                             calendarService = CalendarService(
                                 watchHistoryService = watchHistoryService,
                                 tmdbEnrichmentRepository = tmdbEnrichmentRepository,
+                                metaEpisodeService = calendarMetaEpisodeService,
                             ),
                             tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
@@ -412,7 +422,7 @@ class HomeViewModel internal constructor(
                             selectedSource = selectedSource,
                             localEntries = filteredEntries,
                             providerResult = filteredProviderResult,
-                            limit = 20,
+                            limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
                             enrichMetadata = enrichMetadata,
                         )
                     }
@@ -508,7 +518,7 @@ class HomeViewModel internal constructor(
             WatchProvider.LOCAL -> ContinueWatchingResult(statusMessage = "")
             WatchProvider.TRAKT, WatchProvider.SIMKL -> {
                 watchHistoryService.listContinueWatching(
-                    limit = 20,
+                    limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
                     source = selectedSource,
                 )
             }

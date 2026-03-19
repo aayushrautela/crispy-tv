@@ -1,5 +1,6 @@
 package com.crispy.tv.home
 
+import com.crispy.tv.BuildConfig
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.network.AppHttp
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -101,10 +103,17 @@ private class CalendarViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
                     val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
+                    val calendarMetaEpisodeService =
+                        CalendarMetaEpisodeService(
+                            context = appContext,
+                            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
+                            httpClient = AppHttp.client(appContext),
+                        )
                     return CalendarViewModel(
                         calendarService = CalendarService(
                             watchHistoryService = watchHistoryService,
                             tmdbEnrichmentRepository = tmdbEnrichmentRepository,
+                            metaEpisodeService = calendarMetaEpisodeService,
                         )
                     ) as T
                 }

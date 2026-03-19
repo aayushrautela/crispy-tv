@@ -65,6 +65,13 @@ data class ContinueWatchingResult(
     val isError: Boolean = false,
 )
 
+data class WatchedEpisodeRecord(
+    val contentId: String,
+    val season: Int,
+    val episode: Int,
+    val watchedAtEpochMs: Long,
+)
+
 data class ProviderLibraryFolder(
     val id: String,
     val label: String,
@@ -254,6 +261,12 @@ interface WatchHistoryService {
         source: WatchProvider? = null
     ): ContinueWatchingResult {
         return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.", isError = true)
+    }
+
+    suspend fun listWatchedEpisodeRecords(
+        source: WatchProvider? = null,
+    ): List<WatchedEpisodeRecord> {
+        return emptyList()
     }
 
     suspend fun listProviderLibrary(

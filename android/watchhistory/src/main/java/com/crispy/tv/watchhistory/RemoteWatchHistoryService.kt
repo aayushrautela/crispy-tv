@@ -14,6 +14,7 @@ import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.ProviderLibrarySnapshot
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.player.WatchedEpisodeRecord
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
@@ -31,7 +32,6 @@ import com.crispy.tv.watchhistory.oauth.OAuthCallbackParser
 import com.crispy.tv.watchhistory.oauth.OAuthStateStore
 import com.crispy.tv.watchhistory.oauth.Pkce
 import com.crispy.tv.watchhistory.provider.ProviderRouter
-import com.crispy.tv.watchhistory.provider.ContinueWatchingNormalizer
 import com.crispy.tv.watchhistory.simkl.SimklOAuthClient
 import com.crispy.tv.watchhistory.simkl.SimklService
 import com.crispy.tv.watchhistory.simkl.SimklWatchHistoryProvider
@@ -137,7 +137,6 @@ class RemoteWatchHistoryService(
             simklClientId = simklClientId,
         )
     private val providerRouter = ProviderRouter(traktProvider = traktProvider, simklProvider = simklProvider)
-    private val continueWatchingNormalizer = ContinueWatchingNormalizer()
 
     override fun authState(): WatchProviderAuthState {
         return sessionStore.authState()
@@ -414,9 +413,8 @@ class RemoteWatchHistoryService(
         if (source != null) {
             if (source == WatchProvider.LOCAL) {
                 val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
-                val normalized = continueWatchingNormalizer.normalize(entries = local, nowMs = nowMs, limit = targetLimit)
-                val status = if (normalized.isNotEmpty()) "" else "No local continue watching entries yet."
-                return ContinueWatchingResult(statusMessage = status, entries = normalized)
+                val status = if (local.isNotEmpty()) "" else "No local continue watching entries yet."
+                return ContinueWatchingResult(statusMessage = status, entries = local)
             }
 
             val provider =
@@ -441,13 +439,12 @@ class RemoteWatchHistoryService(
                     emptyList()
                 }
 
-            val normalized = continueWatchingNormalizer.normalize(entries = entries, nowMs = nowMs, limit = targetLimit)
+            val projected = entries.sortedByDescending { it.lastUpdatedEpochMs }.take(targetLimit)
 
-            if (normalized.isEmpty()) {
+            if (projected.isEmpty()) {
                 val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
-                val normalizedLocal = continueWatchingNormalizer.normalize(entries = local, nowMs = nowMs, limit = targetLimit)
-                if (normalizedLocal.isNotEmpty()) {
-                    return ContinueWatchingResult(statusMessage = "", entries = normalizedLocal)
+                if (local.isNotEmpty()) {
+                    return ContinueWatchingResult(statusMessage = "", entries = local)
                 }
             }
             val status =
@@ -457,7 +454,7 @@ class RemoteWatchHistoryService(
                             "Trakt client ID missing. Set TRAKT_CLIENT_ID in gradle.properties."
                         } else if (sessionStore.traktAccessToken().isBlank()) {
                             "Connect Trakt to load continue watching."
-                        } else if (normalized.isNotEmpty()) {
+                        } else if (projected.isNotEmpty()) {
                             ""
                         } else {
                             "No Trakt continue watching entries available."
@@ -469,7 +466,7 @@ class RemoteWatchHistoryService(
                             "Simkl client ID missing. Set SIMKL_CLIENT_ID in gradle.properties."
                         } else if (sessionStore.simklAccessToken().isBlank()) {
                             "Connect Simkl to load continue watching."
-                        } else if (normalized.isNotEmpty()) {
+                        } else if (projected.isNotEmpty()) {
                             ""
                         } else {
                             "No Simkl continue watching entries available."
@@ -482,7 +479,7 @@ class RemoteWatchHistoryService(
             val result =
                 ContinueWatchingResult(
                     statusMessage = status,
-                    entries = normalized,
+                    entries = projected,
                     isError =
                         when (source) {
                             WatchProvider.TRAKT -> traktClientId.isBlank() || sessionStore.traktAccessToken().isBlank()
@@ -502,20 +499,48 @@ class RemoteWatchHistoryService(
             if (cached.entries.isNotEmpty()) return cached
 
             val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
-            val normalized = continueWatchingNormalizer.normalize(entries = local, nowMs = nowMs, limit = targetLimit)
-            val status = if (normalized.isNotEmpty()) "" else "No continue watching entries yet."
-            return ContinueWatchingResult(statusMessage = status, entries = normalized)
+            val status = if (local.isNotEmpty()) "" else "No continue watching entries yet."
+            return ContinueWatchingResult(statusMessage = status, entries = local)
         }
 
-        val merged = continueWatchingNormalizer.normalize(entries = traktEntries + simklEntries, nowMs = nowMs, limit = targetLimit)
+        val merged = (traktEntries + simklEntries).sortedByDescending { it.lastUpdatedEpochMs }.take(targetLimit)
         val status =
             when {
                 merged.isNotEmpty() -> ""
                 sessionStore.traktAccessToken().isNotEmpty() -> "No Trakt continue watching entries available."
                 sessionStore.simklAccessToken().isNotEmpty() -> "No Simkl continue watching entries available."
                 else -> "No continue watching entries yet."
-            }
+        }
         return ContinueWatchingResult(statusMessage = status, entries = merged)
+    }
+
+    override suspend fun listWatchedEpisodeRecords(source: WatchProvider?): List<WatchedEpisodeRecord> {
+        return when (source) {
+            WatchProvider.TRAKT -> listTraktWatchedEpisodeRecords()
+            WatchProvider.SIMKL -> emptyList()
+            WatchProvider.LOCAL -> {
+                localStore
+                    .listLocalHistory(limit = Int.MAX_VALUE, authState = authState())
+                    .entries
+                    .mapNotNull { entry ->
+                        val season = entry.season ?: return@mapNotNull null
+                        val episode = entry.episode ?: return@mapNotNull null
+                        WatchedEpisodeRecord(
+                            contentId = entry.contentId,
+                            season = season,
+                            episode = episode,
+                            watchedAtEpochMs = entry.watchedAtEpochMs,
+                        )
+                    }
+            }
+            null -> {
+                if (authState().traktAuthenticated) {
+                    listTraktWatchedEpisodeRecords()
+                } else {
+                    emptyList()
+                }
+            }
+        }
     }
 
     override suspend fun listProviderLibrary(limitPerFolder: Int, source: WatchProvider?): ProviderLibrarySnapshot {
@@ -621,8 +646,8 @@ class RemoteWatchHistoryService(
             nowMs = nowMs,
             source = source,
             localFallback = { localStore.localContinueWatchingFallback() },
-            normalize = { entries, normalizedNowMs, targetLimit ->
-                continueWatchingNormalizer.normalize(entries = entries, nowMs = normalizedNowMs, limit = targetLimit)
+            normalize = { entries, _, targetLimit ->
+                entries.sortedByDescending { it.lastUpdatedEpochMs }.take(targetLimit)
             },
         )
     }
@@ -1390,6 +1415,47 @@ class RemoteWatchHistoryService(
         if (durationMs <= 0L) return null
         val percent = (positionMs.coerceAtLeast(0L).toDouble() / durationMs.toDouble()) * 100.0
         return percent.coerceIn(0.0, 100.0)
+    }
+
+    private suspend fun listTraktWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
+        if (!authState().traktAuthenticated || traktClientId.isBlank()) {
+            return emptyList()
+        }
+
+        val watchedShows = traktApi.getArray("/sync/watched/shows") ?: return emptyList()
+        val records = mutableListOf<WatchedEpisodeRecord>()
+
+        for (index in 0 until watchedShows.length()) {
+            val item = watchedShows.optJSONObject(index) ?: continue
+            val show = item.optJSONObject("show") ?: continue
+            val showImdb = normalizedImdbIdOrNull(show.optJSONObject("ids")?.optString("imdb")) ?: continue
+            val resetAt = parseIsoToEpochMs(item.optString("reset_at")) ?: 0L
+            val seasons = item.optJSONArray("seasons") ?: continue
+
+            for (seasonIndex in 0 until seasons.length()) {
+                val seasonObj = seasons.optJSONObject(seasonIndex) ?: continue
+                val seasonNumber = seasonObj.optInt("number", 0)
+                if (seasonNumber <= 0) continue
+                val episodes = seasonObj.optJSONArray("episodes") ?: continue
+
+                for (episodeIndex in 0 until episodes.length()) {
+                    val episodeObj = episodes.optJSONObject(episodeIndex) ?: continue
+                    val episodeNumber = episodeObj.optInt("number", 0)
+                    if (episodeNumber <= 0) continue
+                    val watchedAtEpochMs = parseIsoToEpochMs(episodeObj.optString("last_watched_at")) ?: continue
+                    if (resetAt > 0L && watchedAtEpochMs < resetAt) continue
+                    records +=
+                        WatchedEpisodeRecord(
+                            contentId = showImdb,
+                            season = seasonNumber,
+                            episode = episodeNumber,
+                            watchedAtEpochMs = watchedAtEpochMs,
+                        )
+                }
+            }
+        }
+
+        return records
     }
 
     private suspend fun refreshProviderSession(provider: WatchProvider, forceRefresh: Boolean): String? {

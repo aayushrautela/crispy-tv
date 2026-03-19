@@ -124,23 +124,20 @@ class HomeWatchActivityService(
         enrichMetadata: Boolean,
     ): ContinueWatchingLoadResult {
         val targetCount = limit.coerceAtLeast(1)
-        val dedupedEntries = entries
-            .sortedByDescending { it.lastUpdatedEpochMs }
-            .distinctBy { "${it.contentType.name}:${it.contentId}:${it.season ?: -1}:${it.episode ?: -1}" }
-            .take(targetCount)
+        val projectedEntries = entries.take(targetCount)
 
-        if (dedupedEntries.isEmpty()) {
+        if (projectedEntries.isEmpty()) {
             return ContinueWatchingLoadResult()
         }
 
         val items =
             if (!enrichMetadata) {
-                dedupedEntries.map { entry ->
+                projectedEntries.map { entry ->
                     buildProviderContinueWatchingItem(entry = entry, resolvedMeta = null)
                 }
             } else {
                 coroutineScope {
-                    dedupedEntries.map { entry ->
+                    projectedEntries.map { entry ->
                         async(Dispatchers.IO) {
                             metaResolveSemaphore.acquire()
                             try {
