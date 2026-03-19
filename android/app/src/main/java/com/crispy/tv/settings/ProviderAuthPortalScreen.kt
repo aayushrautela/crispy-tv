@@ -20,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -32,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -49,7 +47,6 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -74,23 +71,10 @@ internal class ProviderPortalViewModel(
     val uiState: StateFlow<ProviderPortalUiState> = _uiState
 
     init {
-        viewModelScope.launch {
-            // Listen for OAuth callback URIs published on the app-wide bus.
-            // MainActivity performs the token exchange; the portal just refreshes UI state
-            // so the connected status updates when a callback arrives.
-            ProviderOAuthCallbackBus.callbacks.collect { callbackUri ->
-                if (callbackUri.scheme != "crispy" || callbackUri.host != "auth") {
-                    return@collect
-                }
-                // Clear any pending external URL and refresh the stored auth state so the
-                // UI reflects any provider connection that may have just completed.
-                _uiState.update {
-                    it.copy(pendingExternalUrl = null, statusMessage = "Processing provider callback...")
-                }
-                refreshAuthState("Processing provider callback...")
-            }
-        }
-        refreshAuthState()
+        refreshAuthState(
+            message = "Connect providers to enable sync, continue watching, library, and comments.",
+            forceRefresh = false,
+        )
     }
 
     fun connectTrakt() {
@@ -112,8 +96,12 @@ internal class ProviderPortalViewModel(
     }
 
     fun disconnectTrakt() {
-        watchHistoryService.disconnectProvider(WatchProvider.TRAKT)
-        refreshAuthState("Disconnected Trakt.")
+        viewModelScope.launch {
+            val result = watchHistoryService.disconnectProvider(WatchProvider.TRAKT)
+            _uiState.update {
+                it.copy(authState = result.authState, statusMessage = result.statusMessage)
+            }
+        }
     }
 
     fun consumePendingExternalUrl() {
@@ -148,16 +136,21 @@ internal class ProviderPortalViewModel(
     }
 
     fun disconnectSimkl() {
-        watchHistoryService.disconnectProvider(WatchProvider.SIMKL)
-        refreshAuthState("Disconnected Simkl.")
+        viewModelScope.launch {
+            val result = watchHistoryService.disconnectProvider(WatchProvider.SIMKL)
+            _uiState.update {
+                it.copy(authState = result.authState, statusMessage = result.statusMessage)
+            }
+        }
     }
 
-    fun refreshAuthState(message: String? = null) {
+    fun refreshAuthState(message: String? = null, forceRefresh: Boolean = true) {
         viewModelScope.launch {
+            val result = watchHistoryService.refreshProviderAuthState(forceRefresh = forceRefresh)
             _uiState.update {
                 it.copy(
-                    authState = watchHistoryService.authState(),
-                    statusMessage = message ?: it.statusMessage
+                    authState = result.authState,
+                    statusMessage = message ?: result.statusMessage.ifBlank { it.statusMessage }
                 )
             }
         }
@@ -211,7 +204,7 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
         onDisconnectTrakt = viewModel::disconnectTrakt,
         onConnectSimkl = viewModel::connectSimkl,
         onDisconnectSimkl = viewModel::disconnectSimkl,
-        onRefresh = { viewModel.refreshAuthState() },
+        onRefresh = { viewModel.refreshAuthState(forceRefresh = true) },
         onBack = onBack
     )
 }
@@ -280,8 +273,6 @@ private fun ProviderAuthPortalScreen(
                     connected = uiState.authState.traktAuthenticated,
                     userHandle = uiState.authState.traktSession?.userHandle,
                     expiresAtEpochMs = uiState.authState.traktSession?.expiresAtEpochMs,
-                    tokenValue = null,
-                    onTokenChanged = null,
                     connectAction = ProviderPortalAction("Connect Trakt OAuth", onConnectTrakt),
                     disconnectAction = ProviderPortalAction("Disconnect Trakt", onDisconnectTrakt)
                 )
@@ -301,8 +292,6 @@ private fun ProviderAuthPortalScreen(
                     connected = uiState.authState.simklAuthenticated,
                     userHandle = uiState.authState.simklSession?.userHandle,
                     expiresAtEpochMs = null,
-                    tokenValue = null,
-                    onTokenChanged = null,
                     connectAction = ProviderPortalAction("Connect Simkl OAuth", onConnectSimkl),
                     disconnectAction = ProviderPortalAction("Disconnect Simkl", onDisconnectSimkl)
                 )
@@ -326,8 +315,6 @@ private fun ProviderCard(
     connected: Boolean,
     userHandle: String?,
     expiresAtEpochMs: Long?,
-    tokenValue: String?,
-    onTokenChanged: ((String) -> Unit)?,
     connectAction: ProviderPortalAction,
     disconnectAction: ProviderPortalAction
 ) {
@@ -360,16 +347,6 @@ private fun ProviderCard(
                     text = "Token expiry: $expiresAtEpochMs",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (tokenValue != null && onTokenChanged != null) {
-                OutlinedTextField(
-                    value = tokenValue,
-                    onValueChange = onTokenChanged,
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
-                    label = { Text("Access token") }
                 )
             }
 

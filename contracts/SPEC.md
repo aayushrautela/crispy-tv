@@ -75,7 +75,8 @@ The spec version documents the contract surface. Each suite owns its own
   - Pull planning: `get_household_addons` is allowed only when there are no unsynced household changes.
   - Shared addons are normalized (trim URL, strip trailing `/`, default enabled=true, canonical sort).
   - Debounce planning: writes are delayed by `debounce_ms` using `now_ms` + `*_changed_at_ms`; `flush_requested` bypasses debounce.
-  - Only owners may plan household addon writes; per-profile writes always include settings + Trakt + Simkl.
+  - `contract_version` 2 removes provider auth from profile-sync payloads; per-profile writes now include only settings + catalog prefs.
+  - Only owners may plan household addon writes.
 - `storage_v1`
   - Logical storage namespace/versioning and schema mismatch behavior.
 

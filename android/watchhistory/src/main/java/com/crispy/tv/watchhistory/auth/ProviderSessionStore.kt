@@ -34,7 +34,6 @@ internal class ProviderSessionStore(
     fun connectProvider(
         provider: WatchProvider,
         accessToken: String,
-        refreshToken: String?,
         expiresAtEpochMs: Long?,
         userHandle: String?,
     ) {
@@ -50,13 +49,7 @@ internal class ProviderSessionStore(
             when (provider) {
                 WatchProvider.TRAKT -> {
                     putString(KEY_TRAKT_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedAccess))
-
-                    val normalizedRefresh = refreshToken?.trim()?.ifBlank { null }
-                    if (normalizedRefresh == null) {
-                        remove(KEY_TRAKT_REFRESH_TOKEN)
-                    } else {
-                        putString(KEY_TRAKT_REFRESH_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedRefresh))
-                    }
+                    remove(KEY_TRAKT_REFRESH_TOKEN)
 
                     if (expiresAtEpochMs != null && expiresAtEpochMs > 0L) {
                         putLong(KEY_TRAKT_EXPIRES_AT, expiresAtEpochMs)
@@ -107,8 +100,8 @@ internal class ProviderSessionStore(
         val traktSession = traktSessionOrNull()
         val simklSession = simklSessionOrNull()
         return WatchProviderAuthState(
-            traktAuthenticated = traktSession != null,
-            simklAuthenticated = simklSession != null,
+            traktAuthenticated = traktSession?.isUsable() == true,
+            simklAuthenticated = simklSession?.isUsable() == true,
             traktSession = traktSession,
             simklSession = simklSession,
         )
@@ -170,12 +163,10 @@ internal class ProviderSessionStore(
         val token = traktAccessToken()
         if (token.isBlank()) return null
 
-        val refresh = readSecret(KEY_TRAKT_REFRESH_TOKEN).trim().ifBlank { null }
         val expiresAt = prefs.getLong(KEY_TRAKT_EXPIRES_AT, -1L).takeIf { it > 0L }
         val handle = prefs.getString(KEY_TRAKT_HANDLE, null)?.trim()?.ifBlank { null }
         return WatchProviderSession(
             accessToken = token,
-            refreshToken = refresh,
             expiresAtEpochMs = expiresAt,
             userHandle = handle,
         )
@@ -187,5 +178,14 @@ internal class ProviderSessionStore(
 
         val handle = prefs.getString(KEY_SIMKL_HANDLE, null)?.trim()?.ifBlank { null }
         return WatchProviderSession(accessToken = token, userHandle = handle)
+    }
+
+    private fun WatchProviderSession.isUsable(nowMs: Long = System.currentTimeMillis()): Boolean {
+        val expiry = expiresAtEpochMs ?: return true
+        return expiry > nowMs + TOKEN_EXPIRY_GRACE_MS
+    }
+
+    private companion object {
+        private const val TOKEN_EXPIRY_GRACE_MS = 60_000L
     }
 }

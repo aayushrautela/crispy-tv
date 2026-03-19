@@ -21,11 +21,13 @@ import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +73,7 @@ class HomeViewModel internal constructor(
     private val homeWatchActivityService: HomeWatchActivityService,
     private val watchHistoryService: WatchHistoryService,
     private val calendarService: CalendarService,
+    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     private val suppressionStore: ContinueWatchingSuppressionStore
 ) : ViewModel() {
     companion object {
@@ -98,6 +101,7 @@ class HomeViewModel internal constructor(
                                 watchHistoryService = watchHistoryService,
                                 tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                             ),
+                            tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
                         ) as T
                     }
@@ -281,6 +285,7 @@ class HomeViewModel internal constructor(
                     )
                 }
                 .toList()
+        val enrichedCatalogSections = enrichCollectionShelfPreviewLogos(catalogSections)
 
         val selectedId =
             primarySnapshot.hero.selectedId?.takeIf { id ->
@@ -295,9 +300,75 @@ class HomeViewModel internal constructor(
                 statusMessage = primaryFeedResult.heroResult.statusMessage,
             ),
             headerPills = headerPills,
-            catalogSections = catalogSections,
+            catalogSections = enrichedCatalogSections,
             catalogStatusMessage = primaryFeedResult.sectionsStatusMessage,
         )
+    }
+
+    private suspend fun enrichCollectionShelfPreviewLogos(
+        catalogSections: List<HomeCatalogSectionUi>,
+    ): List<HomeCatalogSectionUi> {
+        if (catalogSections.isEmpty()) {
+            return emptyList()
+        }
+
+        val collectionItemsToEnrich =
+            catalogSections
+                .asSequence()
+                .filter { it.section.presentation == HomeCatalogPresentation.COLLECTION_SHELF }
+                .mapNotNull { sectionUi ->
+                    sectionUi.items.firstOrNull()?.takeIf { item ->
+                        item.logoUrl.isNullOrBlank() && item.id.isNotBlank()
+                    }
+                }
+                .distinctBy { item -> collectionLogoCacheKey(item.type, item.id) }
+                .toList()
+
+        if (collectionItemsToEnrich.isEmpty()) {
+            return catalogSections
+        }
+
+        val logosByKey =
+            withContext(Dispatchers.IO) {
+                coroutineScope {
+                    collectionItemsToEnrich.map { item ->
+                        async {
+                            val logoUrl =
+                                try {
+                                    tmdbEnrichmentRepository
+                                        .loadArtwork(
+                                            rawId = item.id,
+                                            mediaTypeHint = item.type.toMetadataLabMediaType(),
+                                        )
+                                        ?.logoUrl
+                                        ?.trim()
+                                        ?.ifBlank { null }
+                                } catch (error: Throwable) {
+                                    if (error is CancellationException) throw error
+                                    Log.w(TAG, "Failed to load collection logo for ${item.id}", error)
+                                    null
+                                }
+                            collectionLogoCacheKey(item.type, item.id) to logoUrl
+                        }
+                    }.awaitAll().toMap()
+                }
+            }
+
+        return catalogSections.map { sectionUi ->
+            if (sectionUi.section.presentation != HomeCatalogPresentation.COLLECTION_SHELF) {
+                return@map sectionUi
+            }
+
+            val featuredItem = sectionUi.items.firstOrNull() ?: return@map sectionUi
+            val logoUrl = logosByKey[collectionLogoCacheKey(featuredItem.type, featuredItem.id)]
+            if (logoUrl.isNullOrBlank()) {
+                sectionUi
+            } else {
+                sectionUi.copy(
+                    items = listOf(featuredItem.copy(logoUrl = logoUrl)) + sectionUi.items.drop(1),
+                )
+            }
+        }
     }
 
     private suspend fun loadWatchActivitySnapshot(
@@ -865,6 +936,10 @@ private fun continueWatchingContentKey(entry: ContinueWatchingEntry): String {
 }
 
 private fun continueWatchingContentKey(type: String, contentId: String): String {
+    return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
+}
+
+private fun collectionLogoCacheKey(type: String, contentId: String): String {
     return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
 }
 

@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "sync_planner",
   "case_id": "debounce_fires_at_2s",
   "input": {
@@ -21,13 +21,7 @@
     "settings": {
       "language": " en "
     },
-    "catalog_prefs": {},
-    "trakt_auth": {
-      "access_token": "  t123  "
-    },
-    "simkl_auth": {
-      "access_token": " s456 "
-    }
+    "catalog_prefs": {}
   },
   "expected": {
     "rpc_calls": [
@@ -50,13 +44,7 @@
           "p_settings": {
             "language": "en"
           },
-          "p_catalog_prefs": {},
-          "p_trakt_auth": {
-            "access_token": "t123"
-          },
-          "p_simkl_auth": {
-            "access_token": "s456"
-          }
+          "p_catalog_prefs": {}
         }
       }
     ]

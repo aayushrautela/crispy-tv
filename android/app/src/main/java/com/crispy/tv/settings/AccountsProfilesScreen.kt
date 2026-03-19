@@ -42,12 +42,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -326,6 +327,7 @@ internal class AccountsProfilesViewModel(
     private val profileStore: ActiveProfileStore,
     private val profileDataCloudSync: ProfileDataCloudSync,
     private val householdAddonsCloudSync: HouseholdAddonsCloudSync,
+    private val watchHistoryService: WatchHistoryService,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AccountsProfilesUiState(configured = supabase.isConfigured()))
     val uiState: StateFlow<AccountsProfilesUiState> = _uiState
@@ -351,6 +353,7 @@ internal class AccountsProfilesViewModel(
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             if (session == null) {
+                watchHistoryService.clearCachedProviderAuthState()
                 _uiState.update {
                     it.copy(
                         isBusy = false,
@@ -411,6 +414,11 @@ internal class AccountsProfilesViewModel(
                 profileDataCloudSync.pullForActiveProfile().exceptionOrNull()?.message
             val addonsSyncError =
                 householdAddonsCloudSync.pullToLocal().exceptionOrNull()?.message
+            val providerSyncError =
+                runCatching { watchHistoryService.refreshProviderAuthState(forceRefresh = false) }
+                    .getOrNull()
+                    ?.statusMessage
+                    ?.takeIf { it.isNotBlank() }
 
             _uiState.update {
                 it.copy(
@@ -426,6 +434,7 @@ internal class AccountsProfilesViewModel(
                         when {
                             !settingsSyncError.isNullOrBlank() -> "Settings sync failed: $settingsSyncError"
                             !addonsSyncError.isNullOrBlank() -> "Addons sync failed: $addonsSyncError"
+                            !providerSyncError.isNullOrBlank() -> providerSyncError
                             else -> ""
                         }
                 )
@@ -488,6 +497,7 @@ internal class AccountsProfilesViewModel(
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             runCatching { supabase.signOut() }
             profileStore.clear(userId)
+            watchHistoryService.clearCachedProviderAuthState()
             refresh()
         }
     }
@@ -501,6 +511,10 @@ internal class AccountsProfilesViewModel(
         viewModelScope.launch {
             profileDataCloudSync.pullForActiveProfile().onFailure {
                 _uiState.update { s -> s.copy(statusMessage = "Settings sync failed: ${it.message.orEmpty()}") }
+            }
+            val providerRefresh = watchHistoryService.refreshProviderAuthState(forceRefresh = false)
+            if (providerRefresh.statusMessage.isNotBlank()) {
+                _uiState.update { it.copy(statusMessage = providerRefresh.statusMessage) }
             }
         }
     }
@@ -566,11 +580,9 @@ internal class AccountsProfilesViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val supabase = SupabaseServicesProvider.accountClient(safeContext)
                     val profileStore = SupabaseServicesProvider.activeProfileStore(safeContext)
-                    val watchHistory = PlaybackDependencies.watchHistoryServiceFactory(safeContext)
                     val profileDataCloudSync =
                         SupabaseServicesProvider.createProfileDataCloudSync(
                             context = safeContext,
-                            watchHistoryService = watchHistory,
                         )
                     val addonRegistry = MetadataAddonRegistry(safeContext, BuildConfig.METADATA_ADDON_URLS)
                     val householdAddonsCloudSync =
@@ -580,7 +592,8 @@ internal class AccountsProfilesViewModel(
                         supabase = supabase,
                         profileStore = profileStore,
                         profileDataCloudSync = profileDataCloudSync,
-                        householdAddonsCloudSync = householdAddonsCloudSync
+                        householdAddonsCloudSync = householdAddonsCloudSync,
+                        watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(safeContext),
                     ) as T
                 }
             }

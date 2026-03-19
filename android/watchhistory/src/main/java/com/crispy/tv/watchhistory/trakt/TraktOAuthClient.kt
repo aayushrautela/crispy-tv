@@ -2,6 +2,7 @@ package com.crispy.tv.watchhistory.trakt
 
 import com.crispy.tv.player.ProviderAuthActionResult
 import com.crispy.tv.player.ProviderAuthStartResult
+import com.crispy.tv.player.ProviderSessionBackend
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.watchhistory.TRAKT_AUTHORIZE_BASE
 import com.crispy.tv.watchhistory.auth.ProviderSessionStore
@@ -9,14 +10,12 @@ import com.crispy.tv.watchhistory.oauth.OAuthCallbackParseResult
 import com.crispy.tv.watchhistory.oauth.OAuthCallbackParser
 import com.crispy.tv.watchhistory.oauth.OAuthStateStore
 import com.crispy.tv.watchhistory.oauth.Pkce
-import com.crispy.tv.watchhistory.oauth.SupabaseFunctionExchangeClient
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import org.json.JSONObject
 
 internal class TraktOAuthClient(
     private val traktClientId: String,
     private val traktRedirectUri: String,
-    private val oauthExchangeClient: SupabaseFunctionExchangeClient,
+    private val sessionBackend: ProviderSessionBackend,
     private val sessionStore: ProviderSessionStore,
     private val stateStore: OAuthStateStore,
     private val callbackParser: OAuthCallbackParser,
@@ -74,7 +73,7 @@ internal class TraktOAuthClient(
                 authState = sessionStore.authState(),
             )
         }
-        if (!oauthExchangeClient.isConfigured()) {
+        if (!sessionBackend.isConfigured()) {
             return ProviderAuthActionResult(
                 success = false,
                 statusMessage = "Provider OAuth requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.",
@@ -133,16 +132,16 @@ internal class TraktOAuthClient(
             )
         }
 
-        val tokenPayload =
-            JSONObject()
-                .put("code", code)
-                .put("redirectUri", traktRedirectUri)
-                .put("codeVerifier", expected.codeVerifier)
+        val exchange =
+            sessionBackend.exchangeProviderSession(
+                provider = WatchProvider.TRAKT,
+                code = code,
+                redirectUri = traktRedirectUri,
+                codeVerifier = expected.codeVerifier,
+            )
 
-        val exchange = oauthExchangeClient.post(functionName = "trakt-oauth-exchange", payload = tokenPayload)
-        val tokenObject = exchange.payload
-
-        if (tokenObject == null) {
+        val session = exchange.session
+        if (session == null) {
             stateStore.clearTrakt()
             return ProviderAuthActionResult(
                 success = false,
@@ -153,28 +152,11 @@ internal class TraktOAuthClient(
 
         stateStore.clearTrakt()
 
-        val accessToken = tokenObject.optString("access_token").trim()
-        if (accessToken.isBlank()) {
-            return ProviderAuthActionResult(
-                success = false,
-                statusMessage = "Trakt token response missing access token.",
-                authState = sessionStore.authState(),
-            )
-        }
-        val refreshToken = tokenObject.optString("refresh_token").trim().ifBlank { null }
-        val expiresInSec = tokenObject.optLong("expires_in", 0L).takeIf { it > 0L }
-        val expiresAt = expiresInSec?.let { seconds -> System.currentTimeMillis() + seconds * 1000L }
-        val userHandle =
-            tokenObject.optString("providerUsername").trim().ifBlank {
-                tokenObject.optString("providerUserId").trim()
-            }.ifBlank { null }
-
         sessionStore.connectProvider(
             provider = WatchProvider.TRAKT,
-            accessToken = accessToken,
-            refreshToken = refreshToken,
-            expiresAtEpochMs = expiresAt,
-            userHandle = userHandle,
+            accessToken = session.accessToken,
+            expiresAtEpochMs = session.expiresAtEpochMs,
+            userHandle = session.userHandle,
         )
 
         return ProviderAuthActionResult(

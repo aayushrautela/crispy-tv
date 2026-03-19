@@ -33,8 +33,6 @@ data class SyncPlannerInput(
     val addons: List<RawAddonInstall>,
     val settings: Map<String, String>,
     val catalogPrefs: Map<String, String>,
-    val traktAuth: Map<String, String>,
-    val simklAuth: Map<String, String>,
 )
 
 sealed interface SyncRpcCall {
@@ -55,8 +53,6 @@ data class UpsertProfileDataCall(
     val profileId: String,
     val settings: Map<String, String>,
     val catalogPrefs: Map<String, String>,
-    val traktAuth: Map<String, String>,
-    val simklAuth: Map<String, String>,
 ) : SyncRpcCall {
     override val name: String = "upsert_profile_data"
 }
@@ -95,8 +91,6 @@ fun planSyncRpcCalls(input: SyncPlannerInput): List<SyncRpcCall> {
                 profileId = input.profileId.trim(),
                 settings = normalizeStringMap(input.settings),
                 catalogPrefs = normalizeStringMap(input.catalogPrefs),
-                traktAuth = normalizeStringMap(input.traktAuth),
-                simklAuth = normalizeStringMap(input.simklAuth),
             )
         )
     }

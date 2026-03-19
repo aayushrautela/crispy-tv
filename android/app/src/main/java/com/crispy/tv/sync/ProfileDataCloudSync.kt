@@ -1,12 +1,8 @@
 package com.crispy.tv.sync
 
 import android.content.Context
-import android.util.Log
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
-import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.player.WatchProviderSession
 import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.settings.AiInsightsSettings
 import com.crispy.tv.settings.AiInsightsSettingsStore
@@ -23,7 +19,6 @@ class ProfileDataCloudSync(
     private val aiInsightsSettingsStore: AiInsightsSettingsStore = AiInsightsSettingsStore(context),
     private val omdbSettingsStore: OmdbSettingsStore = OmdbSettingsStore(context),
     private val shadowStore: ProfileDataShadowStore = ProfileDataShadowStore(context),
-    private val watchHistoryService: WatchHistoryService? = null,
 ) {
     suspend fun pullForActiveProfile(): Result<Unit> {
         val session =
@@ -71,14 +66,11 @@ class ProfileDataCloudSync(
                 profileId = trimmedProfileId,
                 settings = remote.settings,
                 catalogPrefs = remote.catalogPrefs,
-                traktAuth = remote.traktAuth,
-                simklAuth = remote.simklAuth,
                 updatedAt = remote.updatedAt
             )
         )
 
         applyProfileSettingsToLocal(remote.settings)
-        applyProviderAuthToLocal(remote.traktAuth, remote.simklAuth)
     }
 
     private suspend fun pushForProfile(accessToken: String, profileId: String) {
@@ -93,148 +85,24 @@ class ProfileDataCloudSync(
                         profileId = trimmedProfileId,
                         settings = remote.settings,
                         catalogPrefs = remote.catalogPrefs,
-                        traktAuth = remote.traktAuth,
-                        simklAuth = remote.simklAuth,
                         updatedAt = remote.updatedAt
                     ).also { shadowStore.write(it) }
                 }
 
         val nextSettings = buildSettingsForCloud(baseline.settings)
 
-        val nextTraktAuth: Map<String, String>
-        val nextSimklAuth: Map<String, String>
-        if (watchHistoryService != null) {
-            val auth = watchHistoryService.authState()
-            nextTraktAuth = buildProviderAuthMap(auth.traktSession)
-            nextSimklAuth = buildProviderAuthMap(auth.simklSession)
-        } else {
-            nextTraktAuth = baseline.traktAuth
-            nextSimklAuth = baseline.simklAuth
-        }
-
         supabase.upsertProfileData(
             accessToken = accessToken,
             profileId = trimmedProfileId,
             settings = nextSettings,
             catalogPrefs = baseline.catalogPrefs,
-            traktAuth = nextTraktAuth,
-            simklAuth = nextSimklAuth
         )
 
         shadowStore.write(
             baseline.copy(
                 settings = nextSettings,
-                traktAuth = nextTraktAuth,
-                simklAuth = nextSimklAuth
             )
         )
-    }
-
-    /**
-     * Push only provider auth (Trakt/Simkl) to cloud for the active profile.
-     * Call this after a manual provider connect or disconnect.
-     */
-    suspend fun pushProviderAuthForActiveProfile(): Result<Unit> {
-        val whs = watchHistoryService ?: return Result.success(Unit)
-        val session =
-            try {
-                supabase.ensureValidSession()
-            } catch (t: Throwable) {
-                return Result.failure(t)
-            }
-        if (session == null) return Result.success(Unit)
-
-        val profileId = activeProfileStore.getActiveProfileId(session.userId) ?: return Result.success(Unit)
-        return try {
-            pushProviderAuthForProfile(whs, session.accessToken, profileId)
-            Result.success(Unit)
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to push provider auth to cloud", t)
-            Result.failure(t)
-        }
-    }
-
-    private suspend fun pushProviderAuthForProfile(
-        whs: WatchHistoryService,
-        accessToken: String,
-        profileId: String,
-    ) {
-        val trimmedProfileId = profileId.trim()
-        if (trimmedProfileId.isBlank()) return
-
-        val baseline =
-            shadowStore.read(trimmedProfileId)
-                ?: run {
-                    val remote = supabase.getProfileData(accessToken, trimmedProfileId)
-                    ProfileDataShadowStore.Snapshot(
-                        profileId = trimmedProfileId,
-                        settings = remote.settings,
-                        catalogPrefs = remote.catalogPrefs,
-                        traktAuth = remote.traktAuth,
-                        simklAuth = remote.simklAuth,
-                        updatedAt = remote.updatedAt
-                    ).also { shadowStore.write(it) }
-                }
-
-        val auth = whs.authState()
-        val nextTraktAuth = buildProviderAuthMap(auth.traktSession)
-        val nextSimklAuth = buildProviderAuthMap(auth.simklSession)
-
-        supabase.upsertProfileData(
-            accessToken = accessToken,
-            profileId = trimmedProfileId,
-            settings = baseline.settings,
-            catalogPrefs = baseline.catalogPrefs,
-            traktAuth = nextTraktAuth,
-            simklAuth = nextSimklAuth
-        )
-
-        shadowStore.write(
-            baseline.copy(
-                traktAuth = nextTraktAuth,
-                simklAuth = nextSimklAuth
-            )
-        )
-    }
-
-    private fun applyProviderAuthToLocal(
-        traktAuth: Map<String, String>,
-        simklAuth: Map<String, String>,
-    ) {
-        val whs = watchHistoryService ?: return
-
-        val traktAccessToken = traktAuth[KEY_AUTH_ACCESS_TOKEN]?.trim().orEmpty()
-        if (traktAccessToken.isNotEmpty()) {
-            whs.connectProvider(
-                provider = WatchProvider.TRAKT,
-                accessToken = traktAccessToken,
-                refreshToken = traktAuth[KEY_AUTH_REFRESH_TOKEN]?.trim(),
-                expiresAtEpochMs = traktAuth[KEY_AUTH_EXPIRES_AT]?.trim()?.toLongOrNull(),
-                userHandle = traktAuth[KEY_AUTH_USER_HANDLE]?.trim()
-            )
-        }
-
-        val simklAccessToken = simklAuth[KEY_AUTH_ACCESS_TOKEN]?.trim().orEmpty()
-        if (simklAccessToken.isNotEmpty()) {
-            whs.connectProvider(
-                provider = WatchProvider.SIMKL,
-                accessToken = simklAccessToken,
-                refreshToken = null,
-                expiresAtEpochMs = null,
-                userHandle = simklAuth[KEY_AUTH_USER_HANDLE]?.trim()
-            )
-        }
-    }
-
-    private fun buildProviderAuthMap(session: WatchProviderSession?): Map<String, String> {
-        if (session == null) return emptyMap()
-        val map = mutableMapOf<String, String>()
-        map[KEY_AUTH_ACCESS_TOKEN] = session.accessToken
-        session.refreshToken?.let { map[KEY_AUTH_REFRESH_TOKEN] = it }
-        session.expiresAtEpochMs?.let { map[KEY_AUTH_EXPIRES_AT] = it.toString() }
-        session.userHandle?.let { map[KEY_AUTH_USER_HANDLE] = it }
-        map[KEY_AUTH_UPDATED_AT] = System.currentTimeMillis().toString()
-        return map
     }
 
     private fun applyProfileSettingsToLocal(settings: Map<String, String>) {
@@ -324,14 +192,6 @@ class ProfileDataCloudSync(
     }
 
     private companion object {
-        private const val TAG = "ProfileDataCloudSync"
-
-        private const val KEY_AUTH_ACCESS_TOKEN = "accessToken"
-        private const val KEY_AUTH_REFRESH_TOKEN = "refreshToken"
-        private const val KEY_AUTH_EXPIRES_AT = "expiresAt"
-        private const val KEY_AUTH_USER_HANDLE = "userHandle"
-        private const val KEY_AUTH_UPDATED_AT = "updatedAt"
-
         private const val KEY_PLAYBACK_SKIP_INTRO_ENABLED = "playback.skip_intro_enabled"
         private const val KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED = "playback.trailer_autoplay_enabled"
         private const val KEY_PLAYBACK_TRAILER_MUTED = "playback.trailer_muted"

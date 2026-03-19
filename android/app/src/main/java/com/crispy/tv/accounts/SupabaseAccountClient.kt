@@ -54,8 +54,6 @@ class SupabaseAccountClient(
     data class ProfileData(
         val settings: Map<String, String>,
         val catalogPrefs: Map<String, String>,
-        val traktAuth: Map<String, String>,
-        val simklAuth: Map<String, String>,
         val updatedAt: String?,
     )
 
@@ -280,7 +278,7 @@ class SupabaseAccountClient(
             "$baseUrl/rest/v1/profile_data".toHttpUrl().newBuilder()
                 .addQueryParameter(
                     "select",
-                    "settings,catalog_prefs,trakt_auth,simkl_auth,updated_at"
+                    "settings,catalog_prefs,updated_at"
                 )
                 .addQueryParameter("profile_id", "eq.${profileId.trim()}")
                 .addQueryParameter("limit", "1")
@@ -293,15 +291,11 @@ class SupabaseAccountClient(
 
         val settings = obj.optJSONObject("settings")?.toStringMap() ?: emptyMap()
         val catalogPrefs = obj.optJSONObject("catalog_prefs")?.toStringMap() ?: emptyMap()
-        val traktAuth = obj.optJSONObject("trakt_auth")?.toStringMap() ?: emptyMap()
-        val simklAuth = obj.optJSONObject("simkl_auth")?.toStringMap() ?: emptyMap()
         val updatedAt = obj.optString("updated_at").trim().ifBlank { null }
 
         return ProfileData(
             settings = settings,
             catalogPrefs = catalogPrefs,
-            traktAuth = traktAuth,
-            simklAuth = simklAuth,
             updatedAt = updatedAt
         )
     }
@@ -311,8 +305,6 @@ class SupabaseAccountClient(
         profileId: String,
         settings: Map<String, String>,
         catalogPrefs: Map<String, String>,
-        traktAuth: Map<String, String>,
-        simklAuth: Map<String, String>,
     ) {
         checkConfigured()
         val url = "$baseUrl/rest/v1/rpc/upsert_profile_data".toHttpUrl()
@@ -321,8 +313,6 @@ class SupabaseAccountClient(
                 .put("p_profile_id", profileId.trim())
                 .put("p_settings", settings.toJsonObject())
                 .put("p_catalog_prefs", catalogPrefs.toJsonObject())
-                .put("p_trakt_auth", traktAuth.toJsonObject())
-                .put("p_simkl_auth", simklAuth.toJsonObject())
                 .toString()
 
         val response = httpClient.postJson(url, payload, authHeaders(accessToken), callTimeoutMs = CALL_TIMEOUT_MS)

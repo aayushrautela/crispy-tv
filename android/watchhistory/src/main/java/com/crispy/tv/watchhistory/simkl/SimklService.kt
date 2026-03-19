@@ -23,6 +23,7 @@ internal class SimklService(
     private val simklRedirectUri: String,
     private val appName: String = SIMKL_APP_NAME,
     private val appVersion: String = "dev",
+    private val onTokenExpired: (suspend () -> String?)? = null,
     private val logTag: String = "SimklService",
 ) {
     private sealed interface PlaybackDecision {
@@ -49,6 +50,7 @@ internal class SimklService(
 
     private val scrobbleMutex = Mutex()
     private val lastScrobblePauseAtByKeyElapsedMs = LinkedHashMap<String, Long>()
+    private val tokenRecoveryMutex = Mutex()
 
     fun userAgent(): String = "$appName/$appVersion"
 
@@ -96,9 +98,20 @@ internal class SimklService(
         return builder.build().toString()
     }
 
+    private suspend fun accessToken(forceRefresh: Boolean = false): String? {
+        val token = sessionStore.simklAccessToken().trim().ifBlank { null } ?: return null
+        if (!forceRefresh) return token
+
+        return tokenRecoveryMutex.withLock {
+            val recheck = sessionStore.simklAccessToken().trim().ifBlank { null } ?: return@withLock null
+            val callback = onTokenExpired ?: return@withLock recheck
+            val refreshed = callback()?.trim()?.ifBlank { null }
+            refreshed ?: recheck
+        }
+    }
+
     suspend fun scrobbleStart(content: SimklScrobbleContent, progressPercent: Double): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
 
         val payload = buildScrobblePayload(content = content, progressPercent = progressPercent)
         val response = apiRequestRaw(method = "POST", path = "/scrobble/start", query = emptyMap(), accessToken = token, payload = payload)
@@ -107,8 +120,7 @@ internal class SimklService(
     }
 
     suspend fun scrobblePause(content: SimklScrobbleContent, progressPercent: Double, force: Boolean = false): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
 
         val key = scrobbleKey(content)
         val nowElapsedMs = SystemClock.elapsedRealtime()
@@ -127,8 +139,7 @@ internal class SimklService(
     }
 
     suspend fun scrobbleStop(content: SimklScrobbleContent, progressPercent: Double): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
 
         val payload = buildScrobblePayload(content = content, progressPercent = progressPercent)
         val response = apiRequestRaw(method = "POST", path = "/scrobble/stop", query = emptyMap(), accessToken = token, payload = payload)
@@ -149,8 +160,7 @@ internal class SimklService(
     }
 
     suspend fun getPlaybackStatus(forceRefresh: Boolean = false): JSONArray {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return JSONArray()
+        val token = accessToken(forceRefresh = forceRefresh) ?: return JSONArray()
 
         val nowElapsedMs = SystemClock.elapsedRealtime()
 
@@ -213,14 +223,12 @@ internal class SimklService(
     }
 
     suspend fun getActivities(): JSONObject? {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return null
+        val token = accessToken() ?: return null
         return apiGetJsonObject(path = "/sync/activities", accessToken = token)
     }
 
     suspend fun getAllItemsResponse(type: String? = null, status: String? = null, dateFrom: String? = null): Any? {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return null
+        val token = accessToken() ?: return null
 
         val path = buildSyncAllItemsPath(type = type, status = status)
         val query = if (dateFrom.isNullOrBlank()) emptyMap() else mapOf("date_from" to dateFrom)
@@ -228,28 +236,24 @@ internal class SimklService(
     }
 
     suspend fun getRatingsResponse(type: String? = null, ratingFilter: String? = null): Any? {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return null
+        val token = accessToken() ?: return null
 
         val path = buildSyncRatingsPath(type = type, ratingFilter = ratingFilter)
         return apiGetAny(path = path, query = emptyMap(), accessToken = token)
     }
 
     suspend fun addToHistory(payload: JSONObject): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
         return apiPostOkOrConflict(path = "/sync/history", payload = payload, accessToken = token)
     }
 
     suspend fun removeFromHistory(payload: JSONObject): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
         return apiPostOkOrConflict(path = "/sync/history/remove", payload = payload, accessToken = token)
     }
 
     suspend fun addToList(typeKey: String, imdbId: String, status: String): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
 
         val payload = JSONObject().put(
             typeKey,
@@ -263,8 +267,7 @@ internal class SimklService(
     }
 
     suspend fun removeFromList(typeKey: String, imdbId: String): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
 
         val payload = JSONObject().put(
             typeKey,
@@ -276,8 +279,7 @@ internal class SimklService(
     }
 
     suspend fun addRating(typeKey: String, imdbId: String, rating: Int): Boolean {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return false
+        val token = accessToken() ?: return false
 
         val ratingValue = rating.coerceIn(1, 10)
         val payload = JSONObject().put(
@@ -292,8 +294,7 @@ internal class SimklService(
     }
 
     suspend fun getUserSettings(forceRefresh: Boolean = false): JSONObject? {
-        val token = sessionStore.simklAccessToken()
-        if (token.isBlank()) return null
+        val token = accessToken(forceRefresh = forceRefresh) ?: return null
         return getUserSettingsForToken(accessToken = token, forceRefresh = forceRefresh)
     }
 
@@ -434,11 +435,21 @@ internal class SimklService(
 
     private suspend fun apiPostOkOrConflict(path: String, payload: JSONObject, accessToken: String): Boolean {
         val response = apiRequestRaw(method = "POST", path = path, query = emptyMap(), accessToken = accessToken, payload = payload) ?: return false
+        if (response.code == 401) {
+            val refreshed = accessToken(forceRefresh = true) ?: return false
+            val retry = apiRequestRaw(method = "POST", path = path, query = emptyMap(), accessToken = refreshed, payload = payload) ?: return false
+            return (retry.code in 200..299) || retry.code == 409
+        }
         return (response.code in 200..299) || response.code == 409
     }
 
     private suspend fun apiRequest(method: String, path: String, query: Map<String, String>, accessToken: String, payload: JSONObject?): Any? {
         val response = apiRequestRaw(method = method, path = path, query = query, accessToken = accessToken, payload = payload) ?: return null
+
+        if (response.code == 401) {
+            val refreshed = accessToken(forceRefresh = true) ?: return null
+            return apiRequest(method = method, path = path, query = query, accessToken = refreshed, payload = payload)
+        }
 
         if (response.code == 409) {
             return null

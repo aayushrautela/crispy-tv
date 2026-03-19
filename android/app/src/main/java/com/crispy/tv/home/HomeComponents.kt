@@ -62,17 +62,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.crispy.tv.R
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.ratings.normalizeRatingText
@@ -659,7 +654,6 @@ internal fun HomeCollectionSectionRow(
             items(visibleSections, key = { it.section.key }) { sectionUi ->
                 HomeCollectionCard(
                     sectionUi = sectionUi,
-                    showSubtitle = sharedSubtitle.isBlank(),
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
                     onPlayClick = { onCollectionPlayClick(it) },
                     onCollectionMovieClick = onCollectionMovieClick,
@@ -672,35 +666,20 @@ internal fun HomeCollectionSectionRow(
 @Composable
 private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
-    showSubtitle: Boolean,
     onCollectionClick: () -> Unit,
     onPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
     val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
     val featuredMovie = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
-    val itemCountLabel = remember(sectionUi.items) { collectionItemCountLabel(sectionUi.items.size) }
-    val artworkUrl =
-        remember(sectionUi.items) {
-            sectionUi.items.firstNotNullOfOrNull { item ->
-                item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
-            }
-        }
-    val artworkModel = rememberCrispyImageModel(
-        artworkUrl,
-        width = 320.dp,
-        height = 180.dp,
-        tmdbSize = "w780",
+    val logoUrl = remember(featuredMovie?.logoUrl) { featuredMovie?.logoUrl?.trim()?.ifBlank { null } }
+    val logoModel = rememberCrispyImageModel(
+        url = logoUrl,
+        width = 256.dp,
+        height = 80.dp,
         enableCrossfade = true,
     )
     val collectionTitle = remember(sectionUi.section.displayTitle) { collectionDisplayTitle(sectionUi.section.displayTitle) }
-    val fallbackText =
-        when {
-            sectionUi.isLoading && sectionUi.items.isEmpty() -> "Loading"
-            showSubtitle && sectionUi.section.subtitle.isNotBlank() -> sectionUi.section.subtitle
-            sectionUi.statusMessage.isNotBlank() -> sectionUi.statusMessage
-            else -> ""
-        }
 
     Card(
         modifier = Modifier
@@ -713,70 +692,38 @@ private fun HomeCollectionCard(
                 .fillMaxWidth()
                 .clickable(onClick = onCollectionClick)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(128.dp)
                     .clip(RoundedCornerShape(22.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
             ) {
-                if (artworkModel != null) {
+                if (logoModel != null) {
                     AsyncImage(
-                        model = artworkModel,
+                        model = logoModel,
                         contentDescription = sectionUi.section.displayTitle,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.14f),
-                                    Color.Black.copy(alpha = 0.68f),
-                                )
-                            )
-                        )
-                )
-
-                Text(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    text = collectionTitle,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontFamily = homeCollectionTitleFontFamily,
-                        lineHeight = 26.sp,
-                    ),
-                    fontWeight = FontWeight.Normal,
-                    color = Color.White,
-                    textAlign = TextAlign.Start,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                if (sectionUi.items.isNotEmpty()) {
-                    Surface(
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(14.dp),
-                        shape = RoundedCornerShape(999.dp),
-                        color = Color.Black.copy(alpha = 0.62f),
-                    ) {
-                        Text(
-                            text = itemCountLabel,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
-                    }
+                            .fillMaxWidth(0.82f)
+                            .height(80.dp)
+                            .padding(horizontal = 12.dp),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.Center,
+                    )
+                } else {
+                    Text(
+                        text = collectionTitle,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
 
@@ -808,7 +755,7 @@ private fun HomeCollectionCard(
 
                 else -> {
                     Text(
-                        text = fallbackText,
+                        text = sectionUi.statusMessage,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 3,
@@ -995,26 +942,8 @@ private fun collectionMovieMetaText(item: CatalogItem): String {
     }.joinToString(separator = " • ")
 }
 
-private fun collectionItemCountLabel(count: Int): String {
-    return when (count) {
-        1 -> "1 movie"
-        else -> "$count movies"
-    }
-}
-
 private const val HOME_WIDE_SKELETON_COUNT = 3
 private const val HOME_POSTER_SKELETON_COUNT = 5
-
-private val homeCollectionTitleFontFamily = FontFamily(
-    Font(
-        googleFont = GoogleFont("Roboto Flex"),
-        fontProvider = GoogleFont.Provider(
-            providerAuthority = "com.google.android.gms.fonts",
-            providerPackage = "com.google.android.gms",
-            certificates = R.array.com_google_android_gms_fonts_certs,
-        ),
-    )
-)
 
 @Composable
 internal fun HomeCatalogPosterCard(

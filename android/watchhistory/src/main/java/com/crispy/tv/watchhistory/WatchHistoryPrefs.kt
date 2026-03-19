@@ -43,7 +43,6 @@ internal fun migrateLegacyWatchHistoryPrefsIfNeeded(context: Context) {
         listOf(
             KEY_LOCAL_WATCHED_ITEMS,
             KEY_TRAKT_TOKEN,
-            KEY_TRAKT_REFRESH_TOKEN,
             KEY_TRAKT_EXPIRES_AT,
             KEY_TRAKT_HANDLE,
             KEY_TRAKT_OAUTH_STATE,

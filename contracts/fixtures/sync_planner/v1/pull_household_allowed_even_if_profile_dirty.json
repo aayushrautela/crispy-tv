@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "sync_planner",
   "case_id": "pull_household_allowed_even_if_profile_dirty",
   "input": {
@@ -15,9 +15,7 @@
     "settings": {
       "theme": " dark "
     },
-    "catalog_prefs": {},
-    "trakt_auth": {},
-    "simkl_auth": {}
+    "catalog_prefs": {}
   },
   "expected": {
     "rpc_calls": [

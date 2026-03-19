@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "sync_planner",
   "case_id": "flush_bypasses_debounce",
   "input": {
@@ -22,9 +22,7 @@
     "settings": {
       "theme": " dark "
     },
-    "catalog_prefs": {},
-    "trakt_auth": {},
-    "simkl_auth": {}
+    "catalog_prefs": {}
   },
   "expected": {
     "rpc_calls": [
@@ -47,9 +45,7 @@
           "p_settings": {
             "theme": "dark"
           },
-          "p_catalog_prefs": {},
-          "p_trakt_auth": {},
-          "p_simkl_auth": {}
+          "p_catalog_prefs": {}
         }
       }
     ]

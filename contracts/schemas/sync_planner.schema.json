@@ -30,9 +30,7 @@
         "profile_id",
         "addons",
         "settings",
-        "catalog_prefs",
-        "trakt_auth",
-        "simkl_auth"
+        "catalog_prefs"
       ],
       "properties": {
         "role": {
@@ -104,18 +102,6 @@
           }
         },
         "catalog_prefs": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "trakt_auth": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "simkl_auth": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
@@ -235,9 +221,7 @@
                       "required": [
                         "p_profile_id",
                         "p_settings",
-                        "p_catalog_prefs",
-                        "p_trakt_auth",
-                        "p_simkl_auth"
+                        "p_catalog_prefs"
                       ],
                       "properties": {
                         "p_profile_id": {
@@ -251,18 +235,6 @@
                           }
                         },
                         "p_catalog_prefs": {
-                          "type": "object",
-                          "additionalProperties": {
-                            "type": "string"
-                          }
-                        },
-                        "p_trakt_auth": {
-                          "type": "object",
-                          "additionalProperties": {
-                            "type": "string"
-                          }
-                        },
-                        "p_simkl_auth": {
                           "type": "object",
                           "additionalProperties": {
                             "type": "string"

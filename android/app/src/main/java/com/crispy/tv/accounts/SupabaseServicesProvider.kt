@@ -6,7 +6,6 @@ import com.crispy.tv.home.HomeCatalogDiskCacheStore
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync
 
@@ -68,14 +67,12 @@ object SupabaseServicesProvider {
 
     fun createProfileDataCloudSync(
         context: Context,
-        watchHistoryService: WatchHistoryService? = null,
     ): ProfileDataCloudSync {
         val appContext = context.applicationContext
         return ProfileDataCloudSync(
             context = appContext,
             supabase = accountClient(appContext),
             activeProfileStore = activeProfileStore(appContext),
-            watchHistoryService = watchHistoryService,
         )
     }
 

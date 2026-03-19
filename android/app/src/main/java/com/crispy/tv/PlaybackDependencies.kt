@@ -60,12 +60,13 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
     val httpClient = AppHttp.client(appContext)
+    val supabase = SupabaseServicesProvider.accountClient(appContext)
+    val activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext)
     val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
     val episodeListProvider = TmdbEpisodeListProvider(
         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
     )
-    lateinit var service: RemoteWatchHistoryService
-    service = RemoteWatchHistoryService(
+    return RemoteWatchHistoryService(
         context = appContext,
         httpClient = httpClient,
         traktClientId = BuildConfig.TRAKT_CLIENT_ID,
@@ -79,21 +80,17 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
                 supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
                 appVersion = BuildConfig.VERSION_NAME,
             ),
-        onTraktTokenExpired = {
-            try {
-                val cloudSync =
-                    SupabaseServicesProvider.createProfileDataCloudSync(
-                        context = appContext,
-                        watchHistoryService = service,
-                    )
-                cloudSync.pullForActiveProfile()
-                service.authState().traktSession?.accessToken
-            } catch (_: Exception) {
-                null
-            }
+        providerSessionAccessTokenProvider = {
+            runCatching { supabase.ensureValidSession()?.accessToken }.getOrNull()
+        },
+        providerSessionProfileIdProvider = {
+            val session = runCatching { supabase.ensureValidSession() }.getOrNull()
+            session?.userId
+                ?.let { userId -> activeProfileStore.getActiveProfileId(userId) }
+                ?.trim()
+                ?.ifBlank { null }
         },
     )
-    return service
 }
 
 private fun newAddonStreamsService(context: Context): AddonStreamsService {
