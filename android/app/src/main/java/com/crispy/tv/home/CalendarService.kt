@@ -88,7 +88,7 @@ data class ThisWeekResult(
     val isError: Boolean = false,
 )
 
-class CalendarService(
+class CalendarService internal constructor(
     private val watchHistoryService: WatchHistoryService,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     private val metaEpisodeService: CalendarMetaEpisodeService,
