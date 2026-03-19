@@ -86,7 +86,7 @@ class NativePlaybackController(
         exoPlayer.addListener(exoListener)
     }
 
-    @OptIn(UnstableApi::class)
+    @UnstableApi
     override fun play(source: PlaybackSource, engine: NativePlaybackEngine) {
         val url = source.url
         Log.d(

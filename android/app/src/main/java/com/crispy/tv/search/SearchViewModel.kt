@@ -365,7 +365,8 @@ class SearchViewModel(
                         aiSearchRepository = AiSearchRepository.create(context, httpClient),
                         searchHistoryStore = SearchHistoryStore(context),
                     )
-                    return modelClass.cast(viewModel)
+                    @Suppress("UNCHECKED_CAST")
+                    return viewModel as T
                 }
             }
         }

@@ -45,7 +45,12 @@ fun PosterCard(
     onClick: () -> Unit
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
-    val imageModel = rememberCrispyImageModel(posterUrl ?: backdropUrl, width = 124.dp, height = 186.dp, tmdbSize = "w342")
+    val imageModel = rememberCrispyImageModel(
+        posterUrl ?: backdropUrl,
+        width = 124.dp,
+        height = 186.dp,
+        tmdbSize = "w342",
+    )
     Column(modifier = modifier) {
         Card(
             modifier = Modifier

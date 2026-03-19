@@ -43,7 +43,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -52,24 +51,6 @@ import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
-
-private typealias HomeCatalogSectionStateProvider = (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>
-
-private sealed interface HomeSectionBlock {
-    val key: String
-
-    data class CatalogRow(
-        val section: CatalogSectionRef,
-    ) : HomeSectionBlock {
-        override val key: String = section.key
-    }
-
-    data class CollectionShelf(
-        val sections: List<CatalogSectionRef>,
-    ) : HomeSectionBlock {
-        override val key: String = sections.joinToString(separator = ":", prefix = "collections:") { it.key }
-    }
-}
 
 private val HomeContentSectionSpacing = 24.dp
 private val HomeTopSectionSpacing = 16.dp
@@ -95,9 +76,7 @@ internal fun HomeRoute(
             HomeViewModel.factory(appContext)
         },
     )
-    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-    val contentSections by viewModel.contentSections.collectAsStateWithLifecycle()
-    val catalogSectionState = remember(viewModel) { viewModel::catalogSectionState }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = appBarScrollBehavior()
 
     androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
@@ -142,15 +121,7 @@ internal fun HomeRoute(
                 .consumeWindowInsets(paddingValues),
         ) {
             HomeScreen(
-                isRefreshing = isRefreshing,
-                pillSectionsState = viewModel.pillSections,
-                contentSections = contentSections,
-                catalogStatusState = viewModel.catalogStatusState,
-                heroState = viewModel.heroState,
-                continueWatchingState = viewModel.continueWatchingState,
-                upNextState = viewModel.upNextState,
-                thisWeekState = viewModel.thisWeekState,
-                catalogSectionState = catalogSectionState,
+                uiState = uiState,
                 onRefresh = viewModel::refresh,
                 onHideContinueWatchingItem = viewModel::hideContinueWatchingItem,
                 onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
@@ -170,15 +141,7 @@ internal fun HomeRoute(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HomeScreen(
-    isRefreshing: Boolean,
-    pillSectionsState: StateFlow<List<CatalogSectionRef>>,
-    contentSections: List<CatalogSectionRef>,
-    catalogStatusState: StateFlow<HomeCatalogStatusState>,
-    heroState: StateFlow<HeroState>,
-    continueWatchingState: StateFlow<HomeWatchActivityRailState>,
-    upNextState: StateFlow<HomeWatchActivityRailState>,
-    thisWeekState: StateFlow<ThisWeekState>,
-    catalogSectionState: HomeCatalogSectionStateProvider,
+    uiState: HomeUiState,
     onRefresh: () -> Unit,
     onHideContinueWatchingItem: (ContinueWatchingItem) -> Unit,
     onRemoveContinueWatchingItem: (ContinueWatchingItem) -> Unit,
@@ -195,11 +158,6 @@ private fun HomeScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val lazyListState = rememberLazyListState()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
-    val continueWatching by continueWatchingState.collectAsStateWithLifecycle()
-    val upNext by upNextState.collectAsStateWithLifecycle()
-    val thisWeek by thisWeekState.collectAsStateWithLifecycle()
-    val catalogStatus by catalogStatusState.collectAsStateWithLifecycle()
-    val sectionBlocks = remember(contentSections) { buildHomeSectionBlocks(contentSections) }
 
     LaunchedEffect(scrollToTopRequest) {
         if (scrollToTopRequest > 0) {
@@ -209,14 +167,14 @@ private fun HomeScreen(
     }
 
     PullToRefreshBox(
-        isRefreshing = isRefreshing,
+        isRefreshing = uiState.isRefreshing,
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),
         state = pullToRefreshState,
         indicator = {
             Indicator(
                 state = pullToRefreshState,
-                isRefreshing = isRefreshing,
+                isRefreshing = uiState.isRefreshing,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         },
@@ -235,78 +193,59 @@ private fun HomeScreen(
             item(key = "topHeader", contentType = "topHeader") {
                 Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
                     HomeHeaderSectionsItem(
-                        headerSectionsState = pillSectionsState,
+                        sections = uiState.headerPills,
                         onSectionClick = onCatalogSeeAllClick,
                     )
                     HomeHeroSection(
-                        heroState = heroState,
+                        state = uiState.hero,
                         onHeroClick = onHeroClick,
                     )
                 }
             }
 
-            if (continueWatching.isVisible) {
-                item(key = "continueWatching", contentType = "continueWatching") {
-                    HomeContinueWatchingSection(
-                        state = continueWatching,
-                        onItemClick = onContinueWatchingClick,
-                        onHideItem = onHideContinueWatchingItem,
-                        onRemoveItem = onRemoveContinueWatchingItem,
-                    )
-                }
-            }
-
-            if (upNext.isVisible) {
-                item(key = "upNext", contentType = "upNext") {
-                    HomeUpNextSection(
-                        state = upNext,
-                        onItemClick = onContinueWatchingClick,
-                    )
-                }
-            }
-
-            if (thisWeek.isVisible) {
-                item(key = "thisWeek", contentType = "thisWeek") {
-                    HomeThisWeekRail(
-                        state = thisWeek,
-                        onItemClick = onThisWeekClick,
-                        onViewAllClick = onThisWeekSeeAllClick,
-                    )
-                }
-            }
-
-            if (!catalogStatus.hasCatalogSections && catalogStatus.statusMessage.isNotBlank()) {
-                item(key = "catalogStatus", contentType = "catalogStatus") {
-                    HomeCatalogStatusCard(statusMessage = catalogStatus.statusMessage)
-                }
-            }
-
-            if (sectionBlocks.isNotEmpty()) {
+            if (uiState.sections.isNotEmpty()) {
                 items(
-                    items = sectionBlocks,
+                    items = uiState.sections,
                     key = { it.key },
                     contentType = {
                         when (it) {
-                            is HomeSectionBlock.CatalogRow -> "catalogSection"
-                            is HomeSectionBlock.CollectionShelf -> "collectionShelf"
+                            is HomeCatalogRowSectionUi -> "catalogSection"
+                            is HomeCollectionShelfSectionUi -> "collectionShelf"
+                            is HomeStatusSectionUi -> "catalogStatus"
+                            is HomeWideRailSectionUi -> it.kind.name
                         }
                     },
                 ) { block ->
                     when (block) {
-                        is HomeSectionBlock.CatalogRow -> {
-                            HomeCatalogSectionItem(
-                                sectionState = catalogSectionState(block.section),
-                                onSeeAllClick = onCatalogSeeAllClick,
+                        is HomeCatalogRowSectionUi -> {
+                            HomeCatalogSectionRow(
+                                sectionUi = block.sectionUi,
+                                onSeeAllClick = { onCatalogSeeAllClick(block.sectionUi.section) },
                                 onItemClick = onCatalogItemClick,
                             )
                         }
 
-                        is HomeSectionBlock.CollectionShelf -> {
-                            HomeCollectionSectionItem(
-                                sectionStates = block.sections.map(catalogSectionState),
+                        is HomeCollectionShelfSectionUi -> {
+                            HomeCollectionSectionRow(
+                                sectionUis = block.sectionUis,
                                 onCollectionClick = onCatalogSeeAllClick,
                                 onCollectionPlayClick = onCatalogItemClick,
                                 onCollectionMovieClick = onCatalogItemClick,
+                            )
+                        }
+
+                        is HomeStatusSectionUi -> {
+                            HomeCatalogStatusCard(statusMessage = block.statusMessage)
+                        }
+
+                        is HomeWideRailSectionUi -> {
+                            HomeWideRailSection(
+                                section = block,
+                                onContinueWatchingClick = onContinueWatchingClick,
+                                onHideContinueWatchingItem = onHideContinueWatchingItem,
+                                onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
+                                onThisWeekClick = onThisWeekClick,
+                                onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
                             )
                         }
                     }
@@ -314,39 +253,13 @@ private fun HomeScreen(
             }
         }
 }
-
-}
-
-private fun buildHomeSectionBlocks(sections: List<CatalogSectionRef>): List<HomeSectionBlock> {
-    if (sections.isEmpty()) {
-        return emptyList()
-    }
-
-    val blocks = mutableListOf<HomeSectionBlock>()
-    var index = 0
-    while (index < sections.size) {
-        val section = sections[index]
-        if (section.presentation == HomeCatalogPresentation.COLLECTION_SHELF) {
-            val groupedSections = mutableListOf<CatalogSectionRef>()
-            while (index < sections.size && sections[index].presentation == HomeCatalogPresentation.COLLECTION_SHELF) {
-                groupedSections += sections[index]
-                index += 1
-            }
-            blocks += HomeSectionBlock.CollectionShelf(groupedSections)
-        } else {
-            blocks += HomeSectionBlock.CatalogRow(section)
-            index += 1
-        }
-    }
-    return blocks
 }
 
 @Composable
 private fun HomeHeaderSectionsItem(
-    headerSectionsState: StateFlow<List<CatalogSectionRef>>,
+    sections: List<CatalogSectionRef>,
     onSectionClick: (CatalogSectionRef) -> Unit,
 ) {
-    val sections by headerSectionsState.collectAsStateWithLifecycle()
     if (sections.isEmpty()) {
         return
     }
@@ -358,11 +271,9 @@ private fun HomeHeaderSectionsItem(
 
 @Composable
 private fun HomeHeroSection(
-    heroState: StateFlow<HeroState>,
+    state: HeroState,
     onHeroClick: (HomeHeroItem) -> Unit,
 ) {
-    val state by heroState.collectAsStateWithLifecycle()
-
     when {
         state.isLoading && state.items.isEmpty() -> {
             HomeHeroSkeleton()
@@ -380,64 +291,10 @@ private fun HomeHeroSection(
         else -> {
             HomeHeroCarousel(
                 items = state.items,
-                selectedId = state.selectedId,
                 onItemClick = onHeroClick,
             )
         }
     }
-}
-
-@Composable
-private fun HomeContinueWatchingSection(
-    state: HomeWatchActivityRailState,
-    onItemClick: (ContinueWatchingItem) -> Unit,
-    onHideItem: (ContinueWatchingItem) -> Unit,
-    onRemoveItem: (ContinueWatchingItem) -> Unit,
-) {
-    HomeRailSection(
-        title = "Continue Watching",
-        items = state.items,
-        statusMessage = state.statusMessage,
-        actionMenuContentDescription = "Continue watching actions",
-        onItemClick = onItemClick,
-        onHideItem = onHideItem,
-        onRemoveItem = onRemoveItem,
-        showProgressBarFor = { item -> item.progressPercent > 0 },
-        useBottomSheetActions = true,
-        useOverlayCardStyle = true,
-        isLoading = state.isLoading,
-    )
-}
-
-@Composable
-private fun HomeUpNextSection(
-    state: HomeWatchActivityRailState,
-    onItemClick: (ContinueWatchingItem) -> Unit,
-) {
-    HomeRailSection(
-        title = "Up Next",
-        items = state.items,
-        statusMessage = state.statusMessage,
-        actionMenuContentDescription = "Up next details",
-        onItemClick = onItemClick,
-        showTitleFallbackWhenNoLogo = true,
-        isLoading = state.isLoading,
-    )
-}
-
-@Composable
-private fun HomeThisWeekRail(
-    state: ThisWeekState,
-    onItemClick: (CalendarEpisodeItem) -> Unit,
-    onViewAllClick: () -> Unit,
-) {
-    ThisWeekSection(
-        items = state.items,
-        isLoading = state.isLoading,
-        statusMessage = state.statusMessage,
-        onItemClick = onItemClick,
-        onViewAllClick = onViewAllClick,
-    )
 }
 
 @Composable
@@ -448,41 +305,6 @@ private fun HomeCatalogStatusCard(statusMessage: String) {
             modifier = Modifier.padding(Dimensions.CardInternalPadding),
         )
     }
-}
-
-@Composable
-private fun HomeCatalogSectionItem(
-    sectionState: StateFlow<HomeCatalogSectionUi>,
-    onSeeAllClick: (CatalogSectionRef) -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
-) {
-    val sectionUi by sectionState.collectAsStateWithLifecycle()
-
-    HomeCatalogSectionRow(
-        sectionUi = sectionUi,
-        onSeeAllClick = { onSeeAllClick(sectionUi.section) },
-        onItemClick = onItemClick,
-    )
-}
-
-@Composable
-private fun HomeCollectionSectionItem(
-    sectionStates: List<StateFlow<HomeCatalogSectionUi>>,
-    onCollectionClick: (CatalogSectionRef) -> Unit,
-    onCollectionPlayClick: (CatalogItem) -> Unit,
-    onCollectionMovieClick: (CatalogItem) -> Unit,
-) {
-    val sectionUis = ArrayList<HomeCatalogSectionUi>(sectionStates.size)
-    for (sectionState in sectionStates) {
-        sectionUis += sectionState.collectAsStateWithLifecycle().value
-    }
-
-    HomeCollectionSectionRow(
-        sectionUis = sectionUis,
-        onCollectionClick = onCollectionClick,
-        onCollectionPlayClick = onCollectionPlayClick,
-        onCollectionMovieClick = onCollectionMovieClick,
-    )
 }
 
 @Composable

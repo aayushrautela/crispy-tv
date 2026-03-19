@@ -9,7 +9,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
@@ -36,52 +35,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.util.LinkedHashMap
+import java.time.LocalDate
 import java.util.Locale
 
 @Immutable
 data class HeroState(
     val items: List<HomeHeroItem> = emptyList(),
-    val selectedId: String? = null,
     val isLoading: Boolean = true,
     val statusMessage: String = "Loading featured content..."
-) {
-    val selected: HomeHeroItem?
-        get() = items.firstOrNull { it.id == selectedId } ?: items.firstOrNull()
-}
-
-@Immutable
-data class HomeWatchActivityItemUi(
-    val item: ContinueWatchingItem,
-    val subtitle: String,
-)
-
-@Immutable
-data class HomeWatchActivityRailState(
-    val items: List<HomeWatchActivityItemUi> = emptyList(),
-    val isLoading: Boolean = true,
-    val statusMessage: String = "",
-    val isError: Boolean = false,
-) {
-    val isVisible: Boolean
-        get() = isLoading || items.isNotEmpty() || isError
-}
-
-@Immutable
-data class ThisWeekState(
-    val items: List<CalendarEpisodeItem> = emptyList(),
-    val isLoading: Boolean = true,
-    val statusMessage: String = "",
-    val isError: Boolean = false,
-) {
-    val isVisible: Boolean
-        get() = isLoading || items.isNotEmpty() || isError
-}
-
-@Immutable
-data class HomeCatalogStatusState(
-    val statusMessage: String = "",
-    val hasCatalogSections: Boolean = false,
 )
 
 @Immutable
@@ -90,6 +51,18 @@ data class HomeCatalogSectionUi(
     val items: List<CatalogItem> = emptyList(),
     val isLoading: Boolean = true,
     val statusMessage: String = ""
+)
+
+private data class HomePrimarySnapshot(
+    val hero: HeroState = HeroState(),
+    val headerPills: List<CatalogSectionRef> = emptyList(),
+    val catalogSections: List<HomeCatalogSectionUi> = emptyList(),
+    val catalogStatusMessage: String = "",
+)
+
+private data class HomeWatchActivitySnapshot(
+    val continueWatching: HomeWideRailSectionUi? = null,
+    val upNext: HomeWideRailSectionUi? = null,
 )
 
 class HomeViewModel internal constructor(
@@ -133,34 +106,13 @@ class HomeViewModel internal constructor(
         }
     }
 
-    private val _heroState = MutableStateFlow(HeroState())
-    val heroState: StateFlow<HeroState> = _heroState.asStateFlow()
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private val _continueWatchingState = MutableStateFlow(HomeWatchActivityRailState())
-    val continueWatchingState: StateFlow<HomeWatchActivityRailState> = _continueWatchingState.asStateFlow()
-
-    private val _upNextState = MutableStateFlow(HomeWatchActivityRailState())
-    val upNextState: StateFlow<HomeWatchActivityRailState> = _upNextState.asStateFlow()
-
-    private val _thisWeekState = MutableStateFlow(ThisWeekState())
-    val thisWeekState: StateFlow<ThisWeekState> = _thisWeekState.asStateFlow()
-
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    private val _pillSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
-    val pillSections: StateFlow<List<CatalogSectionRef>> = _pillSections.asStateFlow()
-
-    private val _contentSections = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
-    val contentSections: StateFlow<List<CatalogSectionRef>> = _contentSections.asStateFlow()
-
-    private val _catalogStatusState = MutableStateFlow(HomeCatalogStatusState())
-    val catalogStatusState: StateFlow<HomeCatalogStatusState> = _catalogStatusState.asStateFlow()
-
-    private val _isForegroundLoading = MutableStateFlow(true)
-    val isForegroundLoading: StateFlow<Boolean> = _isForegroundLoading.asStateFlow()
-
-    private val catalogSectionStates = LinkedHashMap<String, MutableStateFlow<HomeCatalogSectionUi>>()
+    private var isForegroundLoading: Boolean = true
+    private var primarySnapshot = HomePrimarySnapshot()
+    private var watchActivitySnapshot = HomeWatchActivitySnapshot()
+    private var thisWeekSection: HomeWideRailSectionUi? = null
 
     private var suppressedItemsByKey: MutableMap<String, Long>? = null
     @Volatile
@@ -187,18 +139,27 @@ class HomeViewModel internal constructor(
 
         refreshJob =
             viewModelScope.launch {
+                var nextPrimarySnapshot: HomePrimarySnapshot? = null
+                var nextWatchActivitySnapshot: HomeWatchActivitySnapshot? = null
                 try {
                     coroutineScope {
-                        val jobs = listOf(
-                            launch { refreshPrimaryFeed(currentRefreshGeneration) },
-                            launch { refreshWatchActivity(currentRefreshGeneration) },
-                        )
-                        jobs.forEach { it.join() }
+                        val primaryDeferred = async { loadPrimarySnapshot(currentRefreshGeneration) }
+                        val watchActivityDeferred =
+                            async {
+                                loadWatchActivitySnapshot(
+                                    generation = currentRefreshGeneration,
+                                    enrichMetadata = !showForegroundLoading,
+                                )
+                            }
+                        nextPrimarySnapshot = primaryDeferred.await()
+                        nextWatchActivitySnapshot = watchActivityDeferred.await()
                     }
                 } finally {
                     if (isCurrentRefresh(currentRefreshGeneration)) {
-                        _isRefreshing.value = false
-                        _isForegroundLoading.value = false
+                        nextPrimarySnapshot?.let { primarySnapshot = it }
+                        nextWatchActivitySnapshot?.let { watchActivitySnapshot = it }
+                        isForegroundLoading = false
+                        publishUiState(isRefreshing = false)
                         lastRefreshCompletedAtMs = System.currentTimeMillis()
                     }
                     refreshJob = null
@@ -208,11 +169,29 @@ class HomeViewModel internal constructor(
                     } else if (isCurrentRefresh(currentRefreshGeneration)) {
                         backgroundRefreshJob =
                             viewModelScope.launch {
-                                refreshWatchActivity(
-                                    generation = currentRefreshGeneration,
-                                    enrichMetadata = true,
-                                )
-                                refreshThisWeek(currentRefreshGeneration)
+                                val refreshedWatchActivitySnapshot =
+                                    if (showForegroundLoading) {
+                                        loadWatchActivitySnapshot(
+                                            generation = currentRefreshGeneration,
+                                            enrichMetadata = true,
+                                        )
+                                    } else {
+                                        watchActivitySnapshot
+                                    }
+                                val refreshedThisWeekSection = loadThisWeekSection(currentRefreshGeneration)
+                                if (!isCurrentRefresh(currentRefreshGeneration)) {
+                                    return@launch
+                                }
+
+                                val didChange =
+                                    refreshedWatchActivitySnapshot != watchActivitySnapshot ||
+                                        refreshedThisWeekSection != thisWeekSection
+                                watchActivitySnapshot = refreshedWatchActivitySnapshot
+                                thisWeekSection = refreshedThisWeekSection
+
+                                if (didChange) {
+                                    publishUiState(isRefreshing = false)
+                                }
                             }
                     }
                 }
@@ -234,63 +213,34 @@ class HomeViewModel internal constructor(
     }
 
     private fun prepareForRefresh(showForegroundLoading: Boolean) {
-        _isRefreshing.value = true
-        _isForegroundLoading.value = showForegroundLoading
+        isForegroundLoading = showForegroundLoading
         if (!showForegroundLoading) {
-            _continueWatchingState.update { current -> current.copy(isError = false) }
-            _upNextState.update { current -> current.copy(isError = false) }
-            _thisWeekState.update { current -> current.copy(isError = false) }
+            _uiState.update { current -> current.copy(isRefreshing = true) }
             return
         }
 
-        _heroState.update { current ->
+        _uiState.update { current ->
             current.copy(
-                isLoading = true,
-                statusMessage = current.statusMessage.ifBlank { "Loading featured content..." },
-            )
-        }
-        _continueWatchingState.update { current ->
-            current.copy(
-                isLoading = true,
-                isError = false,
-            )
-        }
-        _upNextState.update { current ->
-            current.copy(
-                isLoading = true,
-                isError = false,
-            )
-        }
-        _thisWeekState.update { current ->
-            current.copy(
-                isLoading = true,
-                isError = false,
-            )
-        }
-        catalogSectionStates.values.forEach { state ->
-            state.update { current ->
-                current.copy(
-                    items = if (current.items.isEmpty()) current.section.previewItems else current.items,
+                isRefreshing = true,
+                hero = current.hero.copy(
                     isLoading = true,
-                )
-            }
+                    statusMessage = current.hero.statusMessage.ifBlank { "Loading featured content..." },
+                ),
+                sections = current.sections.ifEmpty { defaultLoadingSections() }.map(::markSectionLoading),
+            )
         }
     }
 
     private fun hasLoadedHomeContent(): Boolean {
-        return _heroState.value.items.isNotEmpty() ||
-            _continueWatchingState.value.items.isNotEmpty() ||
-            _upNextState.value.items.isNotEmpty() ||
-            _thisWeekState.value.items.isNotEmpty() ||
-            _contentSections.value.isNotEmpty() ||
-            _pillSections.value.isNotEmpty()
+        val current = _uiState.value
+        return current.hero.items.isNotEmpty() || current.sections.isNotEmpty() || current.headerPills.isNotEmpty()
     }
 
     private fun isCurrentRefresh(generation: Long): Boolean {
         return refreshGeneration == generation
     }
 
-    private suspend fun refreshPrimaryFeed(generation: Long) {
+    private suspend fun loadPrimarySnapshot(generation: Long): HomePrimarySnapshot {
         val feedLoadStartedAt = System.currentTimeMillis()
         val primaryFeedResult =
             try {
@@ -301,50 +251,52 @@ class HomeViewModel internal constructor(
                 if (error is CancellationException) throw error
                 Log.w(TAG, "Primary home feed refresh failed", error)
                 delayForMinimumSkeletonVisibility(feedLoadStartedAt)
-                if (!isCurrentRefresh(generation)) return
                 val message = error.message ?: "Failed to load home feed."
-                _heroState.value = HeroState(items = emptyList(), isLoading = false, statusMessage = message)
-                setCatalogSections(sections = emptyList(), statusMessage = message)
-                return
+                return HomePrimarySnapshot(
+                    hero = HeroState(items = emptyList(), isLoading = false, statusMessage = message),
+                    catalogStatusMessage = message,
+                )
             }
 
         delayForMinimumSkeletonVisibility(feedLoadStartedAt)
-        if (!isCurrentRefresh(generation)) return
+        val heroItems = primaryFeedResult.heroResult.items
+        val allSections = primaryFeedResult.sections
+        val headerPills =
+            allSections
+                .asSequence()
+                .filter { it.presentation == HomeCatalogPresentation.PILL }
+                .filter { it.displayTitle.trim().isNotEmpty() }
+                .distinctBy { it.key }
+                .toList()
+        val catalogSections =
+            allSections
+                .asSequence()
+                .filter { it.presentation != HomeCatalogPresentation.PILL }
+                .map { section ->
+                    HomeCatalogSectionUi(
+                        section = section,
+                        items = section.previewItems,
+                        isLoading = false,
+                    )
+                }
+                .toList()
 
-        _heroState.update { current ->
-            val selectedId =
-                current.selectedId?.takeIf { id ->
-                    primaryFeedResult.heroResult.items.any { it.id == id }
-                } ?: primaryFeedResult.heroResult.items.firstOrNull()?.id
-            current.copy(
-                items = primaryFeedResult.heroResult.items,
-                selectedId = selectedId,
+        return HomePrimarySnapshot(
+            hero = HeroState(
+                items = heroItems,
                 isLoading = false,
                 statusMessage = primaryFeedResult.heroResult.statusMessage,
-            )
-        }
-
-        setCatalogSections(
-            sections = primaryFeedResult.sections,
-            statusMessage = primaryFeedResult.sectionsStatusMessage,
+            ),
+            headerPills = headerPills,
+            catalogSections = catalogSections,
+            catalogStatusMessage = primaryFeedResult.sectionsStatusMessage,
         )
-
-        primaryFeedResult.sections.forEach { section ->
-            updateCatalogSectionState(
-                section = section,
-                pageResult = CatalogPageResult(items = section.previewItems),
-            )
-        }
     }
 
-    private suspend fun refreshWatchActivity(generation: Long) {
-        refreshWatchActivity(generation = generation, enrichMetadata = !_isForegroundLoading.value)
-    }
-
-    private suspend fun refreshWatchActivity(
+    private suspend fun loadWatchActivitySnapshot(
         generation: Long,
         enrichMetadata: Boolean,
-    ) {
+    ): HomeWatchActivitySnapshot {
         val sectionLoadStartedAt = System.currentTimeMillis()
         val continueWatchingResult =
             try {
@@ -391,47 +343,54 @@ class HomeViewModel internal constructor(
                 if (error is CancellationException) throw error
                 Log.w(TAG, "Watch activity refresh failed", error)
                 delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-                if (!isCurrentRefresh(generation)) return
                 val message = error.message ?: "Failed to load continue watching."
-                setWatchActivityStates(
-                    continueWatching = HomeWatchActivityRailState(
+                return HomeWatchActivitySnapshot(
+                    continueWatching = HomeWideRailSectionUi(
+                        key = "continueWatching",
+                        title = "Continue Watching",
+                        kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
                         isLoading = false,
                         statusMessage = message,
-                        isError = true,
                     ),
-                    upNext = HomeWatchActivityRailState(isLoading = false),
+                    upNext = HomeWideRailSectionUi(
+                        key = "upNext",
+                        title = "Up Next",
+                        kind = HomeWideRailSectionKind.UP_NEXT,
+                        isLoading = false,
+                    ),
                 )
-                return
             }
 
         delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-        if (!isCurrentRefresh(generation)) return
 
         val nowMs = System.currentTimeMillis()
-        val railItems = continueWatchingResult.items.map { item -> item.toHomeWatchActivityItemUi(nowMs) }
-        val continueWatchingItems = railItems.filterNot { it.item.isUpNextPlaceholder }
-        val upNextItems = railItems.filter { it.item.isUpNextPlaceholder }
+        val railItems = continueWatchingResult.items
+        val continueWatchingItems = railItems.filterNot { it.isUpNextPlaceholder }
+        val upNextItems = railItems.filter { it.isUpNextPlaceholder }
 
-        setWatchActivityStates(
-            continueWatching =
-                HomeWatchActivityRailState(
-                    items = continueWatchingItems,
-                    isLoading = false,
-                    statusMessage =
-                        continueWatchingResult.statusMessage.takeIf {
-                            continueWatchingItems.isNotEmpty() || continueWatchingResult.isError
-                        }.orEmpty(),
-                    isError = continueWatchingResult.isError,
-                ),
-            upNext =
-                HomeWatchActivityRailState(
-                    items = upNextItems,
-                    isLoading = false,
-                ),
+        return HomeWatchActivitySnapshot(
+            continueWatching = HomeWideRailSectionUi(
+                key = "continueWatching",
+                title = "Continue Watching",
+                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+                items = continueWatchingItems.map { item -> item.toWideRailItem(nowMs) },
+                isLoading = false,
+                statusMessage =
+                    continueWatchingResult.statusMessage.takeIf {
+                        continueWatchingItems.isNotEmpty() || continueWatchingResult.isError
+                    }.orEmpty(),
+            ),
+            upNext = HomeWideRailSectionUi(
+                key = "upNext",
+                title = "Up Next",
+                kind = HomeWideRailSectionKind.UP_NEXT,
+                items = upNextItems.map { item -> item.toWideRailItem(nowMs) },
+                isLoading = false,
+            ),
         )
     }
 
-    private suspend fun refreshThisWeek(generation: Long) {
+    private suspend fun loadThisWeekSection(generation: Long): HomeWideRailSectionUi? {
         val sectionLoadStartedAt = System.currentTimeMillis()
         val thisWeekResult =
             try {
@@ -442,42 +401,28 @@ class HomeViewModel internal constructor(
                 if (error is CancellationException) throw error
                 Log.w(TAG, "This week refresh failed", error)
                 delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-                if (!isCurrentRefresh(generation)) return
-                setThisWeekState(
-                    ThisWeekState(
-                        isLoading = false,
-                        statusMessage = error.message ?: "Failed to load this week.",
-                        isError = true,
-                    )
+                return HomeWideRailSectionUi(
+                    key = "thisWeek",
+                    title = "This Week",
+                    kind = HomeWideRailSectionKind.THIS_WEEK,
+                    isLoading = false,
+                    statusMessage = error.message ?: "Failed to load this week.",
                 )
-                return
             }
 
         delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-        if (!isCurrentRefresh(generation)) return
-        setThisWeekState(
-            ThisWeekState(
-                items = thisWeekResult.items,
-                isLoading = false,
-                statusMessage =
-                    thisWeekResult.statusMessage.takeIf {
-                        thisWeekResult.items.isNotEmpty() || thisWeekResult.isError
-                    }.orEmpty(),
-                isError = thisWeekResult.isError,
-            )
-        )
-    }
 
-    fun catalogSectionState(section: CatalogSectionRef): StateFlow<HomeCatalogSectionUi> {
-        return catalogSectionStates.getOrPut(section.key) {
-            MutableStateFlow(
-                HomeCatalogSectionUi(
-                    section = section,
-                    items = section.previewItems,
-                    isLoading = false,
-                )
-            )
-        }
+        return HomeWideRailSectionUi(
+            key = "thisWeek",
+            title = "This Week",
+            kind = HomeWideRailSectionKind.THIS_WEEK,
+            items = thisWeekResult.items.map { item -> item.toWideRailItem() },
+            isLoading = false,
+            statusMessage =
+                thisWeekResult.statusMessage.takeIf {
+                    thisWeekResult.items.isNotEmpty() || thisWeekResult.isError
+                }.orEmpty(),
+        )
     }
 
     private suspend fun loadProviderContinueWatching(selectedSource: WatchProvider): ContinueWatchingResult {
@@ -505,12 +450,11 @@ class HomeViewModel internal constructor(
             item.id,
             continueWatchingContentKey(type = item.type, contentId = item.contentId)
         )
-        updateWatchActivityRailState(item) { current ->
-            val remainingItems = current.items.filterNot { it.item.id == item.id }
+        updateWatchActivitySection(item) { current ->
+            val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
             current.copy(
                 items = remainingItems,
                 statusMessage = if (remainingItems.isEmpty()) "" else "Hidden ${item.title}.",
-                isError = false,
             )
         }
     }
@@ -520,12 +464,11 @@ class HomeViewModel internal constructor(
             item.id,
             continueWatchingContentKey(type = item.type, contentId = item.contentId)
         )
-        updateWatchActivityRailState(item) { current ->
-            val remainingItems = current.items.filterNot { it.item.id == item.id }
+        updateWatchActivitySection(item) { current ->
+            val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
             current.copy(
                 items = remainingItems,
                 statusMessage = if (remainingItems.isEmpty()) "" else "Removing ${item.title}...",
-                isError = false,
             )
         }
 
@@ -560,21 +503,10 @@ class HomeViewModel internal constructor(
                     }
                 }
             }
-            updateWatchActivityRailState(item) { current ->
+            updateWatchActivitySection(item) { current ->
                 current.copy(
                     statusMessage = removalResult.statusMessage.takeIf { current.items.isNotEmpty() }.orEmpty(),
-                    isError = false,
                 )
-            }
-        }
-    }
-
-    fun onHeroSelected(heroId: String) {
-        _heroState.update { current ->
-            if (current.items.none { it.id == heroId }) {
-                current
-            } else {
-                current.copy(selectedId = heroId)
             }
         }
     }
@@ -688,87 +620,188 @@ class HomeViewModel internal constructor(
         suppressionStore.write(suppressionMap)
     }
 
-    private fun setWatchActivityStates(
-        continueWatching: HomeWatchActivityRailState = _continueWatchingState.value,
-        upNext: HomeWatchActivityRailState = _upNextState.value,
-    ) {
-        _continueWatchingState.value = continueWatching
-        _upNextState.value = upNext
-    }
-
-    private fun updateWatchActivityRailState(
+    private fun updateWatchActivitySection(
         item: ContinueWatchingItem,
-        transform: (HomeWatchActivityRailState) -> HomeWatchActivityRailState,
+        transform: (HomeWideRailSectionUi) -> HomeWideRailSectionUi,
     ) {
-        if (item.isUpNextPlaceholder) {
-            setWatchActivityStates(upNext = transform(_upNextState.value))
-        } else {
-            setWatchActivityStates(continueWatching = transform(_continueWatchingState.value))
-        }
-    }
-
-    private fun setThisWeekState(state: ThisWeekState) {
-        _thisWeekState.value = state
-    }
-
-    private fun setCatalogSections(
-        sections: List<CatalogSectionRef>,
-        statusMessage: String,
-    ) {
-        val activeKeys = sections.mapTo(linkedSetOf()) { it.key }
-        sections.forEach { section ->
-            val sectionState = catalogSectionStates.getOrPut(section.key) {
-                MutableStateFlow(
-                    HomeCatalogSectionUi(
-                        section = section,
-                        items = section.previewItems,
-                        isLoading = false,
-                    )
+        watchActivitySnapshot =
+            if (item.isUpNextPlaceholder) {
+                watchActivitySnapshot.copy(
+                    upNext = watchActivitySnapshot.upNext?.let(transform),
+                )
+            } else {
+                watchActivitySnapshot.copy(
+                    continueWatching = watchActivitySnapshot.continueWatching?.let(transform),
                 )
             }
-            val current = sectionState.value
-            sectionState.value = current.copy(
-                section = section,
-                items = section.previewItems.ifEmpty { current.items },
-            )
-        }
-        catalogSectionStates.keys.retainAll(activeKeys)
-
-        _pillSections.value =
-            sections
-                .asSequence()
-                .filter { it.presentation == HomeCatalogPresentation.PILL }
-                .filter { it.displayTitle.trim().isNotEmpty() }
-                .distinctBy { it.key }
-                .toList()
-        _contentSections.value = sections.filter { it.presentation != HomeCatalogPresentation.PILL }
-        _catalogStatusState.value =
-            HomeCatalogStatusState(
-                statusMessage = statusMessage,
-                hasCatalogSections = sections.isNotEmpty(),
-            )
+        publishUiState(isRefreshing = _uiState.value.isRefreshing)
     }
 
-    private fun updateCatalogSectionState(
-        section: CatalogSectionRef,
-        pageResult: CatalogPageResult,
-    ) {
-        val sectionState = catalogSectionStates.getOrPut(section.key) {
-            MutableStateFlow(
-                HomeCatalogSectionUi(
-                    section = section,
-                    items = section.previewItems,
-                    isLoading = false,
-                )
+    private fun publishUiState(isRefreshing: Boolean) {
+        val newState =
+            HomeUiState(
+                isRefreshing = isRefreshing,
+                headerPills = primarySnapshot.headerPills,
+                hero = primarySnapshot.hero,
+                sections = buildHomeSections(),
+            )
+        if (_uiState.value != newState) {
+            _uiState.value = newState
+        }
+    }
+
+    private fun buildHomeSections(): List<HomeContentSectionUi> {
+        val sections = mutableListOf<HomeContentSectionUi>()
+        watchActivitySnapshot.continueWatching?.takeIf { it.isVisible() }?.let(sections::add)
+        watchActivitySnapshot.upNext?.takeIf { it.isVisible() }?.let(sections::add)
+        thisWeekSection?.takeIf { it.isVisible() }?.let(sections::add)
+        if (primarySnapshot.catalogSections.isEmpty() && primarySnapshot.catalogStatusMessage.isNotBlank()) {
+            sections += HomeStatusSectionUi(
+                key = "catalogStatus",
+                statusMessage = primarySnapshot.catalogStatusMessage,
             )
         }
-        sectionState.value =
-            HomeCatalogSectionUi(
-                section = section,
-                items = pageResult.items.ifEmpty { section.previewItems },
-                isLoading = false,
-                statusMessage = pageResult.statusMessage,
+        sections += groupCatalogSections(primarySnapshot.catalogSections)
+        return sections
+    }
+
+    private fun defaultLoadingSections(): List<HomeContentSectionUi> {
+        return listOf(
+            HomeWideRailSectionUi(
+                key = "continueWatching",
+                title = "Continue Watching",
+                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+                isLoading = true,
+            ),
+            HomeWideRailSectionUi(
+                key = "upNext",
+                title = "Up Next",
+                kind = HomeWideRailSectionKind.UP_NEXT,
+                isLoading = true,
+            ),
+            HomeWideRailSectionUi(
+                key = "thisWeek",
+                title = "This Week",
+                kind = HomeWideRailSectionKind.THIS_WEEK,
+                isLoading = true,
+            ),
+        )
+    }
+
+    private fun groupCatalogSections(catalogSections: List<HomeCatalogSectionUi>): List<HomeContentSectionUi> {
+        if (catalogSections.isEmpty()) {
+            return emptyList()
+        }
+
+        val sections = mutableListOf<HomeContentSectionUi>()
+        var index = 0
+        while (index < catalogSections.size) {
+            val sectionUi = catalogSections[index]
+            if (sectionUi.section.presentation == HomeCatalogPresentation.COLLECTION_SHELF) {
+                val groupedSections = mutableListOf<HomeCatalogSectionUi>()
+                while (
+                    index < catalogSections.size &&
+                    catalogSections[index].section.presentation == HomeCatalogPresentation.COLLECTION_SHELF
+                ) {
+                    groupedSections += catalogSections[index]
+                    index += 1
+                }
+                sections += HomeCollectionShelfSectionUi(
+                    key = groupedSections.joinToString(separator = ":", prefix = "collections:") { it.section.key },
+                    sectionUis = groupedSections,
+                )
+            } else {
+                sections += HomeCatalogRowSectionUi(
+                    key = sectionUi.section.key,
+                    sectionUi = sectionUi,
+                )
+                index += 1
+            }
+        }
+        return sections
+    }
+
+    private fun markSectionLoading(section: HomeContentSectionUi): HomeContentSectionUi {
+        return when (section) {
+            is HomeCatalogRowSectionUi -> section.copy(
+                sectionUi = section.sectionUi.copy(
+                    items = section.sectionUi.items.ifEmpty { section.sectionUi.section.previewItems },
+                    isLoading = true,
+                )
             )
+
+            is HomeCollectionShelfSectionUi -> section.copy(
+                sectionUis =
+                    section.sectionUis.map { sectionUi ->
+                        sectionUi.copy(
+                            items = sectionUi.items.ifEmpty { sectionUi.section.previewItems },
+                            isLoading = true,
+                        )
+                    }
+            )
+
+            is HomeStatusSectionUi -> section
+            is HomeWideRailSectionUi -> section.copy(isLoading = true)
+        }
+    }
+
+    private fun HomeWideRailSectionUi.isVisible(): Boolean {
+        return isLoading || items.isNotEmpty() || statusMessage.isNotBlank()
+    }
+}
+
+private fun ContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
+    return HomeWideRailItemUi(
+        key = "${type}:${id}",
+        title = title,
+        subtitle = buildHomeWatchActivitySubtitle(nowMs),
+        imageUrl = backdropUrl ?: posterUrl,
+        progressFraction = progressPercent.takeIf { it > 0.0 }?.let { (it / 100.0).coerceIn(0.0, 1.0).toFloat() },
+        kind = HomeWideRailItemKind.WATCH_ACTIVITY,
+        continueWatchingItem = this,
+    )
+}
+
+private fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
+    return HomeWideRailItemUi(
+        key = "${type}:${id}",
+        title = seriesName,
+        subtitle = buildCalendarSecondaryText(),
+        imageUrl = thumbnailUrl ?: backdropUrl ?: posterUrl,
+        badgeLabel = buildCalendarBadgeLabel(),
+        kind = HomeWideRailItemKind.CALENDAR_EPISODE,
+        calendarEpisodeItem = this,
+    )
+}
+
+private fun CalendarEpisodeItem.buildCalendarBadgeLabel(): String? {
+    if (isReleased) return "Released"
+    return try {
+        val date = LocalDate.parse(releaseDate.take(10))
+        "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun CalendarEpisodeItem.buildCalendarSecondaryText(): String {
+    val supportingText = when {
+        isGroup -> "${episodeCount} new episodes"
+        !episodeTitle.isNullOrBlank() -> episodeTitle
+        !overview.isNullOrBlank() -> overview
+        else -> null
+    }?.trim()
+
+    val episodeLabel =
+        if (episodeRange != null) {
+            "S${season} ${episodeRange}"
+        } else {
+            "S${season} E${episode}"
+        }
+    return if (supportingText.isNullOrBlank()) {
+        episodeLabel
+    } else {
+        "$episodeLabel - $supportingText"
     }
 }
 
@@ -826,13 +859,6 @@ private fun continueWatchingContentKey(entry: ContinueWatchingEntry): String {
 
 private fun continueWatchingContentKey(type: String, contentId: String): String {
     return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
-}
-
-private fun ContinueWatchingItem.toHomeWatchActivityItemUi(nowMs: Long): HomeWatchActivityItemUi {
-    return HomeWatchActivityItemUi(
-        item = this,
-        subtitle = buildHomeWatchActivitySubtitle(nowMs),
-    )
 }
 
 private fun ContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {

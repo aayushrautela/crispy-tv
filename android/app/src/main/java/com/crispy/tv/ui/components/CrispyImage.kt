@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.crispy.tv.metadata.tmdb.TmdbApi
 
@@ -14,6 +15,7 @@ internal fun rememberCrispyImageModel(
     width: Dp,
     height: Dp,
     tmdbSize: String? = null,
+    enableCrossfade: Boolean = false,
 ): Any? {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -27,12 +29,15 @@ internal fun rememberCrispyImageModel(
         }
     }
 
-    return remember(context, resolvedUrl, widthPx, heightPx) {
+    return remember(context, resolvedUrl, widthPx, heightPx, enableCrossfade) {
         resolvedUrl?.let {
             ImageRequest.Builder(context)
                 .data(it)
                 .size(widthPx, heightPx)
-                .crossfade(true)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .crossfade(enableCrossfade)
                 .build()
         }
     }
