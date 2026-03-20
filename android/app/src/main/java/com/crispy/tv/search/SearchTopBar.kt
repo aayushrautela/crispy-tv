@@ -7,7 +7,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -121,7 +125,13 @@ fun SearchTopBar(
                     )
 
                     if (query.isNotBlank()) {
-                        IconButton(onClick = onClear) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(onClick = onClear),
+                            contentAlignment = Alignment.Center,
+                        ) {
                             Icon(
                                 imageVector = Icons.Outlined.Clear,
                                 contentDescription = "Clear search",
@@ -146,8 +156,12 @@ private fun AiSearchAction(
     onClick: () -> Unit,
     isHighlighted: Boolean,
 ) {
-    IconButton(
-        onClick = onClick,
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = Icons.Outlined.AutoAwesome,
@@ -189,9 +203,8 @@ private fun rememberAiSearchBorderModifier(isAiLoading: Boolean): Modifier {
         drawContent()
 
         val strokeWidth = 2.5.dp.toPx()
-        val glowStrokeWidth = 10.dp.toPx()
         val inset = strokeWidth / 2f
-        val glowInset = glowStrokeWidth / 2f
+        val maxGlowWidth = 14.dp.toPx()
         val cornerRadius = CornerRadius(28.dp.toPx(), 28.dp.toPx())
         val brush =
             Brush.linearGradient(
@@ -207,17 +220,20 @@ private fun rememberAiSearchBorderModifier(isAiLoading: Boolean): Modifier {
                 tileMode = androidx.compose.ui.graphics.TileMode.Repeated
             )
 
-        drawRoundRect(
-            brush = brush,
-            topLeft = Offset(glowInset, glowInset),
-            size = Size(
-                width = size.width - glowStrokeWidth,
-                height = size.height - glowStrokeWidth,
-            ),
-            cornerRadius = cornerRadius,
-            style = Stroke(width = glowStrokeWidth, cap = StrokeCap.Round),
-            alpha = glowAlpha,
-        )
+        val glowLevels = 5
+        for (i in 1..glowLevels) {
+            val currentW = maxGlowWidth * (glowLevels - i + 1) / glowLevels.toFloat()
+            val outlineOffset = -currentW / 2f
+
+            drawRoundRect(
+                brush = brush,
+                topLeft = Offset(outlineOffset, outlineOffset),
+                size = Size(size.width - 2 * outlineOffset, size.height - 2 * outlineOffset),
+                cornerRadius = CornerRadius(28.dp.toPx() - outlineOffset, 28.dp.toPx() - outlineOffset),
+                style = Stroke(width = currentW),
+                alpha = (glowAlpha / glowLevels) * 1.5f,
+            )
+        }
 
         drawRoundRect(
             brush = brush,

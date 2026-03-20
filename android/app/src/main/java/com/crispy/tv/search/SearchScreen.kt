@@ -342,11 +342,7 @@ private fun GenreTab(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color(0x1A000000), Color(0x66000000)),
-                    ),
-                ),
+                .background(Color(0x1A000000)),
         )
         Text(
             text = genre.label,
