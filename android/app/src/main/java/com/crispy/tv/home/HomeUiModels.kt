@@ -1,20 +1,21 @@
 package com.crispy.tv.home
 
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.catalog.CatalogSectionRef
-
 @Immutable
-data class HomeUiState(
-    val isRefreshing: Boolean = false,
-    val headerPills: List<CatalogSectionRef> = emptyList(),
-    val hero: HeroState = HeroState(),
-    val sections: List<HomeContentSectionUi> = emptyList(),
+data class HomeLayoutState(
+    val blocks: List<HomeContentSectionUi> = emptyList(),
 )
 
 @Immutable
 sealed interface HomeContentSectionUi {
     val key: String
 }
+
+@Immutable
+data class HomeWideRailLayoutUi(
+    override val key: String,
+    val kind: HomeWideRailSectionKind,
+) : HomeContentSectionUi
 
 enum class HomeWideRailSectionKind {
     CONTINUE_WATCHING,
@@ -42,24 +43,24 @@ data class HomeWideRailItemUi(
 
 @Immutable
 data class HomeWideRailSectionUi(
-    override val key: String,
+    val key: String,
     val title: String,
     val kind: HomeWideRailSectionKind,
     val items: List<HomeWideRailItemUi> = emptyList(),
     val isLoading: Boolean = false,
     val statusMessage: String = "",
-) : HomeContentSectionUi
+)
 
 @Immutable
 data class HomeCatalogRowSectionUi(
     override val key: String,
-    val sectionUi: HomeCatalogSectionUi,
+    val sectionKey: String,
 ) : HomeContentSectionUi
 
 @Immutable
 data class HomeCollectionShelfSectionUi(
     override val key: String,
-    val sectionUis: List<HomeCatalogSectionUi>,
+    val sectionKeys: List<String>,
 ) : HomeContentSectionUi
 
 @Immutable

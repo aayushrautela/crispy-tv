@@ -26,11 +26,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -38,13 +36,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,7 +55,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -324,7 +318,6 @@ internal fun HomeWideRailCard(
     onRemoveClick: (() -> Unit)? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    var bottomSheetVisible by remember { mutableStateOf(false) }
     val hasItemActions = showActions && (onHideClick != null || onRemoveClick != null)
     val artworkModel = rememberLandscapeImageModel(item.imageUrl, 280.dp)
 
@@ -333,7 +326,7 @@ internal fun HomeWideRailCard(
             Modifier.combinedClickable(
                 onClick = onClick,
                 onLongClickLabel = "Item actions",
-                onLongClick = { bottomSheetVisible = true },
+                onLongClick = { menuExpanded = true },
             )
         } else {
             Modifier.clickable(onClick = onClick)
@@ -436,85 +429,6 @@ internal fun HomeWideRailCard(
         }
     }
 
-    if (hasItemActions && bottomSheetVisible) {
-        HomeRailActionBottomSheet(
-            title = item.title,
-            subtitle = item.subtitle,
-            onDismiss = { bottomSheetVisible = false },
-            onDetailsClick = {
-                bottomSheetVisible = false
-                onDetailsClick()
-            },
-            onRemoveClick = onRemoveClick?.let {
-                {
-                    bottomSheetVisible = false
-                    it()
-                }
-            },
-            onHideClick = onHideClick?.let {
-                {
-                    bottomSheetVisible = false
-                    it()
-                }
-            },
-        )
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun HomeRailActionBottomSheet(
-    title: String,
-    subtitle: String,
-    onDismiss: () -> Unit,
-    onDetailsClick: () -> Unit,
-    onRemoveClick: (() -> Unit)? = null,
-    onHideClick: (() -> Unit)? = null
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        ListItem(
-            headlineContent = { Text(title) },
-            supportingContent = { Text(subtitle) }
-        )
-        HorizontalDivider()
-        HomeRailActionBottomSheetItem(
-            label = "Details",
-            icon = Icons.Outlined.Info,
-            onClick = onDetailsClick
-        )
-        onRemoveClick?.let {
-            HomeRailActionBottomSheetItem(
-                label = "Remove",
-                icon = Icons.Outlined.DeleteOutline,
-                onClick = it
-            )
-        }
-        onHideClick?.let {
-            HomeRailActionBottomSheetItem(
-                label = "Hide",
-                icon = Icons.Outlined.VisibilityOff,
-                onClick = it
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeRailActionBottomSheetItem(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    ListItem(
-        headlineContent = { Text(label) },
-        leadingContent = {
-            Icon(
-                imageVector = icon,
-                contentDescription = null
-            )
-        },
-        modifier = Modifier.clickable(onClick = onClick)
-    )
 }
 
 @Composable
@@ -670,8 +584,9 @@ private fun HomeCollectionCard(
     onPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
-    val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
+    val previewMovies = remember(sectionUi.items) { sectionUi.items.take(2) }
     val featuredMovie = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
+    val secondaryMovie = remember(sectionUi.items) { sectionUi.items.drop(1).firstOrNull() }
     val logoUrl = remember(featuredMovie?.logoUrl) { featuredMovie?.logoUrl?.trim()?.ifBlank { null } }
     val logoModel = rememberCrispyImageModel(
         url = logoUrl,
@@ -725,15 +640,26 @@ private fun HomeCollectionCard(
             }
 
             when {
-                previewMovies.isNotEmpty() -> {
+                featuredMovie != null -> {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        previewMovies.forEach { item ->
-                            HomeCollectionMovieRow(
+                        HomeCollectionMovieRow(
+                            item = featuredMovie,
+                            onClick = { onCollectionMovieClick(featuredMovie) },
+                        )
+                        secondaryMovie?.let { item ->
+                            HomeCollectionCompactMovieRow(
                                 item = item,
                                 onClick = { onCollectionMovieClick(item) },
+                            )
+                        }
+                        if (sectionUi.items.size > previewMovies.size) {
+                            Text(
+                                text = "+${sectionUi.items.size - previewMovies.size} more in collection",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -742,11 +668,10 @@ private fun HomeCollectionCard(
                 sectionUi.isLoading -> {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        repeat(3) {
-                            HomeCollectionMovieSkeletonRow()
-                        }
+                        HomeCollectionMovieSkeletonRow()
+                        HomeCollectionCompactMovieSkeletonRow()
                     }
                 }
 
@@ -924,6 +849,54 @@ private fun HomeCollectionMovieSkeletonRow() {
             )
         }
     }
+}
+
+@Composable
+private fun HomeCollectionCompactMovieRow(
+    item: CatalogItem,
+    onClick: () -> Unit,
+) {
+    val detailText = collectionMovieMetaText(item)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = item.title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (detailText.isNotBlank()) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = detailText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeCollectionCompactMovieSkeletonRow() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.82f)
+            .height(14.dp)
+            .skeletonElement(pulse = false),
+    )
 }
 
 private fun collectionDisplayTitle(title: String): String {

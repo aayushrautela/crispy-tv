@@ -76,7 +76,12 @@ internal fun HomeRoute(
             HomeViewModel.factory(appContext)
         },
     )
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val headerPills by viewModel.headerPillsState.collectAsStateWithLifecycle()
+    val heroState by viewModel.heroState.collectAsStateWithLifecycle()
+    val layoutState by viewModel.layoutState.collectAsStateWithLifecycle()
+    val wideRailSections by viewModel.wideRailSectionsState.collectAsStateWithLifecycle()
+    val catalogSections by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
     val scrollBehavior = appBarScrollBehavior()
 
     androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
@@ -121,7 +126,12 @@ internal fun HomeRoute(
                 .consumeWindowInsets(paddingValues),
         ) {
             HomeScreen(
-                uiState = uiState,
+                isRefreshing = isRefreshing,
+                headerPills = headerPills,
+                heroState = heroState,
+                layoutState = layoutState,
+                wideRailSections = wideRailSections,
+                catalogSections = catalogSections,
                 onRefresh = viewModel::refresh,
                 onHideContinueWatchingItem = viewModel::hideContinueWatchingItem,
                 onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
@@ -141,7 +151,12 @@ internal fun HomeRoute(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HomeScreen(
-    uiState: HomeUiState,
+    isRefreshing: Boolean,
+    headerPills: List<CatalogSectionRef>,
+    heroState: HeroState,
+    layoutState: HomeLayoutState,
+    wideRailSections: Map<String, HomeWideRailSectionUi>,
+    catalogSections: Map<String, HomeCatalogSectionUi>,
     onRefresh: () -> Unit,
     onHideContinueWatchingItem: (ContinueWatchingItem) -> Unit,
     onRemoveContinueWatchingItem: (ContinueWatchingItem) -> Unit,
@@ -167,14 +182,14 @@ private fun HomeScreen(
     }
 
     PullToRefreshBox(
-        isRefreshing = uiState.isRefreshing,
+        isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),
         state = pullToRefreshState,
         indicator = {
             Indicator(
                 state = pullToRefreshState,
-                isRefreshing = uiState.isRefreshing,
+                isRefreshing = isRefreshing,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         },
@@ -193,60 +208,69 @@ private fun HomeScreen(
             item(key = "topHeader", contentType = "topHeader") {
                 Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
                     HomeHeaderSectionsItem(
-                        sections = uiState.headerPills,
+                        sections = headerPills,
                         onSectionClick = onCatalogSeeAllClick,
                     )
                     HomeHeroSection(
-                        state = uiState.hero,
+                        state = heroState,
                         onHeroClick = onHeroClick,
                     )
                 }
             }
 
-            if (uiState.sections.isNotEmpty()) {
+            if (layoutState.blocks.isNotEmpty()) {
                 items(
-                    items = uiState.sections,
+                    items = layoutState.blocks,
                     key = { it.key },
                     contentType = {
                         when (it) {
+                            is HomeWideRailLayoutUi -> it.kind.name
                             is HomeCatalogRowSectionUi -> "catalogSection"
                             is HomeCollectionShelfSectionUi -> "collectionShelf"
                             is HomeStatusSectionUi -> "catalogStatus"
-                            is HomeWideRailSectionUi -> it.kind.name
                         }
                     },
                 ) { block ->
                     when (block) {
                         is HomeCatalogRowSectionUi -> {
-                            HomeCatalogSectionRow(
-                                sectionUi = block.sectionUi,
-                                onSeeAllClick = { onCatalogSeeAllClick(block.sectionUi.section) },
-                                onItemClick = onCatalogItemClick,
-                            )
+                            val sectionUi = catalogSections[block.sectionKey]
+                            if (sectionUi != null) {
+                                HomeCatalogSectionRow(
+                                    sectionUi = sectionUi,
+                                    onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
+                                    onItemClick = onCatalogItemClick,
+                                )
+                            }
                         }
 
                         is HomeCollectionShelfSectionUi -> {
-                            HomeCollectionSectionRow(
-                                sectionUis = block.sectionUis,
-                                onCollectionClick = onCatalogSeeAllClick,
-                                onCollectionPlayClick = onCatalogItemClick,
-                                onCollectionMovieClick = onCatalogItemClick,
-                            )
+                            val sectionUis = block.sectionKeys.mapNotNull(catalogSections::get)
+                            if (sectionUis.isNotEmpty()) {
+                                HomeCollectionSectionRow(
+                                    sectionUis = sectionUis,
+                                    onCollectionClick = onCatalogSeeAllClick,
+                                    onCollectionPlayClick = onCatalogItemClick,
+                                    onCollectionMovieClick = onCatalogItemClick,
+                                )
+                            }
                         }
 
                         is HomeStatusSectionUi -> {
                             HomeCatalogStatusCard(statusMessage = block.statusMessage)
                         }
 
-                        is HomeWideRailSectionUi -> {
-                            HomeWideRailSection(
-                                section = block,
-                                onContinueWatchingClick = onContinueWatchingClick,
-                                onHideContinueWatchingItem = onHideContinueWatchingItem,
-                                onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
-                                onThisWeekClick = onThisWeekClick,
-                                onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
-                            )
+                        is HomeWideRailLayoutUi -> {
+                            val section = wideRailSections[block.key]
+                            if (section != null) {
+                                HomeWideRailSection(
+                                    section = section,
+                                    onContinueWatchingClick = onContinueWatchingClick,
+                                    onHideContinueWatchingItem = onHideContinueWatchingItem,
+                                    onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
+                                    onThisWeekClick = onThisWeekClick,
+                                    onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
+                                )
+                            }
                         }
                     }
                 }
