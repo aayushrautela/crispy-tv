@@ -645,7 +645,7 @@ private fun HomeCollectionCard(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         previewMovies.forEach { item ->
-                            HomeCollectionCompactMovieRow(
+                            HomeCollectionMovieRow(
                                 item = item,
                                 onClick = { onCollectionMovieClick(item) },
                             )
