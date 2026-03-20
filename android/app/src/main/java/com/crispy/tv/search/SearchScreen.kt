@@ -332,11 +332,6 @@ private fun GenreTab(
             .height(88.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(14.dp),
-            ),
     ) {
         Image(
             painter = painterResource(id = genre.imageResId),
@@ -349,7 +344,7 @@ private fun GenreTab(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color(0x3D000000), Color(0x99000000)),
+                        colors = listOf(Color(0x1A000000), Color(0x66000000)),
                     ),
                 ),
         )
@@ -358,7 +353,7 @@ private fun GenreTab(
             modifier = Modifier
                 .align(Alignment.Center)
                 .padding(horizontal = 12.dp),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = Color.White,
             textAlign = TextAlign.Center,

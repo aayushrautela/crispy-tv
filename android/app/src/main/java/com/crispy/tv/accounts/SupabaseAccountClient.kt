@@ -75,6 +75,29 @@ class SupabaseAccountClient(
         return loadSession()
     }
 
+    fun resolveAvatarUrl(avatar: String?): String? {
+        val normalized = avatar?.trim().orEmpty().removePrefix("/")
+        if (normalized.isBlank()) {
+            return null
+        }
+        if (normalized.startsWith("https://") || normalized.startsWith("http://")) {
+            return normalized
+        }
+
+        val storagePath =
+            if (normalized.startsWith("avatars/")) {
+                normalized
+            } else {
+                "avatars/$normalized"
+            }
+
+        return baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("storage/v1/object/public")
+            .addPathSegments(storagePath)
+            .build()
+            .toString()
+    }
+
     suspend fun ensureValidSession(): Session? {
         val existing = loadSession() ?: return null
         if (!shouldRefresh(existing)) {
