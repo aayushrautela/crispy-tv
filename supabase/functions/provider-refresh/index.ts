@@ -5,24 +5,14 @@ import {
   authorizeProfileAccess,
   corsHeaders,
   expiresAtIsoFromNow,
-  firstRow,
+  loadProviderCredentials,
+  markProviderRefreshError,
   jsonResponse,
   loadConnectedAt,
   normalizeProvider,
-  ProviderName,
   requireEnv,
   upsertProviderSession,
 } from '../_shared/providerAuth.ts';
-
-type ProviderCredentialRow = {
-  profile_id: string;
-  provider: ProviderName;
-  refresh_token: string | null;
-  access_token: string | null;
-  access_token_expires_at: string | null;
-  provider_user_id: string | null;
-  provider_username: string | null;
-};
 
 async function fetchTraktProfile(accessToken: string, clientId: string) {
   const response = await fetch('https://api.trakt.tv/users/settings', {
@@ -193,20 +183,7 @@ Deno.serve(async (req) => {
       return jsonResponse(403, { error: 'Not authorized for profile.' });
     }
 
-    const credentialResult = await auth.adminClient
-      .schema('private')
-      .from('provider_credentials')
-      .select('profile_id, provider, refresh_token, access_token, access_token_expires_at, provider_user_id, provider_username')
-      .eq('profile_id', profileId)
-      .eq('provider', provider)
-      .limit(1);
-
-    if (credentialResult.error) {
-      console.error('Failed to load provider credentials', credentialResult.error);
-      return jsonResponse(500, { error: 'Failed to load provider credentials.' });
-    }
-
-    const credential = firstRow<ProviderCredentialRow>(credentialResult.data);
+    const credential = await loadProviderCredentials(auth.adminClient, profileId, provider);
     if (!credential) {
       return jsonResponse(404, { error: 'Provider is not connected for this profile.' });
     }
@@ -224,24 +201,11 @@ Deno.serve(async (req) => {
       : await refreshSimklToken(refreshToken);
 
     if (refreshed.error) {
-      await auth.adminClient
-        .from('provider_accounts')
-        .update({
-          last_refresh_at: nowIso,
-          last_refresh_error: refreshed.error,
-        })
-        .eq('profile_id', profileId)
-        .eq('provider', provider);
-
-      await auth.adminClient
-        .schema('private')
-        .from('provider_credentials')
-        .update({
-          last_refresh_at: nowIso,
-          last_refresh_error: refreshed.error,
-        })
-        .eq('profile_id', profileId)
-        .eq('provider', provider);
+      try {
+        await markProviderRefreshError(auth.adminClient, profileId, provider, nowIso, refreshed.error);
+      } catch (persistError) {
+        console.error('Failed to persist provider refresh error', persistError);
+      }
 
       return jsonResponse(502, { error: refreshed.error });
     }

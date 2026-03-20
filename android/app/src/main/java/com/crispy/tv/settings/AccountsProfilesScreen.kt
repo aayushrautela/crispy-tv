@@ -507,6 +507,7 @@ internal class AccountsProfilesViewModel(
         if (userId.isNullOrBlank()) return
         profileStore.setActiveProfileId(userId, profileId)
         _uiState.update { it.copy(activeProfileId = profileId, statusMessage = "") }
+        watchHistoryService.clearCachedProviderAuthState()
 
         viewModelScope.launch {
             profileDataCloudSync.pullForActiveProfile().onFailure {

@@ -9,11 +9,23 @@ export const corsHeaders = {
 export type ProviderName = 'trakt' | 'simkl';
 
 export type ProviderSessionRow = {
-  access_token: string;
   access_token_expires_at: string | null;
   provider_username: string | null;
   provider_user_id: string | null;
   connected_at: string | null;
+};
+
+export type ProviderCredentialRow = {
+  profile_id: string;
+  provider: ProviderName;
+  refresh_token: string | null;
+  access_token: string | null;
+  access_token_expires_at: string | null;
+  provider_user_id: string | null;
+  provider_username: string | null;
+  connected_at: string | null;
+  last_refresh_at: string | null;
+  last_refresh_error: string | null;
 };
 
 export type PersistProviderSessionInput = {
@@ -175,48 +187,84 @@ export async function upsertProviderSession(
   adminClient: ReturnType<typeof createClient>,
   input: PersistProviderSessionInput,
 ): Promise<ProviderSessionRow> {
-  const publicUpsert = await adminClient
-    .from('provider_accounts')
-    .upsert({
-      profile_id: input.profileId,
-      provider: input.provider,
-      access_token: input.accessToken,
-      access_token_expires_at: input.accessTokenExpiresAt,
-      provider_user_id: input.providerUserId,
-      provider_username: input.providerUsername,
-      connected_at: input.connectedAt,
-      last_refresh_at: input.lastRefreshAt,
-      last_refresh_error: input.lastRefreshError,
-    }, { onConflict: 'profile_id,provider' })
-    .select('access_token, access_token_expires_at, provider_username, provider_user_id, connected_at')
-    .single();
+  const result = await adminClient.rpc('internal_upsert_provider_session', {
+    p_profile_id: input.profileId,
+    p_provider: input.provider,
+    p_access_token: input.accessToken,
+    p_access_token_expires_at: input.accessTokenExpiresAt,
+    p_provider_user_id: input.providerUserId,
+    p_provider_username: input.providerUsername,
+    p_refresh_token: input.refreshToken,
+    p_connected_at: input.connectedAt,
+    p_last_refresh_at: input.lastRefreshAt,
+    p_last_refresh_error: input.lastRefreshError,
+  });
 
-  if (publicUpsert.error) {
-    console.error('Failed to upsert public provider account', publicUpsert.error);
-    throw new Error('Failed to persist provider account.');
+  if (result.error) {
+    console.error('Failed to upsert provider session', result.error);
+    throw new Error('Failed to persist provider session.');
   }
 
-  const privateUpsert = await adminClient
-    .schema('private')
-    .from('provider_credentials')
-    .upsert({
-      profile_id: input.profileId,
-      provider: input.provider,
-      refresh_token: input.refreshToken,
-      access_token: input.accessToken,
-      access_token_expires_at: input.accessTokenExpiresAt,
-      provider_user_id: input.providerUserId,
-      provider_username: input.providerUsername,
-      last_refresh_at: input.lastRefreshAt,
-      last_refresh_error: input.lastRefreshError,
-    }, { onConflict: 'profile_id,provider' });
-
-  if (privateUpsert.error) {
-    console.error('Failed to upsert private provider credentials', privateUpsert.error);
-    throw new Error('Failed to persist provider credentials.');
+  const row = firstRow<ProviderSessionRow>(result.data);
+  if (!row) {
+    throw new Error('Failed to load persisted provider session.');
   }
 
-  return publicUpsert.data as ProviderSessionRow;
+  return row;
+}
+
+export async function loadProviderCredentials(
+  adminClient: ReturnType<typeof createClient>,
+  profileId: string,
+  provider: ProviderName,
+): Promise<ProviderCredentialRow | null> {
+  const result = await adminClient.rpc('internal_get_provider_credentials', {
+    p_profile_id: profileId,
+    p_provider: provider,
+  });
+
+  if (result.error) {
+    console.error('Failed to load provider credentials', result.error);
+    throw new Error('Failed to load provider credentials.');
+  }
+
+  return firstRow<ProviderCredentialRow>(result.data);
+}
+
+export async function markProviderRefreshError(
+  adminClient: ReturnType<typeof createClient>,
+  profileId: string,
+  provider: ProviderName,
+  lastRefreshAt: string,
+  lastRefreshError: string,
+): Promise<void> {
+  const result = await adminClient.rpc('internal_set_provider_refresh_error', {
+    p_profile_id: profileId,
+    p_provider: provider,
+    p_last_refresh_at: lastRefreshAt,
+    p_last_refresh_error: lastRefreshError,
+  });
+
+  if (result.error) {
+    console.error('Failed to mark provider refresh error', result.error);
+    throw new Error('Failed to persist provider refresh error.');
+  }
+}
+
+export async function deleteProviderSession(
+  adminClient: ReturnType<typeof createClient>,
+  profileId: string,
+  provider: ProviderName,
+): Promise<void> {
+  const result = await adminClient.rpc('internal_delete_provider_session', {
+    p_profile_id: profileId,
+    p_provider: provider,
+  });
+
+  if (result.error) {
+    console.error('Failed to delete provider session', result.error);
+    throw new Error('Failed to disconnect provider.');
+  }
 }
 
 function createAdminClient(supabaseUrl: string, adminApiKey: string) {

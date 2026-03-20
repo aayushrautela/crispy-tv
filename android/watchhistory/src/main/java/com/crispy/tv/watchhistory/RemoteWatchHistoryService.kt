@@ -156,6 +156,14 @@ class RemoteWatchHistoryService(
             )
         }
 
+        if (!forceRefresh) {
+            return ProviderAuthActionResult(
+                success = true,
+                statusMessage = "",
+                authState = authState(),
+            )
+        }
+
         val sessionToken = providerSessionAccessTokenProvider()?.trim().orEmpty()
         val profileId = providerSessionProfileIdProvider()?.trim().orEmpty()
         if (sessionToken.isBlank() || profileId.isBlank()) {

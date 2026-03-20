@@ -6,8 +6,6 @@ import com.crispy.tv.player.ProviderSessionDisconnectResult
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderSession
 import com.crispy.tv.watchhistory.WatchHistoryHttp
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 
@@ -40,51 +38,15 @@ internal class ProviderSessionBackendClient(
     }
 
     override suspend fun resolveProviderSession(provider: WatchProvider, forceRefresh: Boolean): ProviderSessionBackendResult {
-        val profileId = profileIdOrError() ?: return missingProfileResult()
-        if (forceRefresh) {
-            return sendFunctionRequest(
-                functionName = "provider-refresh",
-                payload = JSONObject().put("profileId", profileId).put("provider", providerKey(provider)),
-            )
-        }
-
-        if (!isConfigured()) {
-            return ProviderSessionBackendResult(errorMessage = "Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY.")
-        }
-
-        val sessionToken = accessTokenProvider()?.trim().orEmpty()
-        if (sessionToken.isBlank()) {
-            return ProviderSessionBackendResult(errorMessage = "Not signed in.")
-        }
-
-        val url =
-            "$baseUrl/rest/v1/provider_accounts".toHttpUrl().newBuilder()
-                .addQueryParameter(
-                    "select",
-                    "provider,access_token,access_token_expires_at,provider_username,provider_user_id,connected_at"
-                )
-                .addQueryParameter("profile_id", "eq.$profileId")
-                .addQueryParameter("provider", "eq.${providerKey(provider)}")
-                .addQueryParameter("limit", "1")
-                .build()
-                .toString()
-        val response =
-            http.getRaw(url = url, headers = authHeaders(sessionToken))
-                ?: return ProviderSessionBackendResult(errorMessage = "Supabase provider session lookup is unavailable.")
-
-        if (response.code !in 200..299) {
-            val body = response.body.toJsonObjectOrNull()
-            return ProviderSessionBackendResult(
-                errorMessage = body.extractErrorMessage() ?: "Provider session lookup failed (HTTP ${response.code}).",
-            )
-        }
-
-        val array = response.body.toJsonArrayOrNull() ?: JSONArray()
-        if (array.length() == 0) {
+        if (!forceRefresh) {
             return ProviderSessionBackendResult(session = null)
         }
 
-        return ProviderSessionBackendResult(session = array.optJSONObject(0)?.toSessionOrNull())
+        val profileId = profileIdOrError() ?: return missingProfileResult()
+        return sendFunctionRequest(
+            functionName = "provider-refresh",
+            payload = JSONObject().put("profileId", profileId).put("provider", providerKey(provider)),
+        )
     }
 
     override suspend fun disconnectProviderSession(provider: WatchProvider): ProviderSessionDisconnectResult {
@@ -167,10 +129,6 @@ internal class ProviderSessionBackendClient(
 
 private fun String.toJsonObjectOrNull(): JSONObject? {
     return runCatching { JSONObject(this.trim()) }.getOrNull()
-}
-
-private fun String.toJsonArrayOrNull(): JSONArray? {
-    return runCatching { JSONArray(this.trim()) }.getOrNull()
 }
 
 private fun JSONObject?.extractErrorMessage(): String? {

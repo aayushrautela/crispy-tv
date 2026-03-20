@@ -10,6 +10,7 @@ import com.crispy.tv.watchhistory.KEY_SIMKL_HANDLE
 import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_CODE_VERIFIER
 import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_STATE
 import com.crispy.tv.watchhistory.KEY_SIMKL_TOKEN
+import com.crispy.tv.watchhistory.KEY_PROVIDER_AUTH_SCHEMA_VERSION
 import com.crispy.tv.watchhistory.KEY_TRAKT_EXPIRES_AT
 import com.crispy.tv.watchhistory.KEY_TRAKT_HANDLE
 import com.crispy.tv.watchhistory.KEY_TRAKT_OAUTH_CODE_VERIFIER
@@ -28,8 +29,26 @@ internal class ProviderSessionStore(
     val prefs: SharedPreferences =
         run {
             migrateLegacyWatchHistoryPrefsIfNeeded(appContext)
-            appContext.getSharedPreferences(WATCH_HISTORY_PREFS_NAME, Context.MODE_PRIVATE)
+            appContext.getSharedPreferences(WATCH_HISTORY_PREFS_NAME, Context.MODE_PRIVATE).also(::migrateProviderAuthStorageIfNeeded)
         }
+
+    private fun migrateProviderAuthStorageIfNeeded(prefs: SharedPreferences) {
+        val currentVersion = prefs.getInt(KEY_PROVIDER_AUTH_SCHEMA_VERSION, 0)
+        if (currentVersion >= PROVIDER_AUTH_SCHEMA_VERSION) return
+
+        prefs.edit().apply {
+            remove(KEY_TRAKT_TOKEN)
+            remove(KEY_TRAKT_REFRESH_TOKEN)
+            remove(KEY_TRAKT_EXPIRES_AT)
+            remove(KEY_TRAKT_HANDLE)
+            remove(KEY_SIMKL_TOKEN)
+            remove(KEY_SIMKL_HANDLE)
+            putInt(KEY_PROVIDER_AUTH_SCHEMA_VERSION, PROVIDER_AUTH_SCHEMA_VERSION)
+        }.apply()
+
+        clearProviderCaches(WatchProvider.TRAKT)
+        clearProviderCaches(WatchProvider.SIMKL)
+    }
 
     fun connectProvider(
         provider: WatchProvider,
@@ -162,5 +181,6 @@ internal class ProviderSessionStore(
 
     private companion object {
         private const val TOKEN_EXPIRY_GRACE_MS = 60_000L
+        private const val PROVIDER_AUTH_SCHEMA_VERSION = 1
     }
 }

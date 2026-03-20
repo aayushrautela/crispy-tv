@@ -18,6 +18,7 @@ internal const val KEY_SIMKL_TOKEN = "simkl_access_token"
 internal const val KEY_SIMKL_HANDLE = "simkl_user_handle"
 internal const val KEY_SIMKL_OAUTH_STATE = "simkl_oauth_state"
 internal const val KEY_SIMKL_OAUTH_CODE_VERIFIER = "simkl_oauth_code_verifier"
+internal const val KEY_PROVIDER_AUTH_SCHEMA_VERSION = "provider_auth_schema_version"
 
 internal const val STALE_PLAYBACK_WINDOW_MS = 30L * 24L * 60L * 60L * 1000L
 internal const val CONTINUE_WATCHING_MIN_PROGRESS_PERCENT = 2.0

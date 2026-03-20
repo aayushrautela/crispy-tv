@@ -4,6 +4,7 @@ import {
   authenticateRequest,
   authorizeProfileAccess,
   corsHeaders,
+  deleteProviderSession,
   jsonResponse,
   normalizeProvider,
 } from '../_shared/providerAuth.ts';
@@ -35,28 +36,7 @@ Deno.serve(async (req) => {
       return jsonResponse(403, { error: 'Not authorized for profile.' });
     }
 
-    const publicDelete = await auth.adminClient
-      .from('provider_accounts')
-      .delete()
-      .eq('profile_id', profileId)
-      .eq('provider', provider);
-
-    if (publicDelete.error) {
-      console.error('Failed to delete provider account', publicDelete.error);
-      return jsonResponse(500, { error: 'Failed to disconnect provider.' });
-    }
-
-    const privateDelete = await auth.adminClient
-      .schema('private')
-      .from('provider_credentials')
-      .delete()
-      .eq('profile_id', profileId)
-      .eq('provider', provider);
-
-    if (privateDelete.error) {
-      console.error('Failed to delete provider credentials', privateDelete.error);
-      return jsonResponse(500, { error: 'Failed to remove provider credentials.' });
-    }
+    await deleteProviderSession(auth.adminClient, profileId, provider);
 
     return jsonResponse(200, { success: true });
   } catch (error) {
