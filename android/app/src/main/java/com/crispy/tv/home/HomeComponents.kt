@@ -584,9 +584,8 @@ private fun HomeCollectionCard(
     onPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
-    val previewMovies = remember(sectionUi.items) { sectionUi.items.take(2) }
+    val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
     val featuredMovie = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
-    val secondaryMovie = remember(sectionUi.items) { sectionUi.items.drop(1).firstOrNull() }
     val logoUrl = remember(featuredMovie?.logoUrl) { featuredMovie?.logoUrl?.trim()?.ifBlank { null } }
     val logoModel = rememberCrispyImageModel(
         url = logoUrl,
@@ -640,26 +639,15 @@ private fun HomeCollectionCard(
             }
 
             when {
-                featuredMovie != null -> {
+                previewMovies.isNotEmpty() -> {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        HomeCollectionMovieRow(
-                            item = featuredMovie,
-                            onClick = { onCollectionMovieClick(featuredMovie) },
-                        )
-                        secondaryMovie?.let { item ->
+                        previewMovies.forEach { item ->
                             HomeCollectionCompactMovieRow(
                                 item = item,
                                 onClick = { onCollectionMovieClick(item) },
-                            )
-                        }
-                        if (sectionUi.items.size > previewMovies.size) {
-                            Text(
-                                text = "+${sectionUi.items.size - previewMovies.size} more in collection",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -668,10 +656,11 @@ private fun HomeCollectionCard(
                 sectionUi.isLoading -> {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         HomeCollectionMovieSkeletonRow()
-                        HomeCollectionCompactMovieSkeletonRow()
+                        HomeCollectionMovieSkeletonRow()
+                        HomeCollectionMovieSkeletonRow()
                     }
                 }
 
@@ -849,54 +838,6 @@ private fun HomeCollectionMovieSkeletonRow() {
             )
         }
     }
-}
-
-@Composable
-private fun HomeCollectionCompactMovieRow(
-    item: CatalogItem,
-    onClick: () -> Unit,
-) {
-    val detailText = collectionMovieMetaText(item)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = item.title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (detailText.isNotBlank()) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = detailText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeCollectionCompactMovieSkeletonRow() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth(0.82f)
-            .height(14.dp)
-            .skeletonElement(pulse = false),
-    )
 }
 
 private fun collectionDisplayTitle(title: String): String {
