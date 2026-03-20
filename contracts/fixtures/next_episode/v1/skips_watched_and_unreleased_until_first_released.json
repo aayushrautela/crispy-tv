@@ -1,0 +1,47 @@
+{
+  "contract_version": 1,
+  "suite": "next_episode",
+  "case_id": "skips_watched_and_unreleased_until_first_released",
+  "now_ms": 1739923200000,
+  "input": {
+    "current_season": 1,
+    "current_episode": 1,
+    "show_id": "123",
+    "watched_set": [
+      "tt123:1:2"
+    ],
+    "episodes": [
+      {
+        "season": 1,
+        "episode": 1,
+        "title": "Pilot",
+        "released": "2025-01-01T00:00:00Z"
+      },
+      {
+        "season": 1,
+        "episode": 2,
+        "title": "Watched",
+        "released": "2025-01-08T00:00:00Z"
+      },
+      {
+        "season": 1,
+        "episode": 3,
+        "title": "Not Yet",
+        "released": "2025-03-15T00:00:00Z"
+      },
+      {
+        "season": 2,
+        "episode": 1,
+        "title": "Return",
+        "released": "2025-02-10"
+      }
+    ]
+  },
+  "expected": {
+    "result": {
+      "season": 2,
+      "episode": 1,
+      "title": "Return"
+    }
+  }
+}

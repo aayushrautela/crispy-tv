@@ -8,24 +8,25 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import com.crispy.tv.BuildConfig
-import com.crispy.tv.accounts.SupabaseAccountClient
-import com.crispy.tv.network.AppHttp
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.settings.AccountsProfilesRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
 import com.crispy.tv.settings.AiInsightsSettingsRoute
+import com.crispy.tv.settings.MetadataSettingsRoute
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.ProviderAuthPortalRoute
 import com.crispy.tv.settings.SettingsScreen
-import com.crispy.tv.sync.ProfileDataCloudSync
 import kotlinx.coroutines.launch
 
 internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostController) {
-    composable(AppRoutes.SettingsRoute) {
+    composable(AppRoutes.SettingsRoute) { entry ->
         SettingsScreen(
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
+            },
+            onNavigateToMetadataSettings = {
+                navController.navigate(AppRoutes.MetadataSettingsRoute)
             },
             onNavigateToPlaybackSettings = {
                 navController.navigate(AppRoutes.PlaybackSettingsRoute)
@@ -38,7 +39,11 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             },
             onNavigateToAccountsProfiles = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
-            }
+            },
+            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+            onScrollToTopConsumed = {
+                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+            },
         )
     }
 
@@ -48,6 +53,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
     composable(AppRoutes.AiInsightsSettingsRoute) {
         AiInsightsSettingsRoute(onBack = { navController.popBackStack() })
+    }
+
+    composable(AppRoutes.MetadataSettingsRoute) {
+        MetadataSettingsRoute(onBack = { navController.popBackStack() })
     }
 
     composable(AppRoutes.ProviderPortalRoute) {
@@ -63,16 +72,7 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
         val appContext = remember(context) { context.applicationContext }
         val coroutineScope = rememberCoroutineScope()
 
-        val httpClient = remember(appContext) { AppHttp.client(appContext) }
-        val supabase = remember(appContext, httpClient) {
-            SupabaseAccountClient(
-                appContext = appContext,
-                httpClient = httpClient,
-                supabaseUrl = BuildConfig.SUPABASE_URL,
-                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-            )
-        }
-        val cloudSync = remember(appContext, supabase) { ProfileDataCloudSync(appContext, supabase) }
+        val cloudSync = remember(appContext) { SupabaseServicesProvider.createProfileDataCloudSync(appContext) }
 
         val playbackSettingsRepository = remember(appContext) {
             PlaybackSettingsRepositoryProvider.get(appContext)
@@ -81,6 +81,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
         PlaybackSettingsScreen(
             settings = playbackSettings,
+            onTrailerAutoplayChanged = { enabled ->
+                playbackSettingsRepository.setTrailerAutoplayEnabled(enabled)
+                coroutineScope.launch { cloudSync.pushForActiveProfile() }
+            },
             onSkipIntroChanged = { enabled ->
                 playbackSettingsRepository.setSkipIntroEnabled(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }

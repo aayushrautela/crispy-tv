@@ -20,10 +20,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -42,14 +39,17 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.oauth.PendingOAuthStore
+import com.crispy.tv.player.ProviderAuthActionResult
+import com.crispy.tv.player.ProviderAuthStartResult
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -59,61 +59,37 @@ data class ProviderPortalUiState(
     val simklRedirectUri: String = BuildConfig.SIMKL_REDIRECT_URI,
     val statusMessage: String = "Connect providers to enable sync, continue watching, library, and comments.",
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
-    val pendingExternalUrl: String? = null
+    val pendingExternalUrl: String? = null,
 )
 
 private data class ProviderPortalAction(
     val label: String,
-    val onClick: () -> Unit
+    val onClick: () -> Unit,
 )
 
 internal class ProviderPortalViewModel(
-    private val watchHistoryService: WatchHistoryService
+    private val watchHistoryService: WatchHistoryService,
+    private val pendingOAuthStore: PendingOAuthStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProviderPortalUiState())
     val uiState: StateFlow<ProviderPortalUiState> = _uiState
 
     init {
-        viewModelScope.launch {
-            // Listen for OAuth callback URIs published on the app-wide bus.
-            // MainActivity performs the token exchange; the portal just refreshes UI state
-            // so the connected status updates when a callback arrives.
-            ProviderOAuthCallbackBus.callbacks.collect { callbackUri ->
-                if (callbackUri.scheme != "crispy" || callbackUri.host != "auth") {
-                    return@collect
-                }
-                // Clear any pending external URL and refresh the stored auth state so the
-                // UI reflects any provider connection that may have just completed.
-                _uiState.update {
-                    it.copy(pendingExternalUrl = null, statusMessage = "Processing provider callback...")
-                }
-                refreshAuthState("Processing provider callback...")
-            }
-        }
-        refreshAuthState()
+        refreshAuthState(
+            message = consumePendingStatusMessage(),
+            forceRefresh = false,
+        )
     }
 
     fun connectTrakt() {
-        viewModelScope.launch {
-            val start = watchHistoryService.beginTraktOAuth()
-            if (start == null) {
-                _uiState.update {
-                    it.copy(statusMessage = "Trakt OAuth is not configured. Set TRAKT_CLIENT_ID and TRAKT_REDIRECT_URI.")
-                }
-                return@launch
-            }
-            _uiState.update {
-                it.copy(
-                    statusMessage = start.statusMessage,
-                    pendingExternalUrl = start.authorizationUrl
-                )
-            }
-        }
+        launchProviderOAuth(
+            begin = { watchHistoryService.beginTraktOAuth() },
+            missingConfigMessage = "Trakt OAuth is not configured. Set TRAKT_CLIENT_ID, TRAKT_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.",
+        )
     }
 
     fun disconnectTrakt() {
-        watchHistoryService.disconnectProvider(WatchProvider.TRAKT)
-        refreshAuthState("Disconnected Trakt.")
+        disconnectProvider(WatchProvider.TRAKT)
     }
 
     fun consumePendingExternalUrl() {
@@ -124,43 +100,66 @@ internal class ProviderPortalViewModel(
         _uiState.update {
             it.copy(
                 pendingExternalUrl = null,
-                statusMessage = message
+                statusMessage = message,
             )
         }
     }
 
     fun connectSimkl() {
+        launchProviderOAuth(
+            begin = { watchHistoryService.beginSimklOAuth() },
+            missingConfigMessage = "Simkl OAuth is not configured. Set SIMKL_CLIENT_ID, SIMKL_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.",
+        )
+    }
+
+    fun disconnectSimkl() {
+        disconnectProvider(WatchProvider.SIMKL)
+    }
+
+    fun refreshAuthState(message: String? = null, forceRefresh: Boolean = true) {
         viewModelScope.launch {
-            val start = watchHistoryService.beginSimklOAuth()
+            val result = watchHistoryService.refreshProviderAuthState(forceRefresh = forceRefresh)
+            applyActionResult(result, message)
+        }
+    }
+
+    private fun disconnectProvider(provider: WatchProvider) {
+        viewModelScope.launch {
+            applyActionResult(watchHistoryService.disconnectProvider(provider))
+        }
+    }
+
+    private fun launchProviderOAuth(
+        begin: suspend () -> ProviderAuthStartResult?,
+        missingConfigMessage: String,
+    ) {
+        viewModelScope.launch {
+            val start = begin()
             if (start == null) {
-                _uiState.update {
-                    it.copy(statusMessage = "Simkl OAuth is not configured. Set SIMKL_CLIENT_ID and SIMKL_REDIRECT_URI.")
-                }
+                _uiState.update { it.copy(statusMessage = missingConfigMessage) }
                 return@launch
             }
             _uiState.update {
                 it.copy(
                     statusMessage = start.statusMessage,
-                    pendingExternalUrl = start.authorizationUrl
+                    pendingExternalUrl = start.authorizationUrl,
                 )
             }
         }
     }
 
-    fun disconnectSimkl() {
-        watchHistoryService.disconnectProvider(WatchProvider.SIMKL)
-        refreshAuthState("Disconnected Simkl.")
+    private fun applyActionResult(result: ProviderAuthActionResult, messageOverride: String? = null) {
+        _uiState.update { current ->
+            current.copy(
+                authState = result.authState,
+                statusMessage = messageOverride ?: result.statusMessage.ifBlank { current.statusMessage },
+            )
+        }
     }
 
-    fun refreshAuthState(message: String? = null) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    authState = watchHistoryService.authState(),
-                    statusMessage = message ?: it.statusMessage
-                )
-            }
-        }
+    private fun consumePendingStatusMessage(): String {
+        return pendingOAuthStore.consumePendingErrorMessage()
+            ?: "Connect providers to enable sync, continue watching, library, and comments."
     }
 
     companion object {
@@ -172,6 +171,7 @@ internal class ProviderPortalViewModel(
                         @Suppress("UNCHECKED_CAST")
                         return ProviderPortalViewModel(
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                            pendingOAuthStore = PendingOAuthStore(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -211,8 +211,8 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
         onDisconnectTrakt = viewModel::disconnectTrakt,
         onConnectSimkl = viewModel::connectSimkl,
         onDisconnectSimkl = viewModel::disconnectSimkl,
-        onRefresh = { viewModel.refreshAuthState() },
-        onBack = onBack
+        onRefresh = { viewModel.refreshAuthState(forceRefresh = true) },
+        onBack = onBack,
     )
 }
 
@@ -225,9 +225,9 @@ private fun ProviderAuthPortalScreen(
     onConnectSimkl: () -> Unit,
     onDisconnectSimkl: () -> Unit,
     onRefresh: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -238,7 +238,7 @@ private fun ProviderAuthPortalScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
                         )
                     }
                 },
@@ -246,7 +246,7 @@ private fun ProviderAuthPortalScreen(
                     IconButton(onClick = onRefresh) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
-                            contentDescription = "Refresh"
+                            contentDescription = "Refresh",
                         )
                     }
                 },
@@ -262,15 +262,15 @@ private fun ProviderAuthPortalScreen(
                 start = pageHorizontalPadding,
                 top = 12.dp,
                 end = pageHorizontalPadding,
-                bottom = 12.dp
+                bottom = 12.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 Text(
                     text = uiState.statusMessage,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -280,10 +280,8 @@ private fun ProviderAuthPortalScreen(
                     connected = uiState.authState.traktAuthenticated,
                     userHandle = uiState.authState.traktSession?.userHandle,
                     expiresAtEpochMs = uiState.authState.traktSession?.expiresAtEpochMs,
-                    tokenValue = null,
-                    onTokenChanged = null,
                     connectAction = ProviderPortalAction("Connect Trakt OAuth", onConnectTrakt),
-                    disconnectAction = ProviderPortalAction("Disconnect Trakt", onDisconnectTrakt)
+                    disconnectAction = ProviderPortalAction("Disconnect Trakt", onDisconnectTrakt),
                 )
             }
 
@@ -291,7 +289,7 @@ private fun ProviderAuthPortalScreen(
                 Text(
                     text = "Trakt redirect URI: ${uiState.traktRedirectUri}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -301,10 +299,8 @@ private fun ProviderAuthPortalScreen(
                     connected = uiState.authState.simklAuthenticated,
                     userHandle = uiState.authState.simklSession?.userHandle,
                     expiresAtEpochMs = null,
-                    tokenValue = null,
-                    onTokenChanged = null,
                     connectAction = ProviderPortalAction("Connect Simkl OAuth", onConnectSimkl),
-                    disconnectAction = ProviderPortalAction("Disconnect Simkl", onDisconnectSimkl)
+                    disconnectAction = ProviderPortalAction("Disconnect Simkl", onDisconnectSimkl),
                 )
             }
 
@@ -312,7 +308,7 @@ private fun ProviderAuthPortalScreen(
                 Text(
                     text = "Simkl redirect URI: ${uiState.simklRedirectUri}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -326,50 +322,38 @@ private fun ProviderCard(
     connected: Boolean,
     userHandle: String?,
     expiresAtEpochMs: Long?,
-    tokenValue: String?,
-    onTokenChanged: ((String) -> Unit)?,
     connectAction: ProviderPortalAction,
-    disconnectAction: ProviderPortalAction
+    disconnectAction: ProviderPortalAction,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = if (connected) "Connected" else "Disconnected",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (!userHandle.isNullOrBlank()) {
                 Text(
                     text = "User: $userHandle",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (expiresAtEpochMs != null) {
                 Text(
                     text = "Token expiry: $expiresAtEpochMs",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (tokenValue != null && onTokenChanged != null) {
-                OutlinedTextField(
-                    value = tokenValue,
-                    onValueChange = onTokenChanged,
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
-                    label = { Text("Access token") }
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 

@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "suite": "next_episode",
+  "case_id": "returns_null_for_blank_and_invalid_release_dates",
+  "now_ms": 1739923200000,
+  "input": {
+    "current_season": 1,
+    "current_episode": 1,
+    "show_id": "tt555",
+    "watched_set": [],
+    "episodes": [
+      {
+        "season": 1,
+        "episode": 2,
+        "title": "Blank",
+        "released": "  "
+      },
+      {
+        "season": 1,
+        "episode": 3,
+        "title": "Invalid",
+        "released": "not-a-date"
+      }
+    ]
+  },
+  "expected": {
+    "result": null
+  }
+}

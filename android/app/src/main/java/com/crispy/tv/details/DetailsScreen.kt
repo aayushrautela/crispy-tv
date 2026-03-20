@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
 
 package com.crispy.tv.details
 
@@ -11,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ColorScheme
@@ -21,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -34,9 +40,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.crispy.tv.settings.AiInsightsMode
+import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
 import kotlinx.coroutines.delay
@@ -44,10 +55,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val PALETTE_MAX_WAIT_MS = 450L
+private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
 
 @Composable
 internal fun DetailsScreen(
     uiState: DetailsUiState,
+    playbackSettings: PlaybackSettings,
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit,
     onPersonClick: (String) -> Unit,
@@ -63,13 +76,41 @@ internal fun DetailsScreen(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onSetRating: (Int?) -> Unit,
+    onTrailerMutedChanged: (Boolean) -> Unit,
     onAiInsightsClick: () -> Unit,
     onDismissAiInsights: () -> Unit,
 ) {
     val details = uiState.details
     val imageUrl = details?.backdropUrl ?: details?.posterUrl
+    val aiBackdropUrls =
+        remember(details, uiState.tmdbEnrichment) {
+            buildList {
+                addAll(uiState.tmdbEnrichment?.backdropUrls.orEmpty())
+                details?.backdropUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
+                details?.posterUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
+            }.distinct()
+        }
     val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val theming = rememberDetailsTheming(imageUrl = imageUrl)
+
+    var isScreenResumed by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, _ ->
+                isScreenResumed =
+                    lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val isSeedColorResolvedState = rememberUpdatedState(theming.isSeedColorResolved)
     val colorSchemeState = rememberUpdatedState(theming.colorScheme)
@@ -114,32 +155,40 @@ internal fun DetailsScreen(
 
     val trailerKey = selectedTrailer?.key?.trim().takeIf { !it.isNullOrBlank() }
 
-    val heroIsPinned by remember {
+    val trailerStopScrollThresholdPx = remember(density) {
+        with(density) { HERO_TRAILER_STOP_SCROLL_THRESHOLD.roundToPx() }
+    }
+
+    val heroAllowsTrailerPlayback by remember(listState, trailerStopScrollThresholdPx) {
         derivedStateOf {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 2
+            listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset <= trailerStopScrollThresholdPx
         }
     }
 
     var showTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
     var userPausedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
-    var userMutedTrailer by rememberSaveable(trailerKey) { mutableStateOf(false) }
+    val userMutedTrailer = playbackSettings.trailerMuted
 
-    LaunchedEffect(trailerKey) {
+    LaunchedEffect(trailerKey, playbackSettings.trailerAutoplayEnabled) {
         showTrailer = false
         userPausedTrailer = false
-        userMutedTrailer = false
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
+        if (!playbackSettings.trailerAutoplayEnabled) return@LaunchedEffect
 
         delay(2000)
         showTrailer = true
     }
 
+    val trailerPlaybackBlocked =
+        visibleUiState.streamSelector.visible || visibleUiState.aiStoryVisible || !isScreenResumed
+
     val isTrailerPlaying =
         showTrailer &&
-            heroIsPinned &&
-            !listState.isScrollInProgress &&
-            !userPausedTrailer
+            heroAllowsTrailerPlayback &&
+            !userPausedTrailer &&
+            !trailerPlaybackBlocked
 
     val topBarAlpha by remember {
         derivedStateOf {
@@ -173,7 +222,7 @@ internal fun DetailsScreen(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
                     .navigationBarsPadding(),
-                state = listState
+                state = listState,
             ) {
                 item {
                     HeroSection(
@@ -193,9 +242,6 @@ internal fun DetailsScreen(
                                 }
                             }
                         },
-                        onToggleTrailerMute = {
-                            userMutedTrailer = !userMutedTrailer
-                        }
                     )
                 }
 
@@ -216,7 +262,7 @@ internal fun DetailsScreen(
                         onWatchNow = onOpenStreamSelector,
                         onToggleWatchlist = onToggleWatchlist,
                         onToggleWatched = onToggleWatched,
-                        onSetRating = onSetRating
+                        onSetRating = onSetRating,
                     )
                 }
 
@@ -252,6 +298,17 @@ internal fun DetailsScreen(
                         )
                     }
                 },
+                actions = {
+                    if (showTrailer && !trailerKey.isNullOrBlank()) {
+                        IconButton(onClick = { onTrailerMutedChanged(!userMutedTrailer) }) {
+                            Icon(
+                                imageVector = if (userMutedTrailer) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = if (userMutedTrailer) "Unmute trailer" else "Mute trailer",
+                                tint = contentColor,
+                            )
+                        }
+                    }
+                },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
                         containerColor = containerColor,
@@ -281,7 +338,7 @@ internal fun DetailsScreen(
             if (visibleUiState.aiStoryVisible && visibleUiState.aiInsights != null) {
                 AiInsightsStoryOverlay(
                     result = visibleUiState.aiInsights,
-                    imageUrl = visibleDetails?.backdropUrl ?: visibleDetails?.posterUrl,
+                    backdropUrls = aiBackdropUrls,
                     onDismiss = onDismissAiInsights,
                 )
             }

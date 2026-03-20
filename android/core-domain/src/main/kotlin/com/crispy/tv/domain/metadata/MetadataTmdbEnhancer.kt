@@ -1,5 +1,7 @@
 package com.crispy.tv.domain.metadata
 
+import java.util.Locale
+
 enum class MetadataMediaType {
     MOVIE,
     SERIES;
@@ -98,7 +100,7 @@ fun bridgeCandidateIds(
         }
     }
 
-    return candidates.distinct()
+    return candidates.distinctCaseInsensitive()
 }
 
 private data class SeasonAccumulator(
@@ -117,4 +119,16 @@ private fun normalizedEpisodeId(contentId: String, season: Int?, episode: Int?):
 private fun String?.nonBlankOrNull(): String? {
     val candidate = this?.trim()
     return if (candidate.isNullOrEmpty()) null else candidate
+}
+
+private fun List<String>.distinctCaseInsensitive(): List<String> {
+    val seen = mutableSetOf<String>()
+    val deduped = mutableListOf<String>()
+    for (candidate in this) {
+        val key = candidate.lowercase(Locale.ROOT)
+        if (seen.add(key)) {
+            deduped += candidate
+        }
+    }
+    return deduped
 }

@@ -13,11 +13,6 @@ val traktClientId =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
-val traktClientSecret =
-    (providers.gradleProperty("TRAKT_CLIENT_SECRET").orNull ?: "")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
 val traktRedirectUri =
     (providers.gradleProperty("TRAKT_REDIRECT_URI").orNull ?: "crispy://auth/trakt")
         .replace("\\", "\\\\")
@@ -25,11 +20,6 @@ val traktRedirectUri =
 
 val simklClientId =
     (providers.gradleProperty("SIMKL_CLIENT_ID").orNull ?: "")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
-val simklClientSecret =
-    (providers.gradleProperty("SIMKL_CLIENT_SECRET").orNull ?: "")
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
@@ -43,8 +33,8 @@ val supabaseUrl =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
-val supabaseAnonKey =
-    (providers.gradleProperty("SUPABASE_ANON_KEY").orNull ?: "")
+val supabasePublishableKey =
+    (providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY").orNull ?: "")
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
@@ -81,13 +71,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
         buildConfigField("String", "TRAKT_CLIENT_ID", "\"$traktClientId\"")
-        buildConfigField("String", "TRAKT_CLIENT_SECRET", "\"$traktClientSecret\"")
         buildConfigField("String", "TRAKT_REDIRECT_URI", "\"$traktRedirectUri\"")
         buildConfigField("String", "SIMKL_CLIENT_ID", "\"$simklClientId\"")
-        buildConfigField("String", "SIMKL_CLIENT_SECRET", "\"$simklClientSecret\"")
         buildConfigField("String", "SIMKL_REDIRECT_URI", "\"$simklRedirectUri\"")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
         buildConfigField("String", "INTRODB_API_URL", "\"$introDbApiUrl\"")
         buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
@@ -189,17 +177,20 @@ dependencies {
 
     implementation(platform("androidx.compose:compose-bom:2026.01.00"))
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.5.0-alpha14")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.woowla.compose.icon.collections:simpleicons:16.6.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-svg:2.6.0")
     implementation("com.materialkolor:material-kolor:4.1.1")
 
     implementation("androidx.media3:media3-common:1.4.1")
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
+    implementation("androidx.media:media:1.7.0")
     implementation("com.github.teamnewpipe:NewPipeExtractor:v0.26.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 

@@ -91,7 +91,8 @@ Contracts:
 ## Configuration / Secrets
 
 - Android app reads Gradle properties and injects them into `BuildConfig`; in CI these come from `ORG_GRADLE_PROJECT_*`.
-- Do not commit secrets; use `~/.gradle/gradle.properties` for `TMDB_API_KEY`, Trakt/Simkl ids+secrets+redirect URIs, `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
+- Do not commit secrets; use `~/.gradle/gradle.properties` for `TMDB_API_KEY`, Trakt/Simkl ids+redirect URIs, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`.
+- Supabase Edge Function `ai-search` also supports optional secret `AI_SEARCH_OPENROUTER_MODEL`; default is `arcee-ai/trinity-large-preview:free`.
 - Signing: release uses `RELEASE_KEYSTORE_*` if present; otherwise debug signing. Debug can be overridden via `DEBUG_KEYSTORE_*`.
 
 ## Code Style

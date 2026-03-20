@@ -10,6 +10,7 @@ import com.crispy.tv.watchhistory.KEY_SIMKL_HANDLE
 import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_CODE_VERIFIER
 import com.crispy.tv.watchhistory.KEY_SIMKL_OAUTH_STATE
 import com.crispy.tv.watchhistory.KEY_SIMKL_TOKEN
+import com.crispy.tv.watchhistory.KEY_PROVIDER_AUTH_SCHEMA_VERSION
 import com.crispy.tv.watchhistory.KEY_TRAKT_EXPIRES_AT
 import com.crispy.tv.watchhistory.KEY_TRAKT_HANDLE
 import com.crispy.tv.watchhistory.KEY_TRAKT_OAUTH_CODE_VERIFIER
@@ -28,13 +29,30 @@ internal class ProviderSessionStore(
     val prefs: SharedPreferences =
         run {
             migrateLegacyWatchHistoryPrefsIfNeeded(appContext)
-            appContext.getSharedPreferences(WATCH_HISTORY_PREFS_NAME, Context.MODE_PRIVATE)
+            appContext.getSharedPreferences(WATCH_HISTORY_PREFS_NAME, Context.MODE_PRIVATE).also(::migrateProviderAuthStorageIfNeeded)
         }
+
+    private fun migrateProviderAuthStorageIfNeeded(prefs: SharedPreferences) {
+        val currentVersion = prefs.getInt(KEY_PROVIDER_AUTH_SCHEMA_VERSION, 0)
+        if (currentVersion >= PROVIDER_AUTH_SCHEMA_VERSION) return
+
+        prefs.edit().apply {
+            remove(KEY_TRAKT_TOKEN)
+            remove(KEY_TRAKT_REFRESH_TOKEN)
+            remove(KEY_TRAKT_EXPIRES_AT)
+            remove(KEY_TRAKT_HANDLE)
+            remove(KEY_SIMKL_TOKEN)
+            remove(KEY_SIMKL_HANDLE)
+            putInt(KEY_PROVIDER_AUTH_SCHEMA_VERSION, PROVIDER_AUTH_SCHEMA_VERSION)
+        }.apply()
+
+        clearProviderCaches(WatchProvider.TRAKT)
+        clearProviderCaches(WatchProvider.SIMKL)
+    }
 
     fun connectProvider(
         provider: WatchProvider,
         accessToken: String,
-        refreshToken: String?,
         expiresAtEpochMs: Long?,
         userHandle: String?,
     ) {
@@ -50,13 +68,7 @@ internal class ProviderSessionStore(
             when (provider) {
                 WatchProvider.TRAKT -> {
                     putString(KEY_TRAKT_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedAccess))
-
-                    val normalizedRefresh = refreshToken?.trim()?.ifBlank { null }
-                    if (normalizedRefresh == null) {
-                        remove(KEY_TRAKT_REFRESH_TOKEN)
-                    } else {
-                        putString(KEY_TRAKT_REFRESH_TOKEN, KeystoreSecretStore.encryptForPrefs(normalizedRefresh))
-                    }
+                    remove(KEY_TRAKT_REFRESH_TOKEN)
 
                     if (expiresAtEpochMs != null && expiresAtEpochMs > 0L) {
                         putLong(KEY_TRAKT_EXPIRES_AT, expiresAtEpochMs)
@@ -107,25 +119,11 @@ internal class ProviderSessionStore(
         val traktSession = traktSessionOrNull()
         val simklSession = simklSessionOrNull()
         return WatchProviderAuthState(
-            traktAuthenticated = traktSession != null,
-            simklAuthenticated = simklSession != null,
+            traktAuthenticated = traktSession?.isUsable() == true,
+            simklAuthenticated = simklSession?.isUsable() == true,
             traktSession = traktSession,
             simklSession = simklSession,
         )
-    }
-
-    fun clearPendingTraktOAuth() {
-        prefs.edit().apply {
-            remove(KEY_TRAKT_OAUTH_STATE)
-            remove(KEY_TRAKT_OAUTH_CODE_VERIFIER)
-        }.apply()
-    }
-
-    fun clearPendingSimklOAuth() {
-        prefs.edit().apply {
-            remove(KEY_SIMKL_OAUTH_STATE)
-            remove(KEY_SIMKL_OAUTH_CODE_VERIFIER)
-        }.apply()
     }
 
     fun readSecret(key: String): String {
@@ -147,17 +145,6 @@ internal class ProviderSessionStore(
         return stored
     }
 
-    fun writeEncryptedSecret(key: String, plaintext: String?) {
-        val normalized = plaintext?.trim()?.ifBlank { null }
-        prefs.edit().apply {
-            if (normalized == null) {
-                remove(key)
-            } else {
-                putString(key, KeystoreSecretStore.encryptForPrefs(normalized))
-            }
-        }.apply()
-    }
-
     fun traktAccessToken(): String {
         return readSecret(KEY_TRAKT_TOKEN).trim()
     }
@@ -170,12 +157,10 @@ internal class ProviderSessionStore(
         val token = traktAccessToken()
         if (token.isBlank()) return null
 
-        val refresh = readSecret(KEY_TRAKT_REFRESH_TOKEN).trim().ifBlank { null }
         val expiresAt = prefs.getLong(KEY_TRAKT_EXPIRES_AT, -1L).takeIf { it > 0L }
         val handle = prefs.getString(KEY_TRAKT_HANDLE, null)?.trim()?.ifBlank { null }
         return WatchProviderSession(
             accessToken = token,
-            refreshToken = refresh,
             expiresAtEpochMs = expiresAt,
             userHandle = handle,
         )
@@ -187,5 +172,15 @@ internal class ProviderSessionStore(
 
         val handle = prefs.getString(KEY_SIMKL_HANDLE, null)?.trim()?.ifBlank { null }
         return WatchProviderSession(accessToken = token, userHandle = handle)
+    }
+
+    private fun WatchProviderSession.isUsable(nowMs: Long = System.currentTimeMillis()): Boolean {
+        val expiry = expiresAtEpochMs ?: return true
+        return expiry > nowMs + TOKEN_EXPIRY_GRACE_MS
+    }
+
+    private companion object {
+        private const val TOKEN_EXPIRY_GRACE_MS = 60_000L
+        private const val PROVIDER_AUTH_SCHEMA_VERSION = 1
     }
 }

@@ -8,7 +8,6 @@ enum class WatchProvider {
 
 data class WatchProviderSession(
     val accessToken: String,
-    val refreshToken: String? = null,
     val expiresAtEpochMs: Long? = null,
     val userHandle: String? = null,
     val connectedAtEpochMs: Long = System.currentTimeMillis()
@@ -64,6 +63,13 @@ data class ContinueWatchingResult(
     val statusMessage: String,
     val entries: List<ContinueWatchingEntry> = emptyList(),
     val isError: Boolean = false,
+)
+
+data class WatchedEpisodeRecord(
+    val contentId: String,
+    val season: Int,
+    val episode: Int,
+    val watchedAtEpochMs: Long,
 )
 
 data class ProviderLibraryFolder(
@@ -134,6 +140,34 @@ data class ProviderAuthActionResult(
     val authState: WatchProviderAuthState = WatchProviderAuthState()
 )
 
+data class ProviderSessionBackendResult(
+    val session: WatchProviderSession? = null,
+    val errorMessage: String? = null,
+)
+
+data class ProviderSessionDisconnectResult(
+    val success: Boolean,
+    val errorMessage: String? = null,
+)
+
+interface ProviderSessionBackend {
+    fun isConfigured(): Boolean
+
+    suspend fun exchangeProviderSession(
+        provider: WatchProvider,
+        code: String,
+        redirectUri: String,
+        codeVerifier: String,
+    ): ProviderSessionBackendResult
+
+    suspend fun resolveProviderSession(
+        provider: WatchProvider,
+        forceRefresh: Boolean = false,
+    ): ProviderSessionBackendResult
+
+    suspend fun disconnectProviderSession(provider: WatchProvider): ProviderSessionDisconnectResult
+}
+
 data class PlaybackIdentity(
     val imdbId: String?,
     val tmdbId: Int? = null,
@@ -161,35 +195,18 @@ data class WatchProgressSyncResult(
 )
 
 interface WatchHistoryService {
-    fun connectProvider(
-        provider: WatchProvider,
-        accessToken: String,
-        refreshToken: String? = null,
-        expiresAtEpochMs: Long? = null,
-        userHandle: String? = null
-    ) {
+    fun clearCachedProviderAuthState() {
     }
 
-    fun disconnectProvider(provider: WatchProvider) {
-    }
-
-    fun updateAuthTokens(traktAccessToken: String, simklAccessToken: String) {
-        val trakt = traktAccessToken.trim()
-        if (trakt.isBlank()) {
-            disconnectProvider(WatchProvider.TRAKT)
-        } else {
-            connectProvider(provider = WatchProvider.TRAKT, accessToken = trakt)
-        }
-
-        val simkl = simklAccessToken.trim()
-        if (simkl.isBlank()) {
-            disconnectProvider(WatchProvider.SIMKL)
-        } else {
-            connectProvider(provider = WatchProvider.SIMKL, accessToken = simkl)
-        }
+    suspend fun disconnectProvider(provider: WatchProvider): ProviderAuthActionResult {
+        return ProviderAuthActionResult(success = false, statusMessage = "Provider disconnect unavailable.")
     }
 
     fun authState(): WatchProviderAuthState
+
+    suspend fun refreshProviderAuthState(forceRefresh: Boolean = false): ProviderAuthActionResult {
+        return ProviderAuthActionResult(success = true, statusMessage = "", authState = authState())
+    }
 
     suspend fun listLocalHistory(limit: Int = 100): WatchHistoryResult
 
@@ -244,6 +261,12 @@ interface WatchHistoryService {
         source: WatchProvider? = null
     ): ContinueWatchingResult {
         return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.", isError = true)
+    }
+
+    suspend fun listWatchedEpisodeRecords(
+        source: WatchProvider? = null,
+    ): List<WatchedEpisodeRecord> {
+        return emptyList()
     }
 
     suspend fun listProviderLibrary(
@@ -315,20 +338,19 @@ interface WatchHistoryService {
 }
 
 object UnavailableWatchHistoryService : WatchHistoryService {
-    override fun connectProvider(
-        provider: WatchProvider,
-        accessToken: String,
-        refreshToken: String?,
-        expiresAtEpochMs: Long?,
-        userHandle: String?
-    ) {
+    override fun clearCachedProviderAuthState() {
     }
 
-    override fun disconnectProvider(provider: WatchProvider) {
+    override suspend fun disconnectProvider(provider: WatchProvider): ProviderAuthActionResult {
+        return ProviderAuthActionResult(success = false, statusMessage = "Watch history service unavailable.")
     }
 
     override fun authState(): WatchProviderAuthState {
         return WatchProviderAuthState()
+    }
+
+    override suspend fun refreshProviderAuthState(forceRefresh: Boolean): ProviderAuthActionResult {
+        return ProviderAuthActionResult(success = false, statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun listLocalHistory(limit: Int): WatchHistoryResult {

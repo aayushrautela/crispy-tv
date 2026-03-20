@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.crispy.tv.ratings.formatRating
 import coil.compose.AsyncImage
 
 @Composable
@@ -43,6 +45,12 @@ fun PosterCard(
     onClick: () -> Unit
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
+    val imageModel = rememberCrispyImageModel(
+        posterUrl ?: backdropUrl,
+        width = 124.dp,
+        height = 186.dp,
+        tmdbSize = "w342",
+    )
     Column(modifier = modifier) {
         Card(
             modifier = Modifier
@@ -52,10 +60,9 @@ fun PosterCard(
             shape = MaterialTheme.shapes.large
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                val imageUrl = posterUrl ?: backdropUrl
-                if (!imageUrl.isNullOrBlank()) {
+                if (imageModel != null) {
                     AsyncImage(
-                        model = imageUrl,
+                        model = imageModel,
                         contentDescription = title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -75,35 +82,33 @@ fun PosterCard(
                     }
                 }
 
-                rating?.toDoubleOrNull()?.let { parsedRating ->
-                    if (parsedRating > 0) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(6.dp)
-                                .background(
-                                    color = Color.Black.copy(alpha = 0.7f),
-                                    shape = MaterialTheme.shapes.small
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                formatRating(rating?.toDoubleOrNull())?.let { formattedRating ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .background(
+                                color = Color.Black.copy(alpha = 0.7f),
+                                shape = MaterialTheme.shapes.small
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = Color(0xFFFFC107)
-                                )
-                                Text(
-                                    text = String.format("%.1f", parsedRating),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    fontSize = 11.sp
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFFFC107)
+                            )
+                            Text(
+                                text = formattedRating,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontSize = 11.sp
+                            )
                         }
                     }
                 }
@@ -116,10 +121,12 @@ fun PosterCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 40.dp),
                 )
                 if (year != null || genre != null) {
                     Text(

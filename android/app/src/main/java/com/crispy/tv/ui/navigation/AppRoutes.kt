@@ -5,6 +5,8 @@ import com.crispy.tv.catalog.CatalogSectionRef
 import java.util.Locale
 
 object AppRoutes {
+    const val TopLevelScrollToTopRequestKey = "topLevelScrollToTopRequest"
+
     const val HomeRoute = "home"
     const val SearchRoute = "search"
     const val DiscoverRoute = "discover"
@@ -24,6 +26,7 @@ object AppRoutes {
 
     const val PlaybackSettingsRoute = "settings/playback"
     const val AddonsSettingsRoute = "settings/addons"
+    const val MetadataSettingsRoute = "settings/metadata"
     const val AiInsightsSettingsRoute = "settings/ai"
     const val ProviderPortalRoute = "settings/providers"
     const val AccountsProfilesRoute = "settings/accounts"
@@ -65,7 +68,7 @@ object AppRoutes {
 
     fun catalogListRoute(section: CatalogSectionRef): String {
         return "$CatalogListRoute/${Uri.encode(section.catalogId)}" +
-            "?$CatalogTitleArg=${Uri.encode(section.title)}"
+            "?$CatalogTitleArg=${Uri.encode(section.displayTitle)}"
     }
 
     fun personDetailsRoute(personId: String): String {

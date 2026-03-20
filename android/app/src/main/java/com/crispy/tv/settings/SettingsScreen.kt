@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Language
@@ -33,18 +36,23 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.utils.appBarScrollBehavior
+import kotlinx.coroutines.flow.StateFlow
 
 data class SettingsItem(
     val label: String,
@@ -63,13 +71,24 @@ data class SettingsGroup(
 @Composable
 fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
+    onNavigateToMetadataSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToAiInsightsSettings: () -> Unit = {},
     onNavigateToProviderPortal: () -> Unit = {},
-    onNavigateToAccountsProfiles: () -> Unit = {}
+    onNavigateToAccountsProfiles: () -> Unit = {},
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val scrollBehavior = appBarScrollBehavior()
+
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            scrollState.animateScrollTo(0)
+            onScrollToTopConsumed()
+        }
+    }
 
     val settingsGroups =
         listOf(
@@ -118,6 +137,13 @@ fun SettingsScreen(
                             onClick = onNavigateToAccountsProfiles
                         ),
                         SettingsItem(
+                            label = "Metadata",
+                            description = "OMDb API key for ratings pills",
+                            icon = Icons.Outlined.Key,
+                            iconTint = MaterialTheme.colorScheme.tertiary,
+                            onClick = onNavigateToMetadataSettings
+                        ),
+                        SettingsItem(
                             label = "Language & Region",
                             description = "Preferred content language",
                             icon = Icons.Outlined.Language,
@@ -145,24 +171,29 @@ fun SettingsScreen(
                     )
             )
         )
-
+    
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             StandardTopAppBar(
                 title = "Settings",
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
+                colors = topLevelAppBarColors(),
             )
-        }
-    ) { innerPadding ->
-
+        },
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState),
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues)
+                .verticalScroll(scrollState)
+                .padding(bottom = Dimensions.ListItemPadding),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
             Text(

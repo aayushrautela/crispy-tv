@@ -16,10 +16,8 @@ object AppStartup {
         }
 
         ProviderSyncScheduler.ensureScheduled(context)
-        ProviderSyncScheduler.enqueueNow(context)
 
         ProgressSyncScheduler.ensureScheduled(context)
-        ProgressSyncScheduler.enqueueNow(context)
 
         val pendingOAuthStore = PendingOAuthStore(context)
         if (pendingOAuthStore.hasPendingOAuth()) {

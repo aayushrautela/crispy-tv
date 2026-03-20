@@ -17,7 +17,7 @@ import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
-    composable(AppRoutes.HomeRoute) {
+    composable(AppRoutes.HomeRoute) { entry ->
         HomeRoute(
             onHeroClick = { hero ->
                 navController.navigate(AppRoutes.homeDetailsRoute(hero.id, hero.type))
@@ -31,18 +31,21 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onThisWeekSeeAllClick = {
                 navController.navigate(AppRoutes.CalendarRoute)
             },
-            onSearchClick = {
-                navController.navigate(AppRoutes.SearchRoute)
-            },
-            onProfileClick = {
-                navController.navigate(AppRoutes.AccountsProfilesRoute)
-            },
             onCatalogItemClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
             },
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))
-            }
+            },
+            onOpenAccountsProfiles = {
+                navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    launchSingleTop = true
+                }
+            },
+            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+            onScrollToTopConsumed = {
+                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+            },
         )
     }
 
@@ -65,8 +68,10 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         val args = entry.arguments
         val section =
             CatalogSectionRef(
+                catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty(),
+                source = com.crispy.tv.domain.home.resolveHomeCatalogSource(args?.getString(AppRoutes.CatalogIdArg).orEmpty()),
+                presentation = com.crispy.tv.domain.home.HomeCatalogPresentation.RAIL,
                 title = args?.getString(AppRoutes.CatalogTitleArg).orEmpty(),
-                catalogId = args?.getString(AppRoutes.CatalogIdArg).orEmpty()
             )
         CatalogRoute(
             section = section,
@@ -100,8 +105,19 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onBack = { navController.popBackStack() },
             onItemClick = { nextId, nextType -> navController.navigate(AppRoutes.homeDetailsRoute(nextId, nextType)) },
             onPersonClick = { personId -> navController.navigate(AppRoutes.personDetailsRoute(personId)) },
-            onOpenPlayer = { playbackUrl, title, identity ->
-                context.startActivity(PlayerActivity.intent(context, playbackUrl, title, identity))
+            onOpenPlayer = { playbackUrl, playbackHeaders, title, identity, subtitle, artworkUrl, launchSnapshot ->
+                context.startActivity(
+                    PlayerActivity.intent(
+                        context = context,
+                        playbackUrl = playbackUrl,
+                        playbackHeaders = playbackHeaders,
+                        title = title,
+                        identity = identity,
+                        subtitle = subtitle,
+                        artworkUrl = artworkUrl,
+                        launchSnapshot = launchSnapshot,
+                    )
+                )
             },
         )
     }

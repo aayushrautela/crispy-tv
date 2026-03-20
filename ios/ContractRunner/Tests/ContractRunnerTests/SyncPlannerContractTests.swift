@@ -69,9 +69,7 @@ private func parseInput(_ input: [String: Any], fixture: URL) throws -> SyncPlan
         profileId: try requireString(input, "profile_id", fixture: fixture),
         addons: addons,
         settings: try requireStringMap(input, key: "settings", fixture: fixture),
-        catalogPrefs: try requireStringMap(input, key: "catalog_prefs", fixture: fixture),
-        traktAuth: try requireStringMap(input, key: "trakt_auth", fixture: fixture),
-        simklAuth: try requireStringMap(input, key: "simkl_auth", fixture: fixture)
+        catalogPrefs: try requireStringMap(input, key: "catalog_prefs", fixture: fixture)
     )
 }
 
@@ -106,9 +104,7 @@ private func parseExpectedCalls(_ expected: [String: Any], fixture: URL) throws 
             return .upsertProfileData(
                 profileId: try requireString(params, "p_profile_id", fixture: fixture),
                 settings: try requireStringMap(params, key: "p_settings", fixture: fixture),
-                catalogPrefs: try requireStringMap(params, key: "p_catalog_prefs", fixture: fixture),
-                traktAuth: try requireStringMap(params, key: "p_trakt_auth", fixture: fixture),
-                simklAuth: try requireStringMap(params, key: "p_simkl_auth", fixture: fixture)
+                catalogPrefs: try requireStringMap(params, key: "p_catalog_prefs", fixture: fixture)
             )
 
         default:

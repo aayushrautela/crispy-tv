@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
 
 package com.crispy.tv.person
 
@@ -77,7 +80,7 @@ fun PersonDetailsRoute(
     PersonDetailsScreen(
         uiState = uiState,
         onBack = onBack,
-        onItemClick = onItemClick
+        onItemClick = onItemClick,
     )
 }
 
@@ -85,7 +88,7 @@ fun PersonDetailsRoute(
 private fun PersonDetailsScreen(
     uiState: PersonDetailsUiState,
     onBack: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem) -> Unit,
 ) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val scrollTopBarAlpha by remember {
@@ -108,7 +111,7 @@ private fun PersonDetailsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            uiState.isLoading -> {
+            uiState.isLoading && uiState.person == null -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     androidx.compose.material3.CircularProgressIndicator()
                 }
@@ -119,7 +122,7 @@ private fun PersonDetailsScreen(
                     person = uiState.person,
                     onItemClick = onItemClick,
                     listState = listState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
 

@@ -15,8 +15,6 @@ class AiInsightsSettingsStore(context: Context) {
         val json = runCatching { JSONObject(raw ?: "{}") }.getOrNull() ?: JSONObject()
         return AiInsightsSettings(
             mode = AiInsightsMode.fromRaw(json.optString("mode").takeIf { it.isNotBlank() }),
-            modelType = AiInsightsModelType.fromRaw(json.optString("model_type").takeIf { it.isNotBlank() }),
-            customModelName = json.optString("custom_model_name", "").trim(),
         )
     }
 
@@ -24,8 +22,6 @@ class AiInsightsSettingsStore(context: Context) {
         val json =
             JSONObject()
                 .put("mode", settings.mode.raw)
-                .put("model_type", settings.modelType.raw)
-                .put("custom_model_name", settings.customModelName)
 
         prefs.edit().putString(KEY_STATE_JSON, json.toString()).apply()
     }

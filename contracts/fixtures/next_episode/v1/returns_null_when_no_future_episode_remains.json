@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "suite": "next_episode",
+  "case_id": "returns_null_when_no_future_episode_remains",
+  "now_ms": 1739923200000,
+  "input": {
+    "current_season": 2,
+    "current_episode": 5,
+    "show_id": "tt999",
+    "watched_set": [
+      "tt999:2:5"
+    ],
+    "episodes": [
+      {
+        "season": 1,
+        "episode": 1,
+        "released": "2024-01-01T00:00:00Z"
+      },
+      {
+        "season": 2,
+        "episode": 5,
+        "released": "2024-02-01T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "result": null
+  }
+}

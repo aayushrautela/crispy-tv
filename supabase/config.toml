@@ -1,0 +1,14 @@
+[functions.ai-search]
+verify_jwt = false
+
+[functions.ai-insights]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
+
+[functions.simkl-oauth-exchange]
+verify_jwt = false
+
+[functions.trakt-oauth-exchange]
+verify_jwt = false

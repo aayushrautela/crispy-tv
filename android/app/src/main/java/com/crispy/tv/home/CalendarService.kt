@@ -1,18 +1,20 @@
 package com.crispy.tv.home
 
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbTvDetails
+import com.crispy.tv.metadata.tmdb.TmdbSeasonEpisode
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.ProviderLibrarySnapshot
+import com.crispy.tv.player.WatchedEpisodeRecord
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.player.WatchProviderAuthState
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -25,6 +27,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
+@Immutable
 data class CalendarEpisodeItem(
     val id: String,
     val seriesId: String,
@@ -42,9 +45,11 @@ data class CalendarEpisodeItem(
     val posterUrl: String?,
     val backdropUrl: String?,
     val thumbnailUrl: String?,
+    val watchedKeys: Set<String> = emptySet(),
     val type: String = "series",
 )
 
+@Immutable
 data class CalendarSeriesItem(
     val id: String,
     val title: String,
@@ -61,6 +66,7 @@ enum class CalendarSectionKey {
     NO_SCHEDULED,
 }
 
+@Immutable
 data class CalendarSection(
     val key: CalendarSectionKey,
     val title: String,
@@ -68,21 +74,24 @@ data class CalendarSection(
     val seriesItems: List<CalendarSeriesItem> = emptyList(),
 )
 
+@Immutable
 data class CalendarSnapshot(
     val sections: List<CalendarSection>,
     val statusMessage: String? = null,
     val isError: Boolean = false,
 )
 
+@Immutable
 data class ThisWeekResult(
     val items: List<CalendarEpisodeItem>,
     val statusMessage: String?,
     val isError: Boolean = false,
 )
 
-class CalendarService(
+class CalendarService internal constructor(
     private val watchHistoryService: WatchHistoryService,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
+    private val metaEpisodeService: CalendarMetaEpisodeService,
 ) {
     suspend fun loadCalendar(nowMs: Long): CalendarSnapshot {
         return try {
@@ -99,13 +108,14 @@ class CalendarService(
 
     suspend fun loadThisWeek(nowMs: Long): ThisWeekResult {
         val snapshot = loadCalendar(nowMs)
-        val items =
+        val rawItems =
             snapshot.sections
                 .firstOrNull { it.key == CalendarSectionKey.THIS_WEEK }
                 ?.episodeItems
                 .orEmpty()
+
         return ThisWeekResult(
-            items = items,
+            items = projectHomeThisWeekItems(rawItems, nowMs),
             statusMessage = snapshot.statusMessage,
             isError = snapshot.isError,
         )
@@ -114,22 +124,13 @@ class CalendarService(
     private suspend fun fetchCalendarSnapshot(nowMs: Long): CalendarSnapshot {
         val zone = ZoneId.systemDefault()
         val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
-        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        val weekEnd = weekStart.plusDays(6)
-        val recentWindowStart = today.minusDays(RECENT_WINDOW_DAYS.toLong())
-        val upcomingWindowEnd = today.plusDays(UPCOMING_WINDOW_DAYS.toLong())
-
         val authState = watchHistoryService.authState()
         val selectedSource = preferredCalendarProvider(authState)
+
         val localHistory = watchHistoryService.listLocalHistory(limit = LOCAL_HISTORY_LIMIT).entries
         val providerLibrary = loadProviderLibrarySnapshot(selectedSource)
         val continueWatching = loadContinueWatchingSnapshot(selectedSource, nowMs)
-        val watchedEpisodeKeys =
-            buildWatchedEpisodeKeys(
-                localHistory = localHistory,
-                providerItems = providerLibrary.items,
-                source = selectedSource,
-            )
+        val watchedEpisodeKeys = buildWatchedEpisodeKeys(loadWatchedEpisodeRecords(selectedSource))
 
         val seeds =
             gatherSeriesSeeds(
@@ -139,7 +140,7 @@ class CalendarService(
                 source = selectedSource,
             )
         if (seeds.isEmpty()) {
-            return CalendarSnapshot(statusMessage = "No shows to track yet.", sections = emptyList())
+            return CalendarSnapshot(sections = emptyList(), statusMessage = "No shows to track yet.")
         }
 
         val results =
@@ -148,107 +149,75 @@ class CalendarService(
                 seeds.map { seed ->
                     async {
                         semaphore.withPermit {
-                            loadSeriesCalendar(
-                                seed = seed,
-                                zone = zone,
-                                nowMs = nowMs,
-                                windowStart = recentWindowStart,
-                                windowEnd = upcomingWindowEnd,
-                                watchedEpisodeKeys = watchedEpisodeKeys,
-                            )
+                            runCatching { loadSeriesCalendar(seed = seed, nowMs = nowMs) }
+                                .getOrElse { error ->
+                                    Log.w(TAG, "Failed calendar series load for ${seed.id}", error)
+                                    SeriesCalendarLoadResult(
+                                        series =
+                                            CalendarSeriesItem(
+                                                id = seed.id,
+                                                title = seed.title,
+                                                posterUrl = seed.posterUrl,
+                                                backdropUrl = seed.backdropUrl,
+                                                sourceLabel = seed.sourceLabel,
+                                            )
+                                    )
+                                }
                         }
                     }
                 }.awaitAll()
             }
 
-        val thisWeekEpisodes =
-            results.flatMap { result ->
-                result.episodes.filter { episode ->
-                    val releasedDate = epochMsToLocalDate(episode.releasedAtMs, zone)
-                    !releasedDate.isBefore(weekStart) && !releasedDate.isAfter(weekEnd)
-                }
-            }
-        val upcomingEpisodes =
-            results.flatMap { result ->
-                result.episodes.filter { episode ->
-                    val releasedDate = epochMsToLocalDate(episode.releasedAtMs, zone)
-                    releasedDate.isAfter(weekEnd)
-                }
-            }
-        val recentlyReleasedEpisodes =
-            results.flatMap { result ->
-                result.episodes.filter { episode ->
-                    val releasedDate = epochMsToLocalDate(episode.releasedAtMs, zone)
-                    releasedDate.isBefore(weekStart)
-                }
-            }
-
-        val thisWeek = groupEpisodes(thisWeekEpisodes, nowMs)
-        val upcoming = groupEpisodes(upcomingEpisodes, nowMs)
-        val recentlyReleased = groupEpisodes(recentlyReleasedEpisodes, nowMs)
-
-        val noScheduledEpisodes =
+        val allEpisodes =
             results
-                .filterNot { it.hasScheduledEpisodesInWindow }
-                .map { result ->
-                    CalendarSeriesItem(
-                        id = result.series.id,
-                        title = result.series.title,
-                        posterUrl = result.series.posterUrl,
-                        backdropUrl = result.series.backdropUrl,
-                        sourceLabel = result.series.sourceLabel,
-                    )
-                }
+                .flatMap { it.episodes }
+                .sortedBy { it.releasedAtMs }
+                .take(MAX_TOTAL_EPISODES)
+
+        val thisWeekEpisodes =
+            allEpisodes.filter { episode ->
+                val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
+                isThisWeek(releaseDate, today) && episode.watchedKeys.none(watchedEpisodeKeys::contains)
+            }
+
+        val upcomingEpisodes =
+            allEpisodes.filter { episode ->
+                val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
+                episode.releasedAtMs > nowMs && !isThisWeek(releaseDate, today)
+            }
+
+        val recentEpisodes =
+            allEpisodes.filter { episode ->
+                val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
+                episode.releasedAtMs < nowMs && !isThisWeek(releaseDate, today)
+            }
+
+        val noScheduledSeries =
+            results
+                .filter { it.episodes.isEmpty() }
+                .map { it.series }
                 .take(MAX_NO_SCHEDULED_ITEMS)
 
         val sections =
             buildList {
-                if (thisWeek.isNotEmpty()) {
-                    add(
-                        CalendarSection(
-                            key = CalendarSectionKey.THIS_WEEK,
-                            title = "This Week",
-                            episodeItems = thisWeek,
-                        )
-                    )
+                if (thisWeekEpisodes.isNotEmpty()) {
+                    add(CalendarSection(CalendarSectionKey.THIS_WEEK, "This Week", episodeItems = thisWeekEpisodes))
                 }
-                if (upcoming.isNotEmpty()) {
-                    add(
-                        CalendarSection(
-                            key = CalendarSectionKey.UPCOMING,
-                            title = "Upcoming",
-                            episodeItems = upcoming,
-                        )
-                    )
+                if (upcomingEpisodes.isNotEmpty()) {
+                    add(CalendarSection(CalendarSectionKey.UPCOMING, "Upcoming", episodeItems = upcomingEpisodes))
                 }
-                if (recentlyReleased.isNotEmpty()) {
-                    add(
-                        CalendarSection(
-                            key = CalendarSectionKey.RECENTLY_RELEASED,
-                            title = "Recently Released",
-                            episodeItems = recentlyReleased,
-                        )
-                    )
+                if (recentEpisodes.isNotEmpty()) {
+                    add(CalendarSection(CalendarSectionKey.RECENTLY_RELEASED, "Recently Released", episodeItems = recentEpisodes))
                 }
-                if (noScheduledEpisodes.isNotEmpty()) {
-                    add(
-                        CalendarSection(
-                            key = CalendarSectionKey.NO_SCHEDULED,
-                            title = "Series with No Scheduled Episodes",
-                            seriesItems = noScheduledEpisodes,
-                        )
-                    )
+                if (noScheduledSeries.isNotEmpty()) {
+                    add(CalendarSection(CalendarSectionKey.NO_SCHEDULED, "Series with No Scheduled Episodes", seriesItems = noScheduledSeries))
                 }
             }
 
-        val statusMessage =
-            if (sections.isEmpty()) {
-                "No upcoming episodes found right now."
-            } else {
-                null
-            }
-
-        return CalendarSnapshot(sections = sections, statusMessage = statusMessage)
+        return CalendarSnapshot(
+            sections = sections,
+            statusMessage = if (sections.isEmpty()) "No upcoming episodes found right now." else null,
+        )
     }
 
     private suspend fun loadProviderLibrarySnapshot(source: WatchProvider): ProviderLibrarySnapshot {
@@ -257,11 +226,8 @@ class CalendarService(
         }
 
         val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = PROVIDER_LIBRARY_LIMIT, source = source)
-        return if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) {
-            cached
-        } else {
-            watchHistoryService.listProviderLibrary(limitPerFolder = PROVIDER_LIBRARY_LIMIT, source = source)
-        }
+        return if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) cached
+        else watchHistoryService.listProviderLibrary(limitPerFolder = PROVIDER_LIBRARY_LIMIT, source = source)
     }
 
     private suspend fun loadContinueWatchingSnapshot(
@@ -269,11 +235,12 @@ class CalendarService(
         nowMs: Long,
     ): ContinueWatchingResult {
         val cached = watchHistoryService.getCachedContinueWatching(limit = CONTINUE_WATCHING_LIMIT, nowMs = nowMs, source = source)
-        return if (cached.entries.isNotEmpty()) {
-            cached
-        } else {
-            watchHistoryService.listContinueWatching(limit = CONTINUE_WATCHING_LIMIT, nowMs = nowMs, source = source)
-        }
+        return if (cached.entries.isNotEmpty()) cached
+        else watchHistoryService.listContinueWatching(limit = CONTINUE_WATCHING_LIMIT, nowMs = nowMs, source = source)
+    }
+
+    private suspend fun loadWatchedEpisodeRecords(source: WatchProvider): List<WatchedEpisodeRecord> {
+        return watchHistoryService.listWatchedEpisodeRecords(source = source)
     }
 
     private fun gatherSeriesSeeds(
@@ -291,305 +258,226 @@ class CalendarService(
             posterUrl: String?,
             backdropUrl: String?,
             sourceLabel: String?,
+            addonId: String? = null,
         ) {
             val normalized = normalizeSeriesKey(contentId)
             if (normalized.isBlank() || !seen.add(normalized)) return
-            result +=
-                SeriesSeed(
-                    id = contentId,
-                    title = title,
-                    posterUrl = posterUrl,
-                    backdropUrl = backdropUrl,
-                    sourceLabel = sourceLabel,
-                )
+            result += SeriesSeed(normalized, title.ifBlank { normalized }, posterUrl, backdropUrl, sourceLabel, addonId)
         }
 
         continueWatching
-            .filter { it.contentType == MetadataLabMediaType.SERIES }
-            .forEach { entry ->
-                addSeed(
-                    contentId = entry.contentId,
-                    title = entry.title,
-                    posterUrl = null,
-                    backdropUrl = null,
-                    sourceLabel = "Continue Watching",
-                )
-            }
-
-        providerItems
-            .asSequence()
-            .filter { item ->
-                item.provider == source &&
-                    item.contentType == MetadataLabMediaType.SERIES &&
-                    item.folderId in watchlistFolderIds(source)
-            }
-            .sortedByDescending { it.addedAtEpochMs }
-            .forEach { item ->
-                addSeed(
-                    contentId = item.contentId,
-                    title = item.title,
-                    posterUrl = item.posterUrl,
-                    backdropUrl = item.backdropUrl,
-                    sourceLabel = "Watchlist",
-                )
-            }
-
-        providerItems
-            .asSequence()
-            .filter { item ->
-                item.provider == source &&
-                    item.contentType == MetadataLabMediaType.SERIES &&
-                    item.folderId in libraryFolderIds(source)
-            }
-            .sortedByDescending { it.addedAtEpochMs }
-            .forEach { item ->
-                addSeed(
-                    contentId = item.contentId,
-                    title = item.title,
-                    posterUrl = item.posterUrl,
-                    backdropUrl = item.backdropUrl,
-                    sourceLabel = "Library",
-                )
-            }
-
-        providerItems
-            .asSequence()
-            .filter { item ->
-                item.provider == source &&
-                    item.contentType == MetadataLabMediaType.SERIES &&
-                    source.isWatchedFolder(item.folderId)
-            }
-            .sortedByDescending { it.addedAtEpochMs }
-            .forEach { item ->
-                addSeed(
-                    contentId = item.contentId,
-                    title = item.title,
-                    posterUrl = item.posterUrl,
-                    backdropUrl = item.backdropUrl,
-                    sourceLabel = "Recently Watched",
-                )
-            }
-
-        localHistory
             .asSequence()
             .filter { it.contentType == MetadataLabMediaType.SERIES }
-            .sortedByDescending { it.watchedAtEpochMs }
             .forEach { entry ->
-                addSeed(
-                    contentId = entry.contentId,
-                    title = entry.title,
-                    posterUrl = null,
-                    backdropUrl = null,
-                    sourceLabel = "Recently Watched",
-                )
+                addSeed(entry.contentId, entry.title, null, null, "Continue Watching")
             }
+
+        providerItems
+            .asSequence()
+            .filter {
+                it.provider == source &&
+                    it.contentType == MetadataLabMediaType.SERIES &&
+                    it.folderId in watchlistFolderIds(source)
+            }
+            .sortedByDescending { it.addedAtEpochMs }
+            .forEach { item ->
+                addSeed(item.contentId, item.title, item.posterUrl, item.backdropUrl, "Watchlist")
+            }
+
+        providerItems
+            .asSequence()
+            .filter {
+                it.provider == source &&
+                    it.contentType == MetadataLabMediaType.SERIES &&
+                    it.folderId in libraryFolderIds(source)
+            }
+            .sortedByDescending { it.addedAtEpochMs }
+            .forEach { item ->
+                addSeed(item.contentId, item.title, item.posterUrl, item.backdropUrl, "Library")
+            }
+
+        when (source) {
+            WatchProvider.LOCAL -> {
+                localHistory
+                    .asSequence()
+                    .filter { it.contentType == MetadataLabMediaType.SERIES }
+                    .sortedByDescending { it.watchedAtEpochMs }
+                    .distinctBy { normalizeSeriesKey(it.contentId) }
+                    .take(RECENTLY_WATCHED_SERIES_LIMIT)
+                    .forEach { entry ->
+                        addSeed(entry.contentId, entry.title, null, null, "Recently Watched")
+                    }
+            }
+
+            else -> {
+                providerItems
+                    .asSequence()
+                    .filter {
+                        it.provider == source &&
+                            it.contentType == MetadataLabMediaType.SERIES &&
+                            source.isWatchedFolder(it.folderId)
+                    }
+                    .sortedByDescending { it.addedAtEpochMs }
+                    .distinctBy { normalizeSeriesKey(it.contentId) }
+                    .take(RECENTLY_WATCHED_SERIES_LIMIT)
+                    .forEach { item ->
+                        addSeed(item.contentId, item.title, item.posterUrl, item.backdropUrl, "Recently Watched")
+                    }
+            }
+        }
 
         return result.take(MAX_SERIES)
     }
 
     private suspend fun loadSeriesCalendar(
         seed: SeriesSeed,
-        zone: ZoneId,
         nowMs: Long,
-        windowStart: LocalDate,
-        windowEnd: LocalDate,
-        watchedEpisodeKeys: Set<String>,
     ): SeriesCalendarLoadResult {
-        val enriched =
-            tmdbEnrichmentRepository.load(
-                rawId = seed.id,
-                mediaTypeHint = MetadataLabMediaType.SERIES,
-                locale = Locale.getDefault(),
-            )
+        val enrichment =
+            runCatching {
+                tmdbEnrichmentRepository.load(
+                    rawId = seed.id,
+                    mediaTypeHint = MetadataLabMediaType.SERIES,
+                    locale = Locale.getDefault(),
+                )
+            }.getOrNull()
 
-        val fallbackDetails = enriched?.fallbackDetails
-        val tvDetails = enriched?.enrichment?.titleDetails as? TmdbTvDetails
-        val tmdbId = enriched?.enrichment?.tmdbId
-        val seasonCount = tvDetails?.numberOfSeasons ?: 0
-        val yearInt = fallbackDetails?.year?.trim()?.toIntOrNull()
+        val fallbackDetails = enrichment?.fallbackDetails
+        val resolvedSeriesId = fallbackDetails?.id ?: seed.id
+        val watchKeys = buildSeriesWatchKeys(seed.id, resolvedSeriesId, fallbackDetails?.imdbId)
+
+        val metaEpisodes =
+            metaEpisodeService.getUpcomingEpisodes(
+                seriesId = seed.id,
+                nowMs = nowMs,
+                daysBack = DAYS_BACK,
+                daysAhead = DAYS_AHEAD,
+                maxEpisodes = MAX_EPISODES_PER_SERIES,
+                preferredAddonId = seed.addonId ?: fallbackDetails?.addonId,
+            )
 
         val series =
             CalendarSeriesItem(
-                id = fallbackDetails?.id ?: seed.id,
-                title = fallbackDetails?.title ?: seed.title,
-                posterUrl = fallbackDetails?.posterUrl ?: seed.posterUrl,
-                backdropUrl = fallbackDetails?.backdropUrl ?: seed.backdropUrl,
+                id = resolvedSeriesId,
+                title = fallbackDetails?.title ?: metaEpisodes?.seriesName ?: seed.title,
+                posterUrl = fallbackDetails?.posterUrl ?: metaEpisodes?.posterUrl ?: seed.posterUrl,
+                backdropUrl = fallbackDetails?.backdropUrl ?: metaEpisodes?.backdropUrl ?: seed.backdropUrl,
                 sourceLabel = seed.sourceLabel,
             )
 
-        if (tvDetails == null || tmdbId == null || seasonCount <= 0) {
+        val videos = metaEpisodes?.episodes.orEmpty()
+        if (videos.isEmpty()) {
             return SeriesCalendarLoadResult(series = series)
         }
 
-        val seasonsToFetch =
-            (maxOf(1, seasonCount - (MAX_SEASONS_PER_SERIES - 1))..seasonCount).toList()
+        val tmdbSeasonDetails =
+            loadTmdbSeasonDetails(
+                tmdbId = enrichment?.enrichment?.tmdbId,
+                seasons = videos.map { it.season }.filter { it > 0 }.distinct().take(MAX_TMDB_SEASONS),
+            )
 
-        var hasScheduledEpisodesInWindow = false
         val episodes =
-            seasonsToFetch.flatMap { seasonNumber ->
-                tmdbEnrichmentRepository.loadSeasonEpisodes(
-                    tmdbId = tmdbId,
-                    seasonNumber = seasonNumber,
-                    locale = Locale.getDefault(),
-                ).mapNotNull { episode ->
-                    if (episode.seasonNumber == 0) return@mapNotNull null
-
-                    val releaseDate = parseReleaseDate(episode.airDate, zone) ?: return@mapNotNull null
-                    if (releaseDate.isBefore(windowStart) || releaseDate.isAfter(windowEnd)) {
-                        return@mapNotNull null
-                    }
-                    hasScheduledEpisodesInWindow = true
-
-                    val isWatched =
-                        episodeIsWatched(
-                            watchedEpisodeKeys = watchedEpisodeKeys,
-                            candidateIds = buildSeriesCandidateIds(seed.id, fallbackDetails?.id, fallbackDetails?.imdbId),
-                            season = episode.seasonNumber,
-                            episode = episode.episodeNumber,
-                            playbackIdentity =
-                                PlaybackIdentity(
-                                    imdbId = fallbackDetails?.imdbId,
-                                    tmdbId = tmdbId,
-                                    contentType = MetadataLabMediaType.SERIES,
-                                    season = episode.seasonNumber,
-                                    episode = episode.episodeNumber,
-                                    title = fallbackDetails?.title ?: seed.title,
-                                    year = yearInt,
-                                    showTitle = fallbackDetails?.title ?: seed.title,
-                                    showYear = yearInt,
-                                ),
-                        )
-                    if (isWatched) return@mapNotNull null
-
-                    val releasedAtMs = releaseDate.atStartOfDay(zone).toInstant().toEpochMilli()
-                    RawCalendarEpisode(
-                        seriesId = series.id,
-                        seriesName = series.title,
-                        episodeTitle = episode.name,
-                        overview = episode.overview,
-                        season = episode.seasonNumber,
-                        episode = episode.episodeNumber,
-                        releaseDate = episode.airDate ?: releaseDate.toString(),
-                        releasedAtMs = releasedAtMs,
-                        posterUrl = series.posterUrl,
-                        backdropUrl = series.backdropUrl,
-                        thumbnailUrl = episode.stillUrl,
-                    )
-                }
+            videos.mapNotNull { video ->
+                if (video.season <= 0 || video.episode <= 0) return@mapNotNull null
+                val releasedAtMs = video.releasedAtMs.takeIf { it > 0L } ?: return@mapNotNull null
+                val tmdbEpisode = tmdbSeasonDetails[video.season to video.episode]
+                val releaseDate = (video.released ?: tmdbEpisode?.airDate)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                CalendarEpisodeItem(
+                    id = "${series.id}:${video.season}:${video.episode}",
+                    seriesId = series.id,
+                    seriesName = series.title,
+                    episodeTitle = tmdbEpisode?.name ?: video.title ?: "Episode ${video.episode}",
+                    overview = tmdbEpisode?.overview ?: video.overview,
+                    season = video.season,
+                    episode = video.episode,
+                    episodeRange = null,
+                    episodeCount = 1,
+                    releaseDate = releaseDate,
+                    releasedAtMs = releasedAtMs,
+                    isReleased = releasedAtMs <= nowMs,
+                    isGroup = false,
+                    posterUrl = series.posterUrl,
+                    backdropUrl = series.backdropUrl,
+                    thumbnailUrl = tmdbEpisode?.stillUrl ?: video.thumbnailUrl,
+                    watchedKeys = watchKeys.mapTo(linkedSetOf()) { key -> "$key:${video.season}:${video.episode}" },
+                )
             }
 
-        return SeriesCalendarLoadResult(
-            series = series,
-            hasScheduledEpisodesInWindow = hasScheduledEpisodesInWindow,
-            episodes = episodes,
-        )
+        return SeriesCalendarLoadResult(series = series, episodes = episodes)
     }
 
-    private suspend fun episodeIsWatched(
-        watchedEpisodeKeys: Set<String>,
-        candidateIds: Set<String>,
-        season: Int,
-        episode: Int,
-        playbackIdentity: PlaybackIdentity,
-    ): Boolean {
-        val keyMatches = candidateIds.any { candidateId -> watchedEpisodeKeys.contains("$candidateId:$season:$episode") }
-        if (keyMatches) return true
+    private suspend fun loadTmdbSeasonDetails(
+        tmdbId: Int?,
+        seasons: List<Int>,
+    ): Map<Pair<Int, Int>, TmdbSeasonEpisode> {
+        if (tmdbId == null || seasons.isEmpty()) return emptyMap()
 
-        val localProgress = watchHistoryService.getLocalWatchProgress(playbackIdentity)
-        return localProgress?.progressPercent?.let { it >= WATCHED_PROGRESS_PERCENT } == true
-    }
-
-    private fun buildWatchedEpisodeKeys(
-        localHistory: List<WatchHistoryEntry>,
-        providerItems: List<ProviderLibraryItem>,
-        source: WatchProvider,
-    ): Set<String> {
-        val result = linkedSetOf<String>()
-
-        localHistory.forEach { entry ->
-            val season = entry.season ?: return@forEach
-            val episode = entry.episode ?: return@forEach
-            result += "${normalizeSeriesKey(entry.contentId)}:$season:$episode"
+        return buildMap {
+            seasons.forEach { season ->
+                runCatching {
+                    tmdbEnrichmentRepository.loadSeasonEpisodes(
+                        tmdbId = tmdbId,
+                        seasonNumber = season,
+                        locale = Locale.getDefault(),
+                    )
+                }.getOrDefault(emptyList()).forEach { episode ->
+                    put(episode.seasonNumber to episode.episodeNumber, episode)
+                }
+            }
         }
-
-        providerItems.forEach { item ->
-            if (item.provider != source || !source.isWatchedFolder(item.folderId)) return@forEach
-            val season = item.season ?: return@forEach
-            val episode = item.episode ?: return@forEach
-            result += "${normalizeSeriesKey(item.contentId)}:$season:$episode"
-        }
-
-        return result
     }
 
-    private fun groupEpisodes(
-        episodes: List<RawCalendarEpisode>,
+    private fun buildWatchedEpisodeKeys(records: List<WatchedEpisodeRecord>): Set<String> {
+        return records.mapTo(linkedSetOf()) { record ->
+            "${normalizeSeriesKey(record.contentId)}:${record.season}:${record.episode}"
+        }
+    }
+
+    private fun buildSeriesWatchKeys(vararg ids: String?): Set<String> {
+        return ids.mapNotNullTo(linkedSetOf()) { id ->
+            id?.takeIf { it.isNotBlank() }?.let(::normalizeSeriesKey)
+        }
+    }
+
+    private fun projectHomeThisWeekItems(
+        items: List<CalendarEpisodeItem>,
         nowMs: Long,
     ): List<CalendarEpisodeItem> {
-        data class GroupKey(val seriesId: String, val season: Int, val releaseDay: String)
+        val rawItems = items.filter { it.season != 0 }.take(HOME_THIS_WEEK_RAW_LIMIT)
 
-        return episodes
-            .sortedBy { it.releasedAtMs }
-            .groupBy { GroupKey(it.seriesId, it.season, it.releaseDate.take(10)) }
+        return rawItems
+            .groupBy { item -> "${item.seriesId}_${item.releaseDate.take(10)}" }
             .values
             .map { group ->
                 val sorted = group.sortedBy { it.episode }
                 val first = sorted.first()
                 val last = sorted.last()
-                val isGroup = sorted.size > 1
-                val episodeRange = if (isGroup) "E${first.episode}-E${last.episode}" else null
-                CalendarEpisodeItem(
-                    id = "${first.seriesId}:${first.season}:${episodeRange ?: first.episode}",
-                    seriesId = first.seriesId,
-                    seriesName = first.seriesName,
-                    episodeTitle = if (isGroup) null else first.episodeTitle,
-                    overview = if (isGroup) null else first.overview,
-                    season = first.season,
-                    episode = first.episode,
-                    episodeRange = episodeRange,
-                    episodeCount = sorted.size,
-                    releaseDate = first.releaseDate,
-                    releasedAtMs = first.releasedAtMs,
-                    isReleased = first.releasedAtMs <= nowMs,
-                    isGroup = isGroup,
-                    posterUrl = first.posterUrl,
-                    backdropUrl = first.backdropUrl,
-                    thumbnailUrl = sorted.firstNotNullOfOrNull { it.thumbnailUrl },
-                )
+                if (sorted.size == 1) {
+                    first
+                } else {
+                    first.copy(
+                        id = "group_${first.seriesId}_${first.releaseDate.take(10)}",
+                        episodeTitle = null,
+                        overview = null,
+                        episodeRange = "E${first.episode}-E${last.episode}",
+                        episodeCount = sorted.size,
+                        isGroup = true,
+                        isReleased = first.releasedAtMs <= nowMs,
+                        thumbnailUrl = sorted.firstNotNullOfOrNull { it.thumbnailUrl },
+                    )
+                }
             }
-            .take(MAX_SECTION_ITEMS)
+            .sortedBy { it.releasedAtMs }
+            .take(HOME_THIS_WEEK_RENDER_LIMIT)
     }
 
-    private fun buildSeriesCandidateIds(
-        seedId: String,
-        resolvedId: String?,
-        imdbId: String?,
-    ): Set<String> {
-        return buildSet {
-            add(normalizeSeriesKey(seedId))
-            resolvedId?.let { add(normalizeSeriesKey(it)) }
-            imdbId?.let { add(normalizeSeriesKey(it)) }
-        }
+    private fun isThisWeek(date: LocalDate, today: LocalDate): Boolean {
+        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
+        val weekEnd = weekStart.plusDays(6)
+        return !date.isBefore(weekStart) && !date.isAfter(weekEnd)
     }
 
-    private fun parseReleaseDate(value: String?, zone: ZoneId): LocalDate? {
-        val rawValue = value?.trim().orEmpty()
-        if (rawValue.isEmpty()) return null
-        return try {
-            Instant.parse(rawValue).atZone(zone).toLocalDate()
-        } catch (_: Exception) {
-            try {
-                LocalDate.parse(rawValue.take(10))
-            } catch (_: Exception) {
-                null
-            }
-        }
-    }
-
-    private fun epochMsToLocalDate(
-        epochMs: Long,
-        zone: ZoneId,
-    ): LocalDate {
+    private fun epochMsToLocalDate(epochMs: Long, zone: ZoneId): LocalDate {
         return Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
     }
 
@@ -619,26 +507,12 @@ class CalendarService(
         val posterUrl: String?,
         val backdropUrl: String?,
         val sourceLabel: String?,
-    )
-
-    private data class RawCalendarEpisode(
-        val seriesId: String,
-        val seriesName: String,
-        val episodeTitle: String?,
-        val overview: String?,
-        val season: Int,
-        val episode: Int,
-        val releaseDate: String,
-        val releasedAtMs: Long,
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val thumbnailUrl: String?,
+        val addonId: String?,
     )
 
     private data class SeriesCalendarLoadResult(
         val series: CalendarSeriesItem,
-        val hasScheduledEpisodesInWindow: Boolean = false,
-        val episodes: List<RawCalendarEpisode> = emptyList(),
+        val episodes: List<CalendarEpisodeItem> = emptyList(),
     )
 
     companion object {
@@ -647,17 +521,20 @@ class CalendarService(
         private const val LOCAL_HISTORY_LIMIT = 1000
         private const val PROVIDER_LIBRARY_LIMIT = 1000
         private const val MAX_SERIES = 300
-        private const val MAX_SEASONS_PER_SERIES = 3
-        private const val RECENT_WINDOW_DAYS = 30
-        private const val UPCOMING_WINDOW_DAYS = 60
-        private const val MAX_SECTION_ITEMS = 20
+        private const val MAX_EPISODES_PER_SERIES = 50
+        private const val MAX_TMDB_SEASONS = 3
+        private const val MAX_TOTAL_EPISODES = 500
         private const val MAX_NO_SCHEDULED_ITEMS = 20
-        private const val WATCHED_PROGRESS_PERCENT = 85.0
+        private const val RECENTLY_WATCHED_SERIES_LIMIT = 20
+        private const val DAYS_BACK = 90
+        private const val DAYS_AHEAD = 60
         private const val SERIES_FETCH_CONCURRENCY = 4
+        private const val HOME_THIS_WEEK_RAW_LIMIT = 60
+        private const val HOME_THIS_WEEK_RENDER_LIMIT = 20
     }
 }
 
-private fun preferredCalendarProvider(authState: com.crispy.tv.player.WatchProviderAuthState): WatchProvider {
+private fun preferredCalendarProvider(authState: WatchProviderAuthState): WatchProvider {
     return when {
         authState.traktAuthenticated -> WatchProvider.TRAKT
         authState.simklAuthenticated -> WatchProvider.SIMKL

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["contract_version", "suite", "case_id", "input", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "omdb"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": ["imdb_id", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "imdb_id": {
+          "type": ["string", "null"]
+        },
+        "payload": {
+          "type": "object",
+          "required": ["ratings", "metascore", "imdb_rating", "imdb_votes", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "ratings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["source", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": ["string", "null"]
+                  },
+                  "value": {
+                    "type": ["string", "null"]
+                  }
+                }
+              }
+            },
+            "metascore": {
+              "type": ["string", "null"]
+            },
+            "imdb_rating": {
+              "type": ["string", "null"]
+            },
+            "imdb_votes": {
+              "type": ["string", "null"]
+            },
+            "type": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["normalized_imdb_id", "details"],
+      "additionalProperties": false,
+      "properties": {
+        "normalized_imdb_id": {
+          "type": ["string", "null"]
+        },
+        "details": {
+          "type": "object",
+          "required": ["ratings", "metascore", "imdb_rating", "imdb_votes", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "ratings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["source", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "metascore": {
+              "type": ["string", "null"]
+            },
+            "imdb_rating": {
+              "type": ["string", "null"]
+            },
+            "imdb_votes": {
+              "type": ["string", "null"]
+            },
+            "type": {
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

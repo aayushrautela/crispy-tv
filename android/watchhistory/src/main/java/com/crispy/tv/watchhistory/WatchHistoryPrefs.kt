@@ -18,6 +18,7 @@ internal const val KEY_SIMKL_TOKEN = "simkl_access_token"
 internal const val KEY_SIMKL_HANDLE = "simkl_user_handle"
 internal const val KEY_SIMKL_OAUTH_STATE = "simkl_oauth_state"
 internal const val KEY_SIMKL_OAUTH_CODE_VERIFIER = "simkl_oauth_code_verifier"
+internal const val KEY_PROVIDER_AUTH_SCHEMA_VERSION = "provider_auth_schema_version"
 
 internal const val STALE_PLAYBACK_WINDOW_MS = 30L * 24L * 60L * 60L * 1000L
 internal const val CONTINUE_WATCHING_MIN_PROGRESS_PERCENT = 2.0
@@ -26,10 +27,8 @@ internal const val CONTINUE_WATCHING_PLAYBACK_LIMIT = 30
 internal const val CONTINUE_WATCHING_UPNEXT_SHOW_LIMIT = 30
 
 internal const val TRAKT_AUTHORIZE_BASE = "https://trakt.tv/oauth/authorize"
-internal const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/token"
 
 internal const val SIMKL_AUTHORIZE_BASE = "https://simkl.com/oauth/authorize"
-internal const val SIMKL_TOKEN_URL = "https://api.simkl.com/oauth/token"
 internal const val SIMKL_API_BASE = "https://api.simkl.com"
 
 internal const val SIMKL_APP_NAME = "crispytv"
@@ -45,7 +44,6 @@ internal fun migrateLegacyWatchHistoryPrefsIfNeeded(context: Context) {
         listOf(
             KEY_LOCAL_WATCHED_ITEMS,
             KEY_TRAKT_TOKEN,
-            KEY_TRAKT_REFRESH_TOKEN,
             KEY_TRAKT_EXPIRES_AT,
             KEY_TRAKT_HANDLE,
             KEY_TRAKT_OAUTH_STATE,

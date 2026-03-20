@@ -1,108 +1,90 @@
 package com.crispy.tv.ai
 
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.metadata.tmdb.TmdbReview
+import android.content.Context
+import com.crispy.tv.BuildConfig
+import com.crispy.tv.accounts.ActiveProfileStore
+import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.settings.AiInsightsModelType
-import com.crispy.tv.settings.AiInsightsSettingsStore
+import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 class AiInsightsRepository(
-    private val openRouterClient: OpenRouterClient,
-    private val settingsStore: AiInsightsSettingsStore,
+    private val supabase: SupabaseAccountClient,
+    private val activeProfileStore: ActiveProfileStore,
+    private val httpClient: CrispyHttpClient,
     private val cacheStore: AiInsightsCacheStore,
+    private val supabaseUrl: String,
+    private val supabasePublishableKey: String,
 ) {
-    fun loadCached(tmdbId: Int, mediaType: MetadataLabMediaType): AiInsightsResult? =
-        cacheStore.load(tmdbId, mediaType)
+    fun loadCached(
+        tmdbId: Int,
+        mediaType: MetadataLabMediaType,
+        locale: Locale = Locale.getDefault(),
+    ): AiInsightsResult? = cacheStore.load(tmdbId, mediaType, locale)
 
     suspend fun generate(
         tmdbId: Int,
         mediaType: MetadataLabMediaType,
-        details: MediaDetails,
-        reviews: List<TmdbReview>,
+        locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
-        val snapshot = settingsStore.loadSnapshot()
-        val key = snapshot.openRouterKey.trim()
-        if (key.isEmpty()) {
-            throw IllegalStateException("AI is not configured yet. Add an OpenRouter key in settings.")
+        val session = supabase.ensureValidSession()
+            ?: throw IllegalStateException("Sign in to use AI insights.")
+
+        val profileId = activeProfileStore.getActiveProfileId(session.userId)?.trim().orEmpty()
+        if (profileId.isBlank()) {
+            throw IllegalStateException("Select a profile to use AI insights.")
         }
 
-        val model = selectModel(snapshot.settings.modelType, snapshot.settings.customModelName)
-        val prompt = buildPrompt(details = details, reviews = reviews)
-        val content = openRouterClient.chatCompletionsJsonObject(apiKey = key, model = model, userPrompt = prompt)
-        val result = parseAiInsightsResult(content)
-        cacheStore.save(tmdbId, mediaType, result)
+        val baseUrl = supabaseUrl.trim().trimEnd('/')
+        val publishableKey = supabasePublishableKey.trim()
+        if (baseUrl.isBlank() || publishableKey.isBlank()) {
+            throw IllegalStateException("Supabase is not configured.")
+        }
+
+        val requestBody =
+            JSONObject()
+                .put("tmdbId", tmdbId)
+                .put("mediaType", mediaType.toApiValue())
+                .put("profileId", profileId)
+                .put("locale", locale.toLanguageTag())
+                .toString()
+
+        val headers =
+            Headers.Builder()
+                .add("apikey", publishableKey)
+                .add("Authorization", "Bearer ${session.accessToken.trim()}")
+                .add("Content-Type", "application/json")
+                .add("Accept", "application/json")
+                .build()
+
+        val response =
+            runCatching {
+                httpClient.postJson(
+                    url = "$baseUrl/functions/v1/ai-insights".toHttpUrl(),
+                    jsonBody = requestBody,
+                    headers = headers,
+                    callTimeoutMs = CALL_TIMEOUT_MS,
+                )
+            }.getOrElse {
+                throw IllegalStateException("AI insights are unreachable right now. Please try again.")
+            }
+
+        if (response.code !in 200..299) {
+            throw IllegalStateException(extractErrorMessage(response.body))
+        }
+
+        val result = parseAiInsightsResult(response.body)
+        cacheStore.save(tmdbId = tmdbId, mediaType = mediaType, locale = locale, result = result)
         return result
     }
 
-    private fun selectModel(type: AiInsightsModelType, custom: String): String {
-        return when (type) {
-            AiInsightsModelType.DEEPSEEK_R1 -> "deepseek/deepseek-r1-0528:free"
-            AiInsightsModelType.NVIDIA_NEMOTRON -> "nvidia/nemotron-3-nano-30b-a3b:free"
-            AiInsightsModelType.CUSTOM -> custom.trim().ifEmpty { "deepseek/deepseek-r1-0528:free" }
-        }
-    }
-
-    private fun buildPrompt(details: MediaDetails, reviews: List<TmdbReview>): String {
-        val title = details.title
-        val year = details.year
-        val plot = details.description?.trim().orEmpty().ifBlank { "N/A" }
-        val rating = details.rating?.trim().orEmpty().ifBlank { "N/A" }
-        val genres = details.genres.joinToString(", ").ifBlank { "N/A" }
-
-        val formattedReviews =
-            if (reviews.isEmpty()) {
-                "No user reviews available."
-            } else {
-                reviews
-                    .take(10)
-                    .joinToString("\n---\n") { r ->
-                        val author = r.author.ifBlank { "Unknown" }
-                        val authorRating = r.rating?.toString() ?: "N/A"
-                        val content = r.content
-                            .replace("\n", " ")
-                            .replace(Regex("\\s+"), " ")
-                            .trim()
-                            .let { if (it.length > 500) it.take(500) + "..." else it }
-                        "(Author: $author, Rating: $authorRating) \"$content\""
-                    }
-            }
-
-        return """
-Be a film enthusiast, not a critic. Use simple, conversational, and exciting English.
-Avoid complex words, academic jargon, or flowery prose. Write like you're talking to a friend.
-
-Do NOT use generic headings.
-
-Context:
-Title: $title ($year)
-Plot: $plot
-Rating: $rating
-Genres: $genres
-
-User Reviews:
-$formattedReviews
-
-Task:
-Generate a JSON object with:
-
-- insights: an array of 3 objects. Each object must include:
-  - category: a short uppercase label (e.g. CONSENSUS, VIBE, STYLE)
-  - title: a punchy, short headline
-  - content: 2-3 sentences
-  - type: one of ["consensus","performance","theme","vibe","style","controversy","character"]
-
-- trivia: one "Did you know?" fact (1-2 sentences)
-
-Return ONLY valid JSON.
-""".trimIndent()
-    }
-
-    private fun parseAiInsightsResult(content: String): AiInsightsResult {
-        val extracted = extractJsonObject(content)
-        val json = JSONObject(extracted)
-
+    private fun parseAiInsightsResult(rawBody: String): AiInsightsResult {
+        val json = runCatching { JSONObject(rawBody) }.getOrNull() ?: JSONObject()
         val trivia = json.optString("trivia", "").trim()
         val insightsArray = json.optJSONArray("insights") ?: JSONArray()
         val insights =
@@ -125,22 +107,42 @@ Return ONLY valid JSON.
         return AiInsightsResult(insights = insights, trivia = trivia)
     }
 
-    private fun extractJsonObject(text: String): String {
-        val trimmed = text.trim()
-
-        val unfenced =
-            trimmed
-                .removePrefix("```json")
-                .removePrefix("```")
-                .removeSuffix("```")
-                .trim()
-
-        val start = unfenced.indexOf('{')
-        val end = unfenced.lastIndexOf('}')
-        if (start >= 0 && end > start) {
-            return unfenced.substring(start, end + 1)
+    private fun extractErrorMessage(rawBody: String): String {
+        val trimmed = rawBody.trim()
+        if (trimmed.isBlank()) {
+            return "AI insights are unavailable right now."
         }
 
-        return unfenced
+        val parsed = runCatching { JSONObject(trimmed) }.getOrNull()
+        val message =
+            parsed?.let { json ->
+                listOf("message", "error", "error_description")
+                    .firstNotNullOfOrNull { key -> json.optString(key).trim().takeIf { it.isNotBlank() } }
+            }
+
+        return message ?: trimmed
+    }
+
+    private fun MetadataLabMediaType.toApiValue(): String {
+        return when (this) {
+            MetadataLabMediaType.MOVIE -> "movie"
+            MetadataLabMediaType.SERIES -> "tv"
+        }
+    }
+
+    companion object {
+        private const val CALL_TIMEOUT_MS = 45_000L
+
+        fun create(context: Context, httpClient: CrispyHttpClient): AiInsightsRepository {
+            val appContext = context.applicationContext
+            return AiInsightsRepository(
+                supabase = SupabaseServicesProvider.accountClient(appContext),
+                activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                httpClient = httpClient,
+                cacheStore = AiInsightsCacheStore(appContext),
+                supabaseUrl = BuildConfig.SUPABASE_URL,
+                supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
+            )
+        }
     }
 }

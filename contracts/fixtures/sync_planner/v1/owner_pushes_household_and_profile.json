@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "sync_planner",
   "case_id": "owner_pushes_household_and_profile",
   "input": {
@@ -30,12 +30,6 @@
     },
     "catalog_prefs": {
       "genre": " sci-fi "
-    },
-    "trakt_auth": {
-      "access_token": "  t123  "
-    },
-    "simkl_auth": {
-      "access_token": " s456 "
     }
   },
   "expected": {
@@ -66,12 +60,6 @@
           },
           "p_catalog_prefs": {
             "genre": "sci-fi"
-          },
-          "p_trakt_auth": {
-            "access_token": "t123"
-          },
-          "p_simkl_auth": {
-            "access_token": "s456"
           }
         }
       }

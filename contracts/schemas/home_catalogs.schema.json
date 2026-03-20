@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["contract_version", "suite", "case_id", "input", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "home_catalogs"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": ["snapshot", "hero_limit", "section_limit", "discover", "page"],
+      "additionalProperties": false,
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/snapshot"
+        },
+        "hero_limit": {
+          "type": "integer"
+        },
+        "section_limit": {
+          "type": "integer"
+        },
+        "discover": {
+          "type": "object",
+          "required": ["media_type", "limit"],
+          "additionalProperties": false,
+          "properties": {
+            "media_type": {
+              "type": ["string", "null"]
+            },
+            "limit": {
+              "type": "integer"
+            }
+          }
+        },
+        "page": {
+          "type": "object",
+          "required": ["catalog_id", "page", "page_size"],
+          "additionalProperties": false,
+          "properties": {
+            "catalog_id": {
+              "type": "string"
+            },
+            "page": {
+              "type": "integer"
+            },
+            "page_size": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["personal_feed", "discover", "page"],
+      "additionalProperties": false,
+      "properties": {
+        "personal_feed": {
+          "type": "object",
+          "required": ["hero_result", "sections", "sections_status_message"],
+          "additionalProperties": false,
+          "properties": {
+            "hero_result": {
+              "type": "object",
+              "required": ["items", "status_message"],
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/hero_item"
+                  }
+                },
+                "status_message": {
+                  "type": "string"
+                }
+              }
+            },
+            "sections": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/section"
+              }
+            },
+            "sections_status_message": {
+              "type": "string"
+            }
+          }
+        },
+        "discover": {
+          "type": "object",
+          "required": ["catalogs", "status_message"],
+          "additionalProperties": false,
+          "properties": {
+            "catalogs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/discover_ref"
+              }
+            },
+            "status_message": {
+              "type": "string"
+            }
+          }
+        },
+        "page": {
+          "type": "object",
+          "required": ["items", "status_message", "attempted_urls"],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            "status_message": {
+              "type": "string"
+            },
+            "attempted_urls": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "required": ["profile_id", "status_message", "lists"],
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "type": ["string", "null"]
+        },
+        "status_message": {
+          "type": "string"
+        },
+        "lists": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/list"
+          }
+        }
+      }
+    },
+    "list": {
+      "type": "object",
+      "required": ["kind", "variant_key", "source", "presentation", "name", "heading", "title", "subtitle", "media_types", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "variant_key": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["personal", "public", "personal_home_feed", "public_home_feed"]
+        },
+        "presentation": {
+          "type": "string",
+          "enum": ["hero", "pill", "rail"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "media_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/item"
+          }
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["id", "title", "poster_url", "backdrop_url", "addon_id", "type", "rating", "year", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "poster_url": {
+          "type": ["string", "null"]
+        },
+        "backdrop_url": {
+          "type": ["string", "null"]
+        },
+        "addon_id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "rating": {
+          "type": ["string", "null"]
+        },
+        "year": {
+          "type": ["string", "null"]
+        },
+        "description": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "hero_item": {
+      "type": "object",
+      "required": ["id", "title", "description", "rating", "year", "genres", "backdrop_url", "addon_id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "rating": {
+          "type": ["string", "null"]
+        },
+        "year": {
+          "type": ["string", "null"]
+        },
+        "genres": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "backdrop_url": {
+          "type": "string"
+        },
+        "addon_id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "required": ["catalog_id", "source", "presentation", "variant_key", "name", "heading", "title", "subtitle"],
+      "additionalProperties": false,
+      "properties": {
+        "catalog_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["personal", "public", "personal_home_feed", "public_home_feed"]
+        },
+        "presentation": {
+          "type": "string",
+          "enum": ["hero", "pill", "rail"]
+        },
+        "variant_key": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        }
+      }
+    },
+    "discover_ref": {
+      "type": "object",
+      "required": ["section", "addon_name", "genres"],
+      "additionalProperties": false,
+      "properties": {
+        "section": {
+          "$ref": "#/$defs/section"
+        },
+        "addon_name": {
+          "type": "string"
+        },
+        "genres": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

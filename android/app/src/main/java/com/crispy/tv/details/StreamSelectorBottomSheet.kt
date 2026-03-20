@@ -40,14 +40,21 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.ui.components.skeletonElement
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 // Keep the sheet's measured height stable while provider results stream in.
 // Without this, ModalBottomSheet can recalculate anchors as content grows and snap between sizes.
@@ -76,8 +83,6 @@ internal fun StreamSelectorBottomSheet(
                 }
             }
         }
-    val showInitialSkeleton = state.isLoading && state.providers.isEmpty()
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -99,7 +104,7 @@ internal fun StreamSelectorBottomSheet(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item {
-                        StreamSheetHeader(details = details)
+                        StreamSheetHeader(details = details, episode = state.headerEpisode)
                     }
 
                     item {
@@ -107,32 +112,6 @@ internal fun StreamSelectorBottomSheet(
                             state = state,
                             onProviderSelected = onProviderSelected,
                         )
-                    }
-
-                    if (showInitialSkeleton) {
-                        items(6) {
-                            ElevatedCard {
-                                Column(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                ) {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth(0.72f)
-                                                .height(14.dp)
-                                                .skeletonElement(color = DetailsSkeletonColors.Base)
-                                    )
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth(0.5f)
-                                                .height(12.dp)
-                                                .skeletonElement(color = DetailsSkeletonColors.Base)
-                                    )
-                                }
-                            }
-                        }
                     }
 
                     if (
@@ -174,7 +153,7 @@ internal fun StreamSelectorBottomSheet(
                         }
                     }
 
-                    if (!showInitialSkeleton && state.isLoading) {
+                    if (state.isLoading) {
                         item {
                             LoadingMoreStreamsRow()
                         }
@@ -186,8 +165,23 @@ internal fun StreamSelectorBottomSheet(
 }
 
 @Composable
-private fun StreamSheetHeader(details: MediaDetails?) {
-    if (details == null) return
+private fun StreamSheetHeader(
+    details: MediaDetails?,
+    episode: MediaVideo?,
+) {
+    if (details == null && episode == null) return
+
+    val imageUrl =
+        episode?.thumbnailUrl
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: details?.backdropUrl
+            ?: details?.posterUrl
+    val description =
+        episode?.overview
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: details?.description?.trim()?.takeIf { it.isNotBlank() }
 
     ElevatedCard {
         Column(
@@ -195,34 +189,61 @@ private fun StreamSheetHeader(details: MediaDetails?) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
-                    model = details.backdropUrl ?: details.posterUrl,
-                    contentDescription = null,
-                    modifier = Modifier.size(width = 96.dp, height = 56.dp),
-                )
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier =
+                            Modifier
+                                .size(width = 96.dp, height = 56.dp)
+                                .clip(RoundedCornerShape(14.dp)),
+                    )
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    val title =
+                        episode?.title
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                            ?: details?.title.orEmpty()
                     Text(
-                        text = details.title,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val year = details.year?.trim().orEmpty()
-                    if (year.isNotBlank()) {
+                    val metadata = episodeHeaderMetadata(episode = episode, details = details)
+                    if (metadata != null) {
                         Text(
-                            text = year,
+                            text = metadata,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    if (episode != null) {
+                        details
+                            ?.title
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { showTitle ->
+                                Text(
+                                    text = showTitle,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                    }
                 }
             }
 
-            details.description
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
+            description
                 ?.let { description ->
                     Text(
                         text = description,
@@ -236,11 +257,71 @@ private fun StreamSheetHeader(details: MediaDetails?) {
     }
 }
 
+private fun episodeHeaderMetadata(
+    episode: MediaVideo?,
+    details: MediaDetails?,
+): String? {
+    if (episode == null) {
+        return details?.year?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    val parts = mutableListOf<String>()
+    val season = episode.season
+    val episodeNumber = episode.episode
+    if (season != null && episodeNumber != null) {
+        parts += "S$season E$episodeNumber"
+    }
+    formatEpisodeHeaderDate(episode.released)?.let(parts::add)
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
+}
+
+private fun formatEpisodeHeaderDate(date: String?): String? {
+    val raw = date?.trim().orEmpty()
+    if (raw.isBlank()) return null
+
+    val iso = if (raw.length >= 10) raw.take(10) else raw
+    return try {
+        val parsed = LocalDate.parse(iso)
+        parsed.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
+    } catch (_: Throwable) {
+        raw
+    }
+}
+
 @Composable
 private fun ProviderChipsRow(
     state: StreamSelectorUiState,
     onProviderSelected: (String?) -> Unit,
 ) {
+    if (state.isLoading && state.providers.isEmpty()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .testTag("stream_provider_chips"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            repeat(4) { index ->
+                val chipWidth = when (index) {
+                    0 -> 68.dp
+                    1 -> 92.dp
+                    2 -> 84.dp
+                    else -> 100.dp
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .width(chipWidth)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .skeletonElement(color = DetailsSkeletonColors.Base)
+                )
+            }
+        }
+        return
+    }
+
     Row(
         modifier =
             Modifier
@@ -290,20 +371,12 @@ private fun ProviderErrorRow(
 
 @Composable
 private fun LoadingMoreStreamsRow() {
-    ElevatedCard {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            LoadingIndicator(modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Loading more streams...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LoadingIndicator(modifier = Modifier.size(48.dp))
     }
 }
 

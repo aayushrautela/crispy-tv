@@ -1,0 +1,47 @@
+{
+  "contract_version": 1,
+  "suite": "omdb",
+  "case_id": "preserves_first_seen_rating_sources_case_insensitively",
+  "input": {
+    "imdb_id": "tt7654321",
+    "payload": {
+      "ratings": [
+        {
+          "source": "internet movie database",
+          "value": "7.4/10"
+        },
+        {
+          "source": "METACRITIC",
+          "value": "55/100"
+        },
+        {
+          "source": "Internet Movie Database",
+          "value": "9.9/10"
+        }
+      ],
+      "metascore": "56",
+      "imdb_rating": "8.9",
+      "imdb_votes": "2,468",
+      "type": "series"
+    }
+  },
+  "expected": {
+    "normalized_imdb_id": "tt7654321",
+    "details": {
+      "ratings": [
+        {
+          "source": "internet movie database",
+          "value": "7.4/10"
+        },
+        {
+          "source": "METACRITIC",
+          "value": "55/100"
+        }
+      ],
+      "metascore": "56",
+      "imdb_rating": "8.9",
+      "imdb_votes": "2,468",
+      "type": "series"
+    }
+  }
+}

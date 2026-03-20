@@ -75,8 +75,6 @@ class SyncPlannerContractTest {
             addons = addons,
             settings = input.requireJsonObject("settings", path).toStringMap(path, "settings"),
             catalogPrefs = input.requireJsonObject("catalog_prefs", path).toStringMap(path, "catalog_prefs"),
-            traktAuth = input.requireJsonObject("trakt_auth", path).toStringMap(path, "trakt_auth"),
-            simklAuth = input.requireJsonObject("simkl_auth", path).toStringMap(path, "simkl_auth"),
         )
     }
 
@@ -112,8 +110,6 @@ class SyncPlannerContractTest {
                         profileId = params.requireString("p_profile_id", path),
                         settings = params.requireJsonObject("p_settings", path).toStringMap(path, "p_settings"),
                         catalogPrefs = params.requireJsonObject("p_catalog_prefs", path).toStringMap(path, "p_catalog_prefs"),
-                        traktAuth = params.requireJsonObject("p_trakt_auth", path).toStringMap(path, "p_trakt_auth"),
-                        simklAuth = params.requireJsonObject("p_simkl_auth", path).toStringMap(path, "p_simkl_auth"),
                     )
                 }
 

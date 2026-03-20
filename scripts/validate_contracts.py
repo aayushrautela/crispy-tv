@@ -15,6 +15,11 @@ SUITE_TO_SCHEMA = {
     "sync_planner": "sync_planner.schema.json",
     "storage_v1": "storage_v1.schema.json",
     "continue_watching": "continue_watching.schema.json",
+    "next_episode": "next_episode.schema.json",
+    "metadata_tmdb_enhancer": "metadata_tmdb_enhancer.schema.json",
+    "omdb": "omdb.schema.json",
+    "home_catalogs": "home_catalogs.schema.json",
+    "catalog_url_building": "catalog_url_building.schema.json",
     "trakt_scrobble_policy": "trakt_scrobble_policy.schema.json",
 }
 

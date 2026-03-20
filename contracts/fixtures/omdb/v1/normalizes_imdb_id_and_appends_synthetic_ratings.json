@@ -1,0 +1,51 @@
+{
+  "contract_version": 1,
+  "suite": "omdb",
+  "case_id": "normalizes_imdb_id_and_appends_synthetic_ratings",
+  "input": {
+    "imdb_id": " TT1234567 ",
+    "payload": {
+      "ratings": [
+        {
+          "source": "Rotten Tomatoes",
+          "value": "95%"
+        },
+        {
+          "source": "  ",
+          "value": "90%"
+        },
+        {
+          "source": "Rotten Tomatoes",
+          "value": "96%"
+        }
+      ],
+      "metascore": " 74 ",
+      "imdb_rating": "8.1",
+      "imdb_votes": " 1,234 ",
+      "type": " movie "
+    }
+  },
+  "expected": {
+    "normalized_imdb_id": "tt1234567",
+    "details": {
+      "ratings": [
+        {
+          "source": "Rotten Tomatoes",
+          "value": "95%"
+        },
+        {
+          "source": "Internet Movie Database",
+          "value": "8.1/10"
+        },
+        {
+          "source": "Metacritic",
+          "value": "74/100"
+        }
+      ],
+      "metascore": "74",
+      "imdb_rating": "8.1",
+      "imdb_votes": "1,234",
+      "type": "movie"
+    }
+  }
+}

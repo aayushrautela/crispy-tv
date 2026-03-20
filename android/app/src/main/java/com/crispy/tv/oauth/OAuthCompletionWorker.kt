@@ -75,6 +75,7 @@ class OAuthCompletionWorker(
             store.setLastCompletedCallbackId(PendingOAuthStore.callbackIdForUri(pending.callbackUri))
             store.clearPending()
             store.setPendingErrorMessage(null)
+
             ProviderSyncScheduler.enqueueNow(applicationContext)
             return Result.success()
         }

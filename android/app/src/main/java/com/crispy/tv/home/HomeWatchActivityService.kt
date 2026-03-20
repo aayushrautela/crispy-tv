@@ -3,7 +3,7 @@ package com.crispy.tv.home
 import android.content.Context
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
@@ -45,7 +45,7 @@ data class ContinueWatchingLoadResult(
 class HomeWatchActivityService(
     context: Context,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository =
-        TmdbEnrichmentRepositoryProvider.get(context.applicationContext),
+        TmdbServicesProvider.enrichmentRepository(context.applicationContext),
 ) {
     private val continueWatchingMetaCache = mutableMapOf<String, CachedContinueWatchingMeta>()
     private val metaResolveSemaphore = Semaphore(6)
@@ -55,12 +55,13 @@ class HomeWatchActivityService(
         localEntries: List<WatchHistoryEntry>,
         providerResult: ContinueWatchingResult,
         limit: Int = 20,
+        enrichMetadata: Boolean = true,
     ): ContinueWatchingLoadResult {
         return when (selectedSource) {
-            WatchProvider.LOCAL -> loadLocalContinueWatchingItems(localEntries, limit)
+            WatchProvider.LOCAL -> loadLocalContinueWatchingItems(localEntries, limit, enrichMetadata)
             WatchProvider.TRAKT, WatchProvider.SIMKL -> {
                 if (providerResult.entries.isNotEmpty()) {
-                    loadProviderContinueWatchingItems(providerResult.entries, limit).copy(
+                    loadProviderContinueWatchingItems(providerResult.entries, limit, enrichMetadata).copy(
                         statusMessage = providerResult.statusMessage,
                         isError = providerResult.isError,
                     )
@@ -79,6 +80,7 @@ class HomeWatchActivityService(
     private suspend fun loadLocalContinueWatchingItems(
         entries: List<WatchHistoryEntry>,
         limit: Int,
+        enrichMetadata: Boolean,
     ): ContinueWatchingLoadResult {
         val targetCount = limit.coerceAtLeast(1)
         val dedupedEntries = entries
@@ -90,36 +92,28 @@ class HomeWatchActivityService(
             return ContinueWatchingLoadResult()
         }
 
-        val items = coroutineScope {
-            dedupedEntries.map { entry ->
-                async(Dispatchers.IO) {
-                    metaResolveSemaphore.acquire()
-                    try {
-                        val mediaType = entry.asCatalogMediaType()
-                        val resolvedMeta = resolveContinueWatchingMeta(entry)
-                        ContinueWatchingItem(
-                            id = continueWatchingKey(entry),
-                            contentId = entry.contentId,
-                            title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
-                            season = entry.season,
-                            episode = entry.episode,
-                            watchedAtEpochMs = entry.watchedAtEpochMs,
-                            progressPercent = 100.0,
-                            provider = WatchProvider.LOCAL,
-                            providerPlaybackId = null,
-                            isUpNextPlaceholder = false,
-                            backdropUrl = resolvedMeta?.backdropUrl,
-                            posterUrl = resolvedMeta?.posterUrl,
-                            logoUrl = resolvedMeta?.logoUrl,
-                            addonId = resolvedMeta?.addonId,
-                            type = mediaType,
-                        )
-                    } finally {
-                        metaResolveSemaphore.release()
-                    }
+        val items =
+            if (!enrichMetadata) {
+                dedupedEntries.map { entry ->
+                    buildLocalContinueWatchingItem(entry = entry, resolvedMeta = null)
                 }
-            }.awaitAll()
-        }
+            } else {
+                coroutineScope {
+                    dedupedEntries.map { entry ->
+                        async(Dispatchers.IO) {
+                            metaResolveSemaphore.acquire()
+                            try {
+                                buildLocalContinueWatchingItem(
+                                    entry = entry,
+                                    resolvedMeta = resolveContinueWatchingMeta(entry),
+                                )
+                            } finally {
+                                metaResolveSemaphore.release()
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
 
         return ContinueWatchingLoadResult(items = items)
     }
@@ -127,57 +121,95 @@ class HomeWatchActivityService(
     private suspend fun loadProviderContinueWatchingItems(
         entries: List<ProviderContinueWatchingEntry>,
         limit: Int,
+        enrichMetadata: Boolean,
     ): ContinueWatchingLoadResult {
         val targetCount = limit.coerceAtLeast(1)
-        val dedupedEntries = entries
-            .sortedByDescending { it.lastUpdatedEpochMs }
-            .distinctBy { "${it.contentType.name}:${it.contentId}:${it.season ?: -1}:${it.episode ?: -1}" }
-            .take(targetCount)
+        val projectedEntries = entries.take(targetCount)
 
-        if (dedupedEntries.isEmpty()) {
+        if (projectedEntries.isEmpty()) {
             return ContinueWatchingLoadResult()
         }
 
-        val items = coroutineScope {
-            dedupedEntries.map { entry ->
-                async(Dispatchers.IO) {
-                    metaResolveSemaphore.acquire()
-                    try {
-                        val fakeWatchEntry = WatchHistoryEntry(
-                            contentId = entry.contentId,
-                            contentType = entry.contentType,
-                            title = entry.title,
-                            season = entry.season,
-                            episode = entry.episode,
-                            watchedAtEpochMs = entry.lastUpdatedEpochMs,
-                        )
-                        val mediaType = fakeWatchEntry.asCatalogMediaType()
-                        val resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry)
-                        ContinueWatchingItem(
-                            id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
-                            contentId = entry.contentId,
-                            title = resolvedMeta?.title ?: entry.title,
-                            season = entry.season,
-                            episode = entry.episode,
-                            watchedAtEpochMs = entry.lastUpdatedEpochMs,
-                            progressPercent = entry.progressPercent,
-                            provider = entry.provider,
-                            providerPlaybackId = entry.providerPlaybackId,
-                            isUpNextPlaceholder = entry.isUpNextPlaceholder,
-                            backdropUrl = resolvedMeta?.backdropUrl,
-                            posterUrl = resolvedMeta?.posterUrl,
-                            logoUrl = resolvedMeta?.logoUrl,
-                            addonId = resolvedMeta?.addonId,
-                            type = mediaType,
-                        )
-                    } finally {
-                        metaResolveSemaphore.release()
-                    }
+        val items =
+            if (!enrichMetadata) {
+                projectedEntries.map { entry ->
+                    buildProviderContinueWatchingItem(entry = entry, resolvedMeta = null)
                 }
-            }.awaitAll()
-        }
+            } else {
+                coroutineScope {
+                    projectedEntries.map { entry ->
+                        async(Dispatchers.IO) {
+                            metaResolveSemaphore.acquire()
+                            try {
+                                val fakeWatchEntry = WatchHistoryEntry(
+                                    contentId = entry.contentId,
+                                    contentType = entry.contentType,
+                                    title = entry.title,
+                                    season = entry.season,
+                                    episode = entry.episode,
+                                    watchedAtEpochMs = entry.lastUpdatedEpochMs,
+                                )
+                                buildProviderContinueWatchingItem(
+                                    entry = entry,
+                                    resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry),
+                                )
+                            } finally {
+                                metaResolveSemaphore.release()
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
 
         return ContinueWatchingLoadResult(items = items)
+    }
+
+    private fun buildLocalContinueWatchingItem(
+        entry: WatchHistoryEntry,
+        resolvedMeta: ContinueWatchingMeta?,
+    ): ContinueWatchingItem {
+        val mediaType = entry.asCatalogMediaType()
+        return ContinueWatchingItem(
+            id = continueWatchingKey(entry),
+            contentId = entry.contentId,
+            title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
+            season = entry.season,
+            episode = entry.episode,
+            watchedAtEpochMs = entry.watchedAtEpochMs,
+            progressPercent = 100.0,
+            provider = WatchProvider.LOCAL,
+            providerPlaybackId = null,
+            isUpNextPlaceholder = false,
+            backdropUrl = resolvedMeta?.backdropUrl,
+            posterUrl = resolvedMeta?.posterUrl,
+            logoUrl = resolvedMeta?.logoUrl,
+            addonId = resolvedMeta?.addonId,
+            type = mediaType,
+        )
+    }
+
+    private fun buildProviderContinueWatchingItem(
+        entry: ProviderContinueWatchingEntry,
+        resolvedMeta: ContinueWatchingMeta?,
+    ): ContinueWatchingItem {
+        val mediaType = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+        return ContinueWatchingItem(
+            id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
+            contentId = entry.contentId,
+            title = resolvedMeta?.title ?: entry.title,
+            season = entry.season,
+            episode = entry.episode,
+            watchedAtEpochMs = entry.lastUpdatedEpochMs,
+            progressPercent = entry.progressPercent,
+            provider = entry.provider,
+            providerPlaybackId = entry.providerPlaybackId,
+            isUpNextPlaceholder = entry.isUpNextPlaceholder,
+            backdropUrl = resolvedMeta?.backdropUrl,
+            posterUrl = resolvedMeta?.posterUrl,
+            logoUrl = resolvedMeta?.logoUrl,
+            addonId = resolvedMeta?.addonId,
+            type = mediaType,
+        )
     }
 
     private suspend fun resolveContinueWatchingMeta(entry: WatchHistoryEntry): ContinueWatchingMeta? {

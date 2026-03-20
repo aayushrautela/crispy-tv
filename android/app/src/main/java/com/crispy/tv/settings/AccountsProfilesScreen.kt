@@ -27,7 +27,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
@@ -43,16 +42,19 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
+import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.metadata.MetadataAddonRegistry
-import com.crispy.tv.network.AppHttp
+import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -85,7 +87,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
         factory = remember(appContext) { AccountsProfilesViewModel.factory(appContext) }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
     Scaffold(
@@ -127,7 +129,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Set SUPABASE_URL and SUPABASE_ANON_KEY in your Gradle properties.",
+                                text = "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in your Gradle properties.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -325,6 +327,7 @@ internal class AccountsProfilesViewModel(
     private val profileStore: ActiveProfileStore,
     private val profileDataCloudSync: ProfileDataCloudSync,
     private val householdAddonsCloudSync: HouseholdAddonsCloudSync,
+    private val watchHistoryService: WatchHistoryService,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AccountsProfilesUiState(configured = supabase.isConfigured()))
     val uiState: StateFlow<AccountsProfilesUiState> = _uiState
@@ -350,6 +353,7 @@ internal class AccountsProfilesViewModel(
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             if (session == null) {
+                watchHistoryService.clearCachedProviderAuthState()
                 _uiState.update {
                     it.copy(
                         isBusy = false,
@@ -402,7 +406,7 @@ internal class AccountsProfilesViewModel(
                 storedActive?.takeIf { id -> profiles.any { it.id == id } }
                     ?: profiles.firstOrNull()?.id
 
-            if (storedActive == null && resolvedActive != null) {
+            if (resolvedActive != null && resolvedActive != storedActive) {
                 profileStore.setActiveProfileId(session.userId, resolvedActive)
             }
 
@@ -410,6 +414,11 @@ internal class AccountsProfilesViewModel(
                 profileDataCloudSync.pullForActiveProfile().exceptionOrNull()?.message
             val addonsSyncError =
                 householdAddonsCloudSync.pullToLocal().exceptionOrNull()?.message
+            val providerSyncError =
+                runCatching { watchHistoryService.refreshProviderAuthState(forceRefresh = false) }
+                    .getOrNull()
+                    ?.statusMessage
+                    ?.takeIf { it.isNotBlank() }
 
             _uiState.update {
                 it.copy(
@@ -425,6 +434,7 @@ internal class AccountsProfilesViewModel(
                         when {
                             !settingsSyncError.isNullOrBlank() -> "Settings sync failed: $settingsSyncError"
                             !addonsSyncError.isNullOrBlank() -> "Addons sync failed: $addonsSyncError"
+                            !providerSyncError.isNullOrBlank() -> providerSyncError
                             else -> ""
                         }
                 )
@@ -487,6 +497,7 @@ internal class AccountsProfilesViewModel(
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             runCatching { supabase.signOut() }
             profileStore.clear(userId)
+            watchHistoryService.clearCachedProviderAuthState()
             refresh()
         }
     }
@@ -496,10 +507,15 @@ internal class AccountsProfilesViewModel(
         if (userId.isNullOrBlank()) return
         profileStore.setActiveProfileId(userId, profileId)
         _uiState.update { it.copy(activeProfileId = profileId, statusMessage = "") }
+        watchHistoryService.clearCachedProviderAuthState()
 
         viewModelScope.launch {
             profileDataCloudSync.pullForActiveProfile().onFailure {
                 _uiState.update { s -> s.copy(statusMessage = "Settings sync failed: ${it.message.orEmpty()}") }
+            }
+            val providerRefresh = watchHistoryService.refreshProviderAuthState(forceRefresh = false)
+            if (providerRefresh.statusMessage.isNotBlank()) {
+                _uiState.update { it.copy(statusMessage = providerRefresh.statusMessage) }
             }
         }
     }
@@ -563,29 +579,22 @@ internal class AccountsProfilesViewModel(
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val httpClient = AppHttp.client(safeContext)
-                    val supabase =
-                        SupabaseAccountClient(
-                            appContext = safeContext,
-                            httpClient = httpClient,
-                            supabaseUrl = BuildConfig.SUPABASE_URL,
-                            supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-                        )
-                    val profileStore = ActiveProfileStore(safeContext)
+                    val supabase = SupabaseServicesProvider.accountClient(safeContext)
+                    val profileStore = SupabaseServicesProvider.activeProfileStore(safeContext)
                     val profileDataCloudSync =
-                        ProfileDataCloudSync(
+                        SupabaseServicesProvider.createProfileDataCloudSync(
                             context = safeContext,
-                            supabase = supabase,
-                            activeProfileStore = profileStore
                         )
                     val addonRegistry = MetadataAddonRegistry(safeContext, BuildConfig.METADATA_ADDON_URLS)
-                    val householdAddonsCloudSync = HouseholdAddonsCloudSync(supabase, addonRegistry)
+                    val householdAddonsCloudSync =
+                        SupabaseServicesProvider.createHouseholdAddonsCloudSync(safeContext, addonRegistry)
 
                     return AccountsProfilesViewModel(
                         supabase = supabase,
                         profileStore = profileStore,
                         profileDataCloudSync = profileDataCloudSync,
-                        householdAddonsCloudSync = householdAddonsCloudSync
+                        householdAddonsCloudSync = householdAddonsCloudSync,
+                        watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(safeContext),
                     ) as T
                 }
             }

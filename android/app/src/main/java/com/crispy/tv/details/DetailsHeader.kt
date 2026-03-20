@@ -16,12 +16,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -45,15 +48,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.ratings.normalizeRatingText
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Date
@@ -141,7 +141,7 @@ internal fun HeaderInfoSection(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                repeat(3) {
+                repeat(4) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -304,26 +304,41 @@ internal fun HeaderInfoSection(
                     WatchCtaIcon.REPLAY -> Icons.Outlined.Replay
                     WatchCtaIcon.PLAY -> Icons.Filled.PlayArrow
                 }
-            Icon(
-                imageVector = iconVector,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.size(10.dp))
-            Column(horizontalAlignment = Alignment.Start) {
-                Text(
-                    text = watchCta.label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (watchCtaSubtext != null) {
-                    Text(
-                        text = watchCtaSubtext,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = palette.onAccent.copy(alpha = 0.85f),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.width(34.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = iconVector,
+                        contentDescription = null,
                     )
                 }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = watchCta.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                    if (watchCtaSubtext != null) {
+                        Text(
+                            text = watchCtaSubtext,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.onAccent.copy(alpha = 0.85f),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(34.dp))
             }
         }
 
@@ -340,6 +355,17 @@ internal fun HeaderInfoSection(
             onRate = {
                 pendingRating = (userRating ?: 0).toFloat()
                 showRatingDialog = true
+            },
+            onShare = {
+                val title = details.title
+                val shareType = if (details.mediaType == "movie") "movie" else "tv"
+                val tmdbId = details.id.removePrefix("tmdb:")
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    val shareUrl = "https://www.themoviedb.org/$shareType/$tmdbId"
+                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy: $shareUrl")
+                }
+                context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
             }
         )
 
@@ -359,6 +385,7 @@ private fun DetailsQuickActionsRow(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onRate: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -396,6 +423,15 @@ private fun DetailsQuickActionsRow(
             selectedAccent = gold,
             icon = if (isRated) Icons.Filled.Star else Icons.Outlined.StarBorder,
             onClick = onRate
+        )
+
+        DetailsQuickAction(
+            label = "Share",
+            selected = false,
+            enabled = enabled,
+            palette = palette,
+            icon = Icons.Outlined.Share,
+            onClick = onShare
         )
     }
 }
@@ -450,7 +486,7 @@ private fun HeaderMetaRow(
     details: MediaDetails,
     palette: DetailsPaletteColors
 ) {
-    val rating = details.rating?.trim().takeIf { !it.isNullOrBlank() }
+    val rating = normalizeRatingText(details.rating)
     val certification = details.certification?.trim().takeIf { !it.isNullOrBlank() }
     val year = details.year?.trim().takeIf { !it.isNullOrBlank() }
     val runtime = formatRuntimeForHeader(details.runtime)
@@ -478,6 +514,14 @@ private fun HeaderMetaRow(
             }
         }
 
+        if (year != null) {
+            Text(
+                text = year,
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.onPageBackground.copy(alpha = 0.86f)
+            )
+        }
+
         if (certification != null) {
             Surface(
                 shape = MaterialTheme.shapes.small,
@@ -490,14 +534,6 @@ private fun HeaderMetaRow(
                     style = MaterialTheme.typography.labelMedium
                 )
             }
-        }
-
-        if (year != null) {
-            Text(
-                text = year,
-                style = MaterialTheme.typography.labelLarge,
-                color = palette.onPageBackground.copy(alpha = 0.86f)
-            )
         }
 
         if (runtime != null) {
@@ -530,44 +566,35 @@ internal fun ExpandableDescription(
     }
 
     var textLayoutResult by remember(content) { mutableStateOf<TextLayoutResult?>(null) }
-    val displayContent = remember(content, expanded, textLayoutResult) {
-        val layout = textLayoutResult
-        if (expanded) {
-            buildAnnotatedString {
-                append(content)
-                append(" ")
-                withStyle(SpanStyle(color = textColor.copy(alpha = 0.64f), fontWeight = FontWeight.Bold)) {
-                    append("Show less")
-                }
-            }
-        } else if (layout != null && layout.hasVisualOverflow) {
-            val lineEnd = layout.getLineEnd(2, true)
-            buildAnnotatedString {
-                append(content.substring(0, lineEnd).dropLast(12).trim())
-                append("... ")
-                withStyle(SpanStyle(color = textColor.copy(alpha = 0.9f), fontWeight = FontWeight.Bold)) {
-                    append("Show more")
-                }
-            }
-        } else {
-            buildAnnotatedString { append(content) }
-        }
-    }
+    val canExpand = (textLayoutResult?.hasVisualOverflow == true) || expanded
 
-    androidx.compose.foundation.layout.Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
-            .clickable { expanded = !expanded }
+            .padding(horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = displayContent,
+            text = content,
             style = MaterialTheme.typography.bodyMedium,
             color = textColor,
             textAlign = textAlign,
             maxLines = if (expanded) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis,
-            onTextLayout = { if (textLayoutResult == null) textLayoutResult = it }
+            onTextLayout = { textLayoutResult = it }
         )
+        if (canExpand) {
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse description" else "Expand description",
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                tint = textColor.copy(alpha = 0.82f),
+            )
+        }
     }
 }

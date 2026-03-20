@@ -6,16 +6,25 @@ import androidx.navigation.compose.composable
 import com.crispy.tv.search.SearchRoute
 
 internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController) {
-    composable(AppRoutes.SearchRoute) {
+    composable(AppRoutes.SearchRoute) { entry ->
         SearchRoute(
-            onBack = { navController.popBackStack() },
+            onBack = { navController.navigateUp() },
             onItemClick = { item ->
                 if (item.type.equals("person", ignoreCase = true)) {
                     navController.navigate(AppRoutes.personDetailsRoute(item.id))
                 } else {
                     navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
                 }
-            }
+            },
+            onOpenAccountsProfiles = {
+                navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    launchSingleTop = true
+                }
+            },
+            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+            onScrollToTopConsumed = {
+                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+            },
         )
     }
 }

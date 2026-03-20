@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -25,31 +26,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,85 +55,89 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.metadata.tmdb.TmdbApi
-import kotlinx.coroutines.flow.StateFlow
+import com.crispy.tv.ratings.normalizeRatingText
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 import com.crispy.tv.ui.components.skeletonElement
 
 @Composable
-internal fun HomeRailSection(
-    title: String,
-    items: List<HomeWatchActivityItemUi>,
-    statusMessage: String,
-    actionMenuContentDescription: String,
-    onItemClick: (ContinueWatchingItem) -> Unit,
-    onHideItem: ((ContinueWatchingItem) -> Unit)? = null,
-    onRemoveItem: ((ContinueWatchingItem) -> Unit)? = null,
-    badgeLabelFor: (ContinueWatchingItem) -> String? = { null },
-    showProgressBarFor: (ContinueWatchingItem) -> Boolean = { false },
-    showTitleFallbackWhenNoLogo: Boolean = false,
-    useBottomSheetActions: Boolean = false,
-    usePosterCardStyle: Boolean = false,
-    isLoading: Boolean = false
+internal fun HomeWideRailSection(
+    section: HomeWideRailSectionUi,
+    onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
+    onHideContinueWatchingItem: (ContinueWatchingItem) -> Unit,
+    onRemoveContinueWatchingItem: (ContinueWatchingItem) -> Unit,
+    onThisWeekClick: (CalendarEpisodeItem) -> Unit,
+    onViewAllClick: (() -> Unit)? = null,
 ) {
-    if (items.isEmpty() && !isLoading && statusMessage.isBlank()) {
+    if (section.items.isEmpty() && !section.isLoading && section.statusMessage.isBlank()) {
         return
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
-            title = title,
-            statusMessage = if (isLoading) "" else statusMessage
+            title = section.title,
+            statusMessage = if (section.isLoading) "" else section.statusMessage,
+            action = onViewAllClick?.let { action ->
+                {
+                    TextButton(onClick = action) {
+                        Text("View all")
+                    }
+                }
+            },
         )
 
-        if (isLoading || items.isNotEmpty()) {
+        if (section.isLoading || section.items.isNotEmpty()) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                if (isLoading && items.isEmpty()) {
-                    if (usePosterCardStyle) {
-                        items(HOME_POSTER_SKELETON_COUNT) {
-                            HomeRailPosterSkeletonCard()
-                        }
-                    } else {
-                        items(HOME_WIDE_SKELETON_COUNT) {
-                            HomeRailSkeletonCard()
-                        }
+                if (section.isLoading && section.items.isEmpty()) {
+                    items(HOME_WIDE_SKELETON_COUNT) {
+                        HomeWideRailSkeletonCard()
                     }
                 } else {
-                    items(items, key = { "${it.item.type}:${it.item.id}" }) { railItem ->
-                        val item = railItem.item
-                        if (usePosterCardStyle) {
-                            HomeRailPosterCard(
-                                item = item,
-                                onClick = { onItemClick(item) }
-                            )
-                        } else {
-                            HomeRailCard(
-                                item = item,
-                                subtitle = railItem.subtitle,
-                                actionMenuContentDescription = actionMenuContentDescription,
-                                onClick = { onItemClick(item) },
-                                onHideClick = onHideItem?.let { { it(item) } },
-                                onRemoveClick = onRemoveItem?.let { { it(item) } },
-                                onDetailsClick = { onItemClick(item) },
-                                badgeLabel = badgeLabelFor(item),
-                                showProgressBar = showProgressBarFor(item),
-                                showTitleFallbackWhenNoLogo = showTitleFallbackWhenNoLogo,
-                                useBottomSheetActions = useBottomSheetActions
-                            )
-                        }
+                    items(section.items, key = { it.key }) { item ->
+                        HomeWideRailCard(
+                            item = item,
+                            showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,
+                            onClick = {
+                                when (item.kind) {
+                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
+                                    HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
+                                }
+                            },
+                            onDetailsClick = {
+                                when (item.kind) {
+                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
+                                    HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
+                                }
+                            },
+                            onHideClick =
+                                if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
+                                    item.continueWatchingItem?.let { continueWatchingItem ->
+                                        { onHideContinueWatchingItem(continueWatchingItem) }
+                                    }
+                                } else {
+                                    null
+                                },
+                            onRemoveClick =
+                                if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
+                                    item.continueWatchingItem?.let { continueWatchingItem ->
+                                        { onRemoveContinueWatchingItem(continueWatchingItem) }
+                                    }
+                                } else {
+                                    null
+                                },
+                        )
                     }
                 }
             }
@@ -148,9 +147,9 @@ internal fun HomeRailSection(
 }
 
 @Composable
-private fun HomeRailSkeletonCard() {
+private fun HomeWideRailSkeletonCard() {
     Column(
-        modifier = Modifier.width(260.dp),
+        modifier = Modifier.width(280.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Box(
@@ -175,16 +174,6 @@ private fun HomeRailSkeletonCard() {
 }
 
 @Composable
-private fun HomeRailPosterSkeletonCard() {
-    Box(
-        modifier = Modifier
-            .width(124.dp)
-            .aspectRatio(2f / 3f)
-            .skeletonElement(shape = RoundedCornerShape(8.dp), pulse = false)
-    )
-}
-
-@Composable
 internal fun HomeRailHeader(
     title: String,
     statusMessage: String,
@@ -200,8 +189,8 @@ internal fun HomeRailHeader(
                 text = title,
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
             )
             action?.invoke()
         }
@@ -220,11 +209,14 @@ internal fun HomeRailHeader(
 @Composable
 private fun LandscapeArtworkFrame(
     title: String,
-    imageUrl: String?,
+    imageModel: Any?,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     badgeLabel: String? = null,
+    badgeAlignment: Alignment = Alignment.TopStart,
     progressFraction: Float? = null,
+    scrimHeightFraction: Float = 0.52f,
+    scrimMaxAlpha: Float = 0.82f,
     topEndContent: (@Composable BoxScope.() -> Unit)? = null,
     bottomOverlayContent: @Composable BoxScope.() -> Unit = {},
 ) {
@@ -234,9 +226,9 @@ private fun LandscapeArtworkFrame(
                 .clip(RoundedCornerShape(20.dp))
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
-        if (!imageUrl.isNullOrBlank()) {
+        if (imageModel != null) {
             AsyncImage(
-                model = imageUrl,
+                model = imageModel,
                 contentDescription = title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -250,15 +242,15 @@ private fun LandscapeArtworkFrame(
         }
 
         HomeArtworkBottomScrim(
-            heightFraction = 0.52f,
-            maxAlpha = 0.82f,
+            heightFraction = scrimHeightFraction,
+            maxAlpha = scrimMaxAlpha,
         )
 
         if (!badgeLabel.isNullOrBlank()) {
             Surface(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 12.dp, top = 12.dp),
+                    .align(badgeAlignment)
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp),
                 shape = RoundedCornerShape(999.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -317,132 +309,45 @@ private fun BoxScope.HomeArtworkBottomScrim(
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
-internal fun HomeRailCard(
-    item: ContinueWatchingItem,
-    subtitle: String,
-    actionMenuContentDescription: String,
+internal fun HomeWideRailCard(
+    item: HomeWideRailItemUi,
+    showActions: Boolean,
     onClick: () -> Unit,
+    onDetailsClick: () -> Unit = onClick,
     onHideClick: (() -> Unit)? = null,
     onRemoveClick: (() -> Unit)? = null,
-    onDetailsClick: () -> Unit,
-    badgeLabel: String? = null,
-    showProgressBar: Boolean = false,
-    showTitleFallbackWhenNoLogo: Boolean = false,
-    useBottomSheetActions: Boolean = false
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    var bottomSheetVisible by remember { mutableStateOf(false) }
-    val hasItemActions = onHideClick != null || onRemoveClick != null
+    var actionSheetVisible by remember { mutableStateOf(false) }
+    val hasItemActions = showActions && (onHideClick != null || onRemoveClick != null)
+    val artworkModel = rememberLandscapeImageModel(item.imageUrl, 280.dp)
 
-    val cardInteractionModifier = if (useBottomSheetActions && hasItemActions) {
-        Modifier.combinedClickable(
-            onClick = onClick,
-            onLongClickLabel = actionMenuContentDescription,
-            onLongClick = { bottomSheetVisible = true }
-        )
-    } else {
-        Modifier.clickable(onClick = onClick)
-    }
+    val cardInteractionModifier =
+        if (hasItemActions) {
+            Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClickLabel = "Item actions",
+                onLongClick = { actionSheetVisible = true },
+            )
+        } else {
+            Modifier.clickable(onClick = onClick)
+        }
 
-    Column(modifier = Modifier.width(260.dp)) {
-        val imageUrl = item.backdropUrl ?: item.posterUrl
+    Column(
+        modifier = Modifier
+            .width(280.dp)
+            .then(cardInteractionModifier),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         LandscapeArtworkFrame(
             title = item.title,
-            imageUrl = imageUrl,
+            imageModel = artworkModel,
             onClick = null,
-            modifier = Modifier
-                .aspectRatio(16f / 9f)
-                .then(cardInteractionModifier),
-            badgeLabel = badgeLabel,
-            progressFraction =
-                if (showProgressBar && item.progressPercent > 0) {
-                    (item.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
-                } else {
-                    null
-                },
-            topEndContent =
-                if (!useBottomSheetActions && hasItemActions) {
-                    {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp),
-                        ) {
-                            IconButton(
-                                onClick = { menuExpanded = true },
-                                modifier = Modifier.background(
-                                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
-                                    shape = CircleShape,
-                                ),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.MoreVert,
-                                    contentDescription = actionMenuContentDescription,
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Details") },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onDetailsClick()
-                                    },
-                                )
-                                onRemoveClick?.let { removeAction ->
-                                    DropdownMenuItem(
-                                        text = { Text("Remove") },
-                                        onClick = {
-                                            menuExpanded = false
-                                            removeAction()
-                                        },
-                                    )
-                                }
-                                onHideClick?.let { hideAction ->
-                                    DropdownMenuItem(
-                                        text = { Text("Hide") },
-                                        onClick = {
-                                            menuExpanded = false
-                                            hideAction()
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    null
-                },
-            bottomOverlayContent = {
-                if (!item.logoUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = item.logoUrl,
-                        contentDescription = "${item.title} logo",
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth(0.72f)
-                            .height(54.dp)
-                            .padding(bottom = 12.dp),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else if (showTitleFallbackWhenNoLogo) {
-                    Text(
-                        text = item.title,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            },
+            modifier = Modifier.aspectRatio(16f / 9f),
+            badgeLabel = item.badgeLabel,
+            badgeAlignment = Alignment.TopEnd,
+            progressFraction = item.progressFraction,
+            scrimHeightFraction = if (item.progressFraction != null) 0.42f else 0f,
+            scrimMaxAlpha = if (item.progressFraction != null) 0.36f else 0f,
         )
 
         Text(
@@ -452,102 +357,79 @@ internal fun HomeRailCard(
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
 
-        if (subtitle.isNotBlank()) {
+        if (item.subtitle.isNotBlank()) {
             Text(
-                text = subtitle,
+                text = item.subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 
-    if (useBottomSheetActions && hasItemActions && bottomSheetVisible) {
-        HomeRailActionBottomSheet(
-            title = item.title,
-            subtitle = subtitle,
-            onDismiss = { bottomSheetVisible = false },
-            onDetailsClick = {
-                bottomSheetVisible = false
-                onDetailsClick()
-            },
-            onRemoveClick = onRemoveClick?.let {
-                {
-                    bottomSheetVisible = false
-                    it()
+    if (hasItemActions && actionSheetVisible) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { actionSheetVisible = false },
+            sheetState = sheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp),
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+                ListItem(
+                    headlineContent = { Text("Details") },
+                    supportingContent = {
+                        if (item.subtitle.isNotBlank()) {
+                            Text(
+                                text = item.subtitle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    },
+                    modifier = Modifier.clickable {
+                        actionSheetVisible = false
+                        onDetailsClick()
+                    },
+                )
+                onRemoveClick?.let { removeAction ->
+                    ListItem(
+                        headlineContent = { Text("Remove") },
+                        modifier = Modifier.clickable {
+                            actionSheetVisible = false
+                            removeAction()
+                        },
+                    )
                 }
-            },
-            onHideClick = onHideClick?.let {
-                {
-                    bottomSheetVisible = false
-                    it()
+                onHideClick?.let { hideAction ->
+                    ListItem(
+                        headlineContent = { Text("Hide") },
+                        modifier = Modifier.clickable {
+                            actionSheetVisible = false
+                            hideAction()
+                        },
+                    )
                 }
             }
-        )
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun HomeRailActionBottomSheet(
-    title: String,
-    subtitle: String,
-    onDismiss: () -> Unit,
-    onDetailsClick: () -> Unit,
-    onRemoveClick: (() -> Unit)? = null,
-    onHideClick: (() -> Unit)? = null
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        ListItem(
-            headlineContent = { Text(title) },
-            supportingContent = { Text(subtitle) }
-        )
-        HorizontalDivider()
-        HomeRailActionBottomSheetItem(
-            label = "Details",
-            icon = Icons.Outlined.Info,
-            onClick = onDetailsClick
-        )
-        onRemoveClick?.let {
-            HomeRailActionBottomSheetItem(
-                label = "Remove",
-                icon = Icons.Outlined.DeleteOutline,
-                onClick = it
-            )
-        }
-        onHideClick?.let {
-            HomeRailActionBottomSheetItem(
-                label = "Hide",
-                icon = Icons.Outlined.VisibilityOff,
-                onClick = it
-            )
         }
     }
-}
 
-@Composable
-private fun HomeRailActionBottomSheetItem(
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    ListItem(
-        headlineContent = { Text(label) },
-        leadingContent = {
-            Icon(
-                imageVector = icon,
-                contentDescription = null
-            )
-        },
-        modifier = Modifier.clickable(onClick = onClick)
-    )
 }
 
 @Composable
@@ -566,10 +448,10 @@ internal fun HomeCatalogSectionRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = sectionUi.section.title,
+                    text = sectionUi.section.displayTitle,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -648,19 +530,14 @@ internal fun HomeCatalogSectionRow(
 
 @Composable
 internal fun HomeCollectionSectionRow(
-    sections: List<CatalogSectionRef>,
-    sectionState: (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>,
+    sectionUis: List<HomeCatalogSectionUi>,
     onCollectionClick: (CatalogSectionRef) -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
+    onCollectionPlayClick: (CatalogItem) -> Unit,
+    onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
-    val sectionStates = mutableListOf<HomeCatalogSectionUi>()
-    for (section in sections) {
-        val sectionUi by sectionState(section).collectAsStateWithLifecycle()
-        sectionStates += sectionUi
-    }
     val visibleSections =
-        remember(sectionStates) {
-            sectionStates.filter {
+        remember(sectionUis) {
+            sectionUis.filter {
                 it.isLoading || it.items.isNotEmpty() || it.statusMessage.isNotBlank()
             }
         }
@@ -669,10 +546,20 @@ internal fun HomeCollectionSectionRow(
         return
     }
 
+    val sharedSubtitle =
+        remember(visibleSections) {
+            visibleSections
+                .map { it.section.subtitle.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .singleOrNull()
+                .orEmpty()
+        }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = "Collections",
-            statusMessage = ""
+            statusMessage = sharedSubtitle,
         )
 
         LazyRow(
@@ -683,7 +570,8 @@ internal fun HomeCollectionSectionRow(
                 HomeCollectionCard(
                     sectionUi = sectionUi,
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
-                    onItemClick = onItemClick
+                    onPlayClick = { onCollectionPlayClick(it) },
+                    onCollectionMovieClick = onCollectionMovieClick,
                 )
             }
         }
@@ -694,150 +582,138 @@ internal fun HomeCollectionSectionRow(
 private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
     onCollectionClick: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onPlayClick: (CatalogItem) -> Unit,
+    onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
-    val previewItems = remember(sectionUi.items) { sectionUi.items.take(COLLECTION_PREVIEW_ITEM_COUNT) }
-    val firstMovie = previewItems.firstOrNull() ?: sectionUi.items.firstOrNull()
-    val artworkUrl =
-        remember(sectionUi.items) {
-            sectionUi.items.firstNotNullOfOrNull { item ->
-                item.backdropUrl?.takeIf { it.isNotBlank() } ?: item.posterUrl?.takeIf { it.isNotBlank() }
-            }
-        }
+    val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
+    val featuredMovie = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
+    val logoUrl = remember(featuredMovie?.logoUrl) { featuredMovie?.logoUrl?.trim()?.ifBlank { null } }
+    val logoModel = rememberCrispyImageModel(
+        url = logoUrl,
+        width = 256.dp,
+        height = 80.dp,
+        enableCrossfade = true,
+    )
+    val collectionTitle = remember(sectionUi.section.displayTitle) { collectionDisplayTitle(sectionUi.section.displayTitle) }
 
-    Card(modifier = Modifier.width(320.dp)) {
-        Column {
+    Card(
+        modifier = Modifier
+            .width(320.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onCollectionClick)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
             ) {
-                if (!artworkUrl.isNullOrBlank()) {
+                if (logoModel != null) {
                     AsyncImage(
-                        model = artworkUrl,
-                        contentDescription = sectionUi.section.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        model = logoModel,
+                        contentDescription = sectionUi.section.displayTitle,
+                        modifier = Modifier
+                            .fillMaxWidth(0.82f)
+                            .height(72.dp)
+                            .padding(vertical = 4.dp),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.Center,
                     )
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                }
-
-                HomeArtworkBottomScrim(
-                    heightFraction = 0.56f,
-                    maxAlpha = 0.78f,
-                )
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
                     Text(
-                        text = sectionUi.section.title,
+                        text = collectionTitle,
+                        modifier = Modifier.padding(horizontal = 20.dp),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
-
-                    val movieCountLabel = collectionMovieCountLabel(sectionUi.items.size)
-                    if (movieCountLabel != null) {
-                        Text(
-                            text = movieCountLabel,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.86f)
-                        )
-                    }
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            when {
+                previewMovies.isNotEmpty() -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        previewMovies.forEach { item ->
+                            HomeCollectionMovieRow(
+                                item = item,
+                                onClick = { onCollectionMovieClick(item) },
+                            )
+                        }
+                    }
+                }
+
+                sectionUi.isLoading -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        HomeCollectionMovieSkeletonRow()
+                        HomeCollectionMovieSkeletonRow()
+                        HomeCollectionMovieSkeletonRow()
+                    }
+                }
+
+                else -> {
+                    Text(
+                        text = sectionUi.statusMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
+                FilledIconButton(
+                    onClick = { featuredMovie?.let(onPlayClick) },
+                    enabled = featuredMovie != null,
+                    modifier = Modifier.size(52.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
                 ) {
-                    if (sectionUi.section.subtitle.isNotBlank()) {
-                        Text(
-                            text = sectionUi.section.subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Play collection",
+                    )
                 }
 
-                HorizontalDivider()
+                Spacer(modifier = Modifier.width(10.dp))
 
-                when {
-                    sectionUi.isLoading && sectionUi.items.isEmpty() -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            repeat(HOME_COLLECTION_SKELETON_ROW_COUNT) {
-                                HomeCollectionMovieSkeletonRow()
-                            }
-                        }
-                    }
-
-                    previewItems.isNotEmpty() -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            repeat(COLLECTION_PREVIEW_ITEM_COUNT) { index ->
-                                val item = previewItems.getOrNull(index)
-                                if (item != null) {
-                                    HomeCollectionMovieRow(
-                                        item = item,
-                                        onClick = { onItemClick(item) }
-                                    )
-                                } else {
-                                    Spacer(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(72.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    else -> {
-                        Text(
-                            text = sectionUi.statusMessage.ifBlank { "No titles available yet." },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                FilledIconButton(
+                    onClick = onCollectionClick,
+                    modifier = Modifier.size(52.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
                 ) {
-                    FilledTonalButton(
-                        onClick = onCollectionClick,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Collection")
-                    }
-
-                    OutlinedButton(
-                        onClick = { firstMovie?.let(onItemClick) },
-                        modifier = Modifier.weight(1f),
-                        enabled = firstMovie != null
-                    ) {
-                        Text("First Movie")
-                    }
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = "Collection info",
+                    )
                 }
             }
         }
@@ -847,81 +723,85 @@ private fun HomeCollectionCard(
 @Composable
 private fun HomeCollectionMovieRow(
     item: CatalogItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
-    Surface(
+    val posterUrl = item.posterUrl?.takeIf { it.isNotBlank() } ?: item.backdropUrl?.takeIf { it.isNotBlank() }
+    val imageModel = rememberCrispyImageModel(posterUrl, width = 56.dp, height = 56.dp, tmdbSize = "w185")
+    val detailText = collectionMovieMetaText(item)
+    val ratingText = normalizeRatingText(item.rating)
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(18.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (imageModel != null) {
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = item.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .width(40.dp)
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(10.dp))
+                    .fillMaxWidth()
+                    .height(40.dp),
+                contentAlignment = Alignment.CenterStart,
             ) {
-                if (!item.posterUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = item.posterUrl,
-                        contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surface)
-                    )
-                }
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
 
-            Text(
-                text = item.title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (detailText.isNotBlank() || ratingText != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (detailText.isNotBlank()) {
+                        Text(
+                            text = detailText,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
 
-            item.rating
-                ?.takeIf { it.isNotBlank() }
-                ?.let { rating ->
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = Color(0xFFFFC107)
-                            )
-                            Text(
-                                text = rating,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
+                    ratingText?.let { rating ->
+                        HomeCollectionRatingBadge(
+                            rating = rating,
+                        )
                     }
                 }
+            }
         }
     }
 }
@@ -931,82 +811,58 @@ private fun HomeCollectionMovieSkeletonRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp),
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(
             modifier = Modifier
-                .width(40.dp)
-                .aspectRatio(2f / 3f)
-                .skeletonElement(shape = RoundedCornerShape(10.dp), pulse = false)
+                .size(56.dp)
+                .skeletonElement(shape = RoundedCornerShape(12.dp), pulse = false)
         )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(16.dp)
-                .skeletonElement(pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .width(48.dp)
-                .height(16.dp)
-                .skeletonElement(shape = RoundedCornerShape(999.dp), pulse = false)
-        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.72f)
+                    .height(16.dp)
+                    .skeletonElement(pulse = false)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.45f)
+                    .height(12.dp)
+                    .skeletonElement(pulse = false)
+            )
+        }
     }
 }
 
-private fun collectionMovieCountLabel(itemCount: Int): String? {
-    return when {
-        itemCount <= 0 -> null
-        itemCount == 1 -> "1 movie"
-        else -> "$itemCount movies"
-    }
+private fun collectionDisplayTitle(title: String): String {
+    val trimmedTitle = title.trim()
+    val simplifiedTitle = trimmedTitle.replace(Regex("\\s+collection$", RegexOption.IGNORE_CASE), "")
+    return simplifiedTitle.ifBlank { trimmedTitle }
+}
+
+private fun collectionMovieMetaText(item: CatalogItem): String {
+    return buildList {
+        item.year?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+        item.genre?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+    }.joinToString(separator = " • ")
 }
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
 private const val HOME_POSTER_SKELETON_COUNT = 5
-private const val HOME_COLLECTION_SKELETON_ROW_COUNT = 2
-private const val HOME_THIS_WEEK_SKELETON_COUNT = 5
-private const val COLLECTION_PREVIEW_ITEM_COUNT = 3
-
-@Composable
-private fun HomeRailPosterCard(
-    item: ContinueWatchingItem,
-    onClick: () -> Unit
-) {
-    Column(modifier = Modifier.width(124.dp)) {
-        Card(
-            modifier = Modifier
-                .aspectRatio(2f / 3f)
-                .clip(MaterialTheme.shapes.large)
-                .clickable(onClick = onClick)
-        ) {
-            val imageUrl = item.posterUrl ?: item.backdropUrl
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (!imageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 internal fun HomeCatalogPosterCard(
     item: CatalogItem,
     onClick: () -> Unit
 ) {
+    val imageModel = rememberPosterImageModel(item.posterUrl ?: item.backdropUrl)
     Column(modifier = Modifier.width(124.dp)) {
         Card(
             modifier = Modifier
@@ -1014,13 +870,13 @@ internal fun HomeCatalogPosterCard(
                 .clip(MaterialTheme.shapes.large)
                 .clickable(onClick = onClick)
         ) {
-            val imageUrl = item.posterUrl ?: item.backdropUrl
             Box(modifier = Modifier.fillMaxSize()) {
-                if (!imageUrl.isNullOrBlank()) {
+                if (imageModel != null) {
                     AsyncImage(
-                        model = imageUrl,
+                        model = imageModel,
                         contentDescription = item.title,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
                     Box(
@@ -1030,7 +886,7 @@ internal fun HomeCatalogPosterCard(
                     )
                 }
 
-                if (!item.rating.isNullOrBlank()) {
+                normalizeRatingText(item.rating)?.let { rating ->
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -1050,7 +906,7 @@ internal fun HomeCatalogPosterCard(
                                 tint = Color(0xFFFFC107)
                             )
                             Text(
-                                text = item.rating,
+                                text = rating,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White
                             )
@@ -1077,97 +933,47 @@ internal fun HomeCatalogPosterCard(
 }
 
 @Composable
-internal fun ThisWeekSection(
-    items: List<CalendarEpisodeItem>,
-    isLoading: Boolean = false,
-    statusMessage: String = "",
-    onItemClick: (CalendarEpisodeItem) -> Unit = {},
-    onViewAllClick: (() -> Unit)? = null,
-) {
-    if (items.isEmpty() && !isLoading && statusMessage.isBlank()) return
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        HomeRailHeader(
-            title = "This Week",
-            statusMessage = if (isLoading) "" else statusMessage,
-            action = onViewAllClick?.let { action ->
-                {
-                    TextButton(onClick = action) {
-                        Text("View all")
-                    }
-                }
-            },
-        )
-
-        if (isLoading || items.isNotEmpty()) {
-            LazyRow(
-                contentPadding = PaddingValues(0.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (isLoading && items.isEmpty()) {
-                    items(HOME_WIDE_SKELETON_COUNT) {
-                        HomeRailSkeletonCard()
-                    }
-                } else {
-                    items(items, key = { "${it.type}:${it.id}" }) { item ->
-                        CalendarEpisodeCard(item = item, onClick = { onItemClick(item) })
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 internal fun CalendarEpisodeCard(
     item: CalendarEpisodeItem,
     onClick: () -> Unit,
 ) {
+    val imageModel = rememberLandscapeImageModel(item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl, 280.dp)
     Column(
         modifier = Modifier.width(280.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LandscapeArtworkFrame(
             title = item.seriesName,
-            imageUrl = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
+            imageModel = imageModel,
             onClick = onClick,
             modifier = Modifier.aspectRatio(16f / 9f),
             badgeLabel = calendarBadgeLabel(item),
+            badgeAlignment = Alignment.TopEnd,
+            scrimHeightFraction = 0.68f,
+            scrimMaxAlpha = 0.92f,
             bottomOverlayContent = {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
                         .padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = item.seriesName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = calendarEpisodeLabel(item),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.84f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    calendarSupportingText(item)?.let { supportingText ->
-                        Text(
-                            text = supportingText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.72f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        text = calendarSecondaryText(item),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             },
         )
@@ -1179,13 +985,14 @@ internal fun CalendarSeriesCard(
     item: CalendarSeriesItem,
     onClick: () -> Unit,
 ) {
+    val imageModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, 280.dp)
     Column(
         modifier = Modifier.width(280.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LandscapeArtworkFrame(
             title = item.title,
-            imageUrl = item.backdropUrl ?: item.posterUrl,
+            imageModel = imageModel,
             onClick = onClick,
             modifier = Modifier.aspectRatio(16f / 9f),
             badgeLabel = "No schedule",
@@ -1238,12 +1045,19 @@ private fun calendarEpisodeLabel(item: CalendarEpisodeItem): String {
     }
 }
 
-private fun calendarSupportingText(item: CalendarEpisodeItem): String? {
-    return when {
+private fun calendarSecondaryText(item: CalendarEpisodeItem): String {
+    val supportingText = when {
         item.isGroup -> "${item.episodeCount} new episodes"
         !item.episodeTitle.isNullOrBlank() -> item.episodeTitle
         !item.overview.isNullOrBlank() -> item.overview
         else -> null
+    }?.trim()
+
+    val episodeLabel = calendarEpisodeLabel(item)
+    return if (supportingText.isNullOrBlank()) {
+        episodeLabel
+    } else {
+        "$episodeLabel - $supportingText"
     }
 }
 
@@ -1284,65 +1098,122 @@ internal fun HomeHeroCarousel(
             .fillMaxWidth()
             .height(320.dp)
     ) { index ->
-            val item = items[index]
-            val heroBackdropUrl = remember(item.backdropUrl) {
-                TmdbApi.resizedImageUrl(item.backdropUrl, size = "w1280")
-            }
+        val item = items[index]
+        val heroImageModel = rememberCrispyImageModel(
+            item.backdropUrl,
+            width = 320.dp,
+            height = 320.dp,
+            tmdbSize = "w780",
+            enableCrossfade = true,
+        )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .maskClip(RoundedCornerShape(28.dp))
-                    .clickable { onItemClick(item) }
-            ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .maskClip(RoundedCornerShape(28.dp))
+                .clickable { onItemClick(item) }
+        ) {
+            if (heroImageModel != null) {
                 AsyncImage(
-                    model = heroBackdropUrl ?: item.backdropUrl,
+                    model = heroImageModel,
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-
-                HomeArtworkBottomScrim(
-                    heightFraction = 0.46f,
-                    maxAlpha = 0.72f,
-                )
-
-                Column(
+            } else {
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    val subtitle = listOfNotNull(
-                        item.year,
-                        item.genres.firstOrNull()
-                    ).joinToString(" • ")
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            }
 
-                    if (subtitle.isNotEmpty()) {
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
+            HomeArtworkBottomScrim(
+                heightFraction = 0.46f,
+                maxAlpha = 0.72f,
+            )
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val subtitle = listOfNotNull(
+                    item.year,
+                    item.genres.firstOrNull()
+                ).joinToString(" • ")
+
+                if (subtitle.isNotEmpty()) {
                     Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.72f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
                 }
+                Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.72f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
+}
+
+@Composable
+private fun HomeCollectionRatingBadge(
+    rating: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = Color.Black.copy(alpha = 0.7f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Star,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = Color.White,
+            )
+            Text(
+                text = rating,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberPosterImageModel(url: String?): Any? {
+    return rememberCrispyImageModel(url = url, width = 124.dp, height = 186.dp, tmdbSize = "w342")
+}
+
+@Composable
+private fun rememberLandscapeImageModel(url: String?, width: Dp): Any? {
+    return rememberCrispyImageModel(
+        url = url,
+        width = width,
+        height = width * (9f / 16f),
+        tmdbSize = "w500",
+    )
+}

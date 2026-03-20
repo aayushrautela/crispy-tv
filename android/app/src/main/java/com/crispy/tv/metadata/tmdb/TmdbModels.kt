@@ -1,8 +1,10 @@
 package com.crispy.tv.metadata.tmdb
 
+import androidx.compose.runtime.Immutable
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.player.MetadataLabMediaType
 
+@Immutable
 data class TmdbCastMember(
     val id: Int,
     val name: String,
@@ -10,12 +12,14 @@ data class TmdbCastMember(
     val profileUrl: String?
 )
 
+@Immutable
 data class TmdbProductionEntity(
     val id: Int,
     val name: String,
     val logoUrl: String?
 )
 
+@Immutable
 data class TmdbTrailer(
     val id: String,
     val name: String,
@@ -27,6 +31,7 @@ data class TmdbTrailer(
     val watchUrl: String?
 )
 
+@Immutable
 data class TmdbReview(
     val id: String,
     val author: String,
@@ -35,6 +40,7 @@ data class TmdbReview(
     val createdAt: String?
 )
 
+@Immutable
 data class TmdbSeasonEpisode(
     val seasonNumber: Int,
     val episodeNumber: Int,
@@ -44,6 +50,7 @@ data class TmdbSeasonEpisode(
     val stillUrl: String?
 )
 
+@Immutable
 sealed interface TmdbTitleDetails {
     val status: String?
     val originalLanguage: String?
@@ -51,6 +58,7 @@ sealed interface TmdbTitleDetails {
     val tagline: String?
 }
 
+@Immutable
 data class TmdbMovieDetails(
     override val status: String?,
     val releaseDate: String?,
@@ -62,6 +70,7 @@ data class TmdbMovieDetails(
     override val tagline: String?
 ) : TmdbTitleDetails
 
+@Immutable
 data class TmdbTvDetails(
     override val status: String?,
     val firstAirDate: String?,
@@ -75,6 +84,7 @@ data class TmdbTvDetails(
     override val tagline: String?
 ) : TmdbTitleDetails
 
+@Immutable
 data class TmdbCollection(
     val id: Int,
     val name: String,
@@ -83,10 +93,12 @@ data class TmdbCollection(
     val parts: List<CatalogItem>
 )
 
+@Immutable
 data class TmdbEnrichment(
     val tmdbId: Int,
     val imdbId: String?,
     val mediaType: MetadataLabMediaType,
+    val backdropUrls: List<String> = emptyList(),
     val cast: List<TmdbCastMember>,
     val production: List<TmdbProductionEntity>,
     val trailers: List<TmdbTrailer>,

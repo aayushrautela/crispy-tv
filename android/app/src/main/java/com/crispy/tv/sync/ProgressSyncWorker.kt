@@ -14,6 +14,9 @@ class ProgressSyncWorker(
     override suspend fun doWork(): Result {
         val watchHistory = PlaybackDependencies.watchHistoryServiceFactory(applicationContext)
 
+        runCatching { watchHistory.refreshProviderAuthState(forceRefresh = false) }
+            .onFailure { Log.w(TAG, "Progress sync: refresh auth failed", it) }
+
         val auth =
             runCatching { watchHistory.authState() }
                 .onFailure { Log.w(TAG, "Progress sync: authState failed", it) }

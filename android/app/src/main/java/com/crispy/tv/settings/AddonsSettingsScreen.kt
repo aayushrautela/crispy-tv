@@ -41,7 +41,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,13 +62,14 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.crispy.tv.BuildConfig
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.metadata.CloudAddonRow
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -423,18 +423,12 @@ internal class AddonsSettingsViewModel(
                                 context = appContext,
                                 configuredManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS
                             )
-                        val supabase =
-                            SupabaseAccountClient(
-                                appContext = appContext,
-                                httpClient = httpClient,
-                                supabaseUrl = BuildConfig.SUPABASE_URL,
-                                supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
-                            )
                         @Suppress("UNCHECKED_CAST")
                         return AddonsSettingsViewModel(
                             addonRegistry = addonRegistry,
                             httpClient = httpClient,
-                            householdAddonsCloudSync = HouseholdAddonsCloudSync(supabase, addonRegistry),
+                            householdAddonsCloudSync =
+                                SupabaseServicesProvider.createHouseholdAddonsCloudSync(appContext, addonRegistry),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -482,7 +476,7 @@ private fun AddonsSettingsScreen(
     var pendingRemoval by remember { mutableStateOf<InstalledAddonUi?>(null) }
 
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior = appBarScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {

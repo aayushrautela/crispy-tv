@@ -43,8 +43,6 @@ public struct SyncPlannerInput: Equatable {
     public let addons: [RawAddonInstall]
     public let settings: [String: String]
     public let catalogPrefs: [String: String]
-    public let traktAuth: [String: String]
-    public let simklAuth: [String: String]
 
     public init(
         role: HouseholdRole,
@@ -59,9 +57,7 @@ public struct SyncPlannerInput: Equatable {
         profileId: String,
         addons: [RawAddonInstall],
         settings: [String: String],
-        catalogPrefs: [String: String],
-        traktAuth: [String: String],
-        simklAuth: [String: String]
+        catalogPrefs: [String: String]
     ) {
         self.role = role
         self.pullRequested = pullRequested
@@ -76,8 +72,6 @@ public struct SyncPlannerInput: Equatable {
         self.addons = addons
         self.settings = settings
         self.catalogPrefs = catalogPrefs
-        self.traktAuth = traktAuth
-        self.simklAuth = simklAuth
     }
 }
 
@@ -87,9 +81,7 @@ public enum SyncRpcCall: Equatable {
     case upsertProfileData(
         profileId: String,
         settings: [String: String],
-        catalogPrefs: [String: String],
-        traktAuth: [String: String],
-        simklAuth: [String: String]
+        catalogPrefs: [String: String]
     )
 
     public var name: String {
@@ -130,9 +122,7 @@ public func planSyncRpcCalls(input: SyncPlannerInput) -> [SyncRpcCall] {
             .upsertProfileData(
                 profileId: input.profileId.trimmed(),
                 settings: normalizeStringMap(input.settings),
-                catalogPrefs: normalizeStringMap(input.catalogPrefs),
-                traktAuth: normalizeStringMap(input.traktAuth),
-                simklAuth: normalizeStringMap(input.simklAuth)
+                catalogPrefs: normalizeStringMap(input.catalogPrefs)
             )
         )
     }

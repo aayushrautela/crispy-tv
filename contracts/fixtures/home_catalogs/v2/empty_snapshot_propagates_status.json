@@ -1,0 +1,42 @@
+{
+  "contract_version": 3,
+  "suite": "home_catalogs",
+  "case_id": "empty_snapshot_propagates_status",
+  "input": {
+    "snapshot": {
+      "profile_id": null,
+      "status_message": "Sign in to Supabase to load catalogs.",
+      "lists": []
+    },
+    "hero_limit": 10,
+    "section_limit": 10,
+    "discover": {
+      "media_type": "series",
+      "limit": 10
+    },
+    "page": {
+      "catalog_id": "personal:anything:default",
+      "page": 1,
+      "page_size": 10
+    }
+  },
+  "expected": {
+    "personal_feed": {
+      "hero_result": {
+        "items": [],
+        "status_message": "Sign in to Supabase to load catalogs."
+      },
+      "sections": [],
+      "sections_status_message": "Sign in to Supabase to load catalogs."
+    },
+    "discover": {
+      "catalogs": [],
+      "status_message": "Sign in to Supabase to load catalogs."
+    },
+    "page": {
+      "items": [],
+      "status_message": "Sign in to Supabase to load catalogs.",
+      "attempted_urls": []
+    }
+  }
+}

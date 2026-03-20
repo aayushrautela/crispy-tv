@@ -1,5 +1,7 @@
 package com.crispy.tv.details
 
+import android.view.LayoutInflater
+import android.view.ViewGroup
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -21,10 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.animation.core.animateFloatAsState
@@ -36,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
@@ -75,7 +76,6 @@ internal fun HeroSection(
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
     onToggleTrailer: () -> Unit,
-    onToggleTrailerMute: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -227,25 +227,6 @@ internal fun HeroSection(
                 )
         )
 
-        if (shouldAttemptPlayback && trailerIsPlaying) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 20.dp, end = 16.dp)
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .clickable { onToggleTrailerMute() },
-                color = Color.Black.copy(alpha = 0.34f),
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = if (isTrailerMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = if (isTrailerMuted) "Unmute trailer" else "Mute trailer",
-                    modifier = Modifier.padding(10.dp)
-                )
-            }
-        }
-
         if (hasTrailer) {
             val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
             val icon = if (isActuallyPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
@@ -318,7 +299,6 @@ private fun HeroYouTubeTrailerLayer(
     val context = LocalContext.current
 
     val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
-    val latestMuted = rememberUpdatedState(isMuted)
     val latestShouldPlay = rememberUpdatedState(shouldPlay)
 
     var source by remember(trailerKey) { mutableStateOf<TrailerPlaybackSource?>(null) }
@@ -344,6 +324,7 @@ private fun HeroYouTubeTrailerLayer(
             .apply {
                 repeatMode = Player.REPEAT_MODE_ONE
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                volume = if (isMuted) 0f else 1f
             }
     }
 
@@ -418,13 +399,13 @@ private fun HeroYouTubeTrailerLayer(
         exoPlayer.prepare()
     }
 
-    LaunchedEffect(exoPlayer, latestMuted.value) {
-        exoPlayer.volume = if (latestMuted.value) 0f else 1f
+    SideEffect {
+        exoPlayer.volume = if (isMuted) 0f else 1f
     }
 
-    LaunchedEffect(exoPlayer, latestShouldPlay.value) {
-        exoPlayer.playWhenReady = latestShouldPlay.value
-        if (latestShouldPlay.value) {
+    LaunchedEffect(exoPlayer, shouldPlay) {
+        exoPlayer.playWhenReady = shouldPlay
+        if (shouldPlay) {
             exoPlayer.play()
         } else {
             exoPlayer.pause()
@@ -435,11 +416,29 @@ private fun HeroYouTubeTrailerLayer(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                PlayerView(ctx).apply {
+                (LayoutInflater.from(ctx).inflate(R.layout.hero_trailer_player_view, null, false) as PlayerView).apply {
+                    layoutParams =
+                        ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                        )
                     useController = false
+                    controllerAutoShow = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    isEnabled = false
+                    isClickable = false
+                    isLongClickable = false
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                     player = exoPlayer
+                    videoSurfaceView?.apply {
+                        isClickable = false
+                        isLongClickable = false
+                        isFocusable = false
+                        isFocusableInTouchMode = false
+                    }
                 }
             },
             update = { view ->

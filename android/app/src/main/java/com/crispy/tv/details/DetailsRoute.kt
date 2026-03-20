@@ -8,6 +8,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.playerui.PlayerLaunchSnapshot
+import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import kotlinx.coroutines.flow.collectLatest
 import java.util.Locale
 
@@ -21,7 +23,7 @@ fun DetailsRoute(
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit = { _, _ -> },
     onPersonClick: (String) -> Unit = {},
-    onOpenPlayer: (String, String, PlaybackIdentity) -> Unit = { _, _, _ -> },
+    onOpenPlayer: (String, Map<String, String>, String, PlaybackIdentity, String?, String?, PlayerLaunchSnapshot?) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
 
@@ -47,13 +49,25 @@ fun DetailsRoute(
             key = viewModelKey,
             factory = remember(appContext, itemId, normalizedType) { DetailsViewModel.factory(appContext, itemId, normalizedType) }
         )
+    val playbackSettingsRepository = remember(appContext) {
+        PlaybackSettingsRepositoryProvider.get(appContext)
+    }
+    val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
         viewModel.navigationEvents.collectLatest { event ->
             when (event) {
                 is DetailsNavigationEvent.OpenPlayer -> {
-                    onOpenPlayer(event.playbackUrl, event.title, event.identity)
+                    onOpenPlayer(
+                        event.playbackUrl,
+                        event.playbackHeaders,
+                        event.title,
+                        event.identity,
+                        event.subtitle,
+                        event.artworkUrl,
+                        event.launchSnapshot,
+                    )
                 }
             }
         }
@@ -69,6 +83,7 @@ fun DetailsRoute(
 
     DetailsScreen(
         uiState = uiState,
+        playbackSettings = playbackSettings,
         onBack = onBack,
         onItemClick = onItemClick,
         onPersonClick = onPersonClick,
@@ -84,6 +99,7 @@ fun DetailsRoute(
         onToggleWatchlist = viewModel::toggleWatchlist,
         onToggleWatched = viewModel::toggleWatched,
         onSetRating = viewModel::setRating,
+        onTrailerMutedChanged = playbackSettingsRepository::setTrailerMuted,
         onAiInsightsClick = viewModel::onAiInsightsClick,
         onDismissAiInsights = viewModel::dismissAiInsightsStory,
     )

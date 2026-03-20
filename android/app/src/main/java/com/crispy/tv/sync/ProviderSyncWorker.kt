@@ -15,6 +15,9 @@ class ProviderSyncWorker(
     override suspend fun doWork(): Result {
         val watchHistory = PlaybackDependencies.watchHistoryServiceFactory(applicationContext)
 
+        runCatching { watchHistory.refreshProviderAuthState(forceRefresh = false) }
+            .onFailure { Log.w(TAG, "Provider sync: refresh auth failed", it) }
+
         val auth = runCatching { watchHistory.authState() }
             .onFailure { Log.w(TAG, "Provider sync: authState failed", it) }
             .getOrNull()

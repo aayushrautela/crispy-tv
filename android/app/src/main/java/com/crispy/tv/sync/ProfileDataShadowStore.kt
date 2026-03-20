@@ -10,8 +10,6 @@ class ProfileDataShadowStore(
         val profileId: String,
         val settings: Map<String, String>,
         val catalogPrefs: Map<String, String>,
-        val traktAuth: Map<String, String>,
-        val simklAuth: Map<String, String>,
         val updatedAt: String?,
     )
 
@@ -24,16 +22,12 @@ class ProfileDataShadowStore(
 
         val settings = obj.optJSONObject("settings")?.toStringMap() ?: emptyMap()
         val catalogPrefs = obj.optJSONObject("catalog_prefs")?.toStringMap() ?: emptyMap()
-        val traktAuth = obj.optJSONObject("trakt_auth")?.toStringMap() ?: emptyMap()
-        val simklAuth = obj.optJSONObject("simkl_auth")?.toStringMap() ?: emptyMap()
         val updatedAt = obj.optString("updated_at").trim().ifBlank { null }
 
         return Snapshot(
             profileId = profileId,
             settings = settings,
             catalogPrefs = catalogPrefs,
-            traktAuth = traktAuth,
-            simklAuth = simklAuth,
             updatedAt = updatedAt
         )
     }
@@ -43,8 +37,6 @@ class ProfileDataShadowStore(
             JSONObject()
                 .put("settings", snapshot.settings.toJsonObject())
                 .put("catalog_prefs", snapshot.catalogPrefs.toJsonObject())
-                .put("trakt_auth", snapshot.traktAuth.toJsonObject())
-                .put("simkl_auth", snapshot.simklAuth.toJsonObject())
                 .put("updated_at", snapshot.updatedAt ?: "")
         prefs.edit().putString(keyForProfile(snapshot.profileId), obj.toString()).apply()
     }

@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,36 +20,37 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -55,16 +58,18 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.BuildConfig
+import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.domain.catalog.CatalogFilter
 import com.crispy.tv.home.HomeCatalogService
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.CrispySectionAppBarTitle
+import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,7 +92,6 @@ data class DiscoverUiState(
     val statusMessage: String = "",
     val catalogs: List<DiscoverCatalogRef> = emptyList(),
     val selectedCatalogKey: String? = null,
-    val selectedGenre: String? = null,
     val results: List<CatalogItem> = emptyList(),
     val isLoadingResults: Boolean = false,
     val isLoadingMore: Boolean = false,
@@ -115,25 +119,19 @@ class DiscoverViewModel(
 
     fun setTypeFilter(filter: DiscoverTypeFilter) {
         _uiState.update { it.copy(typeFilter = filter) }
-        refresh()
+        refresh(preserveContent = false)
     }
 
     fun selectCatalog(catalog: DiscoverCatalogRef) {
-        _uiState.update {
-            it.copy(
-                selectedCatalogKey = catalog.key,
-                selectedGenre = null
-            )
-        }
-        loadFirstPage()
-    }
-
-    fun selectGenre(genre: String?) {
-        _uiState.update { it.copy(selectedGenre = genre) }
-        loadFirstPage()
+        _uiState.update { it.copy(selectedCatalogKey = catalog.key) }
+        loadFirstPage(clearResults = true, keepRefreshing = false)
     }
 
     fun refresh() {
+        refresh(preserveContent = true)
+    }
+
+    private fun refresh(preserveContent: Boolean) {
         refreshJob?.cancel()
         resultsJob?.cancel()
         loadMoreJob?.cancel()
@@ -141,20 +139,18 @@ class DiscoverViewModel(
             viewModelScope.launch {
                 val filterSnapshot = uiState.value.typeFilter
                 val priorSelected = uiState.value.selectedCatalogKey
-                val priorGenre = uiState.value.selectedGenre
 
                 _uiState.update {
                     it.copy(
                         isRefreshing = true,
-                        statusMessage = "Loading discover catalogs...",
-                        catalogs = emptyList(),
-                        selectedCatalogKey = null,
-                        selectedGenre = null,
-                        results = emptyList(),
-                        isLoadingResults = false,
+                        statusMessage = if (preserveContent && it.catalogs.isNotEmpty()) it.statusMessage else "Loading discover catalogs...",
+                        catalogs = if (preserveContent) it.catalogs else emptyList(),
+                        selectedCatalogKey = if (preserveContent) it.selectedCatalogKey else null,
+                        results = if (preserveContent) it.results else emptyList(),
+                        isLoadingResults = preserveContent && it.results.isNotEmpty(),
                         isLoadingMore = false,
-                        page = 1,
-                        hasMore = false
+                        page = if (preserveContent) it.page else 1,
+                        hasMore = if (preserveContent) it.hasMore else false,
                     )
                 }
 
@@ -169,22 +165,16 @@ class DiscoverViewModel(
                 val selectedKey =
                     priorSelected?.takeIf { key -> catalogs.any { it.key == key } }
                         ?: catalogs.firstOrNull()?.key
-                val selectedCatalog = catalogs.firstOrNull { it.key == selectedKey }
-                val normalizedGenre = priorGenre?.trim()?.takeIf { it.isNotBlank() }
-                val selectedGenre =
-                    normalizedGenre?.takeIf { genre -> selectedCatalog?.genres?.any { it.equals(genre, ignoreCase = true) } == true }
 
                 _uiState.update {
                     it.copy(
                         catalogs = catalogs,
                         selectedCatalogKey = selectedKey,
-                        selectedGenre = selectedGenre,
                         statusMessage = statusMessage,
-                        isRefreshing = false
                     )
                 }
 
-                loadFirstPage()
+                loadFirstPage(clearResults = !preserveContent, keepRefreshing = true)
             }
     }
 
@@ -209,7 +199,6 @@ class DiscoverViewModel(
                                 section = catalog.section,
                                 page = nextPage,
                                 pageSize = pageSize,
-                                filters = buildGenreFilters(snapshot.selectedGenre)
                             )
                         }
                     }
@@ -231,7 +220,7 @@ class DiscoverViewModel(
             }
     }
 
-    private fun loadFirstPage() {
+    private fun loadFirstPage(clearResults: Boolean, keepRefreshing: Boolean) {
         resultsJob?.cancel()
         resultsJob =
             viewModelScope.launch {
@@ -244,7 +233,8 @@ class DiscoverViewModel(
                             isLoadingResults = false,
                             isLoadingMore = false,
                             hasMore = false,
-                            page = 1
+                            page = 1,
+                            isRefreshing = false,
                         )
                     }
                     return@launch
@@ -254,10 +244,10 @@ class DiscoverViewModel(
                     it.copy(
                         isLoadingResults = true,
                         isLoadingMore = false,
-                        results = emptyList(),
+                        results = if (clearResults) emptyList() else it.results,
                         page = 1,
-                        hasMore = false,
-                        statusMessage = "Loading..."
+                        hasMore = if (clearResults) false else it.hasMore,
+                        statusMessage = if (clearResults || it.statusMessage.isBlank()) "Loading..." else it.statusMessage,
                     )
                 }
 
@@ -269,7 +259,6 @@ class DiscoverViewModel(
                                 section = catalog.section,
                                 page = 1,
                                 pageSize = pageSize,
-                                filters = buildGenreFilters(snapshot.selectedGenre)
                             )
                         }
                     }
@@ -281,9 +270,10 @@ class DiscoverViewModel(
                     it.copy(
                         results = items,
                         isLoadingResults = false,
+                        isRefreshing = if (keepRefreshing) false else it.isRefreshing,
                         page = 1,
                         hasMore = hasMore,
-                        statusMessage = pageResult?.statusMessage ?: (result.exceptionOrNull()?.message ?: "Failed to load")
+                        statusMessage = pageResult?.statusMessage ?: (result.exceptionOrNull()?.message ?: "Failed to load"),
                     )
                 }
             }
@@ -297,13 +287,7 @@ class DiscoverViewModel(
                     if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
-                            homeCatalogService =
-                                  HomeCatalogService(
-                                      context = appContext,
-                                      httpClient = AppHttp.client(appContext),
-                                      supabaseUrl = BuildConfig.SUPABASE_URL,
-                                      supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY,
-                                  )
+                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -314,11 +298,6 @@ class DiscoverViewModel(
 }
 
 private const val PAGE_SIZE = 60
-
-private fun buildGenreFilters(selectedGenre: String?): List<CatalogFilter> {
-    val normalized = selectedGenre?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
-    return listOf(CatalogFilter(key = "genre", value = normalized))
-}
 
 private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
     if (items.isEmpty()) {
@@ -335,8 +314,12 @@ private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
     return output
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverRoute(
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
+    onOpenAccountsProfiles: () -> Unit,
     onItemClick: (CatalogItem) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -348,22 +331,49 @@ fun DiscoverRoute(
             }
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scrollBehavior = appBarScrollBehavior()
 
-    DiscoverScreen(
-        uiState = uiState,
-        onRefresh = viewModel::refresh,
-        onTypeFilterClick = viewModel::setTypeFilter,
-        onCatalogClick = viewModel::selectCatalog,
-        onGenreClick = viewModel::selectGenre,
-        onLoadMore = viewModel::loadMore,
-        onItemClick = onItemClick
-    )
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            StandardTopAppBar(
+                title = {
+                    CrispySectionAppBarTitle(label = "Discover")
+                },
+                actions = {
+                    ProfileIconButton(onClick = onOpenAccountsProfiles)
+                },
+                scrollBehavior = scrollBehavior,
+                colors = topLevelAppBarColors(),
+            )
+        },
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues),
+        ) {
+            DiscoverScreen(
+                uiState = uiState,
+                onRefresh = viewModel::refresh,
+                onTypeFilterClick = viewModel::setTypeFilter,
+                onCatalogClick = viewModel::selectCatalog,
+                onLoadMore = viewModel::loadMore,
+                onItemClick = onItemClick,
+                scrollToTopRequests = scrollToTopRequests,
+                onScrollToTopConsumed = onScrollToTopConsumed,
+            )
+        }
+    }
 }
 
 private enum class DiscoverSheet {
     Type,
-    Catalog,
-    Genre
+    Catalog
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -373,229 +383,199 @@ private fun DiscoverScreen(
     onRefresh: () -> Unit,
     onTypeFilterClick: (DiscoverTypeFilter) -> Unit,
     onCatalogClick: (DiscoverCatalogRef) -> Unit,
-    onGenreClick: (String?) -> Unit,
     onLoadMore: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem) -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
     val selectedCatalog = uiState.selectedCatalog
     val pageHorizontalPadding = responsivePageHorizontalPadding()
+    val pullToRefreshState = rememberPullToRefreshState()
+    val gridState = rememberLazyGridState()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Discover",
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            IconButton(onClick = onRefresh) {
-                                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh")
-                            }
-                        }
-
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            item {
-                                FilterChip(
-                                    selected = false,
-                                    onClick = { activeSheet = DiscoverSheet.Type },
-                                    label = { Text(uiState.typeFilter.label) },
-                                    trailingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.KeyboardArrowDown,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-
-                            item {
-                                FilterChip(
-                                    selected = false,
-                                    onClick = { activeSheet = DiscoverSheet.Catalog },
-                                    label = {
-                                        Text(
-                                            text = selectedCatalog?.section?.title ?: "Select catalog",
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Outlined.KeyboardArrowDown,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-
-                            if (selectedCatalog != null && selectedCatalog.genres.isNotEmpty()) {
-                                item {
-                                    FilterChip(
-                                        selected = false,
-                                        onClick = { activeSheet = DiscoverSheet.Genre },
-                                        label = {
-                                            Text(
-                                                text = uiState.selectedGenre ?: "All genres",
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Outlined.KeyboardArrowDown,
-                                                contentDescription = null
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            gridState.animateScrollToItem(0)
+            onScrollToTopConsumed()
         }
-    ) { innerPadding ->
+    }
+
+    PullToRefreshBox(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            Indicator(
+                state = pullToRefreshState,
+                isRefreshing = uiState.isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        },
+    ) {
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Adaptive(minSize = 124.dp),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
-                top = innerPadding.calculateTopPadding() + Dimensions.SmallSpacing,
+                top = Dimensions.SmallSpacing,
                 end = pageHorizontalPadding,
-                bottom = Dimensions.PageBottomPadding
+                bottom = Dimensions.PageBottomPadding,
             ),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                         if (selectedCatalog != null) {
-                             val summaryGenre = uiState.selectedGenre ?: "All genres"
-                             Text(
-                                 text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label} | $summaryGenre",
-                                 style = MaterialTheme.typography.bodySmall,
-                                 color = MaterialTheme.colorScheme.onSurfaceVariant
-                             )
-                         }
-
-                        if (uiState.statusMessage.isNotBlank()) {
-                            Text(
-                                text = uiState.statusMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = false,
+                                onClick = { activeSheet = DiscoverSheet.Type },
+                                label = { Text(uiState.typeFilter.label) },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                                        contentDescription = null
+                                    )
+                                }
                             )
+                        }
+
+                        item {
+                            FilterChip(
+                                selected = false,
+                                onClick = { activeSheet = DiscoverSheet.Catalog },
+                                label = {
+                                    Text(
+                                        text = selectedCatalog?.section?.title ?: "Select catalog",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+                        }
+
+                    }
+                }
+                if (selectedCatalog != null || uiState.statusMessage.isNotBlank()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (selectedCatalog != null) {
+                                Text(
+                                    text = "${selectedCatalog.section.title} | ${uiState.typeFilter.label}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            if (uiState.statusMessage.isNotBlank()) {
+                                Text(
+                                    text = uiState.statusMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            if (uiState.isLoadingResults && uiState.results.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                if (uiState.isLoadingResults && uiState.results.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            LoadingIndicator(modifier = Modifier.size(18.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                LoadingIndicator(modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = "Discovering...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else if (uiState.results.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = "Discovering...",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = if (selectedCatalog == null) "Select a catalog to start discovering" else "No content found",
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                }
-            } else if (uiState.results.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (selectedCatalog == null) "Select a catalog to start discovering" else "No content found",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    gridItems(
+                        items = uiState.results,
+                        key = { "${it.type}:${it.id}" }
+                    ) { item ->
+                        PosterCard(
+                            title = item.title,
+                            posterUrl = item.posterUrl,
+                            backdropUrl = item.backdropUrl,
+                            rating = item.rating,
+                            year = item.year,
+                            genre = item.genre,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onItemClick(item) }
                         )
                     }
                 }
-            } else {
-                items(
-                    items = uiState.results,
-                    key = { "${it.type}:${it.id}" }
-                ) { item ->
-                    PosterCard(
-                        title = item.title,
-                        posterUrl = item.posterUrl,
-                        backdropUrl = item.backdropUrl,
-                        rating = item.rating,
-                        year = item.year,
-                        genre = item.genre,
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onItemClick(item) }
-                    )
-                }
-            }
 
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Spacer(Modifier.height(4.dp))
-            }
-
-            if (uiState.isLoadingMore) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Dimensions.ListItemPadding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LoadingIndicator(modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                if (uiState.isLoadingMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Dimensions.ListItemPadding),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LoadingIndicator(modifier = Modifier.size(20.dp))
+                        }
                     }
-                }
-            } else if (uiState.hasMore && uiState.results.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        FilledTonalButton(onClick = onLoadMore) {
-                            Text("Load more")
+                } else if (uiState.hasMore && uiState.results.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            FilledTonalButton(onClick = onLoadMore) {
+                                Text("Load more")
+                            }
                         }
                     }
                 }
             }
         }
-    }
-
     if (activeSheet != null) {
         ModalBottomSheet(
             onDismissRequest = { activeSheet = null }
@@ -706,66 +686,6 @@ private fun DiscoverScreen(
                                             .padding(horizontal = 4.dp)
                                     )
                                 }
-                            }
-                        }
-                    }
-
-                    DiscoverSheet.Genre -> {
-                        val genres = selectedCatalog?.genres.orEmpty()
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding)
-                        ) {
-                            item {
-                                Text(
-                                    text = "Genre",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(horizontal = Dimensions.ListItemPadding, vertical = Dimensions.SmallSpacing)
-                                )
-                            }
-                            item {
-                                ListItem(
-                                    headlineContent = { Text("All genres") },
-                                    trailingContent =
-                                        if (uiState.selectedGenre == null) {
-                                            {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Check,
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onGenreClick(null)
-                                            activeSheet = null
-                                        }
-                                )
-                            }
-                            items(genres) { genre ->
-                                ListItem(
-                                    headlineContent = { Text(genre) },
-                                    trailingContent =
-                                        if (uiState.selectedGenre == genre) {
-                                            {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Check,
-                                                    contentDescription = null
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onGenreClick(genre)
-                                            activeSheet = null
-                                        }
-                                )
                             }
                         }
                     }

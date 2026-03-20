@@ -7,23 +7,25 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.ai.AiInsightsCacheStore
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
-import com.crispy.tv.ai.OpenRouterClient
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.TmdbImdbIdResolver
-import com.crispy.tv.metadata.TmdbImdbIdResolverProvider
+import com.crispy.tv.metadata.omdb.OmdbDetails
+import com.crispy.tv.metadata.omdb.OmdbRepository
+import com.crispy.tv.metadata.omdb.OmdbRepositoryProvider
 import com.crispy.tv.metadata.tmdb.TmdbEnrichment
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepositoryProvider
+import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.playerui.PlayerEpisodeSnapshot
+import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
@@ -63,6 +65,8 @@ data class DetailsUiState(
     val details: MediaDetails? = null,
     val tmdbIsLoading: Boolean = false,
     val tmdbEnrichment: TmdbEnrichment? = null,
+    val omdbIsLoading: Boolean = false,
+    val omdbDetails: OmdbDetails? = null,
     val statusMessage: String = "",
     val aiMode: AiInsightsMode = AiInsightsMode.ON_DEMAND,
     val aiConfigured: Boolean = false,
@@ -103,6 +107,7 @@ data class StreamSelectorUiState(
     val visible: Boolean = false,
     val mediaType: MetadataLabMediaType? = null,
     val lookupId: String? = null,
+    val headerEpisode: MediaVideo? = null,
     val selectedProviderId: String? = null,
     val providers: List<StreamProviderUiState> = emptyList(),
     val isLoading: Boolean = false,
@@ -114,8 +119,12 @@ data class StreamSelectorUiState(
 sealed interface DetailsNavigationEvent {
     data class OpenPlayer(
         val playbackUrl: String,
+        val playbackHeaders: Map<String, String> = emptyMap(),
         val title: String,
         val identity: PlaybackIdentity,
+        val subtitle: String?,
+        val artworkUrl: String?,
+        val launchSnapshot: PlayerLaunchSnapshot?,
     ) : DetailsNavigationEvent
 }
 
@@ -125,6 +134,7 @@ class DetailsViewModel internal constructor(
     private val watchHistoryService: WatchHistoryService,
     private val tmdbImdbIdResolver: TmdbImdbIdResolver,
     private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
+    private val omdbRepository: OmdbRepository,
     private val aiSettingsStore: AiInsightsSettingsStore,
     private val aiRepository: AiInsightsRepository,
     private val addonStreamsService: AddonStreamsService,
@@ -141,6 +151,7 @@ class DetailsViewModel internal constructor(
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
+    private var omdbJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var resolvedTmdbId: Int? = null
     private var cachedEpisodeWatchKeys: Set<String>? = null
@@ -156,6 +167,7 @@ class DetailsViewModel internal constructor(
             val aiSnapshot = aiSettingsStore.loadSnapshot()
 
             episodesJob?.cancel()
+            omdbJob?.cancel()
             seasonEpisodesCache.clear()
             resolvedTmdbId = null
             cachedEpisodeWatchKeys = null
@@ -165,6 +177,8 @@ class DetailsViewModel internal constructor(
                     isLoading = true,
                     tmdbIsLoading = true,
                     statusMessage = "Loading...",
+                    omdbIsLoading = false,
+                    omdbDetails = null,
                     aiMode = aiSnapshot.settings.mode,
                     aiConfigured = aiSnapshot.openRouterKey.isNotBlank(),
                     aiIsLoading = false,
@@ -260,6 +274,8 @@ class DetailsViewModel internal constructor(
                 )
             }
 
+            loadOmdbRatings(enrichedDetails)
+
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
             if (enrichedDetails?.mediaType?.trim()?.equals("series", ignoreCase = true) == true && seasonToLoad != null) {
                 loadEpisodesForSeason(seasonToLoad, force = true)
@@ -269,16 +285,16 @@ class DetailsViewModel internal constructor(
             val detailsForAi = enrichedDetails
             val aiMode = aiSnapshot.settings.mode
             val aiConfigured = aiSnapshot.openRouterKey.isNotBlank()
+            val aiLocale = Locale.getDefault()
 
             if (tmdbId != null && detailsForAi != null && aiMode != AiInsightsMode.OFF) {
-                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId, requestedMediaType) }
+                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId, requestedMediaType, aiLocale) }
                 if (cached != null) {
                     _uiState.update { it.copy(aiInsights = cached) }
                 } else if (aiMode == AiInsightsMode.ALWAYS && aiConfigured) {
                     startAiGeneration(
                         tmdbId = tmdbId,
-                        details = detailsForAi,
-                        reviews = tmdbEnrichment.reviews.orEmpty(),
+                        locale = aiLocale,
                         showStory = false,
                         announce = false,
                     )
@@ -315,8 +331,7 @@ class DetailsViewModel internal constructor(
 
         startAiGeneration(
             tmdbId = tmdbId,
-            details = details,
-            reviews = state.tmdbEnrichment.reviews.orEmpty(),
+            locale = Locale.getDefault(),
             showStory = true,
             announce = true,
         )
@@ -328,8 +343,7 @@ class DetailsViewModel internal constructor(
 
     private fun startAiGeneration(
         tmdbId: Int,
-        details: MediaDetails,
-        reviews: List<com.crispy.tv.metadata.tmdb.TmdbReview>,
+        locale: Locale,
         showStory: Boolean,
         announce: Boolean,
     ) {
@@ -347,8 +361,7 @@ class DetailsViewModel internal constructor(
                         aiRepository.generate(
                             tmdbId = tmdbId,
                             mediaType = requestedMediaType,
-                            details = details,
-                            reviews = reviews,
+                            locale = locale,
                         )
                     }
                 }.onSuccess { result ->
@@ -435,7 +448,13 @@ class DetailsViewModel internal constructor(
                     fallbackMediaType = requestedMediaType,
                 )
 
-        openStreamSelectorWithTarget(target, blankIdMessage = "Unable to resolve stream lookup id for this title.")
+        val headerEpisode = findEpisodeForLookupId(target.lookupId, state.seasonEpisodes)
+
+        openStreamSelectorWithTarget(
+            target = target,
+            headerEpisode = headerEpisode,
+            blankIdMessage = "Unable to resolve stream lookup id for this title.",
+        )
     }
 
     private fun loadEpisodesForSeason(
@@ -568,11 +587,16 @@ class DetailsViewModel internal constructor(
                 mediaType = requestedMediaType,
                 lookupId = videoId.trim(),
             )
-        openStreamSelectorWithTarget(target, blankIdMessage = "This episode does not have a stream lookup id.")
+        openStreamSelectorWithTarget(
+            target = target,
+            headerEpisode = findEpisodeForLookupId(target.lookupId, state.seasonEpisodes),
+            blankIdMessage = "This episode does not have a stream lookup id.",
+        )
     }
 
     private fun openStreamSelectorWithTarget(
         target: StreamLookupTarget,
+        headerEpisode: MediaVideo? = null,
         blankIdMessage: String,
     ) {
         if (target.lookupId.isBlank()) {
@@ -588,7 +612,7 @@ class DetailsViewModel internal constructor(
         ) {
             _uiState.update {
                 it.copy(
-                    streamSelector = current.copy(visible = true),
+                    streamSelector = current.copy(visible = true, headerEpisode = headerEpisode ?: current.headerEpisode),
                     statusMessage = "",
                 )
             }
@@ -603,6 +627,7 @@ class DetailsViewModel internal constructor(
                         visible = true,
                         mediaType = target.mediaType,
                         lookupId = target.lookupId,
+                        headerEpisode = headerEpisode,
                         isLoading = true,
                     ),
                 statusMessage = "Fetching streams...",
@@ -690,6 +715,18 @@ class DetailsViewModel internal constructor(
                     }
                 }
             }
+    }
+
+    private fun findEpisodeForLookupId(
+        lookupId: String,
+        currentEpisodes: List<MediaVideo>,
+    ): MediaVideo? {
+        val normalizedLookupId = lookupId.trim()
+        if (normalizedLookupId.isBlank()) return null
+
+        return sequenceOf(currentEpisodes.asSequence(), seasonEpisodesCache.values.asSequence().flatten())
+            .flatten()
+            .firstOrNull { episode -> episode.id.equals(normalizedLookupId, ignoreCase = true) }
     }
 
     fun onDismissStreamSelector() {
@@ -813,12 +850,12 @@ class DetailsViewModel internal constructor(
             return
         }
 
-        val title =
-            stream.name
+        val currentState = _uiState.value
+        val selectedEpisodeTitle =
+            currentState.streamSelector.headerEpisode
+                ?.title
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?: _uiState.value.details?.title
-                ?: "Player"
 
         _uiState.update { state ->
             state.copy(
@@ -827,8 +864,8 @@ class DetailsViewModel internal constructor(
             )
         }
 
-        val initialDetails = _uiState.value.details
-        val lookupId = _uiState.value.streamSelector.lookupId
+        val initialDetails = currentState.details
+        val lookupId = currentState.streamSelector.lookupId
 
         viewModelScope.launch {
             val details = initialDetails
@@ -854,6 +891,8 @@ class DetailsViewModel internal constructor(
             val season = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.season else null
             val episode = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.episode else null
 
+            val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
+            val title = selectedEpisodeTitle ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
             val tmdbId = extractTmdbIdOrNull(enriched.id) ?: extractTmdbIdOrNull(lookupId)
 
@@ -869,14 +908,89 @@ class DetailsViewModel internal constructor(
                     showTitle = if (resolvedMediaType == MetadataLabMediaType.SERIES) enriched.title else null,
                     showYear = if (resolvedMediaType == MetadataLabMediaType.SERIES) yearInt else null,
                 )
+            val artworkUrl = enriched.backdropUrl?.trim()?.ifBlank { null } ?: enriched.posterUrl?.trim()?.ifBlank { null }
+            val subtitle = buildPlayerSubtitle(
+                mediaType = resolvedMediaType,
+                details = enriched,
+                playerTitle = title,
+                season = season,
+                episode = episode,
+            )
 
             _navigationEvents.tryEmit(
                 DetailsNavigationEvent.OpenPlayer(
                     playbackUrl = playbackUrl,
+                    playbackHeaders = stream.requestHeaders,
                     title = title,
                     identity = identity,
+                    subtitle = subtitle,
+                    artworkUrl = artworkUrl,
+                    launchSnapshot =
+                        PlayerLaunchSnapshot(
+                            contentId = enriched.id,
+                            imdbId = enriched.imdbId,
+                            mediaType = enriched.mediaType,
+                            title = enriched.title,
+                            posterUrl = enriched.posterUrl,
+                            backdropUrl = enriched.backdropUrl,
+                            description = enriched.description,
+                            genres = enriched.genres,
+                            year = enriched.year,
+                            runtime = enriched.runtime,
+                            certification = enriched.certification,
+                            rating = enriched.rating,
+                            cast = enriched.cast,
+                            seasons = currentState.seasons,
+                            selectedSeason = currentState.selectedSeasonOrFirst,
+                            seasonEpisodes =
+                                currentState.seasonEpisodes.map { episodeItem ->
+                                    PlayerEpisodeSnapshot(
+                                        id = episodeItem.id,
+                                        title = episodeItem.title,
+                                        season = episodeItem.season,
+                                        episode = episodeItem.episode,
+                                        released = episodeItem.released,
+                                        overview = episodeItem.overview,
+                                        thumbnailUrl = episodeItem.thumbnailUrl,
+                                    )
+                                },
+                            currentEpisodeId = lookupId,
+                        ),
                 )
             )
+        }
+    }
+
+    private fun buildPlayerSubtitle(
+        mediaType: MetadataLabMediaType,
+        details: MediaDetails,
+        playerTitle: String,
+        season: Int?,
+        episode: Int?,
+    ): String? {
+        return when (mediaType) {
+            MetadataLabMediaType.SERIES -> {
+                val normalizedPlayerTitle = playerTitle.trim().ifBlank { null }
+                val episodeLabel =
+                    when {
+                        season != null && episode != null -> {
+                            "S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
+                        }
+
+                        season != null -> "Season $season"
+                        else -> null
+                    }
+                val seriesTitle =
+                    details.title
+                        .trim()
+                        .ifBlank { null }
+                        ?.takeUnless { it == normalizedPlayerTitle }
+                listOfNotNull(seriesTitle, episodeLabel)
+                    .joinToString(separator = " • ")
+                    .ifBlank { null }
+            }
+
+            MetadataLabMediaType.MOVIE -> details.year?.trim()?.ifBlank { null }
         }
     }
 
@@ -1180,6 +1294,38 @@ class DetailsViewModel internal constructor(
         val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
         val resolved = tmdbImdbIdResolver.resolveImdbId(details.id, mediaType) ?: return details
         return details.copy(imdbId = resolved)
+    }
+
+    private fun loadOmdbRatings(details: MediaDetails?) {
+        omdbJob?.cancel()
+
+        val imdbId =
+            details
+                ?.imdbId
+                ?.trim()
+                ?.takeIf { it.startsWith("tt", ignoreCase = true) }
+                ?.lowercase(Locale.US)
+
+        if (imdbId == null || !omdbRepository.isConfigured) {
+            _uiState.update { it.copy(omdbIsLoading = false, omdbDetails = null) }
+            return
+        }
+
+        omdbJob =
+            viewModelScope.launch {
+                _uiState.update { it.copy(omdbIsLoading = true, omdbDetails = null) }
+
+                val omdbDetails = withContext(Dispatchers.IO) { omdbRepository.load(imdbId) }
+
+                _uiState.update { state ->
+                    val currentImdbId = state.details?.imdbId?.trim()?.lowercase(Locale.US)
+                    if (currentImdbId != imdbId) {
+                        state
+                    } else {
+                        state.copy(omdbIsLoading = false, omdbDetails = omdbDetails)
+                    }
+                }
+            }
     }
 
     private data class ProviderState(
@@ -1531,8 +1677,9 @@ class DetailsViewModel internal constructor(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val httpClient = AppHttp.client(appContext)
-                    val tmdbImdbIdResolver = TmdbImdbIdResolverProvider.get(appContext)
-                    val tmdbEnrichmentRepository = TmdbEnrichmentRepositoryProvider.get(appContext)
+                    val tmdbImdbIdResolver = TmdbServicesProvider.imdbIdResolver(appContext)
+                    val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
+                    val omdbRepository = OmdbRepositoryProvider.get(appContext)
                     val addonStreamsService =
                         AddonStreamsService(
                             context = appContext,
@@ -1541,18 +1688,14 @@ class DetailsViewModel internal constructor(
                         )
 
                     val aiSettingsStore = AiInsightsSettingsStore(appContext)
-                    val aiRepository =
-                        AiInsightsRepository(
-                            openRouterClient = OpenRouterClient(httpClient = httpClient, xTitle = "Crispy Rewrite Android"),
-                            settingsStore = aiSettingsStore,
-                            cacheStore = AiInsightsCacheStore(appContext),
-                        )
+                    val aiRepository = AiInsightsRepository.create(appContext, httpClient)
                     return DetailsViewModel(
                         itemId = itemId,
                         mediaType = mediaType,
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
                         tmdbImdbIdResolver = tmdbImdbIdResolver,
                         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
+                        omdbRepository = omdbRepository,
                         aiSettingsStore = aiSettingsStore,
                         aiRepository = aiRepository,
                         addonStreamsService = addonStreamsService,

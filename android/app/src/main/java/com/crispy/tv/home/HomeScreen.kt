@@ -1,28 +1,34 @@
 package com.crispy.tv.home
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -30,205 +36,268 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.flow.StateFlow
 
-private typealias HomeCatalogSectionStateProvider = (CatalogSectionRef) -> StateFlow<HomeCatalogSectionUi>
+private val HomeContentSectionSpacing = 24.dp
+private val HomeTopSectionSpacing = 16.dp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeRoute(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
-    onSearchClick: () -> Unit,
-    onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
+    onOpenAccountsProfiles: () -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val viewModel: HomeViewModel = viewModel(
         factory = remember(appContext) {
             HomeViewModel.factory(appContext)
         },
     )
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val headerPills by viewModel.headerPillsState.collectAsStateWithLifecycle()
+    val heroState by viewModel.heroState.collectAsStateWithLifecycle()
     val layoutState by viewModel.layoutState.collectAsStateWithLifecycle()
+    val wideRailSections by viewModel.wideRailSectionsState.collectAsStateWithLifecycle()
+    val catalogSections by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
+    val scrollBehavior = appBarScrollBehavior()
 
-    HomeScreen(
-        layoutState = layoutState,
-        heroState = viewModel.heroState,
-        continueWatchingState = viewModel.continueWatchingState,
-        upNextState = viewModel.upNextState,
-        thisWeekState = viewModel.thisWeekState,
-        catalogSectionState = viewModel::catalogSectionState,
-        onHideContinueWatchingItem = viewModel::hideContinueWatchingItem,
-        onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
-        onHeroClick = onHeroClick,
-        onContinueWatchingClick = onContinueWatchingClick,
-        onThisWeekClick = onThisWeekClick,
-        onThisWeekSeeAllClick = onThisWeekSeeAllClick,
-        onSearchClick = onSearchClick,
-        onProfileClick = onProfileClick,
-        onCatalogItemClick = onCatalogItemClick,
-        onCatalogSeeAllClick = onCatalogSeeAllClick,
-    )
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    viewModel.refreshIfStale()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            StandardTopAppBar(
+                title = {
+                    CrispyWordmark(
+                        modifier = Modifier
+                            .width(118.dp)
+                            .height(26.dp),
+                    )
+                },
+                actions = {
+                    ProfileIconButton(onClick = onOpenAccountsProfiles)
+                },
+                scrollBehavior = scrollBehavior,
+                colors = topLevelAppBarColors(),
+            )
+        },
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues),
+        ) {
+            HomeScreen(
+                isRefreshing = isRefreshing,
+                headerPills = headerPills,
+                heroState = heroState,
+                layoutState = layoutState,
+                wideRailSections = wideRailSections,
+                catalogSections = catalogSections,
+                onRefresh = viewModel::refresh,
+                onHideContinueWatchingItem = viewModel::hideContinueWatchingItem,
+                onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
+                onHeroClick = onHeroClick,
+                onContinueWatchingClick = onContinueWatchingClick,
+                onThisWeekClick = onThisWeekClick,
+                onThisWeekSeeAllClick = onThisWeekSeeAllClick,
+                onCatalogItemClick = onCatalogItemClick,
+                onCatalogSeeAllClick = onCatalogSeeAllClick,
+                scrollToTopRequests = scrollToTopRequests,
+                onScrollToTopConsumed = onScrollToTopConsumed,
+            )
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HomeScreen(
+    isRefreshing: Boolean,
+    headerPills: List<CatalogSectionRef>,
+    heroState: HeroState,
     layoutState: HomeLayoutState,
-    heroState: StateFlow<HeroState>,
-    continueWatchingState: StateFlow<HomeWatchActivityRailState>,
-    upNextState: StateFlow<HomeWatchActivityRailState>,
-    thisWeekState: StateFlow<ThisWeekState>,
-    catalogSectionState: HomeCatalogSectionStateProvider,
+    wideRailSections: Map<String, HomeWideRailSectionUi>,
+    catalogSections: Map<String, HomeCatalogSectionUi>,
+    onRefresh: () -> Unit,
     onHideContinueWatchingItem: (ContinueWatchingItem) -> Unit,
     onRemoveContinueWatchingItem: (ContinueWatchingItem) -> Unit,
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
-    onSearchClick: () -> Unit,
-    onProfileClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
+    scrollToTopRequests: StateFlow<Int>,
+    onScrollToTopConsumed: () -> Unit,
 ) {
     val horizontalPadding = responsivePageHorizontalPadding()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val pullToRefreshState = rememberPullToRefreshState()
+    val lazyListState = rememberLazyListState()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CrispyWordmark(Modifier.height(36.dp))
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            lazyListState.animateScrollToItem(0)
+            onScrollToTopConsumed()
+        }
+    }
 
-                        Box(modifier = Modifier.weight(1f))
-
-                        IconButton(onClick = onSearchClick) {
-                            Icon(
-                                imageVector = Icons.Outlined.Search,
-                                contentDescription = "Search",
-                            )
-                        }
-
-                        HomeProfileSelector(onClick = onProfileClick)
-                    }
-                },
-                scrollBehavior = scrollBehavior,
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        state = pullToRefreshState,
+        indicator = {
+            Indicator(
+                state = pullToRefreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         },
-    ) { innerPadding ->
+    ) {
         LazyColumn(
+            state = lazyListState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = horizontalPadding,
+                top = Dimensions.PageTopPadding,
                 end = horizontalPadding,
-                top = innerPadding.calculateTopPadding(),
                 bottom = Dimensions.PageBottomPadding,
             ),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing),
+            verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
         ) {
-            if (layoutState.headerSections.isNotEmpty()) {
-                item(contentType = "headerSections") {
-                    HomeHeaderSectionChips(
-                        sections = layoutState.headerSections,
+            item(key = "topHeader", contentType = "topHeader") {
+                Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
+                    HomeHeaderSectionsItem(
+                        sections = headerPills,
                         onSectionClick = onCatalogSeeAllClick,
                     )
-                }
-            }
-
-            item(contentType = "hero") {
-                HomeHeroSection(
-                    heroState = heroState,
-                    onHeroClick = onHeroClick,
-                )
-            }
-
-            if (layoutState.showContinueWatching) {
-                item(contentType = "continueWatching") {
-                    HomeContinueWatchingSection(
-                        continueWatchingState = continueWatchingState,
-                        onItemClick = onContinueWatchingClick,
-                        onHideItem = onHideContinueWatchingItem,
-                        onRemoveItem = onRemoveContinueWatchingItem,
+                    HomeHeroSection(
+                        state = heroState,
+                        onHeroClick = onHeroClick,
                     )
                 }
             }
 
-            if (layoutState.showUpNext) {
-                item(contentType = "upNext") {
-                    HomeUpNextSection(
-                        upNextState = upNextState,
-                        onItemClick = onContinueWatchingClick,
-                    )
-                }
-            }
-
-            if (layoutState.showThisWeek) {
-                item(contentType = "thisWeek") {
-                    HomeThisWeekRail(
-                        thisWeekState = thisWeekState,
-                        onItemClick = onThisWeekClick,
-                        onViewAllClick = onThisWeekSeeAllClick,
-                    )
-                }
-            }
-
-            if (layoutState.collectionSections.isNotEmpty()) {
-                item(contentType = "collections") {
-                    HomeCollectionSectionRow(
-                        sections = layoutState.collectionSections,
-                        sectionState = catalogSectionState,
-                        onCollectionClick = onCatalogSeeAllClick,
-                        onItemClick = onCatalogItemClick,
-                    )
-                }
-            }
-
-            if (!layoutState.hasCatalogSections && layoutState.catalogStatusMessage.isNotBlank()) {
-                item(contentType = "catalogStatus") {
-                    HomeCatalogStatusCard(statusMessage = layoutState.catalogStatusMessage)
-                }
-            }
-
-            if (layoutState.standardCatalogSections.isNotEmpty()) {
+            if (layoutState.blocks.isNotEmpty()) {
                 items(
-                    items = layoutState.standardCatalogSections,
+                    items = layoutState.blocks,
                     key = { it.key },
-                    contentType = { "catalogSection" },
-                ) { section ->
-                    HomeCatalogSectionItem(
-                        sectionState = catalogSectionState(section),
-                        onSeeAllClick = onCatalogSeeAllClick,
-                        onItemClick = onCatalogItemClick,
-                    )
+                    contentType = {
+                        when (it) {
+                            is HomeWideRailLayoutUi -> it.kind.name
+                            is HomeCatalogRowSectionUi -> "catalogSection"
+                            is HomeCollectionShelfSectionUi -> "collectionShelf"
+                            is HomeStatusSectionUi -> "catalogStatus"
+                        }
+                    },
+                ) { block ->
+                    when (block) {
+                        is HomeCatalogRowSectionUi -> {
+                            val sectionUi = catalogSections[block.sectionKey]
+                            if (sectionUi != null) {
+                                HomeCatalogSectionRow(
+                                    sectionUi = sectionUi,
+                                    onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
+                                    onItemClick = onCatalogItemClick,
+                                )
+                            }
+                        }
+
+                        is HomeCollectionShelfSectionUi -> {
+                            val sectionUis = block.sectionKeys.mapNotNull(catalogSections::get)
+                            if (sectionUis.isNotEmpty()) {
+                                HomeCollectionSectionRow(
+                                    sectionUis = sectionUis,
+                                    onCollectionClick = onCatalogSeeAllClick,
+                                    onCollectionPlayClick = onCatalogItemClick,
+                                    onCollectionMovieClick = onCatalogItemClick,
+                                )
+                            }
+                        }
+
+                        is HomeStatusSectionUi -> {
+                            HomeCatalogStatusCard(statusMessage = block.statusMessage)
+                        }
+
+                        is HomeWideRailLayoutUi -> {
+                            val section = wideRailSections[block.key]
+                            if (section != null) {
+                                HomeWideRailSection(
+                                    section = section,
+                                    onContinueWatchingClick = onContinueWatchingClick,
+                                    onHideContinueWatchingItem = onHideContinueWatchingItem,
+                                    onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
+                                    onThisWeekClick = onThisWeekClick,
+                                    onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
+}
+}
+
+@Composable
+private fun HomeHeaderSectionsItem(
+    sections: List<CatalogSectionRef>,
+    onSectionClick: (CatalogSectionRef) -> Unit,
+) {
+    if (sections.isEmpty()) {
+        return
     }
+    HomeHeaderSectionChips(
+        sections = sections,
+        onSectionClick = onSectionClick,
+    )
 }
 
 @Composable
 private fun HomeHeroSection(
-    heroState: StateFlow<HeroState>,
+    state: HeroState,
     onHeroClick: (HomeHeroItem) -> Unit,
 ) {
-    val state by heroState.collectAsStateWithLifecycle()
-
     when {
         state.isLoading && state.items.isEmpty() -> {
             HomeHeroSkeleton()
@@ -254,65 +323,6 @@ private fun HomeHeroSection(
 }
 
 @Composable
-private fun HomeContinueWatchingSection(
-    continueWatchingState: StateFlow<HomeWatchActivityRailState>,
-    onItemClick: (ContinueWatchingItem) -> Unit,
-    onHideItem: (ContinueWatchingItem) -> Unit,
-    onRemoveItem: (ContinueWatchingItem) -> Unit,
-) {
-    val state by continueWatchingState.collectAsStateWithLifecycle()
-
-    HomeRailSection(
-        title = "Continue Watching",
-        items = state.items,
-        statusMessage = state.statusMessage,
-        actionMenuContentDescription = "Continue watching actions",
-        onItemClick = onItemClick,
-        onHideItem = onHideItem,
-        onRemoveItem = onRemoveItem,
-        showProgressBarFor = { item -> item.progressPercent > 0 },
-        showTitleFallbackWhenNoLogo = true,
-        useBottomSheetActions = true,
-        isLoading = state.isLoading,
-    )
-}
-
-@Composable
-private fun HomeUpNextSection(
-    upNextState: StateFlow<HomeWatchActivityRailState>,
-    onItemClick: (ContinueWatchingItem) -> Unit,
-) {
-    val state by upNextState.collectAsStateWithLifecycle()
-
-    HomeRailSection(
-        title = "Up Next",
-        items = state.items,
-        statusMessage = state.statusMessage,
-        actionMenuContentDescription = "Up next details",
-        onItemClick = onItemClick,
-        showTitleFallbackWhenNoLogo = true,
-        isLoading = state.isLoading,
-    )
-}
-
-@Composable
-private fun HomeThisWeekRail(
-    thisWeekState: StateFlow<ThisWeekState>,
-    onItemClick: (CalendarEpisodeItem) -> Unit,
-    onViewAllClick: () -> Unit,
-) {
-    val state by thisWeekState.collectAsStateWithLifecycle()
-
-    ThisWeekSection(
-        items = state.items,
-        isLoading = state.isLoading,
-        statusMessage = state.statusMessage,
-        onItemClick = onItemClick,
-        onViewAllClick = onViewAllClick,
-    )
-}
-
-@Composable
 private fun HomeCatalogStatusCard(statusMessage: String) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -323,21 +333,6 @@ private fun HomeCatalogStatusCard(statusMessage: String) {
 }
 
 @Composable
-private fun HomeCatalogSectionItem(
-    sectionState: StateFlow<HomeCatalogSectionUi>,
-    onSeeAllClick: (CatalogSectionRef) -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
-) {
-    val sectionUi by sectionState.collectAsStateWithLifecycle()
-
-    HomeCatalogSectionRow(
-        sectionUi = sectionUi,
-        onSeeAllClick = { onSeeAllClick(sectionUi.section) },
-        onItemClick = onItemClick,
-    )
-}
-
-@Composable
 private fun HomeHeaderSectionChips(
     sections: List<CatalogSectionRef>,
     onSectionClick: (CatalogSectionRef) -> Unit,
@@ -345,23 +340,22 @@ private fun HomeHeaderSectionChips(
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 2.dp),
     ) {
         items(sections, key = { it.key }) { section ->
             FilterChip(
                 selected = false,
                 onClick = { onSectionClick(section) },
-                label = { Text(section.title) },
+                label = { Text(section.displayTitle) },
+                shape = RoundedCornerShape(16.dp),
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    labelColor = MaterialTheme.colorScheme.onSurface,
+                ),
             )
         }
     }
 }
 
-@Composable
-private fun HomeProfileSelector(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(
-            imageVector = Icons.Outlined.Person,
-            contentDescription = "Profile",
-        )
-    }
-}
+// End of file
