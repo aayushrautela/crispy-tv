@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -27,24 +28,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -317,7 +317,7 @@ internal fun HomeWideRailCard(
     onHideClick: (() -> Unit)? = null,
     onRemoveClick: (() -> Unit)? = null,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    var actionSheetVisible by remember { mutableStateOf(false) }
     val hasItemActions = showActions && (onHideClick != null || onRemoveClick != null)
     val artworkModel = rememberLandscapeImageModel(item.imageUrl, 280.dp)
 
@@ -326,85 +326,28 @@ internal fun HomeWideRailCard(
             Modifier.combinedClickable(
                 onClick = onClick,
                 onLongClickLabel = "Item actions",
-                onLongClick = { menuExpanded = true },
+                onLongClick = { actionSheetVisible = true },
             )
         } else {
             Modifier.clickable(onClick = onClick)
         }
 
     Column(
-        modifier = Modifier.width(280.dp),
+        modifier = Modifier
+            .width(280.dp)
+            .then(cardInteractionModifier),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LandscapeArtworkFrame(
             title = item.title,
             imageModel = artworkModel,
             onClick = null,
-            modifier = Modifier
-                .aspectRatio(16f / 9f)
-                .then(cardInteractionModifier),
+            modifier = Modifier.aspectRatio(16f / 9f),
             badgeLabel = item.badgeLabel,
             badgeAlignment = Alignment.TopEnd,
             progressFraction = item.progressFraction,
             scrimHeightFraction = if (item.progressFraction != null) 0.42f else 0f,
             scrimMaxAlpha = if (item.progressFraction != null) 0.36f else 0f,
-            topEndContent =
-                if (hasItemActions) {
-                    {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp),
-                        ) {
-                            IconButton(
-                                onClick = { menuExpanded = true },
-                                modifier = Modifier.background(
-                                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
-                                    shape = CircleShape,
-                                ),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.MoreVert,
-                                    contentDescription = "Item actions",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Details") },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onDetailsClick()
-                                    },
-                                )
-                                onRemoveClick?.let { removeAction ->
-                                    DropdownMenuItem(
-                                        text = { Text("Remove") },
-                                        onClick = {
-                                            menuExpanded = false
-                                            removeAction()
-                                        },
-                                    )
-                                }
-                                onHideClick?.let { hideAction ->
-                                    DropdownMenuItem(
-                                        text = { Text("Hide") },
-                                        onClick = {
-                                            menuExpanded = false
-                                            hideAction()
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    null
-                },
         )
 
         Text(
@@ -426,6 +369,64 @@ internal fun HomeWideRailCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+
+    if (hasItemActions && actionSheetVisible) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { actionSheetVisible = false },
+            sheetState = sheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp),
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+                ListItem(
+                    headlineContent = { Text("Details") },
+                    supportingContent = {
+                        if (item.subtitle.isNotBlank()) {
+                            Text(
+                                text = item.subtitle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    },
+                    modifier = Modifier.clickable {
+                        actionSheetVisible = false
+                        onDetailsClick()
+                    },
+                )
+                onRemoveClick?.let { removeAction ->
+                    ListItem(
+                        headlineContent = { Text("Remove") },
+                        modifier = Modifier.clickable {
+                            actionSheetVisible = false
+                            removeAction()
+                        },
+                    )
+                }
+                onHideClick?.let { hideAction ->
+                    ListItem(
+                        headlineContent = { Text("Hide") },
+                        modifier = Modifier.clickable {
+                            actionSheetVisible = false
+                            hideAction()
+                        },
+                    )
+                }
+            }
         }
     }
 

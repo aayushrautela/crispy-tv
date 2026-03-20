@@ -133,8 +133,8 @@ fun SearchTopBar(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
+                unfocusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
             ),
         )
         ProfileIconButton(onClick = onOpenAccountsProfiles)
@@ -148,20 +148,12 @@ private fun AiSearchAction(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.background(
-            color = if (isHighlighted) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-            shape = CircleShape,
-        ),
     ) {
         Icon(
             imageVector = Icons.Outlined.AutoAwesome,
             contentDescription = "AI search",
             tint = if (isHighlighted) {
-                MaterialTheme.colorScheme.onPrimaryContainer
+                MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
@@ -200,12 +192,19 @@ private fun rememberAiSearchBorderModifier(isAiLoading: Boolean): Modifier {
         val glowStrokeWidth = 10.dp.toPx()
         val inset = strokeWidth / 2f
         val glowInset = glowStrokeWidth / 2f
-        val cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
+        val cornerRadius = CornerRadius(28.dp.toPx(), 28.dp.toPx())
         val brush =
             Brush.linearGradient(
                 colors = SearchAiLoadingColors,
-                start = Offset(x = size.width * (borderSweepProgress - 1f), y = 0f),
-                end = Offset(x = size.width * borderSweepProgress, y = size.height),
+                start = Offset(
+                    x = size.width * borderSweepProgress,
+                    y = size.height * borderSweepProgress
+                ),
+                end = Offset(
+                    x = size.width * (borderSweepProgress + 1f),
+                    y = size.height * (borderSweepProgress + 1f)
+                ),
+                tileMode = androidx.compose.ui.graphics.TileMode.Repeated
             )
 
         drawRoundRect(
