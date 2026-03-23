@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,15 +19,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,14 +37,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.BuildConfig
-import com.crispy.tv.oauth.PendingOAuthStore
-import com.crispy.tv.player.ProviderAuthActionResult
-import com.crispy.tv.player.ProviderAuthStartResult
-import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.player.WatchProviderAuthState
+import com.crispy.tv.accounts.ActiveProfileStore
+import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -52,44 +49,56 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
+
+@Immutable
+data class ProviderImportUiState(
+    val connected: Boolean = false,
+    val connectionStatus: String = "Disconnected",
+    val externalUsername: String? = null,
+    val latestJobStatus: String? = null,
+    val latestJobError: String? = null,
+)
 
 @Immutable
 data class ProviderPortalUiState(
-    val traktRedirectUri: String = BuildConfig.TRAKT_REDIRECT_URI,
-    val simklRedirectUri: String = BuildConfig.SIMKL_REDIRECT_URI,
-    val statusMessage: String = "Connect providers to enable sync, continue watching, library, and comments.",
-    val authState: WatchProviderAuthState = WatchProviderAuthState(),
+    val configured: Boolean = false,
+    val isBusy: Boolean = false,
+    val statusMessage: String = "Run a backend import to populate watch history for the active profile.",
+    val activeProfileName: String? = null,
+    val activeProfileId: String? = null,
+    val trakt: ProviderImportUiState = ProviderImportUiState(),
+    val simkl: ProviderImportUiState = ProviderImportUiState(),
     val pendingExternalUrl: String? = null,
 )
 
-private data class ProviderPortalAction(
-    val label: String,
-    val onClick: () -> Unit,
+private data class ActiveProfileContext(
+    val session: SupabaseAccountClient.Session,
+    val profile: CrispyBackendClient.Profile,
 )
 
 internal class ProviderPortalViewModel(
-    private val watchHistoryService: WatchHistoryService,
-    private val pendingOAuthStore: PendingOAuthStore,
+    private val supabase: SupabaseAccountClient,
+    private val backend: CrispyBackendClient,
+    private val activeProfileStore: ActiveProfileStore,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(ProviderPortalUiState())
+    private val _uiState = MutableStateFlow(
+        ProviderPortalUiState(
+            configured = supabase.isConfigured() && backend.isConfigured(),
+        )
+    )
     val uiState: StateFlow<ProviderPortalUiState> = _uiState
 
     init {
-        refreshAuthState(
-            message = consumePendingStatusMessage(),
-            forceRefresh = false,
-        )
+        refreshImportState(forceMessage = null)
     }
 
     fun connectTrakt() {
-        launchProviderOAuth(
-            begin = { watchHistoryService.beginTraktOAuth() },
-            missingConfigMessage = "Trakt OAuth is not configured. Set TRAKT_CLIENT_ID, TRAKT_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.",
-        )
+        startImport(CrispyBackendClient.ImportProvider.TRAKT)
     }
 
-    fun disconnectTrakt() {
-        disconnectProvider(WatchProvider.TRAKT)
+    fun connectSimkl() {
+        startImport(CrispyBackendClient.ImportProvider.SIMKL)
     }
 
     fun consumePendingExternalUrl() {
@@ -105,61 +114,161 @@ internal class ProviderPortalViewModel(
         }
     }
 
-    fun connectSimkl() {
-        launchProviderOAuth(
-            begin = { watchHistoryService.beginSimklOAuth() },
-            missingConfigMessage = "Simkl OAuth is not configured. Set SIMKL_CLIENT_ID, SIMKL_REDIRECT_URI, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY.",
-        )
-    }
-
-    fun disconnectSimkl() {
-        disconnectProvider(WatchProvider.SIMKL)
-    }
-
-    fun refreshAuthState(message: String? = null, forceRefresh: Boolean = true) {
+    fun refreshImportState(forceMessage: String? = null) {
         viewModelScope.launch {
-            val result = watchHistoryService.refreshProviderAuthState(forceRefresh = forceRefresh)
-            applyActionResult(result, message)
-        }
-    }
+            _uiState.update { it.copy(isBusy = true, statusMessage = forceMessage ?: it.statusMessage) }
 
-    private fun disconnectProvider(provider: WatchProvider) {
-        viewModelScope.launch {
-            applyActionResult(watchHistoryService.disconnectProvider(provider))
-        }
-    }
-
-    private fun launchProviderOAuth(
-        begin: suspend () -> ProviderAuthStartResult?,
-        missingConfigMessage: String,
-    ) {
-        viewModelScope.launch {
-            val start = begin()
-            if (start == null) {
-                _uiState.update { it.copy(statusMessage = missingConfigMessage) }
+            val context = resolveActiveProfileContext()
+            if (context == null) {
                 return@launch
             }
+
+            val connectionsResult = runCatching {
+                backend.listImportConnections(context.session.accessToken, context.profile.id)
+            }
+            val jobsResult = runCatching {
+                backend.listImportJobs(context.session.accessToken, context.profile.id)
+            }
+
+            val connections = connectionsResult.getOrNull()
+            val jobs = jobsResult.getOrNull()
+            val errorMessage =
+                connectionsResult.exceptionOrNull()?.message
+                    ?: jobsResult.exceptionOrNull()?.message
+
             _uiState.update {
                 it.copy(
-                    statusMessage = start.statusMessage,
-                    pendingExternalUrl = start.authorizationUrl,
+                    isBusy = false,
+                    activeProfileId = context.profile.id,
+                    activeProfileName = context.profile.name,
+                    trakt = buildProviderState("trakt", connections?.connections, jobs?.jobs),
+                    simkl = buildProviderState("simkl", connections?.connections, jobs?.jobs),
+                    statusMessage =
+                        forceMessage
+                            ?: errorMessage
+                            ?: "Imports run against ${context.profile.name}. Disconnect is temporarily unavailable until a backend revoke route exists.",
                 )
             }
         }
     }
 
-    private fun applyActionResult(result: ProviderAuthActionResult, messageOverride: String? = null) {
-        _uiState.update { current ->
-            current.copy(
-                authState = result.authState,
-                statusMessage = messageOverride ?: result.statusMessage.ifBlank { current.statusMessage },
-            )
+    private fun startImport(provider: CrispyBackendClient.ImportProvider) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
+            val context = resolveActiveProfileContext() ?: return@launch
+            val started =
+                runCatching {
+                    backend.startImport(
+                        accessToken = context.session.accessToken,
+                        profileId = context.profile.id,
+                        provider = provider,
+                    )
+                }
+
+            val result = started.getOrNull()
+            if (result == null) {
+                _uiState.update {
+                    it.copy(
+                        isBusy = false,
+                        statusMessage = started.exceptionOrNull()?.message.orEmpty(),
+                    )
+                }
+                return@launch
+            }
+
+            val providerLabel = providerLabel(provider.apiValue)
+            val message =
+                when (result.nextAction) {
+                    "authorize_provider" ->
+                        "Continue in your browser to authorize $providerLabel. The backend will queue the import after approval."
+                    else -> "$providerLabel import queued for ${context.profile.name}."
+                }
+
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    pendingExternalUrl = result.authUrl,
+                    statusMessage = message,
+                )
+            }
+            refreshImportState(forceMessage = message)
         }
     }
 
-    private fun consumePendingStatusMessage(): String {
-        return pendingOAuthStore.consumePendingErrorMessage()
-            ?: "Connect providers to enable sync, continue watching, library, and comments."
+    private suspend fun resolveActiveProfileContext(): ActiveProfileContext? {
+        if (!supabase.isConfigured() || !backend.isConfigured()) {
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    configured = false,
+                    statusMessage = "Set SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, and CRISPY_BACKEND_URL before using provider imports.",
+                )
+            }
+            return null
+        }
+
+        val session = runCatching { supabase.ensureValidSession() }.getOrNull()
+        if (session == null) {
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    activeProfileId = null,
+                    activeProfileName = null,
+                    statusMessage = "Sign in and select a profile before starting provider imports.",
+                )
+            }
+            return null
+        }
+
+        val me = runCatching { backend.getMe(session.accessToken) }.getOrElse { error ->
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    statusMessage = error.message.orEmpty(),
+                )
+            }
+            return null
+        }
+
+        val userKey = me.user.supabaseAuthUserId ?: session.userId ?: me.user.id
+        val storedProfileId = activeProfileStore.getActiveProfileId(userKey)
+        val profile = me.profiles.firstOrNull { it.id == storedProfileId } ?: me.profiles.firstOrNull()
+        if (profile == null) {
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    activeProfileId = null,
+                    activeProfileName = null,
+                    statusMessage = "Create and select a profile before starting provider imports.",
+                )
+            }
+            return null
+        }
+
+        if (profile.id != storedProfileId) {
+            activeProfileStore.setActiveProfileId(userKey, profile.id)
+        }
+
+        return ActiveProfileContext(
+            session = session,
+            profile = profile,
+        )
+    }
+
+    private fun buildProviderState(
+        provider: String,
+        connections: List<CrispyBackendClient.ImportConnection>?,
+        jobs: List<CrispyBackendClient.ImportJob>?,
+    ): ProviderImportUiState {
+        val connection = connections.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
+        val latestJob = jobs.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
+        return ProviderImportUiState(
+            connected = connection?.status.equals("connected", ignoreCase = true),
+            connectionStatus = connection?.status?.toDisplayLabel() ?: "Disconnected",
+            externalUsername = connection?.externalUsername,
+            latestJobStatus = latestJob?.status?.toDisplayLabel(),
+            latestJobError = latestJob?.errorMessage,
+        )
     }
 
     companion object {
@@ -170,8 +279,9 @@ internal class ProviderPortalViewModel(
                     if (modelClass.isAssignableFrom(ProviderPortalViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return ProviderPortalViewModel(
-                            watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                            pendingOAuthStore = PendingOAuthStore(appContext),
+                            supabase = SupabaseServicesProvider.accountClient(appContext),
+                            backend = BackendServicesProvider.backendClient(appContext),
+                            activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -199,7 +309,7 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(launchUrl)))
         }
         if (launchResult.isFailure) {
-            viewModel.onExternalLaunchFailed("Unable to open browser for provider OAuth.")
+            viewModel.onExternalLaunchFailed("Unable to open browser for provider authorization.")
         } else {
             viewModel.consumePendingExternalUrl()
         }
@@ -208,10 +318,8 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
     ProviderAuthPortalScreen(
         uiState = uiState,
         onConnectTrakt = viewModel::connectTrakt,
-        onDisconnectTrakt = viewModel::disconnectTrakt,
         onConnectSimkl = viewModel::connectSimkl,
-        onDisconnectSimkl = viewModel::disconnectSimkl,
-        onRefresh = { viewModel.refreshAuthState(forceRefresh = true) },
+        onRefresh = { viewModel.refreshImportState() },
         onBack = onBack,
     )
 }
@@ -221,9 +329,7 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
 private fun ProviderAuthPortalScreen(
     uiState: ProviderPortalUiState,
     onConnectTrakt: () -> Unit,
-    onDisconnectTrakt: () -> Unit,
     onConnectSimkl: () -> Unit,
-    onDisconnectSimkl: () -> Unit,
     onRefresh: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -233,7 +339,7 @@ private fun ProviderAuthPortalScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
-                title = "Providers",
+                title = "Provider Imports",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -243,7 +349,7 @@ private fun ProviderAuthPortalScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onRefresh) {
+                    IconButton(onClick = onRefresh, enabled = uiState.configured && !uiState.isBusy) {
                         Icon(
                             imageVector = Icons.Outlined.Refresh,
                             contentDescription = "Refresh",
@@ -274,44 +380,45 @@ private fun ProviderAuthPortalScreen(
                 )
             }
 
-            item {
-                ProviderCard(
-                    title = "Trakt",
-                    connected = uiState.authState.traktAuthenticated,
-                    userHandle = uiState.authState.traktSession?.userHandle,
-                    expiresAtEpochMs = uiState.authState.traktSession?.expiresAtEpochMs,
-                    connectAction = ProviderPortalAction("Connect Trakt OAuth", onConnectTrakt),
-                    disconnectAction = ProviderPortalAction("Disconnect Trakt", onDisconnectTrakt),
-                )
+            if (!uiState.activeProfileName.isNullOrBlank()) {
+                item {
+                    Text(
+                        text = "Active profile: ${uiState.activeProfileName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
 
             item {
-                Text(
-                    text = "Trakt redirect URI: ${uiState.traktRedirectUri}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ProviderCard(
+                    title = "Trakt",
+                    state = uiState.trakt,
+                    actionLabel = if (uiState.trakt.connected) "Run import" else "Connect & import",
+                    actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
+                    onAction = onConnectTrakt,
                 )
             }
 
             item {
                 ProviderCard(
                     title = "Simkl",
-                    connected = uiState.authState.simklAuthenticated,
-                    userHandle = uiState.authState.simklSession?.userHandle,
-                    expiresAtEpochMs = null,
-                    connectAction = ProviderPortalAction("Connect Simkl OAuth", onConnectSimkl),
-                    disconnectAction = ProviderPortalAction("Disconnect Simkl", onDisconnectSimkl),
+                    state = uiState.simkl,
+                    actionLabel = if (uiState.simkl.connected) "Run import" else "Connect & import",
+                    actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
+                    onAction = onConnectSimkl,
                 )
             }
 
             item {
-                Text(
-                    text = "Simkl redirect URI: ${uiState.simklRedirectUri}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                OutlinedButton(
+                    onClick = onRefresh,
+                    enabled = uiState.configured && !uiState.isBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Refresh import status")
+                }
             }
-
         }
     }
 }
@@ -319,11 +426,10 @@ private fun ProviderAuthPortalScreen(
 @Composable
 private fun ProviderCard(
     title: String,
-    connected: Boolean,
-    userHandle: String?,
-    expiresAtEpochMs: Long?,
-    connectAction: ProviderPortalAction,
-    disconnectAction: ProviderPortalAction,
+    state: ProviderImportUiState,
+    actionLabel: String,
+    actionEnabled: Boolean,
+    onAction: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -338,33 +444,64 @@ private fun ProviderCard(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = if (connected) "Connected" else "Disconnected",
+                text = state.connectionStatus,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (state.connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (!userHandle.isNullOrBlank()) {
+            if (!state.externalUsername.isNullOrBlank()) {
                 Text(
-                    text = "User: $userHandle",
+                    text = "Connected account: ${state.externalUsername}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (expiresAtEpochMs != null) {
+            if (!state.latestJobStatus.isNullOrBlank()) {
                 Text(
-                    text = "Token expiry: $expiresAtEpochMs",
+                    text = "Latest import: ${state.latestJobStatus}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = connectAction.onClick) {
-                    Text(connectAction.label)
-                }
-                Button(onClick = disconnectAction.onClick) {
-                    Text(disconnectAction.label)
-                }
+            if (!state.latestJobError.isNullOrBlank()) {
+                Text(
+                    text = state.latestJobError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            Text(
+                text = "Disconnect is not available on the backend yet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onAction,
+                enabled = actionEnabled,
+            ) {
+                Text(actionLabel)
             }
         }
+    }
+}
+
+private fun String.toDisplayLabel(): String {
+    return trim()
+        .replace('_', ' ')
+        .lowercase(Locale.US)
+        .split(' ')
+        .filter { it.isNotBlank() }
+        .joinToString(separator = " ") { word ->
+            word.replaceFirstChar { char ->
+                if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString()
+            }
+        }
+        .ifBlank { this }
+}
+
+private fun providerLabel(provider: String): String {
+    return when (provider.lowercase(Locale.US)) {
+        "trakt" -> "Trakt"
+        "simkl" -> "Simkl"
+        else -> provider.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
     }
 }

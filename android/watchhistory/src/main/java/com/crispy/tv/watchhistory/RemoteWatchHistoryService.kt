@@ -24,22 +24,16 @@ import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
-import com.crispy.tv.watchhistory.auth.ProviderSessionBackendClient
 import com.crispy.tv.watchhistory.auth.ProviderSessionStore
 import com.crispy.tv.watchhistory.cache.WatchHistoryCache
 import com.crispy.tv.watchhistory.local.LocalWatchHistoryStore
-import com.crispy.tv.watchhistory.oauth.OAuthCallbackParser
-import com.crispy.tv.watchhistory.oauth.OAuthStateStore
-import com.crispy.tv.watchhistory.oauth.Pkce
 import com.crispy.tv.watchhistory.provider.ProviderRouter
-import com.crispy.tv.watchhistory.simkl.SimklOAuthClient
 import com.crispy.tv.watchhistory.simkl.SimklService
 import com.crispy.tv.watchhistory.simkl.SimklWatchHistoryProvider
 import com.crispy.tv.watchhistory.progress.WatchProgress
 import com.crispy.tv.watchhistory.progress.WatchProgressStore
 import com.crispy.tv.watchhistory.progress.UnsyncedProgressItem
 import com.crispy.tv.watchhistory.trakt.TraktApi
-import com.crispy.tv.watchhistory.trakt.TraktOAuthClient
 import com.crispy.tv.watchhistory.trakt.TraktScrobbleService
 import com.crispy.tv.watchhistory.trakt.TraktWatchHistoryProvider
 import kotlinx.coroutines.delay
@@ -55,12 +49,8 @@ class RemoteWatchHistoryService(
     private val simklClientId: String,
     private val episodeListProvider: EpisodeListProvider,
     private val config: WatchHistoryConfig = WatchHistoryConfig(),
-    private val providerSessionAccessTokenProvider: suspend () -> String? = { null },
-    private val providerSessionProfileIdProvider: suspend () -> String? = { null },
 ) : WatchHistoryService {
     private val appContext = context.applicationContext
-    private val traktRedirectUri = config.traktRedirectUri
-    private val simklRedirectUri = config.simklRedirectUri
     private val appVersion = config.appVersion.trim().ifEmpty { "dev" }
 
     private val watchHistoryCache = WatchHistoryCache(appContext)
@@ -72,56 +62,23 @@ class RemoteWatchHistoryService(
         )
 
     private val http = WatchHistoryHttp(httpClient = httpClient, tag = TAG)
-    private val sessionBackend =
-        ProviderSessionBackendClient(
-            http = http,
-            supabaseUrl = config.supabaseUrl,
-            publishableKey = config.supabasePublishableKey,
-            accessTokenProvider = providerSessionAccessTokenProvider,
-            profileIdProvider = providerSessionProfileIdProvider,
-        )
     private val simklService =
         SimklService(
             http = http,
             sessionStore = sessionStore,
             simklClientId = simklClientId,
-            simklRedirectUri = simklRedirectUri,
+            simklRedirectUri = "",
             appVersion = appVersion,
-            onTokenExpired = { resolveProviderAccessToken(WatchProvider.SIMKL, forceRefresh = true) },
+            onTokenExpired = { null },
         )
     private val traktApi =
         TraktApi(
             http = http,
             traktClientId = traktClientId,
             readAccessToken = { sessionStore.traktAccessToken() },
-            onTokenExpired = { resolveProviderAccessToken(WatchProvider.TRAKT, forceRefresh = true) },
+            onTokenExpired = { null },
         )
     private val traktScrobbleService = TraktScrobbleService(traktApi = traktApi)
-
-    private val pkce = Pkce()
-    private val callbackParser = OAuthCallbackParser()
-    private val oauthStateStore = OAuthStateStore(sessionStore.prefs)
-    private val traktOAuthClient =
-        TraktOAuthClient(
-            traktClientId = traktClientId,
-            traktRedirectUri = traktRedirectUri,
-            sessionBackend = sessionBackend,
-            sessionStore = sessionStore,
-            stateStore = oauthStateStore,
-            callbackParser = callbackParser,
-            pkce = pkce,
-        )
-    private val simklOAuthClient =
-        SimklOAuthClient(
-            simklClientId = simklClientId,
-            simklRedirectUri = simklRedirectUri,
-            sessionBackend = sessionBackend,
-            simklService = simklService,
-            sessionStore = sessionStore,
-            stateStore = oauthStateStore,
-            callbackParser = callbackParser,
-            pkce = pkce,
-        )
 
     private val traktProvider =
         TraktWatchHistoryProvider(
@@ -148,38 +105,9 @@ class RemoteWatchHistoryService(
     }
 
     override suspend fun refreshProviderAuthState(forceRefresh: Boolean): ProviderAuthActionResult {
-        if (!sessionBackend.isConfigured()) {
-            return ProviderAuthActionResult(
-                success = false,
-                statusMessage = "Provider auth requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.",
-                authState = authState(),
-            )
-        }
-
-        if (!forceRefresh) {
-            return ProviderAuthActionResult(
-                success = true,
-                statusMessage = "",
-                authState = authState(),
-            )
-        }
-
-        val sessionToken = providerSessionAccessTokenProvider()?.trim().orEmpty()
-        val profileId = providerSessionProfileIdProvider()?.trim().orEmpty()
-        if (sessionToken.isBlank() || profileId.isBlank()) {
-            return ProviderAuthActionResult(
-                success = true,
-                statusMessage = "",
-                authState = authState(),
-            )
-        }
-
-        val traktError = refreshProviderSession(provider = WatchProvider.TRAKT, forceRefresh = forceRefresh)
-        val simklError = refreshProviderSession(provider = WatchProvider.SIMKL, forceRefresh = forceRefresh)
-        val message = listOfNotNull(traktError, simklError).joinToString(separator = " ")
         return ProviderAuthActionResult(
-            success = message.isBlank(),
-            statusMessage = message,
+            success = !forceRefresh,
+            statusMessage = if (forceRefresh) "Legacy provider session refresh is disabled until watch sync moves to backend /v1 APIs." else "",
             authState = authState(),
         )
     }
@@ -188,57 +116,35 @@ class RemoteWatchHistoryService(
         if (provider == WatchProvider.LOCAL) {
             return ProviderAuthActionResult(success = false, statusMessage = "Local provider does not support disconnect.", authState = authState())
         }
-        if (!sessionBackend.isConfigured()) {
-            return ProviderAuthActionResult(
-                success = false,
-                statusMessage = "Provider auth requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.",
-                authState = authState(),
-            )
-        }
-
-        val result = sessionBackend.disconnectProviderSession(provider)
-        if (result.success) {
-            sessionStore.disconnectProvider(provider)
-        }
         return ProviderAuthActionResult(
-            success = result.success,
-            statusMessage = result.errorMessage ?: if (result.success) "Disconnected ${providerLabel(provider)}." else "Provider disconnect failed.",
+            success = false,
+            statusMessage = "${providerLabel(provider)} disconnect is temporarily unavailable until backend revoke support exists.",
             authState = authState(),
         )
     }
 
     override suspend fun beginTraktOAuth(): ProviderAuthStartResult? {
-        if (traktClientId.isBlank()) return null
-        if (traktRedirectUri.isBlank()) return null
-        if (!sessionBackend.isConfigured()) return null
-        return traktOAuthClient.begin()
+        return null
     }
 
     override suspend fun completeTraktOAuth(callbackUri: String): ProviderAuthActionResult {
-        if (traktClientId.isBlank()) {
-            return ProviderAuthActionResult(success = false, statusMessage = "Missing TRAKT_CLIENT_ID.")
-        }
-        if (config.supabaseUrl.trim().isBlank() || config.supabasePublishableKey.trim().isBlank()) {
-            return ProviderAuthActionResult(success = false, statusMessage = "Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY.")
-        }
-        return traktOAuthClient.complete(callbackUri)
+        return ProviderAuthActionResult(
+            success = false,
+            statusMessage = "Trakt OAuth completion is disabled. Use backend provider imports instead.",
+            authState = authState(),
+        )
     }
 
     override suspend fun beginSimklOAuth(): ProviderAuthStartResult? {
-        if (simklClientId.isBlank()) return null
-        if (simklRedirectUri.isBlank()) return null
-        if (!sessionBackend.isConfigured()) return null
-        return simklOAuthClient.begin()
+        return null
     }
 
     override suspend fun completeSimklOAuth(callbackUri: String): ProviderAuthActionResult {
-        if (simklClientId.isBlank()) {
-            return ProviderAuthActionResult(success = false, statusMessage = "Missing SIMKL_CLIENT_ID.")
-        }
-        if (config.supabaseUrl.trim().isBlank() || config.supabasePublishableKey.trim().isBlank()) {
-            return ProviderAuthActionResult(success = false, statusMessage = "Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY.")
-        }
-        return simklOAuthClient.complete(callbackUri)
+        return ProviderAuthActionResult(
+            success = false,
+            statusMessage = "Simkl OAuth completion is disabled. Use backend provider imports instead.",
+            authState = authState(),
+        )
     }
 
     override suspend fun listLocalHistory(limit: Int): WatchHistoryResult {
@@ -1464,37 +1370,6 @@ class RemoteWatchHistoryService(
         }
 
         return records
-    }
-
-    private suspend fun refreshProviderSession(provider: WatchProvider, forceRefresh: Boolean): String? {
-        val resolved = sessionBackend.resolveProviderSession(provider = provider, forceRefresh = forceRefresh)
-        val session = resolved.session
-        return if (session == null) {
-            if (resolved.errorMessage == null) {
-                sessionStore.disconnectProvider(provider)
-            }
-            resolved.errorMessage
-        } else {
-            sessionStore.connectProvider(
-                provider = provider,
-                accessToken = session.accessToken,
-                expiresAtEpochMs = session.expiresAtEpochMs,
-                userHandle = session.userHandle,
-            )
-            null
-        }
-    }
-
-    private suspend fun resolveProviderAccessToken(provider: WatchProvider, forceRefresh: Boolean): String? {
-        val error = refreshProviderSession(provider = provider, forceRefresh = forceRefresh)
-        if (error != null) {
-            return null
-        }
-        return when (provider) {
-            WatchProvider.TRAKT -> sessionStore.traktAccessToken().ifBlank { null }
-            WatchProvider.SIMKL -> sessionStore.simklAccessToken().ifBlank { null }
-            WatchProvider.LOCAL -> null
-        }
     }
 
     private fun providerLabel(provider: WatchProvider): String {

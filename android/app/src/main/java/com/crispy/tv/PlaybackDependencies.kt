@@ -60,8 +60,6 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
     val httpClient = AppHttp.client(appContext)
-    val supabase = SupabaseServicesProvider.accountClient(appContext)
-    val activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext)
     val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
     val episodeListProvider = TmdbEpisodeListProvider(
         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
@@ -74,22 +72,8 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
         episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(
-                traktRedirectUri = BuildConfig.TRAKT_REDIRECT_URI,
-                simklRedirectUri = BuildConfig.SIMKL_REDIRECT_URI,
-                supabaseUrl = BuildConfig.SUPABASE_URL,
-                supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
                 appVersion = BuildConfig.VERSION_NAME,
             ),
-        providerSessionAccessTokenProvider = {
-            runCatching { supabase.ensureValidSession()?.accessToken }.getOrNull()
-        },
-        providerSessionProfileIdProvider = {
-            val session = runCatching { supabase.ensureValidSession() }.getOrNull()
-            session?.userId
-                ?.let { userId -> activeProfileStore.getActiveProfileId(userId) }
-                ?.trim()
-                ?.ifBlank { null }
-        },
     )
 }
 

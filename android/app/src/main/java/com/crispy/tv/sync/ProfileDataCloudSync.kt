@@ -3,6 +3,7 @@ package com.crispy.tv.sync
 import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.settings.AiInsightsSettings
 import com.crispy.tv.settings.AiInsightsSettingsStore
@@ -15,6 +16,7 @@ import com.crispy.tv.settings.PLAYBACK_SETTINGS_PREFS_NAME
 class ProfileDataCloudSync(
     private val context: Context,
     private val supabase: SupabaseAccountClient,
+    private val backend: CrispyBackendClient,
     private val activeProfileStore: ActiveProfileStore = ActiveProfileStore(context),
     private val aiInsightsSettingsStore: AiInsightsSettingsStore = AiInsightsSettingsStore(context),
     private val omdbSettingsStore: OmdbSettingsStore = OmdbSettingsStore(context),
@@ -60,13 +62,13 @@ class ProfileDataCloudSync(
         val trimmedProfileId = profileId.trim()
         if (trimmedProfileId.isBlank()) return
 
-        val remote = supabase.getProfileData(accessToken, trimmedProfileId)
+        val remote = backend.getProfileSettings(accessToken, trimmedProfileId)
         shadowStore.write(
             ProfileDataShadowStore.Snapshot(
                 profileId = trimmedProfileId,
                 settings = remote.settings,
-                catalogPrefs = remote.catalogPrefs,
-                updatedAt = remote.updatedAt
+                catalogPrefs = emptyMap(),
+                updatedAt = null,
             )
         )
 
@@ -80,22 +82,21 @@ class ProfileDataCloudSync(
         val baseline =
             shadowStore.read(trimmedProfileId)
                 ?: run {
-                    val remote = supabase.getProfileData(accessToken, trimmedProfileId)
+                    val remote = backend.getProfileSettings(accessToken, trimmedProfileId)
                     ProfileDataShadowStore.Snapshot(
                         profileId = trimmedProfileId,
                         settings = remote.settings,
-                        catalogPrefs = remote.catalogPrefs,
-                        updatedAt = remote.updatedAt
+                        catalogPrefs = emptyMap(),
+                        updatedAt = null,
                     ).also { shadowStore.write(it) }
                 }
 
         val nextSettings = buildSettingsForCloud(baseline.settings)
 
-        supabase.upsertProfileData(
+        backend.patchProfileSettings(
             accessToken = accessToken,
             profileId = trimmedProfileId,
             settings = nextSettings,
-            catalogPrefs = baseline.catalogPrefs,
         )
 
         shadowStore.write(

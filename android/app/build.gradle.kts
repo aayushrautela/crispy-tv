@@ -38,6 +38,11 @@ val supabasePublishableKey =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
+val crispyBackendUrl =
+    (providers.gradleProperty("CRISPY_BACKEND_URL").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 val introDbApiUrl =
     (providers.gradleProperty("INTRODB_API_URL").orNull ?: "https://api.introdb.app")
         .replace("\\", "\\\\")
@@ -76,6 +81,7 @@ android {
         buildConfigField("String", "SIMKL_REDIRECT_URI", "\"$simklRedirectUri\"")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
+        buildConfigField("String", "CRISPY_BACKEND_URL", "\"$crispyBackendUrl\"")
         buildConfigField("String", "INTRODB_API_URL", "\"$introDbApiUrl\"")
         buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
