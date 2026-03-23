@@ -11,6 +11,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -21,16 +22,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import coil.compose.AsyncImage
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
 
 private val ProfileIconButtonSize = 48.dp
 private val ProfileIconContainerSize = 36.dp
@@ -41,13 +43,15 @@ fun ProfileIconButton(onClick: () -> Unit) {
     val appContext = remember(context) { context.applicationContext }
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshKey by remember { mutableIntStateOf(0) }
-    val avatarUrl by produceState<String?>(initialValue = null, appContext, refreshKey) {
+    val profileName by produceState<String?>(initialValue = null, appContext, refreshKey) {
         val supabase = SupabaseServicesProvider.accountClient(appContext)
+        val backend = BackendServicesProvider.backendClient(appContext)
         val activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext)
         value =
             runCatching {
                 val session = supabase.ensureValidSession() ?: supabase.currentSession() ?: return@runCatching null
-                val userId = session.userId?.trim().orEmpty()
+                val me = backend.getMe(session.accessToken)
+                val userId = (me.user.supabaseAuthUserId ?: session.userId ?: me.user.id).trim()
                 if (userId.isBlank()) {
                     return@runCatching null
                 }
@@ -57,19 +61,19 @@ fun ProfileIconButton(onClick: () -> Unit) {
                     return@runCatching null
                 }
 
-                val membership = supabase.ensureHouseholdMembership(session.accessToken)
-                val profile =
-                    supabase.listProfiles(session.accessToken, membership.householdId)
-                        .firstOrNull { it.id == activeProfileId }
-                supabase.resolveAvatarUrl(profile?.avatar)
+                me.profiles.firstOrNull { it.id == activeProfileId }?.name
             }.getOrNull()
     }
-    val avatarModel = rememberCrispyImageModel(
-        url = avatarUrl,
-        width = ProfileIconContainerSize,
-        height = ProfileIconContainerSize,
-        enableCrossfade = true,
-    )
+    val initials = remember(profileName) {
+        profileName
+            ?.trim()
+            ?.split(Regex("\\s+"))
+            ?.filter { it.isNotBlank() }
+            ?.take(2)
+            ?.mapNotNull { it.firstOrNull()?.uppercaseChar() }
+            ?.joinToString(separator = "")
+            ?.ifBlank { null }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer =
@@ -96,15 +100,22 @@ fun ProfileIconButton(onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             tonalElevation = 0.dp,
         ) {
-            if (avatarModel != null) {
-                AsyncImage(
-                    model = avatarModel,
-                    contentDescription = null,
+            if (!initials.isNullOrBlank()) {
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
                         .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = initials,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             } else {
                 Box(
                     modifier = Modifier

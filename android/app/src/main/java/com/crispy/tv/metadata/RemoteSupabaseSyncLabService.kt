@@ -8,134 +8,38 @@ import com.crispy.tv.player.SupabaseSyncLabService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+@Suppress("UNUSED_PARAMETER")
 class RemoteSupabaseSyncLabService(
     context: Context,
     private val supabase: SupabaseAccountClient,
     addonManifestUrlsCsv: String,
 ) : SupabaseSyncLabService {
-    private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
-
     override suspend fun initialize(): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
-        if (!supabase.isConfigured()) {
-            return@withContext result("Supabase sync is not configured. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.")
-        }
-
-        val session = supabase.ensureValidSession()
-        if (session == null) {
-            return@withContext result("Supabase configured. Sign in to enable cloud sync.")
-        }
-
-        runCatching {
-            pullAllInternal(session.accessToken)
-        }.fold(
-            onSuccess = { pulled ->
-                result(
-                    message = pulled.status,
-                    pulledAddons = pulled.addons,
-                    pulledWatchedItems = pulled.watched,
-                )
-            },
-            onFailure = { error ->
-                result("Supabase session restored, but startup pull failed: ${error.message ?: "unknown error"}")
-            },
-        )
+        result("Sync Lab is temporarily disabled until addon sync moves to backend APIs.")
     }
 
     override suspend fun signUpWithEmail(email: String, password: String): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
-        if (!supabase.isConfigured()) {
-            return@withContext result("Supabase sync is not configured.")
-        }
-
-        val normalizedEmail = email.trim()
-        val normalizedPassword = password.trim()
-        if (normalizedEmail.isEmpty() || normalizedPassword.isEmpty()) {
-            return@withContext result("Email and password are required for sign-up.")
-        }
-
-        runCatching {
-            val signUp = supabase.signUpWithEmail(normalizedEmail, normalizedPassword)
-            signUp.message
-        }.fold(
-            onSuccess = { message -> result(message) },
-            onFailure = { error -> result("Supabase sign-up failed: ${error.message ?: "unknown error"}") },
-        )
+        result("Sync Lab sign-up is disabled until addon sync moves to backend APIs.")
     }
 
     override suspend fun signInWithEmail(email: String, password: String): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
-        if (!supabase.isConfigured()) {
-            return@withContext result("Supabase sync is not configured.")
-        }
-
-        val normalizedEmail = email.trim()
-        val normalizedPassword = password.trim()
-        if (normalizedEmail.isEmpty() || normalizedPassword.isEmpty()) {
-            return@withContext result("Email and password are required for sign-in.")
-        }
-
-        runCatching {
-            supabase.signInWithEmail(normalizedEmail, normalizedPassword)
-            "Supabase sign-in successful."
-        }.fold(
-            onSuccess = { message -> result(message) },
-            onFailure = { error -> result("Supabase sign-in failed: ${error.message ?: "unknown error"}") },
-        )
+        result("Sync Lab sign-in is disabled until addon sync moves to backend APIs.")
     }
 
     override suspend fun signOut(): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
-        runCatching { supabase.signOut() }
-        result("Signed out from Supabase sync.")
+        result("Sync Lab sign-out is disabled because Sync Lab is temporarily unavailable.")
     }
 
     override suspend fun pushAllLocalData(): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
-        if (!supabase.isConfigured()) {
-            return@withContext result("Supabase sync is not configured.")
-        }
-
-        val session = supabase.ensureValidSession()
-            ?: return@withContext result("Sign in to Supabase before pushing local data.")
-
-        runCatching {
-            pushAllInternal(session.accessToken)
-        }.fold(
-            onSuccess = { pushed ->
-                result(
-                    message = pushed.status,
-                    pushedAddons = pushed.addons,
-                    pushedWatchedItems = pushed.watched,
-                )
-            },
-            onFailure = { error ->
-                result("Supabase push failed: ${error.message ?: "unknown error"}")
-            },
-        )
+        result("Sync Lab push is disabled until addon sync moves to backend APIs.")
     }
 
     override suspend fun pullAllToLocal(): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
-        if (!supabase.isConfigured()) {
-            return@withContext result("Supabase sync is not configured.")
-        }
-
-        val session = supabase.ensureValidSession()
-            ?: return@withContext result("Sign in to Supabase before pulling cloud data.")
-
-        runCatching {
-            pullAllInternal(session.accessToken)
-        }.fold(
-            onSuccess = { pulled ->
-                result(
-                    message = pulled.status,
-                    pulledAddons = pulled.addons,
-                    pulledWatchedItems = pulled.watched,
-                )
-            },
-            onFailure = { error ->
-                result("Supabase pull failed: ${error.message ?: "unknown error"}")
-            },
-        )
+        result("Sync Lab pull is disabled until addon sync moves to backend APIs.")
     }
 
     override suspend fun syncNow(): SupabaseSyncLabResult {
-        return pullAllToLocal()
+        return result("Sync Lab is disabled until addon sync moves to backend APIs.")
     }
 
     override suspend fun generateSyncCode(pin: String): SupabaseSyncLabResult = withContext(Dispatchers.IO) {
@@ -157,51 +61,6 @@ class RemoteSupabaseSyncLabService(
         )
     }
 
-    private suspend fun pushAllInternal(accessToken: String): SyncCounts {
-        val pushedAddons = pushAddons(accessToken)
-        val pushedWatched = 0
-        return SyncCounts(
-            status = "Pushed $pushedAddons addon rows. Watched sync not implemented.",
-            addons = pushedAddons,
-            watched = pushedWatched,
-        )
-    }
-
-    private suspend fun pullAllInternal(accessToken: String): SyncCounts {
-        val pulledAddons = pullAddons(accessToken)
-        val pulledWatched = 0
-        return SyncCounts(
-            status = "Pulled $pulledAddons addon rows. Watched sync not implemented.",
-            addons = pulledAddons,
-            watched = pulledWatched,
-        )
-    }
-
-    private suspend fun pushAddons(accessToken: String): Int {
-        val localRows = addonRegistry.exportCloudAddons()
-        val addons =
-            localRows.map {
-                SupabaseAccountClient.HouseholdAddon(
-                    url = it.manifestUrl,
-                    enabled = true,
-                    name = null,
-                )
-            }
-        supabase.replaceHouseholdAddons(accessToken, addons)
-        return localRows.size
-    }
-
-    private suspend fun pullAddons(accessToken: String): Int {
-        val rows =
-            supabase.getHouseholdAddons(accessToken)
-                .filter { it.enabled }
-                .mapIndexed { index, addon ->
-                    CloudAddonRow(manifestUrl = addon.url, sortOrder = index)
-                }
-        addonRegistry.reconcileCloudAddons(rows)
-        return rows.size
-    }
-
     private fun result(
         message: String,
         syncCode: String? = null,
@@ -221,9 +80,3 @@ class RemoteSupabaseSyncLabService(
         )
     }
 }
-
-private data class SyncCounts(
-    val status: String,
-    val addons: Int,
-    val watched: Int,
-)

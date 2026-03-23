@@ -47,6 +47,8 @@ import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
@@ -71,8 +73,7 @@ data class AccountsProfilesUiState(
     val userId: String? = null,
     val email: String? = null,
     val householdId: String? = null,
-    val householdRole: String? = null,
-    val profiles: List<SupabaseAccountClient.Profile> = emptyList(),
+    val profiles: List<CrispyBackendClient.Profile> = emptyList(),
     val activeProfileId: String? = null,
     val newProfileNameInput: String = "",
 )
@@ -124,12 +125,12 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
                             Text(
-                                text = "Supabase is not configured.",
+                                text = "Account services are not configured.",
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in your Gradle properties.",
+                                text = "Set SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, and CRISPY_BACKEND_URL in your Gradle properties.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -223,7 +224,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                             if (!uiState.householdId.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Household: ${uiState.householdId} (${uiState.householdRole ?: ""})",
+                                    text = "Household: ${uiState.householdId}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -276,7 +277,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                             headlineContent = { Text(profile.name) },
                             supportingContent = {
                                 Text(
-                                    text = "Order ${profile.orderIndex}",
+                                    text = "Order ${profile.sortOrder}",
                                     maxLines = 1
                                 )
                             },
@@ -324,12 +325,13 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
 
 internal class AccountsProfilesViewModel(
     private val supabase: SupabaseAccountClient,
+    private val backend: CrispyBackendClient,
     private val profileStore: ActiveProfileStore,
     private val profileDataCloudSync: ProfileDataCloudSync,
     private val householdAddonsCloudSync: HouseholdAddonsCloudSync,
     private val watchHistoryService: WatchHistoryService,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(AccountsProfilesUiState(configured = supabase.isConfigured()))
+    private val _uiState = MutableStateFlow(AccountsProfilesUiState(configured = supabase.isConfigured() && backend.isConfigured()))
     val uiState: StateFlow<AccountsProfilesUiState> = _uiState
 
     init {
@@ -361,7 +363,6 @@ internal class AccountsProfilesViewModel(
                         userId = null,
                         email = null,
                         householdId = null,
-                        householdRole = null,
                         profiles = emptyList(),
                         activeProfileId = null
                     )
@@ -369,8 +370,8 @@ internal class AccountsProfilesViewModel(
                 return@launch
             }
 
-            val membership =
-                runCatching { supabase.ensureHouseholdMembership(session.accessToken) }
+            val me =
+                runCatching { backend.getMe(session.accessToken) }
                     .getOrElse {
                         _uiState.update { state ->
                             state.copy(
@@ -384,30 +385,16 @@ internal class AccountsProfilesViewModel(
                         return@launch
                     }
 
-            val profiles =
-                runCatching { supabase.listProfiles(session.accessToken, membership.householdId) }
-                    .getOrElse {
-                        _uiState.update { state ->
-                            state.copy(
-                                isBusy = false,
-                                authenticated = true,
-                                userId = session.userId,
-                                email = session.email,
-                                householdId = membership.householdId,
-                                householdRole = membership.role,
-                                statusMessage = it.message.orEmpty(),
-                            )
-                        }
-                        return@launch
-                    }
+            val profiles = me.profiles
 
-            val storedActive = profileStore.getActiveProfileId(session.userId)
+            val userId = me.user.supabaseAuthUserId ?: session.userId ?: me.user.id
+            val storedActive = profileStore.getActiveProfileId(userId)
             val resolvedActive =
                 storedActive?.takeIf { id -> profiles.any { it.id == id } }
                     ?: profiles.firstOrNull()?.id
 
             if (resolvedActive != null && resolvedActive != storedActive) {
-                profileStore.setActiveProfileId(session.userId, resolvedActive)
+                profileStore.setActiveProfileId(userId, resolvedActive)
             }
 
             val settingsSyncError =
@@ -424,10 +411,9 @@ internal class AccountsProfilesViewModel(
                 it.copy(
                     isBusy = false,
                     authenticated = true,
-                    userId = session.userId,
-                    email = session.email,
-                    householdId = membership.householdId,
-                    householdRole = membership.role,
+                    userId = userId,
+                    email = me.user.email ?: session.email,
+                    householdId = me.household.id,
                     profiles = profiles,
                     activeProfileId = resolvedActive,
                     statusMessage =
@@ -523,12 +509,6 @@ internal class AccountsProfilesViewModel(
     fun createProfile() {
         viewModelScope.launch {
             val state = uiState.value
-            val householdId = state.householdId
-            if (householdId.isNullOrBlank()) {
-                _uiState.update { it.copy(statusMessage = "No household loaded.") }
-                return@launch
-            }
-
             val name = state.newProfileNameInput.trim()
             if (name.isBlank()) {
                 _uiState.update { it.copy(statusMessage = "Enter a profile name.") }
@@ -545,17 +525,15 @@ internal class AccountsProfilesViewModel(
                 return@launch
             }
 
-            val nextOrderIndex = (state.profiles.maxOfOrNull { it.orderIndex } ?: 0) + 1
+            val nextSortOrder = (state.profiles.maxOfOrNull { it.sortOrder } ?: -1) + 1
 
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             val created =
                 runCatching {
-                    supabase.createProfile(
+                    backend.createProfile(
                         accessToken = session.accessToken,
-                        householdId = householdId,
                         name = name,
-                        orderIndex = nextOrderIndex,
-                        createdByUserId = session.userId
+                        sortOrder = nextSortOrder,
                     )
                 }
 
@@ -566,8 +544,9 @@ internal class AccountsProfilesViewModel(
 
             _uiState.update { it.copy(newProfileNameInput = "", isBusy = false) }
             val newId = created.getOrNull()?.id
-            if (!newId.isNullOrBlank() && !session.userId.isNullOrBlank()) {
-                profileStore.setActiveProfileId(session.userId, newId)
+            val userKey = state.userId?.trim().orEmpty().ifBlank { session.userId.orEmpty().trim() }
+            if (!newId.isNullOrBlank() && userKey.isNotBlank()) {
+                profileStore.setActiveProfileId(userKey, newId)
             }
             refresh()
         }
@@ -580,6 +559,7 @@ internal class AccountsProfilesViewModel(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val supabase = SupabaseServicesProvider.accountClient(safeContext)
+                    val backend = BackendServicesProvider.backendClient(safeContext)
                     val profileStore = SupabaseServicesProvider.activeProfileStore(safeContext)
                     val profileDataCloudSync =
                         SupabaseServicesProvider.createProfileDataCloudSync(
@@ -591,6 +571,7 @@ internal class AccountsProfilesViewModel(
 
                     return AccountsProfilesViewModel(
                         supabase = supabase,
+                        backend = backend,
                         profileStore = profileStore,
                         profileDataCloudSync = profileDataCloudSync,
                         householdAddonsCloudSync = householdAddonsCloudSync,

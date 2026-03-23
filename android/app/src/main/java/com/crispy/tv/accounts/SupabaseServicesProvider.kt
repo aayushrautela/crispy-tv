@@ -2,6 +2,7 @@ package com.crispy.tv.accounts
 
 import android.content.Context
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.home.HomeCatalogDiskCacheStore
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.metadata.MetadataAddonRegistry
@@ -72,6 +73,7 @@ object SupabaseServicesProvider {
         return ProfileDataCloudSync(
             context = appContext,
             supabase = accountClient(appContext),
+            backend = BackendServicesProvider.backendClient(appContext),
             activeProfileStore = activeProfileStore(appContext),
         )
     }
