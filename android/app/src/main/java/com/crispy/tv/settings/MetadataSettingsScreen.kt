@@ -85,7 +85,7 @@ private class MetadataSettingsViewModel(
         pushJob =
             viewModelScope.launch {
                 delay(800)
-                cloudSync.pushForActiveProfile()
+                cloudSync.pushForActiveAccount()
             }
     }
 
@@ -173,7 +173,7 @@ private fun MetadataSettingsScreen(
                         },
                         visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                         supportingText = {
-                            Text("Stored on-device and synced to your active profile when available.")
+                            Text("Stored on-device and synced to your account when available. All profiles on the account share this key.")
                         },
                     )
                     FilterChip(

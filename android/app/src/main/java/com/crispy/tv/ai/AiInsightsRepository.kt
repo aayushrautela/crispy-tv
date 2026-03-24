@@ -4,6 +4,8 @@ import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabMediaType
 import java.util.Locale
@@ -11,6 +13,7 @@ import java.util.Locale
 class AiInsightsRepository(
     private val supabase: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore,
+    private val backend: CrispyBackendClient,
     @Suppress("UNUSED_PARAMETER") httpClient: CrispyHttpClient,
     private val cacheStore: AiInsightsCacheStore,
 ) {
@@ -33,7 +36,26 @@ class AiInsightsRepository(
             throw IllegalStateException("Select a profile to use AI insights.")
         }
 
-        throw IllegalStateException("AI insights are temporarily disabled until they have a backend /v1 replacement.")
+        val payload = backend.getAiInsights(
+            accessToken = session.accessToken,
+            profileId = profileId,
+            tmdbId = tmdbId,
+            mediaType = mediaType.toBackendMediaType(),
+            locale = locale.toLanguageTag(),
+        )
+        return AiInsightsResult(
+            insights = payload.insights.map { card ->
+                AiInsightCard(
+                    type = card.type,
+                    title = card.title,
+                    category = card.category,
+                    content = card.content,
+                )
+            },
+            trivia = payload.trivia,
+        ).also { result ->
+            cacheStore.save(tmdbId, mediaType, locale, result)
+        }
     }
 
     companion object {
@@ -42,9 +64,17 @@ class AiInsightsRepository(
             return AiInsightsRepository(
                 supabase = SupabaseServicesProvider.accountClient(appContext),
                 activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                backend = BackendServicesProvider.backendClient(appContext),
                 httpClient = httpClient,
                 cacheStore = AiInsightsCacheStore(appContext),
             )
         }
+    }
+}
+
+private fun MetadataLabMediaType.toBackendMediaType(): String {
+    return when (this) {
+        MetadataLabMediaType.MOVIE -> "movie"
+        MetadataLabMediaType.SERIES -> "tv"
     }
 }

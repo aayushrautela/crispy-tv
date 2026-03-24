@@ -17,17 +17,11 @@ class CrispyBackendClient(
 
     data class User(
         val id: String,
-        val supabaseAuthUserId: String?,
         val email: String?,
-    )
-
-    data class Household(
-        val id: String,
     )
 
     data class Profile(
         val id: String,
-        val householdId: String,
         val name: String,
         val avatarKey: String?,
         val isKids: Boolean,
@@ -39,8 +33,19 @@ class CrispyBackendClient(
 
     data class MeResponse(
         val user: User,
-        val household: Household,
+        val accountSettings: AccountSettings,
         val profiles: List<Profile>,
+    )
+
+    data class AccountSettings(
+        val settings: Map<String, String>,
+        val hasOpenRouterKey: Boolean,
+        val hasOmdbApiKey: Boolean,
+    )
+
+    data class AccountSecret(
+        val key: String,
+        val value: String,
     )
 
     data class ProfileSettings(
@@ -68,7 +73,6 @@ class CrispyBackendClient(
     data class ImportJob(
         val id: String,
         val profileId: String,
-        val householdId: String,
         val provider: String,
         val mode: String,
         val status: String,
@@ -84,6 +88,39 @@ class CrispyBackendClient(
     data class ImportConnectionsResponse(
         val connections: List<ImportConnection>,
         val watchDataOrigin: String?,
+    )
+
+    data class BackendMetadataItem(
+        val id: String,
+        val title: String,
+        val summary: String?,
+        val posterUrl: String?,
+        val backdropUrl: String?,
+        val logoUrl: String?,
+        val mediaType: String,
+        val rating: String?,
+        val year: String?,
+        val genre: String?,
+    )
+
+    data class MetadataSearchResponse(
+        val items: List<BackendMetadataItem>,
+    )
+
+    data class AiSearchResponse(
+        val items: List<BackendMetadataItem>,
+    )
+
+    data class AiInsightsCard(
+        val type: String,
+        val title: String,
+        val category: String,
+        val content: String,
+    )
+
+    data class AiInsightsResponse(
+        val insights: List<AiInsightsCard>,
+        val trivia: String,
     )
 
     data class ImportJobsResponse(
@@ -112,13 +149,63 @@ class CrispyBackendClient(
         )
         val json = JSONObject(requireSuccess(response))
         val userJson = json.optJSONObject("user") ?: throw IllegalStateException("Backend /v1/me did not return a user.")
-        val householdJson =
-            json.optJSONObject("household") ?: throw IllegalStateException("Backend /v1/me did not return a household.")
         return MeResponse(
             user = parseUser(userJson),
-            household = Household(id = householdJson.optString("id").trim().ifEmpty { throw IllegalStateException("Backend /v1/me returned a household without an id.") }),
+            accountSettings = parseAccountSettings(json.optJSONObject("accountSettings")),
             profiles = parseProfiles(json.optJSONArray("profiles")),
         )
+    }
+
+    suspend fun getAccountSettings(accessToken: String): AccountSettings {
+        checkConfigured()
+        val response = httpClient.get(
+            url = "$baseUrl/v1/account/settings".toHttpUrl(),
+            headers = authHeaders(accessToken),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return parseAccountSettings(json.optJSONObject("settings"))
+    }
+
+    suspend fun patchAccountSettings(accessToken: String, settings: Map<String, String>): AccountSettings {
+        checkConfigured()
+        val payload = JSONObject().apply {
+            settings.forEach { (key, value) -> put(key, value) }
+        }.toString()
+        val response = httpClient.execute(
+            request = okhttp3.Request.Builder()
+                .url("$baseUrl/v1/account/settings".toHttpUrl())
+                .headers(authHeaders(accessToken))
+                .patch(payload.toRequestBody(JSON_MEDIA_TYPE))
+                .build(),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return parseAccountSettings(json.optJSONObject("settings"))
+    }
+
+    suspend fun getOpenRouterSecret(accessToken: String): AccountSecret? {
+        return getAccountSecret(accessToken, "openrouter-key")
+    }
+
+    suspend fun putOpenRouterSecret(accessToken: String, value: String): AccountSecret {
+        return putAccountSecret(accessToken, "openrouter-key", value)
+    }
+
+    suspend fun deleteOpenRouterSecret(accessToken: String): Boolean {
+        return deleteAccountSecret(accessToken, "openrouter-key")
+    }
+
+    suspend fun getOmdbApiSecret(accessToken: String): AccountSecret? {
+        return getAccountSecret(accessToken, "omdb-api-key")
+    }
+
+    suspend fun putOmdbApiSecret(accessToken: String, value: String): AccountSecret {
+        return putAccountSecret(accessToken, "omdb-api-key", value)
+    }
+
+    suspend fun deleteOmdbApiSecret(accessToken: String): Boolean {
+        return deleteAccountSecret(accessToken, "omdb-api-key")
     }
 
     suspend fun createProfile(
@@ -227,6 +314,82 @@ class CrispyBackendClient(
         )
     }
 
+    suspend fun searchTitles(
+        accessToken: String,
+        query: String,
+        limit: Int = 20,
+    ): MetadataSearchResponse {
+        checkConfigured()
+        val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
+            .addQueryParameter("query", query.trim())
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        val response = httpClient.get(
+            url = url,
+            headers = authHeaders(accessToken),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return MetadataSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    }
+
+    suspend fun searchTitlesByGenre(
+        accessToken: String,
+        genre: String,
+        limit: Int = 20,
+    ): MetadataSearchResponse {
+        return searchTitles(accessToken = accessToken, query = genre, limit = limit)
+    }
+
+    suspend fun searchAiTitles(
+        accessToken: String,
+        profileId: String,
+        query: String,
+        filter: String? = null,
+        locale: String? = null,
+    ): AiSearchResponse {
+        checkConfigured()
+        val payload = JSONObject().apply {
+            put("query", query.trim())
+            if (!filter.isNullOrBlank()) put("filter", filter)
+            if (!locale.isNullOrBlank()) put("locale", locale)
+        }.toString()
+        val response = httpClient.postJson(
+            url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/search".toHttpUrl(),
+            jsonBody = payload,
+            headers = authHeaders(accessToken),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return AiSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    }
+
+    suspend fun getAiInsights(
+        accessToken: String,
+        profileId: String,
+        tmdbId: Int,
+        mediaType: String,
+        locale: String? = null,
+    ): AiInsightsResponse {
+        checkConfigured()
+        val payload = JSONObject().apply {
+            put("tmdbId", tmdbId)
+            put("mediaType", mediaType)
+            if (!locale.isNullOrBlank()) put("locale", locale)
+        }.toString()
+        val response = httpClient.postJson(
+            url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/insights".toHttpUrl(),
+            jsonBody = payload,
+            headers = authHeaders(accessToken),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return AiInsightsResponse(
+            insights = parseAiInsightsCards(json.optJSONArray("insights")),
+            trivia = json.optString("trivia").trim(),
+        )
+    }
+
     private fun checkConfigured() {
         if (!isConfigured()) {
             throw IllegalStateException("Backend API is not configured.")
@@ -267,7 +430,6 @@ class CrispyBackendClient(
         }
         return User(
             id = id,
-            supabaseAuthUserId = json.optString("supabaseAuthUserId").trim().ifBlank { null },
             email = json.optString("email").trim().ifBlank { null },
         )
     }
@@ -284,14 +446,12 @@ class CrispyBackendClient(
 
     private fun parseProfile(json: JSONObject): Profile {
         val id = json.optString("id").trim()
-        val householdId = json.optString("householdId").trim()
         val name = json.optString("name").trim()
-        if (id.isBlank() || householdId.isBlank() || name.isBlank()) {
+        if (id.isBlank() || name.isBlank()) {
             throw IllegalStateException("Backend profile is missing required fields.")
         }
         return Profile(
             id = id,
-            householdId = householdId,
             name = name,
             avatarKey = json.optString("avatarKey").trim().ifBlank { null },
             isKids = json.optBoolean("isKids", false),
@@ -341,7 +501,6 @@ class CrispyBackendClient(
         return ImportJob(
             id = json.optString("id").trim(),
             profileId = json.optString("profileId").trim(),
-            householdId = json.optString("householdId").trim(),
             provider = json.optString("provider").trim(),
             mode = json.optString("mode").trim(),
             status = json.optString("status").trim(),
@@ -353,6 +512,120 @@ class CrispyBackendClient(
             finishedAt = json.optString("finishedAt").trim().ifBlank { null },
             updatedAt = json.optString("updatedAt").trim().ifBlank { null },
         )
+    }
+
+    private fun parseAccountSettings(json: JSONObject?): AccountSettings {
+        val settingsJson = json ?: JSONObject()
+        val rawSettings = settingsJson.toStringMap()
+        val hasOpenRouterKey = settingsJson.optJSONObject("ai")?.optBoolean("hasOpenRouterKey", false) == true
+        val hasOmdbApiKey = settingsJson.optJSONObject("metadata")?.optBoolean("hasOmdbApiKey", false) == true
+        return AccountSettings(
+            settings = rawSettings,
+            hasOpenRouterKey = hasOpenRouterKey,
+            hasOmdbApiKey = hasOmdbApiKey,
+        )
+    }
+
+    private fun parseMetadataItems(array: JSONArray?): List<BackendMetadataItem> {
+        val safeArray = array ?: JSONArray()
+        return buildList {
+            for (index in 0 until safeArray.length()) {
+                val item = safeArray.optJSONObject(index) ?: continue
+                add(parseMetadataItem(item))
+            }
+        }
+    }
+
+    private fun parseMetadataItem(json: JSONObject): BackendMetadataItem {
+        val id = json.optString("id").trim()
+        val title = json.optString("title").trim()
+        if (id.isBlank() || title.isBlank()) {
+            throw IllegalStateException("Backend metadata item is missing required fields.")
+        }
+        val genre = json.optJSONArray("genres")?.optString(0)?.trim().takeUnless { it.isNullOrBlank() }
+        return BackendMetadataItem(
+            id = id,
+            title = title,
+            summary = json.optString("summary").trim().ifBlank { null },
+            posterUrl = json.optJSONObject("images")?.optString("posterUrl")?.trim().ifBlank { null },
+            backdropUrl = json.optJSONObject("images")?.optString("backdropUrl")?.trim().ifBlank { null },
+            logoUrl = json.optJSONObject("images")?.optString("logoUrl")?.trim().ifBlank { null },
+            mediaType = json.optString("mediaType").trim().ifBlank { "movie" },
+            rating = json.opt("rating")?.toString()?.trim().ifBlank { null },
+            year = json.opt("releaseYear")?.toString()?.trim().ifBlank { null },
+            genre = genre,
+        )
+    }
+
+    private fun parseAiInsightsCards(array: JSONArray?): List<AiInsightsCard> {
+        val safeArray = array ?: JSONArray()
+        return buildList {
+            for (index in 0 until safeArray.length()) {
+                val item = safeArray.optJSONObject(index) ?: continue
+                add(
+                    AiInsightsCard(
+                        type = item.optString("type").trim(),
+                        title = item.optString("title").trim(),
+                        category = item.optString("category").trim(),
+                        content = item.optString("content").trim(),
+                    )
+                )
+            }
+        }
+    }
+
+    private suspend fun getAccountSecret(accessToken: String, pathSuffix: String): AccountSecret? {
+        checkConfigured()
+        val response = httpClient.get(
+            url = "$baseUrl/v1/account/secrets/$pathSuffix".toHttpUrl(),
+            headers = authHeaders(accessToken),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        if (response.code == 404) {
+            return null
+        }
+        val json = JSONObject(requireSuccess(response))
+        return parseAccountSecret(json.optJSONObject("secret"))
+    }
+
+    private suspend fun putAccountSecret(accessToken: String, pathSuffix: String, value: String): AccountSecret {
+        checkConfigured()
+        val payload = JSONObject().put("value", value.trim()).toString()
+        val response = httpClient.execute(
+            request = okhttp3.Request.Builder()
+                .url("$baseUrl/v1/account/secrets/$pathSuffix".toHttpUrl())
+                .headers(authHeaders(accessToken))
+                .put(payload.toRequestBody(JSON_MEDIA_TYPE))
+                .build(),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return parseAccountSecret(json.optJSONObject("secret"))
+            ?: throw IllegalStateException("Backend did not return an account secret.")
+    }
+
+    private suspend fun deleteAccountSecret(accessToken: String, pathSuffix: String): Boolean {
+        checkConfigured()
+        val response = httpClient.execute(
+            request = okhttp3.Request.Builder()
+                .url("$baseUrl/v1/account/secrets/$pathSuffix".toHttpUrl())
+                .headers(authHeaders(accessToken))
+                .delete()
+                .build(),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return json.optBoolean("deleted", false)
+    }
+
+    private fun parseAccountSecret(json: JSONObject?): AccountSecret? {
+        val secretJson = json ?: return null
+        val key = secretJson.optString("key").trim()
+        val value = secretJson.optString("value").trim()
+        if (key.isBlank() || value.isBlank()) {
+            return null
+        }
+        return AccountSecret(key = key, value = value)
     }
 
     private fun JSONObject?.toStringMap(): Map<String, String> {

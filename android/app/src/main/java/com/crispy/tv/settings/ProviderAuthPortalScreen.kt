@@ -230,7 +230,7 @@ internal class ProviderPortalViewModel(
             return null
         }
 
-        val userKey = me.user.supabaseAuthUserId ?: session.userId ?: me.user.id
+        val userKey = session.userId.ifBlank { me.user.id }
         val storedProfileId = activeProfileStore.getActiveProfileId(userKey)
         val profile = me.profiles.firstOrNull { it.id == storedProfileId } ?: me.profiles.firstOrNull()
         if (profile == null) {

@@ -9,9 +9,11 @@ import com.crispy.tv.ratings.formatRating
 import java.util.Locale
 
 data class SearchResultsPayload(
-    val items: List<CatalogItem> = emptyList(),
+    val items: List<SearchCatalogItem> = emptyList(),
     val message: String? = null,
 )
+
+typealias SearchCatalogItem = CatalogItem
 
 class TmdbSearchRepository internal constructor(
     private val remoteDataSource: TmdbSearchRemoteDataSource,

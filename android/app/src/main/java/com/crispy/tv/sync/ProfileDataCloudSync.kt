@@ -22,6 +22,40 @@ class ProfileDataCloudSync(
     private val omdbSettingsStore: OmdbSettingsStore = OmdbSettingsStore(context),
     private val shadowStore: ProfileDataShadowStore = ProfileDataShadowStore(context),
 ) {
+    suspend fun pullForActiveAccount(): Result<Unit> {
+        val session =
+            try {
+                supabase.ensureValidSession()
+            } catch (t: Throwable) {
+                return Result.failure(t)
+            }
+        if (session == null) return Result.success(Unit)
+
+        return try {
+            pullForAccount(session.accessToken)
+            Result.success(Unit)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
+    suspend fun pushForActiveAccount(): Result<Unit> {
+        val session =
+            try {
+                supabase.ensureValidSession()
+            } catch (t: Throwable) {
+                return Result.failure(t)
+            }
+        if (session == null) return Result.success(Unit)
+
+        return try {
+            pushForAccount(session.accessToken)
+            Result.success(Unit)
+        } catch (t: Throwable) {
+            Result.failure(t)
+        }
+    }
+
     suspend fun pullForActiveProfile(): Result<Unit> {
         val session =
             try {
@@ -106,10 +140,50 @@ class ProfileDataCloudSync(
         )
     }
 
+    private suspend fun pullForAccount(accessToken: String) {
+        val remoteSettings = backend.getAccountSettings(accessToken)
+        applyAccountSettingsToLocal(remoteSettings)
+        backend.getOpenRouterSecret(accessToken)?.let { secret ->
+            aiInsightsSettingsStore.saveOpenRouterKey(secret.value)
+        }
+        backend.getOmdbApiSecret(accessToken)?.let { secret ->
+            omdbSettingsStore.saveOmdbKey(secret.value)
+        }
+    }
+
+    private suspend fun pushForAccount(accessToken: String) {
+        backend.patchAccountSettings(
+            accessToken = accessToken,
+            settings = buildAccountSettingsForCloud(),
+        )
+
+        val openRouterKey = aiInsightsSettingsStore.loadOpenRouterKey().trim()
+        if (openRouterKey.isBlank()) {
+            backend.deleteOpenRouterSecret(accessToken)
+        } else {
+            backend.putOpenRouterSecret(accessToken, openRouterKey)
+        }
+
+        val omdbKey = omdbSettingsStore.loadOmdbKey().trim()
+        if (omdbKey.isBlank()) {
+            backend.deleteOmdbApiSecret(accessToken)
+        } else {
+            backend.putOmdbApiSecret(accessToken, omdbKey)
+        }
+    }
+
     private fun applyProfileSettingsToLocal(settings: Map<String, String>) {
         applyPlaybackSettings(settings)
-        applyAiInsightsSettings(settings)
-        applyMetadataSettings(settings)
+    }
+
+    private fun applyAccountSettingsToLocal(settings: CrispyBackendClient.AccountSettings) {
+        val mode = settings.settings[KEY_AI_INSIGHTS_MODE]?.let(AiInsightsMode::fromRaw)
+        if (mode != null) {
+            val current = aiInsightsSettingsStore.loadSettings()
+            if (current.mode != mode) {
+                aiInsightsSettingsStore.saveSettings(current.copy(mode = mode))
+            }
+        }
     }
 
     private fun applyPlaybackSettings(settings: Map<String, String>) {
@@ -135,24 +209,6 @@ class ProfileDataCloudSync(
         }
     }
 
-    private fun applyAiInsightsSettings(settings: Map<String, String>) {
-        val currentSettings = aiInsightsSettingsStore.loadSettings()
-        val nextSettings =
-            currentSettings.copy(
-                mode =
-                    settings[KEY_AI_INSIGHTS_MODE]?.let { AiInsightsMode.fromRaw(it) }
-                        ?: currentSettings.mode,
-            )
-
-        if (nextSettings != currentSettings) {
-            aiInsightsSettingsStore.saveSettings(nextSettings)
-        }
-
-        if (settings.containsKey(KEY_AI_OPENROUTER_KEY)) {
-            aiInsightsSettingsStore.saveOpenRouterKey(settings[KEY_AI_OPENROUTER_KEY].orEmpty())
-        }
-    }
-
     private fun buildSettingsForCloud(base: Map<String, String>): Map<String, String> {
         val result = base.toMutableMap()
 
@@ -168,28 +224,17 @@ class ProfileDataCloudSync(
         result[KEY_AI_INSIGHTS_MODE] = aiSettings.mode.raw
         result.remove("ai.insights.model_type")
         result.remove("ai.insights.custom_model_name")
-
-        val openRouterKey = aiInsightsSettingsStore.loadOpenRouterKey().trim()
-        if (openRouterKey.isBlank()) {
-            result.remove(KEY_AI_OPENROUTER_KEY)
-        } else {
-            result[KEY_AI_OPENROUTER_KEY] = openRouterKey
-        }
-
-        val omdbKey = omdbSettingsStore.loadOmdbKey().trim()
-        if (omdbKey.isBlank()) {
-            result.remove(KEY_METADATA_OMDB_KEY)
-        } else {
-            result[KEY_METADATA_OMDB_KEY] = omdbKey
-        }
+        result.remove(KEY_AI_OPENROUTER_KEY)
+        result.remove(KEY_METADATA_OMDB_KEY)
 
         return result
     }
 
-    private fun applyMetadataSettings(settings: Map<String, String>) {
-        if (settings.containsKey(KEY_METADATA_OMDB_KEY)) {
-            omdbSettingsStore.saveOmdbKey(settings[KEY_METADATA_OMDB_KEY].orEmpty())
-        }
+    private fun buildAccountSettingsForCloud(): Map<String, String> {
+        val aiSettings: AiInsightsSettings = aiInsightsSettingsStore.loadSettings()
+        return linkedMapOf(
+            KEY_AI_INSIGHTS_MODE to aiSettings.mode.raw,
+        )
     }
 
     private companion object {

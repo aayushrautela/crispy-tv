@@ -96,7 +96,7 @@ private class AiInsightsSettingsViewModel(
         pushJob =
             viewModelScope.launch {
                 delay(800)
-                cloudSync.pushForActiveProfile()
+                cloudSync.pushForActiveAccount()
             }
     }
 
@@ -192,7 +192,7 @@ private fun AiInsightsSettingsScreen(
                         visualTransformation =
                             if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                         supportingText = {
-                            Text("Stored locally and synced to your profile when signed in. The server chooses the model.")
+                            Text("Stored locally and synced to your account when signed in. All profiles on the account share this key.")
                         }
                     )
 
