@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal class WatchHistoryCache(
+class WatchHistoryCache(
     context: Context,
 ) {
     private val appContext = context.applicationContext

@@ -2,6 +2,7 @@ package com.crispy.tv
 
 import android.content.Context
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.metadata.TmdbEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
@@ -11,7 +12,7 @@ import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.streams.AddonStreamsService
-import com.crispy.tv.watchhistory.RemoteWatchHistoryService
+import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackController
@@ -59,16 +60,15 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
 
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
-    val httpClient = AppHttp.client(appContext)
     val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
     val episodeListProvider = TmdbEpisodeListProvider(
         tmdbEnrichmentRepository = tmdbEnrichmentRepository,
     )
-    return RemoteWatchHistoryService(
+    return BackendWatchHistoryService(
         context = appContext,
-        httpClient = httpClient,
-        traktClientId = BuildConfig.TRAKT_CLIENT_ID,
-        simklClientId = BuildConfig.SIMKL_CLIENT_ID,
+        supabase = SupabaseServicesProvider.accountClient(appContext),
+        backend = BackendServicesProvider.backendClient(appContext),
+        activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
         episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(

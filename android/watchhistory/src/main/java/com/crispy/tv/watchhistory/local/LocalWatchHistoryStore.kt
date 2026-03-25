@@ -14,7 +14,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
-internal class LocalWatchHistoryStore(
+class LocalWatchHistoryStore(
     private val prefs: SharedPreferences,
 ) {
     fun listLocalHistory(limit: Int, authState: WatchProviderAuthState): WatchHistoryResult {
@@ -208,7 +208,7 @@ internal class LocalWatchHistoryStore(
     }
 }
 
-internal data class NormalizedWatchRequest(
+data class NormalizedWatchRequest(
     val contentId: String,
     val contentType: MetadataLabMediaType,
     val title: String,
@@ -229,7 +229,7 @@ internal data class NormalizedWatchRequest(
     }
 }
 
-internal data class LocalWatchedItem(
+data class LocalWatchedItem(
     val contentId: String,
     val contentType: MetadataLabMediaType,
     val title: String,

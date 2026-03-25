@@ -16,7 +16,7 @@ import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.max
 
-internal data class WatchProgress(
+data class WatchProgress(
     val currentTimeSeconds: Double,
     val durationSeconds: Double,
     val lastUpdatedEpochMs: Long,
@@ -35,7 +35,7 @@ internal data class WatchProgress(
     }
 }
 
-internal data class UnsyncedProgressItem(
+data class UnsyncedProgressItem(
     val key: String,
     val id: String,
     val type: String,
@@ -43,7 +43,7 @@ internal data class UnsyncedProgressItem(
     val progress: WatchProgress,
 )
 
-internal class WatchProgressStore(
+class WatchProgressStore(
     private val prefs: SharedPreferences,
     private val nowEpochMs: () -> Long = System::currentTimeMillis,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
