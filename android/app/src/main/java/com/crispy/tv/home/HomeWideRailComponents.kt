@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.components.skeletonElement
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
 

@@ -26,7 +26,7 @@ class WatchHistoryCache(
         limit: Int,
         nowMs: Long,
         source: WatchProvider?,
-        localFallback: () -> List<ContinueWatchingEntry>,
+        localFallback: suspend () -> List<ContinueWatchingEntry>,
         normalize: (List<ContinueWatchingEntry>, Long, Int) -> List<ContinueWatchingEntry>,
     ): ContinueWatchingResult {
         val targetLimit = limit.coerceAtLeast(1)

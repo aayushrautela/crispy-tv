@@ -373,7 +373,7 @@ internal class AccountsProfilesViewModel(
 
             val profiles = me.profiles
 
-            val userId = session.userId.ifBlank { me.user.id }
+            val userId = session.userId?.ifBlank { me.user.id } ?: me.user.id
             val storedActive = profileStore.getActiveProfileId(userId)
             val resolvedActive =
                 storedActive?.takeIf { id -> profiles.any { it.id == id } }

@@ -162,12 +162,12 @@ internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMet
         id = id,
         title = title,
         summary = json.optString("summary").trim().ifBlank { null },
-        posterUrl = json.optJSONObject("images")?.optString("posterUrl")?.trim().ifBlank { null },
-        backdropUrl = json.optJSONObject("images")?.optString("backdropUrl")?.trim().ifBlank { null },
-        logoUrl = json.optJSONObject("images")?.optString("logoUrl")?.trim().ifBlank { null },
+        posterUrl = json.optJSONObject("images").optNullableString("posterUrl"),
+        backdropUrl = json.optJSONObject("images").optNullableString("backdropUrl"),
+        logoUrl = json.optJSONObject("images").optNullableString("logoUrl"),
         mediaType = json.optString("mediaType").trim().ifBlank { "movie" },
-        rating = json.opt("rating")?.toString()?.trim().ifBlank { null },
-        year = json.opt("releaseYear")?.toString()?.trim().ifBlank { null },
+        rating = json.opt("rating")?.toString()?.trim()?.ifBlank { null },
+        year = json.opt("releaseYear")?.toString()?.trim()?.ifBlank { null },
         genre = genre,
     )
 }
@@ -433,6 +433,7 @@ internal fun CrispyBackendClient.parseHydratedWatchItems(array: JSONArray?): Lis
 internal fun CrispyBackendClient.parseHydratedWatchItem(json: JSONObject): HydratedWatchItem {
     val media = json.optJSONObject("media") ?: throw IllegalStateException("Backend watch item is missing media.")
     return HydratedWatchItem(
+        id = json.optNullableString("id"),
         media = parseMetadataView(media),
         progress = parseWatchProgressView(json.optJSONObject("progress")),
         watchedAt = json.optNullableString("watchedAt"),
