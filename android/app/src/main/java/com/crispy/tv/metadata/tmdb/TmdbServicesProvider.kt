@@ -2,7 +2,6 @@ package com.crispy.tv.metadata.tmdb
 
 import android.content.Context
 import com.crispy.tv.metadata.TmdbImdbIdResolver
-import com.crispy.tv.search.TmdbSearchRepository
 
 object TmdbServicesProvider {
     @Volatile
@@ -10,12 +9,6 @@ object TmdbServicesProvider {
 
     @Volatile
     private var titleRemoteDataSourceInstance: TmdbTitleRemoteDataSource? = null
-
-    @Volatile
-    private var searchRemoteDataSourceInstance: TmdbSearchRemoteDataSource? = null
-
-    @Volatile
-    private var searchRepositoryInstance: TmdbSearchRepository? = null
 
     @Volatile
     private var personRepositoryInstance: TmdbPersonRepository? = null
@@ -47,24 +40,6 @@ object TmdbServicesProvider {
         }
     }
 
-    private fun searchRemoteDataSource(context: Context): TmdbSearchRemoteDataSource {
-        val existing = searchRemoteDataSourceInstance
-        if (existing != null) {
-            return existing
-        }
-
-        return synchronized(this) {
-            val synchronizedExisting = searchRemoteDataSourceInstance
-            if (synchronizedExisting != null) {
-                synchronizedExisting
-            } else {
-                TmdbSearchRemoteDataSource(TmdbJsonClientProvider.get(context.applicationContext)).also { created ->
-                    searchRemoteDataSourceInstance = created
-                }
-            }
-        }
-    }
-
     private fun titleRemoteDataSource(context: Context): TmdbTitleRemoteDataSource {
         val existing = titleRemoteDataSourceInstance
         if (existing != null) {
@@ -78,24 +53,6 @@ object TmdbServicesProvider {
             } else {
                 TmdbTitleRemoteDataSource(TmdbJsonClientProvider.get(context.applicationContext)).also { created ->
                     titleRemoteDataSourceInstance = created
-                }
-            }
-        }
-    }
-
-    internal fun searchRepository(context: Context): TmdbSearchRepository {
-        val existing = searchRepositoryInstance
-        if (existing != null) {
-            return existing
-        }
-
-        return synchronized(this) {
-            val synchronizedExisting = searchRepositoryInstance
-            if (synchronizedExisting != null) {
-                synchronizedExisting
-            } else {
-                TmdbSearchRepository(searchRemoteDataSource(context.applicationContext)).also { created ->
-                    searchRepositoryInstance = created
                 }
             }
         }

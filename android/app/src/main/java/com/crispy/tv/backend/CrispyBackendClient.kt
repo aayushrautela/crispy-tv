@@ -317,11 +317,21 @@ class CrispyBackendClient(
     suspend fun searchTitles(
         accessToken: String,
         query: String,
+        filter: String? = null,
+        locale: String? = null,
         limit: Int = 20,
     ): MetadataSearchResponse {
         checkConfigured()
         val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
             .addQueryParameter("query", query.trim())
+            .apply {
+                if (!filter.isNullOrBlank()) {
+                    addQueryParameter("filter", filter)
+                }
+                if (!locale.isNullOrBlank()) {
+                    addQueryParameter("locale", locale)
+                }
+            }
             .addQueryParameter("limit", limit.toString())
             .build()
         val response = httpClient.get(
@@ -336,9 +346,30 @@ class CrispyBackendClient(
     suspend fun searchTitlesByGenre(
         accessToken: String,
         genre: String,
+        filter: String? = null,
+        locale: String? = null,
         limit: Int = 20,
     ): MetadataSearchResponse {
-        return searchTitles(accessToken = accessToken, query = genre, limit = limit)
+        checkConfigured()
+        val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
+            .addQueryParameter("genre", genre.trim())
+            .apply {
+                if (!filter.isNullOrBlank()) {
+                    addQueryParameter("filter", filter)
+                }
+                if (!locale.isNullOrBlank()) {
+                    addQueryParameter("locale", locale)
+                }
+            }
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        val response = httpClient.get(
+            url = url,
+            headers = authHeaders(accessToken),
+            callTimeoutMs = CALL_TIMEOUT_MS,
+        )
+        val json = JSONObject(requireSuccess(response))
+        return MetadataSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
     }
 
     suspend fun searchAiTitles(

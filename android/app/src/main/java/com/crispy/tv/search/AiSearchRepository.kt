@@ -24,10 +24,6 @@ class AiSearchRepository(
         if (normalizedQuery.isBlank()) {
             return SearchResultsPayload()
         }
-        if (filter == SearchTypeFilter.PEOPLE) {
-            return SearchResultsPayload(message = "AI search supports movies and shows right now.")
-        }
-
         val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             ?: return SearchResultsPayload(message = "Sign in to use AI search.")
 
@@ -64,22 +60,5 @@ private fun SearchTypeFilter.toBackendAiFilter(): String? {
         SearchTypeFilter.ALL -> null
         SearchTypeFilter.MOVIES -> "movies"
         SearchTypeFilter.SERIES -> "series"
-        SearchTypeFilter.PEOPLE -> null
     }
-}
-
-private fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(): SearchCatalogItem {
-    return SearchCatalogItem(
-        id = id,
-        title = title,
-        posterUrl = posterUrl,
-        backdropUrl = backdropUrl,
-        logoUrl = logoUrl,
-        addonId = "backend",
-        type = if (mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true)) "series" else "movie",
-        rating = rating,
-        year = year,
-        genre = genre,
-        description = summary,
-    )
 }
