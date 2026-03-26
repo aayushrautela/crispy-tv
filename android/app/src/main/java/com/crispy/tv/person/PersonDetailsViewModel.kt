@@ -135,7 +135,6 @@ private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails 
 
 private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): CatalogItem {
     val type = if (mediaType.equals("movie", ignoreCase = true)) "movie" else "series"
-    val id = tmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" } ?: this.id
     return CatalogItem(
         id = id,
         title = title,

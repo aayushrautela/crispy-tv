@@ -27,6 +27,9 @@ internal fun AddonStream.toPlaybackSource(): PlaybackSource? {
 }
 
 internal fun buildPlaybackRawId(identity: PlaybackIdentity?, snapshot: PlayerLaunchSnapshot?): String? {
+    snapshot?.imdbId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
+    snapshot?.showTmdbId?.takeIf { it > 0 }?.let { return "tmdb:$it" }
+    snapshot?.tmdbId?.takeIf { it > 0 }?.let { return "tmdb:$it" }
     snapshot?.contentId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
     identity?.imdbId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
     identity?.tmdbId?.takeIf { it > 0 }?.let { return "tmdb:$it" }
@@ -41,7 +44,7 @@ internal fun buildEpisodeLookupId(
     if (season <= 0 || episode <= 0) return null
     val base =
         details.imdbId?.trim()?.takeIf { it.isNotBlank() }
-            ?: details.id.trim().takeIf { it.isNotBlank() }
+            ?: (details.showTmdbId ?: details.tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
             ?: return null
     val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
     if (canonicalBase.isBlank()) return null
@@ -57,14 +60,20 @@ internal fun resolveStreamLookupTarget(
     val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
     val lookupId =
         when (mediaType) {
-            MetadataLabMediaType.MOVIE -> details.imdbId?.trim()?.takeIf { it.isNotBlank() } ?: details.id.trim()
+            MetadataLabMediaType.MOVIE ->
+                details.imdbId?.trim()?.takeIf { it.isNotBlank() }
+                    ?: details.tmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
+                    ?: ""
             MetadataLabMediaType.SERIES -> {
-                val fromLoadedEpisodes = seasonEpisodes.firstOrNull { it.id.trim().isNotBlank() }?.id?.trim()
+                val fromLoadedEpisodes = seasonEpisodes.firstOrNull { !it.lookupId.isNullOrBlank() }?.lookupId?.trim()
                 if (fromLoadedEpisodes != null) {
                     fromLoadedEpisodes
                 } else {
                     val season = selectedSeason ?: seasonEpisodes.firstOrNull()?.season ?: 1
-                    val base = details.imdbId?.trim()?.takeIf { it.isNotBlank() } ?: details.id.trim()
+                    val base =
+                        details.imdbId?.trim()?.takeIf { it.isNotBlank() }
+                            ?: (details.showTmdbId ?: details.tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
+                            ?: ""
                     val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
                     if (canonicalBase.isNotBlank() && season > 0) {
                         "$canonicalBase:$season:1"
@@ -88,7 +97,10 @@ internal fun findEpisodeForLookupId(
 
     return sequenceOf(currentEpisodes.asSequence(), cachedEpisodes.asSequence().flatten())
         .flatten()
-        .firstOrNull { episode -> episode.id.equals(normalizedLookupId, ignoreCase = true) }
+        .firstOrNull { episode ->
+            episode.lookupId?.equals(normalizedLookupId, ignoreCase = true) == true ||
+                episode.id.equals(normalizedLookupId, ignoreCase = true)
+        }
 }
 
 internal fun buildPlayerSubtitle(

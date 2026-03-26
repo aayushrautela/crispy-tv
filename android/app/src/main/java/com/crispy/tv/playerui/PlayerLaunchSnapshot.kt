@@ -15,12 +15,20 @@ data class PlayerEpisodeSnapshot(
     val released: String? = null,
     val overview: String? = null,
     val thumbnailUrl: String? = null,
+    val lookupId: String? = null,
+    val tmdbId: Int? = null,
+    val showTmdbId: Int? = null,
 )
 
 @Immutable
 data class PlayerLaunchSnapshot(
     val contentId: String,
     val imdbId: String? = null,
+    val mediaKey: String? = null,
+    val tmdbId: Int? = null,
+    val showTmdbId: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
     val mediaType: String,
     val title: String,
     val posterUrl: String? = null,
@@ -41,6 +49,11 @@ data class PlayerLaunchSnapshot(
         return JSONObject()
             .put("content_id", contentId)
             .put("imdb_id", imdbId)
+            .put("media_key", mediaKey)
+            .put("tmdb_id", tmdbId)
+            .put("show_tmdb_id", showTmdbId)
+            .put("season_number", seasonNumber)
+            .put("episode_number", episodeNumber)
             .put("media_type", mediaType)
             .put("title", title)
             .put("poster_url", posterUrl)
@@ -67,6 +80,9 @@ data class PlayerLaunchSnapshot(
                                 .put("released", episode.released)
                                 .put("overview", episode.overview)
                                 .put("thumbnail_url", episode.thumbnailUrl)
+                                .put("lookup_id", episode.lookupId)
+                                .put("tmdb_id", episode.tmdbId)
+                                .put("show_tmdb_id", episode.showTmdbId)
                         )
                     }
                 },
@@ -94,6 +110,11 @@ data class PlayerLaunchSnapshot(
             directors = emptyList(),
             creators = emptyList(),
             videos = seasonEpisodes.map(PlayerEpisodeSnapshot::toMediaVideo),
+            mediaKey = mediaKey,
+            tmdbId = tmdbId,
+            showTmdbId = showTmdbId,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
             addonId = null,
         )
     }
@@ -108,6 +129,11 @@ data class PlayerLaunchSnapshot(
                 PlayerLaunchSnapshot(
                     contentId = json.optString("content_id").trim(),
                     imdbId = json.optString("imdb_id").trim().ifBlank { null },
+                    mediaKey = json.optString("media_key").trim().ifBlank { null },
+                    tmdbId = json.optInt("tmdb_id").takeIf { it > 0 },
+                    showTmdbId = json.optInt("show_tmdb_id").takeIf { it > 0 },
+                    seasonNumber = json.optInt("season_number").takeIf { it > 0 },
+                    episodeNumber = json.optInt("episode_number").takeIf { it > 0 },
                     mediaType = json.optString("media_type").trim(),
                     title = json.optString("title").trim(),
                     posterUrl = json.optString("poster_url").trim().ifBlank { null },
@@ -140,6 +166,9 @@ internal fun PlayerEpisodeSnapshot.toMediaVideo(): MediaVideo {
         released = released,
         overview = overview,
         thumbnailUrl = thumbnailUrl,
+        lookupId = lookupId,
+        tmdbId = tmdbId,
+        showTmdbId = showTmdbId,
     )
 }
 
@@ -184,6 +213,9 @@ private fun JSONArray?.toEpisodeSnapshots(): List<PlayerEpisodeSnapshot> {
                     released = json.optString("released").trim().ifBlank { null },
                     overview = json.optString("overview").trim().ifBlank { null },
                     thumbnailUrl = json.optString("thumbnail_url").trim().ifBlank { null },
+                    lookupId = json.optString("lookup_id").trim().ifBlank { null },
+                    tmdbId = json.optInt("tmdb_id").takeIf { it > 0 },
+                    showTmdbId = json.optInt("show_tmdb_id").takeIf { it > 0 },
                 )
             )
         }

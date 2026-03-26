@@ -359,11 +359,17 @@ internal fun HeaderInfoSection(
             onShare = {
                 val title = details.title
                 val shareType = if (details.mediaType == "movie") "movie" else "tv"
-                val tmdbId = details.id.removePrefix("tmdb:")
                 val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    val shareUrl = "https://www.themoviedb.org/$shareType/$tmdbId"
-                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy: $shareUrl")
+                    val shareText =
+                        details.tmdbId
+                            ?.takeIf { it > 0 }
+                            ?.let { tmdbId ->
+                                val shareUrl = "https://www.themoviedb.org/$shareType/$tmdbId"
+                                "Check out $title on Crispy: $shareUrl"
+                            }
+                            ?: "Check out $title on Crispy"
+                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
             }

@@ -77,6 +77,8 @@ internal fun JSONObject.toFallbackMediaDetails(
         directors = directors,
         creators = creators,
         videos = emptyList(),
+        tmdbId = optIntOrNull("id"),
+        showTmdbId = optIntOrNull("id").takeIf { mediaType == MetadataLabMediaType.SERIES },
         addonId = "tmdb",
     )
 }

@@ -177,9 +177,13 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
     if (id.isBlank()) {
         throw IllegalStateException("Backend metadata view is missing an id.")
     }
+    val mediaKey = json.optString("mediaKey").trim()
+    if (mediaKey.isBlank()) {
+        throw IllegalStateException("Backend metadata view is missing a mediaKey.")
+    }
     return MetadataView(
         id = id,
-        mediaKey = json.optNullableString("mediaKey") ?: id,
+        mediaKey = mediaKey,
         mediaType = json.optNullableString("mediaType") ?: "movie",
         kind = json.optNullableString("kind") ?: "title",
         tmdbId = json.optIntOrNull("tmdbId"),

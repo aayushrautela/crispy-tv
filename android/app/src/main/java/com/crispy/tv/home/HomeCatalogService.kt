@@ -53,6 +53,11 @@ data class MediaDetails(
     val directors: List<String> = emptyList(),
     val creators: List<String> = emptyList(),
     val videos: List<MediaVideo> = emptyList(),
+    val mediaKey: String? = null,
+    val tmdbId: Int? = null,
+    val showTmdbId: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
     val addonId: String?,
 )
 
@@ -65,6 +70,9 @@ data class MediaVideo(
     val released: String?,
     val overview: String?,
     val thumbnailUrl: String?,
+    val lookupId: String? = null,
+    val tmdbId: Int? = null,
+    val showTmdbId: Int? = null,
 )
 
 class HomeCatalogService internal constructor(
