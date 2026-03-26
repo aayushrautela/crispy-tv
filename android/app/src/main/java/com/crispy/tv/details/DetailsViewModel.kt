@@ -986,8 +986,8 @@ class DetailsViewModel internal constructor(
             val yearInt = enriched.year?.trim()?.toIntOrNull()
             val tmdbId =
                 when (resolvedMediaType) {
-                    MetadataLabMediaType.SERIES -> enriched.showTmdbId ?: enriched.tmdbId ?: targetEpisode?.showTmdbId ?: currentTmdbId
-                    MetadataLabMediaType.MOVIE -> enriched.tmdbId ?: targetEpisode?.tmdbId ?: currentTmdbId
+                    MetadataLabMediaType.SERIES -> enriched.showTmdbId ?: enriched.tmdbId ?: targetEpisode?.showTmdbId ?: resolvedTmdbId
+                    MetadataLabMediaType.MOVIE -> enriched.tmdbId ?: targetEpisode?.tmdbId ?: resolvedTmdbId
                 }
 
             val identity =
