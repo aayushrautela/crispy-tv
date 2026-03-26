@@ -992,7 +992,7 @@ class DetailsViewModel internal constructor(
 
             val identity =
                 PlaybackIdentity(
-                    contentId = enriched.showId?.takeIf { resolvedMediaType == MetadataLabMediaType.SERIES } ?: enriched.id,
+                    contentId = enriched.id,
                     imdbId = enriched.imdbId,
                     tmdbId = tmdbId,
                     contentType = resolvedMediaType,
@@ -1521,6 +1521,7 @@ class DetailsViewModel internal constructor(
             null,
         )
     }
+}
 
 private suspend fun resolveContinueWatchingEntry(
     details: MediaDetails,
@@ -1798,7 +1799,6 @@ private fun addEpisodeKey(
             }
         }
     }
-}
 
 private fun preferredWatchProvider(authState: WatchProviderAuthState): WatchProvider {
     return when {
