@@ -984,6 +984,25 @@ internal class TraktWatchHistoryProvider(
         return if (cleaned.startsWith("tt")) cleaned else "tt$cleaned"
     }
 
+    private fun normalizedImdbIdOrNull(raw: String?): String? {
+        val value = raw?.trim()?.lowercase(Locale.US).orEmpty()
+        if (value.isBlank()) return null
+
+        val candidate =
+            when {
+                value.startsWith("tt") -> value
+                value.startsWith("imdb:") -> value.substringAfter("imdb:")
+                value.all { it.isDigit() } -> "tt$value"
+                else -> return null
+            }
+
+        if (!candidate.startsWith("tt")) return null
+        if (candidate.length < 4) return null
+        if (!candidate.substring(2).all { it.isDigit() }) return null
+
+        return candidate
+    }
+
     private fun normalizedContentIdFromIds(ids: JSONObject?): String {
         val imdbId = normalizedImdbIdForContent(ids?.optString("imdb")?.trim().orEmpty())
         if (imdbId.isNotEmpty()) return imdbId
