@@ -101,6 +101,14 @@ internal class ProviderPortalViewModel(
         startImport(CrispyBackendClient.ImportProvider.SIMKL)
     }
 
+    fun disconnectTrakt() {
+        disconnectProvider(CrispyBackendClient.ImportProvider.TRAKT)
+    }
+
+    fun disconnectSimkl() {
+        disconnectProvider(CrispyBackendClient.ImportProvider.SIMKL)
+    }
+
     fun consumePendingExternalUrl() {
         _uiState.update { it.copy(pendingExternalUrl = null) }
     }
@@ -146,7 +154,7 @@ internal class ProviderPortalViewModel(
                     statusMessage =
                         forceMessage
                             ?: errorMessage
-                            ?: "Imports run against ${context.profile.name}. Disconnect is temporarily unavailable until a backend revoke route exists.",
+                            ?: "Imports run against ${context.profile.name}. Connect a provider to import watch history, playback, watchlist, and ratings.",
                 )
             }
         }
@@ -192,6 +200,39 @@ internal class ProviderPortalViewModel(
                 )
             }
             refreshImportState(forceMessage = message)
+        }
+    }
+
+    private fun disconnectProvider(provider: CrispyBackendClient.ImportProvider) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
+            val context = resolveActiveProfileContext() ?: return@launch
+            val providerLabel = providerLabel(provider.apiValue)
+            val disconnected =
+                runCatching {
+                    backend.disconnectImportConnection(
+                        accessToken = context.session.accessToken,
+                        profileId = context.profile.id,
+                        provider = provider,
+                    )
+                }
+
+            val message =
+                disconnected.fold(
+                    onSuccess = { "$providerLabel disconnected from ${context.profile.name}." },
+                    onFailure = { it.message ?: "Unable to disconnect $providerLabel." },
+                )
+
+            if (disconnected.isSuccess) {
+                refreshImportState(forceMessage = message)
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isBusy = false,
+                        statusMessage = message,
+                    )
+                }
+            }
         }
     }
 
@@ -319,6 +360,8 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
         uiState = uiState,
         onConnectTrakt = viewModel::connectTrakt,
         onConnectSimkl = viewModel::connectSimkl,
+        onDisconnectTrakt = viewModel::disconnectTrakt,
+        onDisconnectSimkl = viewModel::disconnectSimkl,
         onRefresh = { viewModel.refreshImportState() },
         onBack = onBack,
     )
@@ -330,6 +373,8 @@ private fun ProviderAuthPortalScreen(
     uiState: ProviderPortalUiState,
     onConnectTrakt: () -> Unit,
     onConnectSimkl: () -> Unit,
+    onDisconnectTrakt: () -> Unit,
+    onDisconnectSimkl: () -> Unit,
     onRefresh: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -397,6 +442,8 @@ private fun ProviderAuthPortalScreen(
                     actionLabel = if (uiState.trakt.connected) "Run import" else "Connect & import",
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
                     onAction = onConnectTrakt,
+                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.trakt.connected,
+                    onDisconnect = onDisconnectTrakt,
                 )
             }
 
@@ -407,6 +454,8 @@ private fun ProviderAuthPortalScreen(
                     actionLabel = if (uiState.simkl.connected) "Run import" else "Connect & import",
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
                     onAction = onConnectSimkl,
+                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.simkl.connected,
+                    onDisconnect = onDisconnectSimkl,
                 )
             }
 
@@ -430,6 +479,8 @@ private fun ProviderCard(
     actionLabel: String,
     actionEnabled: Boolean,
     onAction: () -> Unit,
+    disconnectEnabled: Boolean,
+    onDisconnect: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -469,16 +520,19 @@ private fun ProviderCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Text(
-                text = "Disconnect is not available on the backend yet.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Button(
                 onClick = onAction,
                 enabled = actionEnabled,
             ) {
                 Text(actionLabel)
+            }
+            if (state.connected) {
+                OutlinedButton(
+                    onClick = onDisconnect,
+                    enabled = disconnectEnabled,
+                ) {
+                    Text("Disconnect")
+                }
             }
         }
     }
