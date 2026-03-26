@@ -1521,7 +1521,6 @@ class DetailsViewModel internal constructor(
             null,
         )
     }
-}
 
 private suspend fun resolveContinueWatchingEntry(
     details: MediaDetails,
