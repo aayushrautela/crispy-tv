@@ -27,12 +27,8 @@ internal fun AddonStream.toPlaybackSource(): PlaybackSource? {
 }
 
 internal fun buildPlaybackRawId(identity: PlaybackIdentity?, snapshot: PlayerLaunchSnapshot?): String? {
-    snapshot?.imdbId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
-    snapshot?.showTmdbId?.takeIf { it > 0 }?.let { return "tmdb:$it" }
-    snapshot?.tmdbId?.takeIf { it > 0 }?.let { return "tmdb:$it" }
     snapshot?.contentId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
-    identity?.imdbId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
-    identity?.tmdbId?.takeIf { it > 0 }?.let { return "tmdb:$it" }
+    identity?.contentId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
     return null
 }
 

@@ -53,7 +53,6 @@ data class MediaDetails(
     val directors: List<String> = emptyList(),
     val creators: List<String> = emptyList(),
     val videos: List<MediaVideo> = emptyList(),
-    val mediaKey: String? = null,
     val tmdbId: Int? = null,
     val showTmdbId: Int? = null,
     val seasonNumber: Int? = null,

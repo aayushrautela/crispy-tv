@@ -10,6 +10,7 @@ import com.crispy.tv.player.ProviderComment
 import com.crispy.tv.player.ProviderCommentQuery
 import com.crispy.tv.player.ProviderCommentResult
 import com.crispy.tv.player.ProviderCommentScope
+import com.crispy.tv.player.ProviderExternalIds
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
@@ -526,6 +527,7 @@ internal class TraktWatchHistoryProvider(
                     contentId = it.contentId,
                     contentType = it.contentType,
                     title = it.title,
+                    externalIds = null,
                     season = it.season,
                     episode = it.episode,
                     addedAtEpochMs = it.lastUpdatedEpochMs,
@@ -604,6 +606,15 @@ internal class TraktWatchHistoryProvider(
             ?: traktExtractImageUrl(images, "banner")
     }
 
+    private fun traktExternalIds(ids: JSONObject?): ProviderExternalIds? {
+        if (ids == null) return null
+        val tmdb = ids.optInt("tmdb").takeIf { it > 0 }
+        val imdb = normalizedImdbIdOrNull(ids.optString("imdb"))
+        val tvdb = ids.optInt("tvdb").takeIf { it > 0 }
+        if (tmdb == null && imdb == null && tvdb == null) return null
+        return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb)
+    }
+
     private fun traktExtractImageUrl(images: JSONObject?, key: String): String? {
         val array = images?.optJSONArray(key) ?: return null
         for (i in 0 until array.length()) {
@@ -674,6 +685,7 @@ internal class TraktWatchHistoryProvider(
                         title = title,
                         posterUrl = posterUrl,
                         backdropUrl = backdropUrl,
+                        externalIds = traktExternalIds(node?.optJSONObject("ids")),
                         addedAtEpochMs = addedAt,
                     )
                 )
@@ -723,6 +735,7 @@ internal class TraktWatchHistoryProvider(
                         title = title,
                         posterUrl = posterUrl,
                         backdropUrl = backdropUrl,
+                        externalIds = traktExternalIds(node.optJSONObject("ids")),
                         addedAtEpochMs = addedAt,
                     )
                 )

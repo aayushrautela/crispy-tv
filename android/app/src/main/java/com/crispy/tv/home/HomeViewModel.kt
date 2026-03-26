@@ -849,6 +849,7 @@ class HomeViewModel internal constructor(
         val normalizedImdb = contentId.trim().lowercase(Locale.US).takeIf { it.startsWith("tt") }
 
         return PlaybackIdentity(
+            contentId = contentId.trim().ifBlank { null },
             imdbId = normalizedImdb,
             tmdbId = null,
             contentType = contentType,

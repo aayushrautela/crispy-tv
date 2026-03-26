@@ -19,6 +19,7 @@ import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.player.ProviderExternalIds
 import com.crispy.tv.player.ProviderAuthActionResult
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
@@ -261,10 +262,7 @@ class BackendWatchHistoryService(
                 itemId = trimmedId,
             )
         } catch (_: Throwable) {
-            return WatchHistoryResult(
-                statusMessage = "Continue watching dismissal requires backend item ids and is not fully migrated yet.",
-                authState = authState(),
-            )
+            return WatchHistoryResult(statusMessage = "Continue watching removal failed.", authState = authState())
         }
 
         val synced = action.accepted
@@ -361,7 +359,7 @@ class BackendWatchHistoryService(
             )
             val authProviders = persistAuthState(response.authProviders)
             val snapshot = response.providers.firstOrNull { it.provider.equals(source.apiValue(), ignoreCase = true) }
-            val mapped = snapshot?.toLegacyProviderLibrary(source) ?: ProviderLibrarySnapshot(statusMessage = "")
+            val mapped = snapshot?.toProviderLibrary(source) ?: ProviderLibrarySnapshot(statusMessage = "")
             val status = when {
                 mapped.folders.isNotEmpty() || mapped.items.isNotEmpty() -> mapped.statusMessage
                 !authProviders.isProviderConnected(source) -> connectLibraryMessage(source)
@@ -438,6 +436,7 @@ class BackendWatchHistoryService(
                 .copy(
                     currentTimeSeconds = currentSeconds.coerceIn(0.0, durationSeconds),
                     durationSeconds = durationSeconds,
+                    remoteImdbId = existing?.remoteImdbId ?: normalizedImdbIdOrNull(identity.imdbId),
                 )
 
         watchProgressStore.setWatchProgress(
@@ -569,7 +568,7 @@ class BackendWatchHistoryService(
                     profileId = backendContext.profileId,
                     limit = limit.coerceAtLeast(1),
                 )
-                .toLegacyContinueWatching(
+                .toContinueWatchingEntries(
                     provider = source,
                     nowMs = nowMs,
                     limit = limit,
@@ -714,10 +713,16 @@ class BackendWatchHistoryService(
     }
 
     private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): String {
-        val suffix = listOf(identity.imdbId, identity.tmdbId?.toString(), identity.season?.toString(), identity.episode?.toString())
-            .filterNotNull()
-            .joinToString(":")
-            .ifBlank { identity.title.trim().replace(' ', '_') }
+        val suffix =
+            listOf(
+                identity.contentId?.trim()?.takeIf { it.isNotBlank() },
+                identity.imdbId?.trim()?.takeIf { it.isNotBlank() },
+                identity.tmdbId?.toString(),
+                identity.season?.toString(),
+                identity.episode?.toString(),
+            ).filterNotNull()
+                .joinToString(":")
+                .ifBlank { identity.title.trim().replace(' ', '_') }
         return "$eventType:$suffix:${System.currentTimeMillis()}"
     }
 
@@ -936,7 +941,7 @@ class BackendWatchHistoryService(
             MetadataLabMediaType.SERIES -> "series"
         }
 
-        val id = normalizedImdbIdOrNull(identity.imdbId) ?: return null
+        val id = identity.contentId?.trim()?.takeIf { it.isNotBlank() } ?: normalizedImdbIdOrNull(identity.imdbId) ?: return null
         val episodeId =
             if (identity.contentType == MetadataLabMediaType.SERIES && identity.season != null && identity.episode != null) {
                 "$id:${identity.season}:${identity.episode}"
@@ -1079,14 +1084,14 @@ class BackendWatchHistoryService(
         )
     }
 
-    private suspend fun List<CrispyBackendClient.HydratedWatchItem>.toLegacyContinueWatching(
+    private suspend fun List<CrispyBackendClient.HydratedWatchItem>.toContinueWatchingEntries(
         provider: WatchProvider,
         nowMs: Long,
         limit: Int,
     ): List<ContinueWatchingEntry> {
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
         return buildList {
-            for (item in this@toLegacyContinueWatching) {
+            for (item in this@toContinueWatchingEntries) {
                 val media = item.media
                 val updatedAt =
                     parseIsoToEpochMs(item.lastActivityAt)
@@ -1098,9 +1103,9 @@ class BackendWatchHistoryService(
                 }
                 add(
                     ContinueWatchingEntry(
-                        contentId = media.legacyContinueWatchingContentId(),
-                        contentType = media.mediaType.toLegacyMediaType(),
-                        title = media.legacyContinueWatchingTitle(),
+                        contentId = media.canonicalContentId(),
+                        contentType = media.mediaType.toMetadataLabMediaType(),
+                        title = media.continueWatchingTitle(),
                         season = media.seasonNumber,
                         episode = media.episodeNumber,
                         progressPercent = item.progress?.progressPercent ?: 0.0,
@@ -1115,7 +1120,7 @@ class BackendWatchHistoryService(
             .take(limit)
     }
 
-    private fun BackendProviderLibrarySnapshot.toLegacyProviderLibrary(provider: WatchProvider): ProviderLibrarySnapshot {
+    private fun BackendProviderLibrarySnapshot.toProviderLibrary(provider: WatchProvider): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(
             statusMessage = statusMessage,
             folders = folders.map { folder ->
@@ -1130,11 +1135,12 @@ class BackendWatchHistoryService(
                 ProviderLibraryItem(
                     provider = provider,
                     folderId = item.folderId,
-                    contentId = item.legacyContentId(),
-                    contentType = item.contentType.toLegacyMediaType(),
+                    contentId = item.contentId,
+                    contentType = item.contentType.toMetadataLabMediaType(),
                     title = item.title,
                     posterUrl = item.posterUrl ?: item.media?.images?.posterUrl,
                     backdropUrl = item.backdropUrl ?: item.media?.images?.backdropUrl,
+                    externalIds = item.externalIds.toProviderExternalIds(),
                     season = item.seasonNumber,
                     episode = item.episodeNumber,
                     addedAtEpochMs = parseIsoToEpochMs(item.addedAt) ?: System.currentTimeMillis(),
@@ -1143,49 +1149,24 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun CrispyBackendClient.ProviderLibraryItem.legacyContentId(): String {
-        val imdb = media?.externalIds?.imdb?.trim().orEmpty()
-        if (imdb.isNotBlank()) return imdb.lowercase(Locale.US)
-
-        val tmdb = media?.tmdbId ?: media?.showTmdbId
-        if (tmdb != null && tmdb > 0) {
-            return "tmdb:$tmdb"
-        }
-
-        return contentId.trim().ifEmpty { title }
+    private fun CrispyBackendClient.MetadataExternalIds?.toProviderExternalIds(): ProviderExternalIds? {
+        val ids = this ?: return null
+        if (ids.tmdb == null && ids.imdb == null && ids.tvdb == null) return null
+        return ProviderExternalIds(tmdb = ids.tmdb, imdb = ids.imdb, tvdb = ids.tvdb)
     }
 
-    private fun CrispyBackendClient.MetadataView.legacyContinueWatchingContentId(): String {
-        val imdb = externalIds.imdb?.trim().orEmpty()
-        if (mediaType.equals("episode", ignoreCase = true)) {
-            if (showTmdbId != null && showTmdbId > 0) {
-                return "tmdb:$showTmdbId"
-            }
-            if (imdb.isNotBlank()) {
-                return imdb.lowercase(Locale.US)
-            }
-        }
-
-        if (imdb.isNotBlank()) {
-            return imdb.lowercase(Locale.US)
-        }
-        if (tmdbId != null && tmdbId > 0) {
-            return "tmdb:$tmdbId"
-        }
-        if (showTmdbId != null && showTmdbId > 0) {
-            return "tmdb:$showTmdbId"
-        }
-        return id.trim().ifEmpty { mediaKey }
+    private fun CrispyBackendClient.MetadataView.canonicalContentId(): String {
+        return id.trim()
     }
 
-    private fun CrispyBackendClient.MetadataView.legacyContinueWatchingTitle(): String {
+    private fun CrispyBackendClient.MetadataView.continueWatchingTitle(): String {
         return when {
-            mediaType.equals("episode", ignoreCase = true) -> subtitle?.trim().orEmpty().ifBlank { title?.trim().orEmpty() }.ifBlank { legacyContinueWatchingContentId() }
-            else -> title?.trim().orEmpty().ifBlank { legacyContinueWatchingContentId() }
+            mediaType.equals("episode", ignoreCase = true) -> subtitle?.trim().orEmpty().ifBlank { title?.trim().orEmpty() }.ifBlank { canonicalContentId() }
+            else -> title?.trim().orEmpty().ifBlank { canonicalContentId() }
         }
     }
 
-    private fun String.toLegacyMediaType(): MetadataLabMediaType {
+    private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
         return when (trim().lowercase(Locale.US)) {
             "show", "series", "tv", "episode" -> MetadataLabMediaType.SERIES
             else -> MetadataLabMediaType.MOVIE

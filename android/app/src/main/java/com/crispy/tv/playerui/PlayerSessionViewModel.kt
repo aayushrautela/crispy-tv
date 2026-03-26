@@ -387,6 +387,7 @@ class PlayerSessionViewModel(
         val nextSubtitle = buildPlayerSubtitle(nextMediaType, details, nextTitle, nextSeason, nextEpisodeNumber)
         val nextIdentity =
             PlaybackIdentity(
+                contentId = details.id,
                 imdbId = details.imdbId,
                 tmdbId =
                     when (nextMediaType) {
@@ -439,9 +440,12 @@ class PlayerSessionViewModel(
         val rawId = rawPlaybackId ?: return
         val mediaTypeHint = activeIdentity?.contentType
         val snapshotDetails = _uiState.value.details
+        val canonicalContentId =
+            launchSnapshotState?.contentId?.trim()?.takeIf { it.isNotBlank() }
+                ?: activeIdentity?.contentId?.trim()?.takeIf { it.isNotBlank() }
 
         val backendTitleId =
-            launchSnapshotState?.contentId?.trim()?.takeIf { it.isNotBlank() }
+            canonicalContentId
                 ?: snapshotDetails?.id?.trim()?.takeIf { it.isNotBlank() && !it.startsWith("tt", ignoreCase = true) && !it.startsWith("tmdb:", ignoreCase = true) }
         val session = withContext(Dispatchers.IO) { runCatching { supabase.ensureValidSession() }.getOrNull() }
         val backendDetail =
@@ -1048,7 +1052,7 @@ private fun buildFallbackDetails(
     artworkUrl: String?,
     identity: PlaybackIdentity?,
 ): MediaDetails? {
-    val contentId = rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val contentId = identity?.contentId?.trim()?.takeIf { it.isNotBlank() } ?: rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedTitle = title.trim().ifBlank { return null }
     val mediaType =
         when (identity?.contentType) {
@@ -1118,7 +1122,6 @@ private fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
         directors = emptyList(),
         creators = emptyList(),
         videos = emptyList(),
-        mediaKey = mediaKey,
         tmdbId = tmdbId,
         showTmdbId = showTmdbId,
         seasonNumber = seasonNumber,

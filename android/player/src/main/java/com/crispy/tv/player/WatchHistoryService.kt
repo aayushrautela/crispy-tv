@@ -79,6 +79,12 @@ data class ProviderLibraryFolder(
     val itemCount: Int
 )
 
+data class ProviderExternalIds(
+    val tmdb: Int? = null,
+    val imdb: String? = null,
+    val tvdb: Int? = null,
+)
+
 data class ProviderLibraryItem(
     val provider: WatchProvider,
     val folderId: String,
@@ -87,6 +93,7 @@ data class ProviderLibraryItem(
     val title: String,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
+    val externalIds: ProviderExternalIds? = null,
     val season: Int? = null,
     val episode: Int? = null,
     val addedAtEpochMs: Long = System.currentTimeMillis()
@@ -169,6 +176,7 @@ interface ProviderSessionBackend {
 }
 
 data class PlaybackIdentity(
+    val contentId: String? = null,
     val imdbId: String?,
     val tmdbId: Int? = null,
     val contentType: MetadataLabMediaType,

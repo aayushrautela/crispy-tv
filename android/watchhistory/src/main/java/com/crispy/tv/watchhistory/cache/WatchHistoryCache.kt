@@ -5,6 +5,7 @@ import android.util.Log
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.ProviderExternalIds
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.ProviderLibrarySnapshot
@@ -183,6 +184,15 @@ class WatchHistoryCache(
                     .put("title", item.title)
                     .put("posterUrl", item.posterUrl)
                     .put("backdropUrl", item.backdropUrl)
+                    .put(
+                        "externalIds",
+                        item.externalIds?.let { ids ->
+                            JSONObject()
+                                .put("tmdb", ids.tmdb)
+                                .put("imdb", ids.imdb)
+                                .put("tvdb", ids.tvdb)
+                        },
+                    )
                     .put("season", item.season)
                     .put("episode", item.episode)
                     .put("addedAtEpochMs", item.addedAtEpochMs)
@@ -341,6 +351,7 @@ class WatchHistoryCache(
             val title = obj.optString("title").trim().ifEmpty { contentId }
             val posterUrl = obj.optString("posterUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val backdropUrl = obj.optString("backdropUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val externalIds = obj.optProviderExternalIds()
             val season = obj.optInt("season", 0).takeIf { it > 0 }
             val episode = obj.optInt("episode", 0).takeIf { it > 0 }
             val addedAtEpochMs = obj.optLong("addedAtEpochMs", updatedAt)
@@ -355,6 +366,7 @@ class WatchHistoryCache(
                     title = title,
                     posterUrl = posterUrl,
                     backdropUrl = backdropUrl,
+                    externalIds = externalIds,
                     season = season,
                     episode = episode,
                     addedAtEpochMs = addedAtEpochMs,
@@ -372,4 +384,15 @@ class WatchHistoryCache(
     private companion object {
         private const val TAG = "WatchHistoryCache"
     }
+}
+
+private fun JSONObject.optProviderExternalIds(): ProviderExternalIds? {
+    val json = optJSONObject("externalIds") ?: return null
+    val tmdb = json.optInt("tmdb").takeIf { it > 0 }
+    val imdb = json.optString("imdb").trim().ifBlank { null }
+    val tvdb = json.optInt("tvdb").takeIf { it > 0 }
+    if (tmdb == null && imdb == null && tvdb == null) {
+        return null
+    }
+    return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb)
 }

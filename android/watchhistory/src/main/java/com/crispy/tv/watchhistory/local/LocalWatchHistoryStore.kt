@@ -1,7 +1,6 @@
 package com.crispy.tv.watchhistory.local
 
 import android.content.SharedPreferences
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryEntry
@@ -56,7 +55,7 @@ class LocalWatchHistoryStore(
 
         val normalized =
             entries.mapNotNull { entry ->
-                val contentId = normalizeNuvioMediaId(entry.contentId).contentId.trim()
+                val contentId = entry.contentId.trim()
                 if (contentId.isEmpty()) {
                     return@mapNotNull null
                 }
@@ -90,13 +89,12 @@ class LocalWatchHistoryStore(
     }
 
     fun normalizeRequest(request: WatchHistoryRequest): NormalizedWatchRequest {
-        val normalizedId = normalizeNuvioMediaId(request.contentId)
-        val contentId = normalizedId.contentId.trim()
+        val contentId = request.contentId.trim()
         require(contentId.isNotEmpty()) { "Content ID is required" }
 
         val isSeries = request.contentType == MetadataLabMediaType.SERIES
-        val season = if (isSeries) request.season ?: normalizedId.season else null
-        val episode = if (isSeries) request.episode ?: normalizedId.episode else null
+        val season = if (isSeries) request.season else null
+        val episode = if (isSeries) request.episode else null
         if (isSeries) {
             require(season != null && season > 0) { "Season must be a positive number" }
             require(episode != null && episode > 0) { "Episode must be a positive number" }
@@ -202,7 +200,7 @@ class LocalWatchHistoryStore(
     }
 
     private fun watchedKey(contentType: MetadataLabMediaType, contentId: String, season: Int?, episode: Int?): String {
-        val normalizedId = normalizeNuvioMediaId(contentId).contentId.trim().lowercase(Locale.US)
+        val normalizedId = contentId.trim().lowercase(Locale.US)
         val typeKey = contentType.name.lowercase(Locale.US)
         return "$typeKey:$normalizedId::${season ?: -1}::${episode ?: -1}"
     }

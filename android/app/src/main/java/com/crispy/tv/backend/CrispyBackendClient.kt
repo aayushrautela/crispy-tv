@@ -450,6 +450,7 @@ class CrispyBackendClient(
         val title: String,
         val posterUrl: String?,
         val backdropUrl: String?,
+        val externalIds: MetadataExternalIds?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
         val addedAt: String?,

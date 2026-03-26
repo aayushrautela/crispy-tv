@@ -605,6 +605,7 @@ internal fun CrispyBackendClient.parseProviderLibraryItems(array: JSONArray?): L
                     title = title,
                     posterUrl = item.optNullableString("posterUrl"),
                     backdropUrl = item.optNullableString("backdropUrl"),
+                    externalIds = item.optJSONObject("externalIds")?.let(::parseMetadataExternalIds),
                     seasonNumber = item.optIntOrNull("seasonNumber"),
                     episodeNumber = item.optIntOrNull("episodeNumber"),
                     addedAt = item.optNullableString("addedAt"),

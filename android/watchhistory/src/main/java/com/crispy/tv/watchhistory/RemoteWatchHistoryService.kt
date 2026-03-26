@@ -613,6 +613,7 @@ class RemoteWatchHistoryService(
                 .copy(
                     currentTimeSeconds = currentSeconds.coerceIn(0.0, durationSeconds),
                     durationSeconds = durationSeconds,
+                    remoteImdbId = existing?.remoteImdbId ?: normalizedImdbIdOrNull(identity.imdbId),
                 )
 
         watchProgressStore.setWatchProgress(id = id, type = type, progress = next, episodeId = episodeId)
@@ -795,7 +796,7 @@ class RemoteWatchHistoryService(
         for (batchStart in items.indices step batchSize) {
             val batch = items.subList(batchStart, minOf(items.size, batchStart + batchSize))
             for (item in batch) {
-                if (!item.id.startsWith("tt")) continue
+                if (item.normalizedRemoteImdbId() == null) continue
 
                 val percent = item.progress.progressPercentOrZero()
                 val watchedAtEpochMs = item.progress.lastUpdatedEpochMs
@@ -841,7 +842,7 @@ class RemoteWatchHistoryService(
 
         var syncedCount = 0
         for (item in items) {
-            if (!item.id.startsWith("tt")) continue
+            if (item.normalizedRemoteImdbId() == null) continue
 
             val percent = item.progress.progressPercentOrZero()
             val ok =
@@ -1086,7 +1087,7 @@ class RemoteWatchHistoryService(
                 com.crispy.tv.player.MetadataLabMediaType.SERIES -> "series"
             }
 
-        val id = normalizedImdbIdOrNull(identity.imdbId) ?: return null
+        val id = identity.contentId?.trim()?.takeIf { it.isNotBlank() } ?: normalizedImdbIdOrNull(identity.imdbId) ?: return null
 
         val episodeId =
             if (identity.contentType == com.crispy.tv.player.MetadataLabMediaType.SERIES && identity.season != null && identity.episode != null) {
@@ -1105,15 +1106,16 @@ class RemoteWatchHistoryService(
     )
 
     private fun UnsyncedProgressItem.toTraktContentDataOrNull(): TraktScrobbleService.TraktContentData? {
+        val imdbId = normalizedRemoteImdbId() ?: return null
         return when (type) {
-            "movie" -> TraktScrobbleService.TraktContentData.Movie(title = id, year = null, imdbId = id)
+            "movie" -> TraktScrobbleService.TraktContentData.Movie(title = id, year = null, imdbId = imdbId)
             else -> {
                 val seasonEpisode = episodeSeasonEpisode() ?: return null
                 TraktScrobbleService.TraktContentData.Episode(
                     title = id,
                     showTitle = id,
                     showYear = null,
-                    showImdbId = id,
+                    showImdbId = imdbId,
                     season = seasonEpisode.first,
                     episode = seasonEpisode.second,
                 )
@@ -1143,7 +1145,7 @@ class RemoteWatchHistoryService(
     }
 
     private fun UnsyncedProgressItem.toSimklContentDataOrNull(): SimklService.SimklScrobbleContent? {
-        val ids = SimklService.SimklIds(imdbId = id)
+        val ids = SimklService.SimklIds(imdbId = normalizedRemoteImdbId() ?: return null)
         return when (type) {
             "movie" -> SimklService.SimklScrobbleContent.Movie(title = id, year = null, ids = ids)
             else -> {
@@ -1187,7 +1189,7 @@ class RemoteWatchHistoryService(
     }
 
     private suspend fun traktAddToHistory(item: UnsyncedProgressItem, watchedAtEpochMs: Long): Boolean {
-        val imdb = normalizedImdbIdOrNull(item.id) ?: return false
+        val imdb = item.normalizedRemoteImdbId() ?: return false
         val watchedAt = Instant.ofEpochMilli(watchedAtEpochMs).toString()
 
         val payload =
@@ -1231,7 +1233,7 @@ class RemoteWatchHistoryService(
     }
 
     private suspend fun simklAddToHistory(item: UnsyncedProgressItem): Boolean {
-        val imdb = normalizedImdbIdOrNull(item.id) ?: return false
+        val imdb = item.normalizedRemoteImdbId() ?: return false
 
         val payload =
             when (item.type) {
@@ -1290,6 +1292,10 @@ class RemoteWatchHistoryService(
         }
 
         return null
+    }
+
+    private fun UnsyncedProgressItem.normalizedRemoteImdbId(): String? {
+        return normalizedImdbIdOrNull(remoteImdbId)
     }
 
     private fun WatchProgress.needsTraktSync(): Boolean {

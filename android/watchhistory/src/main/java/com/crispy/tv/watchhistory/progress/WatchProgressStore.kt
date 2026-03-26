@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -20,6 +21,7 @@ data class WatchProgress(
     val currentTimeSeconds: Double,
     val durationSeconds: Double,
     val lastUpdatedEpochMs: Long,
+    val remoteImdbId: String? = null,
     val addonId: String? = null,
     val traktSynced: Boolean = false,
     val traktLastSyncedEpochMs: Long? = null,
@@ -40,6 +42,7 @@ data class UnsyncedProgressItem(
     val id: String,
     val type: String,
     val episodeId: String?,
+    val remoteImdbId: String?,
     val progress: WatchProgress,
 )
 
@@ -271,6 +274,7 @@ class WatchProgressStore(
                         id = parts[1],
                         type = parts[0],
                         episodeId = episodeId,
+                        remoteImdbId = progress.remoteImdbId,
                         progress = progress,
                     )
             }
@@ -414,6 +418,7 @@ class WatchProgressStore(
                     currentTimeSeconds = currentTime,
                     durationSeconds = durationSeconds,
                     lastUpdatedEpochMs = timestamp,
+                    remoteImdbId = normalizedImdbIdOrNull(id),
                     traktSynced = provider == Provider.TRAKT,
                     simklSynced = provider == Provider.SIMKL,
                     traktLastSyncedEpochMs = if (provider == Provider.TRAKT) nowEpochMs() else null,
@@ -477,6 +482,7 @@ class WatchProgressStore(
                 currentTimeSeconds = currentTime,
                 durationSeconds = duration,
                 lastUpdatedEpochMs = timestamp,
+                remoteImdbId = local.remoteImdbId ?: normalizedImdbIdOrNull(id),
                 traktSynced = if (provider == Provider.TRAKT) true else local.traktSynced,
                 simklSynced = if (provider == Provider.SIMKL) true else local.simklSynced,
                 traktLastSyncedEpochMs = if (provider == Provider.TRAKT) nowEpochMs() else local.traktLastSyncedEpochMs,
@@ -618,6 +624,7 @@ class WatchProgressStore(
                 currentTimeSeconds = obj.optDouble("currentTime", 0.0),
                 durationSeconds = obj.optDouble("duration", 0.0),
                 lastUpdatedEpochMs = obj.optLong("lastUpdated", 0L),
+                remoteImdbId = obj.optString("remoteImdbId").trim().ifBlank { null },
                 addonId = obj.optString("addonId").trim().ifBlank { null },
                 traktSynced = obj.optBoolean("traktSynced", false),
                 traktLastSyncedEpochMs = obj.optLongOrNull("traktLastSynced"),
@@ -646,6 +653,7 @@ class WatchProgressStore(
         obj.put("currentTime", currentTimeSeconds)
         obj.put("duration", durationSeconds)
         obj.put("lastUpdated", lastUpdatedEpochMs)
+        if (!remoteImdbId.isNullOrBlank()) obj.put("remoteImdbId", remoteImdbId)
         if (!addonId.isNullOrBlank()) obj.put("addonId", addonId)
 
         obj.put("traktSynced", traktSynced)
@@ -657,6 +665,24 @@ class WatchProgressStore(
         if (simklProgressPercent != null) obj.put("simklProgress", simklProgressPercent)
 
         return obj
+    }
+
+    private fun normalizedImdbIdOrNull(raw: String?): String? {
+        val value = raw?.trim()?.lowercase(Locale.US).orEmpty()
+        if (value.isBlank()) return null
+
+        val candidate =
+            when {
+                value.startsWith("tt") -> value
+                value.startsWith("imdb:") -> value.substringAfter("imdb:")
+                value.all { it.isDigit() } -> "tt$value"
+                else -> return null
+            }
+
+        if (!candidate.startsWith("tt")) return null
+        if (candidate.length < 4) return null
+        if (!candidate.substring(2).all { it.isDigit() }) return null
+        return candidate
     }
 
     private companion object {

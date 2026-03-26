@@ -4,6 +4,7 @@ import android.util.Log
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.ProviderExternalIds
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
@@ -356,6 +357,7 @@ internal class SimklWatchHistoryProvider(
                     title = title,
                     posterUrl = posterUrl,
                     backdropUrl = backdropUrl,
+                    externalIds = providerExternalIds(ids),
                     addedAtEpochMs = addedAtEpochMs,
                 )
         }
@@ -397,6 +399,7 @@ internal class SimklWatchHistoryProvider(
                     title = title,
                     posterUrl = posterUrl,
                     backdropUrl = backdropUrl,
+                    externalIds = providerExternalIds(ids),
                     addedAtEpochMs = addedAtEpochMs,
                 )
         }
@@ -423,10 +426,30 @@ internal class SimklWatchHistoryProvider(
             contentId = contentId,
             contentType = contentType,
             title = title,
+            externalIds = null,
             season = season,
             episode = episode,
             addedAtEpochMs = lastUpdatedEpochMs,
         )
+    }
+
+    private fun providerExternalIds(ids: JSONObject?): ProviderExternalIds? {
+        if (ids == null) return null
+        val tmdb =
+            when (val raw = ids.opt("tmdb")) {
+                is Number -> raw.toInt().takeIf { it > 0 }
+                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
+                else -> null
+            }
+        val imdb = normalizedImdbIdOrNull(ids.optString("imdb"))
+        val tvdb =
+            when (val raw = ids.opt("tvdb")) {
+                is Number -> raw.toInt().takeIf { it > 0 }
+                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
+                else -> null
+            }
+        if (tmdb == null && imdb == null && tvdb == null) return null
+        return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb)
     }
 
     private fun contentIdFromIds(ids: JSONObject?): String {

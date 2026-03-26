@@ -24,7 +24,6 @@ data class PlayerEpisodeSnapshot(
 data class PlayerLaunchSnapshot(
     val contentId: String,
     val imdbId: String? = null,
-    val mediaKey: String? = null,
     val tmdbId: Int? = null,
     val showTmdbId: Int? = null,
     val seasonNumber: Int? = null,
@@ -49,7 +48,6 @@ data class PlayerLaunchSnapshot(
         return JSONObject()
             .put("content_id", contentId)
             .put("imdb_id", imdbId)
-            .put("media_key", mediaKey)
             .put("tmdb_id", tmdbId)
             .put("show_tmdb_id", showTmdbId)
             .put("season_number", seasonNumber)
@@ -110,7 +108,6 @@ data class PlayerLaunchSnapshot(
             directors = emptyList(),
             creators = emptyList(),
             videos = seasonEpisodes.map(PlayerEpisodeSnapshot::toMediaVideo),
-            mediaKey = mediaKey,
             tmdbId = tmdbId,
             showTmdbId = showTmdbId,
             seasonNumber = seasonNumber,
@@ -129,7 +126,6 @@ data class PlayerLaunchSnapshot(
                 PlayerLaunchSnapshot(
                     contentId = json.optString("content_id").trim(),
                     imdbId = json.optString("imdb_id").trim().ifBlank { null },
-                    mediaKey = json.optString("media_key").trim().ifBlank { null },
                     tmdbId = json.optInt("tmdb_id").takeIf { it > 0 },
                     showTmdbId = json.optInt("show_tmdb_id").takeIf { it > 0 },
                     seasonNumber = json.optInt("season_number").takeIf { it > 0 },
