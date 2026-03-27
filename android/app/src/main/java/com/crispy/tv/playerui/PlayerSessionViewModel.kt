@@ -15,6 +15,23 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.details.StreamSelectorUiState
+import com.crispy.tv.metadata.mergeEnhancements
+import com.crispy.tv.metadata.toMediaDetails
+import com.crispy.tv.metadata.toMediaVideo
+import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.metadata.tmdbLookupId
+import com.crispy.tv.metadata.seasonNumbers
+import com.crispy.tv.playback.PlayerStreamLookupTarget
+import com.crispy.tv.playback.StreamLookupTarget
+import com.crispy.tv.playback.applyProviderResult
+import com.crispy.tv.playback.buildPlayerSubtitle
+import com.crispy.tv.playback.buildStreamStatusMessage
+import com.crispy.tv.playback.finalizeFrom
+import com.crispy.tv.playback.findEpisodeForLookupId
+import com.crispy.tv.playback.matchesTarget
+import com.crispy.tv.playback.resolveStreamLookupTarget
+import com.crispy.tv.playback.toLoadingUiState
+import com.crispy.tv.playback.toUiState
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
@@ -32,7 +49,6 @@ import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
-import com.crispy.tv.ratings.formatRating
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -1083,107 +1099,6 @@ private fun buildFallbackDetails(
         seasonNumber = identity?.season,
         episodeNumber = identity?.episode,
         addonId = null,
-    )
-}
-
-private fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
-    return item.toMediaDetails()
-}
-
-private fun CrispyBackendClient.MetadataTitleDetailResponse.seasonNumbers(): List<Int> {
-    val seasonNumbers = seasons.map { it.seasonNumber }.filter { it > 0 }.distinct().sorted()
-    if (seasonNumbers.isNotEmpty()) return seasonNumbers
-    val seasonCount = item.seasonCount ?: return emptyList()
-    return if (seasonCount > 0) (1..seasonCount).toList() else emptyList()
-}
-
-private fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
-    val resolvedMediaType =
-        if (mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true)) {
-            "series"
-        } else {
-            "movie"
-        }
-    return MediaDetails(
-        id = id,
-        imdbId = externalIds.imdb,
-        mediaType = resolvedMediaType,
-        title = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: id,
-        posterUrl = images.posterUrl,
-        backdropUrl = images.backdropUrl,
-        logoUrl = images.logoUrl,
-        description = summary ?: overview,
-        genres = genres,
-        year = releaseYear?.toString() ?: releaseDate?.take(4),
-        runtime = runtimeMinutes?.takeIf { it > 0 }?.let { "$it min" },
-        certification = certification,
-        rating = formatRating(rating),
-        cast = emptyList(),
-        directors = emptyList(),
-        creators = emptyList(),
-        videos = emptyList(),
-        tmdbId = tmdbId,
-        showTmdbId = showTmdbId,
-        seasonNumber = seasonNumber,
-        episodeNumber = episodeNumber,
-        addonId = "backend",
-    )
-}
-
-private fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo? {
-    val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
-    val season = seasonNumber
-    val episode = episodeNumber
-    val lookupBase =
-        showExternalIds.imdb?.trim()?.takeIf { it.isNotBlank() }
-            ?: showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
-    val lookupId =
-        if (season != null && episode != null && lookupBase != null) {
-            "${com.crispy.tv.domain.metadata.normalizeNuvioMediaId(lookupBase).contentId}:$season:$episode"
-        } else {
-            null
-        }
-    return MediaVideo(
-        id = canonicalId,
-        title = title?.trim()?.takeIf { it.isNotBlank() } ?: if (episode != null) "Episode $episode" else canonicalId,
-        season = season,
-        episode = episode,
-        released = airDate,
-        overview = summary,
-        thumbnailUrl = images.stillUrl ?: images.posterUrl,
-        lookupId = lookupId,
-        tmdbId = tmdbId,
-        showTmdbId = showTmdbId,
-    )
-}
-
-private fun CrispyBackendClient.MetadataView.tmdbLookupId(): String? {
-    return externalIds.imdb?.trim()?.takeIf { it.isNotBlank() }
-        ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
-}
-
-private fun MediaDetails.tmdbLookupId(): String? {
-    return imdbId?.trim()?.takeIf { it.isNotBlank() }
-        ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
-}
-
-private fun MediaDetails.mergeEnhancements(enhancement: MediaDetails): MediaDetails {
-    return copy(
-        imdbId = imdbId ?: enhancement.imdbId,
-        posterUrl = posterUrl ?: enhancement.posterUrl,
-        backdropUrl = backdropUrl ?: enhancement.backdropUrl,
-        logoUrl = logoUrl ?: enhancement.logoUrl,
-        description = description ?: enhancement.description,
-        genres = if (genres.isNotEmpty()) genres else enhancement.genres,
-        year = year ?: enhancement.year,
-        runtime = runtime ?: enhancement.runtime,
-        certification = certification ?: enhancement.certification,
-        rating = rating ?: enhancement.rating,
-        cast = if (cast.isNotEmpty()) cast else enhancement.cast,
-        directors = if (directors.isNotEmpty()) directors else enhancement.directors,
-        creators = if (creators.isNotEmpty()) creators else enhancement.creators,
-        tmdbId = tmdbId ?: enhancement.tmdbId,
-        showTmdbId = showTmdbId ?: enhancement.showTmdbId,
     )
 }
 
