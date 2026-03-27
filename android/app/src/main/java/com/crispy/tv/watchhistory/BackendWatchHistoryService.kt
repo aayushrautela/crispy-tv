@@ -357,8 +357,8 @@ class BackendWatchHistoryService(
                 source = source.toLibrarySource(),
                 limitPerFolder = limitPerFolder.coerceAtLeast(1),
             )
-            val authProviders = persistAuthState(response.authProviders)
-            val snapshot = response.providers.firstOrNull { it.provider.equals(source.apiValue(), ignoreCase = true) }
+            val authProviders = persistAuthState(response.auth.providers)
+            val snapshot = response.diagnostics.providers.firstOrNull { it.provider.equals(source.apiValue(), ignoreCase = true) }
             val mapped = snapshot?.toProviderLibrary(source) ?: ProviderLibrarySnapshot(statusMessage = "")
             val status = when {
                 mapped.folders.isNotEmpty() || mapped.items.isNotEmpty() -> mapped.statusMessage
@@ -567,7 +567,7 @@ class BackendWatchHistoryService(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
                     limit = limit.coerceAtLeast(1),
-                )
+                ).items
                 .toContinueWatchingEntries(
                     provider = source,
                     nowMs = nowMs,

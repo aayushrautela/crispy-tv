@@ -1,6 +1,7 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
+import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
 import com.crispy.tv.backend.CrispyBackendClient.HomeResponse
 import com.crispy.tv.backend.CrispyBackendClient.HydratedRatingItem
 import com.crispy.tv.backend.CrispyBackendClient.HydratedWatchItem
@@ -14,7 +15,9 @@ import com.crispy.tv.backend.CrispyBackendClient.ProfileLibraryResponse
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAuthState
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchMutationInput
+import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateResponse
+import com.crispy.tv.backend.CrispyBackendClient.WatchStatesEnvelope
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -29,7 +32,12 @@ internal suspend fun CrispyBackendClient.getHomeApi(accessToken: String, profile
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return HomeResponse(sections = parseHomeSections(json.optJSONArray("sections")))
+    return HomeResponse(
+        profileId = json.optString("profileId").trim(),
+        source = json.optString("source").trim(),
+        generatedAt = json.optNullableString("generatedAt"),
+        sections = parseHomeSections(json.optJSONArray("sections")),
+    )
 }
 
 internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, profileId: String): CalendarResponse {
@@ -41,6 +49,8 @@ internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, pro
     )
     val json = JSONObject(requireSuccess(response))
     return CalendarResponse(
+        profileId = json.optString("profileId").trim(),
+        source = json.optString("source").trim(),
         generatedAt = json.optNullableString("generatedAt"),
         items = parseCalendarItems(json.optJSONArray("items")),
     )
@@ -86,9 +96,11 @@ internal suspend fun CrispyBackendClient.getProfileLibraryApi(
     return ProfileLibraryResponse(
         profileId = json.optString("profileId").trim(),
         source = json.optString("source").trim().ifBlank { source?.apiValue ?: LibrarySource.ALL.apiValue },
-        authProviders = parseProviderAuthStates(json.optJSONObject("auth")?.optJSONArray("providers")),
+        generatedAt = json.optNullableString("generatedAt"),
+        auth = parseLibraryAuth(json.optJSONObject("auth")),
+        canonical = parseCanonicalLibrary(json.optJSONObject("canonical") ?: JSONObject()),
         native = json.optJSONObject("native")?.let(::parseNativeLibrary),
-        providers = parseProviderLibrarySnapshots(json.optJSONArray("providers")),
+        diagnostics = parseLibraryDiagnostics(json.optJSONObject("diagnostics")),
     )
 }
 
@@ -180,7 +192,7 @@ internal suspend fun CrispyBackendClient.listContinueWatchingApi(
     accessToken: String,
     profileId: String,
     limit: Int = 20,
-): List<HydratedWatchItem> {
+): CanonicalWatchCollectionResponse<HydratedWatchItem> {
     return listHydratedWatchItemsApi(accessToken, profileId, path = "continue-watching", limit = limit)
 }
 
@@ -202,7 +214,7 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
     accessToken: String,
     profileId: String,
     limit: Int = 50,
-): List<HydratedWatchItem> {
+): CanonicalWatchCollectionResponse<HydratedWatchItem> {
     return listHydratedWatchItemsApi(accessToken, profileId, path = "history", limit = limit)
 }
 
@@ -210,7 +222,7 @@ internal suspend fun CrispyBackendClient.listWatchlistApi(
     accessToken: String,
     profileId: String,
     limit: Int = 50,
-): List<HydratedWatchlistItem> {
+): CanonicalWatchCollectionResponse<HydratedWatchlistItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist".toHttpUrl().newBuilder()
@@ -220,14 +232,14 @@ internal suspend fun CrispyBackendClient.listWatchlistApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseHydratedWatchlistItems(json.optJSONArray("items"))
+    return parseHydratedWatchlistCollectionResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.listRatingsApi(
     accessToken: String,
     profileId: String,
     limit: Int = 50,
-): List<HydratedRatingItem> {
+): CanonicalWatchCollectionResponse<HydratedRatingItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/ratings".toHttpUrl().newBuilder()
@@ -237,14 +249,14 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseHydratedRatingItems(json.optJSONArray("items"))
+    return parseHydratedRatingCollectionResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.getWatchStateApi(
     accessToken: String,
     profileId: String,
     input: MediaLookupInput,
-): WatchStateResponse {
+): WatchStateEnvelope {
     checkConfigured()
     val response = httpClient.get(
         url = metadataLookupUrl(
@@ -258,14 +270,14 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseWatchStateResponse(json)
+    return parseWatchStateEnvelope(json)
 }
 
 internal suspend fun CrispyBackendClient.getWatchStatesApi(
     accessToken: String,
     profileId: String,
     items: List<MediaLookupInput>,
-): List<WatchStateResponse> {
+): WatchStatesEnvelope {
     checkConfigured()
     val payload = JSONObject().put(
         "items",
@@ -286,13 +298,7 @@ internal suspend fun CrispyBackendClient.getWatchStatesApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return buildList {
-        val array = json.optJSONArray("items") ?: JSONArray()
-        for (index in 0 until array.length()) {
-            val item = array.optJSONObject(index) ?: continue
-            add(parseWatchStateResponse(item))
-        }
-    }
+    return parseWatchStatesEnvelope(json)
 }
 
 internal suspend fun CrispyBackendClient.markWatchedApi(
@@ -392,7 +398,7 @@ private suspend fun CrispyBackendClient.listHydratedWatchItemsApi(
     profileId: String,
     path: String,
     limit: Int,
-): List<HydratedWatchItem> {
+): CanonicalWatchCollectionResponse<HydratedWatchItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl().newBuilder()
@@ -402,7 +408,7 @@ private suspend fun CrispyBackendClient.listHydratedWatchItemsApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseHydratedWatchItems(json.optJSONArray("items"))
+    return parseHydratedWatchCollectionResponse(json)
 }
 
 private suspend fun CrispyBackendClient.postWatchMutationApi(

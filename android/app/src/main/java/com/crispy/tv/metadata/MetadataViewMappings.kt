@@ -1,7 +1,7 @@
 package com.crispy.tv.metadata
 
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
+import com.crispy.tv.domain.metadata.normalizeMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
@@ -9,8 +9,13 @@ import com.crispy.tv.ratings.formatRating
 import java.util.Locale
 
 internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
-    return item.toMediaDetails().copy(
-        videos = emptyList(),
+    val itemDetails = item.toMediaDetails()
+    val mergedVideos = (itemDetails.videos + videos.mapNotNull { it.toMediaVideo() }).distinctBy { it.id }
+    return itemDetails.copy(
+        cast = cast.map { it.name },
+        directors = directors.map { it.name },
+        creators = creators.map { it.name },
+        videos = mergedVideos,
     )
 }
 
@@ -39,7 +44,7 @@ internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
         cast = emptyList(),
         directors = emptyList(),
         creators = emptyList(),
-        videos = emptyList(),
+        videos = nextEpisode?.let { listOfNotNull(it.toMediaVideo()) } ?: emptyList(),
         tmdbId = tmdbId,
         showTmdbId = showTmdbId,
         seasonNumber = seasonNumber,
@@ -63,7 +68,7 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
             ?: showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
     val lookupId =
         if (season != null && episode != null && showLookupBase != null) {
-            "${normalizeNuvioMediaId(showLookupBase).contentId}:$season:$episode"
+            "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
         } else {
             null
         }
@@ -78,6 +83,54 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
         lookupId = lookupId,
         tmdbId = tmdbId,
         showTmdbId = showTmdbId,
+    )
+}
+
+internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVideo? {
+    val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
+    val season = seasonNumber
+    val episode = episodeNumber
+    val titleText =
+        title?.trim()?.takeIf { it.isNotBlank() }
+            ?: when {
+                episode != null -> "Episode $episode"
+                else -> canonicalId
+            }
+    val showLookupBase = showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
+    val lookupId =
+        if (season != null && episode != null && showLookupBase != null) {
+            "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
+        } else {
+            null
+        }
+    return MediaVideo(
+        id = canonicalId,
+        title = titleText,
+        season = season,
+        episode = episode,
+        released = airDate,
+        overview = summary,
+        thumbnailUrl = images.stillUrl ?: images.posterUrl,
+        lookupId = lookupId,
+        tmdbId = tmdbId,
+        showTmdbId = showTmdbId,
+    )
+}
+
+internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
+    val canonicalId = id.trim().ifBlank { key.trim() }.ifBlank { return null }
+    val titleText = name?.trim()?.takeIf { it.isNotBlank() } ?: type?.trim()?.takeIf { it.isNotBlank() } ?: canonicalId
+    return MediaVideo(
+        id = canonicalId,
+        title = titleText,
+        season = null,
+        episode = null,
+        released = publishedAt,
+        overview = type,
+        thumbnailUrl = thumbnailUrl,
+        lookupId = url,
+        tmdbId = null,
+        showTmdbId = null,
     )
 }
 

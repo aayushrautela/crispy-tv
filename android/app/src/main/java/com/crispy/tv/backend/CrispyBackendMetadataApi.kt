@@ -150,6 +150,13 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
     return MetadataTitleDetailResponse(
         item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend title detail is missing item.")),
         seasons = parseMetadataSeasonViews(json.optJSONArray("seasons")),
+        videos = parseMetadataVideoViews(json.optJSONArray("videos")),
+        cast = parseMetadataPersonRefViews(json.optJSONArray("cast")),
+        directors = parseMetadataPersonRefViews(json.optJSONArray("directors")),
+        creators = parseMetadataPersonRefViews(json.optJSONArray("creators")),
+        reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
+        production = parseMetadataProductionInfoView(json.optJSONObject("production")),
+        collection = parseMetadataCollectionView(json.optJSONObject("collection")),
     )
 }
 

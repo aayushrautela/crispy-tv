@@ -56,9 +56,7 @@ object SupabaseServicesProvider {
                 HomeCatalogService(
                     supabaseAccountClient = accountClient(appContext),
                     activeProfileStore = activeProfileStore(appContext),
-                    httpClient = AppHttp.client(appContext),
-                    supabaseUrl = BuildConfig.SUPABASE_URL,
-                    supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
+                    backendClient = BackendServicesProvider.backendClient(appContext),
                     diskCacheStore = HomeCatalogDiskCacheStore(appContext),
                 )
             homeCatalogService = created

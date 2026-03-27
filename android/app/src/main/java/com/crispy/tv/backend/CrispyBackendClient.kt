@@ -279,6 +279,69 @@ class CrispyBackendClient(
     data class MetadataTitleDetailResponse(
         val item: MetadataView,
         val seasons: List<MetadataSeasonView>,
+        val videos: List<MetadataVideoView>,
+        val cast: List<MetadataPersonRefView>,
+        val directors: List<MetadataPersonRefView>,
+        val creators: List<MetadataPersonRefView>,
+        val reviews: List<MetadataReviewView>,
+        val production: MetadataProductionInfoView,
+        val collection: MetadataCollectionView?,
+    )
+
+    data class MetadataVideoView(
+        val id: String,
+        val key: String,
+        val name: String?,
+        val site: String?,
+        val type: String?,
+        val official: Boolean,
+        val publishedAt: String?,
+        val url: String?,
+        val thumbnailUrl: String?,
+    )
+
+    data class MetadataPersonRefView(
+        val id: String,
+        val tmdbPersonId: Int,
+        val name: String,
+        val role: String?,
+        val department: String?,
+        val profileUrl: String?,
+    )
+
+    data class MetadataReviewView(
+        val id: String,
+        val author: String?,
+        val username: String?,
+        val content: String,
+        val createdAt: String?,
+        val updatedAt: String?,
+        val url: String?,
+        val rating: Double?,
+        val avatarUrl: String?,
+    )
+
+    data class MetadataCompanyView(
+        val id: Int,
+        val name: String,
+        val logoUrl: String?,
+        val originCountry: String?,
+    )
+
+    data class MetadataCollectionView(
+        val id: Int,
+        val name: String,
+        val posterUrl: String?,
+        val backdropUrl: String?,
+    )
+
+    data class MetadataProductionInfoView(
+        val originalLanguage: String?,
+        val originCountries: List<String>,
+        val spokenLanguages: List<String>,
+        val productionCountries: List<String>,
+        val companies: List<MetadataCompanyView>,
+        val networks: List<MetadataCompanyView>,
     )
 
     data class MetadataSeasonDetailResponse(
@@ -394,6 +457,14 @@ class CrispyBackendClient(
         val payload: Map<String, Any?>,
     )
 
+    data class CanonicalWatchCollectionResponse<T>(
+        val profileId: String,
+        val kind: String,
+        val source: String,
+        val generatedAt: String?,
+        val items: List<T>,
+    )
+
     data class WatchStateResponse(
         val media: MetadataView,
         val progress: WatchProgressView?,
@@ -402,6 +473,20 @@ class CrispyBackendClient(
         val watchlist: WatchlistStateView?,
         val rating: RatingStateView?,
         val watchedEpisodeKeys: List<String>,
+    )
+
+    data class WatchStateEnvelope(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val item: WatchStateResponse,
+    )
+
+    data class WatchStatesEnvelope(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val items: List<WatchStateResponse>,
     )
 
     data class CalendarItem(
@@ -413,18 +498,56 @@ class CrispyBackendClient(
     )
 
     data class CalendarResponse(
+        val profileId: String,
+        val source: String,
         val generatedAt: String?,
         val items: List<CalendarItem>,
     )
 
-    data class HomeSection(
-        val id: String,
-        val title: String,
-        val watchItems: List<HydratedWatchItem>,
-        val calendarItems: List<CalendarItem>,
+    data class HomeRecommendationItem(
+        val media: MetadataView,
+        val reason: String?,
+        val score: Double?,
+        val rank: Int?,
+        val payload: Map<String, Any?>,
     )
 
+    sealed interface HomeSection {
+        val id: String
+        val title: String
+        val kind: String
+        val source: String
+    }
+
+    data class HomeWatchSection(
+        override val id: String,
+        override val title: String,
+        override val kind: String = "watch",
+        override val source: String = "canonical_watch",
+        val items: List<HydratedWatchItem> = emptyList(),
+    ) : HomeSection
+
+    data class HomeCalendarSection(
+        override val id: String,
+        override val title: String,
+        override val kind: String = "calendar",
+        override val source: String = "canonical_calendar",
+        val items: List<CalendarItem> = emptyList(),
+    ) : HomeSection
+
+    data class HomeRecommendationSection(
+        override val id: String,
+        override val title: String,
+        override val kind: String = "recommendation",
+        override val source: String = "recommendation",
+        val items: List<HomeRecommendationItem> = emptyList(),
+        val meta: Map<String, Any?> = emptyMap(),
+    ) : HomeSection
+
     data class HomeResponse(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
         val sections: List<HomeSection>,
     )
 
@@ -465,12 +588,51 @@ class CrispyBackendClient(
         val items: List<ProviderLibraryItem>,
     )
 
+    data class LibraryAuth(
+        val providers: List<ProviderAuthState>,
+    )
+
+    data class CanonicalLibraryItem(
+        val key: String,
+        val mediaKey: String?,
+        val contentId: String,
+        val contentType: String,
+        val externalIds: MetadataExternalIds?,
+        val title: String,
+        val posterUrl: String?,
+        val backdropUrl: String?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val addedAt: String,
+        val providers: List<String>,
+        val folderIds: List<String>,
+        val media: MetadataView?,
+    )
+
+    data class CanonicalLibrary(
+        val source: String,
+        val generatedAt: String?,
+        val continueWatching: List<HydratedWatchItem>,
+        val history: List<HydratedWatchItem>,
+        val watchlist: List<HydratedWatchlistItem>,
+        val ratings: List<HydratedRatingItem>,
+        val items: List<CanonicalLibraryItem>,
+    )
+
+    data class LibraryDiagnostics(
+        val source: String,
+        val generatedAt: String?,
+        val providers: List<ProviderLibrarySnapshot>,
+    )
+
     data class ProfileLibraryResponse(
         val profileId: String,
         val source: String,
-        val authProviders: List<ProviderAuthState>,
+        val generatedAt: String?,
+        val auth: LibraryAuth,
+        val canonical: CanonicalLibrary,
         val native: NativeLibrary?,
-        val providers: List<ProviderLibrarySnapshot>,
+        val diagnostics: LibraryDiagnostics,
     )
 
     data class ProviderMutationResult(
@@ -744,7 +906,11 @@ class CrispyBackendClient(
         return sendWatchEventApi(accessToken, profileId, input)
     }
 
-    suspend fun listContinueWatching(accessToken: String, profileId: String, limit: Int = 20): List<HydratedWatchItem> {
+    suspend fun listContinueWatching(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 20,
+    ): CanonicalWatchCollectionResponse<HydratedWatchItem> {
         return listContinueWatchingApi(accessToken, profileId, limit)
     }
 
@@ -752,23 +918,39 @@ class CrispyBackendClient(
         return dismissContinueWatchingApi(accessToken, profileId, itemId)
     }
 
-    suspend fun listWatchHistory(accessToken: String, profileId: String, limit: Int = 50): List<HydratedWatchItem> {
+    suspend fun listWatchHistory(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 50,
+    ): CanonicalWatchCollectionResponse<HydratedWatchItem> {
         return listWatchHistoryApi(accessToken, profileId, limit)
     }
 
-    suspend fun listWatchlist(accessToken: String, profileId: String, limit: Int = 50): List<HydratedWatchlistItem> {
+    suspend fun listWatchlist(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 50,
+    ): CanonicalWatchCollectionResponse<HydratedWatchlistItem> {
         return listWatchlistApi(accessToken, profileId, limit)
     }
 
-    suspend fun listRatings(accessToken: String, profileId: String, limit: Int = 50): List<HydratedRatingItem> {
+    suspend fun listRatings(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 50,
+    ): CanonicalWatchCollectionResponse<HydratedRatingItem> {
         return listRatingsApi(accessToken, profileId, limit)
     }
 
-    suspend fun getWatchState(accessToken: String, profileId: String, input: MediaLookupInput): WatchStateResponse {
+    suspend fun getWatchState(accessToken: String, profileId: String, input: MediaLookupInput): WatchStateEnvelope {
         return getWatchStateApi(accessToken, profileId, input)
     }
 
-    suspend fun getWatchStates(accessToken: String, profileId: String, items: List<MediaLookupInput>): List<WatchStateResponse> {
+    suspend fun getWatchStates(
+        accessToken: String,
+        profileId: String,
+        items: List<MediaLookupInput>,
+    ): WatchStatesEnvelope {
         return getWatchStatesApi(accessToken, profileId, items)
     }
 
