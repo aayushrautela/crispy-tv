@@ -16,10 +16,10 @@ import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.details.StreamSelectorUiState
 import com.crispy.tv.metadata.mergeEnhancements
+import com.crispy.tv.metadata.tmdbLookupId
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.metadata.tmdbLookupId
 import com.crispy.tv.metadata.seasonNumbers
 import com.crispy.tv.playback.PlayerStreamLookupTarget
 import com.crispy.tv.playback.StreamLookupTarget

@@ -94,9 +94,19 @@ internal fun MediaDetails.providerBaseLookupId(): String? {
         ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }
 
+internal fun CrispyBackendClient.MetadataView.providerBaseLookupId(): String? {
+    return externalIds.imdb?.trim()?.takeIf { it.isNotBlank() }
+        ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
+}
+
 internal fun MediaDetails.tmdbLookupId(): String? {
     return imdbId?.trim()?.takeIf { it.isNotBlank() }
         ?: primaryTmdbId()?.takeIf { it > 0 }?.let { "tmdb:$it" }
+}
+
+internal fun CrispyBackendClient.MetadataView.tmdbLookupId(): String? {
+    return externalIds.imdb?.trim()?.takeIf { it.isNotBlank() }
+        ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }
 
 internal fun MediaDetails.primaryTmdbId(): Int? {

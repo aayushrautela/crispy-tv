@@ -8,6 +8,7 @@ import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.watchhistory.addEpisodeKey
 import com.crispy.tv.watchhistory.episodeWatchKeyCandidates
+import com.crispy.tv.watchhistory.isWatchedFolder
 import com.crispy.tv.watchhistory.preferredWatchProvider
 
 internal class EpisodeWatchStateResolver(
@@ -66,7 +67,7 @@ internal class EpisodeWatchStateResolver(
     private suspend fun resolveWatchKeys(): Set<String> {
         cachedEpisodeWatchKeys?.let { return it }
 
-        val localHistoryKeys =
+        val localHistoryKeys: List<String> =
             watchHistoryService
                 .listLocalHistory(limit = 1000)
                 .entries
@@ -77,7 +78,7 @@ internal class EpisodeWatchStateResolver(
                 }
 
         val source = preferredWatchProvider(watchHistoryService.authState())
-        val providerHistoryKeys =
+        val providerHistoryKeys: List<String> =
             if (source == WatchProvider.LOCAL) {
                 emptyList()
             } else {
@@ -88,7 +89,14 @@ internal class EpisodeWatchStateResolver(
                     } else {
                         watchHistoryService.listProviderLibrary(limitPerFolder = 1000, source = source)
                     }
-                snapshot.items.mapNotNull { item -> item.toEpisodeWatchKey(source) }
+                snapshot.items.mapNotNull { item ->
+                    if (item.provider != source || !source.isWatchedFolder(item.folderId)) {
+                        return@mapNotNull null
+                    }
+                    val season = item.season ?: return@mapNotNull null
+                    val episode = item.episode ?: return@mapNotNull null
+                    addEpisodeKey(item.contentId, season, episode)
+                }
             }
 
         val combined = LinkedHashSet<String>(localHistoryKeys.size + providerHistoryKeys.size)

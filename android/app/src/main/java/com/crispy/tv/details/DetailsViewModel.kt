@@ -574,6 +574,17 @@ class DetailsViewModel internal constructor(
             }
     }
 
+    private suspend fun resolveEpisodeWatchStates(
+        details: MediaDetails,
+        videos: List<MediaVideo>,
+    ): Map<String, EpisodeWatchState> {
+        val tmdbId = details.primaryTmdbId() ?: resolvedTmdbId
+        if (tmdbId != null) {
+            resolvedTmdbId = tmdbId
+        }
+        return episodeWatchStateResolver.resolve(details, videos, tmdbId)
+    }
+
     fun onOpenStreamSelectorForEpisode(videoId: String) {
         val state = _uiState.value
         val details = state.details
