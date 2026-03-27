@@ -11,8 +11,6 @@ import androidx.navigation.compose.composable
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.settings.AccountsProfilesRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
-import com.crispy.tv.settings.AiInsightsSettingsRoute
-import com.crispy.tv.settings.MetadataSettingsRoute
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.ProviderAuthPortalRoute
@@ -25,14 +23,8 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             onNavigateToAddonsSettings = {
                 navController.navigate(AppRoutes.AddonsSettingsRoute)
             },
-            onNavigateToMetadataSettings = {
-                navController.navigate(AppRoutes.MetadataSettingsRoute)
-            },
             onNavigateToPlaybackSettings = {
                 navController.navigate(AppRoutes.PlaybackSettingsRoute)
-            },
-            onNavigateToAiInsightsSettings = {
-                navController.navigate(AppRoutes.AiInsightsSettingsRoute)
             },
             onNavigateToProviderPortal = {
                 navController.navigate(AppRoutes.ProviderPortalRoute)
@@ -49,14 +41,6 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
     composable(AppRoutes.AddonsSettingsRoute) {
         AddonsSettingsRoute(onBack = { navController.popBackStack() })
-    }
-
-    composable(AppRoutes.AiInsightsSettingsRoute) {
-        AiInsightsSettingsRoute(onBack = { navController.popBackStack() })
-    }
-
-    composable(AppRoutes.MetadataSettingsRoute) {
-        MetadataSettingsRoute(onBack = { navController.popBackStack() })
     }
 
     composable(AppRoutes.ProviderPortalRoute) {

@@ -2,8 +2,6 @@ package com.crispy.tv.details
 
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.metadata.tmdbLookupId
-import com.crispy.tv.metadata.TmdbImdbIdResolver
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchProvider
@@ -26,17 +24,12 @@ internal data class ProviderState(
 internal class WatchCtaResolver(
     private val watchHistoryService: WatchHistoryService,
     private val requestedMediaType: MetadataLabMediaType,
-    private val tmdbImdbIdResolver: TmdbImdbIdResolver,
 ) {
 
     suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
         val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
         if (fromField != null) return details.copy(imdbId = fromField)
-
-        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
-        val lookupId = details.tmdbLookupId() ?: return details
-        val resolved = tmdbImdbIdResolver.resolveImdbId(lookupId, mediaType) ?: return details
-        return details.copy(imdbId = resolved)
+        return details
     }
 
     suspend fun resolveProviderState(

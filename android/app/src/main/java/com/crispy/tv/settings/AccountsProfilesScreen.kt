@@ -383,8 +383,6 @@ internal class AccountsProfilesViewModel(
                 profileStore.setActiveProfileId(userId, resolvedActive)
             }
 
-            val accountSyncError =
-                profileDataCloudSync.pullForActiveAccount().exceptionOrNull()?.message
             val settingsSyncError =
                 profileDataCloudSync.pullForActiveProfile().exceptionOrNull()?.message
             val providerSyncError =
@@ -403,7 +401,6 @@ internal class AccountsProfilesViewModel(
                     activeProfileId = resolvedActive,
                     statusMessage =
                         when {
-                            !accountSyncError.isNullOrBlank() -> "Account sync failed: $accountSyncError"
                             !settingsSyncError.isNullOrBlank() -> "Settings sync failed: $settingsSyncError"
                             !providerSyncError.isNullOrBlank() -> providerSyncError
                             else -> ""

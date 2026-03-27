@@ -31,19 +31,7 @@ class CrispyBackendClient(
 
     data class MeResponse(
         val user: User,
-        val accountSettings: AccountSettings,
         val profiles: List<Profile>,
-    )
-
-    data class AccountSettings(
-        val settings: Map<String, String>,
-        val hasOpenRouterKey: Boolean,
-        val hasOmdbApiKey: Boolean,
-    )
-
-    data class AccountSecret(
-        val key: String,
-        val value: String,
     )
 
     data class ProfileSettings(
@@ -286,6 +274,28 @@ class CrispyBackendClient(
         val reviews: List<MetadataReviewView>,
         val production: MetadataProductionInfoView,
         val collection: MetadataCollectionView?,
+        val similar: List<MetadataCardView>,
+    )
+
+    data class MetadataCardView(
+        val id: String,
+        val mediaKey: String,
+        val mediaType: String,
+        val kind: String,
+        val tmdbId: Int?,
+        val showTmdbId: Int?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val title: String?,
+        val subtitle: String?,
+        val summary: String?,
+        val overview: String?,
+        val images: MetadataImages,
+        val releaseDate: String?,
+        val releaseYear: Int?,
+        val runtimeMinutes: Int?,
+        val rating: Double?,
+        val status: String?,
     )
 
     data class MetadataVideoView(
@@ -342,6 +352,45 @@ class CrispyBackendClient(
         val productionCountries: List<String>,
         val companies: List<MetadataCompanyView>,
         val networks: List<MetadataCompanyView>,
+    )
+
+    data class OmdbRatingEntry(
+        val source: String,
+        val value: String,
+    )
+
+    data class OmdbContentView(
+        val imdbId: String,
+        val title: String?,
+        val type: String?,
+        val year: String?,
+        val rated: String?,
+        val released: String?,
+        val runtime: String?,
+        val genres: List<String>,
+        val directors: List<String>,
+        val writers: List<String>,
+        val actors: List<String>,
+        val plot: String?,
+        val language: String?,
+        val country: String?,
+        val awards: String?,
+        val posterUrl: String?,
+        val ratings: List<OmdbRatingEntry>,
+        val metascore: String?,
+        val imdbRating: String?,
+        val imdbVotes: String?,
+        val boxOffice: String?,
+        val production: String?,
+        val website: String?,
+        val totalSeasons: String?,
+        val response: String?,
+        val error: String?,
+    )
+
+    data class MetadataTitleContentResponse(
+        val item: MetadataView,
+        val omdb: OmdbContentView,
     )
 
     data class MetadataSeasonDetailResponse(
@@ -664,38 +713,6 @@ class CrispyBackendClient(
         return getMeApi(accessToken)
     }
 
-    suspend fun getAccountSettings(accessToken: String): AccountSettings {
-        return getAccountSettingsApi(accessToken)
-    }
-
-    suspend fun patchAccountSettings(accessToken: String, settings: Map<String, String>): AccountSettings {
-        return patchAccountSettingsApi(accessToken, settings)
-    }
-
-    suspend fun getOpenRouterSecret(accessToken: String): AccountSecret? {
-        return getOpenRouterSecretApi(accessToken)
-    }
-
-    suspend fun putOpenRouterSecret(accessToken: String, value: String): AccountSecret {
-        return putOpenRouterSecretApi(accessToken, value)
-    }
-
-    suspend fun deleteOpenRouterSecret(accessToken: String): Boolean {
-        return deleteOpenRouterSecretApi(accessToken)
-    }
-
-    suspend fun getOmdbApiSecret(accessToken: String): AccountSecret? {
-        return getOmdbApiSecretApi(accessToken)
-    }
-
-    suspend fun putOmdbApiSecret(accessToken: String, value: String): AccountSecret {
-        return putOmdbApiSecretApi(accessToken, value)
-    }
-
-    suspend fun deleteOmdbApiSecret(accessToken: String): Boolean {
-        return deleteOmdbApiSecretApi(accessToken)
-    }
-
     suspend fun createProfile(
         accessToken: String,
         name: String,
@@ -806,6 +823,10 @@ class CrispyBackendClient(
 
     suspend fun getMetadataTitleDetail(accessToken: String, id: String): MetadataTitleDetailResponse {
         return getMetadataTitleDetailApi(accessToken, id)
+    }
+
+    suspend fun getMetadataTitleContent(accessToken: String, id: String): MetadataTitleContentResponse {
+        return getMetadataTitleContentApi(accessToken, id)
     }
 
     suspend fun getMetadataSeasonDetail(accessToken: String, id: String, seasonNumber: Int): MetadataSeasonDetailResponse {

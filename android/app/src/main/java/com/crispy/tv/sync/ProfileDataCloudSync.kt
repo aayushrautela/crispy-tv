@@ -4,10 +4,6 @@ import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.settings.AiInsightsMode
-import com.crispy.tv.settings.AiInsightsSettings
-import com.crispy.tv.settings.AiInsightsSettingsStore
-import com.crispy.tv.settings.OmdbSettingsStore
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_SKIP_INTRO_ENABLED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_AUTOPLAY_ENABLED
 import com.crispy.tv.settings.PLAYBACK_SETTINGS_KEY_TRAILER_MUTED
@@ -18,44 +14,8 @@ class ProfileDataCloudSync(
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
     private val activeProfileStore: ActiveProfileStore = ActiveProfileStore(context),
-    private val aiInsightsSettingsStore: AiInsightsSettingsStore = AiInsightsSettingsStore(context),
-    private val omdbSettingsStore: OmdbSettingsStore = OmdbSettingsStore(context),
     private val shadowStore: ProfileDataShadowStore = ProfileDataShadowStore(context),
 ) {
-    suspend fun pullForActiveAccount(): Result<Unit> {
-        val session =
-            try {
-                supabase.ensureValidSession()
-            } catch (t: Throwable) {
-                return Result.failure(t)
-            }
-        if (session == null) return Result.success(Unit)
-
-        return try {
-            pullForAccount(session.accessToken)
-            Result.success(Unit)
-        } catch (t: Throwable) {
-            Result.failure(t)
-        }
-    }
-
-    suspend fun pushForActiveAccount(): Result<Unit> {
-        val session =
-            try {
-                supabase.ensureValidSession()
-            } catch (t: Throwable) {
-                return Result.failure(t)
-            }
-        if (session == null) return Result.success(Unit)
-
-        return try {
-            pushForAccount(session.accessToken)
-            Result.success(Unit)
-        } catch (t: Throwable) {
-            Result.failure(t)
-        }
-    }
-
     suspend fun pullForActiveProfile(): Result<Unit> {
         val session =
             try {
@@ -140,50 +100,8 @@ class ProfileDataCloudSync(
         )
     }
 
-    private suspend fun pullForAccount(accessToken: String) {
-        val remoteSettings = backend.getAccountSettings(accessToken)
-        applyAccountSettingsToLocal(remoteSettings)
-        backend.getOpenRouterSecret(accessToken)?.let { secret ->
-            aiInsightsSettingsStore.saveOpenRouterKey(secret.value)
-        }
-        backend.getOmdbApiSecret(accessToken)?.let { secret ->
-            omdbSettingsStore.saveOmdbKey(secret.value)
-        }
-    }
-
-    private suspend fun pushForAccount(accessToken: String) {
-        backend.patchAccountSettings(
-            accessToken = accessToken,
-            settings = buildAccountSettingsForCloud(),
-        )
-
-        val openRouterKey = aiInsightsSettingsStore.loadOpenRouterKey().trim()
-        if (openRouterKey.isBlank()) {
-            backend.deleteOpenRouterSecret(accessToken)
-        } else {
-            backend.putOpenRouterSecret(accessToken, openRouterKey)
-        }
-
-        val omdbKey = omdbSettingsStore.loadOmdbKey().trim()
-        if (omdbKey.isBlank()) {
-            backend.deleteOmdbApiSecret(accessToken)
-        } else {
-            backend.putOmdbApiSecret(accessToken, omdbKey)
-        }
-    }
-
     private fun applyProfileSettingsToLocal(settings: Map<String, String>) {
         applyPlaybackSettings(settings)
-    }
-
-    private fun applyAccountSettingsToLocal(settings: CrispyBackendClient.AccountSettings) {
-        val mode = settings.settings[KEY_AI_INSIGHTS_MODE]?.let(AiInsightsMode::fromRaw)
-        if (mode != null) {
-            val current = aiInsightsSettingsStore.loadSettings()
-            if (current.mode != mode) {
-                aiInsightsSettingsStore.saveSettings(current.copy(mode = mode))
-            }
-        }
     }
 
     private fun applyPlaybackSettings(settings: Map<String, String>) {
@@ -220,31 +138,13 @@ class ProfileDataCloudSync(
         result[KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED] = trailerAutoplayEnabled.toString()
         result[KEY_PLAYBACK_TRAILER_MUTED] = trailerMuted.toString()
 
-        val aiSettings: AiInsightsSettings = aiInsightsSettingsStore.loadSettings()
-        result[KEY_AI_INSIGHTS_MODE] = aiSettings.mode.raw
-        result.remove("ai.insights.model_type")
-        result.remove("ai.insights.custom_model_name")
-        result.remove(KEY_AI_OPENROUTER_KEY)
-        result.remove(KEY_METADATA_OMDB_KEY)
-
         return result
-    }
-
-    private fun buildAccountSettingsForCloud(): Map<String, String> {
-        val aiSettings: AiInsightsSettings = aiInsightsSettingsStore.loadSettings()
-        return linkedMapOf(
-            KEY_AI_INSIGHTS_MODE to aiSettings.mode.raw,
-        )
     }
 
     private companion object {
         private const val KEY_PLAYBACK_SKIP_INTRO_ENABLED = "playback.skip_intro_enabled"
         private const val KEY_PLAYBACK_TRAILER_AUTOPLAY_ENABLED = "playback.trailer_autoplay_enabled"
         private const val KEY_PLAYBACK_TRAILER_MUTED = "playback.trailer_muted"
-
-        private const val KEY_AI_INSIGHTS_MODE = "ai.insights.mode"
-        private const val KEY_AI_OPENROUTER_KEY = "ai.openrouter_key"
-        private const val KEY_METADATA_OMDB_KEY = "metadata.omdb_key"
     }
 }
 

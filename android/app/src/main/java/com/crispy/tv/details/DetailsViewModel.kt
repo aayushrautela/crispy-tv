@@ -16,14 +16,6 @@ import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.TmdbImdbIdResolver
-import com.crispy.tv.metadata.omdb.OmdbDetails
-import com.crispy.tv.metadata.omdb.OmdbRepository
-import com.crispy.tv.metadata.omdb.OmdbRepositoryProvider
-import com.crispy.tv.metadata.tmdb.TmdbEnrichment
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
-import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
@@ -35,20 +27,15 @@ import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
-import com.crispy.tv.settings.AiInsightsMode
-import com.crispy.tv.settings.AiInsightsSettingsStore
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
-import com.crispy.tv.metadata.mergeEnhancements
 import com.crispy.tv.metadata.primaryTmdbId
-import com.crispy.tv.metadata.providerBaseLookupId
 import com.crispy.tv.metadata.seasonNumbers
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.metadata.tmdbLookupId
 import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.buildEpisodeLookupId
 import com.crispy.tv.playback.buildPlayerSubtitle
@@ -88,10 +75,6 @@ class DetailsViewModel internal constructor(
     private val supabaseAccountClient: SupabaseAccountClient,
     private val backendClient: CrispyBackendClient,
     private val watchHistoryService: WatchHistoryService,
-    private val tmdbImdbIdResolver: TmdbImdbIdResolver,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
-    private val omdbRepository: OmdbRepository,
-    private val aiSettingsStore: AiInsightsSettingsStore,
     private val aiRepository: AiInsightsRepository,
     private val addonStreamsService: AddonStreamsService,
 ) : ViewModel() {
@@ -107,11 +90,10 @@ class DetailsViewModel internal constructor(
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
-    private var omdbJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var resolvedTmdbId: Int? = null
     private val episodeWatchStateResolver = EpisodeWatchStateResolver(watchHistoryService)
-    private val watchCtaResolver = WatchCtaResolver(watchHistoryService, requestedMediaType, tmdbImdbIdResolver)
+    private val watchCtaResolver = WatchCtaResolver(watchHistoryService, requestedMediaType)
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
 
     init {
@@ -121,10 +103,8 @@ class DetailsViewModel internal constructor(
     fun reload() {
         viewModelScope.launch {
             val nowMs = System.currentTimeMillis()
-            val aiSnapshot = aiSettingsStore.loadSnapshot()
 
             episodesJob?.cancel()
-            omdbJob?.cancel()
             seasonEpisodesCache.clear()
             resolvedTmdbId = null
             episodeWatchStateResolver.clearCache()
@@ -132,12 +112,9 @@ class DetailsViewModel internal constructor(
             _uiState.update {
                 it.copy(
                     isLoading = true,
-                    tmdbIsLoading = true,
+                    titleDetail = null,
+                    omdbContent = null,
                     statusMessage = "Loading...",
-                    omdbIsLoading = false,
-                    omdbDetails = null,
-                    aiMode = aiSnapshot.settings.mode,
-                    aiConfigured = aiSnapshot.openRouterKey.isNotBlank(),
                     aiIsLoading = false,
                     aiInsights = null,
                     aiStoryVisible = false,
@@ -166,43 +143,21 @@ class DetailsViewModel internal constructor(
                     }
                 }
 
-            val backendDetails = backendDetail?.toMediaDetails()
-            var mergedDetails = backendDetails
-            if (backendDetails != null) {
-                mergedDetails =
-                    withContext(Dispatchers.IO) {
-                        if (backendDetails.imdbId == null) watchCtaResolver.ensureImdbId(backendDetails) else backendDetails
-                    }
-            }
-
-            val tmdbLookupId = mergedDetails?.tmdbLookupId()
-            val tmdbResult =
+            val titleContent =
                 withContext(Dispatchers.IO) {
-                    tmdbLookupId?.let {
-                        tmdbEnrichmentRepository.load(rawId = it, mediaTypeHint = requestedMediaType)
+                    session?.let {
+                        runCatching {
+                            backendClient.getMetadataTitleContent(accessToken = it.accessToken, id = itemId)
+                        }.getOrNull()
                     }
                 }
-
-            val tmdbEnrichment = tmdbResult?.enrichment
-            val tmdbFallbackDetails = tmdbResult?.fallbackDetails
-            mergedDetails =
-                when {
-                    mergedDetails != null && tmdbFallbackDetails != null -> mergedDetails.mergeEnhancements(
-                        enhancement = tmdbFallbackDetails,
-                        resolvedImdbId = tmdbEnrichment?.imdbId,
-                    )
-                    mergedDetails != null -> mergedDetails
-                    else -> tmdbFallbackDetails
-                }
-
-            resolvedTmdbId = mergedDetails?.primaryTmdbId() ?: tmdbEnrichment?.tmdbId
 
             val enrichedDetails =
                 withContext(Dispatchers.IO) {
-                    mergedDetails?.let { details ->
-                        if (details.imdbId == null) watchCtaResolver.ensureImdbId(details) else details
-                    }
+                    backendDetail?.toMediaDetails()?.let(watchCtaResolver::ensureImdbId)
                 }
+
+            resolvedTmdbId = enrichedDetails?.primaryTmdbId()
 
             val providerState =
                 withContext(Dispatchers.IO) {
@@ -218,8 +173,7 @@ class DetailsViewModel internal constructor(
                 val details = enrichedDetails
                 val isSeries = details?.mediaType?.trim()?.equals("series", ignoreCase = true) == true
                 val backendSeasons = backendDetail?.seasonNumbers().orEmpty()
-                val fallbackSeasonCount = (tmdbEnrichment?.titleDetails as? TmdbTvDetails)?.numberOfSeasons ?: 0
-                val seasonCount = backendDetail?.item?.seasonCount ?: fallbackSeasonCount
+                val seasonCount = backendDetail?.item?.seasonCount ?: 0
                 val seasons =
                     when {
                         !isSeries -> emptyList()
@@ -244,9 +198,9 @@ class DetailsViewModel internal constructor(
                     }
                 state.copy(
                     isLoading = false,
-                    tmdbIsLoading = false,
                     details = details,
-                    tmdbEnrichment = tmdbEnrichment,
+                    titleDetail = backendDetail,
+                    omdbContent = titleContent,
                     statusMessage = statusMessage,
                     isWatched = providerState.isWatched,
                     isInWatchlist = providerState.isInWatchlist,
@@ -263,30 +217,19 @@ class DetailsViewModel internal constructor(
                 )
             }
 
-            loadOmdbRatings(enrichedDetails)
-
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
             if (enrichedDetails?.mediaType?.trim()?.equals("series", ignoreCase = true) == true && seasonToLoad != null) {
                 loadEpisodesForSeason(seasonToLoad, force = true)
             }
 
-            val tmdbId = resolvedTmdbId ?: tmdbEnrichment?.tmdbId
+            val tmdbId = resolvedTmdbId
             val detailsForAi = enrichedDetails
-            val aiMode = aiSnapshot.settings.mode
-            val aiConfigured = aiSnapshot.openRouterKey.isNotBlank()
             val aiLocale = Locale.getDefault()
 
-            if (tmdbId != null && detailsForAi != null && aiMode != AiInsightsMode.OFF) {
+            if (tmdbId != null && detailsForAi != null) {
                 val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId, requestedMediaType, aiLocale) }
                 if (cached != null) {
                     _uiState.update { it.copy(aiInsights = cached) }
-                } else if (aiMode == AiInsightsMode.ALWAYS && aiConfigured) {
-                    startAiGeneration(
-                        tmdbId = tmdbId,
-                        locale = aiLocale,
-                        showStory = false,
-                        announce = false,
-                    )
                 }
             }
         }
@@ -294,19 +237,10 @@ class DetailsViewModel internal constructor(
 
     fun onAiInsightsClick() {
         val state = uiState.value
-        if (state.aiMode == AiInsightsMode.OFF) {
-            _uiState.update { it.copy(statusMessage = "AI insights are off. Enable them in Settings > AI Insights.") }
-            return
-        }
-        if (!state.aiConfigured) {
-            _uiState.update { it.copy(statusMessage = "Add an OpenRouter key in Settings > AI Insights.") }
-            return
-        }
-
         val details = state.details
-        val tmdbId = resolvedTmdbId ?: state.tmdbEnrichment?.tmdbId ?: details?.primaryTmdbId()
+        val tmdbId = resolvedTmdbId ?: details?.primaryTmdbId()
         if (details == null || tmdbId == null) {
-            _uiState.update { it.copy(statusMessage = "TMDB data isn't ready yet. Try again in a moment.") }
+            _uiState.update { it.copy(statusMessage = "AI insights aren't available for this title yet.") }
             return
         }
 
@@ -1279,38 +1213,6 @@ class DetailsViewModel internal constructor(
         }
     }
 
-    private fun loadOmdbRatings(details: MediaDetails?) {
-        omdbJob?.cancel()
-
-        val imdbId =
-            details
-                ?.imdbId
-                ?.trim()
-                ?.takeIf { it.startsWith("tt", ignoreCase = true) }
-                ?.lowercase(Locale.US)
-
-        if (imdbId == null || !omdbRepository.isConfigured) {
-            _uiState.update { it.copy(omdbIsLoading = false, omdbDetails = null) }
-            return
-        }
-
-        omdbJob =
-            viewModelScope.launch {
-                _uiState.update { it.copy(omdbIsLoading = true, omdbDetails = null) }
-
-                val omdbDetails = withContext(Dispatchers.IO) { omdbRepository.load(imdbId) }
-
-                _uiState.update { state ->
-                    val currentImdbId = state.details?.imdbId?.trim()?.lowercase(Locale.US)
-                    if (currentImdbId != imdbId) {
-                        state
-                    } else {
-                        state.copy(omdbIsLoading = false, omdbDetails = omdbDetails)
-                    }
-                }
-            }
-    }
-
 private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
     val pending = pendingEpisodeNavigation ?: return
     val selectedSeason = _uiState.value.selectedSeasonOrFirst
@@ -1332,9 +1234,6 @@ private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
                     val httpClient = AppHttp.client(appContext)
                     val supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext)
                     val backendClient = BackendServicesProvider.backendClient(appContext)
-                    val tmdbImdbIdResolver = TmdbServicesProvider.imdbIdResolver(appContext)
-                    val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
-                    val omdbRepository = OmdbRepositoryProvider.get(appContext)
                     val addonStreamsService =
                         AddonStreamsService(
                             context = appContext,
@@ -1342,7 +1241,6 @@ private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
                             httpClient = httpClient,
                         )
 
-                    val aiSettingsStore = AiInsightsSettingsStore(appContext)
                     val aiRepository = AiInsightsRepository.create(appContext, httpClient)
                     return DetailsViewModel(
                         itemId = itemId,
@@ -1350,10 +1248,6 @@ private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
                         supabaseAccountClient = supabaseAccountClient,
                         backendClient = backendClient,
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                        tmdbImdbIdResolver = tmdbImdbIdResolver,
-                        tmdbEnrichmentRepository = tmdbEnrichmentRepository,
-                        omdbRepository = omdbRepository,
-                        aiSettingsStore = aiSettingsStore,
                         aiRepository = aiRepository,
                         addonStreamsService = addonStreamsService,
                     ) as T

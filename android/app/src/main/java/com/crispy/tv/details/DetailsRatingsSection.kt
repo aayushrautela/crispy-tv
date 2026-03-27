@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+import com.crispy.tv.backend.CrispyBackendClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
@@ -33,19 +34,18 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.R
-import com.crispy.tv.metadata.omdb.OmdbDetails
 import com.crispy.tv.ratings.formatRatingOutOfTen
 import com.crispy.tv.ui.components.skeletonElement
 
 @Composable
 internal fun RatingsSection(
     tmdbRating: String?,
-    omdbDetails: OmdbDetails?,
+    omdbContent: CrispyBackendClient.OmdbContentView?,
     isLoading: Boolean,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
 ) {
-    val ratings = remember(tmdbRating, omdbDetails) { buildRatings(tmdbRating = tmdbRating, omdbDetails = omdbDetails) }
+    val ratings = remember(tmdbRating, omdbContent) { buildRatings(tmdbRating = tmdbRating, omdbContent = omdbContent) }
     if (ratings.isEmpty() && !isLoading) return
 
     Spacer(modifier = Modifier.height(18.dp))
@@ -164,7 +164,7 @@ private data class DetailsRatingPill(
 
 private fun buildRatings(
     tmdbRating: String?,
-    omdbDetails: OmdbDetails?,
+    omdbContent: CrispyBackendClient.OmdbContentView?,
 ): List<DetailsRatingPill> {
     val ratings = mutableListOf<DetailsRatingPill>()
     tmdbRating?.trim()?.takeIf { it.isNotBlank() }?.let { rating ->
@@ -179,7 +179,7 @@ private fun buildRatings(
             )
     }
 
-    omdbDetails?.ratings.orEmpty().forEachIndexed { index, rating ->
+    omdbContent?.ratings.orEmpty().forEachIndexed { index, rating ->
         val source = rating.source.trim()
         val value = rating.value.trim()
         if (source.isBlank() || value.isBlank()) return@forEachIndexed
@@ -240,5 +240,4 @@ private fun buildRatings(
 private fun formatTmdbRating(value: String): String {
     return formatRatingOutOfTen(value) ?: value.trim()
 }
-
 

@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
@@ -83,9 +82,8 @@ internal fun DetailsScreen(
     val details = uiState.details
     val imageUrl = details?.backdropUrl ?: details?.posterUrl
     val aiBackdropUrls =
-        remember(details, uiState.tmdbEnrichment) {
+        remember(details) {
             buildList {
-                addAll(uiState.tmdbEnrichment?.backdropUrls.orEmpty())
                 details?.backdropUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
                 details?.posterUrl?.trim()?.takeIf { it.isNotEmpty() }?.let(::add)
             }.distinct()
@@ -143,14 +141,14 @@ internal fun DetailsScreen(
     val palette = remember(detailsScheme) { detailsPaletteFromScheme(detailsScheme) }
 
     val selectedTrailer =
-        uiState.tmdbEnrichment
-            ?.trailers
+        uiState.titleDetail
+            ?.videos
             ?.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }
-            ?: uiState.tmdbEnrichment
-                ?.trailers
+            ?: uiState.titleDetail
+                ?.videos
                 ?.firstOrNull { it.key.isNotBlank() && it.type.equals("Trailer", true) }
-            ?: uiState.tmdbEnrichment
-                ?.trailers
+            ?: uiState.titleDetail
+                ?.videos
                 ?.firstOrNull { it.key.isNotBlank() }
 
     val trailerKey = selectedTrailer?.key?.trim().takeIf { !it.isNullOrBlank() }
@@ -255,8 +253,6 @@ internal fun DetailsScreen(
                         isMutating = visibleUiState.isMutating,
                         palette = palette,
                         watchCta = visibleUiState.watchCta,
-                        showAiInsights = visibleUiState.aiMode != AiInsightsMode.OFF,
-                        aiInsightsEnabled = visibleUiState.aiConfigured,
                         aiInsightsIsLoading = visibleUiState.aiIsLoading,
                         onAiInsightsClick = onAiInsightsClick,
                         onWatchNow = onOpenStreamSelector,

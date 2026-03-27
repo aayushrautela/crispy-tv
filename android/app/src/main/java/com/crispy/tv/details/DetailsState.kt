@@ -1,15 +1,13 @@
 package com.crispy.tv.details
 
 import androidx.compose.runtime.Immutable
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.omdb.OmdbDetails
-import com.crispy.tv.metadata.tmdb.TmdbEnrichment
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
-import com.crispy.tv.settings.AiInsightsMode
 import com.crispy.tv.streams.AddonStream
 
 @Immutable
@@ -23,13 +21,9 @@ data class DetailsUiState(
     val itemId: String,
     val isLoading: Boolean = true,
     val details: MediaDetails? = null,
-    val tmdbIsLoading: Boolean = false,
-    val tmdbEnrichment: TmdbEnrichment? = null,
-    val omdbIsLoading: Boolean = false,
-    val omdbDetails: OmdbDetails? = null,
+    val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
+    val omdbContent: CrispyBackendClient.MetadataTitleContentResponse? = null,
     val statusMessage: String = "",
-    val aiMode: AiInsightsMode = AiInsightsMode.ON_DEMAND,
-    val aiConfigured: Boolean = false,
     val aiIsLoading: Boolean = false,
     val aiInsights: AiInsightsResult? = null,
     val aiStoryVisible: Boolean = false,

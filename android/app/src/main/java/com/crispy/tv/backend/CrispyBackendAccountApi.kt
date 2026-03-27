@@ -1,7 +1,5 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.backend.CrispyBackendClient.AccountSecret
-import com.crispy.tv.backend.CrispyBackendClient.AccountSettings
 import com.crispy.tv.backend.CrispyBackendClient.ImportConnectionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.ImportJobsResponse
 import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
@@ -25,64 +23,8 @@ internal suspend fun CrispyBackendClient.getMeApi(accessToken: String): MeRespon
     val userJson = json.optJSONObject("user") ?: throw IllegalStateException("Backend /v1/me did not return a user.")
     return MeResponse(
         user = parseUser(userJson),
-        accountSettings = parseAccountSettings(json.optJSONObject("accountSettings")),
         profiles = parseProfiles(json.optJSONArray("profiles")),
     )
-}
-
-internal suspend fun CrispyBackendClient.getAccountSettingsApi(accessToken: String): AccountSettings {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/account/settings".toHttpUrl(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return parseAccountSettings(json.optJSONObject("settings"))
-}
-
-internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
-    accessToken: String,
-    settings: Map<String, String>,
-): AccountSettings {
-    checkConfigured()
-    val payload = JSONObject().apply {
-        settings.forEach { (key, value) -> put(key, value) }
-    }.toString()
-    val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/account/settings".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .patch(payload.toRequestBody(jsonMediaType))
-            .build(),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return parseAccountSettings(json.optJSONObject("settings"))
-}
-
-internal suspend fun CrispyBackendClient.getOpenRouterSecretApi(accessToken: String): AccountSecret? {
-    return getAccountSecretApi(accessToken, "openrouter-key")
-}
-
-internal suspend fun CrispyBackendClient.putOpenRouterSecretApi(accessToken: String, value: String): AccountSecret {
-    return putAccountSecretApi(accessToken, "openrouter-key", value)
-}
-
-internal suspend fun CrispyBackendClient.deleteOpenRouterSecretApi(accessToken: String): Boolean {
-    return deleteAccountSecretApi(accessToken, "openrouter-key")
-}
-
-internal suspend fun CrispyBackendClient.getOmdbApiSecretApi(accessToken: String): AccountSecret? {
-    return getAccountSecretApi(accessToken, "omdb-api-key")
-}
-
-internal suspend fun CrispyBackendClient.putOmdbApiSecretApi(accessToken: String, value: String): AccountSecret {
-    return putAccountSecretApi(accessToken, "omdb-api-key", value)
-}
-
-internal suspend fun CrispyBackendClient.deleteOmdbApiSecretApi(accessToken: String): Boolean {
-    return deleteAccountSecretApi(accessToken, "omdb-api-key")
 }
 
 internal suspend fun CrispyBackendClient.createProfileApi(
@@ -219,52 +161,4 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
     val json = JSONObject(requireSuccess(response))
     val connectionJson = json.optJSONObject("connection") ?: throw IllegalStateException("Backend did not return a provider connection.")
     return parseImportConnection(connectionJson)
-}
-
-private suspend fun CrispyBackendClient.getAccountSecretApi(accessToken: String, pathSuffix: String): AccountSecret? {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/account/secrets/$pathSuffix".toHttpUrl(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    if (response.code == 404) {
-        return null
-    }
-    val json = JSONObject(requireSuccess(response))
-    return parseAccountSecret(json.optJSONObject("secret"))
-}
-
-private suspend fun CrispyBackendClient.putAccountSecretApi(
-    accessToken: String,
-    pathSuffix: String,
-    value: String,
-): AccountSecret {
-    checkConfigured()
-    val payload = JSONObject().put("value", value.trim()).toString()
-    val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/account/secrets/$pathSuffix".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .put(payload.toRequestBody(jsonMediaType))
-            .build(),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return parseAccountSecret(json.optJSONObject("secret"))
-        ?: throw IllegalStateException("Backend did not return an account secret.")
-}
-
-private suspend fun CrispyBackendClient.deleteAccountSecretApi(accessToken: String, pathSuffix: String): Boolean {
-    checkConfigured()
-    val response = httpClient.execute(
-        request = Request.Builder()
-            .url("$baseUrl/v1/account/secrets/$pathSuffix".toHttpUrl())
-            .headers(authHeaders(accessToken))
-            .delete()
-            .build(),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return json.optBoolean("deleted", false)
 }

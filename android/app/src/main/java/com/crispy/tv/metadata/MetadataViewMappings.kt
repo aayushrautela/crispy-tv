@@ -1,6 +1,7 @@
 package com.crispy.tv.metadata
 
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.domain.metadata.normalizeMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
@@ -140,6 +141,24 @@ internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): Stri
     } else {
         "movie"
     }
+}
+
+internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
+    val itemId = id.trim().takeIf { it.isNotBlank() } ?: return null
+    val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    return CatalogItem(
+        id = itemId,
+        title = itemTitle,
+        posterUrl = images.posterUrl,
+        backdropUrl = images.backdropUrl,
+        logoUrl = images.logoUrl,
+        addonId = "backend",
+        type = if (mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true)) "series" else "movie",
+        rating = formatRating(rating),
+        year = releaseYear?.toString() ?: releaseDate?.take(4),
+        genre = null,
+        description = summary ?: overview,
+    )
 }
 
 internal fun MediaDetails.providerBaseLookupId(): String? {

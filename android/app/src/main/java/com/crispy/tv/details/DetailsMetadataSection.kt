@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+import com.crispy.tv.backend.CrispyBackendClient
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,9 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.metadata.tmdb.TmdbMovieDetails
-import com.crispy.tv.metadata.tmdb.TmdbTitleDetails
-import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -28,77 +26,62 @@ import java.util.Locale
 
 internal fun buildDetailsRows(
     details: MediaDetails,
-    titleDetails: TmdbTitleDetails?
+    titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
+    omdbContent: CrispyBackendClient.OmdbContentView?,
 ): List<Pair<String, String>> {
     val rows = mutableListOf<Pair<String, String>>()
+    val item = titleDetail?.item
+    val production = titleDetail?.production
 
-    when (titleDetails) {
-        is TmdbTvDetails -> {
-            titleDetails.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
+    if (details.mediaType.equals("series", ignoreCase = true)) {
+        item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
 
-            formatLongDate(titleDetails.firstAirDate)?.let { rows += "FIRST AIR DATE" to it }
-            formatLongDate(titleDetails.lastAirDate)?.let { rows += "LAST AIR DATE" to it }
+        formatLongDate(item?.releaseDate)?.let { rows += "FIRST AIR DATE" to it }
 
-            titleDetails.numberOfSeasons?.takeIf { it > 0 }?.let { rows += "SEASONS" to "$it" }
-            titleDetails.numberOfEpisodes?.takeIf { it > 0 }?.let { rows += "EPISODES" to "$it" }
+        titleDetail?.seasons?.size?.takeIf { it > 0 }?.let { rows += "SEASONS" to "$it" }
+        item?.episodeCount?.takeIf { it > 0 }?.let { rows += "EPISODES" to "$it" }
 
-            val episodeRuntime = titleDetails.episodeRunTimeMinutes.filter { it > 0 }
-            if (episodeRuntime.isNotEmpty()) {
-                rows += "EPISODE RUNTIME" to "${episodeRuntime.joinToString(" - ")} min"
-            }
+        details.runtime?.takeIf { it.isNotBlank() }?.let { rows += "EPISODE RUNTIME" to it }
 
-            if (titleDetails.originCountries.isNotEmpty()) {
-                rows += "ORIGIN COUNTRY" to titleDetails.originCountries.joinToString(", ")
-            }
-
-            titleDetails.originalLanguage?.takeIf { it.isNotBlank() }?.let {
-                rows += "ORIGINAL LANGUAGE" to it.uppercase()
-            }
-
-            if (details.creators.isNotEmpty()) {
-                rows += "CREATED BY" to details.creators.joinToString(", ")
-            }
+        val originCountries = production?.originCountries.orEmpty().ifEmpty { production?.productionCountries.orEmpty() }
+        if (originCountries.isNotEmpty()) {
+            rows += "ORIGIN COUNTRY" to originCountries.joinToString(", ")
         }
 
-        is TmdbMovieDetails -> {
-            titleDetails.tagline?.takeIf { it.isNotBlank() }?.let {
-                rows += "TAGLINE" to "\"$it\""
-            }
-            titleDetails.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
-
-            formatLongDate(titleDetails.releaseDate)?.let { rows += "RELEASE DATE" to it }
-
-            val runtime = formatRuntimeMinutes(titleDetails.runtimeMinutes) ?: details.runtime?.takeIf { it.isNotBlank() }
-            runtime?.let { rows += "RUNTIME" to it }
-
-            formatCurrency(titleDetails.budget)?.let { rows += "BUDGET" to it }
-            formatCurrency(titleDetails.revenue)?.let { rows += "REVENUE" to it }
-
-            if (titleDetails.originCountries.isNotEmpty()) {
-                rows += "ORIGIN COUNTRY" to titleDetails.originCountries.joinToString(", ")
-            }
-
-            titleDetails.originalLanguage?.takeIf { it.isNotBlank() }?.let {
-                rows += "ORIGINAL LANGUAGE" to it.uppercase()
-            }
+        production?.originalLanguage?.takeIf { it.isNotBlank() }?.let {
+            rows += "ORIGINAL LANGUAGE" to it.uppercase()
         }
 
-        else -> Unit
+        if (details.creators.isNotEmpty()) {
+            rows += "CREATED BY" to details.creators.joinToString(", ")
+        }
+    } else {
+        omdbContent?.plot?.takeIf { it.isNotBlank() && !it.equals(details.description, ignoreCase = true) }?.let {
+            rows += "PLOT" to it
+        }
+        item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
+
+        formatLongDate(item?.releaseDate ?: omdbContent?.released)?.let { rows += "RELEASE DATE" to it }
+
+        (details.runtime?.takeIf { it.isNotBlank() } ?: omdbContent?.runtime?.takeIf { it.isNotBlank() })?.let {
+            rows += "RUNTIME" to it
+        }
+
+        omdbContent?.boxOffice?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }?.let {
+            rows += "BOX OFFICE" to it
+        }
+
+        val originCountry = omdbContent?.country?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+            ?: production?.originCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
+            ?: production?.productionCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
+        originCountry?.let { rows += "ORIGIN COUNTRY" to it }
+
+        val language = omdbContent?.language?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+            ?: production?.originalLanguage?.takeIf { it.isNotBlank() }?.uppercase()
+        language?.let { rows += "LANGUAGE" to it }
     }
 
     return rows
-}
-
-internal fun formatCurrency(amount: Long?): String? {
-    if (amount == null || amount <= 0) return null
-    return try {
-        NumberFormat
-            .getCurrencyInstance(Locale.US)
-            .apply { maximumFractionDigits = 0 }
-            .format(amount)
-    } catch (_: Throwable) {
-        "$amount"
-    }
 }
 
 internal fun formatLongDate(date: String?): String? {
