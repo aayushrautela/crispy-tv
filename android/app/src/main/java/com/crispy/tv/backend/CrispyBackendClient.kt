@@ -343,6 +343,7 @@ class CrispyBackendClient(
         val name: String,
         val posterUrl: String?,
         val backdropUrl: String?,
+        val parts: List<MetadataCardView>,
     )
 
     data class MetadataProductionInfoView(

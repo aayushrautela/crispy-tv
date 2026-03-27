@@ -379,21 +379,26 @@ internal fun DetailsBody(
         }
 
         titleDetail?.collection?.let { collection ->
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = collection.name,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "Collection details are now server-owned; full series entries are not available yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = horizontalPadding),
-            )
+            val collectionParts = collection.parts.mapNotNull { it.toCatalogItem() }
+            if (collectionParts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = collection.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(items = collectionParts, key = { "${it.type}:${it.id}" }) { item ->
+                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id, item.type) })
+                    }
+                }
+            }
         }
 
         val similar = titleDetail?.similar.orEmpty().mapNotNull { it.toCatalogItem() }

@@ -510,6 +510,7 @@ internal fun CrispyBackendClient.parseMetadataCollectionView(json: JSONObject?):
         name = name,
         posterUrl = safe.optNullableString("posterUrl"),
         backdropUrl = safe.optNullableString("backdropUrl"),
+        parts = parseMetadataCardViews(safe.optJSONArray("parts")),
     )
 }
 
