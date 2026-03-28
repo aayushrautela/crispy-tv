@@ -22,10 +22,8 @@ import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -286,17 +284,6 @@ class HomeViewModel internal constructor(
                             )
                         }
 
-                        item.provider == WatchProvider.LOCAL -> {
-                            if (item.progressPercent < 100.0) {
-                                watchHistoryService.removeLocalWatchProgress(item.toPlaybackIdentity())
-                            } else {
-                                watchHistoryService.unmarkWatched(
-                                    request = item.toUnmarkRequest(),
-                                    source = item.provider,
-                                )
-                            }
-                        }
-
                         item.providerPlaybackId?.takeIf { it.isNotBlank() } != null -> {
                             val playbackId = item.providerPlaybackId?.takeIf { it.isNotBlank() }
                             watchHistoryService.removeFromPlayback(
@@ -499,40 +486,17 @@ class HomeViewModel internal constructor(
                     val suppressionMap = suppressionStore.read()
                     suppressedItemsByKey = suppressionMap
 
-                    coroutineScope {
-                        val authStateDeferred = async { watchHistoryService.authState() }
-                        val watchHistoryDeferred = async { watchHistoryService.listLocalHistory(limit = 40) }
-
-                        val authState = authStateDeferred.await()
-                        val selectedSource =
-                            when {
-                                authState.traktAuthenticated -> WatchProvider.TRAKT
-                                authState.simklAuthenticated -> WatchProvider.SIMKL
-                                else -> WatchProvider.LOCAL
-                            }
-                        val providerContinueWatchingDeferred = async {
-                            loadProviderContinueWatching(selectedSource)
-                        }
-
-                        val filteredEntries =
-                            applySuppressionFilter(
-                                entries = watchHistoryDeferred.await().entries,
-                                suppressionMap = suppressionMap,
-                            )
-                        val providerResult = providerContinueWatchingDeferred.await()
-                        val filteredProviderResult =
-                            providerResult.copy(
-                                entries = applyProviderSuppressionFilter(providerResult.entries, suppressionMap),
-                            )
-
-                        homeWatchActivityService.loadWatchActivity(
-                            selectedSource = selectedSource,
-                            localEntries = filteredEntries,
-                            providerResult = filteredProviderResult,
-                            limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-                            enrichMetadata = enrichMetadata,
+                    val providerResult = loadProviderContinueWatching()
+                    val filteredProviderResult =
+                        providerResult.copy(
+                            entries = applyProviderSuppressionFilter(providerResult.entries, suppressionMap),
                         )
-                    }
+
+                    homeWatchActivityService.loadWatchActivity(
+                        providerResult = filteredProviderResult,
+                        limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
+                        enrichMetadata = enrichMetadata,
+                    )
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -628,16 +592,11 @@ class HomeViewModel internal constructor(
         )
     }
 
-    private suspend fun loadProviderContinueWatching(selectedSource: WatchProvider): CanonicalContinueWatchingResult {
-        return when (selectedSource) {
-            WatchProvider.LOCAL -> CanonicalContinueWatchingResult(statusMessage = "")
-            WatchProvider.TRAKT, WatchProvider.SIMKL -> {
-                watchHistoryService.getCanonicalContinueWatching(
-                    limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-                    source = selectedSource,
-                )
-            }
-        }
+    private suspend fun loadProviderContinueWatching(): CanonicalContinueWatchingResult {
+        return watchHistoryService.getCanonicalContinueWatching(
+            limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
+            source = null,
+        )
     }
 
     private suspend fun delayForMinimumSkeletonVisibility(visibleAtMs: Long) {
@@ -755,54 +714,6 @@ class HomeViewModel internal constructor(
         }
 
         _layoutState.value = HomeLayoutState(blocks = blocks)
-    }
-
-    private fun applySuppressionFilter(
-        entries: List<WatchHistoryEntry>,
-        suppressionMap: MutableMap<String, Long>? = suppressedItemsByKey,
-    ): List<WatchHistoryEntry> {
-        if (entries.isEmpty()) return emptyList()
-        val activeSuppressionMap = suppressionMap ?: return entries
-
-        var updated = false
-        val filtered = mutableListOf<WatchHistoryEntry>()
-        entries.forEach { entry ->
-            val episodeKey = continueWatchingKey(entry)
-            val contentKey = continueWatchingContentKey(entry)
-
-            val episodeSuppressedAt = activeSuppressionMap[episodeKey]
-            val contentSuppressedAt = activeSuppressionMap[contentKey]
-
-            val suppressedAt =
-                when {
-                    episodeSuppressedAt == null -> contentSuppressedAt
-                    contentSuppressedAt == null -> episodeSuppressedAt
-                    else -> maxOf(episodeSuppressedAt, contentSuppressedAt)
-                }
-
-            if (suppressedAt == null) {
-                filtered += entry
-                return@forEach
-            }
-
-            if (entry.watchedAtEpochMs > suppressedAt) {
-                if (episodeSuppressedAt != null && entry.watchedAtEpochMs > episodeSuppressedAt) {
-                    activeSuppressionMap.remove(episodeKey)
-                    updated = true
-                }
-                if (contentSuppressedAt != null && entry.watchedAtEpochMs > contentSuppressedAt) {
-                    activeSuppressionMap.remove(contentKey)
-                    updated = true
-                }
-                filtered += entry
-            }
-        }
-
-        if (updated) {
-            suppressionStore.write(activeSuppressionMap)
-        }
-
-        return filtered
     }
 
     private fun applyProviderSuppressionFilter(
@@ -1003,17 +914,6 @@ class ContinueWatchingSuppressionStore(context: Context) {
         private const val PREFS_NAME = "home_continue_watching"
         private const val KEY_ITEM_SUPPRESSIONS = "suppressed_items"
     }
-}
-
-private fun continueWatchingKey(entry: WatchHistoryEntry): String {
-    val seasonPart = entry.season?.toString() ?: "-"
-    val episodePart = entry.episode?.toString() ?: "-"
-    return "${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:$seasonPart:$episodePart"
-}
-
-private fun continueWatchingContentKey(entry: WatchHistoryEntry): String {
-    val type = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
-    return "$type:${entry.contentId.lowercase(Locale.US)}"
 }
 
 private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {

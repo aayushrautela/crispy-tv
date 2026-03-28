@@ -22,7 +22,6 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                     )
                 )
             },
-            onNavigateToDiscover = { navController.navigate(AppRoutes.DiscoverRoute) },
             onOpenCalendar = {
                 navController.navigate(AppRoutes.CalendarRoute) {
                     launchSingleTop = true

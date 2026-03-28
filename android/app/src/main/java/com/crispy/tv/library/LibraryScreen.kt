@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -19,7 +18,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -62,7 +60,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 enum class LibrarySource {
-    LOCAL,
     TRAKT,
     SIMKL,
 }
@@ -72,16 +69,6 @@ private data class LibraryArtwork(
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
 )
-
-@Immutable
-data class LibraryLocalItemUi(
-    val entry: WatchHistoryEntry,
-    val posterUrl: String?,
-    val backdropUrl: String?,
-) {
-    val stableKey: String
-        get() = "local:${entry.contentType}:${entry.contentId}"
-}
 
 @Immutable
 data class LibraryProviderFolderUi(
@@ -106,18 +93,16 @@ data class LibraryProviderItemUi(
 data class LibraryUiState(
     val isRefreshing: Boolean = false,
     val statusMessage: String = "",
-    val localItems: List<LibraryLocalItemUi> = emptyList(),
     val providerFolders: List<LibraryProviderFolderUi> = emptyList(),
     val providerItems: List<LibraryProviderItemUi> = emptyList(),
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
-    val selectedSource: LibrarySource = LibrarySource.LOCAL,
+    val selectedSource: LibrarySource = LibrarySource.TRAKT,
     val selectedProviderFolderId: String? = null,
 )
 
 private data class LibraryRefreshPayload(
     val authState: WatchProviderAuthState,
     val selectedSource: LibrarySource,
-    val localItems: List<LibraryLocalItemUi>,
     val providerFolders: List<LibraryProviderFolderUi>,
     val providerItems: List<LibraryProviderItemUi>,
     val statusMessage: String,
@@ -160,23 +145,13 @@ class LibraryViewModel internal constructor(
                 val selectedSource = resolveSelectedSource(authState)
                 val selectedProvider = selectedSource.toProvider()
                 val providerAuthenticated =
-                    when (selectedProvider) {
-                        WatchProvider.TRAKT -> authState.traktAuthenticated
-                        WatchProvider.SIMKL -> authState.simklAuthenticated
-                        else -> false
-                    }
-
-                val localResult =
-                    if (selectedSource == LibrarySource.LOCAL) {
-                        withContext(Dispatchers.IO) {
-                            runCatching { watchHistoryService.listLocalHistory(limit = 100) }.getOrNull()
-                        }
-                    } else {
-                        null
+                    when (selectedSource) {
+                        LibrarySource.TRAKT -> authState.traktAuthenticated
+                        LibrarySource.SIMKL -> authState.simklAuthenticated
                     }
 
                 val cachedProviderResult: List<CanonicalProviderLibraryItem> =
-                    if (selectedProvider != null && providerAuthenticated) {
+                    if (providerAuthenticated) {
                         withContext(Dispatchers.IO) {
                             runCatching {
                                 watchHistoryService.getCachedCanonicalProviderLibraryItems(
@@ -189,12 +164,11 @@ class LibraryViewModel internal constructor(
                         emptyList()
                     }
 
-                if (selectedSource != LibrarySource.LOCAL && cachedProviderResult.isNotEmpty()) {
+                if (cachedProviderResult.isNotEmpty()) {
                     val cachedPayload =
                         buildRefreshPayload(
                             authState = authState,
                             selectedSource = selectedSource,
-                            localEntries = emptyList(),
                             providerItems = cachedProviderResult,
                             providerAuthenticated = providerAuthenticated,
                             providerStatusMessage = "",
@@ -203,7 +177,7 @@ class LibraryViewModel internal constructor(
                 }
 
                 val providerResult: List<CanonicalProviderLibraryItem> =
-                        if (selectedProvider != null && providerAuthenticated) {
+                        if (providerAuthenticated) {
                             val networkResult =
                                 withContext(Dispatchers.IO) {
                                     runCatching {
@@ -222,7 +196,6 @@ class LibraryViewModel internal constructor(
                     buildRefreshPayload(
                         authState = authState,
                         selectedSource = selectedSource,
-                        localEntries = localResult?.entries.orEmpty().sortedByDescending { it.watchedAtEpochMs },
                         providerItems = providerResult,
                         providerAuthenticated = providerAuthenticated,
                         providerStatusMessage = if (providerResult.isEmpty()) null else "",
@@ -241,44 +214,24 @@ class LibraryViewModel internal constructor(
     private suspend fun buildRefreshPayload(
         authState: WatchProviderAuthState,
         selectedSource: LibrarySource,
-        localEntries: List<WatchHistoryEntry>,
         providerItems: List<CanonicalProviderLibraryItem>,
         providerAuthenticated: Boolean,
         providerStatusMessage: String?,
     ): LibraryRefreshPayload {
-        val localUiItems = if (selectedSource == LibrarySource.LOCAL) enrichLocalItems(localEntries) else emptyList()
-        val providerUiItems =
-            if (selectedSource == LibrarySource.LOCAL) {
-                emptyList()
-            } else {
-                enrichProviderItems(providerItems)
-            }
+        val providerUiItems = enrichProviderItems(providerItems)
         val derivedProviderFolders = providerFolders(selectedSource, providerUiItems)
 
         val statusMessage =
-            when (selectedSource) {
-                LibrarySource.LOCAL -> {
-                    if (localUiItems.isEmpty()) {
-                        "No local history yet."
-                    } else {
-                        "Recently watched"
-                    }
+            providerStatusMessage
+                ?: if (!providerAuthenticated) {
+                    "Connect ${selectedSource.displayName()} in Settings to load this provider."
+                } else {
+                    "No provider library data available."
                 }
-                LibrarySource.TRAKT,
-                LibrarySource.SIMKL -> {
-                    providerStatusMessage
-                        ?: if (!providerAuthenticated) {
-                            "Connect ${selectedSource.displayName()} in Settings to load this provider."
-                        } else {
-                            "No provider library data available."
-                        }
-                }
-            }
 
         return LibraryRefreshPayload(
             authState = authState,
             selectedSource = selectedSource,
-            localItems = localUiItems,
             providerFolders = derivedProviderFolders,
             providerItems = providerUiItems,
             statusMessage = statusMessage,
@@ -291,7 +244,6 @@ class LibraryViewModel internal constructor(
             current.copy(
                 isRefreshing = isRefreshing,
                 statusMessage = payload.statusMessage,
-                localItems = payload.localItems,
                 providerFolders = payload.providerFolders,
                 providerItems = payload.providerItems,
                 authState = payload.authState,
@@ -301,31 +253,6 @@ class LibraryViewModel internal constructor(
                     payload.selectedSource,
                     availableFolders,
                 ),
-            )
-        }
-    }
-
-    private suspend fun enrichLocalItems(entries: List<WatchHistoryEntry>): List<LibraryLocalItemUi> {
-        if (entries.isEmpty()) {
-            return emptyList()
-        }
-        val artworkByKey =
-            resolveArtwork(
-                entries.map { entry ->
-                    ArtworkRequest(
-                        cacheKey = artworkCacheKey(entry.contentId, entry.contentType.name),
-                        rawId = entry.contentId,
-                        posterUrl = null,
-                        backdropUrl = null,
-                    )
-                },
-            )
-        return entries.map { entry ->
-            val artwork = artworkByKey[artworkCacheKey(entry.contentId, entry.contentType.name)] ?: LibraryArtwork()
-            LibraryLocalItemUi(
-                entry = entry,
-                posterUrl = artwork.posterUrl,
-                backdropUrl = artwork.backdropUrl,
             )
         }
     }
@@ -417,7 +344,7 @@ class LibraryViewModel internal constructor(
         return when {
             authState.traktAuthenticated -> LibrarySource.TRAKT
             authState.simklAuthenticated -> LibrarySource.SIMKL
-            else -> LibrarySource.LOCAL
+            else -> LibrarySource.TRAKT
         }
     }
 
@@ -425,7 +352,7 @@ class LibraryViewModel internal constructor(
         selectedSource: LibrarySource,
         providerItems: List<LibraryProviderItemUi>,
     ): List<LibraryProviderFolderUi> {
-        val provider = selectedSource.toProvider() ?: return emptyList()
+        val provider = selectedSource.toProvider()
         return providerItems
             .flatMap { item ->
                 val folderIds = item.item.folderIds.ifEmpty { setOf(defaultProviderFolderId(provider)) }
@@ -448,7 +375,7 @@ class LibraryViewModel internal constructor(
         selectedSource: LibrarySource,
         folders: List<LibraryProviderFolderUi>,
     ): String? {
-        val provider = selectedSource.toProvider() ?: return null
+        val provider = selectedSource.toProvider()
         return currentFolderId
             ?.takeIf { selectedId -> folders.any { folder -> folder.provider == provider && folder.id == selectedId } }
             ?: folders.firstOrNull { folder -> folder.provider == provider }?.id
@@ -475,7 +402,6 @@ class LibraryViewModel internal constructor(
                 "ratings" -> "Ratings"
                 else -> normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase() }
             }
-            WatchProvider.LOCAL -> "Library"
         }
     }
 
@@ -483,7 +409,6 @@ class LibraryViewModel internal constructor(
         return when (provider) {
             WatchProvider.TRAKT -> "collection"
             WatchProvider.SIMKL -> "watching"
-            WatchProvider.LOCAL -> "library"
         }
     }
 
@@ -513,7 +438,6 @@ internal fun LibraryRouteContent(
     uiState: LibraryUiState,
     onRefresh: () -> Unit,
     onItemClick: (WatchHistoryEntry) -> Unit,
-    onNavigateToDiscover: () -> Unit,
     onSelectProviderFolder: (String) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
@@ -522,7 +446,6 @@ internal fun LibraryRouteContent(
     val providerFolders = uiState.providerFolders.filter { folder -> folder.provider == selectedProvider }
     val providerAuthenticated =
         when (uiState.selectedSource) {
-            LibrarySource.LOCAL -> false
             LibrarySource.TRAKT -> uiState.authState.traktAuthenticated
             LibrarySource.SIMKL -> uiState.authState.simklAuthenticated
         }
@@ -534,11 +457,7 @@ internal fun LibraryRouteContent(
             } else {
                 val folderIds =
                     item.item.folderIds.ifEmpty {
-                        if (selectedProvider != null) {
-                            setOf(defaultProviderFolderId(selectedProvider))
-                        } else {
-                            emptySet()
-                        }
+                        setOf(defaultProviderFolderId(selectedProvider))
                     }
                 folderIds.contains(selectedFolder)
             }
@@ -582,7 +501,7 @@ internal fun LibraryRouteContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
                 item(span = { GridItemSpan(maxLineSpan) }, key = "filters") {
-                    if (uiState.selectedSource != LibrarySource.LOCAL && providerAuthenticated && providerFolders.isNotEmpty()) {
+                    if (providerAuthenticated && providerFolders.isNotEmpty()) {
                         LazyRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -608,107 +527,58 @@ internal fun LibraryRouteContent(
                     }
                 }
 
-                when (uiState.selectedSource) {
-                    LibrarySource.LOCAL -> {
-                        if (uiState.localItems.isEmpty()) {
-                            item(span = { GridItemSpan(maxLineSpan) }, key = "local-empty") {
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                        androidx.compose.foundation.layout.Column(
-                                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                                        ) {
-                                            Text(
-                                                text = "Nothing here yet",
-                                                style = MaterialTheme.typography.titleMedium,
-                                            )
-                                            Text(
-                                                text = "Start watching from Discover or Home and your recent local history will appear here.",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                            FilledTonalButton(onClick = onNavigateToDiscover) {
-                                                Text("Go to Discover")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            gridItems(
-                                items = uiState.localItems,
-                                key = { item -> item.stableKey },
-                            ) { item ->
-                                PosterCard(
-                                    title = item.entry.title.ifBlank { item.entry.contentId },
-                                    posterUrl = item.posterUrl,
-                                    backdropUrl = item.backdropUrl,
-                                    rating = null,
-                                    year = null,
-                                    genre = null,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = { onItemClick(item.entry) },
+                if (!providerAuthenticated) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "provider-auth") {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                                Text(
+                                    text = "Connect ${uiState.selectedSource.displayName()} in Settings to load this provider.",
+                                    style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
                         }
                     }
-
-                    LibrarySource.TRAKT,
-                    LibrarySource.SIMKL -> {
-                        if (!providerAuthenticated) {
-                            item(span = { GridItemSpan(maxLineSpan) }, key = "provider-auth") {
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                        Text(
-                                            text = "Connect ${uiState.selectedSource.displayName()} in Settings to load this provider.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    }
-                                }
+                } else if (providerItems.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "provider-empty") {
+                        val emptyMessage =
+                            if (providerFolders.isEmpty()) {
+                                "No provider library data available."
+                            } else {
+                                val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
+                                "No items in $label yet."
                             }
-                        } else if (providerItems.isEmpty()) {
-                            item(span = { GridItemSpan(maxLineSpan) }, key = "provider-empty") {
-                                val emptyMessage =
-                                    if (providerFolders.isEmpty()) {
-                                        "No provider library data available."
-                                    } else {
-                                        val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
-                                        "No items in $label yet."
-                                    }
-                                Card(modifier = Modifier.fillMaxWidth()) {
-                                    Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                        Text(
-                                            text = emptyMessage,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            gridItems(
-                                items = providerItems,
-                                key = { item -> item.stableKey },
-                            ) { item ->
-                                PosterCard(
-                                    title = item.item.title.ifBlank { item.item.contentId },
-                                    posterUrl = item.posterUrl,
-                                    backdropUrl = item.backdropUrl,
-                                    rating = null,
-                                    year = null,
-                                    genre = null,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = { onItemClick(item.watchHistoryEntry) },
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                                Text(
+                                    text = emptyMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
                         }
+                    }
+                } else {
+                    gridItems(
+                        items = providerItems,
+                        key = { item -> item.stableKey },
+                    ) { item ->
+                        PosterCard(
+                            title = item.item.title.ifBlank { item.item.contentId },
+                            posterUrl = item.posterUrl,
+                            backdropUrl = item.backdropUrl,
+                            rating = null,
+                            year = null,
+                            genre = null,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onItemClick(item.watchHistoryEntry) },
+                        )
                     }
                 }
             }
         }
 }
 
-private fun LibrarySource.toProvider(): WatchProvider? {
+private fun LibrarySource.toProvider(): WatchProvider {
     return when (this) {
-        LibrarySource.LOCAL -> null
         LibrarySource.TRAKT -> WatchProvider.TRAKT
         LibrarySource.SIMKL -> WatchProvider.SIMKL
     }
@@ -716,7 +586,6 @@ private fun LibrarySource.toProvider(): WatchProvider? {
 
 private fun LibrarySource.displayName(): String {
     return when (this) {
-        LibrarySource.LOCAL -> "Local"
         LibrarySource.TRAKT -> "Trakt"
         LibrarySource.SIMKL -> "Simkl"
     }

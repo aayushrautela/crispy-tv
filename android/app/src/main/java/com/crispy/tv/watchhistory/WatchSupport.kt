@@ -6,11 +6,11 @@ import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchProviderAuthState
 import java.util.Locale
 
-fun preferredWatchProvider(authState: WatchProviderAuthState): WatchProvider {
+fun preferredWatchProvider(authState: WatchProviderAuthState): WatchProvider? {
     return when {
         authState.traktAuthenticated -> WatchProvider.TRAKT
         authState.simklAuthenticated -> WatchProvider.SIMKL
-        else -> WatchProvider.LOCAL
+        else -> null
     }
 }
 

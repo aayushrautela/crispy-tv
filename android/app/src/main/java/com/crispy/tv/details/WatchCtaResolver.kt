@@ -3,9 +3,7 @@ package com.crispy.tv.details
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import com.crispy.tv.player.CanonicalWatchStateSnapshot
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.watchhistory.matchesContentId
 import com.crispy.tv.watchhistory.matchesMediaType
@@ -36,10 +34,7 @@ internal class WatchCtaResolver(
         details: MediaDetails?,
         itemId: String,
     ): ProviderState {
-        val authState = watchHistoryService.authState()
-        val source = preferredWatchProvider(authState)
         val targetId = (details?.id ?: itemId).trim().lowercase(Locale.US)
-        val expectedType = requestedMediaType
         if (targetId.isBlank()) {
             return ProviderState(
                 isWatched = false,
@@ -50,48 +45,23 @@ internal class WatchCtaResolver(
             )
         }
 
-        return when (source) {
-            WatchProvider.LOCAL -> {
-                val local = watchHistoryService.listLocalHistory(limit = 250)
-                val watchedEntry =
-                    local.entries
-                        .asSequence()
-                        .filter { entry ->
-                            matchesContentId(entry.contentId, targetId) && matchesMediaType(expectedType, entry.contentType)
-                        }
-                        .maxByOrNull { it.watchedAtEpochMs }
-
-                val watched = watchedEntry != null
-                ProviderState(
-                    isWatched = watched,
-                    watchedAtEpochMs = watchedEntry?.watchedAtEpochMs,
-                    isInWatchlist = false,
-                    isRated = false,
-                    userRating = null,
-                )
-            }
-
-            WatchProvider.TRAKT,
-            WatchProvider.SIMKL -> {
-                val snapshot = watchHistoryService.getCanonicalWatchState(buildPlaybackIdentity(details, itemId))
-                if (snapshot == null) {
-                    ProviderState(
-                        isWatched = false,
-                        watchedAtEpochMs = null,
-                        isInWatchlist = false,
-                        isRated = false,
-                        userRating = null,
-                    )
-                } else {
-                    ProviderState(
-                        isWatched = snapshot.isWatched,
-                        watchedAtEpochMs = snapshot.watchedAtEpochMs,
-                        isInWatchlist = snapshot.isInWatchlist,
-                        isRated = snapshot.isRated,
-                        userRating = snapshot.userRating,
-                    )
-                }
-            }
+        val snapshot = watchHistoryService.getCanonicalWatchState(buildPlaybackIdentity(details, itemId))
+        return if (snapshot == null) {
+            ProviderState(
+                isWatched = false,
+                watchedAtEpochMs = null,
+                isInWatchlist = false,
+                isRated = false,
+                userRating = null,
+            )
+        } else {
+            ProviderState(
+                isWatched = snapshot.isWatched,
+                watchedAtEpochMs = snapshot.watchedAtEpochMs,
+                isInWatchlist = snapshot.isInWatchlist,
+                isRated = snapshot.isRated,
+                userRating = snapshot.userRating,
+            )
         }
     }
 

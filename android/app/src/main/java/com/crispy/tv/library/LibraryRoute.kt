@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.StateFlow
 @Composable
 fun LibraryRoute(
     onItemClick: (WatchHistoryEntry) -> Unit,
-    onNavigateToDiscover: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
@@ -81,7 +80,6 @@ fun LibraryRoute(
                 uiState = uiState,
                 onRefresh = viewModel::refresh,
                 onItemClick = onItemClick,
-                onNavigateToDiscover = onNavigateToDiscover,
                 onSelectProviderFolder = viewModel::selectProviderFolder,
                 scrollToTopRequests = scrollToTopRequests,
                 onScrollToTopConsumed = onScrollToTopConsumed,

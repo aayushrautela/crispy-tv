@@ -42,6 +42,7 @@ data class WatchHistoryResult(
     val statusMessage: String,
     val entries: List<WatchHistoryEntry> = emptyList(),
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
+    val accepted: Boolean = false,
     val syncedToTrakt: Boolean = false,
     val syncedToSimkl: Boolean = false
 )
@@ -327,7 +328,7 @@ interface WatchHistoryService {
     suspend fun getCanonicalContinueWatching(
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
-        source: WatchProvider,
+        source: WatchProvider? = null,
     ): CanonicalContinueWatchingResult {
         return CanonicalContinueWatchingResult(statusMessage = "Canonical continue watching unavailable.", isError = true)
     }

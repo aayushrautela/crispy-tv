@@ -183,6 +183,38 @@ class BackendWatchHistoryService(
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update watchlist.")
 
+        if (source == null) {
+            val mediaKey = resolveMediaKey(backendContext.accessToken, request)
+                ?: return WatchHistoryResult(statusMessage = "Watchlist update failed.")
+            val action = try {
+                if (inWatchlist) {
+                    backend.putNativeWatchlist(
+                        accessToken = backendContext.accessToken,
+                        profileId = backendContext.profileId,
+                        mediaKey = mediaKey,
+                    )
+                } else {
+                    backend.deleteNativeWatchlist(
+                        accessToken = backendContext.accessToken,
+                        profileId = backendContext.profileId,
+                        mediaKey = mediaKey,
+                    )
+                }
+            } catch (error: Throwable) {
+                return WatchHistoryResult(statusMessage = error.message ?: "Watchlist update failed.")
+            }
+
+            return WatchHistoryResult(
+                statusMessage = if (action.accepted) {
+                    if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
+                } else {
+                    "Watchlist update failed."
+                },
+                authState = authState(),
+                accepted = action.accepted,
+            )
+        }
+
         val response = try {
             backend.setProviderWatchlist(
                 accessToken = backendContext.accessToken,
@@ -205,6 +237,7 @@ class BackendWatchHistoryService(
                 if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
             },
             authState = authState(),
+            accepted = syncedTrakt || syncedSimkl,
             syncedToTrakt = syncedTrakt,
             syncedToSimkl = syncedSimkl,
         )
@@ -221,6 +254,39 @@ class BackendWatchHistoryService(
 
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
+
+        if (source == null) {
+            val mediaKey = resolveMediaKey(backendContext.accessToken, request)
+                ?: return WatchHistoryResult(statusMessage = "Rating update failed.")
+            val action = try {
+                if (rating == null) {
+                    backend.deleteNativeRating(
+                        accessToken = backendContext.accessToken,
+                        profileId = backendContext.profileId,
+                        mediaKey = mediaKey,
+                    )
+                } else {
+                    backend.putNativeRating(
+                        accessToken = backendContext.accessToken,
+                        profileId = backendContext.profileId,
+                        mediaKey = mediaKey,
+                        rating = rating.coerceIn(1, 10),
+                    )
+                }
+            } catch (error: Throwable) {
+                return WatchHistoryResult(statusMessage = error.message ?: "Rating update failed.")
+            }
+
+            return WatchHistoryResult(
+                statusMessage = if (action.accepted) {
+                    if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
+                } else {
+                    "Rating update failed."
+                },
+                authState = authState(),
+                accepted = action.accepted,
+            )
+        }
 
         val response = try {
             backend.setProviderRating(
@@ -244,6 +310,7 @@ class BackendWatchHistoryService(
                 if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
             },
             authState = authState(),
+            accepted = syncedTrakt || syncedSimkl,
             syncedToTrakt = syncedTrakt,
             syncedToSimkl = syncedSimkl,
         )
@@ -272,6 +339,7 @@ class BackendWatchHistoryService(
         return WatchHistoryResult(
             statusMessage = if (synced) "Removed from continue watching." else "Continue watching removal unavailable.",
             authState = authState(),
+            accepted = synced,
             syncedToTrakt = synced && source == WatchProvider.TRAKT,
             syncedToSimkl = synced && source == WatchProvider.SIMKL,
         )
@@ -417,7 +485,7 @@ class BackendWatchHistoryService(
     override suspend fun getCanonicalContinueWatching(
         limit: Int,
         nowMs: Long,
-        source: WatchProvider,
+        source: WatchProvider?,
     ): CanonicalContinueWatchingResult {
         val targetLimit = limit.coerceAtLeast(1)
         return when (source) {
@@ -431,6 +499,21 @@ class BackendWatchHistoryService(
 
             WatchProvider.TRAKT,
             WatchProvider.SIMKL -> listCanonicalProviderContinueWatching(source, targetLimit, nowMs)
+
+            null -> {
+                val auth = authState()
+                when {
+                    auth.traktAuthenticated -> listCanonicalProviderContinueWatching(WatchProvider.TRAKT, targetLimit, nowMs)
+                    auth.simklAuthenticated -> listCanonicalProviderContinueWatching(WatchProvider.SIMKL, targetLimit, nowMs)
+                    else -> {
+                        val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
+                        CanonicalContinueWatchingResult(
+                            statusMessage = if (local.isNotEmpty()) "" else "No continue watching entries yet.",
+                            entries = local.map { it.toCanonicalContinueWatchingItem() },
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -561,19 +644,48 @@ class BackendWatchHistoryService(
         localStore.saveEntries(updated)
 
         val synced =
-            if (source == WatchProvider.LOCAL || source == null) {
+            if (source == WatchProvider.LOCAL) {
                 false
             } else {
                 syncWatchedMutation(normalized, shouldMark)
             }
 
+        val accepted =
+            when (source) {
+                WatchProvider.LOCAL -> true
+                WatchProvider.TRAKT,
+                WatchProvider.SIMKL,
+                null -> synced
+            }
+
+        val successStatus = if (shouldMark) "Marked watched." else "Removed from watched."
+        val failureStatus =
+            when (source) {
+                WatchProvider.LOCAL -> successStatus
+                WatchProvider.TRAKT -> "Trakt watched sync failed."
+                WatchProvider.SIMKL -> "Simkl watched sync failed."
+                null -> "Watched update failed."
+            }
+
         return WatchHistoryResult(
-            statusMessage = if (shouldMark) "Marked watched." else "Removed from watched.",
+            statusMessage = if (accepted) successStatus else failureStatus,
             entries = updated.sortedByDescending { it.watchedAtEpochMs }.map { it.toPublicEntry() },
             authState = authState(),
+            accepted = accepted,
             syncedToTrakt = synced && source == WatchProvider.TRAKT,
             syncedToSimkl = synced && source == WatchProvider.SIMKL,
         )
+    }
+
+    private suspend fun resolveMediaKey(accessToken: String, request: WatchHistoryRequest): String? {
+        return try {
+            backend.resolvePlayback(
+                accessToken = accessToken,
+                input = request.toProviderLookupInput(),
+            ).item.mediaKey.trim().takeIf { it.isNotBlank() }
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     private suspend fun syncWatchedMutation(request: NormalizedWatchRequest, shouldMark: Boolean): Boolean {

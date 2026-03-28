@@ -940,10 +940,6 @@ class DetailsViewModel internal constructor(
                 withContext(Dispatchers.IO) {
                     preferredWatchProvider(watchHistoryService.authState())
                 }
-            if (source == WatchProvider.LOCAL) {
-                _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to use watchlist.") }
-                return@launch
-            }
 
             val desired = !_uiState.value.isInWatchlist
             _uiState.update { it.copy(isMutating = true) }
@@ -976,12 +972,7 @@ class DetailsViewModel internal constructor(
                 withContext(Dispatchers.IO) {
                     watchHistoryService.setInWatchlist(request, desired, source)
                 }
-            val success =
-                when (source) {
-                    WatchProvider.TRAKT -> result.syncedToTrakt
-                    WatchProvider.SIMKL -> result.syncedToSimkl
-                    WatchProvider.LOCAL -> false
-                }
+            val success = mutationSucceeded(source, result)
             _uiState.update {
                 it.copy(
                     isMutating = false,
@@ -1040,12 +1031,7 @@ class DetailsViewModel internal constructor(
                         watchHistoryService.unmarkWatched(request, source)
                     }
                 }
-            val success =
-                when (source) {
-                    WatchProvider.TRAKT -> result.syncedToTrakt
-                    WatchProvider.SIMKL -> result.syncedToSimkl
-                    WatchProvider.LOCAL -> true
-                }
+            val success = mutationSucceeded(source, result)
             _uiState.update {
                 val nextIsWatched = if (success) desired else it.isWatched
                 val nextCta =
@@ -1158,10 +1144,6 @@ class DetailsViewModel internal constructor(
                 withContext(Dispatchers.IO) {
                     preferredWatchProvider(watchHistoryService.authState())
                 }
-            if (source == WatchProvider.LOCAL) {
-                _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to rate.") }
-                return@launch
-            }
             if (source == WatchProvider.SIMKL && rating == null) {
                 _uiState.update { it.copy(statusMessage = "Removing ratings is not supported for Simkl yet.") }
                 return@launch
@@ -1197,12 +1179,7 @@ class DetailsViewModel internal constructor(
                 withContext(Dispatchers.IO) {
                     watchHistoryService.setRating(request, rating, source)
                 }
-            val success =
-                when (source) {
-                    WatchProvider.TRAKT -> result.syncedToTrakt
-                    WatchProvider.SIMKL -> result.syncedToSimkl
-                    WatchProvider.LOCAL -> false
-                }
+            val success = mutationSucceeded(source, result)
             _uiState.update {
                 it.copy(
                     isMutating = false,
@@ -1214,17 +1191,29 @@ class DetailsViewModel internal constructor(
         }
     }
 
-private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
-    val pending = pendingEpisodeNavigation ?: return
-    val selectedSeason = _uiState.value.selectedSeasonOrFirst
-    if (pending.season != null && pending.season != selectedSeason) return
-    pendingEpisodeNavigation = null
+    private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
+        val pending = pendingEpisodeNavigation ?: return
+        val selectedSeason = _uiState.value.selectedSeasonOrFirst
+        if (pending.season != null && pending.season != selectedSeason) return
+        pendingEpisodeNavigation = null
 
-    if (!pending.autoOpenEpisode || pending.episode == null) return
+        if (!pending.autoOpenEpisode || pending.episode == null) return
 
-    val target = videos.firstOrNull { video -> video.episode == pending.episode }
-    target?.let { video -> onOpenStreamSelectorForEpisode(video.id) }
-}
+        val target = videos.firstOrNull { video -> video.episode == pending.episode }
+        target?.let { video -> onOpenStreamSelectorForEpisode(video.id) }
+    }
+
+    private fun mutationSucceeded(
+        source: WatchProvider?,
+        result: com.crispy.tv.player.WatchHistoryResult,
+    ): Boolean {
+        return when (source) {
+            WatchProvider.TRAKT -> result.syncedToTrakt
+            WatchProvider.SIMKL -> result.syncedToSimkl
+            WatchProvider.LOCAL -> true
+            null -> result.accepted
+        }
+    }
 
     companion object {
         fun factory(context: Context, itemId: String, mediaType: String): ViewModelProvider.Factory {
