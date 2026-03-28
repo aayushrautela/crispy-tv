@@ -150,7 +150,12 @@ class DetailsViewModel internal constructor(
 
             val enrichedDetails =
                 withContext(Dispatchers.IO) {
-                    backendDetail?.toMediaDetails()?.let(watchCtaResolver::ensureImdbId)
+                    val details = backendDetail?.toMediaDetails()
+                    if (details != null) {
+                        watchCtaResolver.ensureImdbId(details)
+                    } else {
+                        null
+                    }
                 }
 
             resolvedTmdbId = enrichedDetails?.primaryTmdbId()

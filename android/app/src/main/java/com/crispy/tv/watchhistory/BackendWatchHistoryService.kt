@@ -1277,7 +1277,7 @@ class BackendWatchHistoryService(
                         posterUrl = media.images.posterUrl,
                         backdropUrl = media.images.backdropUrl,
                         logoUrl = media.images.logoUrl,
-                        addonId = media.addonId?.trim()?.ifBlank { null },
+                        addonId = "backend",
                     )
                 )
             }
@@ -1319,7 +1319,7 @@ class BackendWatchHistoryService(
                         posterUrl = media.images.posterUrl,
                         backdropUrl = media.images.backdropUrl,
                         logoUrl = media.images.logoUrl,
-                        addonId = media.addonId?.trim()?.ifBlank { null },
+                        addonId = "backend",
                     ),
                 )
             }

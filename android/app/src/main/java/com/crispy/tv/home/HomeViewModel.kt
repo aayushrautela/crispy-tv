@@ -297,9 +297,10 @@ class HomeViewModel internal constructor(
                             }
                         }
 
-                        !item.providerPlaybackId.isNullOrBlank() -> {
+                        item.providerPlaybackId?.takeIf { it.isNotBlank() } != null -> {
+                            val playbackId = item.providerPlaybackId?.takeIf { it.isNotBlank() }
                             watchHistoryService.removeFromPlayback(
-                                playbackId = item.providerPlaybackId,
+                                playbackId = checkNotNull(playbackId),
                                 source = item.provider,
                             )
                         }
@@ -560,7 +561,7 @@ class HomeViewModel internal constructor(
         delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
 
         val nowMs = System.currentTimeMillis()
-        val railItems = continueWatchingResult.items
+        val railItems = continueWatchingResult.entries
         val continueWatchingItems = railItems.filterNot { it.isUpNextPlaceholder }
         val upNextItems = railItems.filter { it.isUpNextPlaceholder }
 

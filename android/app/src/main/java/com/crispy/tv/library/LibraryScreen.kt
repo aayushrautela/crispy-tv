@@ -532,9 +532,14 @@ internal fun LibraryRouteContent(
             if (selectedFolder == null) {
                 true
             } else {
-                val folderIds = item.item.folderIds.ifEmpty {
-                    selectedProvider?.let(::defaultProviderFolderId)?.let(::setOf) ?: emptySet()
-                }
+                val folderIds =
+                    item.item.folderIds.ifEmpty {
+                        if (selectedProvider != null) {
+                            setOf(defaultProviderFolderId(selectedProvider))
+                        } else {
+                            emptySet()
+                        }
+                    }
                 folderIds.contains(selectedFolder)
             }
         }

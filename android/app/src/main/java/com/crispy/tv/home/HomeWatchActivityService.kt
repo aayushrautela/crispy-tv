@@ -45,7 +45,7 @@ class HomeWatchActivityService(
                         isError = true,
                     )
                 } else {
-                    CanonicalContinueWatchingResult()
+                    CanonicalContinueWatchingResult(statusMessage = "")
                 }
             }
         }
@@ -63,7 +63,7 @@ class HomeWatchActivityService(
             .take(targetCount)
 
         if (dedupedEntries.isEmpty()) {
-            return CanonicalContinueWatchingResult()
+            return CanonicalContinueWatchingResult(statusMessage = "")
         }
 
         val items =
@@ -89,7 +89,10 @@ class HomeWatchActivityService(
                 }
             }
 
-        return CanonicalContinueWatchingResult(items = items)
+        return CanonicalContinueWatchingResult(
+            statusMessage = "",
+            entries = items,
+        )
     }
 
     private suspend fun loadProviderContinueWatchingItems(
@@ -101,7 +104,7 @@ class HomeWatchActivityService(
         val projectedEntries = entries.take(targetCount)
 
         if (projectedEntries.isEmpty()) {
-            return CanonicalContinueWatchingResult()
+            return CanonicalContinueWatchingResult(statusMessage = "")
         }
 
         val items =
@@ -127,7 +130,10 @@ class HomeWatchActivityService(
                 }
             }
 
-        return CanonicalContinueWatchingResult(items = items)
+        return CanonicalContinueWatchingResult(
+            statusMessage = "",
+            entries = items,
+        )
     }
 
     private fun buildLocalContinueWatchingItem(
