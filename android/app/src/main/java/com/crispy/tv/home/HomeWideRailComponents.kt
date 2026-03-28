@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.components.skeletonElement
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
@@ -43,9 +44,9 @@ private const val HOME_WIDE_SKELETON_COUNT = 3
 @Composable
 internal fun HomeWideRailSection(
     section: HomeWideRailSectionUi,
-    onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
-    onHideContinueWatchingItem: (ContinueWatchingItem) -> Unit,
-    onRemoveContinueWatchingItem: (ContinueWatchingItem) -> Unit,
+    onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
+    onHideContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
+    onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
 ) {

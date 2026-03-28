@@ -2,11 +2,11 @@ package com.crispy.tv.details
 
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.player.ContinueWatchingEntry
+import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.player.CanonicalWatchStateSnapshot
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.watchhistory.isWatchedFolder
 import com.crispy.tv.watchhistory.matchesContentId
 import com.crispy.tv.watchhistory.matchesMediaType
 import com.crispy.tv.watchhistory.preferredWatchProvider
@@ -73,54 +73,24 @@ internal class WatchCtaResolver(
 
             WatchProvider.TRAKT,
             WatchProvider.SIMKL -> {
-                val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 250, source = source)
-                val snapshot =
-                    if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) {
-                        cached
-                    } else {
-                        watchHistoryService.listProviderLibrary(limitPerFolder = 250, source = source)
-                    }
-
-                val watchedItem =
-                    snapshot.items.firstOrNull { item ->
-                        item.provider == source &&
-                            source.isWatchedFolder(item.folderId) &&
-                            matchesContentId(item.contentId, targetId) &&
-                            matchesMediaType(expectedType, item.contentType)
-                    }
-
-                val watchedAtEpochMs = watchedItem?.addedAtEpochMs
-                val watched = watchedItem != null
-
-                val watchlistFolderId =
-                    when (source) {
-                        WatchProvider.TRAKT -> "watchlist"
-                        WatchProvider.SIMKL -> "plantowatch"
-                        WatchProvider.LOCAL -> ""
-                    }
-                val inWatchlist =
-                    snapshot.items.any { item ->
-                        item.provider == source &&
-                            item.folderId == watchlistFolderId &&
-                            matchesContentId(item.contentId, targetId) &&
-                            matchesMediaType(expectedType, item.contentType)
-                    }
-
-                val isRated =
-                    snapshot.items.any { item ->
-                        item.provider == source &&
-                            item.folderId == "ratings" &&
-                            matchesContentId(item.contentId, targetId) &&
-                            matchesMediaType(expectedType, item.contentType)
-                    }
-
-                ProviderState(
-                    isWatched = watched,
-                    watchedAtEpochMs = watchedAtEpochMs,
-                    isInWatchlist = inWatchlist,
-                    isRated = isRated,
-                    userRating = null,
-                )
+                val snapshot = watchHistoryService.getCanonicalWatchState(buildPlaybackIdentity(details, itemId))
+                if (snapshot == null) {
+                    ProviderState(
+                        isWatched = false,
+                        watchedAtEpochMs = null,
+                        isInWatchlist = false,
+                        isRated = false,
+                        userRating = null,
+                    )
+                } else {
+                    ProviderState(
+                        isWatched = snapshot.isWatched,
+                        watchedAtEpochMs = snapshot.watchedAtEpochMs,
+                        isInWatchlist = snapshot.isInWatchlist,
+                        isRated = snapshot.isRated,
+                        userRating = snapshot.userRating,
+                    )
+                }
             }
         }
     }
@@ -129,18 +99,12 @@ internal class WatchCtaResolver(
         details: MediaDetails,
         expectedType: MetadataLabMediaType,
         nowMs: Long,
-    ): ContinueWatchingEntry? {
+    ): CanonicalContinueWatchingItem? {
         val source = preferredWatchProvider(watchHistoryService.authState())
         val targetId = details.id.trim().lowercase(Locale.US)
         if (targetId.isBlank()) return null
 
-        val cached = watchHistoryService.getCachedContinueWatching(limit = 50, nowMs = nowMs, source = source)
-        val snapshot =
-            if (cached.entries.isNotEmpty()) {
-                cached
-            } else {
-                watchHistoryService.listContinueWatching(limit = 50, nowMs = nowMs, source = source)
-            }
+        val snapshot = watchHistoryService.getCanonicalContinueWatching(limit = 50, nowMs = nowMs, source = source)
 
         return snapshot.entries
             .asSequence()
@@ -240,5 +204,19 @@ internal class WatchCtaResolver(
     companion object {
         private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
         private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
+    }
+
+    private fun buildPlaybackIdentity(details: MediaDetails?, itemId: String): com.crispy.tv.player.PlaybackIdentity {
+        val resolvedDetails = details
+        return com.crispy.tv.player.PlaybackIdentity(
+            contentId = resolvedDetails?.id ?: itemId,
+            imdbId = resolvedDetails?.imdbId,
+            tmdbId = resolvedDetails?.tmdbId,
+            contentType = requestedMediaType,
+            title = resolvedDetails?.title ?: itemId,
+            year = resolvedDetails?.year?.trim()?.toIntOrNull(),
+            showTitle = resolvedDetails?.title,
+            showYear = resolvedDetails?.year?.trim()?.toIntOrNull(),
+        )
     }
 }

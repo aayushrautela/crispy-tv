@@ -145,6 +145,10 @@ class WatchHistoryCache(
                     .put("provider", entry.provider.name)
                     .put("providerPlaybackId", entry.providerPlaybackId)
                     .put("isUpNextPlaceholder", entry.isUpNextPlaceholder)
+                    .put("posterUrl", entry.posterUrl)
+                    .put("backdropUrl", entry.backdropUrl)
+                    .put("logoUrl", entry.logoUrl)
+                    .put("addonId", entry.addonId)
             )
         }
 
@@ -282,6 +286,10 @@ class WatchHistoryCache(
             val providerValue = runCatching { WatchProvider.valueOf(obj.optString("provider").trim()) }.getOrNull() ?: provider
             val playbackId = obj.optString("providerPlaybackId").trim().ifEmpty { null }
             val isUpNext = obj.optBoolean("isUpNextPlaceholder", false)
+            val posterUrl = obj.optString("posterUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val backdropUrl = obj.optString("backdropUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val logoUrl = obj.optString("logoUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val addonId = obj.optString("addonId").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
 
             entries.add(
                 ContinueWatchingEntry(
@@ -295,6 +303,10 @@ class WatchHistoryCache(
                     provider = providerValue,
                     providerPlaybackId = playbackId,
                     isUpNextPlaceholder = isUpNext,
+                    posterUrl = posterUrl,
+                    backdropUrl = backdropUrl,
+                    logoUrl = logoUrl,
+                    addonId = addonId,
                 )
             )
         }

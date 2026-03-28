@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
+import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -59,7 +60,7 @@ private val HomeTopSectionSpacing = 16.dp
 @Composable
 internal fun HomeRoute(
     onHeroClick: (HomeHeroItem) -> Unit,
-    onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
+    onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
@@ -158,10 +159,10 @@ private fun HomeScreen(
     wideRailSections: Map<String, HomeWideRailSectionUi>,
     catalogSections: Map<String, HomeCatalogSectionUi>,
     onRefresh: () -> Unit,
-    onHideContinueWatchingItem: (ContinueWatchingItem) -> Unit,
-    onRemoveContinueWatchingItem: (ContinueWatchingItem) -> Unit,
+    onHideContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
+    onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onHeroClick: (HomeHeroItem) -> Unit,
-    onContinueWatchingClick: (ContinueWatchingItem) -> Unit,
+    onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,

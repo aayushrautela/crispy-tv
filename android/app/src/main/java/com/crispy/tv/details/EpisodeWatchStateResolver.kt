@@ -8,7 +8,6 @@ import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.watchhistory.addEpisodeKey
 import com.crispy.tv.watchhistory.episodeWatchKeyCandidates
-import com.crispy.tv.watchhistory.isWatchedFolder
 import com.crispy.tv.watchhistory.preferredWatchProvider
 
 internal class EpisodeWatchStateResolver(
@@ -28,7 +27,7 @@ internal class EpisodeWatchStateResolver(
     ): Map<String, EpisodeWatchState> {
         if (videos.isEmpty()) return emptyMap()
 
-        val watchedKeys = resolveWatchKeys()
+        val watchedKeys = resolveWatchKeys(details, resolvedTmdbId)
         val yearInt = details.year?.trim()?.toIntOrNull()
         return videos.associate { video ->
             val season = video.season
@@ -64,8 +63,28 @@ internal class EpisodeWatchStateResolver(
         }
     }
 
-    private suspend fun resolveWatchKeys(): Set<String> {
+    private suspend fun resolveWatchKeys(details: MediaDetails, resolvedTmdbId: Int?): Set<String> {
         cachedEpisodeWatchKeys?.let { return it }
+
+        val source = preferredWatchProvider(watchHistoryService.authState())
+        if (source != WatchProvider.LOCAL) {
+            val canonical = watchHistoryService.getCanonicalWatchState(
+                PlaybackIdentity(
+                    contentId = details.id,
+                    imdbId = details.imdbId,
+                    tmdbId = resolvedTmdbId ?: details.tmdbId,
+                    contentType = MetadataLabMediaType.SERIES,
+                    title = details.title,
+                    year = details.year?.trim()?.toIntOrNull(),
+                    showTitle = details.title,
+                    showYear = details.year?.trim()?.toIntOrNull(),
+                )
+            )
+            val canonicalKeys = canonical?.watchedEpisodeKeys.orEmpty().map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+            if (canonicalKeys.isNotEmpty()) {
+                return canonicalKeys.also { cachedEpisodeWatchKeys = it }
+            }
+        }
 
         val localHistoryKeys: List<String> =
             watchHistoryService
@@ -77,25 +96,12 @@ internal class EpisodeWatchStateResolver(
                     addEpisodeKey(entry.contentId, season, episode)
                 }
 
-        val source = preferredWatchProvider(watchHistoryService.authState())
         val providerHistoryKeys: List<String> =
             if (source == WatchProvider.LOCAL) {
                 emptyList()
             } else {
-                val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 1000, source = source)
-                val snapshot =
-                    if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) {
-                        cached
-                    } else {
-                        watchHistoryService.listProviderLibrary(limitPerFolder = 1000, source = source)
-                    }
-                snapshot.items.mapNotNull { item ->
-                    if (item.provider != source || !source.isWatchedFolder(item.folderId)) {
-                        return@mapNotNull null
-                    }
-                    val season = item.season ?: return@mapNotNull null
-                    val episode = item.episode ?: return@mapNotNull null
-                    addEpisodeKey(item.contentId, season, episode)
+                watchHistoryService.listWatchedEpisodeRecords(source = source).mapNotNull { record ->
+                    addEpisodeKey(record.contentId, record.season, record.episode)
                 }
             }
 

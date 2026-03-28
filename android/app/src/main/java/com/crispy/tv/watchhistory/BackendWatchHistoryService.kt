@@ -11,11 +11,14 @@ import com.crispy.tv.backend.CrispyBackendClient.LibrarySource
 import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAuthState
-import com.crispy.tv.backend.CrispyBackendClient.ProviderLibrarySnapshot as BackendProviderLibrarySnapshot
 import com.crispy.tv.backend.CrispyBackendClient.WatchMutationInput
 import com.crispy.tv.domain.watch.findNextEpisode
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
+import com.crispy.tv.player.CanonicalProviderLibraryItem
+import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.player.CanonicalContinueWatchingResult
+import com.crispy.tv.player.CanonicalWatchStateSnapshot
 import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
@@ -358,8 +361,7 @@ class BackendWatchHistoryService(
                 limitPerFolder = limitPerFolder.coerceAtLeast(1),
             )
             val authProviders = persistAuthState(response.auth.providers)
-            val snapshot = response.diagnostics.providers.firstOrNull { it.provider.equals(source.apiValue(), ignoreCase = true) }
-            val mapped = snapshot?.toProviderLibrary(source) ?: ProviderLibrarySnapshot(statusMessage = "")
+            val mapped = response.canonical.toProviderLibrary(source)
             val status = when {
                 mapped.folders.isNotEmpty() || mapped.items.isNotEmpty() -> mapped.statusMessage
                 !authProviders.isProviderConnected(source) -> connectLibraryMessage(source)
@@ -375,8 +377,80 @@ class BackendWatchHistoryService(
         }
     }
 
+    override suspend fun getCanonicalProviderLibraryItems(
+        limitPerFolder: Int,
+        source: WatchProvider,
+    ): List<CanonicalProviderLibraryItem> {
+        if (source == WatchProvider.LOCAL) {
+            return emptyList()
+        }
+
+        val backendContext = getBackendContext() ?: return emptyList()
+        return try {
+            val response = backend.getProfileLibrary(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                source = source.toLibrarySource(),
+                limitPerFolder = limitPerFolder.coerceAtLeast(1),
+            )
+            persistAuthState(response.auth.providers)
+            response.canonical.items
+                .filter { item -> item.providers.any { it.equals(source.apiValue(), ignoreCase = true) } }
+                .map { item -> item.toCanonicalProviderLibraryItem() }
+        } catch (_: Throwable) {
+            emptyList()
+        }
+    }
+
+    override suspend fun getCachedCanonicalProviderLibraryItems(
+        limitPerFolder: Int,
+        source: WatchProvider,
+    ): List<CanonicalProviderLibraryItem> {
+        if (source == WatchProvider.LOCAL) {
+            return emptyList()
+        }
+
+        val snapshot = getCachedProviderLibrary(limitPerFolder = limitPerFolder, source = source)
+        return snapshot.items.map { item -> item.toCanonicalProviderLibraryItem() }
+    }
+
+    override suspend fun getCanonicalContinueWatching(
+        limit: Int,
+        nowMs: Long,
+        source: WatchProvider,
+    ): CanonicalContinueWatchingResult {
+        val targetLimit = limit.coerceAtLeast(1)
+        return when (source) {
+            WatchProvider.LOCAL -> {
+                val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
+                CanonicalContinueWatchingResult(
+                    statusMessage = if (local.isNotEmpty()) "" else "No local continue watching entries yet.",
+                    entries = local.map { it.toCanonicalContinueWatchingItem() },
+                )
+            }
+
+            WatchProvider.TRAKT,
+            WatchProvider.SIMKL -> listCanonicalProviderContinueWatching(source, targetLimit, nowMs)
+        }
+    }
+
     override suspend fun getCachedProviderLibrary(limitPerFolder: Int, source: WatchProvider?): ProviderLibrarySnapshot {
         return watchHistoryCache.getCachedProviderLibrary(limitPerFolder = limitPerFolder, source = source)
+    }
+
+    override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
+        val backendContext = getBackendContext() ?: return null
+        val input = identity.toWatchStateLookupInput() ?: return null
+        return try {
+            val envelope = backend.getWatchState(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                input = input,
+            )
+            envelope.item.toCanonicalWatchStateSnapshot()
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
@@ -590,6 +664,56 @@ class BackendWatchHistoryService(
         }
     }
 
+    private suspend fun listCanonicalProviderContinueWatching(
+        source: WatchProvider,
+        limit: Int,
+        nowMs: Long,
+    ): CanonicalContinueWatchingResult {
+        val backendContext = getBackendContext()
+            ?: return CanonicalContinueWatchingResult(
+                statusMessage = connectContinueWatchingMessage(source),
+                isError = true,
+            )
+
+        return try {
+            val authState = persistAuthState(
+                backend.getProviderAuthState(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                ),
+            )
+            if (!authState.isProviderConnected(source)) {
+                return CanonicalContinueWatchingResult(
+                    statusMessage = connectContinueWatchingMessage(source),
+                    isError = true,
+                )
+            }
+
+            val entries = backend
+                .listContinueWatching(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    limit = limit.coerceAtLeast(1),
+                ).items
+                .toCanonicalContinueWatchingItems(
+                    provider = source,
+                    nowMs = nowMs,
+                    limit = limit,
+                )
+            val status = when {
+                entries.isNotEmpty() -> ""
+                !authState.isProviderConnected(source) -> connectContinueWatchingMessage(source)
+                else -> "No ${providerLabel(source)} continue watching entries available."
+            }
+            CanonicalContinueWatchingResult(statusMessage = status, entries = entries)
+        } catch (_: Throwable) {
+            CanonicalContinueWatchingResult(
+                statusMessage = "${providerLabel(source)} temporarily unavailable.",
+                isError = true,
+            )
+        }
+    }
+
     private suspend fun listMergedProviderLibrary(limitPerFolder: Int): ProviderLibrarySnapshot {
         val auth = authState()
         val providers = buildList {
@@ -635,24 +759,39 @@ class BackendWatchHistoryService(
     }
 
     private suspend fun providerWatchedEpisodeRecords(source: WatchProvider): List<WatchedEpisodeRecord> {
-        val snapshot = listProviderLibrary(limitPerFolder = 1000, source = source)
-        return snapshot.items
+        return listCanonicalWatchHistory(limit = 1000)
             .asSequence()
             .filter { item ->
-                item.provider == source &&
-                    source.isWatchedFolder(item.folderId) &&
-                    item.season != null &&
-                    item.episode != null
+                item.media.mediaType.equals("episode", ignoreCase = true) &&
+                    item.media.seasonNumber != null &&
+                    item.media.episodeNumber != null
             }
             .map { item ->
                 WatchedEpisodeRecord(
-                    contentId = item.contentId,
-                    season = item.season ?: 1,
-                    episode = item.episode ?: 1,
-                    watchedAtEpochMs = item.addedAtEpochMs,
+                    contentId = item.media.canonicalContentId(),
+                    season = item.media.seasonNumber ?: 1,
+                    episode = item.media.episodeNumber ?: 1,
+                    watchedAtEpochMs =
+                        parseIsoToEpochMs(item.watchedAt)
+                            ?: parseIsoToEpochMs(item.lastActivityAt)
+                            ?: 0L,
                 )
             }
+            .filter { it.watchedAtEpochMs > 0L }
             .toList()
+    }
+
+    private suspend fun listCanonicalWatchHistory(limit: Int): List<CrispyBackendClient.HydratedWatchItem> {
+        val backendContext = getBackendContext() ?: return emptyList()
+        return try {
+            backend.listWatchHistory(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                limit = limit.coerceAtLeast(1),
+            ).items
+        } catch (_: Throwable) {
+            emptyList()
+        }
     }
 
     private fun localWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
@@ -1074,6 +1213,29 @@ class BackendWatchHistoryService(
         )
     }
 
+    private fun PlaybackIdentity.toWatchStateLookupInput(): MediaLookupInput? {
+        val normalizedImdb = normalizedImdbIdOrNull(imdbId)
+        val normalizedContentId = contentId?.trim()?.takeIf { it.isNotBlank() }
+        val mediaType = when (contentType) {
+            MetadataLabMediaType.MOVIE -> "movie"
+            MetadataLabMediaType.SERIES -> if (season != null && episode != null) "episode" else "show"
+        }
+        return MediaLookupInput(
+            id = normalizedContentId,
+            mediaType = mediaType,
+            tmdbId = if (mediaType == "episode") null else tmdbId,
+            showTmdbId = if (mediaType == "episode") tmdbId else null,
+            imdbId = normalizedImdb,
+            seasonNumber = season,
+            episodeNumber = episode,
+        ).takeIf {
+            it.id != null ||
+                it.tmdbId != null ||
+                it.showTmdbId != null ||
+                it.imdbId != null
+        }
+    }
+
     private fun NormalizedWatchRequest.toPlaybackLookupInput(): MediaLookupInput {
         return MediaLookupInput(
             id = contentId,
@@ -1112,6 +1274,10 @@ class BackendWatchHistoryService(
                         lastUpdatedEpochMs = updatedAt,
                         provider = provider,
                         providerPlaybackId = item.id,
+                        posterUrl = media.images.posterUrl,
+                        backdropUrl = media.images.backdropUrl,
+                        logoUrl = media.images.logoUrl,
+                        addonId = media.addonId?.trim()?.ifBlank { null },
                     )
                 )
             }
@@ -1120,39 +1286,179 @@ class BackendWatchHistoryService(
             .take(limit)
     }
 
-    private fun BackendProviderLibrarySnapshot.toProviderLibrary(provider: WatchProvider): ProviderLibrarySnapshot {
-        return ProviderLibrarySnapshot(
-            statusMessage = statusMessage,
-            folders = folders.map { folder ->
-                ProviderLibraryFolder(
-                    id = folder.id,
-                    label = folder.label,
-                    provider = provider,
-                    itemCount = folder.itemCount,
+    private suspend fun List<CrispyBackendClient.HydratedWatchItem>.toCanonicalContinueWatchingItems(
+        provider: WatchProvider,
+        nowMs: Long,
+        limit: Int,
+    ): List<CanonicalContinueWatchingItem> {
+        val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
+        return buildList {
+            for (item in this@toCanonicalContinueWatchingItems) {
+                val media = item.media
+                val updatedAt =
+                    parseIsoToEpochMs(item.lastActivityAt)
+                        ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
+                        ?: parseIsoToEpochMs(item.watchedAt)
+                        ?: nowMs
+                if (updatedAt < staleCutoff) {
+                    continue
+                }
+                add(
+                    CanonicalContinueWatchingItem(
+                        id = item.id ?: media.canonicalContentId(),
+                        contentId = media.canonicalContentId(),
+                        contentType = media.mediaType.toMetadataLabMediaType(),
+                        title = media.continueWatchingTitle(),
+                        season = media.seasonNumber,
+                        episode = media.episodeNumber,
+                        progressPercent = item.progress?.progressPercent ?: 0.0,
+                        lastUpdatedEpochMs = updatedAt,
+                        provider = provider,
+                        providerPlaybackId = item.id,
+                        isUpNextPlaceholder = false,
+                        posterUrl = media.images.posterUrl,
+                        backdropUrl = media.images.backdropUrl,
+                        logoUrl = media.images.logoUrl,
+                        addonId = media.addonId?.trim()?.ifBlank { null },
+                    ),
                 )
-            },
-            items = items.map { item ->
-                ProviderLibraryItem(
-                    provider = provider,
-                    folderId = item.folderId,
-                    contentId = item.contentId,
-                    contentType = item.contentType.toMetadataLabMediaType(),
-                    title = item.title,
-                    posterUrl = item.posterUrl ?: item.media?.images?.posterUrl,
-                    backdropUrl = item.backdropUrl ?: item.media?.images?.backdropUrl,
-                    externalIds = item.externalIds.toProviderExternalIds(),
-                    season = item.seasonNumber,
-                    episode = item.episodeNumber,
-                    addedAtEpochMs = parseIsoToEpochMs(item.addedAt) ?: System.currentTimeMillis(),
-                )
-            },
+            }
+        }
+            .sortedByDescending { it.lastUpdatedEpochMs }
+            .take(limit)
+    }
+
+    private fun ContinueWatchingEntry.toCanonicalContinueWatchingItem(): CanonicalContinueWatchingItem {
+        return CanonicalContinueWatchingItem(
+            id = "${provider.name.lowercase(Locale.US)}:${contentType.name.lowercase(Locale.US)}:${contentId}:${season ?: -1}:${episode ?: -1}",
+            contentId = contentId,
+            contentType = contentType,
+            title = title,
+            season = season,
+            episode = episode,
+            progressPercent = progressPercent,
+            lastUpdatedEpochMs = lastUpdatedEpochMs,
+            provider = provider,
+            providerPlaybackId = providerPlaybackId,
+            isUpNextPlaceholder = isUpNextPlaceholder,
+            posterUrl = posterUrl,
+            backdropUrl = backdropUrl,
+            logoUrl = logoUrl,
+            addonId = addonId,
         )
+    }
+
+    private fun CrispyBackendClient.CanonicalLibrary.toProviderLibrary(provider: WatchProvider): ProviderLibrarySnapshot {
+        val providerValue = provider.apiValue()
+        val expandedItems =
+            items
+                .asSequence()
+                .filter { item -> item.providers.any { it.equals(providerValue, ignoreCase = true) } }
+                .flatMap { item ->
+                    val title = item.media?.title?.trim().orEmpty().ifBlank { item.title.trim() }.ifBlank { item.contentId.trim() }
+                    val contentId = item.contentId.trim().ifBlank { item.media?.canonicalContentId().orEmpty() }
+                    if (contentId.isBlank()) {
+                        emptySequence()
+                    } else {
+                        val folderIds = item.folderIds.filter { it.isNotBlank() }.ifEmpty { listOf(defaultProviderFolderId(provider)) }
+                        folderIds.asSequence().map { folderId ->
+                            ProviderLibraryItem(
+                                provider = provider,
+                                folderId = folderId,
+                                contentId = contentId,
+                                contentType = item.contentType.toMetadataLabMediaType(),
+                                title = title,
+                                posterUrl = item.posterUrl ?: item.media?.images?.posterUrl,
+                                backdropUrl = item.backdropUrl ?: item.media?.images?.backdropUrl,
+                                externalIds = item.externalIds.toProviderExternalIds(),
+                                season = item.seasonNumber,
+                                episode = item.episodeNumber,
+                                addedAtEpochMs = parseIsoToEpochMs(item.addedAt) ?: System.currentTimeMillis(),
+                            )
+                        }
+                    }
+                }
+                .sortedByDescending { it.addedAtEpochMs }
+                .toList()
+
+        val folders =
+            expandedItems
+                .groupBy { it.folderId }
+                .map { (folderId, folderItems) ->
+                    ProviderLibraryFolder(
+                        id = folderId,
+                        label = providerFolderLabel(provider, folderId),
+                        provider = provider,
+                        itemCount = folderItems.size,
+                    )
+                }
+                .sortedBy { it.label.lowercase(Locale.US) }
+
+        return ProviderLibrarySnapshot(
+            statusMessage = "",
+            folders = folders,
+            items = expandedItems,
+        )
+    }
+
+    private fun defaultProviderFolderId(provider: WatchProvider): String {
+        return when (provider) {
+            WatchProvider.TRAKT -> "collection"
+            WatchProvider.SIMKL -> "watching"
+            WatchProvider.LOCAL -> "library"
+        }
+    }
+
+    private fun providerFolderLabel(provider: WatchProvider, folderId: String): String {
+        val normalized = folderId.trim().lowercase(Locale.US)
+        return when (provider) {
+            WatchProvider.TRAKT -> when (normalized) {
+                "collection" -> "Collection"
+                "watchlist" -> "Watchlist"
+                "watched" -> "Watched"
+                "ratings" -> "Ratings"
+                else -> normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase(Locale.US) }
+            }
+            WatchProvider.SIMKL -> when (normalized) {
+                "watching" -> "Watching"
+                "plantowatch" -> "Plan to Watch"
+                "completed", "completed-tv", "completed-movies" -> "Completed"
+                "ratings" -> "Ratings"
+                else -> normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase(Locale.US) }
+            }
+            WatchProvider.LOCAL -> "Library"
+        }
     }
 
     private fun CrispyBackendClient.MetadataExternalIds?.toProviderExternalIds(): ProviderExternalIds? {
         val ids = this ?: return null
         if (ids.tmdb == null && ids.imdb == null && ids.tvdb == null) return null
         return ProviderExternalIds(tmdb = ids.tmdb, imdb = ids.imdb, tvdb = ids.tvdb)
+    }
+
+    private fun CrispyBackendClient.CanonicalLibraryItem.toCanonicalProviderLibraryItem(): CanonicalProviderLibraryItem {
+        val resolvedContentId = contentId.trim().ifBlank { media?.canonicalContentId().orEmpty() }
+        return CanonicalProviderLibraryItem(
+            contentId = resolvedContentId,
+            contentType = contentType.toMetadataLabMediaType(),
+            title = media?.title?.trim().orEmpty().ifBlank { title.trim() }.ifBlank { resolvedContentId },
+            posterUrl = posterUrl ?: media?.images?.posterUrl,
+            backdropUrl = backdropUrl ?: media?.images?.backdropUrl,
+            folderIds = folderIds.map { it.trim() }.filter { it.isNotBlank() }.toSet(),
+            addedAtEpochMs = parseIsoToEpochMs(addedAt) ?: 0L,
+        )
+    }
+
+    private fun ProviderLibraryItem.toCanonicalProviderLibraryItem(): CanonicalProviderLibraryItem {
+        return CanonicalProviderLibraryItem(
+            contentId = contentId.trim(),
+            contentType = contentType,
+            title = title.trim().ifBlank { contentId.trim() },
+            posterUrl = posterUrl,
+            backdropUrl = backdropUrl,
+            folderIds = setOf(folderId.trim()).filter { it.isNotBlank() }.toSet(),
+            addedAtEpochMs = addedAtEpochMs,
+        )
     }
 
     private fun CrispyBackendClient.MetadataView.canonicalContentId(): String {
@@ -1166,19 +1472,21 @@ class BackendWatchHistoryService(
         }
     }
 
+    private fun CrispyBackendClient.WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {
+        return CanonicalWatchStateSnapshot(
+            isWatched = watched != null,
+            watchedAtEpochMs = parseIsoToEpochMs(watched?.watchedAt),
+            isInWatchlist = watchlist != null,
+            isRated = rating != null,
+            userRating = rating?.value,
+            watchedEpisodeKeys = watchedEpisodeKeys.map { it.trim().lowercase(Locale.US) }.filter { it.isNotBlank() }.toSet(),
+        )
+    }
+
     private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
         return when (trim().lowercase(Locale.US)) {
             "show", "series", "tv", "episode" -> MetadataLabMediaType.SERIES
             else -> MetadataLabMediaType.MOVIE
-        }
-    }
-
-    private fun WatchProvider.isWatchedFolder(folderId: String): Boolean {
-        val normalized = folderId.trim().lowercase(Locale.US)
-        return when (this) {
-            WatchProvider.TRAKT -> normalized == "watched"
-            WatchProvider.SIMKL -> normalized.startsWith("completed")
-            WatchProvider.LOCAL -> false
         }
     }
 

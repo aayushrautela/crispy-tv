@@ -38,10 +38,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.player.CanonicalProviderLibraryItem
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
-import com.crispy.tv.player.ProviderLibraryFolder
-import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
@@ -85,14 +84,22 @@ data class LibraryLocalItemUi(
 }
 
 @Immutable
+data class LibraryProviderFolderUi(
+    val id: String,
+    val label: String,
+    val provider: WatchProvider,
+    val itemCount: Int,
+)
+
+@Immutable
 data class LibraryProviderItemUi(
-    val item: ProviderLibraryItem,
+    val item: CanonicalProviderLibraryItem,
     val watchHistoryEntry: WatchHistoryEntry,
     val posterUrl: String?,
     val backdropUrl: String?,
 ) {
     val stableKey: String
-        get() = "${item.provider.name}:${item.folderId}:${item.contentType}:${item.contentId}"
+        get() = "${item.contentType.name}:${item.contentId}:${item.folderIds.sorted().joinToString(separator = ",") }"
 }
 
 @Immutable
@@ -100,7 +107,7 @@ data class LibraryUiState(
     val isRefreshing: Boolean = false,
     val statusMessage: String = "",
     val localItems: List<LibraryLocalItemUi> = emptyList(),
-    val providerFolders: List<ProviderLibraryFolder> = emptyList(),
+    val providerFolders: List<LibraryProviderFolderUi> = emptyList(),
     val providerItems: List<LibraryProviderItemUi> = emptyList(),
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
     val selectedSource: LibrarySource = LibrarySource.LOCAL,
@@ -111,7 +118,7 @@ private data class LibraryRefreshPayload(
     val authState: WatchProviderAuthState,
     val selectedSource: LibrarySource,
     val localItems: List<LibraryLocalItemUi>,
-    val providerFolders: List<ProviderLibraryFolder>,
+    val providerFolders: List<LibraryProviderFolderUi>,
     val providerItems: List<LibraryProviderItemUi>,
     val statusMessage: String,
 )
@@ -168,61 +175,57 @@ class LibraryViewModel internal constructor(
                         null
                     }
 
-                val cachedProviderResult =
+                val cachedProviderResult: List<CanonicalProviderLibraryItem> =
                     if (selectedProvider != null && providerAuthenticated) {
                         withContext(Dispatchers.IO) {
                             runCatching {
-                                watchHistoryService.getCachedProviderLibrary(
+                                watchHistoryService.getCachedCanonicalProviderLibraryItems(
                                     limitPerFolder = 250,
                                     source = selectedProvider,
                                 )
-                            }.getOrNull()?.takeIf { snapshot ->
-                                snapshot.folders.isNotEmpty() || snapshot.items.isNotEmpty()
-                            }
+                            }.getOrNull().orEmpty()
                         }
                     } else {
-                        null
+                        emptyList()
                     }
 
-                if (selectedSource != LibrarySource.LOCAL && cachedProviderResult != null) {
+                if (selectedSource != LibrarySource.LOCAL && cachedProviderResult.isNotEmpty()) {
                     val cachedPayload =
                         buildRefreshPayload(
                             authState = authState,
                             selectedSource = selectedSource,
                             localEntries = emptyList(),
-                            providerFolders = cachedProviderResult.folders,
-                            providerItems = cachedProviderResult.items,
+                            providerItems = cachedProviderResult,
                             providerAuthenticated = providerAuthenticated,
-                            providerStatusMessage = cachedProviderResult.statusMessage,
+                            providerStatusMessage = "",
                         )
                     applyPayload(cachedPayload, isRefreshing = true)
                 }
 
-                val providerResult =
-                    if (selectedProvider != null && providerAuthenticated) {
-                        val networkResult =
-                            withContext(Dispatchers.IO) {
-                                runCatching {
-                                    watchHistoryService.listProviderLibrary(
-                                        limitPerFolder = 250,
-                                        source = selectedProvider,
-                                    )
-                                }.getOrNull()
-                            }
-                        networkResult ?: cachedProviderResult
-                    } else {
-                        cachedProviderResult
-                    }
+                val providerResult: List<CanonicalProviderLibraryItem> =
+                        if (selectedProvider != null && providerAuthenticated) {
+                            val networkResult =
+                                withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        watchHistoryService.getCanonicalProviderLibraryItems(
+                                            limitPerFolder = 250,
+                                            source = selectedProvider,
+                                        )
+                                    }.getOrNull()
+                                }
+                            networkResult ?: cachedProviderResult
+                        } else {
+                            emptyList()
+                        }
 
                 val finalPayload =
                     buildRefreshPayload(
                         authState = authState,
                         selectedSource = selectedSource,
                         localEntries = localResult?.entries.orEmpty().sortedByDescending { it.watchedAtEpochMs },
-                        providerFolders = providerResult?.folders.orEmpty(),
-                        providerItems = providerResult?.items.orEmpty(),
+                        providerItems = providerResult,
                         providerAuthenticated = providerAuthenticated,
-                        providerStatusMessage = providerResult?.statusMessage,
+                        providerStatusMessage = if (providerResult.isEmpty()) null else "",
                     )
                 applyPayload(finalPayload, isRefreshing = false)
             }
@@ -239,8 +242,7 @@ class LibraryViewModel internal constructor(
         authState: WatchProviderAuthState,
         selectedSource: LibrarySource,
         localEntries: List<WatchHistoryEntry>,
-        providerFolders: List<ProviderLibraryFolder>,
-        providerItems: List<ProviderLibraryItem>,
+        providerItems: List<CanonicalProviderLibraryItem>,
         providerAuthenticated: Boolean,
         providerStatusMessage: String?,
     ): LibraryRefreshPayload {
@@ -251,6 +253,7 @@ class LibraryViewModel internal constructor(
             } else {
                 enrichProviderItems(providerItems)
             }
+        val derivedProviderFolders = providerFolders(selectedSource, providerUiItems)
 
         val statusMessage =
             when (selectedSource) {
@@ -276,7 +279,7 @@ class LibraryViewModel internal constructor(
             authState = authState,
             selectedSource = selectedSource,
             localItems = localUiItems,
-            providerFolders = providerFolders,
+            providerFolders = derivedProviderFolders,
             providerItems = providerUiItems,
             statusMessage = statusMessage,
         )
@@ -327,23 +330,8 @@ class LibraryViewModel internal constructor(
         }
     }
 
-    private suspend fun enrichProviderItems(items: List<ProviderLibraryItem>): List<LibraryProviderItemUi> {
-        if (items.isEmpty()) {
-            return emptyList()
-        }
-        val artworkByKey =
-            resolveArtwork(
-                items.map { item ->
-                    ArtworkRequest(
-                        cacheKey = artworkCacheKey(item.contentId, item.contentType.name),
-                        rawId = item.contentId,
-                        posterUrl = item.posterUrl,
-                        backdropUrl = item.backdropUrl,
-                    )
-                },
-            )
+    private suspend fun enrichProviderItems(items: List<CanonicalProviderLibraryItem>): List<LibraryProviderItemUi> {
         return items.map { item ->
-            val artwork = artworkByKey[artworkCacheKey(item.contentId, item.contentType.name)] ?: LibraryArtwork()
             LibraryProviderItemUi(
                 item = item,
                 watchHistoryEntry =
@@ -351,12 +339,12 @@ class LibraryViewModel internal constructor(
                         contentId = item.contentId,
                         contentType = item.contentType,
                         title = item.title,
-                        season = item.season,
-                        episode = item.episode,
+                        season = null,
+                        episode = null,
                         watchedAtEpochMs = item.addedAtEpochMs,
                     ),
-                posterUrl = artwork.posterUrl,
-                backdropUrl = artwork.backdropUrl,
+                posterUrl = item.posterUrl,
+                backdropUrl = item.backdropUrl,
             )
         }
     }
@@ -433,10 +421,32 @@ class LibraryViewModel internal constructor(
         }
     }
 
+    private fun providerFolders(
+        selectedSource: LibrarySource,
+        providerItems: List<LibraryProviderItemUi>,
+    ): List<LibraryProviderFolderUi> {
+        val provider = selectedSource.toProvider() ?: return emptyList()
+        return providerItems
+            .flatMap { item ->
+                val folderIds = item.item.folderIds.ifEmpty { setOf(defaultProviderFolderId(provider)) }
+                folderIds.map { folderId -> folderId to item }
+            }
+            .groupBy({ it.first }, { it.second })
+            .map { (folderId, items) ->
+                LibraryProviderFolderUi(
+                    id = folderId,
+                    label = providerFolderLabel(provider, folderId),
+                    provider = provider,
+                    itemCount = items.size,
+                )
+            }
+            .sortedBy { it.label.lowercase() }
+    }
+
     private fun resolveSelectedFolderId(
         currentFolderId: String?,
         selectedSource: LibrarySource,
-        folders: List<ProviderLibraryFolder>,
+        folders: List<LibraryProviderFolderUi>,
     ): String? {
         val provider = selectedSource.toProvider() ?: return null
         return currentFolderId
@@ -446,6 +456,35 @@ class LibraryViewModel internal constructor(
 
     private fun artworkCacheKey(contentId: String, contentType: String): String {
         return "${contentType.trim().lowercase()}:${contentId.trim().lowercase()}"
+    }
+
+    private fun providerFolderLabel(provider: WatchProvider, folderId: String): String {
+        val normalized = folderId.trim().lowercase()
+        return when (provider) {
+            WatchProvider.TRAKT -> when (normalized) {
+                "collection" -> "Collection"
+                "watchlist" -> "Watchlist"
+                "watched" -> "Watched"
+                "ratings" -> "Ratings"
+                else -> normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase() }
+            }
+            WatchProvider.SIMKL -> when (normalized) {
+                "watching" -> "Watching"
+                "plantowatch" -> "Plan to Watch"
+                "completed", "completed-tv", "completed-movies" -> "Completed"
+                "ratings" -> "Ratings"
+                else -> normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase() }
+            }
+            WatchProvider.LOCAL -> "Library"
+        }
+    }
+
+    private fun defaultProviderFolderId(provider: WatchProvider): String {
+        return when (provider) {
+            WatchProvider.TRAKT -> "collection"
+            WatchProvider.SIMKL -> "watching"
+            WatchProvider.LOCAL -> "library"
+        }
     }
 
     companion object {
@@ -489,9 +528,16 @@ internal fun LibraryRouteContent(
         }
     val selectedFolder = uiState.selectedProviderFolderId
     val providerItems =
-        uiState.providerItems
-            .filter { item -> item.item.provider == selectedProvider }
-            .filter { item -> selectedFolder == null || item.item.folderId == selectedFolder }
+        uiState.providerItems.filter { item ->
+            if (selectedFolder == null) {
+                true
+            } else {
+                val folderIds = item.item.folderIds.ifEmpty {
+                    selectedProvider?.let(::defaultProviderFolderId)?.let(::setOf) ?: emptySet()
+                }
+                folderIds.contains(selectedFolder)
+            }
+        }
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val gridState = rememberLazyGridState()

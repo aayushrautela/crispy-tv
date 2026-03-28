@@ -11,14 +11,15 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.player.ContinueWatchingEntry
-import com.crispy.tv.player.ContinueWatchingResult
+import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryEntry
@@ -109,12 +110,6 @@ class HomeViewModel internal constructor(
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
                         val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
-                        val calendarMetaEpisodeService =
-                            CalendarMetaEpisodeService(
-                                context = appContext,
-                                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                                httpClient = AppHttp.client(appContext),
-                            )
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
@@ -126,9 +121,9 @@ class HomeViewModel internal constructor(
                             watchHistoryService = watchHistoryService,
                             calendarService =
                                 CalendarService(
-                                    watchHistoryService = watchHistoryService,
-                                    tmdbEnrichmentRepository = tmdbEnrichmentRepository,
-                                    metaEpisodeService = calendarMetaEpisodeService,
+                                    supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
+                                    activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                                    backendClient = BackendServicesProvider.backendClient(appContext),
                                 ),
                             tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
@@ -254,7 +249,7 @@ class HomeViewModel internal constructor(
         refresh(forceForegroundLoading = false)
     }
 
-    fun hideContinueWatchingItem(item: ContinueWatchingItem) {
+    fun hideContinueWatchingItem(item: CanonicalContinueWatchingItem) {
         suppressKeys(
             item.id,
             continueWatchingContentKey(type = item.type, contentId = item.contentId),
@@ -268,7 +263,7 @@ class HomeViewModel internal constructor(
         }
     }
 
-    fun removeContinueWatchingItem(item: ContinueWatchingItem) {
+    fun removeContinueWatchingItem(item: CanonicalContinueWatchingItem) {
         suppressKeys(
             item.id,
             continueWatchingContentKey(type = item.type, contentId = item.contentId),
@@ -632,11 +627,11 @@ class HomeViewModel internal constructor(
         )
     }
 
-    private suspend fun loadProviderContinueWatching(selectedSource: WatchProvider): ContinueWatchingResult {
+    private suspend fun loadProviderContinueWatching(selectedSource: WatchProvider): CanonicalContinueWatchingResult {
         return when (selectedSource) {
-            WatchProvider.LOCAL -> ContinueWatchingResult(statusMessage = "")
+            WatchProvider.LOCAL -> CanonicalContinueWatchingResult(statusMessage = "")
             WatchProvider.TRAKT, WatchProvider.SIMKL -> {
-                watchHistoryService.listContinueWatching(
+                watchHistoryService.getCanonicalContinueWatching(
                     limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
                     source = selectedSource,
                 )
@@ -810,14 +805,14 @@ class HomeViewModel internal constructor(
     }
 
     private fun applyProviderSuppressionFilter(
-        entries: List<ContinueWatchingEntry>,
+        entries: List<CanonicalContinueWatchingItem>,
         suppressionMap: MutableMap<String, Long>? = suppressedItemsByKey,
-    ): List<ContinueWatchingEntry> {
+    ): List<CanonicalContinueWatchingItem> {
         if (entries.isEmpty()) return emptyList()
         val activeSuppressionMap = suppressionMap ?: return entries
 
         var updated = false
-        val filtered = mutableListOf<ContinueWatchingEntry>()
+        val filtered = mutableListOf<CanonicalContinueWatchingItem>()
         entries.forEach { entry ->
             val key = continueWatchingContentKey(entry)
             val suppressedAt = activeSuppressionMap[key]
@@ -840,7 +835,7 @@ class HomeViewModel internal constructor(
         return filtered
     }
 
-    private fun ContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity {
+private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity {
         val contentType =
             when (type.lowercase(Locale.US)) {
                 "series" -> MetadataLabMediaType.SERIES
@@ -913,11 +908,11 @@ private fun HomeWideRailSectionUi.isVisible(): Boolean {
     return isLoading || items.isNotEmpty() || statusMessage.isNotBlank()
 }
 
-private fun ContinueWatchingItem.sectionKey(): String {
+private fun CanonicalContinueWatchingItem.sectionKey(): String {
     return if (isUpNextPlaceholder) UP_NEXT_SECTION_KEY else CONTINUE_WATCHING_SECTION_KEY
 }
 
-private fun ContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
+private fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
     return HomeWideRailItemUi(
         key = "${type}:${id}",
         title = title,
@@ -1020,7 +1015,7 @@ private fun continueWatchingContentKey(entry: WatchHistoryEntry): String {
     return "$type:${entry.contentId.lowercase(Locale.US)}"
 }
 
-private fun continueWatchingContentKey(entry: ContinueWatchingEntry): String {
+private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
     val type = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
     return "$type:${entry.contentId.lowercase(Locale.US)}"
 }
@@ -1033,7 +1028,7 @@ private fun collectionLogoCacheKey(type: String, contentId: String): String {
     return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
 }
 
-private fun ContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
+private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
     val seasonEpisode =
         if (type.equals("series", ignoreCase = true) && season != null && episode != null) {
             String.format(Locale.US, "S%02d:E%02d", season, episode)
@@ -1050,7 +1045,7 @@ private fun ContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): St
     return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
 }
 
-private fun ContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
+private fun CanonicalContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
     return WatchHistoryRequest(
         contentId = contentId,
         contentType = type.toMetadataLabMediaType(),

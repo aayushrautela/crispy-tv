@@ -56,13 +56,66 @@ data class ContinueWatchingEntry(
     val lastUpdatedEpochMs: Long,
     val provider: WatchProvider,
     val providerPlaybackId: String? = null,
-    val isUpNextPlaceholder: Boolean = false
+    val isUpNextPlaceholder: Boolean = false,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val logoUrl: String? = null,
+    val addonId: String? = null,
 )
 
 data class ContinueWatchingResult(
     val statusMessage: String,
     val entries: List<ContinueWatchingEntry> = emptyList(),
     val isError: Boolean = false,
+)
+
+data class CanonicalContinueWatchingItem(
+    val id: String,
+    val contentId: String,
+    val contentType: MetadataLabMediaType,
+    val title: String,
+    val season: Int?,
+    val episode: Int?,
+    val progressPercent: Double,
+    val lastUpdatedEpochMs: Long,
+    val provider: WatchProvider,
+    val providerPlaybackId: String? = null,
+    val isUpNextPlaceholder: Boolean = false,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val logoUrl: String? = null,
+    val addonId: String? = null,
+) {
+    val type: String
+        get() = if (contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+
+    val watchedAtEpochMs: Long
+        get() = lastUpdatedEpochMs
+}
+
+data class CanonicalContinueWatchingResult(
+    val statusMessage: String,
+    val entries: List<CanonicalContinueWatchingItem> = emptyList(),
+    val isError: Boolean = false,
+)
+
+data class CanonicalWatchStateSnapshot(
+    val isWatched: Boolean,
+    val watchedAtEpochMs: Long?,
+    val isInWatchlist: Boolean,
+    val isRated: Boolean,
+    val userRating: Int?,
+    val watchedEpisodeKeys: Set<String> = emptySet(),
+)
+
+data class CanonicalProviderLibraryItem(
+    val contentId: String,
+    val contentType: MetadataLabMediaType,
+    val title: String,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val folderIds: Set<String> = emptySet(),
+    val addedAtEpochMs: Long = 0L,
 )
 
 data class WatchedEpisodeRecord(
@@ -271,6 +324,14 @@ interface WatchHistoryService {
         return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.", isError = true)
     }
 
+    suspend fun getCanonicalContinueWatching(
+        limit: Int = 20,
+        nowMs: Long = System.currentTimeMillis(),
+        source: WatchProvider,
+    ): CanonicalContinueWatchingResult {
+        return CanonicalContinueWatchingResult(statusMessage = "Canonical continue watching unavailable.", isError = true)
+    }
+
     suspend fun listWatchedEpisodeRecords(
         source: WatchProvider? = null,
     ): List<WatchedEpisodeRecord> {
@@ -282,6 +343,24 @@ interface WatchHistoryService {
         source: WatchProvider? = null
     ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
+    }
+
+    suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
+        return null
+    }
+
+    suspend fun getCanonicalProviderLibraryItems(
+        limitPerFolder: Int = 200,
+        source: WatchProvider,
+    ): List<CanonicalProviderLibraryItem> {
+        return emptyList()
+    }
+
+    suspend fun getCachedCanonicalProviderLibraryItems(
+        limitPerFolder: Int = 200,
+        source: WatchProvider,
+    ): List<CanonicalProviderLibraryItem> {
+        return emptyList()
     }
 
     suspend fun getCachedProviderLibrary(

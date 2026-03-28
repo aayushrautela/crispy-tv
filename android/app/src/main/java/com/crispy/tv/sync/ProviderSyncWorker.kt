@@ -31,7 +31,7 @@ class ProviderSyncWorker(
         }
 
         if (shouldSyncTrakt) {
-            val cw = watchHistory.listContinueWatching(limit = 40, source = WatchProvider.TRAKT)
+            val cw = watchHistory.getCanonicalContinueWatching(limit = 40, source = WatchProvider.TRAKT)
             val lib = watchHistory.listProviderLibrary(limitPerFolder = 250, source = WatchProvider.TRAKT)
             if (cw.statusMessage.startsWith("Trakt temporarily unavailable") ||
                 lib.statusMessage.startsWith("Trakt temporarily unavailable")
@@ -41,7 +41,7 @@ class ProviderSyncWorker(
         }
 
         if (shouldSyncSimkl) {
-            val cw = watchHistory.listContinueWatching(limit = 40, source = WatchProvider.SIMKL)
+            val cw = watchHistory.getCanonicalContinueWatching(limit = 40, source = WatchProvider.SIMKL)
             val lib = watchHistory.listProviderLibrary(limitPerFolder = 250, source = WatchProvider.SIMKL)
             if (cw.statusMessage.startsWith("Simkl temporarily unavailable") ||
                 lib.statusMessage.startsWith("Simkl temporarily unavailable")

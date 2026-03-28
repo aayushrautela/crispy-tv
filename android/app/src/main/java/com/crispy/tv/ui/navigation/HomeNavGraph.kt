@@ -14,6 +14,7 @@ import com.crispy.tv.home.CalendarRoute
 import com.crispy.tv.home.CalendarSeriesItem
 import com.crispy.tv.home.HomeRoute
 import com.crispy.tv.person.PersonDetailsRoute
+import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {

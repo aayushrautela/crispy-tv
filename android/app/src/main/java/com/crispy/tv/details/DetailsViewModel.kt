@@ -17,12 +17,10 @@ import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerEpisodeSnapshot
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
-import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
@@ -49,11 +47,9 @@ import com.crispy.tv.playback.applyProviderResult
 import com.crispy.tv.playback.finalizeFrom
 import com.crispy.tv.watchhistory.addEpisodeKey
 import com.crispy.tv.watchhistory.episodeWatchKeyCandidates
-import com.crispy.tv.watchhistory.isWatchedFolder
 import com.crispy.tv.watchhistory.matchesContentId
 import com.crispy.tv.watchhistory.matchesMediaType
 import com.crispy.tv.watchhistory.preferredWatchProvider
-import com.crispy.tv.watchhistory.toEpisodeWatchKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

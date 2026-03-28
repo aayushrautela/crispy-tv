@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
-import com.crispy.tv.player.ContinueWatchingEntry as ProviderContinueWatchingEntry
-import com.crispy.tv.player.ContinueWatchingResult
+import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchProvider
@@ -15,32 +15,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import java.util.Locale
-
-@Immutable
-data class ContinueWatchingItem(
-    val id: String,
-    val contentId: String,
-    val title: String,
-    val season: Int?,
-    val episode: Int?,
-    val watchedAtEpochMs: Long,
-    val progressPercent: Double,
-    val provider: WatchProvider,
-    val providerPlaybackId: String?,
-    val isUpNextPlaceholder: Boolean = false,
-    val backdropUrl: String?,
-    val posterUrl: String?,
-    val logoUrl: String?,
-    val addonId: String?,
-    val type: String,
-)
-
-@Immutable
-data class ContinueWatchingLoadResult(
-    val items: List<ContinueWatchingItem> = emptyList(),
-    val statusMessage: String = "",
-    val isError: Boolean = false,
-)
 
 class HomeWatchActivityService(
     context: Context,
@@ -53,10 +27,10 @@ class HomeWatchActivityService(
     suspend fun loadWatchActivity(
         selectedSource: WatchProvider,
         localEntries: List<WatchHistoryEntry>,
-        providerResult: ContinueWatchingResult,
+        providerResult: CanonicalContinueWatchingResult,
         limit: Int = 20,
         enrichMetadata: Boolean = true,
-    ): ContinueWatchingLoadResult {
+    ): CanonicalContinueWatchingResult {
         return when (selectedSource) {
             WatchProvider.LOCAL -> loadLocalContinueWatchingItems(localEntries, limit, enrichMetadata)
             WatchProvider.TRAKT, WatchProvider.SIMKL -> {
@@ -66,12 +40,12 @@ class HomeWatchActivityService(
                         isError = providerResult.isError,
                     )
                 } else if (providerResult.isError) {
-                    ContinueWatchingLoadResult(
+                    CanonicalContinueWatchingResult(
                         statusMessage = providerResult.statusMessage,
                         isError = true,
                     )
                 } else {
-                    ContinueWatchingLoadResult()
+                    CanonicalContinueWatchingResult()
                 }
             }
         }
@@ -81,7 +55,7 @@ class HomeWatchActivityService(
         entries: List<WatchHistoryEntry>,
         limit: Int,
         enrichMetadata: Boolean,
-    ): ContinueWatchingLoadResult {
+    ): CanonicalContinueWatchingResult {
         val targetCount = limit.coerceAtLeast(1)
         val dedupedEntries = entries
             .sortedByDescending { it.watchedAtEpochMs }
@@ -89,7 +63,7 @@ class HomeWatchActivityService(
             .take(targetCount)
 
         if (dedupedEntries.isEmpty()) {
-            return ContinueWatchingLoadResult()
+            return CanonicalContinueWatchingResult()
         }
 
         val items =
@@ -115,19 +89,19 @@ class HomeWatchActivityService(
                 }
             }
 
-        return ContinueWatchingLoadResult(items = items)
+        return CanonicalContinueWatchingResult(items = items)
     }
 
     private suspend fun loadProviderContinueWatchingItems(
-        entries: List<ProviderContinueWatchingEntry>,
+        entries: List<CanonicalContinueWatchingItem>,
         limit: Int,
         enrichMetadata: Boolean,
-    ): ContinueWatchingLoadResult {
+    ): CanonicalContinueWatchingResult {
         val targetCount = limit.coerceAtLeast(1)
         val projectedEntries = entries.take(targetCount)
 
         if (projectedEntries.isEmpty()) {
-            return ContinueWatchingLoadResult()
+            return CanonicalContinueWatchingResult()
         }
 
         val items =
@@ -141,17 +115,9 @@ class HomeWatchActivityService(
                         async(Dispatchers.IO) {
                             metaResolveSemaphore.acquire()
                             try {
-                                val fakeWatchEntry = WatchHistoryEntry(
-                                    contentId = entry.contentId,
-                                    contentType = entry.contentType,
-                                    title = entry.title,
-                                    season = entry.season,
-                                    episode = entry.episode,
-                                    watchedAtEpochMs = entry.lastUpdatedEpochMs,
-                                )
                                 buildProviderContinueWatchingItem(
                                     entry = entry,
-                                    resolvedMeta = resolveContinueWatchingMeta(fakeWatchEntry),
+                                    resolvedMeta = resolveProviderContinueWatchingMeta(entry),
                                 )
                             } finally {
                                 metaResolveSemaphore.release()
@@ -161,21 +127,21 @@ class HomeWatchActivityService(
                 }
             }
 
-        return ContinueWatchingLoadResult(items = items)
+        return CanonicalContinueWatchingResult(items = items)
     }
 
     private fun buildLocalContinueWatchingItem(
         entry: WatchHistoryEntry,
         resolvedMeta: ContinueWatchingMeta?,
-    ): ContinueWatchingItem {
+    ): CanonicalContinueWatchingItem {
         val mediaType = entry.asCatalogMediaType()
-        return ContinueWatchingItem(
+        return CanonicalContinueWatchingItem(
             id = continueWatchingKey(entry),
             contentId = entry.contentId,
             title = resolvedMeta?.title ?: fallbackContinueWatchingTitle(entry),
             season = entry.season,
             episode = entry.episode,
-            watchedAtEpochMs = entry.watchedAtEpochMs,
+            lastUpdatedEpochMs = entry.watchedAtEpochMs,
             progressPercent = 100.0,
             provider = WatchProvider.LOCAL,
             providerPlaybackId = null,
@@ -184,32 +150,63 @@ class HomeWatchActivityService(
             posterUrl = resolvedMeta?.posterUrl,
             logoUrl = resolvedMeta?.logoUrl,
             addonId = resolvedMeta?.addonId,
-            type = mediaType,
+            contentType = if (mediaType == "series") MetadataLabMediaType.SERIES else MetadataLabMediaType.MOVIE,
         )
     }
 
     private fun buildProviderContinueWatchingItem(
-        entry: ProviderContinueWatchingEntry,
+        entry: CanonicalContinueWatchingItem,
         resolvedMeta: ContinueWatchingMeta?,
-    ): ContinueWatchingItem {
-        val mediaType = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
-        return ContinueWatchingItem(
+    ): CanonicalContinueWatchingItem {
+        val displayMeta = resolvedMeta ?: ContinueWatchingMeta(
+            title = null,
+            backdropUrl = entry.backdropUrl,
+            posterUrl = entry.posterUrl,
+            logoUrl = entry.logoUrl,
+            addonId = entry.addonId,
+        )
+        return CanonicalContinueWatchingItem(
             id = "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}",
             contentId = entry.contentId,
-            title = resolvedMeta?.title ?: entry.title,
+            title = displayMeta.title ?: entry.title,
             season = entry.season,
             episode = entry.episode,
-            watchedAtEpochMs = entry.lastUpdatedEpochMs,
+            lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
             progressPercent = entry.progressPercent,
             provider = entry.provider,
             providerPlaybackId = entry.providerPlaybackId,
             isUpNextPlaceholder = entry.isUpNextPlaceholder,
-            backdropUrl = resolvedMeta?.backdropUrl,
-            posterUrl = resolvedMeta?.posterUrl,
-            logoUrl = resolvedMeta?.logoUrl,
-            addonId = resolvedMeta?.addonId,
-            type = mediaType,
+            backdropUrl = displayMeta.backdropUrl,
+            posterUrl = displayMeta.posterUrl,
+            logoUrl = displayMeta.logoUrl,
+            addonId = displayMeta.addonId,
+            contentType = entry.contentType,
         )
+    }
+
+    private suspend fun resolveProviderContinueWatchingMeta(
+        entry: CanonicalContinueWatchingItem,
+    ): ContinueWatchingMeta? {
+        val existing = ContinueWatchingMeta(
+            title = nonBlank(entry.title),
+            backdropUrl = entry.backdropUrl,
+            posterUrl = entry.posterUrl,
+            logoUrl = entry.logoUrl,
+            addonId = entry.addonId,
+        )
+        if (existing.hasDisplayData()) {
+            return existing
+        }
+
+        val fakeWatchEntry = WatchHistoryEntry(
+            contentId = entry.contentId,
+            contentType = entry.contentType,
+            title = entry.title,
+            season = entry.season,
+            episode = entry.episode,
+            watchedAtEpochMs = entry.lastUpdatedEpochMs,
+        )
+        return resolveContinueWatchingMeta(fakeWatchEntry)
     }
 
     private suspend fun resolveContinueWatchingMeta(entry: WatchHistoryEntry): ContinueWatchingMeta? {
