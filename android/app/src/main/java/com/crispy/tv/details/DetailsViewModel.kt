@@ -176,7 +176,7 @@ class DetailsViewModel internal constructor(
                     details?.mediaType
                         ?.toMetadataLabMediaTypeOrNull()
                         ?.let { it != MetadataLabMediaType.MOVIE }
-                        == true
+                    ?: false
                 val backendSeasons = backendDetail?.seasonNumbers().orEmpty()
                 val seasonCount = backendDetail?.item?.seasonCount ?: 0
                 val seasons =

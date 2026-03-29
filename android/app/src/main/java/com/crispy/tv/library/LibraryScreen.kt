@@ -385,33 +385,6 @@ class LibraryViewModel internal constructor(
         return "${contentType.trim().lowercase()}:${contentId.trim().lowercase()}"
     }
 
-    private fun providerFolderLabel(provider: WatchProvider, folderId: String): String {
-        val normalized = folderId.trim().lowercase()
-        return when (provider) {
-            WatchProvider.TRAKT -> when (normalized) {
-                "collection" -> "Collection"
-                "watchlist" -> "Watchlist"
-                "watched" -> "Watched"
-                "ratings" -> "Ratings"
-                else -> normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase() }
-            }
-            WatchProvider.SIMKL -> when (normalized) {
-                "watching" -> "Watching"
-                "plantowatch" -> "Plan to Watch"
-                "completed", "completed-tv", "completed-movies" -> "Completed"
-                "ratings" -> "Ratings"
-                else -> normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase() }
-            }
-        }
-    }
-
-    private fun defaultProviderFolderId(provider: WatchProvider): String {
-        return when (provider) {
-            WatchProvider.TRAKT -> "collection"
-            WatchProvider.SIMKL -> "watching"
-        }
-    }
-
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -581,6 +554,36 @@ private fun LibrarySource.toProvider(): WatchProvider {
     return when (this) {
         LibrarySource.TRAKT -> WatchProvider.TRAKT
         LibrarySource.SIMKL -> WatchProvider.SIMKL
+    }
+}
+
+private fun providerFolderLabel(provider: WatchProvider, folderId: String): String {
+    val normalized = folderId.trim().lowercase()
+    val fallback = normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase() }
+    return when (provider) {
+        WatchProvider.LOCAL -> fallback
+        WatchProvider.TRAKT -> when (normalized) {
+            "collection" -> "Collection"
+            "watchlist" -> "Watchlist"
+            "watched" -> "Watched"
+            "ratings" -> "Ratings"
+            else -> fallback
+        }
+        WatchProvider.SIMKL -> when (normalized) {
+            "watching" -> "Watching"
+            "plantowatch" -> "Plan to Watch"
+            "completed", "completed-tv", "completed-movies" -> "Completed"
+            "ratings" -> "Ratings"
+            else -> fallback
+        }
+    }
+}
+
+private fun defaultProviderFolderId(provider: WatchProvider): String {
+    return when (provider) {
+        WatchProvider.LOCAL -> "local"
+        WatchProvider.TRAKT -> "collection"
+        WatchProvider.SIMKL -> "watching"
     }
 }
 

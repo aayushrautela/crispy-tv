@@ -162,6 +162,14 @@ internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): Stri
     }
 }
 
+internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): String {
+    return when {
+        mediaType.equals("anime", ignoreCase = true) -> "anime"
+        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+        else -> "movie"
+    }
+}
+
 internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
     val itemId = id.trim().takeIf { it.isNotBlank() } ?: return null
     val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
