@@ -9,7 +9,8 @@ import com.crispy.tv.domain.metadata.withDerivedSeasons
 
 enum class MetadataLabMediaType {
     MOVIE,
-    SERIES
+    SERIES,
+    ANIME,
 }
 
 data class MetadataLabRequest(
@@ -117,5 +118,6 @@ private fun MetadataLabMediaType.toDomainMediaType(): MetadataMediaType {
     return when (this) {
         MetadataLabMediaType.MOVIE -> MetadataMediaType.MOVIE
         MetadataLabMediaType.SERIES -> MetadataMediaType.SERIES
+        MetadataLabMediaType.ANIME -> MetadataMediaType.ANIME
     }
 }

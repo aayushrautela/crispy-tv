@@ -31,11 +31,20 @@ internal fun JSONObject.toFallbackMediaDetails(
         when (mediaType) {
             MetadataLabMediaType.MOVIE -> optStringNonBlank("release_date")
             MetadataLabMediaType.SERIES -> optStringNonBlank("first_air_date")
+            MetadataLabMediaType.ANIME -> optStringNonBlank("first_air_date")
         }?.take(4)
     val runtime =
         when (mediaType) {
             MetadataLabMediaType.MOVIE -> optIntOrNull("runtime")?.let { "$it min" }
             MetadataLabMediaType.SERIES -> {
+                val runtimes = optJSONArray("episode_run_time")
+                val first =
+                    runtimes?.let { array ->
+                        (0 until array.length()).asSequence().map { array.optInt(it) }.firstOrNull { it > 0 }
+                    }
+                first?.let { "$it min" }
+            }
+            MetadataLabMediaType.ANIME -> {
                 val runtimes = optJSONArray("episode_run_time")
                 val first =
                     runtimes?.let { array ->
@@ -53,7 +62,7 @@ internal fun JSONObject.toFallbackMediaDetails(
             emptyList()
         }
     val creators =
-        if (mediaType == MetadataLabMediaType.SERIES) {
+        if (mediaType != MetadataLabMediaType.MOVIE) {
             parseSeriesCreators(this).take(12)
         } else {
             emptyList()
@@ -78,7 +87,7 @@ internal fun JSONObject.toFallbackMediaDetails(
         creators = creators,
         videos = emptyList(),
         tmdbId = optIntOrNull("id"),
-        showTmdbId = optIntOrNull("id").takeIf { mediaType == MetadataLabMediaType.SERIES },
+        showTmdbId = optIntOrNull("id").takeIf { mediaType != MetadataLabMediaType.MOVIE },
         addonId = "tmdb",
     )
 }
@@ -90,6 +99,7 @@ private fun parseCertification(
     return when (mediaType) {
         MetadataLabMediaType.MOVIE -> parseMovieCertification(details)
         MetadataLabMediaType.SERIES -> parseSeriesCertification(details)
+        MetadataLabMediaType.ANIME -> parseSeriesCertification(details)
     }
 }
 

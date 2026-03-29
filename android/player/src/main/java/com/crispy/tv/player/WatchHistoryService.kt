@@ -35,7 +35,13 @@ data class WatchHistoryRequest(
     val title: String? = null,
     val season: Int? = null,
     val episode: Int? = null,
-    val remoteImdbId: String? = null
+    val remoteImdbId: String? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 data class WatchHistoryResult(
@@ -62,6 +68,11 @@ data class ContinueWatchingEntry(
     val backdropUrl: String? = null,
     val logoUrl: String? = null,
     val addonId: String? = null,
+    val metadataProviderId: String? = null,
+    val metadataProvider: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 data class ContinueWatchingResult(
@@ -86,9 +97,19 @@ data class CanonicalContinueWatchingItem(
     val backdropUrl: String? = null,
     val logoUrl: String? = null,
     val addonId: String? = null,
+    val metadataProviderId: String? = null,
+    val metadataProvider: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 ) {
     val type: String
-        get() = if (contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+        get() =
+            when (contentType) {
+                MetadataLabMediaType.MOVIE -> "movie"
+                MetadataLabMediaType.SERIES -> "series"
+                MetadataLabMediaType.ANIME -> "anime"
+            }
 
     val watchedAtEpochMs: Long
         get() = lastUpdatedEpochMs
@@ -137,6 +158,7 @@ data class ProviderExternalIds(
     val tmdb: Int? = null,
     val imdb: String? = null,
     val tvdb: Int? = null,
+    val kitsu: Int? = null,
 )
 
 data class ProviderLibraryItem(
@@ -239,7 +261,13 @@ data class PlaybackIdentity(
     val title: String,
     val year: Int? = null,
     val showTitle: String? = null,
-    val showYear: Int? = null
+    val showYear: Int? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 data class WatchProgressSnapshot(

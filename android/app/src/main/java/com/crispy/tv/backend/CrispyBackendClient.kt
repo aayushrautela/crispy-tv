@@ -143,6 +143,11 @@ class CrispyBackendClient(
         val showTmdbId: Int? = null,
         val imdbId: String? = null,
         val tvdbId: Int? = null,
+        val provider: String? = null,
+        val providerId: String? = null,
+        val parentProvider: String? = null,
+        val parentProviderId: String? = null,
+        val absoluteEpisodeNumber: Int? = null,
         val seasonNumber: Int? = null,
         val episodeNumber: Int? = null,
     )
@@ -152,6 +157,11 @@ class CrispyBackendClient(
         val mediaType: String,
         val tmdbId: Int? = null,
         val showTmdbId: Int? = null,
+        val provider: String? = null,
+        val providerId: String? = null,
+        val parentProvider: String? = null,
+        val parentProviderId: String? = null,
+        val absoluteEpisodeNumber: Int? = null,
         val seasonNumber: Int? = null,
         val episodeNumber: Int? = null,
         val occurredAt: String? = null,
@@ -166,6 +176,11 @@ class CrispyBackendClient(
         val mediaType: String,
         val tmdbId: Int? = null,
         val showTmdbId: Int? = null,
+        val provider: String? = null,
+        val providerId: String? = null,
+        val parentProvider: String? = null,
+        val parentProviderId: String? = null,
+        val absoluteEpisodeNumber: Int? = null,
         val seasonNumber: Int? = null,
         val episodeNumber: Int? = null,
         val positionSeconds: Double? = null,
@@ -186,6 +201,7 @@ class CrispyBackendClient(
         val tmdb: Int?,
         val imdb: String?,
         val tvdb: Int?,
+        val kitsu: Int?,
     )
 
     data class MetadataEpisodePreview(
@@ -193,6 +209,12 @@ class CrispyBackendClient(
         val mediaType: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
         val title: String?,
@@ -210,6 +232,12 @@ class CrispyBackendClient(
         val kind: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
         val title: String?,
@@ -234,6 +262,11 @@ class CrispyBackendClient(
         val id: String,
         val showId: String,
         val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
         val seasonNumber: Int,
         val title: String?,
         val summary: String?,
@@ -247,6 +280,12 @@ class CrispyBackendClient(
         val mediaType: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
         val title: String?,
@@ -284,6 +323,12 @@ class CrispyBackendClient(
         val kind: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
         val title: String?,
@@ -1070,18 +1115,27 @@ class CrispyBackendClient(
         input: MediaLookupInput,
         includeId: Boolean = true,
         includeMediaKey: Boolean = true,
-        includeShowTmdbId: Boolean = true,
         includeImdbId: Boolean = true,
-        includeTvdbId: Boolean = true,
     ) = path.toHttpUrl().newBuilder()
         .apply {
             if (includeId && !input.id.isNullOrBlank()) addQueryParameter("id", input.id.trim())
             if (includeMediaKey && !input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
             if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
             if (input.tmdbId != null) addQueryParameter("tmdbId", input.tmdbId.toString())
-            if (includeShowTmdbId && input.showTmdbId != null) addQueryParameter("showTmdbId", input.showTmdbId.toString())
             if (includeImdbId && !input.imdbId.isNullOrBlank()) addQueryParameter("imdbId", input.imdbId.trim())
-            if (includeTvdbId && input.tvdbId != null) addQueryParameter("tvdbId", input.tvdbId.toString())
+            if (!input.provider.isNullOrBlank()) addQueryParameter("provider", input.provider.trim())
+            if (!input.providerId.isNullOrBlank()) addQueryParameter("providerId", input.providerId.trim())
+            if (!input.parentProvider.isNullOrBlank()) addQueryParameter("parentProvider", input.parentProvider.trim())
+            if (!input.parentProviderId.isNullOrBlank()) addQueryParameter("parentProviderId", input.parentProviderId.trim())
+            if (input.tvdbId != null && input.provider.isNullOrBlank()) {
+                addQueryParameter("provider", "tvdb")
+                addQueryParameter("providerId", input.tvdbId.toString())
+            }
+            if (input.showTmdbId != null && input.parentProvider.isNullOrBlank()) {
+                addQueryParameter("parentProvider", "tmdb")
+                addQueryParameter("parentProviderId", input.showTmdbId.toString())
+            }
+            if (input.absoluteEpisodeNumber != null) addQueryParameter("absoluteEpisodeNumber", input.absoluteEpisodeNumber.toString())
             if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
             if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
         }

@@ -62,7 +62,7 @@ class LocalWatchHistoryStore(
 
                 val season = entry.season?.takeIf { value -> value > 0 }
                 val episode = entry.episode?.takeIf { value -> value > 0 }
-                if (entry.contentType == MetadataLabMediaType.SERIES && (season == null || episode == null)) {
+                if (entry.contentType != MetadataLabMediaType.MOVIE && (season == null || episode == null)) {
                     return@mapNotNull null
                 }
 
@@ -92,10 +92,10 @@ class LocalWatchHistoryStore(
         val contentId = request.contentId.trim()
         require(contentId.isNotEmpty()) { "Content ID is required" }
 
-        val isSeries = request.contentType == MetadataLabMediaType.SERIES
-        val season = if (isSeries) request.season else null
-        val episode = if (isSeries) request.episode else null
-        if (isSeries) {
+        val isEpisodic = request.contentType != MetadataLabMediaType.MOVIE
+        val season = if (isEpisodic) request.season else null
+        val episode = if (isEpisodic) request.episode else null
+        if (isEpisodic) {
             require(season != null && season > 0) { "Season must be a positive number" }
             require(episode != null && episode > 0) { "Episode must be a positive number" }
         }
@@ -112,7 +112,7 @@ class LocalWatchHistoryStore(
             request.title
                 ?.trim()
                 ?.takeIf { value -> value.isNotEmpty() }
-                ?: if (isSeries) {
+                ?: if (isEpisodic) {
                     "$contentId S$season E$episode"
                 } else {
                     contentId
@@ -126,6 +126,12 @@ class LocalWatchHistoryStore(
             episode = episode,
             watchedAtEpochMs = System.currentTimeMillis(),
             remoteImdbId = remoteImdbId,
+            provider = request.provider,
+            providerId = request.providerId,
+            parentMediaType = request.parentMediaType,
+            parentProvider = request.parentProvider,
+            parentProviderId = request.parentProviderId,
+            absoluteEpisodeNumber = request.absoluteEpisodeNumber,
         )
     }
 
@@ -214,6 +220,12 @@ data class NormalizedWatchRequest(
     val episode: Int?,
     val watchedAtEpochMs: Long,
     val remoteImdbId: String?,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 ) {
     fun toLocalWatchedItem(): LocalWatchedItem {
         return LocalWatchedItem(
@@ -267,6 +279,7 @@ data class LocalWatchedItem(
                 when (json.optString("content_type").trim().lowercase()) {
                     "movie" -> MetadataLabMediaType.MOVIE
                     "series" -> MetadataLabMediaType.SERIES
+                    "anime" -> MetadataLabMediaType.ANIME
                     else -> return null
                 }
             val title = json.optString("title").trim().ifEmpty { contentId }

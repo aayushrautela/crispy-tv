@@ -66,6 +66,7 @@ private fun SearchTypeFilter.toBackendSearchFilter(): String? {
         SearchTypeFilter.ALL -> null
         SearchTypeFilter.MOVIES -> "movies"
         SearchTypeFilter.SERIES -> "series"
+        SearchTypeFilter.ANIME -> "anime"
     }
 }
 
@@ -77,7 +78,12 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
         backdropUrl = backdropUrl,
         logoUrl = logoUrl,
         addonId = "backend",
-        type = if (mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true)) "series" else "movie",
+        type =
+            when {
+                mediaType.equals("anime", ignoreCase = true) -> "anime"
+                mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+                else -> "movie"
+            },
         rating = rating,
         year = year,
         genre = genre ?: defaultGenre,

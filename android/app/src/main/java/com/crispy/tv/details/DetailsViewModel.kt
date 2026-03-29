@@ -172,12 +172,16 @@ class DetailsViewModel internal constructor(
 
             _uiState.update { state ->
                 val details = enrichedDetails
-                val isSeries = details?.mediaType?.trim()?.equals("series", ignoreCase = true) == true
+                val isEpisodic =
+                    details?.mediaType
+                        ?.toMetadataLabMediaTypeOrNull()
+                        ?.let { it != MetadataLabMediaType.MOVIE }
+                        == true
                 val backendSeasons = backendDetail?.seasonNumbers().orEmpty()
                 val seasonCount = backendDetail?.item?.seasonCount ?: 0
                 val seasons =
                     when {
-                        !isSeries -> emptyList()
+                        !isEpisodic -> emptyList()
                         backendSeasons.isNotEmpty() -> backendSeasons
                         seasonCount > 0 -> (1..seasonCount).toList()
                         else -> emptyList()
@@ -219,7 +223,12 @@ class DetailsViewModel internal constructor(
             }
 
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
-            if (enrichedDetails?.mediaType?.trim()?.equals("series", ignoreCase = true) == true && seasonToLoad != null) {
+            if (
+                enrichedDetails?.mediaType
+                    ?.toMetadataLabMediaTypeOrNull()
+                    ?.let { it != MetadataLabMediaType.MOVIE }
+                    == true && seasonToLoad != null
+            ) {
                 loadEpisodesForSeason(seasonToLoad, force = true)
             }
 
@@ -387,7 +396,7 @@ class DetailsViewModel internal constructor(
     ) {
         val state = _uiState.value
         val details = state.details ?: return
-        if (details.mediaType.trim().equals("series", ignoreCase = true).not()) return
+        if (details.mediaType.toMetadataLabMediaTypeOrNull()?.let { it != MetadataLabMediaType.MOVIE } != true) return
 
         val cached = if (!force) seasonEpisodesCache[season] else null
         if (cached != null) {
@@ -837,18 +846,15 @@ class DetailsViewModel internal constructor(
                     resolvedLookupId,
                 )
 
-            val season =
-                if (resolvedMediaType == MetadataLabMediaType.SERIES) {
-                    targetEpisode?.season ?: normalizedLookupId.season
-                } else {
-                    null
+            val isEpisodic = resolvedMediaType != MetadataLabMediaType.MOVIE
+            val parentMediaType =
+                when (resolvedMediaType) {
+                    MetadataLabMediaType.MOVIE -> null
+                    MetadataLabMediaType.SERIES -> "show"
+                    MetadataLabMediaType.ANIME -> "anime"
                 }
-            val episode =
-                if (resolvedMediaType == MetadataLabMediaType.SERIES) {
-                    targetEpisode?.episode ?: normalizedLookupId.episode
-                } else {
-                    null
-                }
+            val season = if (isEpisodic) targetEpisode?.season ?: normalizedLookupId.season else null
+            val episode = if (isEpisodic) targetEpisode?.episode ?: normalizedLookupId.episode else null
 
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
             val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"
@@ -856,6 +862,7 @@ class DetailsViewModel internal constructor(
             val tmdbId =
                 when (resolvedMediaType) {
                     MetadataLabMediaType.SERIES -> enriched.showTmdbId ?: enriched.tmdbId ?: targetEpisode?.showTmdbId ?: resolvedTmdbId
+                    MetadataLabMediaType.ANIME -> enriched.showTmdbId ?: enriched.tmdbId ?: targetEpisode?.showTmdbId ?: resolvedTmdbId
                     MetadataLabMediaType.MOVIE -> enriched.tmdbId ?: targetEpisode?.tmdbId ?: resolvedTmdbId
                 }
 
@@ -869,8 +876,14 @@ class DetailsViewModel internal constructor(
                     episode = episode,
                     title = title,
                     year = yearInt,
-                    showTitle = if (resolvedMediaType == MetadataLabMediaType.SERIES) enriched.title else null,
-                    showYear = if (resolvedMediaType == MetadataLabMediaType.SERIES) yearInt else null,
+                    showTitle = if (isEpisodic) enriched.title else null,
+                    showYear = if (isEpisodic) yearInt else null,
+                    provider = targetEpisode?.provider ?: enriched.provider,
+                    providerId = targetEpisode?.providerId ?: enriched.providerId,
+                    parentMediaType = enriched.parentMediaType ?: parentMediaType,
+                    parentProvider = targetEpisode?.parentProvider ?: enriched.parentProvider ?: enriched.provider,
+                    parentProviderId = targetEpisode?.parentProviderId ?: enriched.parentProviderId ?: enriched.providerId,
+                    absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
                 )
             val artworkUrl = enriched.backdropUrl?.trim()?.ifBlank { null } ?: enriched.posterUrl?.trim()?.ifBlank { null }
             val subtitle = buildPlayerSubtitle(
@@ -898,6 +911,12 @@ class DetailsViewModel internal constructor(
                             seasonNumber = season,
                             episodeNumber = episode,
                             mediaType = enriched.mediaType,
+                            provider = enriched.provider,
+                            providerId = enriched.providerId,
+                            parentMediaType = enriched.parentMediaType ?: parentMediaType,
+                            parentProvider = enriched.parentProvider ?: enriched.provider,
+                            parentProviderId = enriched.parentProviderId ?: enriched.providerId,
+                            absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
                             title = enriched.title,
                             posterUrl = enriched.posterUrl,
                             backdropUrl = enriched.backdropUrl,
@@ -923,6 +942,11 @@ class DetailsViewModel internal constructor(
                                         lookupId = episodeItem.lookupId,
                                         tmdbId = episodeItem.tmdbId,
                                         showTmdbId = episodeItem.showTmdbId,
+                                        provider = episodeItem.provider,
+                                        providerId = episodeItem.providerId,
+                                        parentProvider = episodeItem.parentProvider,
+                                        parentProviderId = episodeItem.parentProviderId,
+                                        absoluteEpisodeNumber = episodeItem.absoluteEpisodeNumber,
                                     )
                                 },
                             currentEpisodeId = targetEpisode?.id,
@@ -962,11 +986,17 @@ class DetailsViewModel internal constructor(
             }
 
             val request =
-                com.crispy.tv.player.WatchHistoryRequest(
+                WatchHistoryRequest(
                     contentId = enriched.id,
                     contentType = mediaType,
                     title = enriched.title,
-                    remoteImdbId = enriched.imdbId
+                    remoteImdbId = enriched.imdbId,
+                    provider = enriched.provider,
+                    providerId = enriched.providerId,
+                    parentMediaType = enriched.parentMediaType,
+                    parentProvider = enriched.parentProvider,
+                    parentProviderId = enriched.parentProviderId,
+                    absoluteEpisodeNumber = enriched.absoluteEpisodeNumber,
                 )
             val result =
                 withContext(Dispatchers.IO) {
@@ -986,8 +1016,8 @@ class DetailsViewModel internal constructor(
     fun toggleWatched() {
         val details = uiState.value.details ?: return
         val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
-        if (mediaType == MetadataLabMediaType.SERIES) {
-            _uiState.update { it.copy(statusMessage = "Marking an entire series as watched isn't supported yet. Mark episodes from the episode list.") }
+        if (mediaType != MetadataLabMediaType.MOVIE) {
+            _uiState.update { it.copy(statusMessage = "Marking an entire episodic title as watched isn't supported yet. Mark episodes from the episode list.") }
             return
         }
         viewModelScope.launch {
@@ -1017,11 +1047,17 @@ class DetailsViewModel internal constructor(
             }
 
             val request =
-                com.crispy.tv.player.WatchHistoryRequest(
+                WatchHistoryRequest(
                     contentId = enriched.id,
                     contentType = mediaType,
                     title = enriched.title,
-                    remoteImdbId = enriched.imdbId
+                    remoteImdbId = enriched.imdbId,
+                    provider = enriched.provider,
+                    providerId = enriched.providerId,
+                    parentMediaType = enriched.parentMediaType,
+                    parentProvider = enriched.parentProvider,
+                    parentProviderId = enriched.parentProviderId,
+                    absoluteEpisodeNumber = enriched.absoluteEpisodeNumber,
                 )
             val result =
                 withContext(Dispatchers.IO) {
@@ -1108,11 +1144,22 @@ class DetailsViewModel internal constructor(
             val request =
                 WatchHistoryRequest(
                     contentId = enriched.id,
-                    contentType = MetadataLabMediaType.SERIES,
+                    contentType = enriched.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
                     title = enriched.title,
                     season = season,
                     episode = episode,
                     remoteImdbId = enriched.imdbId,
+                    provider = video.provider ?: enriched.provider,
+                    providerId = video.providerId ?: enriched.providerId,
+                    parentMediaType =
+                        when (enriched.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES) {
+                            MetadataLabMediaType.MOVIE -> null
+                            MetadataLabMediaType.SERIES -> "show"
+                            MetadataLabMediaType.ANIME -> "anime"
+                        },
+                    parentProvider = video.parentProvider ?: enriched.parentProvider ?: enriched.provider,
+                    parentProviderId = video.parentProviderId ?: enriched.parentProviderId ?: enriched.providerId,
+                    absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
                 )
             val result =
                 withContext(Dispatchers.IO) {
@@ -1169,11 +1216,17 @@ class DetailsViewModel internal constructor(
             }
 
             val request =
-                com.crispy.tv.player.WatchHistoryRequest(
+                WatchHistoryRequest(
                     contentId = enriched.id,
                     contentType = mediaType,
                     title = enriched.title,
-                    remoteImdbId = enriched.imdbId
+                    remoteImdbId = enriched.imdbId,
+                    provider = enriched.provider,
+                    providerId = enriched.providerId,
+                    parentMediaType = enriched.parentMediaType,
+                    parentProvider = enriched.parentProvider,
+                    parentProviderId = enriched.parentProviderId,
+                    absoluteEpisodeNumber = enriched.absoluteEpisodeNumber,
                 )
             val result =
                 withContext(Dispatchers.IO) {

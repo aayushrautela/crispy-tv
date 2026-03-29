@@ -35,7 +35,8 @@ fun resolveStreamLookupTarget(
                 details.imdbId?.trim()?.takeIf { it.isNotBlank() }
                     ?: details.tmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
                     ?: ""
-            MetadataLabMediaType.SERIES -> {
+            MetadataLabMediaType.SERIES,
+            MetadataLabMediaType.ANIME -> {
                 val fromLoadedEpisodes = seasonEpisodes.firstOrNull { !it.lookupId.isNullOrBlank() }?.lookupId?.trim()
                 if (fromLoadedEpisodes != null) {
                     fromLoadedEpisodes
@@ -91,7 +92,8 @@ fun buildPlayerSubtitle(
     episode: Int?,
 ): String? {
     return when (mediaType) {
-        MetadataLabMediaType.SERIES -> {
+        MetadataLabMediaType.SERIES,
+        MetadataLabMediaType.ANIME -> {
             val normalizedPlayerTitle = playerTitle.trim().ifBlank { null }
             val episodeLabel =
                 when {

@@ -113,6 +113,11 @@ class HomeWatchActivityService(
             logoUrl = displayMeta.logoUrl,
             addonId = displayMeta.addonId,
             contentType = entry.contentType,
+            metadataProviderId = entry.metadataProviderId,
+            metadataProvider = entry.metadataProvider,
+            parentProvider = entry.parentProvider,
+            parentProviderId = entry.parentProviderId,
+            absoluteEpisodeNumber = entry.absoluteEpisodeNumber,
         )
     }
 
@@ -227,7 +232,11 @@ class HomeWatchActivityService(
 }
 
 private fun WatchHistoryEntry.asCatalogMediaType(): String {
-    return if (contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+    return when (contentType) {
+        MetadataLabMediaType.MOVIE -> "movie"
+        MetadataLabMediaType.SERIES -> "series"
+        MetadataLabMediaType.ANIME -> "anime"
+    }
 }
 
 private fun nonBlank(value: String?): String? {

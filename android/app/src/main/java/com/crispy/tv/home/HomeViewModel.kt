@@ -751,9 +751,21 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
         val contentType =
             when (type.lowercase(Locale.US)) {
                 "series" -> MetadataLabMediaType.SERIES
+                "anime" -> MetadataLabMediaType.ANIME
                 else -> MetadataLabMediaType.MOVIE
             }
         val normalizedImdb = contentId.trim().lowercase(Locale.US).takeIf { it.startsWith("tt") }
+        val isEpisodic = contentType != MetadataLabMediaType.MOVIE
+        val resolvedParentMediaType =
+            if (isEpisodic) {
+                when (contentType) {
+                    MetadataLabMediaType.SERIES -> "show"
+                    MetadataLabMediaType.ANIME -> "anime"
+                    MetadataLabMediaType.MOVIE -> null
+                }
+            } else {
+                null
+            }
 
         return PlaybackIdentity(
             contentId = contentId.trim().ifBlank { null },
@@ -764,8 +776,14 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
             episode = episode,
             title = title,
             year = null,
-            showTitle = if (contentType == MetadataLabMediaType.SERIES) title else null,
+            showTitle = if (isEpisodic) title else null,
             showYear = null,
+            provider = metadataProvider,
+            providerId = metadataProviderId,
+            parentMediaType = resolvedParentMediaType,
+            parentProvider = parentProvider ?: metadataProvider,
+            parentProviderId = parentProviderId ?: metadataProviderId,
+            absoluteEpisodeNumber = absoluteEpisodeNumber,
         )
     }
 
@@ -917,7 +935,12 @@ class ContinueWatchingSuppressionStore(context: Context) {
 }
 
 private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-    val type = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
+    val type =
+        when (entry.contentType) {
+            MetadataLabMediaType.MOVIE -> "movie"
+            MetadataLabMediaType.SERIES -> "series"
+            MetadataLabMediaType.ANIME -> "anime"
+        }
     return "$type:${entry.contentId.lowercase(Locale.US)}"
 }
 
@@ -931,7 +954,7 @@ private fun collectionLogoCacheKey(type: String, contentId: String): String {
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
     val seasonEpisode =
-        if (type.equals("series", ignoreCase = true) && season != null && episode != null) {
+        if ((type.equals("series", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {
             String.format(Locale.US, "S%02d:E%02d", season, episode)
         } else {
             null
@@ -947,19 +970,31 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
 }
 
 private fun CanonicalContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
+    val resolvedContentType = type.toMetadataLabMediaType()
     return WatchHistoryRequest(
         contentId = contentId,
-        contentType = type.toMetadataLabMediaType(),
+        contentType = resolvedContentType,
         title = title,
         season = season,
         episode = episode,
+        provider = metadataProvider,
+        providerId = metadataProviderId,
+        parentMediaType =
+            when (resolvedContentType) {
+                MetadataLabMediaType.SERIES -> "show"
+                MetadataLabMediaType.ANIME -> "anime"
+                MetadataLabMediaType.MOVIE -> null
+            },
+        parentProvider = parentProvider ?: metadataProvider,
+        parentProviderId = parentProviderId ?: metadataProviderId,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
 
 private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
-    return if (equals("series", ignoreCase = true)) {
-        MetadataLabMediaType.SERIES
-    } else {
-        MetadataLabMediaType.MOVIE
+    return when {
+        equals("series", ignoreCase = true) -> MetadataLabMediaType.SERIES
+        equals("anime", ignoreCase = true) -> MetadataLabMediaType.ANIME
+        else -> MetadataLabMediaType.MOVIE
     }
 }

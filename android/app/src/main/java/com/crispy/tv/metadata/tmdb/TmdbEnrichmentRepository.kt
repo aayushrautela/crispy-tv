@@ -47,6 +47,7 @@ class TmdbEnrichmentRepository internal constructor(
             when (resolved.mediaType) {
                 MetadataLabMediaType.MOVIE -> detailsJson.optStringNonBlank("imdb_id")
                 MetadataLabMediaType.SERIES -> detailsJson.optJSONObject("external_ids")?.optStringNonBlank("imdb_id")
+                MetadataLabMediaType.ANIME -> detailsJson.optJSONObject("external_ids")?.optStringNonBlank("imdb_id")
             }?.let(::extractImdbId)
 
         val cast = parseCastMembers(credits)
@@ -113,6 +114,7 @@ class TmdbEnrichmentRepository internal constructor(
             when (resolved.mediaType) {
                 MetadataLabMediaType.MOVIE -> detailsJson.optStringNonBlank("imdb_id")
                 MetadataLabMediaType.SERIES -> detailsJson.optJSONObject("external_ids")?.optStringNonBlank("imdb_id")
+                MetadataLabMediaType.ANIME -> detailsJson.optJSONObject("external_ids")?.optStringNonBlank("imdb_id")
             }?.let(::extractImdbId)
 
         return detailsJson.toFallbackMediaDetails(

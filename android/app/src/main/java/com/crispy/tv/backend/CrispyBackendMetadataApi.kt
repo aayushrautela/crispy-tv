@@ -128,7 +128,7 @@ internal suspend fun CrispyBackendClient.resolveMetadataApi(
 ): MetadataResolveResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = metadataLookupUrl("$baseUrl/v1/metadata/resolve", input, includeMediaKey = false, includeShowTmdbId = false),
+        url = metadataLookupUrl("$baseUrl/v1/metadata/resolve", input, includeMediaKey = false),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -294,7 +294,7 @@ internal suspend fun CrispyBackendClient.resolvePlaybackApi(
 ): PlaybackResolveResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = metadataLookupUrl("$baseUrl/v1/playback/resolve", input, includeMediaKey = false, includeShowTmdbId = false),
+        url = metadataLookupUrl("$baseUrl/v1/playback/resolve", input, includeMediaKey = false),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )

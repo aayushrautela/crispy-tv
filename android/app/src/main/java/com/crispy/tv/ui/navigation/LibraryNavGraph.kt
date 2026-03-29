@@ -12,7 +12,8 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                 val type = when (entry.contentType) {
                     com.crispy.tv.player.MetadataLabMediaType.MOVIE -> "movie"
                     com.crispy.tv.player.MetadataLabMediaType.SERIES -> "series"
-            }
+                    com.crispy.tv.player.MetadataLabMediaType.ANIME -> "anime"
+                }
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
                         itemId = entry.contentId,

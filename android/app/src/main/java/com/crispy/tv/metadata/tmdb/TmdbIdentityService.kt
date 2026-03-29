@@ -35,6 +35,9 @@ internal class TmdbIdentityService(
                 MetadataLabMediaType.SERIES -> {
                     client.getJson(path = "tv/$tmdbId/external_ids")?.optStringNonBlank("imdb_id")
                 }
+                MetadataLabMediaType.ANIME -> {
+                    client.getJson(path = "tv/$tmdbId/external_ids")?.optStringNonBlank("imdb_id")
+                }
             }?.let(::extractImdbId)
 
         imdbIdCache[cacheKey] = imdbId ?: NO_VALUE
@@ -100,6 +103,10 @@ internal class TmdbIdentityService(
                 }
                 MetadataLabMediaType.SERIES -> {
                     tvId?.let { TmdbResolvedId(it, MetadataLabMediaType.SERIES) }
+                        ?: movieId?.let { TmdbResolvedId(it, MetadataLabMediaType.MOVIE) }
+                }
+                MetadataLabMediaType.ANIME -> {
+                    tvId?.let { TmdbResolvedId(it, MetadataLabMediaType.ANIME) }
                         ?: movieId?.let { TmdbResolvedId(it, MetadataLabMediaType.MOVIE) }
                 }
                 null -> {

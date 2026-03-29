@@ -76,5 +76,6 @@ private fun MetadataLabMediaType.toBackendMediaType(): String {
     return when (this) {
         MetadataLabMediaType.MOVIE -> "movie"
         MetadataLabMediaType.SERIES -> "tv"
+        MetadataLabMediaType.ANIME -> "tv"
     }
 }

@@ -930,8 +930,9 @@ class RemoteWatchHistoryService(
         val removed = watchProgressStore.getContinueWatchingRemoved()
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
 
-        data class SeriesCandidate(
+        data class EpisodicCandidate(
             val showId: String,
+            val contentType: MetadataLabMediaType,
             val season: Int,
             val episode: Int,
             val progressPercent: Double,
@@ -940,10 +941,11 @@ class RemoteWatchHistoryService(
 
         val movies = ArrayList<ContinueWatchingEntry>()
 
-        val latestInProgressEpisodeByShow = LinkedHashMap<String, SeriesCandidate>()
+        val latestInProgressEpisodeByShow = LinkedHashMap<String, EpisodicCandidate>()
         val maxWatchedEpisodeByShow = LinkedHashMap<String, Pair<Int, Int>>()
         val watchedSetByShow = LinkedHashMap<String, MutableSet<String>>()
         val latestWatchedAtByShow = LinkedHashMap<String, Long>()
+        val contentTypeByShow = LinkedHashMap<String, MetadataLabMediaType>()
 
         for ((rawKey, progress) in watchProgressStore.getAllWatchProgress()) {
             val parts = rawKey.split(':')
@@ -981,8 +983,11 @@ class RemoteWatchHistoryService(
                         )
                 }
 
-                "series" -> {
+                "series", "anime" -> {
                     if (parts.size < 4) continue
+
+                    val episodicType = if (type.equals("anime", ignoreCase = true)) MetadataLabMediaType.ANIME else MetadataLabMediaType.SERIES
+                    contentTypeByShow[id] = episodicType
 
                     val season = parts[parts.size - 2].toIntOrNull()?.takeIf { it > 0 } ?: continue
                     val episode = parts[parts.size - 1].toIntOrNull()?.takeIf { it > 0 } ?: continue
@@ -999,8 +1004,9 @@ class RemoteWatchHistoryService(
                         latestWatchedAtByShow[id] = maxOf(latestWatchedAtByShow[id] ?: 0L, lastUpdated)
                     } else {
                         val candidate =
-                            SeriesCandidate(
+                            EpisodicCandidate(
                                 showId = id,
+                                contentType = episodicType,
                                 season = season,
                                 episode = episode,
                                 progressPercent = percent,
@@ -1020,7 +1026,7 @@ class RemoteWatchHistoryService(
             latestInProgressEpisodeByShow.values.map {
                 ContinueWatchingEntry(
                     contentId = it.showId,
-                    contentType = MetadataLabMediaType.SERIES,
+                    contentType = it.contentType,
                     title = it.showId,
                     season = it.season,
                     episode = it.episode,
@@ -1043,10 +1049,15 @@ class RemoteWatchHistoryService(
 
             val lastWatchedAt = latestWatchedAtByShow[showId] ?: 0L
             if (lastWatchedAt < staleCutoff) continue
+            val episodicType = contentTypeByShow[showId] ?: MetadataLabMediaType.SERIES
 
             val episodeList =
                 runCatching {
-                    episodeListProvider.fetchEpisodeList(mediaType = "series", contentId = showId, seasonHint = null)
+                    episodeListProvider.fetchEpisodeList(
+                        mediaType = if (episodicType == MetadataLabMediaType.ANIME) "anime" else "series",
+                        contentId = showId,
+                        seasonHint = null,
+                    )
                 }.getOrNull()
                     ?: continue
             val watchedSet = watchedSetByShow[showId]
@@ -1061,12 +1072,12 @@ class RemoteWatchHistoryService(
                 ) ?: continue
 
             placeholders +=
-                ContinueWatchingEntry(
-                    contentId = showId,
-                    contentType = MetadataLabMediaType.SERIES,
-                    title = showId,
-                    season = next.season,
-                    episode = next.episode,
+                    ContinueWatchingEntry(
+                        contentId = showId,
+                        contentType = episodicType,
+                        title = showId,
+                        season = next.season,
+                        episode = next.episode,
                     progressPercent = 0.0,
                     lastUpdatedEpochMs = lastWatchedAt,
                     provider = WatchProvider.LOCAL,
@@ -1085,12 +1096,13 @@ class RemoteWatchHistoryService(
             when (identity.contentType) {
                 com.crispy.tv.player.MetadataLabMediaType.MOVIE -> "movie"
                 com.crispy.tv.player.MetadataLabMediaType.SERIES -> "series"
+                com.crispy.tv.player.MetadataLabMediaType.ANIME -> "anime"
             }
 
         val id = identity.contentId?.trim()?.takeIf { it.isNotBlank() } ?: normalizedImdbIdOrNull(identity.imdbId) ?: return null
 
         val episodeId =
-            if (identity.contentType == com.crispy.tv.player.MetadataLabMediaType.SERIES && identity.season != null && identity.episode != null) {
+            if (identity.contentType != com.crispy.tv.player.MetadataLabMediaType.MOVIE && identity.season != null && identity.episode != null) {
                 "$id:${identity.season}:${identity.episode}"
             } else {
                 null
@@ -1141,6 +1153,18 @@ class RemoteWatchHistoryService(
                     episode = episodeValue,
                 )
             }
+            com.crispy.tv.player.MetadataLabMediaType.ANIME -> {
+                val seasonValue = season ?: return null
+                val episodeValue = episode ?: return null
+                TraktScrobbleService.TraktContentData.Episode(
+                    title = title,
+                    showTitle = showTitle ?: title,
+                    showYear = showYear,
+                    showImdbId = imdbId,
+                    season = seasonValue,
+                    episode = episodeValue,
+                )
+            }
         }
     }
 
@@ -1173,6 +1197,19 @@ class RemoteWatchHistoryService(
         return when (contentType) {
             com.crispy.tv.player.MetadataLabMediaType.MOVIE -> SimklService.SimklScrobbleContent.Movie(title = title, year = year, ids = ids)
             com.crispy.tv.player.MetadataLabMediaType.SERIES -> {
+                val seasonValue = season ?: return null
+                val episodeValue = episode ?: return null
+                SimklService.SimklScrobbleContent.Episode(
+                    showTitle = showTitle ?: title,
+                    showYear = showYear,
+                    season = seasonValue,
+                    episode = episodeValue,
+                    title = title,
+                    year = year,
+                    ids = ids,
+                )
+            }
+            com.crispy.tv.player.MetadataLabMediaType.ANIME -> {
                 val seasonValue = season ?: return null
                 val episodeValue = episode ?: return null
                 SimklService.SimklScrobbleContent.Episode(

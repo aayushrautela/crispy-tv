@@ -71,6 +71,12 @@ data class MediaDetails(
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
     val addonId: String?,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 @Immutable
@@ -85,6 +91,11 @@ data class MediaVideo(
     val lookupId: String? = null,
     val tmdbId: Int? = null,
     val showTmdbId: Int? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 class HomeCatalogService internal constructor(

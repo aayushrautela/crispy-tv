@@ -51,6 +51,12 @@ internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
         seasonNumber = seasonNumber,
         episodeNumber = episodeNumber,
         addonId = "backend",
+        provider = provider,
+        providerId = providerId,
+        parentMediaType = parentMediaType,
+        parentProvider = parentProvider,
+        parentProviderId = parentProviderId,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
 
@@ -65,7 +71,8 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
                 else -> canonicalId
             }
     val showLookupBase =
-        showExternalIds.imdb?.trim()?.takeIf { it.isNotBlank() }
+        canonicalProviderLookupId(parentProvider, parentProviderId)
+            ?: externalProviderLookupId(showExternalIds)
             ?: showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
     val lookupId =
         if (season != null && episode != null && showLookupBase != null) {
@@ -84,6 +91,11 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
         lookupId = lookupId,
         tmdbId = tmdbId,
         showTmdbId = showTmdbId,
+        provider = provider,
+        providerId = providerId,
+        parentProvider = parentProvider,
+        parentProviderId = parentProviderId,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
 
@@ -97,7 +109,9 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
                 episode != null -> "Episode $episode"
                 else -> canonicalId
             }
-    val showLookupBase = showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
+    val showLookupBase =
+        canonicalProviderLookupId(parentProvider, parentProviderId)
+            ?: showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
     val lookupId =
         if (season != null && episode != null && showLookupBase != null) {
             "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
@@ -115,6 +129,11 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
         lookupId = lookupId,
         tmdbId = tmdbId,
         showTmdbId = showTmdbId,
+        provider = provider,
+        providerId = providerId,
+        parentProvider = parentProvider,
+        parentProviderId = parentProviderId,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
 
@@ -136,10 +155,10 @@ internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
 }
 
 internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
-    return if (mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true)) {
-        "series"
-    } else {
-        "movie"
+    return when {
+        mediaType.equals("anime", ignoreCase = true) -> "anime"
+        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+        else -> "movie"
     }
 }
 
@@ -153,7 +172,7 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
         backdropUrl = images.backdropUrl,
         logoUrl = images.logoUrl,
         addonId = "backend",
-        type = if (mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true)) "series" else "movie",
+        type = normalizedCatalogMediaType(),
         rating = formatRating(rating),
         year = releaseYear?.toString() ?: releaseDate?.take(4),
         genre = null,
@@ -162,12 +181,16 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
 }
 
 internal fun MediaDetails.providerBaseLookupId(): String? {
-    return imdbId?.trim()?.takeIf { it.isNotBlank() }
+    return canonicalProviderLookupId(parentProvider, parentProviderId)
+        ?: canonicalProviderLookupId(provider, providerId)
+        ?: imdbId?.trim()?.takeIf { it.isNotBlank() }
         ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }
 
 internal fun CrispyBackendClient.MetadataView.providerBaseLookupId(): String? {
-    return externalIds.imdb?.trim()?.takeIf { it.isNotBlank() }
+    return canonicalProviderLookupId(parentProvider, parentProviderId)
+        ?: canonicalProviderLookupId(provider, providerId)
+        ?: externalProviderLookupId(externalIds)
         ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }
 
@@ -205,6 +228,12 @@ internal fun MediaDetails.mergeEnhancements(
         creators = if (creators.isNotEmpty()) creators else enhancement.creators,
         tmdbId = tmdbId ?: enhancement.tmdbId,
         showTmdbId = showTmdbId ?: enhancement.showTmdbId,
+        provider = provider ?: enhancement.provider,
+        providerId = providerId ?: enhancement.providerId,
+        parentMediaType = parentMediaType ?: enhancement.parentMediaType,
+        parentProvider = parentProvider ?: enhancement.parentProvider,
+        parentProviderId = parentProviderId ?: enhancement.parentProviderId,
+        absoluteEpisodeNumber = absoluteEpisodeNumber ?: enhancement.absoluteEpisodeNumber,
     )
 }
 
@@ -212,6 +241,22 @@ internal fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {
     return when (this?.lowercase(Locale.US)) {
         "movie" -> MetadataLabMediaType.MOVIE
         "series", "show", "tv" -> MetadataLabMediaType.SERIES
+        "anime" -> MetadataLabMediaType.ANIME
         else -> null
     }
+}
+
+private fun canonicalProviderLookupId(provider: String?, providerId: String?): String? {
+    val normalizedProvider = provider?.trim()?.lowercase(Locale.US).orEmpty()
+    val normalizedProviderId = providerId?.trim().orEmpty()
+    if (normalizedProvider.isBlank() || normalizedProviderId.isBlank()) return null
+    return "$normalizedProvider:$normalizedProviderId"
+}
+
+private fun externalProviderLookupId(externalIds: CrispyBackendClient.MetadataExternalIds?): String? {
+    val ids = externalIds ?: return null
+    return ids.imdb?.trim()?.takeIf { it.isNotBlank() }
+        ?: ids.tvdb?.takeIf { it > 0 }?.let { "tvdb:$it" }
+        ?: ids.kitsu?.takeIf { it > 0 }?.let { "kitsu:$it" }
+        ?: ids.tmdb?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }

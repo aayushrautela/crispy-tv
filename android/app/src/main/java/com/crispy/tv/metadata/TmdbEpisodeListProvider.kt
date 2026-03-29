@@ -37,7 +37,11 @@ internal class TmdbEpisodeListProvider(
         contentId: String,
         seasonHint: Int?,
     ): List<EpisodeInfo>? = withContext(Dispatchers.IO) {
-        if (!mediaType.trim().equals("series", ignoreCase = true)) {
+        val normalizedMediaType = mediaType.trim()
+        if (
+            !normalizedMediaType.equals("series", ignoreCase = true) &&
+                !normalizedMediaType.equals("anime", ignoreCase = true)
+        ) {
             return@withContext null
         }
 
@@ -46,8 +50,14 @@ internal class TmdbEpisodeListProvider(
             return@withContext null
         }
 
-        val showKey = "series:$baseId"
-        val showEntry = loadShowEntry(showKey = showKey, rawId = baseId) ?: return@withContext null
+        val contentType =
+            if (normalizedMediaType.equals("anime", ignoreCase = true)) {
+                MetadataLabMediaType.ANIME
+            } else {
+                MetadataLabMediaType.SERIES
+            }
+        val showKey = "${normalizedMediaType.lowercase(Locale.US)}:$baseId"
+        val showEntry = loadShowEntry(showKey = showKey, rawId = baseId, mediaTypeHint = contentType) ?: return@withContext null
 
         val requestedSeason = seasonHint?.takeIf { it > 0 }
         val effectiveSeason =
@@ -77,7 +87,11 @@ internal class TmdbEpisodeListProvider(
             .takeIf { it.isNotEmpty() }
     }
 
-    private suspend fun loadShowEntry(showKey: String, rawId: String): ShowCacheEntry? {
+    private suspend fun loadShowEntry(
+        showKey: String,
+        rawId: String,
+        mediaTypeHint: MetadataLabMediaType,
+    ): ShowCacheEntry? {
         val cached = readCachedShowEntry(showKey)
         if (cached != null) return cached
 
@@ -88,7 +102,7 @@ internal class TmdbEpisodeListProvider(
             val enrichmentResult =
                 tmdbEnrichmentRepository.load(
                     rawId = rawId,
-                    mediaTypeHint = MetadataLabMediaType.SERIES,
+                    mediaTypeHint = mediaTypeHint,
                     locale = localeProvider(),
                 ) ?: return@withPermit null
 

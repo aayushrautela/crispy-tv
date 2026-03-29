@@ -18,6 +18,11 @@ data class PlayerEpisodeSnapshot(
     val lookupId: String? = null,
     val tmdbId: Int? = null,
     val showTmdbId: Int? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 @Immutable
@@ -43,6 +48,12 @@ data class PlayerLaunchSnapshot(
     val selectedSeason: Int? = null,
     val seasonEpisodes: List<PlayerEpisodeSnapshot> = emptyList(),
     val currentEpisodeId: String? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 ) {
     fun toJsonString(): String {
         return JSONObject()
@@ -53,6 +64,12 @@ data class PlayerLaunchSnapshot(
             .put("season_number", seasonNumber)
             .put("episode_number", episodeNumber)
             .put("media_type", mediaType)
+            .put("provider", provider)
+            .put("provider_id", providerId)
+            .put("parent_media_type", parentMediaType)
+            .put("parent_provider", parentProvider)
+            .put("parent_provider_id", parentProviderId)
+            .put("absolute_episode_number", absoluteEpisodeNumber)
             .put("title", title)
             .put("poster_url", posterUrl)
             .put("backdrop_url", backdropUrl)
@@ -81,6 +98,11 @@ data class PlayerLaunchSnapshot(
                                 .put("lookup_id", episode.lookupId)
                                 .put("tmdb_id", episode.tmdbId)
                                 .put("show_tmdb_id", episode.showTmdbId)
+                                .put("provider", episode.provider)
+                                .put("provider_id", episode.providerId)
+                                .put("parent_provider", episode.parentProvider)
+                                .put("parent_provider_id", episode.parentProviderId)
+                                .put("absolute_episode_number", episode.absoluteEpisodeNumber)
                         )
                     }
                 },
@@ -113,6 +135,12 @@ data class PlayerLaunchSnapshot(
             seasonNumber = seasonNumber,
             episodeNumber = episodeNumber,
             addonId = null,
+            provider = provider,
+            providerId = providerId,
+            parentMediaType = parentMediaType,
+            parentProvider = parentProvider,
+            parentProviderId = parentProviderId,
+            absoluteEpisodeNumber = absoluteEpisodeNumber,
         )
     }
 
@@ -131,6 +159,12 @@ data class PlayerLaunchSnapshot(
                     seasonNumber = json.optInt("season_number").takeIf { it > 0 },
                     episodeNumber = json.optInt("episode_number").takeIf { it > 0 },
                     mediaType = json.optString("media_type").trim(),
+                    provider = json.optString("provider").trim().ifBlank { null },
+                    providerId = json.optString("provider_id").trim().ifBlank { null },
+                    parentMediaType = json.optString("parent_media_type").trim().ifBlank { null },
+                    parentProvider = json.optString("parent_provider").trim().ifBlank { null },
+                    parentProviderId = json.optString("parent_provider_id").trim().ifBlank { null },
+                    absoluteEpisodeNumber = json.optInt("absolute_episode_number").takeIf { it > 0 },
                     title = json.optString("title").trim(),
                     posterUrl = json.optString("poster_url").trim().ifBlank { null },
                     backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
@@ -165,6 +199,11 @@ internal fun PlayerEpisodeSnapshot.toMediaVideo(): MediaVideo {
         lookupId = lookupId,
         tmdbId = tmdbId,
         showTmdbId = showTmdbId,
+        provider = provider,
+        providerId = providerId,
+        parentProvider = parentProvider,
+        parentProviderId = parentProviderId,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
 
@@ -212,6 +251,11 @@ private fun JSONArray?.toEpisodeSnapshots(): List<PlayerEpisodeSnapshot> {
                     lookupId = json.optString("lookup_id").trim().ifBlank { null },
                     tmdbId = json.optInt("tmdb_id").takeIf { it > 0 },
                     showTmdbId = json.optInt("show_tmdb_id").takeIf { it > 0 },
+                    provider = json.optString("provider").trim().ifBlank { null },
+                    providerId = json.optString("provider_id").trim().ifBlank { null },
+                    parentProvider = json.optString("parent_provider").trim().ifBlank { null },
+                    parentProviderId = json.optString("parent_provider_id").trim().ifBlank { null },
+                    absoluteEpisodeNumber = json.optInt("absolute_episode_number").takeIf { it > 0 },
                 )
             )
         }

@@ -33,7 +33,10 @@ internal fun buildDetailsRows(
     val item = titleDetail?.item
     val production = titleDetail?.production
 
-    if (details.mediaType.equals("series", ignoreCase = true)) {
+    if (
+        details.mediaType.equals("series", ignoreCase = true) ||
+            details.mediaType.equals("anime", ignoreCase = true)
+    ) {
         item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
 
         formatLongDate(item?.releaseDate)?.let { rows += "FIRST AIR DATE" to it }

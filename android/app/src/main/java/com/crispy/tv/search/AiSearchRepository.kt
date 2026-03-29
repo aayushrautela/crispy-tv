@@ -60,5 +60,6 @@ private fun SearchTypeFilter.toBackendAiFilter(): String? {
         SearchTypeFilter.ALL -> null
         SearchTypeFilter.MOVIES -> "movies"
         SearchTypeFilter.SERIES -> "series"
+        SearchTypeFilter.ANIME -> "anime"
     }
 }

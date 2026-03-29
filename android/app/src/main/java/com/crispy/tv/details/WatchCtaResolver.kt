@@ -91,7 +91,7 @@ internal class WatchCtaResolver(
     ): Pair<WatchCta, String?> {
         if (details == null) return Pair(WatchCta(), null)
 
-        val isSeries = requestedMediaType == MetadataLabMediaType.SERIES
+        val isSeries = requestedMediaType != MetadataLabMediaType.MOVIE
         val expectedType = requestedMediaType
 
         val continueEntry = resolveContinueWatchingEntry(details, expectedType, nowMs)
@@ -178,6 +178,7 @@ internal class WatchCtaResolver(
 
     private fun buildPlaybackIdentity(details: MediaDetails?, itemId: String): com.crispy.tv.player.PlaybackIdentity {
         val resolvedDetails = details
+        val isEpisodic = requestedMediaType != MetadataLabMediaType.MOVIE
         return com.crispy.tv.player.PlaybackIdentity(
             contentId = resolvedDetails?.id ?: itemId,
             imdbId = resolvedDetails?.imdbId,
@@ -185,8 +186,24 @@ internal class WatchCtaResolver(
             contentType = requestedMediaType,
             title = resolvedDetails?.title ?: itemId,
             year = resolvedDetails?.year?.trim()?.toIntOrNull(),
-            showTitle = resolvedDetails?.title,
-            showYear = resolvedDetails?.year?.trim()?.toIntOrNull(),
+            showTitle = if (isEpisodic) resolvedDetails?.title else null,
+            showYear = if (isEpisodic) resolvedDetails?.year?.trim()?.toIntOrNull() else null,
+            provider = resolvedDetails?.provider,
+            providerId = resolvedDetails?.providerId,
+            parentMediaType =
+                if (isEpisodic) {
+                    resolvedDetails?.parentMediaType
+                        ?: when (requestedMediaType) {
+                            MetadataLabMediaType.SERIES -> "show"
+                            MetadataLabMediaType.ANIME -> "anime"
+                            MetadataLabMediaType.MOVIE -> null
+                        }
+                } else {
+                    null
+                },
+            parentProvider = resolvedDetails?.parentProvider ?: resolvedDetails?.provider,
+            parentProviderId = resolvedDetails?.parentProviderId ?: resolvedDetails?.providerId,
+            absoluteEpisodeNumber = resolvedDetails?.absoluteEpisodeNumber,
         )
     }
 }

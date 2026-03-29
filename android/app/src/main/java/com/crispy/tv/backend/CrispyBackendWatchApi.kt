@@ -171,6 +171,11 @@ internal suspend fun CrispyBackendClient.sendWatchEventApi(
         if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
         if (input.tmdbId != null) put("tmdbId", input.tmdbId)
         if (input.showTmdbId != null) put("showTmdbId", input.showTmdbId)
+        if (!input.provider.isNullOrBlank()) put("provider", input.provider.trim())
+        if (!input.providerId.isNullOrBlank()) put("providerId", input.providerId.trim())
+        if (!input.parentProvider.isNullOrBlank()) put("parentProvider", input.parentProvider.trim())
+        if (!input.parentProviderId.isNullOrBlank()) put("parentProviderId", input.parentProviderId.trim())
+        if (input.absoluteEpisodeNumber != null) put("absoluteEpisodeNumber", input.absoluteEpisodeNumber)
         if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
         if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
         if (input.positionSeconds != null) put("positionSeconds", input.positionSeconds)
@@ -264,7 +269,6 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
             input,
             includeId = false,
             includeImdbId = false,
-            includeTvdbId = false,
         ),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -423,6 +427,11 @@ private suspend fun CrispyBackendClient.postWatchMutationApi(
         if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
         if (input.tmdbId != null) put("tmdbId", input.tmdbId)
         if (input.showTmdbId != null) put("showTmdbId", input.showTmdbId)
+        if (!input.provider.isNullOrBlank()) put("provider", input.provider.trim())
+        if (!input.providerId.isNullOrBlank()) put("providerId", input.providerId.trim())
+        if (!input.parentProvider.isNullOrBlank()) put("parentProvider", input.parentProvider.trim())
+        if (!input.parentProviderId.isNullOrBlank()) put("parentProviderId", input.parentProviderId.trim())
+        if (input.absoluteEpisodeNumber != null) put("absoluteEpisodeNumber", input.absoluteEpisodeNumber)
         if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
         if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
         if (!input.occurredAt.isNullOrBlank()) put("occurredAt", input.occurredAt.trim())

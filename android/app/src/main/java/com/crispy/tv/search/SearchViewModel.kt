@@ -18,7 +18,8 @@ import kotlinx.coroutines.withContext
 enum class SearchTypeFilter {
     ALL,
     MOVIES,
-    SERIES;
+    SERIES,
+    ANIME;
 
     val label: String
         get() =
@@ -26,6 +27,7 @@ enum class SearchTypeFilter {
                 ALL -> "All"
                 MOVIES -> "Movies"
                 SERIES -> "Series"
+                ANIME -> "Anime"
             }
 }
 
@@ -54,7 +56,7 @@ data class SearchUiState(
             if (selectedGenre == null) {
                 SearchTypeFilter.entries
             } else {
-                listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES)
+                listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES, SearchTypeFilter.ANIME)
             }
 }
 

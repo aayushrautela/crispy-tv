@@ -10,15 +10,28 @@ internal fun JSONObject.putLibraryResolveInput(input: MediaLookupInput) {
     if (!input.imdbId.isNullOrBlank()) put("imdbId", input.imdbId.trim())
     if (input.tvdbId != null) put("tvdbId", input.tvdbId)
     if (!input.mediaType.isNullOrBlank()) put("mediaType", input.mediaType.trim())
+    if (!input.provider.isNullOrBlank()) put("provider", input.provider.trim())
+    if (!input.providerId.isNullOrBlank()) put("providerId", input.providerId.trim())
+    if (!input.parentProvider.isNullOrBlank()) put("parentProvider", input.parentProvider.trim())
+    if (!input.parentProviderId.isNullOrBlank()) put("parentProviderId", input.parentProviderId.trim())
+    if (input.absoluteEpisodeNumber != null) put("absoluteEpisodeNumber", input.absoluteEpisodeNumber)
     if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
     if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
 }
 
 internal fun JSONObject.putWatchLookupInput(input: MediaLookupInput) {
+    if (!input.id.isNullOrBlank()) put("id", input.id.trim())
     if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
     if (!input.mediaType.isNullOrBlank()) put("mediaType", input.mediaType.trim())
     if (input.tmdbId != null) put("tmdbId", input.tmdbId)
     if (input.showTmdbId != null) put("showTmdbId", input.showTmdbId)
+    if (!input.imdbId.isNullOrBlank()) put("imdbId", input.imdbId.trim())
+    if (input.tvdbId != null) put("tvdbId", input.tvdbId)
+    if (!input.provider.isNullOrBlank()) put("provider", input.provider.trim())
+    if (!input.providerId.isNullOrBlank()) put("providerId", input.providerId.trim())
+    if (!input.parentProvider.isNullOrBlank()) put("parentProvider", input.parentProvider.trim())
+    if (!input.parentProviderId.isNullOrBlank()) put("parentProviderId", input.parentProviderId.trim())
+    if (input.absoluteEpisodeNumber != null) put("absoluteEpisodeNumber", input.absoluteEpisodeNumber)
     if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
     if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
 }

@@ -59,12 +59,16 @@ internal fun parseSimilarCatalogItems(
                     MetadataLabMediaType.SERIES -> {
                         item.optStringNonBlank("name") ?: item.optStringNonBlank("original_name")
                     }
+                    MetadataLabMediaType.ANIME -> {
+                        item.optStringNonBlank("name") ?: item.optStringNonBlank("original_name")
+                    }
                 } ?: continue
 
             val year =
                 when (mediaType) {
                     MetadataLabMediaType.MOVIE -> item.optStringNonBlank("release_date")
                     MetadataLabMediaType.SERIES -> item.optStringNonBlank("first_air_date")
+                    MetadataLabMediaType.ANIME -> item.optStringNonBlank("first_air_date")
                 }?.take(4)
 
             val genreIds = item.optJSONArray("genre_ids")
@@ -185,6 +189,7 @@ internal fun parseProductionEntities(
         when (mediaType) {
             MetadataLabMediaType.MOVIE -> details.optJSONArray("production_companies")
             MetadataLabMediaType.SERIES -> details.optJSONArray("networks")
+            MetadataLabMediaType.ANIME -> details.optJSONArray("networks")
         } ?: return emptyList()
 
     return buildList {
@@ -306,6 +311,7 @@ internal fun parseTitleDetails(
         when (mediaType) {
             MetadataLabMediaType.MOVIE -> details.optJSONArray("origin_country")
             MetadataLabMediaType.SERIES -> details.optJSONArray("origin_country")
+            MetadataLabMediaType.ANIME -> details.optJSONArray("origin_country")
         }?.let { array ->
             buildList {
                 for (index in 0 until array.length()) {
@@ -329,6 +335,29 @@ internal fun parseTitleDetails(
             )
         }
         MetadataLabMediaType.SERIES -> {
+            val episodeRunTime = details.optJSONArray("episode_run_time")
+            TmdbTvDetails(
+                status = status,
+                firstAirDate = details.optStringNonBlank("first_air_date"),
+                lastAirDate = details.optStringNonBlank("last_air_date"),
+                numberOfSeasons = details.optIntOrNull("number_of_seasons"),
+                numberOfEpisodes = details.optIntOrNull("number_of_episodes"),
+                episodeRunTimeMinutes =
+                    buildList {
+                        if (episodeRunTime != null) {
+                            for (index in 0 until episodeRunTime.length()) {
+                                val value = episodeRunTime.optInt(index)
+                                if (value > 0) add(value)
+                            }
+                        }
+                    },
+                type = details.optStringNonBlank("type"),
+                originalLanguage = originalLanguage,
+                originCountries = originCountries,
+                tagline = tagline,
+            )
+        }
+        MetadataLabMediaType.ANIME -> {
             val episodeRunTime = details.optJSONArray("episode_run_time")
             TmdbTvDetails(
                 status = status,
@@ -432,6 +461,7 @@ internal fun resolveTitle(
     return when (mediaType) {
         MetadataLabMediaType.MOVIE -> details.optStringNonBlank("title") ?: details.optStringNonBlank("original_title")
         MetadataLabMediaType.SERIES -> details.optStringNonBlank("name") ?: details.optStringNonBlank("original_name")
+        MetadataLabMediaType.ANIME -> details.optStringNonBlank("name") ?: details.optStringNonBlank("original_name")
     }
 }
 

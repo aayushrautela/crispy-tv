@@ -31,6 +31,7 @@ fun DetailsRoute(
         when (mediaType.trim().lowercase(Locale.US)) {
             "movie" -> "movie"
             "series", "show", "tv" -> "series"
+            "anime" -> "anime"
             else -> ""
         }
     }

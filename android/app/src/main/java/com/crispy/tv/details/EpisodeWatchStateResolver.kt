@@ -2,6 +2,7 @@ package com.crispy.tv.details
 
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryService
@@ -28,6 +29,13 @@ internal class EpisodeWatchStateResolver(
 
         val watchedKeys = resolveWatchKeys(details, resolvedTmdbId)
         val yearInt = details.year?.trim()?.toIntOrNull()
+        val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
+        val parentMediaType =
+            when (contentType) {
+                MetadataLabMediaType.MOVIE -> null
+                MetadataLabMediaType.SERIES -> "show"
+                MetadataLabMediaType.ANIME -> "anime"
+            }
         return videos.associate { video ->
             val season = video.season
             val episode = video.episode
@@ -42,13 +50,19 @@ internal class EpisodeWatchStateResolver(
                             contentId = details.id,
                             imdbId = details.imdbId,
                             tmdbId = resolvedTmdbId,
-                            contentType = MetadataLabMediaType.SERIES,
+                            contentType = contentType,
                             season = season,
                             episode = episode,
                             title = video.title,
                             year = yearInt,
-                            showTitle = details.title,
-                            showYear = yearInt,
+                            showTitle = if (contentType == MetadataLabMediaType.MOVIE) null else details.title,
+                            showYear = if (contentType == MetadataLabMediaType.MOVIE) null else yearInt,
+                            provider = video.provider ?: details.provider,
+                            providerId = video.providerId ?: details.providerId,
+                            parentMediaType = parentMediaType,
+                            parentProvider = video.parentProvider ?: details.parentProvider ?: details.provider,
+                            parentProviderId = video.parentProviderId ?: details.parentProviderId ?: details.providerId,
+                            absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
                         )
                     )
                 val progressPercent = localProgress?.progressPercent ?: 0.0
@@ -71,11 +85,17 @@ internal class EpisodeWatchStateResolver(
                 contentId = details.id,
                 imdbId = details.imdbId,
                 tmdbId = resolvedTmdbId ?: details.tmdbId,
-                contentType = MetadataLabMediaType.SERIES,
+                contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
                 title = details.title,
                 year = details.year?.trim()?.toIntOrNull(),
                 showTitle = details.title,
                 showYear = details.year?.trim()?.toIntOrNull(),
+                provider = details.provider,
+                providerId = details.providerId,
+                parentMediaType = details.parentMediaType,
+                parentProvider = details.parentProvider ?: details.provider,
+                parentProviderId = details.parentProviderId ?: details.providerId,
+                absoluteEpisodeNumber = details.absoluteEpisodeNumber,
             )
         )
         val canonicalKeys = canonical?.watchedEpisodeKeys.orEmpty().map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()

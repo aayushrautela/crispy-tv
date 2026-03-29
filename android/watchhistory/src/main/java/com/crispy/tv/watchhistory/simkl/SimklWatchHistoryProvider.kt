@@ -118,7 +118,7 @@ internal class SimklWatchHistoryProvider(
                 folderItems = folderItems,
                 status = status,
                 typeId = "anime",
-                contentType = MetadataLabMediaType.SERIES,
+                contentType = MetadataLabMediaType.ANIME,
                 limitPerFolder = limitPerFolder,
             )
         }
@@ -129,7 +129,7 @@ internal class SimklWatchHistoryProvider(
                 buildList {
                     addAll(parseRatingsArray(ratingsResponse.optJSONArray("movies"), MetadataLabMediaType.MOVIE))
                     addAll(parseRatingsArray(ratingsResponse.optJSONArray("shows"), MetadataLabMediaType.SERIES))
-                    addAll(parseRatingsArray(ratingsResponse.optJSONArray("anime"), MetadataLabMediaType.SERIES))
+                    addAll(parseRatingsArray(ratingsResponse.optJSONArray("anime"), MetadataLabMediaType.ANIME))
                 }
             addFolder(folderItems, FOLDER_RATINGS, ratingItems, limitPerFolder)
         }
@@ -175,6 +175,28 @@ internal class SimklWatchHistoryProvider(
             }
 
             MetadataLabMediaType.SERIES -> {
+                val season = request.season ?: return null
+                val episode = request.episode ?: return null
+                if (season <= 0 || episode <= 0) return null
+
+                val episodeObj = JSONObject().put("number", episode)
+                if (watchedAtEpochMs != null) {
+                    episodeObj.put("watched_at", toIsoString(watchedAtEpochMs))
+                }
+
+                val seasonObj =
+                    JSONObject()
+                        .put("number", season)
+                        .put("episodes", JSONArray().put(episodeObj))
+
+                val showObj =
+                    JSONObject()
+                        .put("ids", ids)
+                        .put("seasons", JSONArray().put(seasonObj))
+
+                JSONObject().put("shows", JSONArray().put(showObj))
+            }
+            MetadataLabMediaType.ANIME -> {
                 val season = request.season ?: return null
                 val episode = request.episode ?: return null
                 if (season <= 0 || episode <= 0) return null
@@ -267,7 +289,7 @@ internal class SimklWatchHistoryProvider(
 
                 ContinueWatchingEntry(
                     contentId = contentId,
-                    contentType = MetadataLabMediaType.SERIES,
+                    contentType = MetadataLabMediaType.ANIME,
                     title = title,
                     season = season,
                     episode = episode,
@@ -448,8 +470,14 @@ internal class SimklWatchHistoryProvider(
                 is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
                 else -> null
             }
-        if (tmdb == null && imdb == null && tvdb == null) return null
-        return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb)
+        val kitsu =
+            when (val raw = ids.opt("kitsu")) {
+                is Number -> raw.toInt().takeIf { it > 0 }
+                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
+                else -> null
+            }
+        if (tmdb == null && imdb == null && tvdb == null && kitsu == null) return null
+        return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb, kitsu = kitsu)
     }
 
     private fun contentIdFromIds(ids: JSONObject?): String {
@@ -503,6 +531,7 @@ internal class SimklWatchHistoryProvider(
         return when (contentType) {
             MetadataLabMediaType.MOVIE -> "movies"
             MetadataLabMediaType.SERIES -> "shows"
+            MetadataLabMediaType.ANIME -> "shows"
         }
     }
 
