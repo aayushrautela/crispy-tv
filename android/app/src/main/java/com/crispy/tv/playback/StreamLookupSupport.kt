@@ -31,10 +31,7 @@ fun resolveStreamLookupTarget(
     val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
     val lookupId =
         when (mediaType) {
-            MetadataLabMediaType.MOVIE ->
-                details.imdbId?.trim()?.takeIf { it.isNotBlank() }
-                    ?: details.tmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
-                    ?: ""
+            MetadataLabMediaType.MOVIE -> details.providerBaseLookupId().orEmpty()
             MetadataLabMediaType.SERIES,
             MetadataLabMediaType.ANIME -> {
                 val fromLoadedEpisodes = seasonEpisodes.firstOrNull { !it.lookupId.isNullOrBlank() }?.lookupId?.trim()

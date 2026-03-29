@@ -181,7 +181,7 @@ internal class WatchCtaResolver(
         return com.crispy.tv.player.PlaybackIdentity(
             contentId = resolvedDetails?.id ?: itemId,
             imdbId = resolvedDetails?.imdbId,
-            tmdbId = resolvedDetails?.tmdbId,
+            tmdbId = resolvedDetails?.tmdbId?.takeIf { requestedMediaType == MetadataLabMediaType.MOVIE },
             contentType = requestedMediaType,
             title = resolvedDetails?.title ?: itemId,
             year = resolvedDetails?.year?.trim()?.toIntOrNull(),

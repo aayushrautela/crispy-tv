@@ -117,7 +117,6 @@ internal class DetailsUseCases(
         itemId: String,
         season: Int,
         details: MediaDetails,
-        resolvedTmdbId: Int?,
     ): DetailsSeasonEpisodesResult {
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
             ?: return DetailsSeasonEpisodesResult(errorMessage = "Sign in to load episodes.")
@@ -137,7 +136,7 @@ internal class DetailsUseCases(
             episodeResponse.episodes
                 .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
                 .sortedWith(compareBy<MediaVideo>({ it.episode ?: Int.MAX_VALUE }, { it.title.lowercase(Locale.US) }, { it.id }))
-        val episodeWatchStates = resolveEpisodeWatchStates(details, videos, resolvedTmdbId)
+        val episodeWatchStates = resolveEpisodeWatchStates(details, videos)
 
         return DetailsSeasonEpisodesResult(
             videos = videos,
@@ -149,9 +148,8 @@ internal class DetailsUseCases(
     suspend fun resolveEpisodeWatchStates(
         details: MediaDetails,
         videos: List<MediaVideo>,
-        resolvedTmdbId: Int?,
     ): Map<String, EpisodeWatchState> {
-        return episodeWatchStateResolver.resolve(details, videos, resolvedTmdbId)
+        return episodeWatchStateResolver.resolve(details, videos)
     }
 
     suspend fun ensureImdbId(
@@ -162,19 +160,17 @@ internal class DetailsUseCases(
     }
 
     fun loadCachedAiInsights(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        contentId: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult? {
-        return aiRepository.loadCached(tmdbId, mediaType, locale)
+        return aiRepository.loadCached(contentId, locale)
     }
 
     suspend fun generateAiInsights(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        contentId: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
-        return aiRepository.generate(tmdbId, mediaType, locale)
+        return aiRepository.generate(contentId, locale)
     }
 
     suspend fun loadStreams(

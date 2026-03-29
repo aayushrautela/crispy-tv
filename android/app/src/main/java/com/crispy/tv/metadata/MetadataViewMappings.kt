@@ -72,8 +72,8 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
             }
     val showLookupBase =
         canonicalProviderLookupId(parentProvider, parentProviderId)
+            ?: showId?.trim()?.takeIf { it.isNotBlank() }
             ?: externalProviderLookupId(showExternalIds)
-            ?: showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
     val lookupId =
         if (season != null && episode != null && showLookupBase != null) {
             "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
@@ -111,7 +111,6 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
             }
     val showLookupBase =
         canonicalProviderLookupId(parentProvider, parentProviderId)
-            ?: showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
     val lookupId =
         if (season != null && episode != null && showLookupBase != null) {
             "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
@@ -191,58 +190,15 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
 internal fun MediaDetails.providerBaseLookupId(): String? {
     return canonicalProviderLookupId(parentProvider, parentProviderId)
         ?: canonicalProviderLookupId(provider, providerId)
+        ?: id.trim().takeIf { it.isNotBlank() }
         ?: imdbId?.trim()?.takeIf { it.isNotBlank() }
-        ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }
 
 internal fun CrispyBackendClient.MetadataView.providerBaseLookupId(): String? {
     return canonicalProviderLookupId(parentProvider, parentProviderId)
         ?: canonicalProviderLookupId(provider, providerId)
+        ?: id.trim().takeIf { it.isNotBlank() }
         ?: externalProviderLookupId(externalIds)
-        ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
-}
-
-internal fun MediaDetails.tmdbLookupId(): String? {
-    return imdbId?.trim()?.takeIf { it.isNotBlank() }
-        ?: primaryTmdbId()?.takeIf { it > 0 }?.let { "tmdb:$it" }
-}
-
-internal fun CrispyBackendClient.MetadataView.tmdbLookupId(): String? {
-    return externalIds.imdb?.trim()?.takeIf { it.isNotBlank() }
-        ?: (showTmdbId ?: tmdbId)?.takeIf { it > 0 }?.let { "tmdb:$it" }
-}
-
-internal fun MediaDetails.primaryTmdbId(): Int? {
-    return showTmdbId ?: tmdbId
-}
-
-internal fun MediaDetails.mergeEnhancements(
-    enhancement: MediaDetails,
-    resolvedImdbId: String? = null,
-): MediaDetails {
-    return copy(
-        imdbId = imdbId ?: resolvedImdbId ?: enhancement.imdbId,
-        posterUrl = posterUrl ?: enhancement.posterUrl,
-        backdropUrl = backdropUrl ?: enhancement.backdropUrl,
-        logoUrl = logoUrl ?: enhancement.logoUrl,
-        description = description ?: enhancement.description,
-        genres = if (genres.isNotEmpty()) genres else enhancement.genres,
-        year = year ?: enhancement.year,
-        runtime = runtime ?: enhancement.runtime,
-        certification = certification ?: enhancement.certification,
-        rating = rating ?: enhancement.rating,
-        cast = if (cast.isNotEmpty()) cast else enhancement.cast,
-        directors = if (directors.isNotEmpty()) directors else enhancement.directors,
-        creators = if (creators.isNotEmpty()) creators else enhancement.creators,
-        tmdbId = tmdbId ?: enhancement.tmdbId,
-        showTmdbId = showTmdbId ?: enhancement.showTmdbId,
-        provider = provider ?: enhancement.provider,
-        providerId = providerId ?: enhancement.providerId,
-        parentMediaType = parentMediaType ?: enhancement.parentMediaType,
-        parentProvider = parentProvider ?: enhancement.parentProvider,
-        parentProviderId = parentProviderId ?: enhancement.parentProviderId,
-        absoluteEpisodeNumber = absoluteEpisodeNumber ?: enhancement.absoluteEpisodeNumber,
-    )
 }
 
 internal fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {
@@ -263,8 +219,8 @@ private fun canonicalProviderLookupId(provider: String?, providerId: String?): S
 
 private fun externalProviderLookupId(externalIds: CrispyBackendClient.MetadataExternalIds?): String? {
     val ids = externalIds ?: return null
-    return ids.imdb?.trim()?.takeIf { it.isNotBlank() }
-        ?: ids.tvdb?.takeIf { it > 0 }?.let { "tvdb:$it" }
+    return ids.tvdb?.takeIf { it > 0 }?.let { "tvdb:$it" }
         ?: ids.kitsu?.takeIf { it > 0 }?.let { "kitsu:$it" }
+        ?: ids.imdb?.trim()?.takeIf { it.isNotBlank() }
         ?: ids.tmdb?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }

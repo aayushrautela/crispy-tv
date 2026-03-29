@@ -7,7 +7,6 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.CrispyHttpClient
-import com.crispy.tv.player.MetadataLabMediaType
 import java.util.Locale
 
 class AiInsightsRepository(
@@ -18,14 +17,12 @@ class AiInsightsRepository(
     private val cacheStore: AiInsightsCacheStore,
 ) {
     fun loadCached(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        contentId: String,
         locale: Locale = Locale.getDefault(),
-    ): AiInsightsResult? = cacheStore.load(tmdbId, mediaType, locale)
+    ): AiInsightsResult? = cacheStore.load(contentId, locale)
 
     suspend fun generate(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        contentId: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
         val session = supabase.ensureValidSession()
@@ -39,8 +36,7 @@ class AiInsightsRepository(
         val payload = backend.getAiInsights(
             accessToken = session.accessToken,
             profileId = profileId,
-            tmdbId = tmdbId,
-            mediaType = mediaType.toBackendMediaType(),
+            contentId = contentId,
             locale = locale.toLanguageTag(),
         )
         return AiInsightsResult(
@@ -54,7 +50,7 @@ class AiInsightsRepository(
             },
             trivia = payload.trivia,
         ).also { result ->
-            cacheStore.save(tmdbId, mediaType, locale, result)
+            cacheStore.save(contentId, locale, result)
         }
     }
 
@@ -69,13 +65,5 @@ class AiInsightsRepository(
                 cacheStore = AiInsightsCacheStore(appContext),
             )
         }
-    }
-}
-
-private fun MetadataLabMediaType.toBackendMediaType(): String {
-    return when (this) {
-        MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES -> "tv"
-        MetadataLabMediaType.ANIME -> "tv"
     }
 }

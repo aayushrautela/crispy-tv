@@ -15,8 +15,6 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.details.StreamSelectorUiState
-import com.crispy.tv.metadata.mergeEnhancements
-import com.crispy.tv.metadata.tmdbLookupId
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
@@ -34,8 +32,6 @@ import com.crispy.tv.playback.toLoadingUiState
 import com.crispy.tv.playback.toUiState
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbTvDetails
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackError
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
@@ -115,8 +111,6 @@ class PlayerSessionViewModel(
     private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(this.appContext)
     private val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(this.appContext)
     private val addonStreamsService: AddonStreamsService = PlaybackDependencies.addonStreamsServiceFactory(this.appContext)
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository =
-        PlaybackDependencies.tmdbEnrichmentRepositoryFactory(this.appContext)
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playbackMetrics = PlaybackMetricsHolder()
     private val playbackController: PlaybackController = PlaybackDependencies.playbackControllerFactory(this.appContext)
@@ -133,7 +127,6 @@ class PlayerSessionViewModel(
     private var activeIdentity: PlaybackIdentity? = identity
     private var activeSubtitle: String? = subtitle?.trim()?.ifBlank { null }
     private var activeArtworkUrl: String? = artworkUrl?.trim()?.ifBlank { null }
-    private var currentTmdbId: Int? = launchSnapshot?.showTmdbId ?: launchSnapshot?.tmdbId ?: identity?.tmdbId
     private var lastHandledErrorToken: Long? = null
     private var hasReportedPlaybackStart = false
     private var hasReportedPlaybackStop = false
@@ -412,12 +405,7 @@ class PlayerSessionViewModel(
             PlaybackIdentity(
                 contentId = details.id,
                 imdbId = details.imdbId,
-                tmdbId =
-                    when (nextMediaType) {
-                        MetadataLabMediaType.SERIES -> details.showTmdbId ?: details.tmdbId ?: nextEpisode?.showTmdbId ?: currentTmdbId
-                        MetadataLabMediaType.ANIME -> details.showTmdbId ?: details.tmdbId ?: nextEpisode?.showTmdbId ?: currentTmdbId
-                        MetadataLabMediaType.MOVIE -> details.tmdbId ?: nextEpisode?.tmdbId ?: currentTmdbId
-                    },
+                tmdbId = if (nextMediaType == MetadataLabMediaType.MOVIE) details.tmdbId ?: nextEpisode?.tmdbId else null,
                 contentType = nextMediaType,
                 season = nextSeason,
                 episode = nextEpisodeNumber,
@@ -468,7 +456,6 @@ class PlayerSessionViewModel(
 
     private suspend fun loadInitialMetadata() {
         val rawId = rawPlaybackId ?: return
-        val mediaTypeHint = activeIdentity?.contentType
         val snapshotDetails = _uiState.value.details
         val canonicalContentId =
             launchSnapshotState?.contentId?.trim()?.takeIf { it.isNotBlank() }
@@ -489,45 +476,15 @@ class PlayerSessionViewModel(
                 null
             }
 
-        val tmdbLookupId =
-            backendDetail?.item?.tmdbLookupId()
-                ?: snapshotDetails?.tmdbLookupId()
-                ?: launchSnapshotState?.imdbId?.trim()?.takeIf { it.isNotBlank() }
-                ?: launchSnapshotState?.showTmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
-                ?: launchSnapshotState?.tmdbId?.takeIf { it > 0 }?.let { "tmdb:$it" }
-                ?: rawId.takeIf { it.startsWith("tt", ignoreCase = true) || it.startsWith("tmdb:", ignoreCase = true) }
-
-        val tmdbResult =
-            withContext(Dispatchers.IO) {
-                tmdbLookupId?.let {
-                    tmdbEnrichmentRepository.load(
-                        rawId = it,
-                        mediaTypeHint = mediaTypeHint,
-                    )
-                }
-            }
-
         val backendDetails = backendDetail?.toMediaDetails()
-        val fetchedDetails =
-            when {
-                backendDetails != null && tmdbResult?.fallbackDetails != null -> backendDetails.mergeEnhancements(tmdbResult.fallbackDetails)
-                backendDetails != null -> backendDetails
-                tmdbResult?.fallbackDetails != null -> tmdbResult.fallbackDetails
-                else -> null
-            } ?: return
+        val fetchedDetails = backendDetails ?: return
 
         val seasons =
-            when {
-                backendDetail?.seasonNumbers()?.isNotEmpty() == true -> backendDetail.seasonNumbers()
-                else ->
-                    ((tmdbResult?.enrichment?.titleDetails as? TmdbTvDetails)?.numberOfSeasons ?: 0)
-                        .takeIf { it > 0 }
-                        ?.let { 1..it }
-                        ?.toList()
-                        .orEmpty()
+            if (backendDetail?.seasonNumbers()?.isNotEmpty() == true) {
+                backendDetail.seasonNumbers()
+            } else {
+                emptyList()
             }
-
-        currentTmdbId = fetchedDetails.showTmdbId ?: fetchedDetails.tmdbId ?: tmdbResult?.enrichment?.tmdbId
 
         _uiState.update { state ->
             val selectedSeason =
@@ -1114,8 +1071,8 @@ private fun buildFallbackDetails(
         directors = emptyList(),
         creators = emptyList(),
         videos = emptyList(),
-        tmdbId = identity?.tmdbId,
-        showTmdbId = identity?.tmdbId?.takeIf { mediaType == "series" },
+        tmdbId = null,
+        showTmdbId = null,
         seasonNumber = identity?.season,
         episodeNumber = identity?.episode,
         addonId = null,

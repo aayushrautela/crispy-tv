@@ -13,7 +13,6 @@ import com.crispy.tv.playerui.PlayerEpisodeSnapshot
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.StreamProviderDescriptor
-import com.crispy.tv.metadata.primaryTmdbId
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.buildPlayerSubtitle
@@ -57,7 +56,6 @@ class DetailsViewModel internal constructor(
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
-    private var resolvedTmdbId: Int? = null
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
 
     init {
@@ -70,7 +68,6 @@ class DetailsViewModel internal constructor(
 
             episodesJob?.cancel()
             seasonEpisodesCache.clear()
-            resolvedTmdbId = null
             detailsUseCases.clearEpisodeWatchStateCache()
 
             _uiState.update {
@@ -103,7 +100,6 @@ class DetailsViewModel internal constructor(
                 }
 
             val enrichedDetails = result.details
-            resolvedTmdbId = enrichedDetails?.primaryTmdbId()
 
             _uiState.update { state ->
                 val pendingSeason = pendingEpisodeNavigation?.season
@@ -146,14 +142,14 @@ class DetailsViewModel internal constructor(
                 loadEpisodesForSeason(seasonToLoad, force = true)
             }
 
-            val tmdbId = resolvedTmdbId
             val detailsForAi = enrichedDetails
             val aiLocale = Locale.getDefault()
+            val contentId = detailsForAi?.id?.trim()
 
-            if (tmdbId != null && detailsForAi != null) {
+            if (!contentId.isNullOrBlank()) {
                 val cached =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.loadCachedAiInsights(tmdbId, requestedMediaType, aiLocale)
+                        detailsUseCases.loadCachedAiInsights(contentId, aiLocale)
                     }
                 if (cached != null) {
                     _uiState.update { it.copy(aiInsights = cached) }
@@ -165,8 +161,8 @@ class DetailsViewModel internal constructor(
     fun onAiInsightsClick() {
         val state = uiState.value
         val details = state.details
-        val tmdbId = resolvedTmdbId ?: details?.primaryTmdbId()
-        if (details == null || tmdbId == null) {
+        val contentId = details?.id?.trim()
+        if (details == null || contentId.isNullOrBlank()) {
             _uiState.update { it.copy(statusMessage = "AI insights aren't available for this title yet.") }
             return
         }
@@ -180,7 +176,7 @@ class DetailsViewModel internal constructor(
         if (state.aiIsLoading) return
 
         startAiGeneration(
-            tmdbId = tmdbId,
+            contentId = contentId,
             locale = Locale.getDefault(),
             showStory = true,
             announce = true,
@@ -192,7 +188,7 @@ class DetailsViewModel internal constructor(
     }
 
     private fun startAiGeneration(
-        tmdbId: Int,
+        contentId: String,
         locale: Locale,
         showStory: Boolean,
         announce: Boolean,
@@ -209,8 +205,7 @@ class DetailsViewModel internal constructor(
                 runCatching {
                     withContext(Dispatchers.IO) {
                         detailsUseCases.generateAiInsights(
-                            tmdbId = tmdbId,
-                            mediaType = requestedMediaType,
+                            contentId = contentId,
                             locale = locale,
                         )
                     }
@@ -347,7 +342,6 @@ class DetailsViewModel internal constructor(
                             itemId = itemId,
                             season = season,
                             details = details,
-                            resolvedTmdbId = resolvedTmdbId,
                         )
                     }
 
@@ -392,7 +386,7 @@ class DetailsViewModel internal constructor(
                 val details = _uiState.value.details ?: return@launch
                 val episodeWatchStates =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.resolveEpisodeWatchStates(details, videos, resolvedTmdbId)
+                        detailsUseCases.resolveEpisodeWatchStates(details, videos)
                     }
                 _uiState.update { current ->
                     if (current.selectedSeasonOrFirst != season) current
@@ -400,17 +394,6 @@ class DetailsViewModel internal constructor(
                 }
                 maybeConsumePendingEpisodeNavigation(videos)
             }
-    }
-
-    private suspend fun resolveEpisodeWatchStates(
-        details: MediaDetails,
-        videos: List<MediaVideo>,
-    ): Map<String, EpisodeWatchState> {
-        val tmdbId = details.primaryTmdbId() ?: resolvedTmdbId
-        if (tmdbId != null) {
-            resolvedTmdbId = tmdbId
-        }
-        return detailsUseCases.resolveEpisodeWatchStates(details, videos, tmdbId)
     }
 
     fun onOpenStreamSelectorForEpisode(videoId: String) {
@@ -743,18 +726,11 @@ class DetailsViewModel internal constructor(
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
             val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
-            val tmdbId =
-                when (resolvedMediaType) {
-                    MetadataLabMediaType.SERIES -> enriched.showTmdbId ?: enriched.tmdbId ?: targetEpisode?.showTmdbId ?: resolvedTmdbId
-                    MetadataLabMediaType.ANIME -> enriched.showTmdbId ?: enriched.tmdbId ?: targetEpisode?.showTmdbId ?: resolvedTmdbId
-                    MetadataLabMediaType.MOVIE -> enriched.tmdbId ?: targetEpisode?.tmdbId ?: resolvedTmdbId
-                }
-
             val identity =
                 PlaybackIdentity(
                     contentId = enriched.id,
                     imdbId = enriched.imdbId,
-                    tmdbId = tmdbId,
+                    tmdbId = if (resolvedMediaType == MetadataLabMediaType.MOVIE) enriched.tmdbId ?: targetEpisode?.tmdbId else null,
                     contentType = resolvedMediaType,
                     season = season,
                     episode = episode,
@@ -790,8 +766,6 @@ class DetailsViewModel internal constructor(
                         PlayerLaunchSnapshot(
                             contentId = enriched.id,
                             imdbId = enriched.imdbId,
-                            tmdbId = enriched.tmdbId,
-                            showTmdbId = enriched.showTmdbId,
                             seasonNumber = season,
                             episodeNumber = episode,
                             mediaType = enriched.mediaType,
@@ -824,8 +798,6 @@ class DetailsViewModel internal constructor(
                                         overview = episodeItem.overview,
                                         thumbnailUrl = episodeItem.thumbnailUrl,
                                         lookupId = episodeItem.lookupId,
-                                        tmdbId = episodeItem.tmdbId,
-                                        showTmdbId = episodeItem.showTmdbId,
                                         provider = episodeItem.provider,
                                         providerId = episodeItem.providerId,
                                         parentProvider = episodeItem.parentProvider,
@@ -939,7 +911,10 @@ class DetailsViewModel internal constructor(
 
             detailsUseCases.clearEpisodeWatchStateCache()
             val refreshedEpisodes = _uiState.value.seasonEpisodes
-            val refreshedWatchStates = withContext(Dispatchers.IO) { resolveEpisodeWatchStates(result.details, refreshedEpisodes) }
+            val refreshedWatchStates =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveEpisodeWatchStates(result.details, refreshedEpisodes)
+                }
             _uiState.update {
                 it.copy(
                     details = result.details,

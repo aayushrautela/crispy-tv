@@ -37,8 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.player.CanonicalProviderLibraryItem
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
@@ -48,27 +46,16 @@ import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 enum class LibrarySource {
     TRAKT,
     SIMKL,
 }
-
-@Immutable
-private data class LibraryArtwork(
-    val posterUrl: String? = null,
-    val backdropUrl: String? = null,
-)
 
 @Immutable
 data class LibraryProviderFolderUi(
@@ -108,21 +95,12 @@ private data class LibraryRefreshPayload(
     val statusMessage: String,
 )
 
-private data class ArtworkRequest(
-    val cacheKey: String,
-    val rawId: String,
-    val posterUrl: String?,
-    val backdropUrl: String?,
-)
-
 class LibraryViewModel internal constructor(
     private val watchHistoryService: WatchHistoryService,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
 
-    private val artworkCache = LinkedHashMap<String, LibraryArtwork>()
     private var refreshJob: Job? = null
 
     init {
@@ -276,70 +254,6 @@ class LibraryViewModel internal constructor(
         }
     }
 
-    private suspend fun resolveArtwork(requests: List<ArtworkRequest>): Map<String, LibraryArtwork> {
-        if (requests.isEmpty()) {
-            return emptyMap()
-        }
-        val uniqueRequests = LinkedHashMap<String, ArtworkRequest>()
-        requests.forEach { request ->
-            val merged =
-                uniqueRequests[request.cacheKey]?.let { existing ->
-                    existing.copy(
-                        posterUrl = existing.posterUrl ?: request.posterUrl,
-                        backdropUrl = existing.backdropUrl ?: request.backdropUrl,
-                    )
-                } ?: request
-            uniqueRequests[request.cacheKey] = merged
-        }
-
-        val semaphore = Semaphore(6)
-        return coroutineScope {
-            uniqueRequests.values.map { request ->
-                async(Dispatchers.IO) {
-                    semaphore.withPermit {
-                        val artwork = resolveArtworkForRequest(request)
-                        request.cacheKey to artwork
-                    }
-                }
-            }.awaitAll().toMap()
-        }
-    }
-
-    private suspend fun resolveArtworkForRequest(request: ArtworkRequest): LibraryArtwork {
-        val providedArtwork =
-            LibraryArtwork(
-                posterUrl = request.posterUrl?.trim().takeIf { !it.isNullOrBlank() },
-                backdropUrl = request.backdropUrl?.trim().takeIf { !it.isNullOrBlank() },
-            )
-        if (providedArtwork.posterUrl != null && providedArtwork.backdropUrl != null) {
-            artworkCache[request.cacheKey] = providedArtwork
-            return providedArtwork
-        }
-
-        val cachedArtwork = artworkCache[request.cacheKey]
-        if (cachedArtwork != null) {
-            return LibraryArtwork(
-                posterUrl = providedArtwork.posterUrl ?: cachedArtwork.posterUrl,
-                backdropUrl = providedArtwork.backdropUrl ?: cachedArtwork.backdropUrl,
-            )
-        }
-
-        val rawId = request.rawId.trim()
-        val canResolve = rawId.startsWith("tt") || rawId.startsWith("tmdb:")
-        if (!canResolve) {
-            return providedArtwork
-        }
-
-        val details = runCatching { tmdbEnrichmentRepository.loadArtwork(rawId = rawId) }.getOrNull()
-        val resolvedArtwork =
-            LibraryArtwork(
-                posterUrl = providedArtwork.posterUrl ?: details?.posterUrl,
-                backdropUrl = providedArtwork.backdropUrl ?: details?.backdropUrl,
-            )
-        artworkCache[request.cacheKey] = resolvedArtwork
-        return resolvedArtwork
-    }
-
     private fun resolveSelectedSource(authState: WatchProviderAuthState): LibrarySource {
         return when {
             authState.traktAuthenticated -> LibrarySource.TRAKT
@@ -381,10 +295,6 @@ class LibraryViewModel internal constructor(
             ?: folders.firstOrNull { folder -> folder.provider == provider }?.id
     }
 
-    private fun artworkCacheKey(contentId: String, contentType: String): String {
-        return "${contentType.trim().lowercase()}:${contentId.trim().lowercase()}"
-    }
-
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -394,7 +304,6 @@ class LibraryViewModel internal constructor(
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
                             watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                            tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

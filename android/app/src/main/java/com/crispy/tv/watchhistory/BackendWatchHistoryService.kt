@@ -523,12 +523,17 @@ class BackendWatchHistoryService(
 
     override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
         val backendContext = getBackendContext() ?: return null
-        val input = identity.toWatchStateLookupInput() ?: return null
+        val input = identity.toPlaybackLookupInput() ?: return null
         return try {
+            val mediaKey =
+                backend.resolvePlayback(
+                    accessToken = backendContext.accessToken,
+                    input = input,
+                ).item.mediaKey.trim().takeIf { it.isNotBlank() } ?: return null
             val envelope = backend.getWatchState(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
-                input = input,
+                mediaKey = mediaKey,
             )
             envelope.item.toCanonicalWatchStateSnapshot()
         } catch (_: Throwable) {
@@ -703,8 +708,6 @@ class BackendWatchHistoryService(
         val mutationInput = WatchMutationInput(
             mediaKey = item.mediaKey,
             mediaType = item.mediaType,
-            tmdbId = if (item.mediaType == "movie") item.tmdbId else null,
-            showTmdbId = item.showTmdbId ?: resolved.show?.tmdbId ?: if (item.mediaType == "show") item.tmdbId else null,
             seasonNumber = item.seasonNumber,
             episodeNumber = item.episodeNumber,
             provider = item.provider,
@@ -944,8 +947,6 @@ class BackendWatchHistoryService(
             clientEventId = buildClientEventId(identity, eventType),
             eventType = eventType,
             mediaType = mediaType,
-            tmdbId = if (mediaType == "movie") identity.tmdbId else null,
-            showTmdbId = if (mediaType == "episode") identity.tmdbId else null,
             seasonNumber = identity.season,
             episodeNumber = identity.episode,
             provider = identity.provider,
@@ -979,7 +980,6 @@ class BackendWatchHistoryService(
             listOf(
                 identity.contentId?.trim()?.takeIf { it.isNotBlank() },
                 identity.imdbId?.trim()?.takeIf { it.isNotBlank() },
-                identity.tmdbId?.toString(),
                 identity.season?.toString(),
                 identity.episode?.toString(),
                 identity.provider?.trim()?.takeIf { it.isNotBlank() },
@@ -1362,7 +1362,7 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun PlaybackIdentity.toWatchStateLookupInput(): MediaLookupInput? {
+    private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
         val normalizedImdb = normalizedImdbIdOrNull(imdbId)
         val normalizedContentId = contentId?.trim()?.takeIf { it.isNotBlank() }
         val mediaType = when (contentType) {
@@ -1373,8 +1373,6 @@ class BackendWatchHistoryService(
         return MediaLookupInput(
             id = normalizedContentId,
             mediaType = mediaType,
-            tmdbId = if (mediaType == "episode") null else tmdbId,
-            showTmdbId = if (mediaType == "episode") tmdbId else null,
             imdbId = normalizedImdb,
             seasonNumber = season,
             episodeNumber = episode,
@@ -1385,8 +1383,6 @@ class BackendWatchHistoryService(
             absoluteEpisodeNumber = absoluteEpisodeNumber,
         ).takeIf {
             it.id != null ||
-                it.tmdbId != null ||
-                it.showTmdbId != null ||
                 it.imdbId != null ||
                 (it.provider != null && it.providerId != null) ||
                 (it.parentProvider != null && it.parentProviderId != null)

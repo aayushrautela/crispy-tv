@@ -155,8 +155,6 @@ class CrispyBackendClient(
     data class WatchMutationInput(
         val mediaKey: String? = null,
         val mediaType: String,
-        val tmdbId: Int? = null,
-        val showTmdbId: Int? = null,
         val provider: String? = null,
         val providerId: String? = null,
         val parentProvider: String? = null,
@@ -174,8 +172,6 @@ class CrispyBackendClient(
         val eventType: String,
         val mediaKey: String? = null,
         val mediaType: String,
-        val tmdbId: Int? = null,
-        val showTmdbId: Int? = null,
         val provider: String? = null,
         val providerId: String? = null,
         val parentProvider: String? = null,
@@ -846,15 +842,13 @@ class CrispyBackendClient(
     suspend fun getAiInsights(
         accessToken: String,
         profileId: String,
-        tmdbId: Int,
-        mediaType: String,
+        contentId: String,
         locale: String? = null,
     ): AiInsightsResponse {
         return getAiInsightsApi(
             accessToken = accessToken,
             profileId = profileId,
-            tmdbId = tmdbId,
-            mediaType = mediaType,
+            contentId = contentId,
             locale = locale,
         )
     }
@@ -1009,16 +1003,16 @@ class CrispyBackendClient(
         return listRatingsApi(accessToken, profileId, limit)
     }
 
-    suspend fun getWatchState(accessToken: String, profileId: String, input: MediaLookupInput): WatchStateEnvelope {
-        return getWatchStateApi(accessToken, profileId, input)
+    suspend fun getWatchState(accessToken: String, profileId: String, mediaKey: String): WatchStateEnvelope {
+        return getWatchStateApi(accessToken, profileId, mediaKey)
     }
 
     suspend fun getWatchStates(
         accessToken: String,
         profileId: String,
-        items: List<MediaLookupInput>,
+        mediaKeys: List<String>,
     ): WatchStatesEnvelope {
-        return getWatchStatesApi(accessToken, profileId, items)
+        return getWatchStatesApi(accessToken, profileId, mediaKeys)
     }
 
     suspend fun markWatched(accessToken: String, profileId: String, input: WatchMutationInput): WatchActionResponse {
@@ -1118,24 +1112,22 @@ class CrispyBackendClient(
         includeImdbId: Boolean = true,
     ) = path.toHttpUrl().newBuilder()
         .apply {
+            val effectiveProvider =
+                input.provider?.trim()?.takeIf { it.isNotBlank() }
+                    ?: input.tvdbId?.toString()?.let { "tvdb" }
+                    ?: input.tmdbId?.toString()?.let { "tmdb" }
+            val effectiveProviderId =
+                input.providerId?.trim()?.takeIf { it.isNotBlank() }
+                    ?: input.tvdbId?.toString()
+                    ?: input.tmdbId?.toString()
             if (includeId && !input.id.isNullOrBlank()) addQueryParameter("id", input.id.trim())
             if (includeMediaKey && !input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
             if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
-            if (input.tmdbId != null) addQueryParameter("tmdbId", input.tmdbId.toString())
             if (includeImdbId && !input.imdbId.isNullOrBlank()) addQueryParameter("imdbId", input.imdbId.trim())
-            if (!input.provider.isNullOrBlank()) addQueryParameter("provider", input.provider.trim())
-            if (!input.providerId.isNullOrBlank()) addQueryParameter("providerId", input.providerId.trim())
+            if (!effectiveProvider.isNullOrBlank()) addQueryParameter("provider", effectiveProvider)
+            if (!effectiveProviderId.isNullOrBlank()) addQueryParameter("providerId", effectiveProviderId)
             if (!input.parentProvider.isNullOrBlank()) addQueryParameter("parentProvider", input.parentProvider.trim())
             if (!input.parentProviderId.isNullOrBlank()) addQueryParameter("parentProviderId", input.parentProviderId.trim())
-            if (input.tvdbId != null && input.provider.isNullOrBlank()) {
-                addQueryParameter("provider", "tvdb")
-                addQueryParameter("providerId", input.tvdbId.toString())
-            }
-            if (input.showTmdbId != null && input.parentProvider.isNullOrBlank()) {
-                addQueryParameter("parentProvider", "tmdb")
-                addQueryParameter("parentProviderId", input.showTmdbId.toString())
-            }
-            if (input.absoluteEpisodeNumber != null) addQueryParameter("absoluteEpisodeNumber", input.absoluteEpisodeNumber.toString())
             if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
             if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
         }

@@ -169,8 +169,6 @@ internal suspend fun CrispyBackendClient.sendWatchEventApi(
         put("eventType", input.eventType.trim())
         put("mediaType", input.mediaType.trim())
         if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
-        if (input.tmdbId != null) put("tmdbId", input.tmdbId)
-        if (input.showTmdbId != null) put("showTmdbId", input.showTmdbId)
         if (!input.provider.isNullOrBlank()) put("provider", input.provider.trim())
         if (!input.providerId.isNullOrBlank()) put("providerId", input.providerId.trim())
         if (!input.parentProvider.isNullOrBlank()) put("parentProvider", input.parentProvider.trim())
@@ -260,16 +258,14 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
 internal suspend fun CrispyBackendClient.getWatchStateApi(
     accessToken: String,
     profileId: String,
-    input: MediaLookupInput,
+    mediaKey: String,
 ): WatchStateEnvelope {
     checkConfigured()
+    val normalizedMediaKey = mediaKey.trim()
     val response = httpClient.get(
-        url = metadataLookupUrl(
-            "$baseUrl/v1/profiles/${profileId.trim()}/watch/state",
-            input,
-            includeId = false,
-            includeImdbId = false,
-        ),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/state".toHttpUrl().newBuilder()
+            .addQueryParameter("mediaKey", normalizedMediaKey)
+            .build(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -280,16 +276,16 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
 internal suspend fun CrispyBackendClient.getWatchStatesApi(
     accessToken: String,
     profileId: String,
-    items: List<MediaLookupInput>,
+    mediaKeys: List<String>,
 ): WatchStatesEnvelope {
     checkConfigured()
     val payload = JSONObject().put(
         "items",
         JSONArray().apply {
-            items.forEach { input ->
+            mediaKeys.forEach { mediaKey ->
                 put(
                     JSONObject().apply {
-                        putWatchLookupInput(input)
+                        put("mediaKey", mediaKey.trim())
                     }
                 )
             }
@@ -425,8 +421,6 @@ private suspend fun CrispyBackendClient.postWatchMutationApi(
     val payload = JSONObject().apply {
         put("mediaType", input.mediaType.trim())
         if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
-        if (input.tmdbId != null) put("tmdbId", input.tmdbId)
-        if (input.showTmdbId != null) put("showTmdbId", input.showTmdbId)
         if (!input.provider.isNullOrBlank()) put("provider", input.provider.trim())
         if (!input.providerId.isNullOrBlank()) put("providerId", input.providerId.trim())
         if (!input.parentProvider.isNullOrBlank()) put("parentProvider", input.parentProvider.trim())

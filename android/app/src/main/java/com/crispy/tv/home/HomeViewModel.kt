@@ -15,8 +15,6 @@ import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.domain.home.HomeCatalogPresentation
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.CanonicalContinueWatchingResult
@@ -92,7 +90,6 @@ class HomeViewModel internal constructor(
     private val homeWatchActivityService: HomeWatchActivityService,
     private val watchHistoryService: WatchHistoryService,
     private val calendarService: CalendarService,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     private val suppressionStore: ContinueWatchingSuppressionStore,
 ) : ViewModel() {
     companion object {
@@ -107,15 +104,10 @@ class HomeViewModel internal constructor(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
-                        val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
-                            homeWatchActivityService =
-                                HomeWatchActivityService(
-                                    context = appContext,
-                                    tmdbEnrichmentRepository = tmdbEnrichmentRepository,
-                                ),
+                            homeWatchActivityService = HomeWatchActivityService(),
                             watchHistoryService = watchHistoryService,
                             calendarService =
                                 CalendarService(
@@ -123,7 +115,6 @@ class HomeViewModel internal constructor(
                                     activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                                     backendClient = BackendServicesProvider.backendClient(appContext),
                                 ),
-                            tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
                         ) as T
                     }
@@ -194,9 +185,7 @@ class HomeViewModel internal constructor(
                         val primaryDeferred = async { loadPrimarySnapshot() }
                         val watchActivityDeferred =
                             async {
-                                loadWatchActivitySnapshot(
-                                    enrichMetadata = !showForegroundLoading,
-                                )
+                                loadWatchActivitySnapshot()
                             }
                         nextPrimarySnapshot = primaryDeferred.await()
                         nextWatchActivitySnapshot = watchActivityDeferred.await()
@@ -218,7 +207,7 @@ class HomeViewModel internal constructor(
                             viewModelScope.launch {
                                 val refreshedWatchActivitySnapshot =
                                     if (showForegroundLoading) {
-                                        loadWatchActivitySnapshot(enrichMetadata = true)
+                                        loadWatchActivitySnapshot()
                                     } else {
                                         watchActivitySnapshot
                                     }
@@ -391,8 +380,6 @@ class HomeViewModel internal constructor(
                     )
                 }
                 .toList()
-        val enrichedCatalogSections = enrichCollectionShelfPreviewLogos(catalogSections)
-
         val selectedId =
             _heroState.value.selectedId?.takeIf { id -> heroItems.any { it.id == id } }
                 ?: heroItems.firstOrNull()?.id
@@ -405,80 +392,12 @@ class HomeViewModel internal constructor(
                 statusMessage = primaryFeedResult.heroResult.statusMessage,
             ),
             headerPills = headerPills,
-            catalogSections = enrichedCatalogSections,
+            catalogSections = catalogSections,
             catalogStatusMessage = primaryFeedResult.sectionsStatusMessage,
         )
     }
 
-    private suspend fun enrichCollectionShelfPreviewLogos(
-        catalogSections: List<HomeCatalogSectionUi>,
-    ): List<HomeCatalogSectionUi> {
-        if (catalogSections.isEmpty()) {
-            return emptyList()
-        }
-
-        val collectionItemsToEnrich =
-            catalogSections
-                .asSequence()
-                .filter { it.section.presentation == HomeCatalogPresentation.COLLECTION_SHELF }
-                .mapNotNull { sectionUi ->
-                    sectionUi.items.firstOrNull()?.takeIf { item ->
-                        item.logoUrl.isNullOrBlank() && item.id.isNotBlank()
-                    }
-                }
-                .distinctBy { item -> collectionLogoCacheKey(item.type, item.id) }
-                .toList()
-
-        if (collectionItemsToEnrich.isEmpty()) {
-            return catalogSections
-        }
-
-        val logosByKey =
-            withContext(Dispatchers.IO) {
-                coroutineScope {
-                    collectionItemsToEnrich.map { item ->
-                        async {
-                            val logoUrl =
-                                try {
-                                    tmdbEnrichmentRepository
-                                        .loadArtwork(
-                                            rawId = item.id,
-                                            mediaTypeHint = item.type.toMetadataLabMediaType(),
-                                        )
-                                        ?.logoUrl
-                                        ?.trim()
-                                        ?.ifBlank { null }
-                                } catch (error: Throwable) {
-                                    if (error is CancellationException) throw error
-                                    Log.w(TAG, "Failed to load collection logo for ${item.id}", error)
-                                    null
-                                }
-                            collectionLogoCacheKey(item.type, item.id) to logoUrl
-                        }
-                    }.awaitAll().toMap()
-                }
-            }
-
-        return catalogSections.map { sectionUi ->
-            if (sectionUi.section.presentation != HomeCatalogPresentation.COLLECTION_SHELF) {
-                return@map sectionUi
-            }
-
-            val featuredItem = sectionUi.items.firstOrNull() ?: return@map sectionUi
-            val logoUrl = logosByKey[collectionLogoCacheKey(featuredItem.type, featuredItem.id)]
-            if (logoUrl.isNullOrBlank()) {
-                sectionUi
-            } else {
-                sectionUi.copy(
-                    items = listOf(featuredItem.copy(logoUrl = logoUrl)) + sectionUi.items.drop(1),
-                )
-            }
-        }
-    }
-
-    private suspend fun loadWatchActivitySnapshot(
-        enrichMetadata: Boolean,
-    ): HomeWatchActivitySnapshot {
+    private suspend fun loadWatchActivitySnapshot(): HomeWatchActivitySnapshot {
         val sectionLoadStartedAt = System.currentTimeMillis()
         val continueWatchingResult =
             try {
@@ -495,7 +414,6 @@ class HomeViewModel internal constructor(
                     homeWatchActivityService.loadWatchActivity(
                         providerResult = filteredProviderResult,
                         limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-                        enrichMetadata = enrichMetadata,
                     )
                 }
             } catch (error: Throwable) {
@@ -945,10 +863,6 @@ private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): St
 }
 
 private fun continueWatchingContentKey(type: String, contentId: String): String {
-    return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
-}
-
-private fun collectionLogoCacheKey(type: String, contentId: String): String {
     return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
 }
 

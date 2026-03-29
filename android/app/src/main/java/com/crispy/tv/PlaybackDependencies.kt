@@ -8,7 +8,6 @@ import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
 import com.crispy.tv.metadata.RemoteSupabaseSyncLabService
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.streams.AddonStreamsService
@@ -156,11 +155,6 @@ object PlaybackDependencies {
         newEpisodeListProvider(context)
     }
 
-    @Volatile
-    var tmdbEnrichmentRepositoryFactory: (Context) -> TmdbEnrichmentRepository = { context ->
-        TmdbServicesProvider.enrichmentRepository(context.applicationContext)
-    }
-
     fun reset() {
         playbackControllerFactory = { context ->
             NativePlaybackController(context)
@@ -187,8 +181,5 @@ object PlaybackDependencies {
         }
         addonStreamsServiceFactory = { context -> newAddonStreamsService(context) }
         episodeListProviderFactory = { context -> newEpisodeListProvider(context) }
-        tmdbEnrichmentRepositoryFactory = { context ->
-            TmdbServicesProvider.enrichmentRepository(context.applicationContext)
-        }
     }
 }

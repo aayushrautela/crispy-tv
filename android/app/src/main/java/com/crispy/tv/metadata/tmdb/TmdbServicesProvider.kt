@@ -17,9 +17,6 @@ object TmdbServicesProvider {
     private var metadataRecordRepositoryInstance: TmdbMetadataRecordRepository? = null
 
     @Volatile
-    private var enrichmentRepositoryInstance: TmdbEnrichmentRepository? = null
-
-    @Volatile
     private var imdbIdResolverInstance: TmdbImdbIdResolver? = null
 
     private fun identityService(context: Context): TmdbIdentityService {
@@ -93,29 +90,6 @@ object TmdbServicesProvider {
                     identityService = identityService(appContext),
                 ).also { created ->
                     metadataRecordRepositoryInstance = created
-                }
-            }
-        }
-    }
-
-    internal fun enrichmentRepository(context: Context): TmdbEnrichmentRepository {
-        val existing = enrichmentRepositoryInstance
-        if (existing != null) {
-            return existing
-        }
-
-        return synchronized(this) {
-            val synchronizedExisting = enrichmentRepositoryInstance
-            if (synchronizedExisting != null) {
-                synchronizedExisting
-            } else {
-                val appContext = context.applicationContext
-                TmdbEnrichmentRepository(
-                    client = TmdbJsonClientProvider.get(appContext),
-                    identityService = identityService(appContext),
-                    remoteDataSource = titleRemoteDataSource(appContext),
-                ).also { created ->
-                    enrichmentRepositoryInstance = created
                 }
             }
         }

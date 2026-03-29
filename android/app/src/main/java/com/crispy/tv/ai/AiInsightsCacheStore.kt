@@ -2,7 +2,6 @@ package com.crispy.tv.ai
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.crispy.tv.player.MetadataLabMediaType
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -12,11 +11,12 @@ class AiInsightsCacheStore(context: Context) {
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun load(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        contentId: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult? {
-        val raw = prefs.getString(keyFor(mediaType, tmdbId, locale), null) ?: return null
+        val normalizedContentId = contentId.trim()
+        if (normalizedContentId.isBlank()) return null
+        val raw = prefs.getString(keyFor(normalizedContentId, locale), null) ?: return null
         val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
 
         val trivia = json.optString("trivia", "").trim()
@@ -39,11 +39,12 @@ class AiInsightsCacheStore(context: Context) {
     }
 
     fun save(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        contentId: String,
         locale: Locale = Locale.getDefault(),
         result: AiInsightsResult,
     ) {
+        val normalizedContentId = contentId.trim()
+        if (normalizedContentId.isBlank()) return
         val json = JSONObject()
         val insightsArray = JSONArray()
         result.insights.forEach { card ->
@@ -58,11 +59,11 @@ class AiInsightsCacheStore(context: Context) {
         json.put("insights", insightsArray)
         json.put("trivia", result.trivia)
 
-        prefs.edit().putString(keyFor(mediaType, tmdbId, locale), json.toString()).apply()
+        prefs.edit().putString(keyFor(normalizedContentId, locale), json.toString()).apply()
     }
 
-    private fun keyFor(mediaType: MetadataLabMediaType, tmdbId: Int, locale: Locale): String =
-        "$CACHE_PREFIX${mediaType.name}_${tmdbId}_${locale.toLanguageTag().ifBlank { DEFAULT_LOCALE_TAG }}"
+    private fun keyFor(contentId: String, locale: Locale): String =
+        "$CACHE_PREFIX${contentId}_${locale.toLanguageTag().ifBlank { DEFAULT_LOCALE_TAG }}"
 
     companion object {
         private const val PREFS_NAME = "ai_insights_cache"

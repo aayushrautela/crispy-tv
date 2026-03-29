@@ -275,7 +275,6 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_PLAYBACK_HEADERS_JSON = "extra_playback_headers_json"
 
         private const val EXTRA_IMDB_ID = "extra_imdb_id"
-        private const val EXTRA_TMDB_ID = "extra_tmdb_id"
         private const val EXTRA_CONTENT_ID = "extra_content_id"
         private const val EXTRA_MEDIA_TYPE = "extra_media_type"
         private const val EXTRA_SEASON = "extra_season"
@@ -309,7 +308,6 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(EXTRA_LAUNCH_SNAPSHOT, launchSnapshot?.toJsonString())
                 .putExtra(EXTRA_CONTENT_ID, identity.contentId)
                 .putExtra(EXTRA_IMDB_ID, identity.imdbId)
-                .putExtra(EXTRA_TMDB_ID, identity.tmdbId ?: -1)
                 .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
                 .putExtra(EXTRA_SEASON, identity.season ?: -1)
                 .putExtra(EXTRA_EPISODE, identity.episode ?: -1)
@@ -331,7 +329,6 @@ class PlayerActivity : ComponentActivity() {
 
             val contentId = intent.getStringExtra(EXTRA_CONTENT_ID)?.trim()?.ifBlank { null }
             val imdbId = intent.getStringExtra(EXTRA_IMDB_ID)?.trim()?.ifBlank { null }
-            val tmdbId = intent.getIntExtra(EXTRA_TMDB_ID, -1).takeIf { it > 0 }
             val season = intent.getIntExtra(EXTRA_SEASON, -1).takeIf { it > 0 }
             val episode = intent.getIntExtra(EXTRA_EPISODE, -1).takeIf { it > 0 }
             val year = intent.getIntExtra(EXTRA_YEAR, -1).takeIf { it > 0 }
@@ -347,7 +344,7 @@ class PlayerActivity : ComponentActivity() {
             return PlaybackIdentity(
                 contentId = contentId,
                 imdbId = imdbId,
-                tmdbId = tmdbId,
+                tmdbId = null,
                 contentType = contentType,
                 season = season,
                 episode = episode,

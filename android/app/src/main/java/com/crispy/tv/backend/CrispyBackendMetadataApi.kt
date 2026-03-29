@@ -99,14 +99,12 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
 internal suspend fun CrispyBackendClient.getAiInsightsApi(
     accessToken: String,
     profileId: String,
-    tmdbId: Int,
-    mediaType: String,
+    contentId: String,
     locale: String? = null,
 ): AiInsightsResponse {
     checkConfigured()
     val payload = JSONObject().apply {
-        put("tmdbId", tmdbId)
-        put("mediaType", mediaType)
+        put("contentId", contentId.trim())
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
     val response = httpClient.postJson(

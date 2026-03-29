@@ -22,11 +22,10 @@ internal class EpisodeWatchStateResolver(
     suspend fun resolve(
         details: MediaDetails,
         videos: List<MediaVideo>,
-        resolvedTmdbId: Int?,
     ): Map<String, EpisodeWatchState> {
         if (videos.isEmpty()) return emptyMap()
 
-        val watchedKeys = resolveWatchKeys(details, resolvedTmdbId)
+        val watchedKeys = resolveWatchKeys(details)
         val yearInt = details.year?.trim()?.toIntOrNull()
         val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
         val parentMediaType =
@@ -48,7 +47,7 @@ internal class EpisodeWatchStateResolver(
                         PlaybackIdentity(
                             contentId = details.id,
                             imdbId = details.imdbId,
-                            tmdbId = resolvedTmdbId,
+                            tmdbId = null,
                             contentType = contentType,
                             season = season,
                             episode = episode,
@@ -75,7 +74,7 @@ internal class EpisodeWatchStateResolver(
         }
     }
 
-    private suspend fun resolveWatchKeys(details: MediaDetails, resolvedTmdbId: Int?): Set<String> {
+    private suspend fun resolveWatchKeys(details: MediaDetails): Set<String> {
         cachedEpisodeWatchKeys?.let { return it }
 
         val source = userMediaRepository.preferredProvider()
@@ -83,7 +82,7 @@ internal class EpisodeWatchStateResolver(
             PlaybackIdentity(
                 contentId = details.id,
                 imdbId = details.imdbId,
-                tmdbId = resolvedTmdbId ?: details.tmdbId,
+                tmdbId = null,
                 contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
                 title = details.title,
                 year = details.year?.trim()?.toIntOrNull(),
