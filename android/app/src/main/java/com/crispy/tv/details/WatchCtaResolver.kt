@@ -1,13 +1,12 @@
 package com.crispy.tv.details
 
+import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.watchhistory.matchesContentId
 import com.crispy.tv.watchhistory.matchesMediaType
-import com.crispy.tv.watchhistory.preferredWatchProvider
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -20,7 +19,7 @@ internal data class ProviderState(
 )
 
 internal class WatchCtaResolver(
-    private val watchHistoryService: WatchHistoryService,
+    private val userMediaRepository: UserMediaRepository,
     private val requestedMediaType: MetadataLabMediaType,
 ) {
 
@@ -45,7 +44,7 @@ internal class WatchCtaResolver(
             )
         }
 
-        val snapshot = watchHistoryService.getCanonicalWatchState(buildPlaybackIdentity(details, itemId))
+        val snapshot = userMediaRepository.getCanonicalWatchState(buildPlaybackIdentity(details, itemId))
         return if (snapshot == null) {
             ProviderState(
                 isWatched = false,
@@ -70,11 +69,11 @@ internal class WatchCtaResolver(
         expectedType: MetadataLabMediaType,
         nowMs: Long,
     ): CanonicalContinueWatchingItem? {
-        val source = preferredWatchProvider(watchHistoryService.authState())
+        val source = userMediaRepository.preferredProvider()
         val targetId = details.id.trim().lowercase(Locale.US)
         if (targetId.isBlank()) return null
 
-        val snapshot = watchHistoryService.getCanonicalContinueWatching(limit = 50, nowMs = nowMs, source = source)
+        val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowMs = nowMs, source = source)
 
         return snapshot.entries
             .asSequence()

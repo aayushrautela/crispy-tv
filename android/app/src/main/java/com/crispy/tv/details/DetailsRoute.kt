@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
@@ -48,7 +49,9 @@ fun DetailsRoute(
     val viewModel: DetailsViewModel =
         viewModel(
             key = viewModelKey,
-            factory = remember(appContext, itemId, normalizedType) { DetailsViewModel.factory(appContext, itemId, normalizedType) }
+            factory = remember(appContext, itemId, normalizedType) {
+                appContext.appGraph().detailsViewModelFactory(itemId, normalizedType)
+            }
         )
     val playbackSettingsRepository = remember(appContext) {
         PlaybackSettingsRepositoryProvider.get(appContext)

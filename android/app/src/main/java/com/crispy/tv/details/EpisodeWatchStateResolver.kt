@@ -1,17 +1,16 @@
 package com.crispy.tv.details
 
+import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.watchhistory.addEpisodeKey
 import com.crispy.tv.watchhistory.episodeWatchKeyCandidates
-import com.crispy.tv.watchhistory.preferredWatchProvider
 
 internal class EpisodeWatchStateResolver(
-    private val watchHistoryService: WatchHistoryService,
+    private val userMediaRepository: UserMediaRepository,
     private val completionPercent: Double = 85.0,
 ) {
     private var cachedEpisodeWatchKeys: Set<String>? = null
@@ -45,7 +44,7 @@ internal class EpisodeWatchStateResolver(
                 val watchedByHistory =
                     episodeWatchKeyCandidates(details, season, episode).any { key -> watchedKeys.contains(key) }
                 val localProgress =
-                    watchHistoryService.getLocalWatchProgress(
+                    userMediaRepository.getLocalWatchProgress(
                         PlaybackIdentity(
                             contentId = details.id,
                             imdbId = details.imdbId,
@@ -79,8 +78,8 @@ internal class EpisodeWatchStateResolver(
     private suspend fun resolveWatchKeys(details: MediaDetails, resolvedTmdbId: Int?): Set<String> {
         cachedEpisodeWatchKeys?.let { return it }
 
-        val source = preferredWatchProvider(watchHistoryService.authState())
-        val canonical = watchHistoryService.getCanonicalWatchState(
+        val source = userMediaRepository.preferredProvider()
+        val canonical = userMediaRepository.getCanonicalWatchState(
             PlaybackIdentity(
                 contentId = details.id,
                 imdbId = details.imdbId,
@@ -104,7 +103,7 @@ internal class EpisodeWatchStateResolver(
         }
 
         val providerHistoryKeys =
-            watchHistoryService.listWatchedEpisodeRecords(source = source).mapNotNull { record ->
+            userMediaRepository.listWatchedEpisodeRecords(source = source).mapNotNull { record ->
                 addEpisodeKey(record.contentId, record.season, record.episode)
             }.toSet()
 
