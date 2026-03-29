@@ -9,9 +9,10 @@ class DefaultSessionRepository(
 ) : SessionRepository {
     override suspend fun ensureValidSession(): CrispySession? {
         return supabaseAccountClient.ensureValidSession()?.let { session ->
+            val userId = session.userId?.takeUnless(String::isBlank) ?: return null
             CrispySession(
                 accessToken = session.accessToken,
-                userId = session.userId,
+                userId = userId,
             )
         }
     }

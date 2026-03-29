@@ -959,7 +959,7 @@ class DetailsViewModel internal constructor(
     }
 
     companion object {
-        fun factory(
+        internal fun factory(
             itemId: String,
             mediaType: String,
             detailsUseCases: DetailsUseCases,

@@ -52,7 +52,7 @@ class AppGraph(
         )
     }
 
-    val detailsUseCases: DetailsUseCases by lazy {
+    private val detailsUseCases: DetailsUseCases by lazy {
         DetailsUseCases(
             sessionRepository = sessionRepository,
             catalogRepository = catalogRepository,
