@@ -273,10 +273,10 @@ class HomeViewModel internal constructor(
                             )
                         }
 
-                        item.providerPlaybackId?.takeIf { it.isNotBlank() } != null -> {
-                            val playbackId = item.providerPlaybackId?.takeIf { it.isNotBlank() }
+                        item.id.isNotBlank() -> {
+                            val dismissId = item.id.trim()
                             watchHistoryService.removeFromPlayback(
-                                playbackId = checkNotNull(playbackId),
+                                playbackId = dismissId,
                                 source = item.provider,
                             )
                         }
@@ -672,33 +672,22 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
                 "anime" -> MetadataLabMediaType.ANIME
                 else -> MetadataLabMediaType.MOVIE
             }
-        val normalizedImdb = contentId.trim().lowercase(Locale.US).takeIf { it.startsWith("tt") }
-        val isEpisodic = contentType != MetadataLabMediaType.MOVIE
-        val resolvedParentMediaType =
-            if (isEpisodic) {
-                when (contentType) {
-                    MetadataLabMediaType.SERIES -> "show"
-                    MetadataLabMediaType.ANIME -> "anime"
-                    MetadataLabMediaType.MOVIE -> null
-                }
-            } else {
-                null
-            }
+        val normalizedImdb = playbackContentId.trim().lowercase(Locale.US).takeIf { it.startsWith("tt") }
 
         return PlaybackIdentity(
-            contentId = playbackContentId.trim().ifBlank { contentId.trim().ifBlank { null } },
+            contentId = playbackContentId.trim().ifBlank { detailsTitleId.trim().ifBlank { null } },
             imdbId = normalizedImdb,
             tmdbId = null,
             contentType = contentType,
-            season = season,
-            episode = episode,
+            season = playbackSeasonNumber,
+            episode = playbackEpisodeNumber,
             title = title,
             year = null,
-            showTitle = if (isEpisodic) title else null,
+            showTitle = if (contentType != MetadataLabMediaType.MOVIE) title else null,
             showYear = null,
             provider = metadataProvider,
             providerId = metadataProviderId,
-            parentMediaType = resolvedParentMediaType,
+            parentMediaType = playbackMediaType,
             parentProvider = parentProvider ?: metadataProvider,
             parentProviderId = parentProviderId ?: metadataProviderId,
             absoluteEpisodeNumber = absoluteEpisodeNumber,

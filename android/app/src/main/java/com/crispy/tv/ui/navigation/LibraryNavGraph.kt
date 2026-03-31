@@ -8,18 +8,13 @@ import com.crispy.tv.library.LibraryRoute
 internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController) {
     composable(AppRoutes.LibraryRoute) { entry ->
         LibraryRoute(
-            onItemClick = { entry ->
-                val type = when (entry.contentType) {
-                    com.crispy.tv.player.MetadataLabMediaType.MOVIE -> "movie"
-                    com.crispy.tv.player.MetadataLabMediaType.SERIES -> "series"
-                    com.crispy.tv.player.MetadataLabMediaType.ANIME -> "anime"
-                }
+            onItemClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        itemId = entry.contentId,
-                        mediaType = type,
-                        initialSeason = entry.season,
-                        initialEpisode = entry.episode,
+                        itemId = item.detailsTitleId,
+                        mediaType = item.detailsTitleMediaType,
+                        initialSeason = item.seasonNumber,
+                        initialEpisode = item.episodeNumber,
                     )
                 )
             },

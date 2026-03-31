@@ -104,14 +104,14 @@ data class CanonicalContinueWatchingItem(
     val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
     val playbackContentId: String = contentId,
+    val detailsTitleId: String = contentId,
+    val detailsTitleMediaType: String = contentType.label,
+    val playbackMediaType: String = contentType.label,
+    val playbackSeasonNumber: Int? = season,
+    val playbackEpisodeNumber: Int? = episode,
 ) {
     val type: String
-        get() =
-            when (contentType) {
-                MetadataLabMediaType.MOVIE -> "movie"
-                MetadataLabMediaType.SERIES -> "series"
-                MetadataLabMediaType.ANIME -> "anime"
-            }
+        get() = contentType.label
 
     val watchedAtEpochMs: Long
         get() = lastUpdatedEpochMs

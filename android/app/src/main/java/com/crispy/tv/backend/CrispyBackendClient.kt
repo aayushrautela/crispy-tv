@@ -527,25 +527,74 @@ class CrispyBackendClient(
         val ratedAt: String,
     )
 
-    data class HydratedWatchItem(
-        val id: String?,
+    data class DetailsTarget(
+        val titleId: String,
+        val titleMediaType: String,
+    )
+
+    data class PlaybackTarget(
+        val contentId: String,
+        val mediaType: String,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+    )
+
+    data class EpisodeContext(
+        val title: String?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+    )
+
+    data class WatchDerivedItem(
+        val id: String,
+        val detailsTarget: DetailsTarget,
+        val playbackTarget: PlaybackTarget?,
+        val episodeContext: EpisodeContext?,
         val media: MetadataView,
         val progress: WatchProgressView?,
         val watchedAt: String?,
         val lastActivityAt: String?,
-        val payload: Map<String, Any?>,
     )
 
-    data class HydratedWatchlistItem(
+    data class WatchlistItem(
+        val id: String,
+        val detailsTarget: DetailsTarget,
+        val playbackTarget: PlaybackTarget?,
         val media: MetadataView,
         val addedAt: String,
-        val payload: Map<String, Any?>,
     )
 
-    data class HydratedRatingItem(
+    data class RatingItem(
+        val id: String,
+        val detailsTarget: DetailsTarget,
+        val playbackTarget: PlaybackTarget?,
         val media: MetadataView,
-        val rating: RatingStateView,
-        val payload: Map<String, Any?>,
+        val value: Int,
+        val ratedAt: String,
+    )
+
+    data class LibrarySection(
+        val id: String,
+        val label: String,
+        val itemCount: Int,
+        val items: List<LibrarySectionItem> = emptyList(),
+    )
+
+    data class LibrarySectionItem(
+        val id: String,
+        val detailsTarget: DetailsTarget,
+        val playbackTarget: PlaybackTarget?,
+        val episodeContext: EpisodeContext?,
+        val media: MetadataView,
+        val progress: WatchProgressView?,
+        val rating: RatingStateView?,
+        val watchedAt: String?,
+        val addedAt: String?,
     )
 
     data class CanonicalWatchCollectionResponse<T>(
@@ -615,7 +664,7 @@ class CrispyBackendClient(
         override val title: String,
         override val kind: String = "watch",
         override val source: String = "canonical_watch",
-        val items: List<HydratedWatchItem> = emptyList(),
+        val items: List<WatchDerivedItem> = emptyList(),
     ) : HomeSection
 
     data class HomeCalendarSection(
@@ -643,10 +692,10 @@ class CrispyBackendClient(
     )
 
     data class NativeLibrary(
-        val continueWatching: List<HydratedWatchItem>,
-        val history: List<HydratedWatchItem>,
-        val watchlist: List<HydratedWatchlistItem>,
-        val ratings: List<HydratedRatingItem>,
+        val continueWatching: List<WatchDerivedItem>,
+        val history: List<WatchDerivedItem>,
+        val watchlist: List<WatchlistItem>,
+        val ratings: List<RatingItem>,
     )
 
     data class ProviderLibraryFolder(
@@ -703,10 +752,10 @@ class CrispyBackendClient(
     data class CanonicalLibrary(
         val source: String,
         val generatedAt: String?,
-        val continueWatching: List<HydratedWatchItem>,
-        val history: List<HydratedWatchItem>,
-        val watchlist: List<HydratedWatchlistItem>,
-        val ratings: List<HydratedRatingItem>,
+        val continueWatching: List<WatchDerivedItem>,
+        val history: List<WatchDerivedItem>,
+        val watchlist: List<WatchlistItem>,
+        val ratings: List<RatingItem>,
         val items: List<CanonicalLibraryItem>,
     )
 
@@ -724,6 +773,7 @@ class CrispyBackendClient(
         val canonical: CanonicalLibrary,
         val native: NativeLibrary?,
         val diagnostics: LibraryDiagnostics,
+        val sections: List<LibrarySection> = emptyList(),
     )
 
     data class ProviderMutationResult(
@@ -971,7 +1021,7 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 20,
-    ): CanonicalWatchCollectionResponse<HydratedWatchItem> {
+    ): CanonicalWatchCollectionResponse<WatchDerivedItem> {
         return listContinueWatchingApi(accessToken, profileId, limit)
     }
 
@@ -983,7 +1033,7 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 50,
-    ): CanonicalWatchCollectionResponse<HydratedWatchItem> {
+    ): CanonicalWatchCollectionResponse<WatchDerivedItem> {
         return listWatchHistoryApi(accessToken, profileId, limit)
     }
 
@@ -991,7 +1041,7 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 50,
-    ): CanonicalWatchCollectionResponse<HydratedWatchlistItem> {
+    ): CanonicalWatchCollectionResponse<WatchlistItem> {
         return listWatchlistApi(accessToken, profileId, limit)
     }
 
@@ -999,7 +1049,7 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 50,
-    ): CanonicalWatchCollectionResponse<HydratedRatingItem> {
+    ): CanonicalWatchCollectionResponse<RatingItem> {
         return listRatingsApi(accessToken, profileId, limit)
     }
 

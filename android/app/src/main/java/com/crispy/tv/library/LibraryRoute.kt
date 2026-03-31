@@ -18,7 +18,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -29,7 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryRoute(
-    onItemClick: (WatchHistoryEntry) -> Unit,
+    onItemClick: (LibrarySectionItemUi) -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
@@ -80,7 +79,7 @@ fun LibraryRoute(
                 uiState = uiState,
                 onRefresh = viewModel::refresh,
                 onItemClick = onItemClick,
-                onSelectProviderFolder = viewModel::selectProviderFolder,
+                onSelectSection = viewModel::selectSection,
                 scrollToTopRequests = scrollToTopRequests,
                 onScrollToTopConsumed = onScrollToTopConsumed,
             )

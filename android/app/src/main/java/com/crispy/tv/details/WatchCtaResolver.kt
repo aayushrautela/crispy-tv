@@ -79,7 +79,8 @@ internal class WatchCtaResolver(
         return snapshot.entries
             .asSequence()
             .filter { entry ->
-                matchesContentId(entry.contentId, targetId) && matchesMediaType(expectedType, entry.contentType)
+                val entryTargetId = entry.detailsTitleId.trim().lowercase(Locale.US)
+                matchesContentId(entryTargetId, targetId) && matchesMediaType(expectedType, entry.contentType)
             }
             .maxByOrNull { it.lastUpdatedEpochMs }
     }

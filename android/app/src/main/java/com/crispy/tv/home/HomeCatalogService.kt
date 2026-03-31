@@ -209,7 +209,7 @@ class HomeCatalogService internal constructor(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
             )
-            val snapshot = response.toSnapshot(backendContext.accessToken)
+            val snapshot = response.toSnapshot()
             writeCachedSnapshot(backendContext.profileId, snapshot)
             snapshot
         }.getOrElse { error ->
@@ -273,24 +273,24 @@ class HomeCatalogService internal constructor(
         )
     }
 
-    private suspend fun CrispyBackendClient.HomeResponse.toSnapshot(accessToken: String): HomeCatalogSnapshot {
+    private fun CrispyBackendClient.HomeResponse.toSnapshot(): HomeCatalogSnapshot {
         return HomeCatalogSnapshot(
             profileId = profileId.takeIf { it.isNotBlank() },
             lists = buildList {
                 sections.forEach { section ->
-                    section.toCatalogList(accessToken)?.let(::add)
+                    section.toCatalogList()?.let(::add)
                 }
             },
             statusMessage = "",
         )
     }
 
-    private suspend fun CrispyBackendClient.HomeSection.toCatalogList(accessToken: String): HomeCatalogList? {
+    private fun CrispyBackendClient.HomeSection.toCatalogList(): HomeCatalogList? {
         return when (this) {
             is CrispyBackendClient.HomeWatchSection -> {
                 val catalogItems = buildList {
                     items.forEach { item ->
-                        item.toCatalogItem(accessToken)?.let(::add)
+                        item.toCatalogItem()?.let(::add)
                     }
                 }
                 if (catalogItems.isEmpty()) return null
@@ -344,12 +344,11 @@ class HomeCatalogService internal constructor(
         }
     }
 
-    private suspend fun CrispyBackendClient.HydratedWatchItem.toCatalogItem(accessToken: String): HomeCatalogItem? {
-        val detailsTarget = media.resolveHomeDetailsTarget(accessToken)
+    private fun CrispyBackendClient.WatchDerivedItem.toCatalogItem(): HomeCatalogItem? {
         return media.toCatalogItem(
             descriptionOverride = watchDescription(progress?.progressPercent, watchedAt, lastActivityAt),
-            detailsContentId = detailsTarget.contentId,
-            detailsMediaType = detailsTarget.mediaType,
+            detailsContentId = detailsTarget.titleId,
+            detailsMediaType = detailsTarget.titleMediaType,
         )
     }
 
@@ -427,41 +426,6 @@ class HomeCatalogService internal constructor(
             else -> "movie"
         }
     }
-
-    private suspend fun CrispyBackendClient.MetadataView.resolveHomeDetailsTarget(accessToken: String): HomeDetailsTarget {
-        val fallbackContentId = id.trim().takeIf { it.isNotBlank() } ?: return HomeDetailsTarget(contentId = id, mediaType = normalizedCatalogType())
-        val fallbackMediaType = normalizedCatalogType()
-        if (!mediaType.equals("episode", ignoreCase = true)) {
-            return HomeDetailsTarget(contentId = fallbackContentId, mediaType = fallbackMediaType)
-        }
-
-        val resolvedShow = runCatching {
-            backendClient.resolvePlayback(
-                accessToken = accessToken,
-                input = CrispyBackendClient.MediaLookupInput(
-                    id = fallbackContentId,
-                    mediaType = "episode",
-                    provider = provider,
-                    providerId = providerId,
-                    parentProvider = parentProvider,
-                    parentProviderId = parentProviderId,
-                    absoluteEpisodeNumber = absoluteEpisodeNumber,
-                    seasonNumber = seasonNumber,
-                    episodeNumber = episodeNumber,
-                ),
-            ).show
-        }.getOrNull()
-
-        return HomeDetailsTarget(
-            contentId = resolvedShow?.id?.trim().takeUnless { it.isNullOrBlank() } ?: fallbackContentId,
-            mediaType = resolvedShow?.normalizedCatalogType() ?: fallbackMediaType,
-        )
-    }
-
-    private data class HomeDetailsTarget(
-        val contentId: String,
-        val mediaType: String,
-    )
 
     private fun String.normalizedKind(): String {
         return trim().ifBlank { "home" }

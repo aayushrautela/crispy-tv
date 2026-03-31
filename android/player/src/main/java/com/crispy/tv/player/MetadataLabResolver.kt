@@ -10,7 +10,14 @@ import com.crispy.tv.domain.metadata.withDerivedSeasons
 enum class MetadataLabMediaType {
     MOVIE,
     SERIES,
-    ANIME,
+    ANIME;
+
+    val label: String
+        get() = when (this) {
+            MOVIE -> "movie"
+            SERIES -> "series"
+            ANIME -> "anime"
+        }
 }
 
 data class MetadataLabRequest(

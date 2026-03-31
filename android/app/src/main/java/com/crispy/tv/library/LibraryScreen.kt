@@ -35,11 +35,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.player.CanonicalProviderLibraryItem
-import com.crispy.tv.player.WatchHistoryEntry
-import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
+import com.crispy.tv.accounts.ActiveProfileStore
+import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.WatchProviderAuthState
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
@@ -52,51 +52,42 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class LibrarySource {
-    TRAKT,
-    SIMKL,
-}
-
 @Immutable
-data class LibraryProviderFolderUi(
+data class LibrarySectionItemUi(
     val id: String,
-    val label: String,
-    val provider: WatchProvider,
-    val itemCount: Int,
-)
-
-@Immutable
-data class LibraryProviderItemUi(
-    val item: CanonicalProviderLibraryItem,
-    val watchHistoryEntry: WatchHistoryEntry,
+    val detailsTitleId: String,
+    val detailsTitleMediaType: String,
+    val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
+    val seasonNumber: Int?,
+    val episodeNumber: Int?,
 ) {
     val stableKey: String
-        get() = "${item.contentType.name}:${item.contentId}:${item.folderIds.sorted().joinToString(separator = ",") }"
+        get() = "$detailsTitleMediaType:$detailsTitleId:${seasonNumber ?: -1}:${episodeNumber ?: -1}"
 }
+
+@Immutable
+data class LibrarySectionUi(
+    val id: String,
+    val label: String,
+    val itemCount: Int,
+    val items: List<LibrarySectionItemUi>,
+)
 
 @Immutable
 data class LibraryUiState(
     val isRefreshing: Boolean = false,
     val statusMessage: String = "",
-    val providerFolders: List<LibraryProviderFolderUi> = emptyList(),
-    val providerItems: List<LibraryProviderItemUi> = emptyList(),
+    val sections: List<LibrarySectionUi> = emptyList(),
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
-    val selectedSource: LibrarySource = LibrarySource.TRAKT,
-    val selectedProviderFolderId: String? = null,
-)
-
-private data class LibraryRefreshPayload(
-    val authState: WatchProviderAuthState,
-    val selectedSource: LibrarySource,
-    val providerFolders: List<LibraryProviderFolderUi>,
-    val providerItems: List<LibraryProviderItemUi>,
-    val statusMessage: String,
+    val selectedSectionId: String? = null,
 )
 
 class LibraryViewModel internal constructor(
-    private val watchHistoryService: WatchHistoryService,
+    private val supabase: SupabaseAccountClient,
+    private val activeProfileStore: ActiveProfileStore,
+    private val backend: CrispyBackendClient,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
@@ -108,192 +99,125 @@ class LibraryViewModel internal constructor(
     }
 
     fun refresh() {
-        if (refreshJob?.isActive == true) {
-            return
-        }
+        if (refreshJob?.isActive == true) return
         refreshJob =
             viewModelScope.launch {
-                _uiState.update { current ->
-                    current.copy(
-                        isRefreshing = true,
-                    )
-                }
+                _uiState.update { it.copy(isRefreshing = true) }
 
-                val authState = watchHistoryService.authState()
-                val selectedSource = resolveSelectedSource(authState)
-                val selectedProvider = selectedSource.toProvider()
-                val providerAuthenticated =
-                    when (selectedSource) {
-                        LibrarySource.TRAKT -> authState.traktAuthenticated
-                        LibrarySource.SIMKL -> authState.simklAuthenticated
-                    }
+                val authState = loadAuthState()
+                _uiState.update { it.copy(authState = authState) }
 
-                val cachedProviderResult: List<CanonicalProviderLibraryItem> =
-                    if (providerAuthenticated) {
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                watchHistoryService.getCachedCanonicalProviderLibraryItems(
-                                    limitPerFolder = 250,
-                                    source = selectedProvider,
-                                )
-                            }.getOrNull().orEmpty()
-                        }
-                    } else {
-                        emptyList()
-                    }
-
-                if (cachedProviderResult.isNotEmpty()) {
-                    val cachedPayload =
-                        buildRefreshPayload(
-                            authState = authState,
-                            selectedSource = selectedSource,
-                            providerItems = cachedProviderResult,
-                            providerAuthenticated = providerAuthenticated,
-                            providerStatusMessage = "",
+                if (!authState.traktAuthenticated && !authState.simklAuthenticated) {
+                    _uiState.update {
+                        it.copy(
+                            isRefreshing = false,
+                            statusMessage = "Connect Trakt or Simkl in Settings to load your library.",
+                            sections = emptyList(),
                         )
-                    applyPayload(cachedPayload, isRefreshing = true)
+                    }
+                    return@launch
                 }
 
-                val providerResult: List<CanonicalProviderLibraryItem> =
-                        if (providerAuthenticated) {
-                            val networkResult =
-                                withContext(Dispatchers.IO) {
-                                    runCatching {
-                                        watchHistoryService.getCanonicalProviderLibraryItems(
-                                            limitPerFolder = 250,
-                                            source = selectedProvider,
-                                        )
-                                    }.getOrNull()
-                                }
-                            networkResult ?: cachedProviderResult
-                        } else {
-                            emptyList()
-                        }
+                val sections = withContext(Dispatchers.IO) {
+                    runCatching { loadLibrarySections() }.getOrNull()
+                }
 
-                val finalPayload =
-                    buildRefreshPayload(
-                        authState = authState,
-                        selectedSource = selectedSource,
-                        providerItems = providerResult,
-                        providerAuthenticated = providerAuthenticated,
-                        providerStatusMessage = if (providerResult.isEmpty()) null else "",
+                if (sections == null) {
+                    _uiState.update {
+                        it.copy(
+                            isRefreshing = false,
+                            statusMessage = "Library temporarily unavailable.",
+                        )
+                    }
+                    return@launch
+                }
+
+                val sectionUis = sections.map { section ->
+                    LibrarySectionUi(
+                        id = section.id,
+                        label = section.label,
+                        itemCount = section.itemCount,
+                        items = section.items.map { item ->
+                            LibrarySectionItemUi(
+                                id = item.id,
+                                detailsTitleId = item.detailsTarget.titleId,
+                                detailsTitleMediaType = item.detailsTarget.titleMediaType,
+                                title = item.media.title ?: item.detailsTarget.titleId,
+                                posterUrl = item.media.images.posterUrl,
+                                backdropUrl = item.media.images.backdropUrl,
+                                seasonNumber = item.episodeContext?.seasonNumber,
+                                episodeNumber = item.episodeContext?.episodeNumber,
+                            )
+                        },
                     )
-                applyPayload(finalPayload, isRefreshing = false)
-            }
-    }
-
-    fun selectProviderFolder(folderId: String) {
-        _uiState.update { current ->
-            val nextFolderId = if (current.selectedProviderFolderId == folderId) null else folderId
-            current.copy(selectedProviderFolderId = nextFolderId)
-        }
-    }
-
-    private suspend fun buildRefreshPayload(
-        authState: WatchProviderAuthState,
-        selectedSource: LibrarySource,
-        providerItems: List<CanonicalProviderLibraryItem>,
-        providerAuthenticated: Boolean,
-        providerStatusMessage: String?,
-    ): LibraryRefreshPayload {
-        val providerUiItems = enrichProviderItems(providerItems)
-        val derivedProviderFolders = providerFolders(selectedSource, providerUiItems)
-
-        val statusMessage =
-            providerStatusMessage
-                ?: if (!providerAuthenticated) {
-                    "Connect ${selectedSource.displayName()} in Settings to load this provider."
-                } else {
-                    "No provider library data available."
                 }
 
-        return LibraryRefreshPayload(
-            authState = authState,
-            selectedSource = selectedSource,
-            providerFolders = derivedProviderFolders,
-            providerItems = providerUiItems,
-            statusMessage = statusMessage,
-        )
+                val selectedId = _uiState.value.selectedSectionId
+                    ?.takeIf { id -> sectionUis.any { it.id == id } }
+                    ?: sectionUis.firstOrNull()?.id
+
+                _uiState.update {
+                    it.copy(
+                        isRefreshing = false,
+                        statusMessage = if (sectionUis.isEmpty()) "No library sections available." else "",
+                        sections = sectionUis,
+                        selectedSectionId = selectedId,
+                    )
+                }
+            }
     }
 
-    private fun applyPayload(payload: LibraryRefreshPayload, isRefreshing: Boolean) {
+    fun selectSection(sectionId: String) {
         _uiState.update { current ->
-            val availableFolders = payload.providerFolders.filter { it.provider == payload.selectedSource.toProvider() }
-            current.copy(
-                isRefreshing = isRefreshing,
-                statusMessage = payload.statusMessage,
-                providerFolders = payload.providerFolders,
-                providerItems = payload.providerItems,
-                authState = payload.authState,
-                selectedSource = payload.selectedSource,
-                selectedProviderFolderId = resolveSelectedFolderId(
-                    current.selectedProviderFolderId,
-                    payload.selectedSource,
-                    availableFolders,
-                ),
+            val nextId = if (current.selectedSectionId == sectionId) null else sectionId
+            current.copy(selectedSectionId = nextId)
+        }
+    }
+
+    private suspend fun loadAuthState(): WatchProviderAuthState {
+        val backendContext = getBackendContext() ?: return WatchProviderAuthState()
+        return try {
+            val states = backend.getProviderAuthState(backendContext.accessToken, backendContext.profileId)
+            val trakt = states.firstOrNull { it.provider.equals("trakt", ignoreCase = true) }
+            val simkl = states.firstOrNull { it.provider.equals("simkl", ignoreCase = true) }
+            WatchProviderAuthState(
+                traktAuthenticated = trakt?.connected == true,
+                simklAuthenticated = simkl?.connected == true,
             )
+        } catch (_: Throwable) {
+            WatchProviderAuthState()
         }
     }
 
-    private suspend fun enrichProviderItems(items: List<CanonicalProviderLibraryItem>): List<LibraryProviderItemUi> {
-        return items.map { item ->
-            LibraryProviderItemUi(
-                item = item,
-                watchHistoryEntry =
-                    WatchHistoryEntry(
-                        contentId = item.contentId,
-                        contentType = item.contentType,
-                        title = item.title,
-                        season = null,
-                        episode = null,
-                        watchedAtEpochMs = item.addedAtEpochMs,
-                    ),
-                posterUrl = item.posterUrl,
-                backdropUrl = item.backdropUrl,
-            )
-        }
+    private suspend fun loadLibrarySections(): List<CrispyBackendClient.LibrarySection> {
+        val backendContext = getBackendContext() ?: return emptyList()
+        val response = backend.getProfileLibrary(
+            accessToken = backendContext.accessToken,
+            profileId = backendContext.profileId,
+        )
+        return response.sections
     }
 
-    private fun resolveSelectedSource(authState: WatchProviderAuthState): LibrarySource {
-        return when {
-            authState.traktAuthenticated -> LibrarySource.TRAKT
-            authState.simklAuthenticated -> LibrarySource.SIMKL
-            else -> LibrarySource.TRAKT
-        }
-    }
-
-    private fun providerFolders(
-        selectedSource: LibrarySource,
-        providerItems: List<LibraryProviderItemUi>,
-    ): List<LibraryProviderFolderUi> {
-        val provider = selectedSource.toProvider()
-        return providerItems
-            .flatMap { item ->
-                val folderIds = item.item.folderIds.ifEmpty { setOf(defaultProviderFolderId(provider)) }
-                folderIds.map { folderId -> folderId to item }
+    private suspend fun getBackendContext(): BackendContext? {
+        if (!supabase.isConfigured() || !backend.isConfigured()) return null
+        val session = supabase.ensureValidSession() ?: return null
+        var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
+        if (profileId.isBlank()) {
+            profileId = try {
+                backend.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
+            } catch (_: Throwable) { "" }
+            if (profileId.isNotBlank()) {
+                activeProfileStore.setActiveProfileId(session.userId, profileId)
             }
-            .groupBy({ it.first }, { it.second })
-            .map { (folderId, items) ->
-                LibraryProviderFolderUi(
-                    id = folderId,
-                    label = providerFolderLabel(provider, folderId),
-                    provider = provider,
-                    itemCount = items.size,
-                )
-            }
-            .sortedBy { it.label.lowercase() }
+        }
+        if (profileId.isBlank()) return null
+        return BackendContext(accessToken = session.accessToken, profileId = profileId)
     }
 
-    private fun resolveSelectedFolderId(
-        currentFolderId: String?,
-        selectedSource: LibrarySource,
-        folders: List<LibraryProviderFolderUi>,
-    ): String? {
-        val provider = selectedSource.toProvider()
-        return currentFolderId
-            ?.takeIf { selectedId -> folders.any { folder -> folder.provider == provider && folder.id == selectedId } }
-            ?: folders.firstOrNull { folder -> folder.provider == provider }?.id
-    }
+    private data class BackendContext(
+        val accessToken: String,
+        val profileId: String,
+    )
 
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {
@@ -303,14 +227,15 @@ class LibraryViewModel internal constructor(
                     if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
-                            watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
+                            supabase = SupabaseServicesProvider.accountClient(appContext),
+                            activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                            backend = BackendServicesProvider.backendClient(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
             }
         }
-
     }
 }
 
@@ -319,31 +244,18 @@ class LibraryViewModel internal constructor(
 internal fun LibraryRouteContent(
     uiState: LibraryUiState,
     onRefresh: () -> Unit,
-    onItemClick: (WatchHistoryEntry) -> Unit,
-    onSelectProviderFolder: (String) -> Unit,
+    onItemClick: (LibrarySectionItemUi) -> Unit,
+    onSelectSection: (String) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
-    val selectedProvider = uiState.selectedSource.toProvider()
-    val providerFolders = uiState.providerFolders.filter { folder -> folder.provider == selectedProvider }
-    val providerAuthenticated =
-        when (uiState.selectedSource) {
-            LibrarySource.TRAKT -> uiState.authState.traktAuthenticated
-            LibrarySource.SIMKL -> uiState.authState.simklAuthenticated
-        }
-    val selectedFolder = uiState.selectedProviderFolderId
-    val providerItems =
-        uiState.providerItems.filter { item ->
-            if (selectedFolder == null) {
-                true
-            } else {
-                val folderIds =
-                    item.item.folderIds.ifEmpty {
-                        setOf(defaultProviderFolderId(selectedProvider))
-                    }
-                folderIds.contains(selectedFolder)
-            }
-        }
+    val sections = uiState.sections
+    val selectedSectionId = uiState.selectedSectionId
+    val selectedSection = sections.firstOrNull { it.id == selectedSectionId }
+    val items = selectedSection?.items.orEmpty()
+    val hasTrakt = uiState.authState.traktAuthenticated
+    val hasSimkl = uiState.authState.simklAuthenticated
+    val hasProvider = hasTrakt || hasSimkl
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val gridState = rememberLazyGridState()
@@ -382,123 +294,75 @@ internal fun LibraryRouteContent(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-                item(span = { GridItemSpan(maxLineSpan) }, key = "filters") {
-                    if (providerAuthenticated && providerFolders.isNotEmpty()) {
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(providerFolders, key = { it.id }) { folder ->
-                                FilterChip(
-                                    selected = folder.id == selectedFolder,
-                                    onClick = { onSelectProviderFolder(folder.id) },
-                                    label = { Text("${folder.label} (${folder.itemCount})") },
-                                )
-                            }
+            item(span = { GridItemSpan(maxLineSpan) }, key = "filters") {
+                if (hasProvider && sections.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(sections, key = { it.id }) { section ->
+                            FilterChip(
+                                selected = section.id == selectedSectionId,
+                                onClick = { onSelectSection(section.id) },
+                                label = { Text("${section.label} (${section.itemCount})") },
+                            )
                         }
-                    }
-                }
-
-                item(span = { GridItemSpan(maxLineSpan) }, key = "status") {
-                    if (uiState.statusMessage.isNotBlank()) {
-                        Text(
-                            text = uiState.statusMessage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                if (!providerAuthenticated) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "provider-auth") {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                Text(
-                                    text = "Connect ${uiState.selectedSource.displayName()} in Settings to load this provider.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                        }
-                    }
-                } else if (providerItems.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "provider-empty") {
-                        val emptyMessage =
-                            if (providerFolders.isEmpty()) {
-                                "No provider library data available."
-                            } else {
-                                val label = providerFolders.firstOrNull { it.id == selectedFolder }?.label ?: "this folder"
-                                "No items in $label yet."
-                            }
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                                Text(
-                                    text = emptyMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    gridItems(
-                        items = providerItems,
-                        key = { item -> item.stableKey },
-                    ) { item ->
-                        PosterCard(
-                            title = item.item.title.ifBlank { item.item.contentId },
-                            posterUrl = item.posterUrl,
-                            backdropUrl = item.backdropUrl,
-                            rating = null,
-                            year = null,
-                            genre = null,
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { onItemClick(item.watchHistoryEntry) },
-                        )
                     }
                 }
             }
+
+            item(span = { GridItemSpan(maxLineSpan) }, key = "status") {
+                if (uiState.statusMessage.isNotBlank()) {
+                    Text(
+                        text = uiState.statusMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (!hasProvider) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "provider-auth") {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                            Text(
+                                text = "Connect Trakt or Simkl in Settings to load your library.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
+            } else if (items.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "section-empty") {
+                    val emptyMessage =
+                        if (sections.isEmpty()) "No library sections available."
+                        else "No items in ${selectedSection?.label ?: "this section"} yet."
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                            Text(
+                                text = emptyMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
+            } else {
+                gridItems(
+                    items = items,
+                    key = { item -> item.stableKey },
+                ) { item ->
+                    PosterCard(
+                        title = item.title.ifBlank { item.detailsTitleId },
+                        posterUrl = item.posterUrl,
+                        backdropUrl = item.backdropUrl,
+                        rating = null,
+                        year = null,
+                        genre = null,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onItemClick(item) },
+                    )
+                }
+            }
         }
-}
-
-private fun LibrarySource.toProvider(): WatchProvider {
-    return when (this) {
-        LibrarySource.TRAKT -> WatchProvider.TRAKT
-        LibrarySource.SIMKL -> WatchProvider.SIMKL
-    }
-}
-
-private fun providerFolderLabel(provider: WatchProvider, folderId: String): String {
-    val normalized = folderId.trim().lowercase()
-    val fallback = normalized.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.titlecase() }
-    return when (provider) {
-        WatchProvider.LOCAL -> fallback
-        WatchProvider.TRAKT -> when (normalized) {
-            "collection" -> "Collection"
-            "watchlist" -> "Watchlist"
-            "watched" -> "Watched"
-            "ratings" -> "Ratings"
-            else -> fallback
-        }
-        WatchProvider.SIMKL -> when (normalized) {
-            "watching" -> "Watching"
-            "plantowatch" -> "Plan to Watch"
-            "completed", "completed-tv", "completed-movies" -> "Completed"
-            "ratings" -> "Ratings"
-            else -> fallback
-        }
-    }
-}
-
-private fun defaultProviderFolderId(provider: WatchProvider): String {
-    return when (provider) {
-        WatchProvider.LOCAL -> "local"
-        WatchProvider.TRAKT -> "collection"
-        WatchProvider.SIMKL -> "watching"
-    }
-}
-
-private fun LibrarySource.displayName(): String {
-    return when (this) {
-        LibrarySource.TRAKT -> "Trakt"
-        LibrarySource.SIMKL -> "Simkl"
     }
 }

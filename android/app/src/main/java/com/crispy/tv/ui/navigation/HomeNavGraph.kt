@@ -24,7 +24,14 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navController.navigate(AppRoutes.homeDetailsRoute(hero.detailsContentId, hero.detailsMediaType))
             },
             onContinueWatchingClick = { item ->
-                navController.navigate(AppRoutes.homeDetailsRoute(item.contentId, item.type))
+                navController.navigate(
+                    AppRoutes.homeDetailsRoute(
+                        itemId = item.detailsTitleId,
+                        mediaType = item.detailsTitleMediaType,
+                        initialSeason = item.playbackSeasonNumber,
+                        initialEpisode = item.playbackEpisodeNumber,
+                    )
+                )
             },
             onThisWeekClick = { item ->
                 navController.navigateToCalendarEpisode(item)
