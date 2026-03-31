@@ -35,6 +35,7 @@ internal data class DetailsScreenLoadResult(
 internal data class DetailsSeasonEpisodesResult(
     val videos: List<MediaVideo> = emptyList(),
     val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),
+    val effectiveSeasonNumber: Int? = null,
     val includedSeasonNumbers: List<Int> = emptyList(),
     val errorMessage: String? = null,
 )
@@ -64,18 +65,22 @@ internal class DetailsUseCases(
         nowMs: Long,
     ): DetailsScreenLoadResult {
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
-        val titleDetail =
+        val titleDetailResult =
             session?.let {
                 runCatching {
                     catalogRepository.getTitleDetail(accessToken = it.accessToken, id = itemId)
-                }.getOrNull()
+                }
             }
-        val titleContent =
+        val titleDetail = titleDetailResult?.getOrNull()
+        val titleDetailError = titleDetailResult?.exceptionOrNull()
+        val titleContentResult =
             session?.let {
                 runCatching {
                     catalogRepository.getTitleContent(accessToken = it.accessToken, id = itemId)
-                }.getOrNull()
+                }
             }
+        val titleContent = titleContentResult?.getOrNull()
+        val titleContentError = titleContentResult?.exceptionOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
         val providerState = watchCtaResolver.resolveProviderState(details, itemId)
@@ -98,6 +103,8 @@ internal class DetailsUseCases(
             when {
                 details != null -> ""
                 session == null -> "Sign in to load details."
+                titleDetailError != null -> titleDetailError.message ?: "Unable to load details."
+                titleContentError != null -> titleContentError.message ?: "Unable to load details."
                 else -> "Unable to load details."
             }
 
@@ -141,6 +148,7 @@ internal class DetailsUseCases(
         return DetailsSeasonEpisodesResult(
             videos = videos,
             episodeWatchStates = episodeWatchStates,
+            effectiveSeasonNumber = episodeResponse.effectiveSeasonNumber,
             includedSeasonNumbers = episodeResponse.includedSeasonNumbers.sorted(),
         )
     }

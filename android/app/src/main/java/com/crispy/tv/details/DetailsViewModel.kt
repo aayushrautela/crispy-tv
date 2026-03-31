@@ -357,10 +357,17 @@ class DetailsViewModel internal constructor(
                 }
 
                 seasonEpisodesCache[season] = result.videos
+                result.effectiveSeasonNumber
+                    ?.takeIf { it != season }
+                    ?.let { effectiveSeason ->
+                        seasonEpisodesCache[effectiveSeason] = result.videos
+                    }
 
                 _uiState.update { current ->
-                    if (current.selectedSeasonOrFirst != season) current
+                    val resolvedSeason = result.effectiveSeasonNumber ?: season
+                    if (current.selectedSeasonOrFirst != season && current.selectedSeasonOrFirst != resolvedSeason) current
                     else current.copy(
+                        selectedSeason = resolvedSeason,
                         seasons =
                             when {
                                 result.includedSeasonNumbers.isNotEmpty() -> result.includedSeasonNumbers

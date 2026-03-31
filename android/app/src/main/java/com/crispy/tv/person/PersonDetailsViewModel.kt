@@ -145,5 +145,7 @@ private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): Cata
         rating = formatRating(rating),
         year = releaseYear?.toString(),
         genre = null,
+        detailsContentId = id,
+        detailsMediaType = type,
     )
 }

@@ -156,7 +156,6 @@ internal fun MetadataProductionCard(
     modifier: Modifier = Modifier,
 ) {
     val logo = entity.logoUrl?.trim().orEmpty()
-    if (logo.isBlank()) return
 
     Surface(
         modifier = modifier.width(160.dp).height(56.dp),
@@ -167,13 +166,24 @@ internal fun MetadataProductionCard(
             modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
-            AsyncImage(
-                model = logo,
-                contentDescription = entity.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.Center,
-            )
+            if (logo.isNotBlank()) {
+                AsyncImage(
+                    model = logo,
+                    contentDescription = entity.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.Center,
+                )
+            } else {
+                Text(
+                    text = entity.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color(0xFF2E2A24),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

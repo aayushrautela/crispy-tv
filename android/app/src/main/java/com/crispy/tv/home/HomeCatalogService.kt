@@ -32,6 +32,8 @@ data class HomeHeroItem(
     val backdropUrl: String,
     val addonId: String,
     val type: String,
+    val detailsContentId: String = id,
+    val detailsMediaType: String = type,
 )
 
 @Immutable
@@ -125,6 +127,8 @@ class HomeCatalogService internal constructor(
                                 backdropUrl = hero.backdropUrl,
                                 addonId = hero.addonId,
                                 type = hero.type,
+                                detailsContentId = hero.detailsContentId,
+                                detailsMediaType = hero.detailsMediaType,
                             )
                         },
                     statusMessage = feedPlan.heroResult.statusMessage,
@@ -205,7 +209,7 @@ class HomeCatalogService internal constructor(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
             )
-            val snapshot = response.toSnapshot()
+            val snapshot = response.toSnapshot(backendContext.accessToken)
             writeCachedSnapshot(backendContext.profileId, snapshot)
             snapshot
         }.getOrElse { error ->
@@ -269,18 +273,26 @@ class HomeCatalogService internal constructor(
         )
     }
 
-    private fun CrispyBackendClient.HomeResponse.toSnapshot(): HomeCatalogSnapshot {
+    private suspend fun CrispyBackendClient.HomeResponse.toSnapshot(accessToken: String): HomeCatalogSnapshot {
         return HomeCatalogSnapshot(
             profileId = profileId.takeIf { it.isNotBlank() },
-            lists = sections.mapNotNull { section -> section.toCatalogList() },
+            lists = buildList {
+                sections.forEach { section ->
+                    section.toCatalogList(accessToken)?.let(::add)
+                }
+            },
             statusMessage = "",
         )
     }
 
-    private fun CrispyBackendClient.HomeSection.toCatalogList(): HomeCatalogList? {
+    private suspend fun CrispyBackendClient.HomeSection.toCatalogList(accessToken: String): HomeCatalogList? {
         return when (this) {
             is CrispyBackendClient.HomeWatchSection -> {
-                val catalogItems = items.mapNotNull { item -> item.toCatalogItem() }
+                val catalogItems = buildList {
+                    items.forEach { item ->
+                        item.toCatalogItem(accessToken)?.let(::add)
+                    }
+                }
                 if (catalogItems.isEmpty()) return null
                 HomeCatalogList(
                     kind = id.normalizedKind(),
@@ -332,8 +344,13 @@ class HomeCatalogService internal constructor(
         }
     }
 
-    private fun CrispyBackendClient.HydratedWatchItem.toCatalogItem(): HomeCatalogItem? {
-        return media.toCatalogItem(descriptionOverride = watchDescription(progress?.progressPercent, watchedAt, lastActivityAt))
+    private suspend fun CrispyBackendClient.HydratedWatchItem.toCatalogItem(accessToken: String): HomeCatalogItem? {
+        val detailsTarget = media.resolveHomeDetailsTarget(accessToken)
+        return media.toCatalogItem(
+            descriptionOverride = watchDescription(progress?.progressPercent, watchedAt, lastActivityAt),
+            detailsContentId = detailsTarget.contentId,
+            detailsMediaType = detailsTarget.mediaType,
+        )
     }
 
     private fun CrispyBackendClient.CalendarItem.toCatalogItem(): HomeCatalogItem {
@@ -342,7 +359,13 @@ class HomeCatalogService internal constructor(
                 relatedShow.title?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
                 airDate?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
             }.joinToString(" - ").ifBlank { media.summary ?: media.overview }
-        return checkNotNull(media.toCatalogItem(descriptionOverride = description)) {
+        return checkNotNull(
+            media.toCatalogItem(
+                descriptionOverride = description,
+                detailsContentId = relatedShow.id,
+                detailsMediaType = relatedShow.normalizedCatalogType(),
+            )
+        ) {
             "Calendar item metadata is missing a title for ${media.id}."
         }
     }
@@ -357,7 +380,11 @@ class HomeCatalogService internal constructor(
         return media.toCatalogItem(descriptionOverride = description)
     }
 
-    private fun CrispyBackendClient.MetadataView.toCatalogItem(descriptionOverride: String? = null): HomeCatalogItem? {
+    private fun CrispyBackendClient.MetadataView.toCatalogItem(
+        descriptionOverride: String? = null,
+        detailsContentId: String = id,
+        detailsMediaType: String = normalizedCatalogType(),
+    ): HomeCatalogItem? {
         val normalizedTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
         return HomeCatalogItem(
             id = id,
@@ -369,6 +396,8 @@ class HomeCatalogService internal constructor(
             rating = formatRatingOutOfTen(rating?.toString()),
             year = releaseYear?.toString() ?: releaseDate?.take(4),
             description = descriptionOverride?.trim()?.takeIf { it.isNotBlank() } ?: summary ?: overview,
+            detailsContentId = detailsContentId,
+            detailsMediaType = detailsMediaType,
         )
     }
 
@@ -383,15 +412,56 @@ class HomeCatalogService internal constructor(
             rating = rating,
             year = year,
             description = description,
+            detailsContentId = detailsContentId,
+            detailsMediaType = detailsMediaType,
         )
     }
 
     private fun CrispyBackendClient.MetadataView.normalizedCatalogType(): String {
-        return when (mediaType.trim().lowercase(Locale.US)) {
+        val normalizedMediaType = mediaType.trim().lowercase(Locale.US)
+        val normalizedParentMediaType = parentMediaType?.trim()?.lowercase(Locale.US)
+        return when (normalizedMediaType) {
+            "anime" -> "anime"
+            "episode" -> if (normalizedParentMediaType == "anime") "anime" else "series"
             "show", "tv", "series" -> "series"
             else -> "movie"
         }
     }
+
+    private suspend fun CrispyBackendClient.MetadataView.resolveHomeDetailsTarget(accessToken: String): HomeDetailsTarget {
+        val fallbackContentId = id.trim().takeIf { it.isNotBlank() } ?: return HomeDetailsTarget(contentId = id, mediaType = normalizedCatalogType())
+        val fallbackMediaType = normalizedCatalogType()
+        if (!mediaType.equals("episode", ignoreCase = true)) {
+            return HomeDetailsTarget(contentId = fallbackContentId, mediaType = fallbackMediaType)
+        }
+
+        val resolvedShow = runCatching {
+            backendClient.resolvePlayback(
+                accessToken = accessToken,
+                input = CrispyBackendClient.MediaLookupInput(
+                    id = fallbackContentId,
+                    mediaType = "episode",
+                    provider = provider,
+                    providerId = providerId,
+                    parentProvider = parentProvider,
+                    parentProviderId = parentProviderId,
+                    absoluteEpisodeNumber = absoluteEpisodeNumber,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                ),
+            ).show
+        }.getOrNull()
+
+        return HomeDetailsTarget(
+            contentId = resolvedShow?.id?.trim().takeUnless { it.isNullOrBlank() } ?: fallbackContentId,
+            mediaType = resolvedShow?.normalizedCatalogType() ?: fallbackMediaType,
+        )
+    }
+
+    private data class HomeDetailsTarget(
+        val contentId: String,
+        val mediaType: String,
+    )
 
     private fun String.normalizedKind(): String {
         return trim().ifBlank { "home" }
@@ -474,6 +544,8 @@ class HomeCatalogService internal constructor(
                                                     .put("backdrop_url", item.backdropUrl)
                                                     .put("addon_id", item.addonId)
                                                     .put("type", item.type)
+                                                    .put("details_content_id", item.detailsContentId)
+                                                    .put("details_media_type", item.detailsMediaType)
                                                     .put("rating", item.rating)
                                                     .put("year", item.year)
                                                     .put("description", item.description)
@@ -549,6 +621,8 @@ class HomeCatalogService internal constructor(
             backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
             addonId = addonId,
             type = type,
+            detailsContentId = json.optString("details_content_id").trim().ifBlank { id },
+            detailsMediaType = json.optString("details_media_type").trim().ifBlank { type },
             rating = json.optString("rating").trim().ifBlank { null },
             year = json.optString("year").trim().ifBlank { null },
             description = json.optString("description").trim().ifBlank { null },

@@ -282,7 +282,6 @@ internal fun DetailsBody(
 
         val production = (titleDetail?.production?.companies.orEmpty() + titleDetail?.production?.networks.orEmpty())
             .distinctBy { it.id }
-            .filter { !it.logoUrl.isNullOrBlank() }
         if (production.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
@@ -301,7 +300,7 @@ internal fun DetailsBody(
             }
         }
 
-        if (details.mediaType == "series" && uiState.seasons.isNotEmpty()) {
+        if (details.mediaType != "movie" && uiState.seasons.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
             Text(
                 text = "Episodes",
@@ -395,7 +394,7 @@ internal fun DetailsBody(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(items = collectionParts, key = { "${it.type}:${it.id}" }) { item ->
-                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id, item.type) })
+                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.detailsContentId, item.detailsMediaType) })
                     }
                 }
             }
@@ -415,16 +414,20 @@ internal fun DetailsBody(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(items = similar, key = { "${it.type}:${it.id}" }) { item ->
-                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.id, item.type) })
+                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.detailsContentId, item.detailsMediaType) })
+                    }
                 }
             }
-        }
 
         val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail, omdbContent = omdbContent)
         if (detailRows.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
 
-            val header = if (details.mediaType == "series") "Show Details" else "Movie Details"
+            val header = when (details.mediaType) {
+                "series" -> "Show Details"
+                "anime" -> "Anime Details"
+                else -> "Movie Details"
+            }
             Text(
                 text = header,
                 style = MaterialTheme.typography.titleMedium,

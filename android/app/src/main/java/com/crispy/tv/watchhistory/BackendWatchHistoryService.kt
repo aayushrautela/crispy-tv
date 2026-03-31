@@ -522,23 +522,30 @@ class BackendWatchHistoryService(
     }
 
     override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
-        val backendContext = getBackendContext() ?: return null
-        val input = identity.toPlaybackLookupInput() ?: return null
-        return try {
-            val mediaKey =
-                backend.resolvePlayback(
-                    accessToken = backendContext.accessToken,
-                    input = input,
-                ).item.mediaKey.trim().takeIf { it.isNotBlank() } ?: return null
-            val envelope = backend.getWatchState(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                mediaKey = mediaKey,
-            )
-            envelope.item.toCanonicalWatchStateSnapshot()
-        } catch (_: Throwable) {
-            null
-        }
+        val localSnapshot = localWatchStateSnapshot(identity)
+        val backendContext = getBackendContext()
+        val input = identity.toPlaybackLookupInput()
+        val backendSnapshot =
+            if (backendContext == null || input == null) {
+                null
+            } else {
+                try {
+                    val mediaKey =
+                        backend.resolvePlayback(
+                            accessToken = backendContext.accessToken,
+                            input = input,
+                        ).item.mediaKey.trim().takeIf { it.isNotBlank() } ?: return mergeCanonicalWatchState(null, localSnapshot)
+                    val envelope = backend.getWatchState(
+                        accessToken = backendContext.accessToken,
+                        profileId = backendContext.profileId,
+                        mediaKey = mediaKey,
+                    )
+                    envelope.item.toCanonicalWatchStateSnapshot()
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+        return mergeCanonicalWatchState(backendSnapshot, localSnapshot)
     }
 
     override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
@@ -763,6 +770,7 @@ class BackendWatchHistoryService(
                     limit = limit.coerceAtLeast(1),
                 ).items
                 .toContinueWatchingEntries(
+                    accessToken = backendContext.accessToken,
                     provider = source,
                     nowMs = nowMs,
                     limit = limit,
@@ -816,6 +824,7 @@ class BackendWatchHistoryService(
                     limit = limit.coerceAtLeast(1),
                 ).items
                 .toCanonicalContinueWatchingItems(
+                    accessToken = backendContext.accessToken,
                     provider = source,
                     nowMs = nowMs,
                     limit = limit,
@@ -827,8 +836,10 @@ class BackendWatchHistoryService(
             }
             CanonicalContinueWatchingResult(statusMessage = status, entries = entries)
         } catch (_: Throwable) {
+            val cached = getCachedContinueWatching(limit = limit, nowMs = nowMs, source = source)
             CanonicalContinueWatchingResult(
-                statusMessage = "${providerLabel(source)} temporarily unavailable.",
+                statusMessage = "${providerLabel(source)} temporarily unavailable. ${cached.statusMessage}",
+                entries = cached.entries.map { it.toCanonicalContinueWatchingItem() },
                 isError = true,
             )
         }
@@ -1409,6 +1420,7 @@ class BackendWatchHistoryService(
     }
 
     private suspend fun List<CrispyBackendClient.HydratedWatchItem>.toContinueWatchingEntries(
+        accessToken: String,
         provider: WatchProvider,
         nowMs: Long,
         limit: Int,
@@ -1425,10 +1437,11 @@ class BackendWatchHistoryService(
                 if (updatedAt < staleCutoff) {
                     continue
                 }
+                val identity = media.resolveContinueWatchingIdentity(accessToken)
                 add(
                     ContinueWatchingEntry(
-                        contentId = media.canonicalContentId(),
-                        contentType = media.mediaType.toMetadataLabMediaType(),
+                        contentId = identity.detailsContentId,
+                        contentType = identity.detailsContentType,
                         title = media.continueWatchingTitle(),
                         season = media.seasonNumber,
                         episode = media.episodeNumber,
@@ -1445,6 +1458,7 @@ class BackendWatchHistoryService(
                         parentProvider = media.parentProvider,
                         parentProviderId = media.parentProviderId,
                         absoluteEpisodeNumber = media.absoluteEpisodeNumber,
+                        playbackContentId = identity.playbackContentId,
                     )
                 )
             }
@@ -1454,6 +1468,7 @@ class BackendWatchHistoryService(
     }
 
     private suspend fun List<CrispyBackendClient.HydratedWatchItem>.toCanonicalContinueWatchingItems(
+        accessToken: String,
         provider: WatchProvider,
         nowMs: Long,
         limit: Int,
@@ -1470,11 +1485,12 @@ class BackendWatchHistoryService(
                 if (updatedAt < staleCutoff) {
                     continue
                 }
+                val identity = media.resolveContinueWatchingIdentity(accessToken)
                 add(
                     CanonicalContinueWatchingItem(
                         id = item.id ?: media.canonicalContentId(),
-                        contentId = media.canonicalContentId(),
-                        contentType = media.mediaType.toMetadataLabMediaType(),
+                        contentId = identity.detailsContentId,
+                        contentType = identity.detailsContentType,
                         title = media.continueWatchingTitle(),
                         season = media.seasonNumber,
                         episode = media.episodeNumber,
@@ -1492,6 +1508,7 @@ class BackendWatchHistoryService(
                         parentProvider = media.parentProvider,
                         parentProviderId = media.parentProviderId,
                         absoluteEpisodeNumber = media.absoluteEpisodeNumber,
+                        playbackContentId = identity.playbackContentId,
                     ),
                 )
             }
@@ -1522,8 +1539,62 @@ class BackendWatchHistoryService(
             parentProvider = parentProvider,
             parentProviderId = parentProviderId,
             absoluteEpisodeNumber = absoluteEpisodeNumber,
+            playbackContentId = playbackContentId,
         )
     }
+
+    private suspend fun CrispyBackendClient.MetadataView.resolveContinueWatchingIdentity(
+        accessToken: String,
+    ): ContinueWatchingIdentity {
+        val playbackContentId = canonicalContentId()
+        val fallbackContentType = continueWatchingDetailsContentType()
+        if (!mediaType.equals("episode", ignoreCase = true)) {
+            return ContinueWatchingIdentity(
+                detailsContentId = playbackContentId,
+                detailsContentType = fallbackContentType,
+                playbackContentId = playbackContentId,
+            )
+        }
+
+        val resolvedShow = runCatching {
+            backend.resolvePlayback(
+                accessToken = accessToken,
+                input = MediaLookupInput(
+                    id = playbackContentId,
+                    mediaType = "episode",
+                    provider = provider,
+                    providerId = providerId,
+                    parentProvider = parentProvider,
+                    parentProviderId = parentProviderId,
+                    absoluteEpisodeNumber = absoluteEpisodeNumber,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                ),
+            ).show
+        }.getOrNull()
+
+        return ContinueWatchingIdentity(
+            detailsContentId = resolvedShow?.canonicalContentId().takeUnless { it.isNullOrBlank() } ?: playbackContentId,
+            detailsContentType = resolvedShow?.continueWatchingDetailsContentType() ?: fallbackContentType,
+            playbackContentId = playbackContentId,
+        )
+    }
+
+    private fun CrispyBackendClient.MetadataView.continueWatchingDetailsContentType(): MetadataLabMediaType {
+        val normalizedMediaType = mediaType.trim().lowercase(Locale.US)
+        val normalizedParentMediaType = parentMediaType?.trim()?.lowercase(Locale.US)
+        return when {
+            normalizedMediaType == "anime" || normalizedParentMediaType == "anime" -> MetadataLabMediaType.ANIME
+            normalizedMediaType == "movie" -> MetadataLabMediaType.MOVIE
+            else -> MetadataLabMediaType.SERIES
+        }
+    }
+
+    private data class ContinueWatchingIdentity(
+        val detailsContentId: String,
+        val detailsContentType: MetadataLabMediaType,
+        val playbackContentId: String,
+    )
 
     private fun CrispyBackendClient.CanonicalLibrary.toProviderLibrary(provider: WatchProvider): ProviderLibrarySnapshot {
         val providerValue = provider.apiValue()
@@ -1657,6 +1728,71 @@ class BackendWatchHistoryService(
             isRated = rating != null,
             userRating = rating?.value,
             watchedEpisodeKeys = watchedEpisodeKeys.map { it.trim().lowercase(Locale.US) }.filter { it.isNotBlank() }.toSet(),
+        )
+    }
+
+    private fun mergeCanonicalWatchState(
+        backendSnapshot: CanonicalWatchStateSnapshot?,
+        localSnapshot: CanonicalWatchStateSnapshot?,
+    ): CanonicalWatchStateSnapshot? {
+        if (backendSnapshot == null && localSnapshot == null) return null
+        val backend = backendSnapshot ?: CanonicalWatchStateSnapshot(
+            isWatched = false,
+            watchedAtEpochMs = null,
+            isInWatchlist = false,
+            isRated = false,
+            userRating = null,
+        )
+        val local = localSnapshot ?: CanonicalWatchStateSnapshot(
+            isWatched = false,
+            watchedAtEpochMs = null,
+            isInWatchlist = false,
+            isRated = false,
+            userRating = null,
+        )
+        return CanonicalWatchStateSnapshot(
+            isWatched = backend.isWatched || local.isWatched,
+            watchedAtEpochMs = listOfNotNull(backend.watchedAtEpochMs, local.watchedAtEpochMs).maxOrNull(),
+            isInWatchlist = backend.isInWatchlist,
+            isRated = backend.isRated,
+            userRating = backend.userRating,
+            watchedEpisodeKeys = backend.watchedEpisodeKeys + local.watchedEpisodeKeys,
+        )
+    }
+
+    private fun localWatchStateSnapshot(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
+        val normalizedContentId = identity.contentId?.trim()?.lowercase(Locale.US).takeUnless { it.isNullOrBlank() } ?: return null
+        val matchingEntries =
+            localStore.loadEntries().filter { item ->
+                item.contentType == identity.contentType &&
+                    item.contentId.trim().lowercase(Locale.US) == normalizedContentId
+            }
+        if (matchingEntries.isEmpty()) return null
+
+        val exactEntries =
+            if (identity.contentType == MetadataLabMediaType.MOVIE || identity.season == null || identity.episode == null) {
+                matchingEntries
+            } else {
+                matchingEntries.filter { it.season == identity.season && it.episode == identity.episode }
+            }
+        val watchedEntries = exactEntries.ifEmpty { matchingEntries }
+        val watchedEpisodeKeys =
+            if (identity.contentType == MetadataLabMediaType.MOVIE) {
+                emptySet()
+            } else {
+                matchingEntries.mapNotNull { item ->
+                    val season = item.season ?: return@mapNotNull null
+                    val episode = item.episode ?: return@mapNotNull null
+                    addEpisodeKey(item.contentId, season, episode)
+                }.toSet()
+            }
+        return CanonicalWatchStateSnapshot(
+            isWatched = watchedEntries.isNotEmpty(),
+            watchedAtEpochMs = watchedEntries.maxOfOrNull { it.watchedAtEpochMs },
+            isInWatchlist = false,
+            isRated = false,
+            userRating = null,
+            watchedEpisodeKeys = watchedEpisodeKeys,
         )
     }
 

@@ -686,7 +686,7 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
             }
 
         return PlaybackIdentity(
-            contentId = contentId.trim().ifBlank { null },
+            contentId = playbackContentId.trim().ifBlank { contentId.trim().ifBlank { null } },
             imdbId = normalizedImdb,
             tmdbId = null,
             contentType = contentType,

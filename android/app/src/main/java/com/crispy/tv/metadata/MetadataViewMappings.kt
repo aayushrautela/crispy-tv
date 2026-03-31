@@ -184,6 +184,8 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
         year = releaseYear?.toString() ?: releaseDate?.take(4),
         genre = null,
         description = summary ?: overview,
+        detailsContentId = itemId,
+        detailsMediaType = normalizedCatalogMediaType(),
     )
 }
 

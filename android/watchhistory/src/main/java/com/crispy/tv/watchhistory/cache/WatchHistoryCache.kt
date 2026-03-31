@@ -149,6 +149,12 @@ class WatchHistoryCache(
                     .put("backdropUrl", entry.backdropUrl)
                     .put("logoUrl", entry.logoUrl)
                     .put("addonId", entry.addonId)
+                    .put("metadataProviderId", entry.metadataProviderId)
+                    .put("metadataProvider", entry.metadataProvider)
+                    .put("parentProvider", entry.parentProvider)
+                    .put("parentProviderId", entry.parentProviderId)
+                    .put("absoluteEpisodeNumber", entry.absoluteEpisodeNumber)
+                    .put("playbackContentId", entry.playbackContentId)
             )
         }
 
@@ -290,6 +296,12 @@ class WatchHistoryCache(
             val backdropUrl = obj.optString("backdropUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val logoUrl = obj.optString("logoUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val addonId = obj.optString("addonId").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val metadataProviderId = obj.optString("metadataProviderId").trim().ifEmpty { null }
+            val metadataProvider = obj.optString("metadataProvider").trim().ifEmpty { null }
+            val parentProvider = obj.optString("parentProvider").trim().ifEmpty { null }
+            val parentProviderId = obj.optString("parentProviderId").trim().ifEmpty { null }
+            val absoluteEpisodeNumber = obj.optInt("absoluteEpisodeNumber", 0).takeIf { it > 0 }
+            val playbackContentId = obj.optString("playbackContentId").trim().ifEmpty { contentId }
 
             entries.add(
                 ContinueWatchingEntry(
@@ -307,6 +319,12 @@ class WatchHistoryCache(
                     backdropUrl = backdropUrl,
                     logoUrl = logoUrl,
                     addonId = addonId,
+                    metadataProviderId = metadataProviderId,
+                    metadataProvider = metadataProvider,
+                    parentProvider = parentProvider,
+                    parentProviderId = parentProviderId,
+                    absoluteEpisodeNumber = absoluteEpisodeNumber,
+                    playbackContentId = playbackContentId,
                 )
             )
         }

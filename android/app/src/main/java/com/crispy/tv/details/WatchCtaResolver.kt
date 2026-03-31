@@ -33,7 +33,8 @@ internal class WatchCtaResolver(
         details: MediaDetails?,
         itemId: String,
     ): ProviderState {
-        val targetId = (details?.id ?: itemId).trim().lowercase(Locale.US)
+        val identity = buildPlaybackIdentity(details, itemId)
+        val targetId = (identity.contentId ?: details?.id ?: itemId).trim().lowercase(Locale.US)
         if (targetId.isBlank()) {
             return ProviderState(
                 isWatched = false,
@@ -44,7 +45,7 @@ internal class WatchCtaResolver(
             )
         }
 
-        val snapshot = userMediaRepository.getCanonicalWatchState(buildPlaybackIdentity(details, itemId))
+        val snapshot = userMediaRepository.getCanonicalWatchState(identity)
         return if (snapshot == null) {
             ProviderState(
                 isWatched = false,

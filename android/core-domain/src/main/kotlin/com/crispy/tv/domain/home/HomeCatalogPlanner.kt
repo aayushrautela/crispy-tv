@@ -12,6 +12,8 @@ data class HomeCatalogItem(
     val rating: String? = null,
     val year: String? = null,
     val description: String? = null,
+    val detailsContentId: String = id,
+    val detailsMediaType: String = type,
 )
 
 enum class HomeCatalogSource(val key: String) {
@@ -88,6 +90,8 @@ data class HomeCatalogHeroItem(
     val backdropUrl: String,
     val addonId: String,
     val type: String,
+    val detailsContentId: String = id,
+    val detailsMediaType: String = type,
 )
 
 data class HomeCatalogHeroResult(
@@ -323,6 +327,8 @@ private fun buildHeroResult(
                     backdropUrl = backdrop,
                     addonId = item.addonId,
                     type = item.type,
+                    detailsContentId = item.detailsContentId,
+                    detailsMediaType = item.detailsMediaType,
                 )
             }
             .take(targetCount)

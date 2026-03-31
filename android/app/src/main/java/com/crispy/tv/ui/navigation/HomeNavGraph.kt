@@ -21,7 +21,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) { entry ->
         HomeRoute(
             onHeroClick = { hero ->
-                navController.navigate(AppRoutes.homeDetailsRoute(hero.id, hero.type))
+                navController.navigate(AppRoutes.homeDetailsRoute(hero.detailsContentId, hero.detailsMediaType))
             },
             onContinueWatchingClick = { item ->
                 navController.navigate(AppRoutes.homeDetailsRoute(item.contentId, item.type))
@@ -33,7 +33,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navController.navigate(AppRoutes.CalendarRoute)
             },
             onCatalogItemClick = { item ->
-                navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
+                navController.navigate(AppRoutes.homeDetailsRoute(item.detailsContentId, item.detailsMediaType))
             },
             onCatalogSeeAllClick = { section ->
                 navController.navigate(AppRoutes.catalogListRoute(section))
@@ -77,7 +77,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         CatalogRoute(
             section = section,
             onBack = { navController.popBackStack() },
-            onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
+            onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.detailsContentId, item.detailsMediaType)) }
         )
     }
 
@@ -133,7 +133,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         PersonDetailsRoute(
             personId = personId,
             onBack = { navController.popBackStack() },
-            onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type)) }
+            onItemClick = { item -> navController.navigate(AppRoutes.homeDetailsRoute(item.detailsContentId, item.detailsMediaType)) }
         )
     }
 }

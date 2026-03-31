@@ -73,6 +73,7 @@ data class ContinueWatchingEntry(
     val parentProvider: String? = null,
     val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
+    val playbackContentId: String = contentId,
 )
 
 data class ContinueWatchingResult(
@@ -102,6 +103,7 @@ data class CanonicalContinueWatchingItem(
     val parentProvider: String? = null,
     val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
+    val playbackContentId: String = contentId,
 ) {
     val type: String
         get() =

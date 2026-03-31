@@ -13,7 +13,7 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
                 if (item.type.equals("person", ignoreCase = true)) {
                     navController.navigate(AppRoutes.personDetailsRoute(item.id))
                 } else {
-                    navController.navigate(AppRoutes.homeDetailsRoute(item.id, item.type))
+                    navController.navigate(AppRoutes.homeDetailsRoute(item.detailsContentId, item.detailsMediaType))
                 }
             },
             onOpenAccountsProfiles = {

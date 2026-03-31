@@ -88,5 +88,12 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
         year = year,
         genre = genre ?: defaultGenre,
         description = summary,
+        detailsContentId = id,
+        detailsMediaType =
+            when {
+                mediaType.equals("anime", ignoreCase = true) -> "anime"
+                mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+                else -> "movie"
+            },
     )
 }
