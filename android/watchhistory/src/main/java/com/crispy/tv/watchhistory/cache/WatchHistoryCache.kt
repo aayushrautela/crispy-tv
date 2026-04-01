@@ -135,33 +135,24 @@ class WatchHistoryCache(
         for (entry in result.entries) {
             entriesJson.put(
                 JSONObject()
-                    .put("contentId", entry.contentId)
-                    .put("contentType", entry.contentType.name)
+                    .put("id", entry.id)
+                    .put("provider", entry.provider)
+                    .put("providerId", entry.providerId)
+                    .put("mediaType", entry.mediaType)
                     .put("title", entry.title)
                     .put("season", entry.season)
                     .put("episode", entry.episode)
                     .put("progressPercent", entry.progressPercent)
                     .put("lastUpdatedEpochMs", entry.lastUpdatedEpochMs)
-                    .put("provider", entry.provider.name)
-                    .put("providerPlaybackId", entry.providerPlaybackId)
+                    .put("source", entry.source.name)
                     .put("isUpNextPlaceholder", entry.isUpNextPlaceholder)
                     .put("posterUrl", entry.posterUrl)
                     .put("backdropUrl", entry.backdropUrl)
                     .put("logoUrl", entry.logoUrl)
                     .put("addonId", entry.addonId)
-                    .put("metadataProviderId", entry.metadataProviderId)
-                    .put("metadataProvider", entry.metadataProvider)
-                    .put("parentProvider", entry.parentProvider)
-                    .put("parentProviderId", entry.parentProviderId)
+                    .put("subtitle", entry.subtitle)
+                    .put("dismissible", entry.dismissible)
                     .put("absoluteEpisodeNumber", entry.absoluteEpisodeNumber)
-                    .put("playbackContentId", entry.playbackContentId)
-                    .put("detailsTitleId", entry.detailsTitleId)
-                    .put("detailsTitleMediaType", entry.detailsTitleMediaType)
-                    .put("highlightEpisodeId", entry.highlightEpisodeId)
-                    .put("playbackMediaType", entry.playbackMediaType)
-                    .put("playbackSeasonNumber", entry.playbackSeasonNumber)
-                    .put("playbackEpisodeNumber", entry.playbackEpisodeNumber)
-                    .put("playbackAbsoluteEpisodeNumber", entry.playbackAbsoluteEpisodeNumber)
             )
         }
 
@@ -288,64 +279,46 @@ class WatchHistoryCache(
         val entries = mutableListOf<ContinueWatchingEntry>()
         for (index in 0 until entriesArray.length()) {
             val obj = entriesArray.optJSONObject(index) ?: continue
-            val contentId = obj.optString("contentId").trim()
-            if (contentId.isBlank()) continue
-            val contentType = runCatching { MetadataLabMediaType.valueOf(obj.optString("contentType").trim()) }.getOrNull() ?: continue
-            val title = obj.optString("title").trim().ifEmpty { contentId }
+            val id = obj.optString("id").trim()
+            val runtimeProvider = obj.optString("provider").trim()
+            val runtimeProviderId = obj.optString("providerId").trim()
+            val mediaType = obj.optString("mediaType").trim()
+            val title = obj.optString("title").trim()
+            if (id.isBlank() || runtimeProvider.isBlank() || runtimeProviderId.isBlank() || mediaType.isBlank() || title.isBlank()) continue
             val season = obj.optInt("season", 0).takeIf { it > 0 }
             val episode = obj.optInt("episode", 0).takeIf { it > 0 }
             val progress = obj.optDouble("progressPercent", 0.0)
             val lastUpdated = obj.optLong("lastUpdatedEpochMs", updatedAt)
-            val providerValue = runCatching { WatchProvider.valueOf(obj.optString("provider").trim()) }.getOrNull() ?: provider
-            val playbackId = obj.optString("providerPlaybackId").trim().ifEmpty { null }
+            val sourceValue = runCatching { WatchProvider.valueOf(obj.optString("source").trim()) }.getOrNull() ?: provider
             val isUpNext = obj.optBoolean("isUpNextPlaceholder", false)
             val posterUrl = obj.optString("posterUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val backdropUrl = obj.optString("backdropUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val logoUrl = obj.optString("logoUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val addonId = obj.optString("addonId").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
-            val metadataProviderId = obj.optString("metadataProviderId").trim().ifEmpty { null }
-            val metadataProvider = obj.optString("metadataProvider").trim().ifEmpty { null }
-            val parentProvider = obj.optString("parentProvider").trim().ifEmpty { null }
-            val parentProviderId = obj.optString("parentProviderId").trim().ifEmpty { null }
+            val subtitle = obj.optString("subtitle").trim().ifEmpty { null }
+            val dismissible = obj.optBoolean("dismissible", false)
             val absoluteEpisodeNumber = obj.optInt("absoluteEpisodeNumber", 0).takeIf { it > 0 }
-            val playbackContentId = obj.optString("playbackContentId").trim().ifEmpty { null }
-            val detailsTitleId = obj.optString("detailsTitleId").trim().ifEmpty { contentId }
-            val detailsTitleMediaType = obj.optString("detailsTitleMediaType").trim().ifEmpty { contentType.label }
-            val highlightEpisodeId = obj.optString("highlightEpisodeId").trim().ifEmpty { null }
-            val playbackMediaType = obj.optString("playbackMediaType").trim().ifEmpty { null }
-            val playbackSeasonNumber = obj.optInt("playbackSeasonNumber", 0).takeIf { it > 0 }
-            val playbackEpisodeNumber = obj.optInt("playbackEpisodeNumber", 0).takeIf { it > 0 }
-            val playbackAbsoluteEpisodeNumber = obj.optInt("playbackAbsoluteEpisodeNumber", 0).takeIf { it > 0 }
 
             entries.add(
                 ContinueWatchingEntry(
-                    contentId = contentId,
-                    contentType = contentType,
+                    id = id,
+                    provider = runtimeProvider,
+                    providerId = runtimeProviderId,
+                    mediaType = mediaType,
                     title = title,
                     season = season,
                     episode = episode,
                     progressPercent = progress,
                     lastUpdatedEpochMs = lastUpdated,
-                    provider = providerValue,
-                    providerPlaybackId = playbackId,
+                    source = sourceValue,
                     isUpNextPlaceholder = isUpNext,
                     posterUrl = posterUrl,
                     backdropUrl = backdropUrl,
                     logoUrl = logoUrl,
                     addonId = addonId,
-                    metadataProviderId = metadataProviderId,
-                    metadataProvider = metadataProvider,
-                    parentProvider = parentProvider,
-                    parentProviderId = parentProviderId,
+                    subtitle = subtitle,
+                    dismissible = dismissible,
                     absoluteEpisodeNumber = absoluteEpisodeNumber,
-                    playbackContentId = playbackContentId,
-                    detailsTitleId = detailsTitleId,
-                    detailsTitleMediaType = detailsTitleMediaType,
-                    highlightEpisodeId = highlightEpisodeId,
-                    playbackMediaType = playbackMediaType,
-                    playbackSeasonNumber = playbackSeasonNumber,
-                    playbackEpisodeNumber = playbackEpisodeNumber,
-                    playbackAbsoluteEpisodeNumber = playbackAbsoluteEpisodeNumber,
                 )
             )
         }

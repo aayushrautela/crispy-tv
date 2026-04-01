@@ -32,6 +32,15 @@ internal data class DetailsScreenLoadResult(
     val seasons: List<Int>,
 )
 
+internal data class RuntimeDetailsEntry(
+    val provider: String,
+    val providerId: String,
+    val mediaType: String,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val absoluteEpisodeNumber: Int? = null,
+)
+
 internal data class DetailsSeasonEpisodesResult(
     val videos: List<MediaVideo> = emptyList(),
     val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),
@@ -62,13 +71,30 @@ internal class DetailsUseCases(
     suspend fun loadScreen(
         itemId: String,
         requestedMediaType: MetadataLabMediaType,
+        runtimeEntry: RuntimeDetailsEntry?,
         nowMs: Long,
     ): DetailsScreenLoadResult {
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val resolvedItemId =
+            if (session != null && runtimeEntry != null) {
+                runCatching {
+                    catalogRepository.resolveTitle(
+                        accessToken = session.accessToken,
+                        provider = runtimeEntry.provider,
+                        providerId = runtimeEntry.providerId,
+                        mediaType = runtimeEntry.mediaType,
+                        seasonNumber = runtimeEntry.seasonNumber,
+                        episodeNumber = runtimeEntry.episodeNumber,
+                        absoluteEpisodeNumber = runtimeEntry.absoluteEpisodeNumber,
+                    ).item.id
+                }.getOrNull()?.trim()?.takeIf { it.isNotBlank() } ?: itemId
+            } else {
+                itemId
+            }
         val titleDetailResult =
             session?.let {
                 runCatching {
-                    catalogRepository.getTitleDetail(accessToken = it.accessToken, id = itemId)
+                    catalogRepository.getTitleDetail(accessToken = it.accessToken, id = resolvedItemId)
                 }
             }
         val titleDetail = titleDetailResult?.getOrNull()
@@ -76,14 +102,14 @@ internal class DetailsUseCases(
         val titleContentResult =
             session?.let {
                 runCatching {
-                    catalogRepository.getTitleContent(accessToken = it.accessToken, id = itemId)
+                    catalogRepository.getTitleContent(accessToken = it.accessToken, id = resolvedItemId)
                 }
             }
         val titleContent = titleContentResult?.getOrNull()
         val titleContentError = titleContentResult?.exceptionOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
-        val providerState = watchCtaResolver.resolveProviderState(details, itemId)
+        val providerState = watchCtaResolver.resolveProviderState(details, resolvedItemId)
         val (watchCta, continueVideoId) = watchCtaResolver.resolveWatchCta(details, providerState, nowMs)
 
         val seasons =

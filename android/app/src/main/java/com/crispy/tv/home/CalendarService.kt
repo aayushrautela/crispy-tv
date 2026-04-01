@@ -16,8 +16,9 @@ import java.util.Locale
 @Immutable
 data class CalendarEpisodeItem(
     val id: String,
-    val seriesId: String,
     val highlightEpisodeId: String? = null,
+    val provider: String,
+    val providerId: String,
     val seriesName: String,
     val episodeTitle: String?,
     val overview: String?,
@@ -34,11 +35,14 @@ data class CalendarEpisodeItem(
     val thumbnailUrl: String?,
     val watchedKeys: Set<String> = emptySet(),
     val type: String = "series",
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 @Immutable
 data class CalendarSeriesItem(
     val id: String,
+    val provider: String,
+    val providerId: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -202,16 +206,17 @@ class CalendarService internal constructor(
         if (mediaType != "episode") return null
         val season = media.seasonNumber ?: return null
         val episode = media.episodeNumber ?: return null
-        val releaseDate = airDate?.trim().takeIf { !it.isNullOrBlank() } ?: media.releaseDate?.trim().takeIf { !it.isNullOrBlank() } ?: return null
+        val releaseDate = media.airDate?.trim().takeIf { !it.isNullOrBlank() } ?: return null
         val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate) ?: return null
-        val watchedKey = "${relatedShow.id.lowercase(Locale.US)}:$season:$episode"
+        val watchedKey = "${media.provider.lowercase(Locale.US)}:${media.providerId.lowercase(Locale.US)}:$season:$episode"
         return CalendarEpisodeItem(
-            id = media.id,
-            seriesId = relatedShow.id,
-            highlightEpisodeId = media.id,
-            seriesName = relatedShow.title ?: relatedShow.subtitle ?: "Series",
-            episodeTitle = media.title ?: media.subtitle,
-            overview = media.summary ?: media.overview,
+            id = "${media.provider}:${media.providerId}:$season:$episode",
+            highlightEpisodeId = null,
+            provider = media.provider,
+            providerId = media.providerId,
+            seriesName = media.title,
+            episodeTitle = media.episodeTitle,
+            overview = media.subtitle,
             season = season,
             episode = episode,
             episodeRange = null,
@@ -220,19 +225,22 @@ class CalendarService internal constructor(
             releasedAtMs = releasedAtMs,
             isReleased = releasedAtMs <= nowMs,
             isGroup = false,
-            posterUrl = relatedShow.images.posterUrl,
-            backdropUrl = relatedShow.images.backdropUrl,
-            thumbnailUrl = media.images.stillUrl ?: media.images.backdropUrl,
+            posterUrl = media.posterUrl,
+            backdropUrl = media.backdropUrl,
+            thumbnailUrl = media.backdropUrl,
             watchedKeys = setOf(watchedKey),
+            absoluteEpisodeNumber = null,
         )
     }
 
     private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
         return CalendarSeriesItem(
-            id = relatedShow.id,
-            title = relatedShow.title ?: relatedShow.subtitle ?: "Series",
-            posterUrl = relatedShow.images.posterUrl,
-            backdropUrl = relatedShow.images.backdropUrl,
+            id = "${media.provider}:${media.providerId}",
+            provider = media.provider,
+            providerId = media.providerId,
+            title = media.title,
+            posterUrl = media.posterUrl,
+            backdropUrl = media.backdropUrl,
             sourceLabel = null,
         )
     }
@@ -244,7 +252,7 @@ class CalendarService internal constructor(
         val rawItems = items.filter { it.season != 0 }.take(HOME_THIS_WEEK_RAW_LIMIT)
 
         return rawItems
-            .groupBy { item -> "${item.seriesId}_${item.releaseDate.take(10)}" }
+            .groupBy { item -> "${item.provider}_${item.providerId}_${item.releaseDate.take(10)}" }
             .values
             .map { group ->
                 val sorted = group.sortedBy { it.episode }
@@ -254,7 +262,7 @@ class CalendarService internal constructor(
                     first
                 } else {
                     first.copy(
-                        id = "group_${first.seriesId}_${first.releaseDate.take(10)}",
+                        id = "group_${first.provider}_${first.providerId}_${first.releaseDate.take(10)}",
                         highlightEpisodeId = null,
                         episodeTitle = null,
                         overview = null,

@@ -71,6 +71,12 @@ private fun SearchTypeFilter.toBackendSearchFilter(): String? {
 }
 
 internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem {
+    val normalizedType =
+        when {
+            mediaType.equals("anime", ignoreCase = true) -> "anime"
+            mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+            else -> "movie"
+        }
     return SearchCatalogItem(
         id = id,
         title = title,
@@ -78,22 +84,14 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
         backdropUrl = backdropUrl,
         logoUrl = logoUrl,
         addonId = "backend",
-        type =
-            when {
-                mediaType.equals("anime", ignoreCase = true) -> "anime"
-                mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
-                else -> "movie"
-            },
+        type = normalizedType,
         rating = rating,
         year = year,
         genre = genre ?: defaultGenre,
         description = summary,
-        detailsContentId = id,
-        detailsMediaType =
-            when {
-                mediaType.equals("anime", ignoreCase = true) -> "anime"
-                mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
-                else -> "movie"
-            },
+        provider = provider,
+        providerId = providerId,
+        detailsContentId = id.takeIf { it.isNotBlank() },
+        detailsMediaType = normalizedType,
     )
 }

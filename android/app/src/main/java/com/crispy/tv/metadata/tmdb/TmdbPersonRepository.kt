@@ -100,6 +100,10 @@ internal class TmdbPersonRepository(
                                 rating = formatRating(credit.optDoubleOrNull("vote_average")),
                                 year = year?.toString(),
                                 genre = null,
+                                provider = "tmdb",
+                                providerId = tmdbId.toString(),
+                                detailsContentId = "tmdb:$tmdbId",
+                                detailsMediaType = type,
                             ),
                             popularity = popularity,
                         )

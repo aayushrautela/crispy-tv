@@ -41,6 +41,7 @@ import java.util.Locale
 class DetailsViewModel internal constructor(
     private val itemId: String,
     private val mediaType: String,
+    private val runtimeEntry: RuntimeDetailsEntry?,
     private val detailsUseCases: DetailsUseCases,
 ) : ViewModel() {
 
@@ -95,6 +96,7 @@ class DetailsViewModel internal constructor(
                     detailsUseCases.loadScreen(
                         itemId = itemId,
                         requestedMediaType = requestedMediaType,
+                        runtimeEntry = runtimeEntry,
                         nowMs = nowMs,
                     )
                 }
@@ -984,6 +986,7 @@ class DetailsViewModel internal constructor(
         internal fun factory(
             itemId: String,
             mediaType: String,
+            runtimeEntry: RuntimeDetailsEntry?,
             detailsUseCases: DetailsUseCases,
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
@@ -992,6 +995,7 @@ class DetailsViewModel internal constructor(
                     return DetailsViewModel(
                         itemId = itemId,
                         mediaType = mediaType,
+                        runtimeEntry = runtimeEntry,
                         detailsUseCases = detailsUseCases,
                     ) as T
                 }

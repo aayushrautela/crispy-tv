@@ -47,35 +47,25 @@ class HomeWatchActivityService {
     private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
         return CanonicalContinueWatchingItem(
             id = entry.id.trim().ifBlank {
-                "${entry.provider.name.lowercase(Locale.US)}:${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:${entry.season ?: -1}:${entry.episode ?: -1}"
+                "${entry.provider.lowercase(Locale.US)}:${entry.providerId}:${entry.mediaType.lowercase(Locale.US)}:${entry.season ?: -1}:${entry.episode ?: -1}"
             },
-            contentId = entry.contentId,
+            provider = entry.provider,
+            providerId = entry.providerId,
+            mediaType = entry.mediaType,
             title = entry.title,
             season = entry.season,
             episode = entry.episode,
             lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
             progressPercent = entry.progressPercent,
-            provider = entry.provider,
-            providerPlaybackId = entry.providerPlaybackId,
+            source = entry.source,
             isUpNextPlaceholder = entry.isUpNextPlaceholder,
             backdropUrl = entry.backdropUrl,
             posterUrl = entry.posterUrl,
             logoUrl = entry.logoUrl,
             addonId = entry.addonId,
-            contentType = entry.contentType,
-            metadataProviderId = entry.metadataProviderId,
-            metadataProvider = entry.metadataProvider,
-            parentProvider = entry.parentProvider,
-            parentProviderId = entry.parentProviderId,
+            subtitle = entry.subtitle,
+            dismissible = entry.dismissible,
             absoluteEpisodeNumber = entry.absoluteEpisodeNumber,
-            playbackContentId = entry.playbackContentId,
-            detailsTitleId = entry.detailsTitleId,
-            detailsTitleMediaType = entry.detailsTitleMediaType,
-            highlightEpisodeId = entry.highlightEpisodeId,
-            playbackMediaType = entry.playbackMediaType,
-            playbackSeasonNumber = entry.playbackSeasonNumber,
-            playbackEpisodeNumber = entry.playbackEpisodeNumber,
-            playbackAbsoluteEpisodeNumber = entry.playbackAbsoluteEpisodeNumber,
         )
     }
 }

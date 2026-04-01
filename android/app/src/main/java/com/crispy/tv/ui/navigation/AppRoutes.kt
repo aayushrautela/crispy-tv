@@ -19,6 +19,11 @@ object AppRoutes {
     const val HomeDetailsMediaTypeArg = "mediaType"
     const val HomeDetailsHighlightEpisodeIdArg = "highlightEpisodeId"
     const val HomeDetailsAutoOpenEpisodeArg = "autoOpenEpisode"
+    const val HomeDetailsRuntimeProviderArg = "runtimeProvider"
+    const val HomeDetailsRuntimeProviderIdArg = "runtimeProviderId"
+    const val HomeDetailsRuntimeSeasonNumberArg = "runtimeSeasonNumber"
+    const val HomeDetailsRuntimeEpisodeNumberArg = "runtimeEpisodeNumber"
+    const val HomeDetailsRuntimeAbsoluteEpisodeArg = "runtimeAbsoluteEpisodeNumber"
 
     const val PersonDetailsRoute = "person/details"
     const val PersonDetailsPersonIdArg = "personId"
@@ -36,7 +41,12 @@ object AppRoutes {
     val HomeDetailsRoutePattern: String =
         "$HomeDetailsRoute/{$HomeDetailsMediaTypeArg}/{$HomeDetailsItemIdArg}" +
             "?$HomeDetailsHighlightEpisodeIdArg={$HomeDetailsHighlightEpisodeIdArg}" +
-            "&$HomeDetailsAutoOpenEpisodeArg={$HomeDetailsAutoOpenEpisodeArg}"
+            "&$HomeDetailsAutoOpenEpisodeArg={$HomeDetailsAutoOpenEpisodeArg}" +
+            "&$HomeDetailsRuntimeProviderArg={$HomeDetailsRuntimeProviderArg}" +
+            "&$HomeDetailsRuntimeProviderIdArg={$HomeDetailsRuntimeProviderIdArg}" +
+            "&$HomeDetailsRuntimeSeasonNumberArg={$HomeDetailsRuntimeSeasonNumberArg}" +
+            "&$HomeDetailsRuntimeEpisodeNumberArg={$HomeDetailsRuntimeEpisodeNumberArg}" +
+            "&$HomeDetailsRuntimeAbsoluteEpisodeArg={$HomeDetailsRuntimeAbsoluteEpisodeArg}"
     val PersonDetailsRoutePattern: String =
         "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}"
     val CatalogListRoutePattern: String =
@@ -57,7 +67,34 @@ object AppRoutes {
         }
         return "$HomeDetailsRoute/${Uri.encode(normalizedType)}/${Uri.encode(itemId.trim())}" +
             "?$HomeDetailsHighlightEpisodeIdArg=${Uri.encode(highlightEpisodeId.orEmpty())}" +
-            "&$HomeDetailsAutoOpenEpisodeArg=${autoOpenEpisode}"
+            "&$HomeDetailsAutoOpenEpisodeArg=${autoOpenEpisode}" +
+            "&$HomeDetailsRuntimeProviderArg=" +
+            "&$HomeDetailsRuntimeProviderIdArg=" +
+            "&$HomeDetailsRuntimeSeasonNumberArg=" +
+            "&$HomeDetailsRuntimeEpisodeNumberArg=" +
+            "&$HomeDetailsRuntimeAbsoluteEpisodeArg="
+    }
+
+    fun runtimeDetailsRoute(
+        provider: String,
+        providerId: String,
+        mediaType: String,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null,
+        absoluteEpisodeNumber: Int? = null,
+        highlightEpisodeId: String? = null,
+        autoOpenEpisode: Boolean = false,
+    ): String {
+        val normalizedType = mediaType.trim().lowercase(Locale.US)
+        val runtimeKey = "$normalizedType:${provider.trim()}:${providerId.trim()}"
+        return "$HomeDetailsRoute/${Uri.encode(normalizedType)}/${Uri.encode(runtimeKey)}" +
+            "?$HomeDetailsHighlightEpisodeIdArg=${Uri.encode(highlightEpisodeId.orEmpty())}" +
+            "&$HomeDetailsAutoOpenEpisodeArg=$autoOpenEpisode" +
+            "&$HomeDetailsRuntimeProviderArg=${Uri.encode(provider.trim())}" +
+            "&$HomeDetailsRuntimeProviderIdArg=${Uri.encode(providerId.trim())}" +
+            "&$HomeDetailsRuntimeSeasonNumberArg=${seasonNumber?.toString().orEmpty()}" +
+            "&$HomeDetailsRuntimeEpisodeNumberArg=${episodeNumber?.toString().orEmpty()}" +
+            "&$HomeDetailsRuntimeAbsoluteEpisodeArg=${absoluteEpisodeNumber?.toString().orEmpty()}"
     }
 
     fun catalogListRoute(section: CatalogSectionRef): String {

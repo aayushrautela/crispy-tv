@@ -13,6 +13,7 @@ import com.crispy.tv.data.repository.DefaultSessionRepository
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
 import com.crispy.tv.details.DetailsUseCases
 import com.crispy.tv.details.DetailsViewModel
+import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
@@ -65,10 +66,12 @@ class AppGraph(
     fun detailsViewModelFactory(
         itemId: String,
         mediaType: String,
+        runtimeEntry: RuntimeDetailsEntry? = null,
     ): ViewModelProvider.Factory {
         return DetailsViewModel.factory(
             itemId = itemId,
             mediaType = mediaType,
+            runtimeEntry = runtimeEntry,
             detailsUseCases = detailsUseCases,
         )
     }

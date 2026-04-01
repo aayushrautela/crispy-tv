@@ -36,9 +36,10 @@ data class CatalogItem(
     val year: String? = null,
     val genre: String? = null,
     val description: String? = null,
-    val detailsContentId: String = id,
-    val detailsMediaType: String = type,
-    val highlightEpisodeId: String? = null,
+    val provider: String,
+    val providerId: String,
+    val detailsContentId: String? = null,
+    val detailsMediaType: String? = null,
 )
 
 @Immutable

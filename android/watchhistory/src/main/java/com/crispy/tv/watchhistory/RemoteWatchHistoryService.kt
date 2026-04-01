@@ -971,17 +971,16 @@ class RemoteWatchHistoryService(
                 "movie" -> {
                     movies +=
                         ContinueWatchingEntry(
-                            contentId = id,
-                            contentType = MetadataLabMediaType.MOVIE,
+                            id = "local:movie:$id",
+                            provider = "local",
+                            providerId = id,
+                            mediaType = "movie",
                             title = id,
                             season = null,
                             episode = null,
                             progressPercent = percent,
                             lastUpdatedEpochMs = lastUpdated,
-                            provider = WatchProvider.LOCAL,
-                            providerPlaybackId = null,
-                            detailsTitleId = id,
-                            detailsTitleMediaType = MetadataLabMediaType.MOVIE.label,
+                            source = WatchProvider.LOCAL,
                         )
                 }
 
@@ -1027,19 +1026,16 @@ class RemoteWatchHistoryService(
         val seriesEntries =
             latestInProgressEpisodeByShow.values.map {
                 ContinueWatchingEntry(
-                    contentId = it.showId,
-                    contentType = it.contentType,
+                    id = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
+                    provider = "local",
+                    providerId = it.showId,
+                    mediaType = it.contentType.label,
                     title = it.showId,
                     season = it.season,
                     episode = it.episode,
                     progressPercent = it.progressPercent,
                     lastUpdatedEpochMs = it.lastUpdatedEpochMs,
-                    provider = WatchProvider.LOCAL,
-                    providerPlaybackId = null,
-                    detailsTitleId = it.showId,
-                    detailsTitleMediaType = it.contentType.label,
-                    playbackSeasonNumber = it.season,
-                    playbackEpisodeNumber = it.episode,
+                    source = WatchProvider.LOCAL,
                 )
             }
 
@@ -1079,20 +1075,17 @@ class RemoteWatchHistoryService(
 
             placeholders +=
                     ContinueWatchingEntry(
-                        contentId = showId,
-                        contentType = episodicType,
+                        id = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
+                        provider = "local",
+                        providerId = showId,
+                        mediaType = episodicType.label,
                         title = showId,
                         season = next.season,
                         episode = next.episode,
                     progressPercent = 0.0,
                     lastUpdatedEpochMs = lastWatchedAt,
-                    provider = WatchProvider.LOCAL,
-                    providerPlaybackId = null,
+                    source = WatchProvider.LOCAL,
                     isUpNextPlaceholder = true,
-                    detailsTitleId = showId,
-                    detailsTitleMediaType = episodicType.label,
-                    playbackSeasonNumber = next.season,
-                    playbackEpisodeNumber = next.episode,
                 )
         }
 

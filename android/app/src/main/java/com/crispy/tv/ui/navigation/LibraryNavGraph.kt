@@ -10,10 +10,10 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
         LibraryRoute(
             onItemClick = { item ->
                 navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.detailsTitleId,
-                        mediaType = item.detailsTitleMediaType,
-                        highlightEpisodeId = item.highlightEpisodeId,
+                    AppRoutes.runtimeDetailsRoute(
+                        provider = item.provider,
+                        providerId = item.providerId,
+                        mediaType = item.mediaType,
                     )
                 )
             },

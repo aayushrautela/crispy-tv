@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.ui.unit.sp
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.home.MediaVideo
@@ -55,7 +56,7 @@ internal fun DetailsBody(
     uiState: DetailsUiState,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
-    onItemClick: (String, String) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
     onPersonClick: (String) -> Unit = {},
     onEpisodeClick: (videoId: String) -> Unit = {},
     onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
@@ -394,7 +395,7 @@ internal fun DetailsBody(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(items = collectionParts, key = { "${it.type}:${it.id}" }) { item ->
-                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.detailsContentId, item.detailsMediaType) })
+                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
                     }
                 }
             }
@@ -414,7 +415,7 @@ internal fun DetailsBody(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(items = similar, key = { "${it.type}:${it.id}" }) { item ->
-                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item.detailsContentId, item.detailsMediaType) })
+                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
                     }
                 }
             }

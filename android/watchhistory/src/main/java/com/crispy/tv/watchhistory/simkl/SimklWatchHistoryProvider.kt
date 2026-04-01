@@ -77,7 +77,7 @@ internal class SimklWatchHistoryProvider(
             val item = playback.optJSONObject(i) ?: continue
             val entry = parsePlaybackItem(item, nowMs) ?: continue
 
-            if (entry.contentId.isBlank()) continue
+            if (entry.providerId.isBlank()) continue
             if (entry.lastUpdatedEpochMs < staleCutoff) continue
 
             val progress = entry.progressPercent
@@ -259,19 +259,16 @@ internal class SimklWatchHistoryProvider(
                 if (contentId.isEmpty()) return null
                 val title = movie.optString("title").trim().ifBlank { contentId }
                 ContinueWatchingEntry(
-                    contentId = contentId,
-                    contentType = MetadataLabMediaType.MOVIE,
+                    id = playbackId ?: "${source.name.lowercase()}:movie:$contentId",
+                    provider = "simkl",
+                    providerId = contentId,
+                    mediaType = "movie",
                     title = title,
                     season = null,
                     episode = null,
                     progressPercent = progress,
                     lastUpdatedEpochMs = pausedAtEpochMs,
-                    provider = source,
-                    providerPlaybackId = playbackId,
-                    detailsTitleId = contentId,
-                    detailsTitleMediaType = MetadataLabMediaType.MOVIE.label,
-                    playbackContentId = contentId,
-                    playbackMediaType = "movie",
+                    source = source,
                 )
             }
 
@@ -292,19 +289,16 @@ internal class SimklWatchHistoryProvider(
                         ?: episodeObj.optInt("number", 0).takeIf { it > 0 }
 
                 ContinueWatchingEntry(
-                    contentId = contentId,
-                    contentType = MetadataLabMediaType.ANIME,
+                    id = playbackId ?: "${source.name.lowercase()}:anime:$contentId:${season ?: -1}:${episode ?: -1}",
+                    provider = "simkl",
+                    providerId = contentId,
+                    mediaType = "anime",
                     title = title,
                     season = season,
                     episode = episode,
                     progressPercent = progress,
                     lastUpdatedEpochMs = pausedAtEpochMs,
-                    provider = source,
-                    providerPlaybackId = playbackId,
-                    detailsTitleId = contentId,
-                    detailsTitleMediaType = MetadataLabMediaType.ANIME.label,
-                    playbackSeasonNumber = season,
-                    playbackEpisodeNumber = episode,
+                    source = source,
                 )
             }
 

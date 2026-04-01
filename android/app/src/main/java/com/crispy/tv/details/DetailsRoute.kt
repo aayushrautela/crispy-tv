@@ -8,6 +8,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.app.appGraph
+import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
@@ -18,10 +20,11 @@ import java.util.Locale
 fun DetailsRoute(
     itemId: String,
     mediaType: String,
+    runtimeEntry: RuntimeDetailsEntry? = null,
     highlightEpisodeId: String? = null,
     autoOpenEpisode: Boolean = false,
     onBack: () -> Unit,
-    onItemClick: (String, String) -> Unit = { _, _ -> },
+    onItemClick: (CatalogItem) -> Unit = {},
     onPersonClick: (String) -> Unit = {},
     onOpenPlayer: (String, Map<String, String>, String, PlaybackIdentity, String?, String?, PlayerLaunchSnapshot?) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
@@ -48,8 +51,8 @@ fun DetailsRoute(
     val viewModel: DetailsViewModel =
         viewModel(
             key = viewModelKey,
-            factory = remember(appContext, itemId, normalizedType) {
-                appContext.appGraph().detailsViewModelFactory(itemId, normalizedType)
+            factory = remember(appContext, itemId, normalizedType, runtimeEntry) {
+                appContext.appGraph().detailsViewModelFactory(itemId, normalizedType, runtimeEntry)
             }
         )
     val playbackSettingsRepository = remember(appContext) {

@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
@@ -61,7 +62,7 @@ internal fun DetailsScreen(
     uiState: DetailsUiState,
     playbackSettings: PlaybackSettings,
     onBack: () -> Unit,
-    onItemClick: (String, String) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
     onPersonClick: (String) -> Unit,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,

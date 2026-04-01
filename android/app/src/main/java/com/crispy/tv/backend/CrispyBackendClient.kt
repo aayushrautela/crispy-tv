@@ -524,65 +524,52 @@ class CrispyBackendClient(
         val ratedAt: String,
     )
 
-    data class DetailsTarget(
-        val kind: String,
-        val titleId: String,
-        val titleMediaType: String,
-        val highlightEpisodeId: String?,
-    )
-
-    data class PlaybackTarget(
-        val contentId: String?,
+    data class RuntimeMediaCard(
         val mediaType: String,
-        val provider: String?,
-        val providerId: String?,
-        val parentProvider: String?,
-        val parentProviderId: String?,
+        val provider: String,
+        val providerId: String,
+        val title: String,
+        val posterUrl: String,
+        val backdropUrl: String?,
+        val subtitle: String?,
+        val releaseYear: Int?,
+        val rating: Double?,
+        val genre: String?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
-        val absoluteEpisodeNumber: Int?,
-    )
-
-    data class EpisodeContext(
-        val episodeId: String,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val absoluteEpisodeNumber: Int?,
-        val title: String?,
+        val episodeTitle: String?,
         val airDate: String?,
         val runtimeMinutes: Int?,
-        val stillUrl: String?,
-        val overview: String?,
     )
 
-    data class WatchDerivedItem(
+    data class ContinueWatchingItem(
         val id: String,
-        val media: MetadataView,
-        val detailsTarget: DetailsTarget,
-        val playbackTarget: PlaybackTarget?,
-        val episodeContext: EpisodeContext?,
+        val media: RuntimeMediaCard,
         val progress: WatchProgressView?,
+        val watchedAt: String?,
+        val lastActivityAt: String?,
+        val origins: List<String>,
+        val dismissible: Boolean,
+    )
+
+    data class WatchedItem(
+        val id: String?,
+        val media: RuntimeMediaCard,
         val watchedAt: String?,
         val lastActivityAt: String?,
         val origins: List<String>,
     )
 
     data class WatchlistItem(
-        val id: String,
-        val media: MetadataView,
-        val detailsTarget: DetailsTarget,
-        val playbackTarget: PlaybackTarget?,
-        val episodeContext: EpisodeContext?,
+        val id: String?,
+        val media: RuntimeMediaCard,
         val addedAt: String?,
         val origins: List<String>,
     )
 
     data class RatingItem(
-        val id: String,
-        val media: MetadataView,
-        val detailsTarget: DetailsTarget,
-        val playbackTarget: PlaybackTarget?,
-        val episodeContext: EpisodeContext?,
+        val id: String?,
+        val media: RuntimeMediaCard,
         val value: Int,
         val ratedAt: String?,
         val origins: List<String>,
@@ -606,10 +593,7 @@ class CrispyBackendClient(
 
     data class LibrarySectionItem(
         val id: String,
-        val media: MetadataView,
-        val detailsTarget: DetailsTarget,
-        val playbackTarget: PlaybackTarget?,
-        val episodeContext: EpisodeContext?,
+        val media: RuntimeMediaCard,
         val state: LibraryItemState,
         val origins: List<String>,
     )
@@ -648,9 +632,7 @@ class CrispyBackendClient(
 
     data class CalendarItem(
         val bucket: String,
-        val media: MetadataView,
-        val relatedShow: MetadataView,
-        val airDate: String?,
+        val media: RuntimeMediaCard,
         val watched: Boolean,
     )
 
@@ -661,51 +643,18 @@ class CrispyBackendClient(
         val items: List<CalendarItem>,
     )
 
-    data class HomeRecommendationItem(
-        val media: MetadataView,
-        val reason: String?,
-        val score: Double?,
-        val rank: Int?,
-        val payload: Map<String, Any?>,
+    data class HomeSnapshotSection(
+        val id: String,
+        val title: String,
+        val layout: String,
+        val sourceKey: String,
+        val items: List<RuntimeMediaCard> = emptyList(),
     )
-
-    sealed interface HomeSection {
-        val id: String
-        val title: String
-        val kind: String
-        val source: String
-    }
-
-    data class HomeWatchSection(
-        override val id: String,
-        override val title: String,
-        override val kind: String = "watch",
-        override val source: String = "canonical_watch",
-        val items: List<WatchDerivedItem> = emptyList(),
-    ) : HomeSection
-
-    data class HomeCalendarSection(
-        override val id: String,
-        override val title: String,
-        override val kind: String = "calendar",
-        override val source: String = "canonical_calendar",
-        val items: List<CalendarItem> = emptyList(),
-    ) : HomeSection
-
-    data class HomeRecommendationSection(
-        override val id: String,
-        override val title: String,
-        override val kind: String = "recommendation",
-        override val source: String = "recommendation",
-        val items: List<HomeRecommendationItem> = emptyList(),
-        val meta: Map<String, Any?> = emptyMap(),
-    ) : HomeSection
 
     data class HomeResponse(
         val profileId: String,
-        val source: String,
         val generatedAt: String?,
-        val sections: List<HomeSection>,
+        val sections: List<HomeSnapshotSection>,
     )
 
     data class ProviderLibraryFolder(
@@ -995,7 +944,7 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 20,
-    ): CanonicalWatchCollectionResponse<WatchDerivedItem> {
+    ): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
         return listContinueWatchingApi(accessToken, profileId, limit)
     }
 
@@ -1007,7 +956,7 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 50,
-    ): CanonicalWatchCollectionResponse<WatchDerivedItem> {
+    ): CanonicalWatchCollectionResponse<WatchedItem> {
         return listWatchHistoryApi(accessToken, profileId, limit)
     }
 

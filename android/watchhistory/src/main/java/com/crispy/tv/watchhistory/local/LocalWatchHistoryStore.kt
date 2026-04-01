@@ -193,18 +193,16 @@ class LocalWatchHistoryStore(
             .sortedByDescending { it.watchedAtEpochMs }
             .map { item ->
                 ContinueWatchingEntry(
-                    contentId = item.contentId,
-                    contentType = item.contentType,
+                    id = "local:${item.contentType.label}:${item.contentId}:${item.season ?: -1}:${item.episode ?: -1}",
+                    provider = "local",
+                    providerId = item.contentId,
+                    mediaType = item.contentType.label,
                     title = item.title,
                     season = item.season,
                     episode = item.episode,
                     progressPercent = 100.0,
                     lastUpdatedEpochMs = item.watchedAtEpochMs,
-                    provider = WatchProvider.LOCAL,
-                    detailsTitleId = item.contentId,
-                    detailsTitleMediaType = item.contentType.label,
-                    playbackSeasonNumber = item.season,
-                    playbackEpisodeNumber = item.episode,
+                    source = WatchProvider.LOCAL,
                 )
             }
     }

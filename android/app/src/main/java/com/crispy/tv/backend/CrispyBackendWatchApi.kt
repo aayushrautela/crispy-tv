@@ -2,9 +2,10 @@ package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
 import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
+import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingItem
 import com.crispy.tv.backend.CrispyBackendClient.HomeResponse
 import com.crispy.tv.backend.CrispyBackendClient.RatingItem
-import com.crispy.tv.backend.CrispyBackendClient.WatchDerivedItem
+import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.LibraryMutationResponse
 import com.crispy.tv.backend.CrispyBackendClient.LibraryMutationSource
@@ -34,9 +35,8 @@ internal suspend fun CrispyBackendClient.getHomeApi(accessToken: String, profile
     val json = JSONObject(requireSuccess(response))
     return HomeResponse(
         profileId = json.optString("profileId").trim(),
-        source = json.optString("source").trim(),
         generatedAt = json.optNullableString("generatedAt"),
-        sections = parseHomeSections(json.optJSONArray("sections")),
+        sections = parseHomeSections(json.optJSONObject("snapshot")?.optJSONArray("sections") ?: json.optJSONArray("sections")),
     )
 }
 
@@ -193,8 +193,8 @@ internal suspend fun CrispyBackendClient.listContinueWatchingApi(
     accessToken: String,
     profileId: String,
     limit: Int = 20,
-): CanonicalWatchCollectionResponse<WatchDerivedItem> {
-    return listWatchDerivedItemsApi(accessToken, profileId, path = "continue-watching", limit = limit)
+): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
+    return listContinueWatchingItemsApi(accessToken, profileId, path = "continue-watching", limit = limit)
 }
 
 internal suspend fun CrispyBackendClient.dismissContinueWatchingApi(
@@ -215,8 +215,23 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
     accessToken: String,
     profileId: String,
     limit: Int = 50,
-): CanonicalWatchCollectionResponse<WatchDerivedItem> {
-    return listWatchDerivedItemsApi(accessToken, profileId, path = "watched", limit = limit)
+): CanonicalWatchCollectionResponse<WatchedItem> {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watched".toHttpUrl().newBuilder()
+            .addQueryParameter("limit", limit.toString())
+            .build(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = JSONObject(requireSuccess(response))
+    return CanonicalWatchCollectionResponse(
+        profileId = json.optString("profileId").trim(),
+        kind = json.optString("kind").trim(),
+        source = json.optString("source").trim(),
+        generatedAt = json.optNullableString("generatedAt"),
+        items = parseWatchedItems(json.optJSONArray("items")),
+    )
 }
 
 internal suspend fun CrispyBackendClient.listWatchlistApi(
@@ -391,12 +406,12 @@ internal suspend fun CrispyBackendClient.deleteNativeRatingApi(
     return parseWatchActionResponse(JSONObject(requireSuccess(response)))
 }
 
-private suspend fun CrispyBackendClient.listWatchDerivedItemsApi(
+private suspend fun CrispyBackendClient.listContinueWatchingItemsApi(
     accessToken: String,
     profileId: String,
     path: String,
     limit: Int,
-): CanonicalWatchCollectionResponse<WatchDerivedItem> {
+): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl().newBuilder()

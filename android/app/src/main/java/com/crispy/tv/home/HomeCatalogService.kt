@@ -32,9 +32,8 @@ data class HomeHeroItem(
     val backdropUrl: String,
     val addonId: String,
     val type: String,
-    val detailsContentId: String = id,
-    val detailsMediaType: String = type,
-    val highlightEpisodeId: String? = null,
+    val provider: String,
+    val providerId: String,
 )
 
 @Immutable
@@ -128,9 +127,8 @@ class HomeCatalogService internal constructor(
                                 backdropUrl = hero.backdropUrl,
                                 addonId = hero.addonId,
                                 type = hero.type,
-                                detailsContentId = hero.detailsContentId,
-                                detailsMediaType = hero.detailsMediaType,
-                                highlightEpisodeId = hero.highlightEpisodeId,
+                                provider = hero.provider,
+                                providerId = hero.providerId,
                             )
                         },
                     statusMessage = feedPlan.heroResult.statusMessage,
@@ -287,123 +285,45 @@ class HomeCatalogService internal constructor(
         )
     }
 
-    private fun CrispyBackendClient.HomeSection.toCatalogList(): HomeCatalogList? {
-        return when (this) {
-            is CrispyBackendClient.HomeWatchSection -> {
-                val catalogItems = buildList {
-                    items.forEach { item ->
-                        item.toCatalogItem()?.let(::add)
-                    }
-                }
-                if (catalogItems.isEmpty()) return null
-                HomeCatalogList(
-                    kind = id.normalizedKind(),
-                    variantKey = source.normalizedVariantKey(),
-                    source = HomeCatalogSource.PERSONAL,
-                    presentation = id.toPresentation(),
-                    name = title,
-                    heading = title,
-                    title = title,
-                    subtitle = watchSubtitle(id),
-                    items = catalogItems,
-                    mediaTypes = catalogItems.map { it.type }.toSet(),
-                )
-            }
-
-            is CrispyBackendClient.HomeCalendarSection -> {
-                val catalogItems = items.map { item -> item.toCatalogItem() }
-                if (catalogItems.isEmpty()) return null
-                HomeCatalogList(
-                    kind = id.normalizedKind(),
-                    variantKey = source.normalizedVariantKey(),
-                    source = HomeCatalogSource.PERSONAL,
-                    presentation = HomeCatalogPresentation.RAIL,
-                    name = title,
-                    heading = title,
-                    title = title,
-                    subtitle = calendarSubtitle(id),
-                    items = catalogItems,
-                    mediaTypes = catalogItems.map { it.type }.toSet(),
-                )
-            }
-
-            is CrispyBackendClient.HomeRecommendationSection -> {
-                val catalogItems = items.mapNotNull { item -> item.toCatalogItem() }
-                if (catalogItems.isEmpty()) return null
-                HomeCatalogList(
-                    kind = id.normalizedKind(),
-                    variantKey = recommendationVariantKey(id, meta, source),
-                    source = HomeCatalogSource.PERSONAL,
-                    presentation = HomeCatalogPresentation.RAIL,
-                    name = title,
-                    heading = title,
-                    title = title,
-                    subtitle = recommendationSubtitle(meta),
-                    items = catalogItems,
-                    mediaTypes = catalogItems.map { it.type }.toSet(),
-                )
-            }
-        }
-    }
-
-    private fun CrispyBackendClient.WatchDerivedItem.toCatalogItem(): HomeCatalogItem? {
-        return media.toCatalogItem(
-            descriptionOverride = watchDescription(progress?.progressPercent, watchedAt, lastActivityAt),
-            detailsContentId = detailsTarget.titleId,
-            detailsMediaType = detailsTarget.titleMediaType,
-            highlightEpisodeId = detailsTarget.highlightEpisodeId,
+    private fun CrispyBackendClient.HomeSnapshotSection.toCatalogList(): HomeCatalogList? {
+        val catalogItems = items.mapNotNull { item -> item.toCatalogItem() }
+        if (catalogItems.isEmpty()) return null
+        return HomeCatalogList(
+            kind = id.normalizedKind(),
+            variantKey = sourceKey.normalizedVariantKey(),
+            source = HomeCatalogSource.PERSONAL,
+            presentation = layout.toPresentation(),
+            name = title,
+            heading = title,
+            title = title,
+            subtitle = when (id.trim().lowercase(Locale.US)) {
+                "continue-watching" -> watchSubtitle(id)
+                "this-week", "up-next", "recently-released" -> calendarSubtitle(id)
+                else -> ""
+            },
+            items = catalogItems,
+            mediaTypes = catalogItems.map { it.type }.toSet(),
         )
     }
 
-    private fun CrispyBackendClient.CalendarItem.toCatalogItem(): HomeCatalogItem {
-        val description =
-            buildList {
-                relatedShow.title?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
-                airDate?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
-            }.joinToString(" - ").ifBlank { media.summary ?: media.overview }
-        return checkNotNull(
-            media.toCatalogItem(
-                descriptionOverride = description,
-                detailsContentId = relatedShow.id,
-                detailsMediaType = relatedShow.normalizedCatalogType(),
-                highlightEpisodeId = media.id.trim().ifBlank { null },
-            )
-        ) {
-            "Calendar item metadata is missing a title for ${media.id}."
-        }
-    }
-
-    private fun CrispyBackendClient.HomeRecommendationItem.toCatalogItem(): HomeCatalogItem? {
-        val scoreText = score?.let { formatRatingOutOfTen(it.toString()) }
-        val description =
-            reason?.trim()?.takeIf { it.isNotBlank() }
-                ?: scoreText?.let { "Match score $it" }
-                ?: media.summary
-                ?: media.overview
-        return media.toCatalogItem(descriptionOverride = description)
-    }
-
-    private fun CrispyBackendClient.MetadataView.toCatalogItem(
-        descriptionOverride: String? = null,
-        detailsContentId: String = id,
-        detailsMediaType: String = normalizedCatalogType(),
-        highlightEpisodeId: String? = null,
-    ): HomeCatalogItem? {
-        val normalizedTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    private fun CrispyBackendClient.RuntimeMediaCard.toCatalogItem(): HomeCatalogItem? {
+        val normalizedTitle = title.trim().ifBlank { return null }
+        val normalizedProvider = provider.trim().ifBlank { return null }
+        val normalizedProviderId = providerId.trim().ifBlank { return null }
+        val normalizedType = normalizedCatalogType()
         return HomeCatalogItem(
-            id = id,
+            id = "$normalizedProvider:$normalizedProviderId:$normalizedType",
             title = normalizedTitle,
-            posterUrl = images.posterUrl,
-            backdropUrl = images.backdropUrl,
+            posterUrl = posterUrl,
+            backdropUrl = backdropUrl,
             addonId = "backend",
-            type = normalizedCatalogType(),
+            type = normalizedType,
             rating = formatRatingOutOfTen(rating?.toString()),
-            year = releaseYear?.toString() ?: releaseDate?.take(4),
-            description = descriptionOverride?.trim()?.takeIf { it.isNotBlank() } ?: summary ?: overview,
-            detailsContentId = detailsContentId,
-            detailsMediaType = detailsMediaType,
-            highlightEpisodeId = highlightEpisodeId,
-        )
+            year = releaseYear?.toString(),
+            description = subtitle,
+            provider = normalizedProvider,
+            providerId = normalizedProviderId,
+        }
     }
 
     private fun HomeCatalogItem.toCatalogItem(): CatalogItem {
@@ -417,19 +337,18 @@ class HomeCatalogService internal constructor(
             rating = rating,
             year = year,
             description = description,
-            detailsContentId = detailsContentId,
-            detailsMediaType = detailsMediaType,
-            highlightEpisodeId = highlightEpisodeId,
+            detailsContentId = id,
+            detailsMediaType = type,
+            provider = provider,
+            providerId = providerId,
         )
     }
 
-    private fun CrispyBackendClient.MetadataView.normalizedCatalogType(): String {
+    private fun CrispyBackendClient.RuntimeMediaCard.normalizedCatalogType(): String {
         val normalizedMediaType = mediaType.trim().lowercase(Locale.US)
-        val normalizedParentMediaType = parentMediaType?.trim()?.lowercase(Locale.US)
         return when (normalizedMediaType) {
             "anime" -> "anime"
-            "episode" -> if (normalizedParentMediaType == "anime") "anime" else "series"
-            "show", "tv", "series" -> "series"
+            "episode", "show", "tv", "series" -> "series"
             else -> "movie"
         }
     }
@@ -443,7 +362,7 @@ class HomeCatalogService internal constructor(
     }
 
     private fun String.toPresentation(): HomeCatalogPresentation {
-        return if (equals("continue-watching", ignoreCase = true)) {
+        return if (equals("hero", ignoreCase = true) || equals("landscape", ignoreCase = true)) {
             HomeCatalogPresentation.HERO
         } else {
             HomeCatalogPresentation.RAIL
@@ -478,12 +397,6 @@ class HomeCatalogService internal constructor(
         return metaKey ?: id.normalizedVariantKey().takeIf { it != DEFAULT_VARIANT_KEY } ?: source.normalizedVariantKey()
     }
 
-    private fun watchDescription(progressPercent: Double?, watchedAt: String?, lastActivityAt: String?): String? {
-        val progressText = progressPercent?.takeIf { it > 0.0 }?.let { "${it.toInt()}% watched" }
-        val activityText = lastActivityAt?.trim()?.takeIf { it.isNotBlank() } ?: watchedAt?.trim()?.takeIf { it.isNotBlank() }
-        return listOfNotNull(progressText, activityText).joinToString(" - ").ifBlank { null }
-    }
-
     private fun HomeCatalogSnapshot.toCachePayload(): String {
         return JSONObject()
             .put("profile_id", profileId)
@@ -515,9 +428,8 @@ class HomeCatalogService internal constructor(
                                                     .put("backdrop_url", item.backdropUrl)
                                                     .put("addon_id", item.addonId)
                                                     .put("type", item.type)
-                                                    .put("details_content_id", item.detailsContentId)
-                                                    .put("details_media_type", item.detailsMediaType)
-                                                    .put("highlight_episode_id", item.highlightEpisodeId)
+                                                    .put("provider", item.provider)
+                                                    .put("provider_id", item.providerId)
                                                     .put("rating", item.rating)
                                                     .put("year", item.year)
                                                     .put("description", item.description)
@@ -593,9 +505,8 @@ class HomeCatalogService internal constructor(
             backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
             addonId = addonId,
             type = type,
-            detailsContentId = json.optString("details_content_id").trim().ifBlank { id },
-            detailsMediaType = json.optString("details_media_type").trim().ifBlank { type },
-            highlightEpisodeId = json.optString("highlight_episode_id").trim().ifBlank { null },
+            provider = json.optString("provider").trim().ifBlank { return null },
+            providerId = json.optString("provider_id").trim().ifBlank { return null },
             rating = json.optString("rating").trim().ifBlank { null },
             year = json.optString("year").trim().ifBlank { null },
             description = json.optString("description").trim().ifBlank { null },

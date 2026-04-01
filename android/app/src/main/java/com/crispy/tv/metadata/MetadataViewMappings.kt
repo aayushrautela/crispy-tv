@@ -172,6 +172,9 @@ internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): 
 internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
     val itemId = id.trim().takeIf { it.isNotBlank() } ?: return null
     val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val lookupProvider = parentProvider?.trim()?.takeIf { it.isNotBlank() } ?: provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val lookupProviderId = parentProviderId?.trim()?.takeIf { it.isNotBlank() } ?: providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedType = normalizedCatalogMediaType()
     return CatalogItem(
         id = itemId,
         title = itemTitle,
@@ -179,13 +182,15 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
         backdropUrl = images.backdropUrl,
         logoUrl = images.logoUrl,
         addonId = "backend",
-        type = normalizedCatalogMediaType(),
+        type = normalizedType,
         rating = formatRating(rating),
         year = releaseYear?.toString() ?: releaseDate?.take(4),
         genre = null,
         description = summary ?: overview,
+        provider = lookupProvider,
+        providerId = lookupProviderId,
         detailsContentId = itemId,
-        detailsMediaType = normalizedCatalogMediaType(),
+        detailsMediaType = normalizedType,
     )
 }
 

@@ -85,6 +85,10 @@ internal fun parseSimilarCatalogItems(
                     rating = formatRating(item.optDoubleOrNull("vote_average")),
                     year = year,
                     genre = TmdbGenre.fromId(primaryGenre),
+                    provider = "tmdb",
+                    providerId = id.toString(),
+                    detailsContentId = "tmdb:$id",
+                    detailsMediaType = mediaType.toCatalogType(),
                 )
             )
         }
@@ -115,6 +119,10 @@ internal fun parseCollection(collection: JSONObject?): TmdbCollection? {
                     rating = null,
                     year = item.optStringNonBlank("release_date")?.take(4),
                     genre = null,
+                    provider = "tmdb",
+                    providerId = itemId.toString(),
+                    detailsContentId = "tmdb:$itemId",
+                    detailsMediaType = MetadataLabMediaType.MOVIE.toCatalogType(),
                 )
             )
         }

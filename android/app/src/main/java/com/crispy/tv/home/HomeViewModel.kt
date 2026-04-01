@@ -239,7 +239,7 @@ class HomeViewModel internal constructor(
     fun hideContinueWatchingItem(item: CanonicalContinueWatchingItem) {
         suppressKeys(
             item.id,
-            continueWatchingContentKey(type = item.type, contentId = item.contentId),
+            continueWatchingContentKey(type = item.type, provider = item.provider, providerId = item.providerId),
         )
         updateWideRailSection(item.sectionKey()) { current ->
             val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
@@ -251,9 +251,10 @@ class HomeViewModel internal constructor(
     }
 
     fun removeContinueWatchingItem(item: CanonicalContinueWatchingItem) {
+        if (!item.dismissible) return
         suppressKeys(
             item.id,
-            continueWatchingContentKey(type = item.type, contentId = item.contentId),
+            continueWatchingContentKey(type = item.type, provider = item.provider, providerId = item.providerId),
         )
         updateWideRailSection(item.sectionKey()) { current ->
             val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
@@ -672,26 +673,28 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
                 "anime" -> MetadataLabMediaType.ANIME
                 else -> MetadataLabMediaType.MOVIE
             }
-        val normalizedPlaybackContentId = playbackContentId?.trim()?.ifBlank { null }
-        val normalizedImdb = normalizedPlaybackContentId?.lowercase(Locale.US)?.takeIf { it.startsWith("tt") }
+        val normalizedImdb = providerId.lowercase(Locale.US).takeIf { provider.equals("imdb", ignoreCase = true) && it.startsWith("tt") }
 
         return PlaybackIdentity(
-            contentId = normalizedPlaybackContentId,
+            contentId = null,
             imdbId = normalizedImdb,
             tmdbId = null,
             contentType = contentType,
-            season = playbackSeasonNumber,
-            episode = playbackEpisodeNumber,
+            season = season,
+            episode = episode,
             title = title,
             year = null,
             showTitle = if (contentType != MetadataLabMediaType.MOVIE) title else null,
             showYear = null,
-            provider = metadataProvider,
-            providerId = metadataProviderId,
-            parentMediaType = playbackMediaType,
-            parentProvider = parentProvider,
-            parentProviderId = parentProviderId,
-            absoluteEpisodeNumber = playbackAbsoluteEpisodeNumber ?: absoluteEpisodeNumber,
+            provider = provider,
+            providerId = providerId,
+            parentMediaType = if (contentType == MetadataLabMediaType.MOVIE) null else when (type.lowercase(Locale.US)) {
+                "anime" -> "anime"
+                else -> "show"
+            },
+            parentProvider = provider,
+            parentProviderId = providerId,
+            absoluteEpisodeNumber = absoluteEpisodeNumber,
         )
     }
 
@@ -843,17 +846,11 @@ class ContinueWatchingSuppressionStore(context: Context) {
 }
 
 private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-    val type =
-        when (entry.contentType) {
-            MetadataLabMediaType.MOVIE -> "movie"
-            MetadataLabMediaType.SERIES -> "series"
-            MetadataLabMediaType.ANIME -> "anime"
-        }
-    return "$type:${entry.contentId.lowercase(Locale.US)}"
+    return continueWatchingContentKey(entry.type, entry.provider, entry.providerId)
 }
 
-private fun continueWatchingContentKey(type: String, contentId: String): String {
-    return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
+private fun continueWatchingContentKey(type: String, provider: String, providerId: String): String {
+    return "${type.trim().lowercase(Locale.US)}:${provider.trim().lowercase(Locale.US)}:${providerId.trim().lowercase(Locale.US)}"
 }
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
@@ -876,21 +873,21 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
 private fun CanonicalContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
     val resolvedContentType = type.toMetadataLabMediaType()
     return WatchHistoryRequest(
-        contentId = contentId,
+        contentId = providerId,
         contentType = resolvedContentType,
         title = title,
         season = season,
         episode = episode,
-        provider = metadataProvider,
-        providerId = metadataProviderId,
+        provider = provider,
+        providerId = providerId,
         parentMediaType =
             when (resolvedContentType) {
                 MetadataLabMediaType.SERIES -> "show"
                 MetadataLabMediaType.ANIME -> "anime"
                 MetadataLabMediaType.MOVIE -> null
             },
-        parentProvider = parentProvider ?: metadataProvider,
-        parentProviderId = parentProviderId ?: metadataProviderId,
+        parentProvider = provider,
+        parentProviderId = providerId,
         absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }

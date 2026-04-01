@@ -79,13 +79,12 @@ internal class WatchCtaResolver(
         return snapshot.entries
             .asSequence()
             .filter { entry ->
-                val entryTargetId = entry.detailsTitleId.trim().lowercase(Locale.US)
-                matchesContentId(entryTargetId, targetId) && matchesMediaType(expectedType, entry.contentType)
+                entry.provider.equals(details.provider, ignoreCase = true) &&
+                    entry.providerId.equals(details.providerId, ignoreCase = true) &&
+                    matchesMediaType(expectedType, entry.type.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
             }
             .sortedWith(
                 compareByDescending<CanonicalContinueWatchingItem> { it.lastUpdatedEpochMs }
-                    .thenByDescending { if (it.highlightEpisodeId != null) 1 else 0 }
-                    .thenByDescending { if (it.playbackContentId != null) 1 else 0 }
             )
             .firstOrNull()
     }
@@ -108,8 +107,8 @@ internal class WatchCtaResolver(
                 continueEntry.progressPercent < CTA_CONTINUE_COMPLETION_PERCENT
 
         if (canContinue) {
-            val continueSeason = continueEntry.playbackSeasonNumber ?: continueEntry.season
-            val continueEpisode = continueEntry.playbackEpisodeNumber ?: continueEntry.episode
+            val continueSeason = continueEntry.season
+            val continueEpisode = continueEntry.episode
             val label =
                 if (isSeries) {
                     if (continueSeason != null && continueEpisode != null) {

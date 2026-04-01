@@ -893,15 +893,15 @@ class BackendWatchHistoryService(
         return listCanonicalWatchHistory(limit = 1000)
             .asSequence()
             .filter { item ->
-                item.playbackTarget?.mediaType.equals("episode", ignoreCase = true) &&
-                    item.playbackTarget?.seasonNumber != null &&
-                    item.playbackTarget?.episodeNumber != null
+                item.media.mediaType.equals("episode", ignoreCase = true) &&
+                    item.media.seasonNumber != null &&
+                    item.media.episodeNumber != null
             }
             .map { item ->
                 WatchedEpisodeRecord(
-                    contentId = item.detailsTarget.titleId,
-                    season = item.playbackTarget?.seasonNumber ?: 1,
-                    episode = item.playbackTarget?.episodeNumber ?: 1,
+                    contentId = item.media.providerId,
+                    season = item.media.seasonNumber ?: 1,
+                    episode = item.media.episodeNumber ?: 1,
                     watchedAtEpochMs =
                         parseIsoToEpochMs(item.watchedAt)
                             ?: parseIsoToEpochMs(item.lastActivityAt)
@@ -912,7 +912,7 @@ class BackendWatchHistoryService(
             .toList()
     }
 
-    private suspend fun listCanonicalWatchHistory(limit: Int): List<CrispyBackendClient.WatchDerivedItem> {
+    private suspend fun listCanonicalWatchHistory(limit: Int): List<CrispyBackendClient.WatchedItem> {
         val backendContext = getBackendContext() ?: return emptyList()
         return try {
             backend.listWatchHistory(
@@ -1113,16 +1113,16 @@ class BackendWatchHistoryService(
             when (type) {
                 "movie" -> {
                     movies += ContinueWatchingEntry(
-                        contentId = id,
-                        contentType = MetadataLabMediaType.MOVIE,
+                        id = "local:movie:$id",
+                        provider = "local",
+                        providerId = id,
+                        mediaType = "movie",
                         title = id,
                         season = null,
                         episode = null,
                         progressPercent = percent,
                         lastUpdatedEpochMs = lastUpdated,
-                        provider = WatchProvider.LOCAL,
-                        detailsTitleId = id,
-                        detailsTitleMediaType = MetadataLabMediaType.MOVIE.label,
+                        source = WatchProvider.LOCAL,
                     )
                 }
 
@@ -1165,18 +1165,16 @@ class BackendWatchHistoryService(
 
         val seriesEntries = latestInProgressEpisodeByShow.values.map {
             ContinueWatchingEntry(
-                contentId = it.showId,
-                contentType = it.contentType,
+                id = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
+                provider = "local",
+                providerId = it.showId,
+                mediaType = if (it.contentType == MetadataLabMediaType.ANIME) "anime" else "series",
                 title = it.showId,
                 season = it.season,
                 episode = it.episode,
                 progressPercent = it.progressPercent,
                 lastUpdatedEpochMs = it.lastUpdatedEpochMs,
-                provider = WatchProvider.LOCAL,
-                detailsTitleId = it.showId,
-                detailsTitleMediaType = it.contentType.label,
-                playbackSeasonNumber = it.season,
-                playbackEpisodeNumber = it.episode,
+                source = WatchProvider.LOCAL,
             )
         }
 
@@ -1216,19 +1214,17 @@ class BackendWatchHistoryService(
             ) ?: continue
 
             placeholders += ContinueWatchingEntry(
-                contentId = showId,
-                contentType = episodicType,
+                id = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
+                provider = "local",
+                providerId = showId,
+                mediaType = if (episodicType == MetadataLabMediaType.ANIME) "anime" else "series",
                 title = showId,
                 season = next.season,
                 episode = next.episode,
                 progressPercent = 0.0,
                 lastUpdatedEpochMs = lastWatchedAt,
-                provider = WatchProvider.LOCAL,
+                source = WatchProvider.LOCAL,
                 isUpNextPlaceholder = true,
-                detailsTitleId = showId,
-                detailsTitleMediaType = episodicType.label,
-                playbackSeasonNumber = next.season,
-                playbackEpisodeNumber = next.episode,
             )
         }
 
@@ -1429,7 +1425,7 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun List<CrispyBackendClient.WatchDerivedItem>.toContinueWatchingEntries(
+    private fun List<CrispyBackendClient.ContinueWatchingItem>.toContinueWatchingEntries(
         provider: WatchProvider,
         nowMs: Long,
         limit: Int,
@@ -1437,8 +1433,6 @@ class BackendWatchHistoryService(
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
         return buildList {
             for (item in this@toContinueWatchingEntries) {
-                val playbackTarget = item.playbackTarget ?: continue
-                val playbackContentId = playbackTarget.contentId?.trim()?.ifBlank { null } ?: continue
                 val updatedAt =
                     parseIsoToEpochMs(item.lastActivityAt)
                         ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
@@ -1447,32 +1441,23 @@ class BackendWatchHistoryService(
                 if (updatedAt < staleCutoff) continue
                 add(
                     ContinueWatchingEntry(
-                        contentId = item.detailsTarget.titleId,
-                        contentType = item.detailsTarget.titleMediaType.toMetadataLabMediaType(),
-                        title = item.episodeContext?.title ?: item.media.continueWatchingTitle(),
-                        season = item.episodeContext?.seasonNumber,
-                        episode = item.episodeContext?.episodeNumber,
+                        id = item.id,
+                        provider = item.media.provider,
+                        providerId = item.media.providerId,
+                        mediaType = item.media.mediaType,
+                        title = item.media.episodeTitle ?: item.media.title,
+                        season = item.media.seasonNumber,
+                        episode = item.media.episodeNumber,
                         progressPercent = item.progress?.progressPercent ?: 0.0,
                         lastUpdatedEpochMs = updatedAt,
-                        provider = provider,
-                        providerPlaybackId = item.id,
-                        posterUrl = item.media.images.posterUrl,
-                        backdropUrl = item.media.images.backdropUrl,
-                        logoUrl = item.media.images.logoUrl,
+                        source = provider,
+                        posterUrl = item.media.posterUrl,
+                        backdropUrl = item.media.backdropUrl,
+                        logoUrl = null,
                         addonId = "backend",
-                        metadataProviderId = playbackTarget.providerId,
-                        metadataProvider = playbackTarget.provider,
-                        parentProvider = playbackTarget.parentProvider,
-                        parentProviderId = playbackTarget.parentProviderId,
-                        absoluteEpisodeNumber = playbackTarget.absoluteEpisodeNumber,
-                        playbackContentId = playbackContentId,
-                        detailsTitleId = item.detailsTarget.titleId,
-                        detailsTitleMediaType = item.detailsTarget.titleMediaType.toMetadataLabMediaType().label,
-                        highlightEpisodeId = item.detailsTarget.highlightEpisodeId,
-                        playbackMediaType = playbackTarget.mediaType,
-                        playbackSeasonNumber = playbackTarget.seasonNumber,
-                        playbackEpisodeNumber = playbackTarget.episodeNumber,
-                        playbackAbsoluteEpisodeNumber = playbackTarget.absoluteEpisodeNumber,
+                        subtitle = item.media.subtitle,
+                        dismissible = item.dismissible,
+                        absoluteEpisodeNumber = null,
                     )
                 )
             }
@@ -1481,91 +1466,34 @@ class BackendWatchHistoryService(
             .take(limit)
     }
 
-    private fun List<CrispyBackendClient.WatchDerivedItem>.toCanonicalContinueWatchingItems(
+    private fun List<CrispyBackendClient.ContinueWatchingItem>.toCanonicalContinueWatchingItems(
         provider: WatchProvider,
         nowMs: Long,
         limit: Int,
     ): List<CanonicalContinueWatchingItem> {
-        val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
-        return buildList {
-            for (item in this@toCanonicalContinueWatchingItems) {
-                val playbackTarget = item.playbackTarget ?: continue
-                val playbackContentId = playbackTarget.contentId?.trim()?.ifBlank { null } ?: continue
-                val updatedAt =
-                    parseIsoToEpochMs(item.lastActivityAt)
-                        ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
-                        ?: parseIsoToEpochMs(item.watchedAt)
-                        ?: nowMs
-                if (updatedAt < staleCutoff) continue
-                val detailsType = item.detailsTarget.titleMediaType.toMetadataLabMediaType()
-                add(
-                    CanonicalContinueWatchingItem(
-                        id = item.id,
-                        contentId = item.detailsTarget.titleId,
-                        contentType = detailsType,
-                        title = item.episodeContext?.title ?: item.media.continueWatchingTitle(),
-                        season = item.episodeContext?.seasonNumber,
-                        episode = item.episodeContext?.episodeNumber,
-                        progressPercent = item.progress?.progressPercent ?: 0.0,
-                        lastUpdatedEpochMs = updatedAt,
-                        provider = provider,
-                        providerPlaybackId = item.id,
-                        isUpNextPlaceholder = false,
-                        posterUrl = item.media.images.posterUrl,
-                        backdropUrl = item.media.images.backdropUrl,
-                        logoUrl = item.media.images.logoUrl,
-                        addonId = "backend",
-                        metadataProviderId = playbackTarget.providerId,
-                        metadataProvider = playbackTarget.provider,
-                        parentProvider = playbackTarget.parentProvider,
-                        parentProviderId = playbackTarget.parentProviderId,
-                        absoluteEpisodeNumber = playbackTarget.absoluteEpisodeNumber,
-                        playbackContentId = playbackContentId,
-                        detailsTitleId = item.detailsTarget.titleId,
-                        detailsTitleMediaType = detailsType.label,
-                        highlightEpisodeId = item.detailsTarget.highlightEpisodeId,
-                        playbackMediaType = playbackTarget.mediaType,
-                        playbackSeasonNumber = playbackTarget.seasonNumber,
-                        playbackEpisodeNumber = playbackTarget.episodeNumber,
-                        playbackAbsoluteEpisodeNumber = playbackTarget.absoluteEpisodeNumber,
-                    ),
-                )
-            }
-        }
-            .sortedByDescending { it.lastUpdatedEpochMs }
-            .take(limit)
+        return toContinueWatchingEntries(provider, nowMs, limit).map { it.toCanonicalContinueWatchingItem() }
     }
 
     private fun ContinueWatchingEntry.toCanonicalContinueWatchingItem(): CanonicalContinueWatchingItem {
         return CanonicalContinueWatchingItem(
-            id = "${provider.name.lowercase(Locale.US)}:${contentType.name.lowercase(Locale.US)}:${detailsTitleId}:${highlightEpisodeId ?: playbackContentId ?: contentId}:${playbackSeasonNumber ?: -1}:${playbackEpisodeNumber ?: -1}",
-            contentId = contentId,
-            contentType = contentType,
+            id = id,
+            provider = provider,
+            providerId = providerId,
+            mediaType = mediaType,
             title = title,
             season = season,
             episode = episode,
             progressPercent = progressPercent,
             lastUpdatedEpochMs = lastUpdatedEpochMs,
-            provider = provider,
-            providerPlaybackId = providerPlaybackId,
+            source = source,
             isUpNextPlaceholder = isUpNextPlaceholder,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
             logoUrl = logoUrl,
             addonId = addonId,
-            metadataProviderId = metadataProviderId,
-            metadataProvider = metadataProvider,
-            parentProvider = parentProvider,
-            parentProviderId = parentProviderId,
+            subtitle = subtitle,
+            dismissible = dismissible,
             absoluteEpisodeNumber = absoluteEpisodeNumber,
-            playbackContentId = playbackContentId,
-            detailsTitleId = detailsTitleId,
-            detailsTitleMediaType = detailsTitleMediaType,
-            highlightEpisodeId = highlightEpisodeId,
-            playbackMediaType = playbackMediaType,
-            playbackSeasonNumber = playbackSeasonNumber,
-            playbackEpisodeNumber = playbackEpisodeNumber,
-            playbackAbsoluteEpisodeNumber = playbackAbsoluteEpisodeNumber,
         )
     }
 
@@ -1592,14 +1520,14 @@ class BackendWatchHistoryService(
                         ProviderLibraryItem(
                             provider = provider,
                             folderId = section.id,
-                            contentId = item.detailsTarget.titleId,
-                            contentType = item.detailsTarget.titleMediaType.toMetadataLabMediaType(),
-                            title = item.media.title?.trim().orEmpty().ifBlank { item.detailsTarget.titleId },
-                            posterUrl = item.media.images.posterUrl,
-                            backdropUrl = item.media.images.backdropUrl,
+                            contentId = item.media.providerId,
+                            contentType = item.media.mediaType.toMetadataLabMediaType(),
+                            title = item.media.title,
+                            posterUrl = item.media.posterUrl,
+                            backdropUrl = item.media.backdropUrl,
                             externalIds = null,
-                            season = item.episodeContext?.seasonNumber,
-                            episode = item.episodeContext?.episodeNumber,
+                            season = item.media.seasonNumber,
+                            episode = item.media.episodeNumber,
                             addedAtEpochMs = parseIsoToEpochMs(item.state.addedAt) ?: 0L,
                         )
                     }
@@ -1614,13 +1542,13 @@ class BackendWatchHistoryService(
     }
 
     private fun CrispyBackendClient.LibrarySectionItem.toCanonicalProviderLibraryItem(folderId: String): CanonicalProviderLibraryItem {
-        val resolvedContentId = detailsTarget.titleId.trim()
+        val resolvedContentId = media.providerId.trim()
         return CanonicalProviderLibraryItem(
             contentId = resolvedContentId,
-            contentType = detailsTarget.titleMediaType.toMetadataLabMediaType(),
-            title = media.title?.trim().orEmpty().ifBlank { resolvedContentId },
-            posterUrl = media.images.posterUrl,
-            backdropUrl = media.images.backdropUrl,
+            contentType = media.mediaType.toMetadataLabMediaType(),
+            title = media.title.trim(),
+            posterUrl = media.posterUrl,
+            backdropUrl = media.backdropUrl,
             folderIds = setOf(folderId.trim()).filter { it.isNotBlank() }.toSet(),
             addedAtEpochMs = parseIsoToEpochMs(state.addedAt) ?: 0L,
         )
@@ -1636,17 +1564,6 @@ class BackendWatchHistoryService(
             folderIds = setOf(folderId.trim()).filter { it.isNotBlank() }.toSet(),
             addedAtEpochMs = addedAtEpochMs,
         )
-    }
-
-    private fun CrispyBackendClient.MetadataView.canonicalContentId(): String {
-        return id.trim()
-    }
-
-    private fun CrispyBackendClient.MetadataView.continueWatchingTitle(): String {
-        return when {
-            mediaType.equals("episode", ignoreCase = true) -> subtitle?.trim().orEmpty().ifBlank { title?.trim().orEmpty() }.ifBlank { canonicalContentId() }
-            else -> title?.trim().orEmpty().ifBlank { canonicalContentId() }
-        }
     }
 
     private fun CrispyBackendClient.WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {

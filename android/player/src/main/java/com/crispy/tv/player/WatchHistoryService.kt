@@ -54,33 +54,24 @@ data class WatchHistoryResult(
 )
 
 data class ContinueWatchingEntry(
-    val contentId: String,
-    val contentType: MetadataLabMediaType,
+    val id: String,
+    val provider: String,
+    val providerId: String,
+    val mediaType: String,
     val title: String,
     val season: Int?,
     val episode: Int?,
     val progressPercent: Double,
     val lastUpdatedEpochMs: Long,
-    val provider: WatchProvider,
-    val providerPlaybackId: String? = null,
+    val source: WatchProvider,
     val isUpNextPlaceholder: Boolean = false,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
     val logoUrl: String? = null,
     val addonId: String? = null,
-    val metadataProviderId: String? = null,
-    val metadataProvider: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
+    val subtitle: String? = null,
+    val dismissible: Boolean = false,
     val absoluteEpisodeNumber: Int? = null,
-    val playbackContentId: String? = null,
-    val detailsTitleId: String,
-    val detailsTitleMediaType: String,
-    val highlightEpisodeId: String? = null,
-    val playbackMediaType: String? = null,
-    val playbackSeasonNumber: Int? = null,
-    val playbackEpisodeNumber: Int? = null,
-    val playbackAbsoluteEpisodeNumber: Int? = null,
 )
 
 data class ContinueWatchingResult(
@@ -91,36 +82,30 @@ data class ContinueWatchingResult(
 
 data class CanonicalContinueWatchingItem(
     val id: String,
-    val contentId: String,
-    val contentType: MetadataLabMediaType,
+    val provider: String,
+    val providerId: String,
+    val mediaType: String,
     val title: String,
     val season: Int?,
     val episode: Int?,
     val progressPercent: Double,
     val lastUpdatedEpochMs: Long,
-    val provider: WatchProvider,
-    val providerPlaybackId: String? = null,
+    val source: WatchProvider,
     val isUpNextPlaceholder: Boolean = false,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
     val logoUrl: String? = null,
     val addonId: String? = null,
-    val metadataProviderId: String? = null,
-    val metadataProvider: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
+    val subtitle: String? = null,
+    val dismissible: Boolean = false,
     val absoluteEpisodeNumber: Int? = null,
-    val playbackContentId: String?,
-    val detailsTitleId: String,
-    val detailsTitleMediaType: String,
-    val highlightEpisodeId: String?,
-    val playbackMediaType: String?,
-    val playbackSeasonNumber: Int?,
-    val playbackEpisodeNumber: Int?,
-    val playbackAbsoluteEpisodeNumber: Int?,
 ) {
     val type: String
-        get() = contentType.label
+        get() = when (mediaType.lowercase()) {
+            "show", "tv", "series", "episode" -> MetadataLabMediaType.SERIES.label
+            "anime" -> MetadataLabMediaType.ANIME.label
+            else -> MetadataLabMediaType.MOVIE.label
+        }
 
     val watchedAtEpochMs: Long
         get() = lastUpdatedEpochMs

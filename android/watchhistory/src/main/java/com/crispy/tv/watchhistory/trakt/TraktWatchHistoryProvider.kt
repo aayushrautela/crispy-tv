@@ -249,20 +249,17 @@ internal class TraktWatchHistoryProvider(
                     val title = movie.optString("title").trim().ifEmpty { contentId }
                     traktBatch.add(
                         ContinueWatchingEntry(
-                            contentId = contentId,
-                            contentType = MetadataLabMediaType.MOVIE,
+                            id = playbackId ?: "trakt:movie:$contentId",
+                            provider = "trakt",
+                            providerId = contentId,
+                            mediaType = "movie",
                             title = title,
                             season = null,
                             episode = null,
                             progressPercent = progress,
                             lastUpdatedEpochMs = pausedAt,
-                            provider = WatchProvider.TRAKT,
-                            providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
+                            source = WatchProvider.TRAKT,
                             isUpNextPlaceholder = false,
-                            detailsTitleId = contentId,
-                            detailsTitleMediaType = MetadataLabMediaType.MOVIE.label,
-                            playbackContentId = contentId,
-                            playbackMediaType = "movie",
                         )
                     )
                     continue
@@ -303,20 +300,17 @@ internal class TraktWatchHistoryProvider(
                                     if (next != null) {
                                         traktBatch.add(
                                             ContinueWatchingEntry(
-                                                contentId = contentId,
-                                                contentType = MetadataLabMediaType.SERIES,
+                                                id = playbackId ?: "trakt:series:$contentId:${next.season}:${next.episode}",
+                                                provider = "trakt",
+                                                providerId = contentId,
+                                                mediaType = "series",
                                                 title = showTitle,
                                                 season = next.season,
                                                 episode = next.episode,
                                                 progressPercent = 0.0,
                                                 lastUpdatedEpochMs = pausedAt,
-                                                provider = WatchProvider.TRAKT,
-                                                providerPlaybackId = playbackId,
+                                                source = WatchProvider.TRAKT,
                                                 isUpNextPlaceholder = true,
-                                                detailsTitleId = contentId,
-                                                detailsTitleMediaType = MetadataLabMediaType.SERIES.label,
-                                                playbackSeasonNumber = next.season,
-                                                playbackEpisodeNumber = next.episode,
                                             )
                                         )
                                         continue
@@ -331,20 +325,17 @@ internal class TraktWatchHistoryProvider(
 
                     traktBatch.add(
                         ContinueWatchingEntry(
-                            contentId = contentId,
-                            contentType = MetadataLabMediaType.SERIES,
+                            id = playbackId ?: "trakt:series:$contentId:${episodeSeason ?: -1}:${episodeNumber ?: -1}",
+                            provider = "trakt",
+                            providerId = contentId,
+                            mediaType = "series",
                             title = title,
                             season = episodeSeason,
                             episode = episodeNumber,
                             progressPercent = progress,
                             lastUpdatedEpochMs = pausedAt,
-                            provider = WatchProvider.TRAKT,
-                            providerPlaybackId = playbackId,
+                            source = WatchProvider.TRAKT,
                             isUpNextPlaceholder = false,
-                            detailsTitleId = contentId,
-                            detailsTitleMediaType = MetadataLabMediaType.SERIES.label,
-                            playbackSeasonNumber = episodeSeason,
-                            playbackEpisodeNumber = episodeNumber,
                         )
                     )
                 }
@@ -447,20 +438,17 @@ internal class TraktWatchHistoryProvider(
 
                 traktBatch.add(
                     ContinueWatchingEntry(
-                        contentId = candidate.contentId,
-                        contentType = MetadataLabMediaType.SERIES,
+                        id = "trakt:series:${candidate.contentId}:${next.season}:${next.episode}",
+                        provider = "trakt",
+                        providerId = candidate.contentId,
+                        mediaType = "series",
                         title = candidate.title,
                         season = next.season,
                         episode = next.episode,
                         progressPercent = 0.0,
                         lastUpdatedEpochMs = candidate.lastWatchedAtMs,
-                        provider = WatchProvider.TRAKT,
-                        providerPlaybackId = null,
+                        source = WatchProvider.TRAKT,
                         isUpNextPlaceholder = true,
-                        detailsTitleId = candidate.contentId,
-                        detailsTitleMediaType = MetadataLabMediaType.SERIES.label,
-                        playbackSeasonNumber = next.season,
-                        playbackEpisodeNumber = next.episode,
                     )
                 )
             } catch (e: Exception) {
@@ -491,14 +479,15 @@ internal class TraktWatchHistoryProvider(
         for (entry in entries) {
             val normalized =
                 entry.copy(
-                    contentId = entry.contentId.trim(),
-                    title = entry.title.trim().ifEmpty { entry.contentId },
+                    provider = entry.provider.trim(),
+                    providerId = entry.providerId.trim(),
+                    title = entry.title.trim().ifEmpty { entry.providerId },
                     progressPercent = entry.progressPercent.coerceIn(0.0, 100.0),
                 )
-            if (normalized.contentId.isBlank()) continue
+            if (normalized.provider.isBlank() || normalized.providerId.isBlank()) continue
             if (!normalized.isUpNextPlaceholder && normalized.progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
 
-            val key = "${normalized.contentType.name}:${normalized.contentId}".lowercase(Locale.US)
+            val key = "${normalized.mediaType}:${normalized.provider}:${normalized.providerId}".lowercase(Locale.US)
             val existing = deduped[key]
             deduped[key] = if (existing == null) normalized else mergeSameContentEntries(existing, normalized)
         }
@@ -540,8 +529,12 @@ internal class TraktWatchHistoryProvider(
                 ProviderLibraryItem(
                     provider = WatchProvider.TRAKT,
                     folderId = "continue-watching",
-                    contentId = it.contentId,
-                    contentType = it.contentType,
+                    contentId = it.providerId,
+                    contentType = when (it.type.lowercase(Locale.US)) {
+                        "anime" -> MetadataLabMediaType.ANIME
+                        "series" -> MetadataLabMediaType.SERIES
+                        else -> MetadataLabMediaType.MOVIE
+                    },
                     title = it.title,
                     externalIds = null,
                     season = it.season,
