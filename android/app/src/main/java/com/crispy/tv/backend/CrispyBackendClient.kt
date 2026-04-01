@@ -77,7 +77,6 @@ class CrispyBackendClient(
     )
 
     data class BackendMetadataItem(
-        val id: String,
         val title: String,
         val summary: String?,
         val posterUrl: String?,
@@ -225,7 +224,7 @@ class CrispyBackendClient(
 
     data class MetadataView(
         val id: String,
-        val mediaKey: String,
+        val mediaKey: String?,
         val mediaType: String,
         val kind: String,
         val tmdbId: Int?,
@@ -315,8 +314,7 @@ class CrispyBackendClient(
     )
 
     data class MetadataCardView(
-        val id: String,
-        val mediaKey: String,
+        val id: String?,
         val mediaType: String,
         val kind: String,
         val tmdbId: Int?,
@@ -465,7 +463,7 @@ class CrispyBackendClient(
     )
 
     data class MetadataPersonKnownForItem(
-        val id: String,
+        val id: String?,
         val mediaType: String,
         val tmdbId: Int?,
         val title: String,

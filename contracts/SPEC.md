@@ -68,7 +68,7 @@ The spec version documents the contract surface. Each suite owns its own
   - Include `person` results (no filtering).
   - Type mapping: TMDB `movie` -> `movie`, TMDB `tv` -> `series`, TMDB `person` -> `person` (unknown media types are ignored).
   - Dedupe key is `(type, tmdb_id)`; keep the first occurrence.
-  - Canonical id form is `tmdb:<id>`.
+  - `contract_version` 3 removes canonical `id` output and emits client navigation identity as `media_type + provider + provider_id` with `provider = tmdb` and `provider_id = <tmdb_id>`.
   - Image URLs use `w500` for movie/series posters and `h632` for person profiles.
   - `year` is parsed from the first 4 digits of `release_date`/`first_air_date` when present; invalid/missing yields `null`.
 - `sync_planner`
@@ -80,6 +80,14 @@ The spec version documents the contract surface. Each suite owns its own
   - Only owners may plan household addon writes.
 - `storage_v1`
   - Logical storage namespace/versioning and schema mismatch behavior.
+- `media_state_contract`
+  - Validate exact backend payload-shape rules from `CLIENT_SERVER_MEDIA_STATE_CONTRACT.md` for client-facing runtime and card-like metadata surfaces.
+  - Regular-card surfaces require provider-based identity via `mediaType + provider + providerId`, plus `title` and `posterUrl`.
+  - Landscape-card surfaces require the same fields plus `backdropUrl`.
+  - Continue-watching items require `id`, `media`, `progress`, `watchedAt`, `lastActivityAt`, `origins`, and `dismissible`; dismissal UI must honor backend `dismissible`.
+  - Watched/watchlist/ratings items require `media` and `origins`, plus their relevant state fields.
+  - Search results, `similar`, `collection.parts`, and person `knownFor` are card-like provider-based items and must not require legacy canonical ids.
+  - Home snapshot sections preserve exact backend `layout` values: `regular`, `landscape`, `collection`, `hero`.
 
 ## Breaking Changes
 

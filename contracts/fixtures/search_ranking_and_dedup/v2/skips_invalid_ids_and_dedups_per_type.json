@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "search_ranking_and_dedup",
   "case_id": "skips_invalid_ids_and_dedups_per_type",
   "input": {
@@ -52,15 +52,17 @@
   "expected": {
     "items": [
       {
-        "id": "tmdb:123",
-        "type": "series",
+        "media_type": "series",
+        "provider": "tmdb",
+        "provider_id": "123",
         "title": "Same Id Series",
         "image_url": "https://image.tmdb.org/t/p/w500/s.jpg",
         "rating": 5.25
       },
       {
-        "id": "tmdb:123",
-        "type": "movie",
+        "media_type": "movie",
+        "provider": "tmdb",
+        "provider_id": "123",
         "title": "Same Id Movie",
         "year": 2018,
         "image_url": "https://image.tmdb.org/t/p/w500/m.jpg",

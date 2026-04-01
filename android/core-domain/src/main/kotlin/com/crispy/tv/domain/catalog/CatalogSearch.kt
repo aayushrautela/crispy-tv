@@ -18,8 +18,9 @@ data class TmdbSearchResultInput(
 )
 
 data class NormalizedSearchItem(
-    val id: String,
-    val type: String,
+    val mediaType: String,
+    val provider: String,
+    val providerId: String,
     val title: String,
     val year: Int?,
     val imageUrl: String?,
@@ -47,8 +48,9 @@ fun normalizeTmdbSearchResults(results: List<TmdbSearchResultInput>): List<Norma
             return@forEach
         }
 
-        val id = "tmdb:$tmdbId"
-        val key = "$type:$id"
+        val provider = "tmdb"
+        val providerId = tmdbId.toString()
+        val key = "$type:$providerId"
         if (!seenKeys.add(key)) {
             return@forEach
         }
@@ -79,8 +81,9 @@ fun normalizeTmdbSearchResults(results: List<TmdbSearchResultInput>): List<Norma
 
         normalized +=
             NormalizedSearchItem(
-                id = id,
-                type = type,
+                mediaType = type,
+                provider = provider,
+                providerId = providerId,
                 title = title,
                 year = year,
                 imageUrl = imageUrl,

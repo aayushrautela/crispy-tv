@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 2
+      "minimum": 3
     },
     "suite": {
       "const": "search_ranking_and_dedup"
@@ -102,26 +102,31 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "id",
-              "type",
-              "title"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "movie",
-                  "series",
-                  "person"
-                ]
-              },
-              "title": {
-                "type": "string",
+              "required": [
+                "media_type",
+                "provider",
+                "provider_id",
+                "title"
+              ],
+              "properties": {
+                "media_type": {
+                  "type": "string",
+                  "enum": [
+                    "movie",
+                    "series",
+                    "person"
+                  ]
+                },
+                "provider": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "provider_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "title": {
+                  "type": "string",
                 "minLength": 1
               },
               "year": {

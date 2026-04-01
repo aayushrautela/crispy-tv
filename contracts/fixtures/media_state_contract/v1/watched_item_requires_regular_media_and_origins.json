@@ -1,0 +1,39 @@
+{
+  "contract_version": 1,
+  "suite": "media_state_contract",
+  "case_id": "watched_item_requires_regular_media_and_origins",
+  "input": {
+    "kind": "watched_item",
+    "payload": {
+      "media": {
+        "mediaType": "movie",
+        "provider": "tmdb",
+        "providerId": "13",
+        "title": "Forrest Gump",
+        "posterUrl": "https://img/forrest.jpg"
+      },
+      "watchedAt": "2026-04-01T10:00:00Z",
+      "origins": ["trakt"]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "regular",
+      "media_type": "movie",
+      "item_id": null,
+      "provider": "tmdb",
+      "provider_id": "13",
+      "title": "Forrest Gump",
+      "poster_url": "https://img/forrest.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": "2026-04-01T10:00:00Z",
+      "last_activity_at": null,
+      "origins": ["trakt"],
+      "dismissible": null,
+      "layout": null
+    }
+  }
+}

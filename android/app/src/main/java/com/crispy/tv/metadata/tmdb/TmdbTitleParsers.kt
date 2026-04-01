@@ -87,8 +87,6 @@ internal fun parseSimilarCatalogItems(
                     genre = TmdbGenre.fromId(primaryGenre),
                     provider = "tmdb",
                     providerId = id.toString(),
-                    detailsContentId = "tmdb:$id",
-                    detailsMediaType = mediaType.toCatalogType(),
                 )
             )
         }
@@ -121,8 +119,6 @@ internal fun parseCollection(collection: JSONObject?): TmdbCollection? {
                     genre = null,
                     provider = "tmdb",
                     providerId = itemId.toString(),
-                    detailsContentId = "tmdb:$itemId",
-                    detailsMediaType = MetadataLabMediaType.MOVIE.toCatalogType(),
                 )
             )
         }

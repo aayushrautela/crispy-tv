@@ -156,25 +156,30 @@ internal fun CrispyBackendClient.parseMetadataItems(array: JSONArray?): List<Bac
 }
 
 internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMetadataItem {
-    val id = json.optString("id").trim()
     val title = json.optString("title").trim()
-    if (id.isBlank() || title.isBlank()) {
+    val mediaType = json.optString("mediaType").trim()
+    val provider = json.optNullableString("provider")
+    val providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null }
+    val posterUrl = json.optJSONObject("images").optNullableString("posterUrl")
+    if (title.isBlank()) {
         throw IllegalStateException("Backend metadata item is missing required fields.")
+    }
+    if (mediaType.isBlank() || provider.isNullOrBlank() || providerId.isNullOrBlank() || posterUrl.isNullOrBlank()) {
+        throw IllegalStateException("Backend metadata item is missing regular-card fields.")
     }
     val genre = json.optJSONArray("genres")?.optString(0)?.trim().takeUnless { it.isNullOrBlank() }
     return BackendMetadataItem(
-        id = id,
         title = title,
         summary = json.optString("summary").trim().ifBlank { null },
-        posterUrl = json.optJSONObject("images").optNullableString("posterUrl"),
+        posterUrl = posterUrl,
         backdropUrl = json.optJSONObject("images").optNullableString("backdropUrl"),
         logoUrl = json.optJSONObject("images").optNullableString("logoUrl"),
-        mediaType = json.optString("mediaType").trim().ifBlank { "movie" },
+        mediaType = mediaType,
         rating = json.opt("rating")?.toString()?.trim()?.ifBlank { null },
         year = json.opt("releaseYear")?.toString()?.trim()?.ifBlank { null },
         genre = genre,
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
+        provider = provider,
+        providerId = providerId,
     )
 }
 
@@ -183,13 +188,9 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
     if (id.isBlank()) {
         throw IllegalStateException("Backend metadata view is missing an id.")
     }
-    val mediaKey = json.optString("mediaKey").trim()
-    if (mediaKey.isBlank()) {
-        throw IllegalStateException("Backend metadata view is missing a mediaKey.")
-    }
     return MetadataView(
         id = id,
-        mediaKey = mediaKey,
+        mediaKey = json.optNullableString("mediaKey"),
         mediaType = json.optNullableString("mediaType") ?: "movie",
         kind = json.optNullableString("kind") ?: "title",
         tmdbId = json.optIntOrNull("tmdbId"),
@@ -232,17 +233,8 @@ internal fun CrispyBackendClient.parseMetadataCardViews(array: JSONArray?): List
 }
 
 internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): MetadataCardView {
-    val id = json.optString("id").trim()
-    if (id.isBlank()) {
-        throw IllegalStateException("Backend metadata card view is missing an id.")
-    }
-    val mediaKey = json.optString("mediaKey").trim()
-    if (mediaKey.isBlank()) {
-        throw IllegalStateException("Backend metadata card view is missing a mediaKey.")
-    }
     return MetadataCardView(
-        id = id,
-        mediaKey = mediaKey,
+        id = json.optNullableString("id"),
         mediaType = json.optNullableString("mediaType") ?: "movie",
         kind = json.optNullableString("kind") ?: "title",
         tmdbId = json.optIntOrNull("tmdbId"),
@@ -416,14 +408,13 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
-            val id = item.optString("id").trim()
             val title = item.optString("title").trim()
-            if (id.isBlank() || title.isBlank()) {
+            if (title.isBlank()) {
                 continue
             }
             add(
                 MetadataPersonKnownForItem(
-                    id = id,
+                    id = item.optNullableString("id"),
                     mediaType = item.optNullableString("mediaType") ?: "movie",
                     tmdbId = item.optIntOrNull("tmdbId"),
                     title = title,

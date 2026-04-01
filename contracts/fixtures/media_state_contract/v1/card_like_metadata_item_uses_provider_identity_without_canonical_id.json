@@ -1,0 +1,39 @@
+{
+  "contract_version": 1,
+  "suite": "media_state_contract",
+  "case_id": "card_like_metadata_item_uses_provider_identity_without_canonical_id",
+  "input": {
+    "kind": "metadata_card",
+    "payload": {
+      "mediaType": "movie",
+      "provider": "tmdb",
+      "providerId": "680",
+      "title": "Pulp Fiction",
+      "images": {
+        "posterUrl": "https://img/pulp-poster.jpg",
+        "backdropUrl": "https://img/pulp-backdrop.jpg"
+      },
+      "summary": "Crime stories interlock."
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "regular",
+      "media_type": "movie",
+      "item_id": null,
+      "provider": "tmdb",
+      "provider_id": "680",
+      "title": "Pulp Fiction",
+      "poster_url": "https://img/pulp-poster.jpg",
+      "backdrop_url": "https://img/pulp-backdrop.jpg",
+      "subtitle": "Crime stories interlock.",
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": null,
+      "dismissible": null,
+      "layout": null
+    }
+  }
+}

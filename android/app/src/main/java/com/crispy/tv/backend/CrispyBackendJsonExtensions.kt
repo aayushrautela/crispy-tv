@@ -24,10 +24,6 @@ internal fun JSONObject.putLibraryResolveInput(input: MediaLookupInput) {
     if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
 }
 
-internal fun JSONObject.putWatchLookupInput(input: MediaLookupInput) {
-    if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
-}
-
 internal fun Map<String, Any?>.toJsonObject(): JSONObject {
     val json = JSONObject()
     for ((key, value) in this) {

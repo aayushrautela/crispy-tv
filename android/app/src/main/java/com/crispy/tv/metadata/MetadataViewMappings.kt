@@ -70,10 +70,7 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
                 episode != null -> "Episode $episode"
                 else -> canonicalId
             }
-    val showLookupBase =
-        canonicalProviderLookupId(parentProvider, parentProviderId)
-            ?: showId?.trim()?.takeIf { it.isNotBlank() }
-            ?: externalProviderLookupId(showExternalIds)
+    val showLookupBase = canonicalProviderLookupId(parentProvider, parentProviderId)
     val lookupId =
         if (season != null && episode != null && showLookupBase != null) {
             "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
@@ -170,15 +167,16 @@ internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): 
 }
 
 internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
-    val itemId = id.trim().takeIf { it.isNotBlank() } ?: return null
     val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val lookupProvider = parentProvider?.trim()?.takeIf { it.isNotBlank() } ?: provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val lookupProviderId = parentProviderId?.trim()?.takeIf { it.isNotBlank() } ?: providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedType = normalizedCatalogMediaType()
+    val normalizedPosterUrl = images.posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val itemId = id?.trim()?.takeIf { it.isNotBlank() } ?: "$normalizedType:${lookupProvider.lowercase(Locale.US)}:${lookupProviderId}"
     return CatalogItem(
         id = itemId,
         title = itemTitle,
-        posterUrl = images.posterUrl,
+        posterUrl = normalizedPosterUrl,
         backdropUrl = images.backdropUrl,
         logoUrl = images.logoUrl,
         addonId = "backend",
@@ -189,23 +187,17 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
         description = summary ?: overview,
         provider = lookupProvider,
         providerId = lookupProviderId,
-        detailsContentId = itemId,
-        detailsMediaType = normalizedType,
     )
 }
 
 internal fun MediaDetails.providerBaseLookupId(): String? {
     return canonicalProviderLookupId(parentProvider, parentProviderId)
         ?: canonicalProviderLookupId(provider, providerId)
-        ?: id.trim().takeIf { it.isNotBlank() }
-        ?: imdbId?.trim()?.takeIf { it.isNotBlank() }
 }
 
 internal fun CrispyBackendClient.MetadataView.providerBaseLookupId(): String? {
     return canonicalProviderLookupId(parentProvider, parentProviderId)
         ?: canonicalProviderLookupId(provider, providerId)
-        ?: id.trim().takeIf { it.isNotBlank() }
-        ?: externalProviderLookupId(externalIds)
 }
 
 internal fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {
@@ -222,12 +214,4 @@ private fun canonicalProviderLookupId(provider: String?, providerId: String?): S
     val normalizedProviderId = providerId?.trim().orEmpty()
     if (normalizedProvider.isBlank() || normalizedProviderId.isBlank()) return null
     return "$normalizedProvider:$normalizedProviderId"
-}
-
-private fun externalProviderLookupId(externalIds: CrispyBackendClient.MetadataExternalIds?): String? {
-    val ids = externalIds ?: return null
-    return ids.tvdb?.takeIf { it > 0 }?.let { "tvdb:$it" }
-        ?: ids.kitsu?.takeIf { it > 0 }?.let { "kitsu:$it" }
-        ?: ids.imdb?.trim()?.takeIf { it.isNotBlank() }
-        ?: ids.tmdb?.takeIf { it > 0 }?.let { "tmdb:$it" }
 }

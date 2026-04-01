@@ -152,6 +152,7 @@ class HomeCatalogService internal constructor(
                         catalogId = section.catalogId,
                         source = section.source,
                         presentation = section.presentation,
+                        layout = section.layout.orEmpty(),
                         variantKey = section.variantKey,
                         name = section.name,
                         heading = section.heading,
@@ -177,6 +178,7 @@ class HomeCatalogService internal constructor(
                         catalogId = catalog.section.catalogId,
                         source = catalog.section.source,
                         presentation = catalog.section.presentation,
+                        layout = catalog.section.layout.orEmpty(),
                         variantKey = catalog.section.variantKey,
                         name = catalog.section.name,
                         heading = catalog.section.heading,
@@ -299,6 +301,7 @@ class HomeCatalogService internal constructor(
             variantKey = sourceKey.normalizedVariantKey(),
             source = HomeCatalogSource.PERSONAL,
             presentation = layout.toPresentation(),
+            layout = layout.normalizedBackendLayout(),
             name = title,
             heading = title,
             title = title,
@@ -343,8 +346,6 @@ class HomeCatalogService internal constructor(
             rating = rating,
             year = year,
             description = description,
-            detailsContentId = id,
-            detailsMediaType = type,
             provider = provider,
             providerId = providerId,
         )
@@ -372,6 +373,15 @@ class HomeCatalogService internal constructor(
             HomeCatalogPresentation.HERO
         } else {
             HomeCatalogPresentation.RAIL
+        }
+    }
+
+    private fun String.normalizedBackendLayout(): String {
+        return when (trim().lowercase(Locale.US)) {
+            "hero" -> "hero"
+            "landscape" -> "landscape"
+            "collection" -> "collection"
+            else -> "regular"
         }
     }
 
@@ -417,6 +427,7 @@ class HomeCatalogService internal constructor(
                                 .put("variant_key", list.variantKey)
                                 .put("source", list.source.key)
                                 .put("presentation", list.presentation.key)
+                                .put("layout", list.layout)
                                 .put("name", list.name)
                                 .put("heading", list.heading)
                                 .put("title", list.title)
@@ -487,6 +498,7 @@ class HomeCatalogService internal constructor(
             variantKey = json.optString("variant_key").trim().ifBlank { DEFAULT_VARIANT_KEY },
             source = source,
             presentation = presentation,
+            layout = json.optString("layout").trim().ifBlank { null },
             name = json.optString("name").trim(),
             heading = json.optString("heading").trim(),
             title = json.optString("title").trim(),

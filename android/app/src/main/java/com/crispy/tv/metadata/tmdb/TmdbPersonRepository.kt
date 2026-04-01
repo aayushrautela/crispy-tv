@@ -102,8 +102,6 @@ internal class TmdbPersonRepository(
                                 genre = null,
                                 provider = "tmdb",
                                 providerId = tmdbId.toString(),
-                                detailsContentId = "tmdb:$tmdbId",
-                                detailsMediaType = type,
                             ),
                             popularity = popularity,
                         )

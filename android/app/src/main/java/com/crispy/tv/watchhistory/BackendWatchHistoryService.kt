@@ -536,7 +536,7 @@ class BackendWatchHistoryService(
                         backend.resolvePlayback(
                             accessToken = backendContext.accessToken,
                             input = input,
-                        ).item.mediaKey.trim().takeIf { it.isNotBlank() } ?: return mergeCanonicalWatchState(null, localSnapshot)
+                        ).item.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return mergeCanonicalWatchState(null, localSnapshot)
                     val envelope = backend.getWatchState(
                         accessToken = backendContext.accessToken,
                         profileId = backendContext.profileId,
@@ -696,7 +696,7 @@ class BackendWatchHistoryService(
             backend.resolvePlayback(
                 accessToken = accessToken,
                 input = request.toProviderLookupInput(),
-            ).item.mediaKey.trim().takeIf { it.isNotBlank() }
+            ).item.mediaKey?.trim()?.takeIf { it.isNotBlank() }
         } catch (_: Throwable) {
             null
         }

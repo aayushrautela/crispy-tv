@@ -30,7 +30,7 @@ class BackendSearchRepository(
             filter = filter.toBackendSearchFilter(),
             locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.map { it.toCatalogItem() })
+        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem() })
     }
 
     suspend fun discoverByGenre(
@@ -47,7 +47,7 @@ class BackendSearchRepository(
             filter = filter.toBackendSearchFilter(),
             locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.map { it.toCatalogItem(defaultGenre = genreSuggestion.label) })
+        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem(defaultGenre = genreSuggestion.label) })
     }
 
     companion object {
@@ -70,17 +70,20 @@ private fun SearchTypeFilter.toBackendSearchFilter(): String? {
     }
 }
 
-internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem {
+internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val normalizedType =
         when {
             mediaType.equals("anime", ignoreCase = true) -> "anime"
             mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
             else -> "movie"
         }
+    val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return SearchCatalogItem(
-        id = id,
+        id = backendCatalogItemId(normalizedType, normalizedProvider, normalizedProviderId),
         title = title,
-        posterUrl = posterUrl,
+        posterUrl = normalizedPosterUrl,
         backdropUrl = backdropUrl,
         logoUrl = logoUrl,
         addonId = "backend",
@@ -89,9 +92,11 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
         year = year,
         genre = genre ?: defaultGenre,
         description = summary,
-        provider = provider ?: "tmdb",
-        providerId = providerId ?: id.substringAfter("tmdb:", missingDelimiterValue = id),
-        detailsContentId = id.takeIf { it.isNotBlank() },
-        detailsMediaType = normalizedType,
+        provider = normalizedProvider,
+        providerId = normalizedProviderId,
     )
+}
+
+private fun backendCatalogItemId(type: String, provider: String, providerId: String): String {
+    return "${type.trim().lowercase(Locale.US)}:${provider.trim().lowercase(Locale.US)}:${providerId.trim()}"
 }

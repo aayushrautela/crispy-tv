@@ -129,25 +129,26 @@ private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails 
         imdbId = imdbId,
         instagramId = instagramId,
         twitterId = twitterId,
-        knownFor = knownFor.map { it.toCatalogItem() },
+        knownFor = knownFor.mapNotNull { it.toCatalogItem() },
     )
 }
 
-private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): CatalogItem {
+private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): CatalogItem? {
     val type = if (mediaType.equals("movie", ignoreCase = true)) "movie" else "series"
+    val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return CatalogItem(
-        id = id,
+        id = id?.trim()?.takeIf { it.isNotBlank() } ?: "$type:${normalizedProvider.lowercase(Locale.US)}:$normalizedProviderId",
         title = title,
-        posterUrl = posterUrl,
+        posterUrl = normalizedPosterUrl,
         backdropUrl = null,
         addonId = "tmdb",
         type = type,
         rating = formatRating(rating),
         year = releaseYear?.toString(),
         genre = null,
-        provider = provider ?: "tmdb",
-        providerId = providerId ?: tmdbId?.toString().orEmpty().ifBlank { id },
-        detailsContentId = id.takeIf { it.isNotBlank() },
-        detailsMediaType = type,
+        provider = normalizedProvider,
+        providerId = normalizedProviderId,
     )
 }

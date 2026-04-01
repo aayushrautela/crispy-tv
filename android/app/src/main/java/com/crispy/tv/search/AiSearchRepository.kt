@@ -39,7 +39,7 @@ class AiSearchRepository(
             filter = filter.toBackendAiFilter(),
             locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.map { it.toCatalogItem() })
+        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem() })
     }
 
     companion object {

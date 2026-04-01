@@ -88,6 +88,7 @@ class HomeCatalogsContractTest {
             source = HomeCatalogSource.fromRaw(json.requireString("source", path))
                 ?: error("${path.fileName}: invalid source"),
             presentation = HomeCatalogPresentation.fromRaw(json.optionalString("presentation", path)),
+            layout = json.optionalString("layout", path),
             name = json.optionalString("name", path).orEmpty(),
             heading = json.optionalString("heading", path).orEmpty(),
             title = json.optionalString("title", path).orEmpty(),
@@ -150,6 +151,7 @@ class HomeCatalogsContractTest {
             source = HomeCatalogSource.fromRaw(json.requireString("source", path))
                 ?: error("${path.fileName}: invalid section source"),
             presentation = HomeCatalogPresentation.fromRaw(json.optionalString("presentation", path)),
+            layout = json.optionalString("layout", path),
             variantKey = json.optionalString("variant_key", path) ?: "default",
             name = json.optionalString("name", path).orEmpty(),
             heading = json.optionalString("heading", path).orEmpty(),

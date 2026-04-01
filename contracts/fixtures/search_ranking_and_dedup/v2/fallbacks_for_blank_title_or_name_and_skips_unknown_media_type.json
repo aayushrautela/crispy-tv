@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "search_ranking_and_dedup",
   "case_id": "fallbacks_for_blank_title_or_name_and_skips_unknown_media_type",
   "input": {
@@ -39,23 +39,26 @@
   "expected": {
     "items": [
       {
-        "id": "tmdb:101",
-        "type": "movie",
+        "media_type": "movie",
+        "provider": "tmdb",
+        "provider_id": "101",
         "title": "Fallback Movie",
         "year": 2010,
         "rating": 7.0
       },
       {
-        "id": "tmdb:202",
-        "type": "series",
+        "media_type": "series",
+        "provider": "tmdb",
+        "provider_id": "202",
         "title": "Fallback Series",
         "year": 2009,
         "image_url": "https://image.tmdb.org/t/p/w500/series.jpg",
         "rating": 9.0
       },
       {
-        "id": "tmdb:303",
-        "type": "person",
+        "media_type": "person",
+        "provider": "tmdb",
+        "provider_id": "303",
         "title": "Name From Title",
         "image_url": "https://image.tmdb.org/t/p/h632/person.jpg"
       }

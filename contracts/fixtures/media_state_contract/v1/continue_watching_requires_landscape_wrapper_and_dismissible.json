@@ -1,0 +1,52 @@
+{
+  "contract_version": 1,
+  "suite": "media_state_contract",
+  "case_id": "continue_watching_requires_landscape_wrapper_and_dismissible",
+  "input": {
+    "kind": "continue_watching_item",
+    "payload": {
+      "id": "cw-123",
+      "media": {
+        "mediaType": "series",
+        "provider": "tmdb",
+        "providerId": "1399",
+        "title": "Game of Thrones",
+        "posterUrl": "https://img/poster.jpg",
+        "backdropUrl": "https://img/backdrop.jpg",
+        "episodeTitle": "The Rains of Castamere",
+        "seasonNumber": 3,
+        "episodeNumber": 9,
+        "airDate": "2013-06-02",
+        "runtimeMinutes": 55,
+        "subtitle": "S3 E9"
+      },
+      "progress": {
+        "progressPercent": 47.5
+      },
+      "watchedAt": "2026-04-01T10:00:00Z",
+      "lastActivityAt": "2026-04-01T10:15:00Z",
+      "origins": ["trakt"],
+      "dismissible": false
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "landscape",
+      "media_type": "series",
+      "item_id": "cw-123",
+      "provider": "tmdb",
+      "provider_id": "1399",
+      "title": "Game of Thrones",
+      "poster_url": "https://img/poster.jpg",
+      "backdrop_url": "https://img/backdrop.jpg",
+      "subtitle": "S3 E9",
+      "progress_percent": 47.5,
+      "watched_at": "2026-04-01T10:00:00Z",
+      "last_activity_at": "2026-04-01T10:15:00Z",
+      "origins": ["trakt"],
+      "dismissible": false,
+      "layout": null
+    }
+  }
+}

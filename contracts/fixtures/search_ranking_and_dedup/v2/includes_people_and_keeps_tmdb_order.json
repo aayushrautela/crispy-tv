@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "search_ranking_and_dedup",
   "case_id": "includes_people_and_keeps_tmdb_order",
   "input": {
@@ -42,22 +42,25 @@
   "expected": {
     "items": [
       {
-        "id": "tmdb:287",
-        "type": "person",
+        "media_type": "person",
+        "provider": "tmdb",
+        "provider_id": "287",
         "title": "Brad Pitt",
         "image_url": "https://image.tmdb.org/t/p/h632/kU3B75TyRiCgE270EyZnHjfivoq.jpg"
       },
       {
-        "id": "tmdb:550",
-        "type": "movie",
+        "media_type": "movie",
+        "provider": "tmdb",
+        "provider_id": "550",
         "title": "Fight Club",
         "year": 1999,
         "image_url": "https://image.tmdb.org/t/p/w500/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
         "rating": 8.4
       },
       {
-        "id": "tmdb:1399",
-        "type": "series",
+        "media_type": "series",
+        "provider": "tmdb",
+        "provider_id": "1399",
         "title": "Game of Thrones",
         "year": 2011,
         "image_url": "https://image.tmdb.org/t/p/w500/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg",

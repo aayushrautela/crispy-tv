@@ -78,7 +78,7 @@ private data class HomeWatchActivitySnapshot(
 
 private data class CatalogSectionLayoutMeta(
     val key: String,
-    val presentation: HomeCatalogPresentation,
+    val layout: String,
 )
 
 private const val CONTINUE_WATCHING_SECTION_KEY = "continueWatching"
@@ -542,7 +542,7 @@ class HomeViewModel internal constructor(
             snapshot.catalogSections.map { sectionUi ->
                 CatalogSectionLayoutMeta(
                     key = sectionUi.section.key,
-                    presentation = sectionUi.section.presentation,
+                    layout = sectionUi.section.layout,
                 )
             }
         _catalogSectionsState.value = snapshot.catalogSections.associateBy { it.section.key }
@@ -616,11 +616,11 @@ class HomeViewModel internal constructor(
         var index = 0
         while (index < catalogSectionLayoutMeta.size) {
             val sectionMeta = catalogSectionLayoutMeta[index]
-            if (sectionMeta.presentation == HomeCatalogPresentation.COLLECTION_SHELF) {
+            if (sectionMeta.layout.equals("collection", ignoreCase = true)) {
                 val groupedKeys = mutableListOf<String>()
                 while (
                     index < catalogSectionLayoutMeta.size &&
-                        catalogSectionLayoutMeta[index].presentation == HomeCatalogPresentation.COLLECTION_SHELF
+                        catalogSectionLayoutMeta[index].layout.equals("collection", ignoreCase = true)
                 ) {
                     groupedKeys += catalogSectionLayoutMeta[index].key
                     index += 1
