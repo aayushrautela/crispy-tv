@@ -87,6 +87,8 @@ class CrispyBackendClient(
         val rating: String?,
         val year: String?,
         val genre: String?,
+        val provider: String?,
+        val providerId: String?,
     )
 
     data class MetadataSearchResponse(
@@ -470,6 +472,8 @@ class CrispyBackendClient(
         val posterUrl: String?,
         val rating: Double?,
         val releaseYear: Int?,
+        val provider: String?,
+        val providerId: String?,
     )
 
     data class MetadataPersonDetail(

@@ -89,8 +89,8 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
         year = year,
         genre = genre ?: defaultGenre,
         description = summary,
-        provider = provider,
-        providerId = providerId,
+        provider = provider ?: "tmdb",
+        providerId = providerId ?: id.substringAfter("tmdb:", missingDelimiterValue = id),
         detailsContentId = id.takeIf { it.isNotBlank() },
         detailsMediaType = normalizedType,
     )

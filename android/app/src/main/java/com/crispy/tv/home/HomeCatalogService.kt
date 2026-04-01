@@ -21,6 +21,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
+private const val DEFAULT_VARIANT_KEY = "default"
+private const val PREVIEW_ITEM_LIMIT = 12
+private const val HOME_CACHE_MAX_AGE_MS = 15 * 60 * 1000L
+private const val GLOBAL_CACHE_KEY = "home_snapshot:last"
+private const val DISCOVER_ADDON_NAME = "Crispy"
+
 @Immutable
 data class HomeHeroItem(
     val id: String,
@@ -526,12 +532,4 @@ class HomeCatalogService internal constructor(
         val accessToken: String,
         val profileId: String,
     )
-
-    private companion object {
-        private const val DEFAULT_VARIANT_KEY = "default"
-        private const val PREVIEW_ITEM_LIMIT = 12
-        private const val HOME_CACHE_MAX_AGE_MS = 15 * 60 * 1000L
-        private const val GLOBAL_CACHE_KEY = "home_snapshot:last"
-        private const val DISCOVER_ADDON_NAME = "Crispy"
-    }
 }

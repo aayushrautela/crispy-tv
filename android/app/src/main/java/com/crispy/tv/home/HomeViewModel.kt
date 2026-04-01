@@ -22,6 +22,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
+import com.crispy.tv.player.WatchProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -278,7 +279,12 @@ class HomeViewModel internal constructor(
                             val dismissId = item.id.trim()
                             watchHistoryService.removeFromPlayback(
                                 playbackId = dismissId,
-                                source = item.provider,
+                                source =
+                                    when (item.provider.trim().lowercase(Locale.US)) {
+                                        "trakt" -> WatchProvider.TRAKT
+                                        "simkl" -> WatchProvider.SIMKL
+                                        else -> null
+                                    },
                             )
                         }
 

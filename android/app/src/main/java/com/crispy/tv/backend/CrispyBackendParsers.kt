@@ -173,6 +173,8 @@ internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMet
         rating = json.opt("rating")?.toString()?.trim()?.ifBlank { null },
         year = json.opt("releaseYear")?.toString()?.trim()?.ifBlank { null },
         genre = genre,
+        provider = json.optNullableString("provider"),
+        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
     )
 }
 
@@ -428,6 +430,8 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
                     posterUrl = item.optNullableString("posterUrl"),
                     rating = item.optDoubleOrNull("rating"),
                     releaseYear = item.optIntOrNull("releaseYear"),
+                    provider = item.optNullableString("provider"),
+                    providerId = item.opt("providerId")?.toString()?.trim()?.ifBlank { null },
                 )
             )
         }

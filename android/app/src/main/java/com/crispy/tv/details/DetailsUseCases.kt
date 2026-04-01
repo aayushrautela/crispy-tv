@@ -32,7 +32,7 @@ internal data class DetailsScreenLoadResult(
     val seasons: List<Int>,
 )
 
-internal data class RuntimeDetailsEntry(
+data class RuntimeDetailsEntry(
     val provider: String,
     val providerId: String,
     val mediaType: String,
