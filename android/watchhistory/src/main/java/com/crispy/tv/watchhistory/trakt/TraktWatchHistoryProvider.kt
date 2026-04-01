@@ -247,6 +247,7 @@ internal class TraktWatchHistoryProvider(
                     val contentId = resolveAndCacheImdb(movie.optJSONObject("ids"), "movie")
                     if (contentId.isEmpty()) continue
                     val title = movie.optString("title").trim().ifEmpty { contentId }
+                    val playbackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null }
                     traktBatch.add(
                         ContinueWatchingEntry(
                             id = playbackId ?: "trakt:movie:$contentId",
@@ -530,7 +531,7 @@ internal class TraktWatchHistoryProvider(
                     provider = WatchProvider.TRAKT,
                     folderId = "continue-watching",
                     contentId = it.providerId,
-                    contentType = when (it.type.lowercase(Locale.US)) {
+                    contentType = when (it.mediaType.lowercase(Locale.US)) {
                         "anime" -> MetadataLabMediaType.ANIME
                         "series" -> MetadataLabMediaType.SERIES
                         else -> MetadataLabMediaType.MOVIE

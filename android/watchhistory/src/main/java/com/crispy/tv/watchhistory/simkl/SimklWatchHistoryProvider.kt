@@ -447,8 +447,12 @@ internal class SimklWatchHistoryProvider(
         return ProviderLibraryItem(
             provider = source,
             folderId = folderId,
-            contentId = contentId,
-            contentType = contentType,
+            contentId = providerId,
+            contentType = when (mediaType.lowercase(Locale.US)) {
+                "anime" -> MetadataLabMediaType.ANIME
+                "series" -> MetadataLabMediaType.SERIES
+                else -> MetadataLabMediaType.MOVIE
+            },
             title = title,
             externalIds = null,
             season = season,
