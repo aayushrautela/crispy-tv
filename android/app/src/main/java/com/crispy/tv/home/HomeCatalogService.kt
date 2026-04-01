@@ -332,7 +332,7 @@ class HomeCatalogService internal constructor(
             description = subtitle,
             provider = normalizedProvider,
             providerId = normalizedProviderId,
-        }
+        )
     }
 
     private fun HomeCatalogItem.toCatalogItem(): CatalogItem {
