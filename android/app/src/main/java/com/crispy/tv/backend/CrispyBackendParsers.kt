@@ -23,7 +23,6 @@ import com.crispy.tv.backend.CrispyBackendClient.WatchDerivedItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.LibraryMutationResponse
 import com.crispy.tv.backend.CrispyBackendClient.LibraryAuth
-import com.crispy.tv.backend.CrispyBackendClient.LibraryDiagnostics
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCollectionView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCardView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCompanyView
