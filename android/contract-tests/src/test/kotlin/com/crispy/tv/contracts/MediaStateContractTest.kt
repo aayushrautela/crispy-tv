@@ -45,23 +45,23 @@ class MediaStateContractTest {
         }
     }
 
-    private fun parseNormalized(object: JsonObject, path: java.nio.file.Path): MediaStateNormalized {
+    private fun parseNormalized(normalized: JsonObject, path: java.nio.file.Path): MediaStateNormalized {
         return MediaStateNormalized(
-            cardFamily = object.requireString("card_family", path),
-            mediaType = object.optionalString("media_type", path),
-            itemId = object.optionalString("item_id", path),
-            provider = object.optionalString("provider", path),
-            providerId = object.optionalString("provider_id", path),
-            title = object.optionalString("title", path),
-            posterUrl = object.optionalString("poster_url", path),
-            backdropUrl = object.optionalString("backdrop_url", path),
-            subtitle = object.optionalString("subtitle", path),
-            progressPercent = object.optionalDouble("progress_percent"),
-            watchedAt = object.optionalString("watched_at", path),
-            lastActivityAt = object.optionalString("last_activity_at", path),
-            origins = object.optionalStringArray("origins", path),
-            dismissible = object.optionalBoolean("dismissible"),
-            layout = object.optionalString("layout", path),
+            cardFamily = normalized.requireString("card_family", path),
+            mediaType = normalized.optionalString("media_type", path),
+            itemId = normalized.optionalString("item_id", path),
+            provider = normalized.optionalString("provider", path),
+            providerId = normalized.optionalString("provider_id", path),
+            title = normalized.optionalString("title", path),
+            posterUrl = normalized.optionalString("poster_url", path),
+            backdropUrl = normalized.optionalString("backdrop_url", path),
+            subtitle = normalized.optionalString("subtitle", path),
+            progressPercent = normalized.optionalDouble("progress_percent"),
+            watchedAt = normalized.optionalString("watched_at", path),
+            lastActivityAt = normalized.optionalString("last_activity_at", path),
+            origins = normalized.optionalStringArray("origins", path),
+            dismissible = normalized.optionalBoolean("dismissible"),
+            layout = normalized.optionalString("layout", path),
         )
     }
 }
