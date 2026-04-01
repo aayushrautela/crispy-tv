@@ -10,6 +10,8 @@ public struct HomeCatalogItem: Equatable {
     public let rating: String?
     public let year: String?
     public let description: String?
+    public let provider: String
+    public let providerId: String
 
     public init(
         id: String,
@@ -20,7 +22,9 @@ public struct HomeCatalogItem: Equatable {
         type: String,
         rating: String? = nil,
         year: String? = nil,
-        description: String? = nil
+        description: String? = nil,
+        provider: String,
+        providerId: String
     ) {
         self.id = id
         self.title = title
@@ -31,6 +35,8 @@ public struct HomeCatalogItem: Equatable {
         self.rating = rating
         self.year = year
         self.description = description
+        self.provider = provider
+        self.providerId = providerId
     }
 }
 
@@ -134,6 +140,8 @@ public struct HomeCatalogHeroItem: Equatable {
     public let backdropUrl: String
     public let addonId: String
     public let type: String
+    public let provider: String
+    public let providerId: String
 
     public init(
         id: String,
@@ -144,7 +152,9 @@ public struct HomeCatalogHeroItem: Equatable {
         genres: [String] = [],
         backdropUrl: String,
         addonId: String,
-        type: String
+        type: String,
+        provider: String,
+        providerId: String
     ) {
         self.id = id
         self.title = title
@@ -155,6 +165,8 @@ public struct HomeCatalogHeroItem: Equatable {
         self.backdropUrl = backdropUrl
         self.addonId = addonId
         self.type = type
+        self.provider = provider
+        self.providerId = providerId
     }
 }
 
@@ -426,7 +438,9 @@ private func buildHeroResult(snapshot: HomeCatalogSnapshot, limit: Int) -> HomeC
             genres: [],
             backdropUrl: backdrop,
             addonId: item.addonId,
-            type: item.type
+            type: item.type,
+            provider: item.provider,
+            providerId: item.providerId
         )
     }
     let limitedItems = Array(heroItems.prefix(targetCount))

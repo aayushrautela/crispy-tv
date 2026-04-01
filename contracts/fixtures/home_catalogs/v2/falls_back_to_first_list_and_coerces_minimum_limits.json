@@ -1,5 +1,5 @@
 {
-  "contract_version": 3,
+  "contract_version": 4,
   "suite": "home_catalogs",
   "case_id": "falls_back_to_first_list_and_coerces_minimum_limits",
   "input": {
@@ -25,6 +25,8 @@
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "series",
+              "provider": "tmdb",
+              "provider_id": "95396",
               "rating": null,
               "year": "2022",
               "description": null
@@ -36,6 +38,8 @@
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "series",
+              "provider": "tmdb",
+              "provider_id": "125988",
               "rating": null,
               "year": "2023",
               "description": null
@@ -60,6 +64,8 @@
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "movie",
+              "provider": "tmdb",
+              "provider_id": "157336",
               "rating": "8.0",
               "year": "2016",
               "description": "First contact"
@@ -93,7 +99,9 @@
             "genres": [],
             "backdrop_url": "https://img/severance.jpg",
             "addon_id": "supabase",
-            "type": "series"
+            "type": "series",
+            "provider": "tmdb",
+            "provider_id": "95396"
           }
         ],
         "status_message": ""
@@ -140,6 +148,8 @@
           "backdrop_url": null,
           "addon_id": "supabase",
           "type": "series",
+          "provider": "tmdb",
+          "provider_id": "95396",
           "rating": null,
           "year": "2022",
           "description": null

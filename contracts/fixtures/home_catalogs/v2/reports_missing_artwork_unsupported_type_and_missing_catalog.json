@@ -1,5 +1,5 @@
 {
-  "contract_version": 3,
+  "contract_version": 4,
   "suite": "home_catalogs",
   "case_id": "reports_missing_artwork_unsupported_type_and_missing_catalog",
   "input": {
@@ -25,6 +25,8 @@
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "movie",
+              "provider": "tmdb",
+              "provider_id": "991001",
               "rating": null,
               "year": null,
               "description": null
@@ -49,6 +51,8 @@
               "backdrop_url": "https://img/dark-matter-backdrop.jpg",
               "addon_id": "supabase",
               "type": "series",
+              "provider": "tmdb",
+              "provider_id": "157239",
               "rating": "7.5",
               "year": "2024",
               "description": "Parallel lives"

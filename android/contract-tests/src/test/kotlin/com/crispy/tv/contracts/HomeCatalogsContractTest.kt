@@ -108,6 +108,8 @@ class HomeCatalogsContractTest {
             rating = json.optionalString("rating", path),
             year = json.optionalString("year", path),
             description = json.optionalString("description", path),
+            provider = json.requireString("provider", path),
+            providerId = json.requireString("provider_id", path),
         )
     }
 
@@ -137,6 +139,8 @@ class HomeCatalogsContractTest {
             backdropUrl = json.requireString("backdrop_url", path),
             addonId = json.requireString("addon_id", path),
             type = json.requireString("type", path),
+            provider = json.requireString("provider", path),
+            providerId = json.requireString("provider_id", path),
         )
     }
 

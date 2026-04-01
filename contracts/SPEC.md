@@ -48,6 +48,7 @@ The spec version documents the contract surface. Each suite owns its own
 - `home_catalogs`
   - Plan home-screen hero shelves, header sections, discover catalog refs, and paged catalog results from deterministic snapshot input.
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
+  - `contract_version` 4 requires provider-based identity on catalog and hero items via `provider` + `provider_id`.
   - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`

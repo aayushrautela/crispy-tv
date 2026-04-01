@@ -1,5 +1,5 @@
 {
-  "contract_version": 3,
+  "contract_version": 4,
   "suite": "home_catalogs",
   "case_id": "plans_hero_sections_discover_and_global_page",
   "input": {
@@ -25,6 +25,8 @@
               "backdrop_url": "https://img/arrival-backdrop.jpg",
               "addon_id": "supabase",
               "type": "movie",
+              "provider": "tmdb",
+              "provider_id": "157336",
               "rating": "8.0",
               "year": "2016",
               "description": null
@@ -36,6 +38,8 @@
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "movie",
+              "provider": "tmdb",
+              "provider_id": "438631",
               "rating": "8.2",
               "year": "2021",
               "description": "Sand and prophecy"
@@ -47,6 +51,8 @@
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "movie",
+              "provider": "tmdb",
+              "provider_id": "999003",
               "rating": null,
               "year": null,
               "description": null
@@ -71,6 +77,8 @@
               "backdrop_url": "https://img/severance-backdrop.jpg",
               "addon_id": "supabase",
               "type": "series",
+              "provider": "tmdb",
+              "provider_id": "95396",
               "rating": "8.7",
               "year": "2022",
               "description": "Work-life split"
@@ -82,6 +90,8 @@
               "backdrop_url": "https://img/silo-backdrop.jpg",
               "addon_id": "supabase",
               "type": "series",
+              "provider": "tmdb",
+              "provider_id": "125988",
               "rating": "8.1",
               "year": "2023",
               "description": "Underground mystery"
@@ -106,6 +116,8 @@
               "backdrop_url": "https://img/furiosa-backdrop.jpg",
               "addon_id": "supabase",
               "type": "movie",
+              "provider": "tmdb",
+              "provider_id": "786892",
               "rating": "7.7",
               "year": "2024",
               "description": "Wasteland origin"
@@ -139,7 +151,9 @@
             "genres": [],
             "backdrop_url": "https://img/arrival-backdrop.jpg",
             "addon_id": "supabase",
-            "type": "movie"
+            "type": "movie",
+            "provider": "tmdb",
+            "provider_id": "157336"
           },
           {
             "id": "movie-2",
@@ -150,7 +164,9 @@
             "genres": [],
             "backdrop_url": "https://img/dune-poster.jpg",
             "addon_id": "supabase",
-            "type": "movie"
+            "type": "movie",
+            "provider": "tmdb",
+            "provider_id": "438631"
           }
         ],
         "status_message": ""
@@ -207,6 +223,8 @@
           "backdrop_url": "https://img/silo-backdrop.jpg",
           "addon_id": "supabase",
           "type": "series",
+          "provider": "tmdb",
+          "provider_id": "125988",
           "rating": "8.1",
           "year": "2023",
           "description": "Underground mystery"

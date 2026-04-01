@@ -88,7 +88,9 @@ final class HomeCatalogsContractTests: XCTestCase {
             type: try requireString(object, "type", fixture: fixture),
             rating: optionalString(object, "rating"),
             year: optionalString(object, "year"),
-            description: optionalString(object, "description")
+            description: optionalString(object, "description"),
+            provider: try requireString(object, "provider", fixture: fixture),
+            providerId: try requireString(object, "provider_id", fixture: fixture)
         )
     }
 
@@ -121,7 +123,9 @@ final class HomeCatalogsContractTests: XCTestCase {
             genres: try stringArrayValue(try requireArray(object, "genres", fixture: fixture), fixture: fixture, field: "genres"),
             backdropUrl: try requireString(object, "backdrop_url", fixture: fixture),
             addonId: try requireString(object, "addon_id", fixture: fixture),
-            type: try requireString(object, "type", fixture: fixture)
+            type: try requireString(object, "type", fixture: fixture),
+            provider: try requireString(object, "provider", fixture: fixture),
+            providerId: try requireString(object, "provider_id", fixture: fixture)
         )
     }
 

@@ -205,7 +205,7 @@
     },
     "item": {
       "type": "object",
-      "required": ["id", "title", "poster_url", "backdrop_url", "addon_id", "type", "rating", "year", "description"],
+      "required": ["id", "title", "poster_url", "backdrop_url", "addon_id", "type", "rating", "year", "description", "provider", "provider_id"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -234,12 +234,20 @@
         },
         "description": {
           "type": ["string", "null"]
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
     "hero_item": {
       "type": "object",
-      "required": ["id", "title", "description", "rating", "year", "genres", "backdrop_url", "addon_id", "type"],
+      "required": ["id", "title", "description", "rating", "year", "genres", "backdrop_url", "addon_id", "type", "provider", "provider_id"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -271,6 +279,14 @@
         },
         "type": {
           "type": "string"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
