@@ -672,10 +672,11 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
                 "anime" -> MetadataLabMediaType.ANIME
                 else -> MetadataLabMediaType.MOVIE
             }
-        val normalizedImdb = playbackContentId.trim().lowercase(Locale.US).takeIf { it.startsWith("tt") }
+        val normalizedPlaybackContentId = playbackContentId?.trim()?.ifBlank { null }
+        val normalizedImdb = normalizedPlaybackContentId?.lowercase(Locale.US)?.takeIf { it.startsWith("tt") }
 
         return PlaybackIdentity(
-            contentId = playbackContentId.trim().ifBlank { detailsTitleId.trim().ifBlank { null } },
+            contentId = normalizedPlaybackContentId,
             imdbId = normalizedImdb,
             tmdbId = null,
             contentType = contentType,
@@ -688,9 +689,9 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
             provider = metadataProvider,
             providerId = metadataProviderId,
             parentMediaType = playbackMediaType,
-            parentProvider = parentProvider ?: metadataProvider,
-            parentProviderId = parentProviderId ?: metadataProviderId,
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
+            parentProvider = parentProvider,
+            parentProviderId = parentProviderId,
+            absoluteEpisodeNumber = playbackAbsoluteEpisodeNumber ?: absoluteEpisodeNumber,
         )
     }
 

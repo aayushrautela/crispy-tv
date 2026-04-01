@@ -98,9 +98,6 @@ internal suspend fun CrispyBackendClient.getProfileLibraryApi(
         source = json.optString("source").trim().ifBlank { source?.apiValue ?: LibrarySource.ALL.apiValue },
         generatedAt = json.optNullableString("generatedAt"),
         auth = parseLibraryAuth(json.optJSONObject("auth")),
-        canonical = parseCanonicalLibrary(json.optJSONObject("canonical") ?: JSONObject()),
-        native = json.optJSONObject("native")?.let(::parseNativeLibrary),
-        diagnostics = parseLibraryDiagnostics(json.optJSONObject("diagnostics")),
         sections = parseLibrarySections(json.optJSONArray("sections")),
     )
 }
@@ -219,7 +216,7 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
     profileId: String,
     limit: Int = 50,
 ): CanonicalWatchCollectionResponse<WatchDerivedItem> {
-    return listWatchDerivedItemsApi(accessToken, profileId, path = "history", limit = limit)
+    return listWatchDerivedItemsApi(accessToken, profileId, path = "watched", limit = limit)
 }
 
 internal suspend fun CrispyBackendClient.listWatchlistApi(
@@ -236,7 +233,7 @@ internal suspend fun CrispyBackendClient.listWatchlistApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseHydratedWatchlistCollectionResponse(json)
+    return parseWatchlistCollectionResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.listRatingsApi(
@@ -253,7 +250,7 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseHydratedRatingCollectionResponse(json)
+    return parseRatingCollectionResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.getWatchStateApi(
@@ -409,7 +406,7 @@ private suspend fun CrispyBackendClient.listWatchDerivedItemsApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseHydratedWatchCollectionResponse(json)
+    return parseWatchCollectionResponse(json)
 }
 
 private suspend fun CrispyBackendClient.postWatchMutationApi(

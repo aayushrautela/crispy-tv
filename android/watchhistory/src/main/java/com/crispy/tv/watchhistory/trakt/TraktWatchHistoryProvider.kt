@@ -259,6 +259,10 @@ internal class TraktWatchHistoryProvider(
                             provider = WatchProvider.TRAKT,
                             providerPlaybackId = obj.opt("id")?.toString()?.trim()?.ifEmpty { null },
                             isUpNextPlaceholder = false,
+                            detailsTitleId = contentId,
+                            detailsTitleMediaType = MetadataLabMediaType.MOVIE.label,
+                            playbackContentId = contentId,
+                            playbackMediaType = "movie",
                         )
                     )
                     continue
@@ -309,6 +313,10 @@ internal class TraktWatchHistoryProvider(
                                                 provider = WatchProvider.TRAKT,
                                                 providerPlaybackId = playbackId,
                                                 isUpNextPlaceholder = true,
+                                                detailsTitleId = contentId,
+                                                detailsTitleMediaType = MetadataLabMediaType.SERIES.label,
+                                                playbackSeasonNumber = next.season,
+                                                playbackEpisodeNumber = next.episode,
                                             )
                                         )
                                         continue
@@ -333,6 +341,10 @@ internal class TraktWatchHistoryProvider(
                             provider = WatchProvider.TRAKT,
                             providerPlaybackId = playbackId,
                             isUpNextPlaceholder = false,
+                            detailsTitleId = contentId,
+                            detailsTitleMediaType = MetadataLabMediaType.SERIES.label,
+                            playbackSeasonNumber = episodeSeason,
+                            playbackEpisodeNumber = episodeNumber,
                         )
                     )
                 }
@@ -445,6 +457,10 @@ internal class TraktWatchHistoryProvider(
                         provider = WatchProvider.TRAKT,
                         providerPlaybackId = null,
                         isUpNextPlaceholder = true,
+                        detailsTitleId = candidate.contentId,
+                        detailsTitleMediaType = MetadataLabMediaType.SERIES.label,
+                        playbackSeasonNumber = next.season,
+                        playbackEpisodeNumber = next.episode,
                     )
                 )
             } catch (e: Exception) {

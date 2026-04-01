@@ -28,8 +28,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                     AppRoutes.homeDetailsRoute(
                         itemId = item.detailsTitleId,
                         mediaType = item.detailsTitleMediaType,
-                        initialSeason = item.playbackSeasonNumber,
-                        initialEpisode = item.playbackEpisodeNumber,
+                        highlightEpisodeId = item.highlightEpisodeId,
                     )
                 )
             },
@@ -93,22 +92,19 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         arguments = listOf(
             navArgument(AppRoutes.HomeDetailsMediaTypeArg) { type = NavType.StringType },
             navArgument(AppRoutes.HomeDetailsItemIdArg) { type = NavType.StringType },
-            navArgument(AppRoutes.HomeDetailsSeasonArg) { type = NavType.IntType; defaultValue = -1 },
-            navArgument(AppRoutes.HomeDetailsEpisodeArg) { type = NavType.IntType; defaultValue = -1 },
+            navArgument(AppRoutes.HomeDetailsHighlightEpisodeIdArg) { type = NavType.StringType; defaultValue = "" },
             navArgument(AppRoutes.HomeDetailsAutoOpenEpisodeArg) { type = NavType.BoolType; defaultValue = false },
         )
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
         val mediaType = entry.arguments?.getString(AppRoutes.HomeDetailsMediaTypeArg).orEmpty()
-        val initialSeason = entry.arguments?.getInt(AppRoutes.HomeDetailsSeasonArg)?.takeIf { it > 0 }
-        val initialEpisode = entry.arguments?.getInt(AppRoutes.HomeDetailsEpisodeArg)?.takeIf { it > 0 }
+        val highlightEpisodeId = entry.arguments?.getString(AppRoutes.HomeDetailsHighlightEpisodeIdArg)?.ifBlank { null }
         val autoOpenEpisode = entry.arguments?.getBoolean(AppRoutes.HomeDetailsAutoOpenEpisodeArg) == true
         val context = LocalContext.current
         DetailsRoute(
             itemId = itemId,
             mediaType = mediaType,
-            initialSeason = initialSeason,
-            initialEpisode = initialEpisode,
+            highlightEpisodeId = highlightEpisodeId,
             autoOpenEpisode = autoOpenEpisode,
             onBack = { navController.popBackStack() },
             onItemClick = { nextId, nextType -> navController.navigate(AppRoutes.homeDetailsRoute(nextId, nextType)) },
@@ -150,8 +146,7 @@ private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeIte
         AppRoutes.homeDetailsRoute(
             itemId = item.seriesId,
             mediaType = item.type,
-            initialSeason = item.season,
-            initialEpisode = item.episode.takeIf { !item.isGroup },
+            highlightEpisodeId = item.highlightEpisodeId.takeIf { !item.isGroup },
             autoOpenEpisode = item.isReleased && !item.isGroup,
         )
     )

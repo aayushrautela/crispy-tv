@@ -980,6 +980,8 @@ class RemoteWatchHistoryService(
                             lastUpdatedEpochMs = lastUpdated,
                             provider = WatchProvider.LOCAL,
                             providerPlaybackId = null,
+                            detailsTitleId = id,
+                            detailsTitleMediaType = MetadataLabMediaType.MOVIE.label,
                         )
                 }
 
@@ -1034,6 +1036,10 @@ class RemoteWatchHistoryService(
                     lastUpdatedEpochMs = it.lastUpdatedEpochMs,
                     provider = WatchProvider.LOCAL,
                     providerPlaybackId = null,
+                    detailsTitleId = it.showId,
+                    detailsTitleMediaType = it.contentType.label,
+                    playbackSeasonNumber = it.season,
+                    playbackEpisodeNumber = it.episode,
                 )
             }
 
@@ -1083,6 +1089,10 @@ class RemoteWatchHistoryService(
                     provider = WatchProvider.LOCAL,
                     providerPlaybackId = null,
                     isUpNextPlaceholder = true,
+                    detailsTitleId = showId,
+                    detailsTitleMediaType = episodicType.label,
+                    playbackSeasonNumber = next.season,
+                    playbackEpisodeNumber = next.episode,
                 )
         }
 

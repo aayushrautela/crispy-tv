@@ -34,6 +34,7 @@ data class HomeHeroItem(
     val type: String,
     val detailsContentId: String = id,
     val detailsMediaType: String = type,
+    val highlightEpisodeId: String? = null,
 )
 
 @Immutable
@@ -129,6 +130,7 @@ class HomeCatalogService internal constructor(
                                 type = hero.type,
                                 detailsContentId = hero.detailsContentId,
                                 detailsMediaType = hero.detailsMediaType,
+                                highlightEpisodeId = hero.highlightEpisodeId,
                             )
                         },
                     statusMessage = feedPlan.heroResult.statusMessage,
@@ -349,6 +351,7 @@ class HomeCatalogService internal constructor(
             descriptionOverride = watchDescription(progress?.progressPercent, watchedAt, lastActivityAt),
             detailsContentId = detailsTarget.titleId,
             detailsMediaType = detailsTarget.titleMediaType,
+            highlightEpisodeId = detailsTarget.highlightEpisodeId,
         )
     }
 
@@ -363,6 +366,7 @@ class HomeCatalogService internal constructor(
                 descriptionOverride = description,
                 detailsContentId = relatedShow.id,
                 detailsMediaType = relatedShow.normalizedCatalogType(),
+                highlightEpisodeId = media.id.trim().ifBlank { null },
             )
         ) {
             "Calendar item metadata is missing a title for ${media.id}."
@@ -383,6 +387,7 @@ class HomeCatalogService internal constructor(
         descriptionOverride: String? = null,
         detailsContentId: String = id,
         detailsMediaType: String = normalizedCatalogType(),
+        highlightEpisodeId: String? = null,
     ): HomeCatalogItem? {
         val normalizedTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
         return HomeCatalogItem(
@@ -397,6 +402,7 @@ class HomeCatalogService internal constructor(
             description = descriptionOverride?.trim()?.takeIf { it.isNotBlank() } ?: summary ?: overview,
             detailsContentId = detailsContentId,
             detailsMediaType = detailsMediaType,
+            highlightEpisodeId = highlightEpisodeId,
         )
     }
 
@@ -413,6 +419,7 @@ class HomeCatalogService internal constructor(
             description = description,
             detailsContentId = detailsContentId,
             detailsMediaType = detailsMediaType,
+            highlightEpisodeId = highlightEpisodeId,
         )
     }
 
@@ -510,6 +517,7 @@ class HomeCatalogService internal constructor(
                                                     .put("type", item.type)
                                                     .put("details_content_id", item.detailsContentId)
                                                     .put("details_media_type", item.detailsMediaType)
+                                                    .put("highlight_episode_id", item.highlightEpisodeId)
                                                     .put("rating", item.rating)
                                                     .put("year", item.year)
                                                     .put("description", item.description)
@@ -587,6 +595,7 @@ class HomeCatalogService internal constructor(
             type = type,
             detailsContentId = json.optString("details_content_id").trim().ifBlank { id },
             detailsMediaType = json.optString("details_media_type").trim().ifBlank { type },
+            highlightEpisodeId = json.optString("highlight_episode_id").trim().ifBlank { null },
             rating = json.optString("rating").trim().ifBlank { null },
             year = json.optString("year").trim().ifBlank { null },
             description = json.optString("description").trim().ifBlank { null },

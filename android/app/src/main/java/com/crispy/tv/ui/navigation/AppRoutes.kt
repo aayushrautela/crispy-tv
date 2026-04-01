@@ -17,8 +17,7 @@ object AppRoutes {
     const val HomeDetailsRoute = "home/details"
     const val HomeDetailsItemIdArg = "itemId"
     const val HomeDetailsMediaTypeArg = "mediaType"
-    const val HomeDetailsSeasonArg = "season"
-    const val HomeDetailsEpisodeArg = "episode"
+    const val HomeDetailsHighlightEpisodeIdArg = "highlightEpisodeId"
     const val HomeDetailsAutoOpenEpisodeArg = "autoOpenEpisode"
 
     const val PersonDetailsRoute = "person/details"
@@ -36,8 +35,7 @@ object AppRoutes {
     // Details: type + id are required route segments.
     val HomeDetailsRoutePattern: String =
         "$HomeDetailsRoute/{$HomeDetailsMediaTypeArg}/{$HomeDetailsItemIdArg}" +
-            "?$HomeDetailsSeasonArg={$HomeDetailsSeasonArg}" +
-            "&$HomeDetailsEpisodeArg={$HomeDetailsEpisodeArg}" +
+            "?$HomeDetailsHighlightEpisodeIdArg={$HomeDetailsHighlightEpisodeIdArg}" +
             "&$HomeDetailsAutoOpenEpisodeArg={$HomeDetailsAutoOpenEpisodeArg}"
     val PersonDetailsRoutePattern: String =
         "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}"
@@ -48,8 +46,7 @@ object AppRoutes {
     fun homeDetailsRoute(
         itemId: String,
         mediaType: String,
-        initialSeason: Int? = null,
-        initialEpisode: Int? = null,
+        highlightEpisodeId: String? = null,
         autoOpenEpisode: Boolean = false,
     ): String {
         val normalizedType =
@@ -57,10 +54,9 @@ object AppRoutes {
                 "movie" -> "movie"
                 "series", "show", "tv" -> "series"
                 else -> mediaType.trim().lowercase(Locale.US)
-            }
+        }
         return "$HomeDetailsRoute/${Uri.encode(normalizedType)}/${Uri.encode(itemId.trim())}" +
-            "?$HomeDetailsSeasonArg=${initialSeason ?: -1}" +
-            "&$HomeDetailsEpisodeArg=${initialEpisode ?: -1}" +
+            "?$HomeDetailsHighlightEpisodeIdArg=${Uri.encode(highlightEpisodeId.orEmpty())}" +
             "&$HomeDetailsAutoOpenEpisodeArg=${autoOpenEpisode}"
     }
 

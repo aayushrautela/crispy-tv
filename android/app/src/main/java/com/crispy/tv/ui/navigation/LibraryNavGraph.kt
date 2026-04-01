@@ -13,8 +13,7 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                     AppRoutes.homeDetailsRoute(
                         itemId = item.detailsTitleId,
                         mediaType = item.detailsTitleMediaType,
-                        initialSeason = item.seasonNumber,
-                        initialEpisode = item.episodeNumber,
+                        highlightEpisodeId = item.highlightEpisodeId,
                     )
                 )
             },

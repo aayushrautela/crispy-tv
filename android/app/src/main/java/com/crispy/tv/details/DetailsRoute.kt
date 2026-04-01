@@ -18,8 +18,7 @@ import java.util.Locale
 fun DetailsRoute(
     itemId: String,
     mediaType: String,
-    initialSeason: Int? = null,
-    initialEpisode: Int? = null,
+    highlightEpisodeId: String? = null,
     autoOpenEpisode: Boolean = false,
     onBack: () -> Unit,
     onItemClick: (String, String) -> Unit = { _, _ -> },
@@ -77,10 +76,9 @@ fun DetailsRoute(
         }
     }
 
-    LaunchedEffect(viewModel, initialSeason, initialEpisode, autoOpenEpisode) {
+    LaunchedEffect(viewModel, highlightEpisodeId, autoOpenEpisode) {
         viewModel.requestEpisodeNavigation(
-            initialSeason = initialSeason,
-            initialEpisode = initialEpisode,
+            highlightEpisodeId = highlightEpisodeId,
             autoOpenEpisode = autoOpenEpisode,
         )
     }

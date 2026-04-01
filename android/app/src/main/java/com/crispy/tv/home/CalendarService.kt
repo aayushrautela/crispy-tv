@@ -17,6 +17,7 @@ import java.util.Locale
 data class CalendarEpisodeItem(
     val id: String,
     val seriesId: String,
+    val highlightEpisodeId: String? = null,
     val seriesName: String,
     val episodeTitle: String?,
     val overview: String?,
@@ -207,6 +208,7 @@ class CalendarService internal constructor(
         return CalendarEpisodeItem(
             id = media.id,
             seriesId = relatedShow.id,
+            highlightEpisodeId = media.id,
             seriesName = relatedShow.title ?: relatedShow.subtitle ?: "Series",
             episodeTitle = media.title ?: media.subtitle,
             overview = media.summary ?: media.overview,
@@ -253,6 +255,7 @@ class CalendarService internal constructor(
                 } else {
                     first.copy(
                         id = "group_${first.seriesId}_${first.releaseDate.take(10)}",
+                        highlightEpisodeId = null,
                         episodeTitle = null,
                         overview = null,
                         episodeRange = "E${first.episode}-E${last.episode}",

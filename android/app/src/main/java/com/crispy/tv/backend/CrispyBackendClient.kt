@@ -491,11 +491,8 @@ class CrispyBackendClient(
         val provider: String,
         val connected: Boolean,
         val status: String,
-        val tokenState: String?,
         val externalUsername: String?,
-        val lastImportCompletedAt: String?,
-        val lastUsedAt: String?,
-        val message: String?,
+        val statusMessage: String?,
     )
 
     data class WatchProgressView(
@@ -528,73 +525,93 @@ class CrispyBackendClient(
     )
 
     data class DetailsTarget(
+        val kind: String,
         val titleId: String,
         val titleMediaType: String,
+        val highlightEpisodeId: String?,
     )
 
     data class PlaybackTarget(
-        val contentId: String,
+        val contentId: String?,
         val mediaType: String,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
         val provider: String?,
         val providerId: String?,
-        val parentMediaType: String?,
         val parentProvider: String?,
         val parentProviderId: String?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val absoluteEpisodeNumber: Int?,
     )
 
     data class EpisodeContext(
-        val title: String?,
+        val episodeId: String,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
+        val absoluteEpisodeNumber: Int?,
+        val title: String?,
+        val airDate: String?,
+        val runtimeMinutes: Int?,
+        val stillUrl: String?,
+        val overview: String?,
     )
 
     data class WatchDerivedItem(
         val id: String,
+        val media: MetadataView,
         val detailsTarget: DetailsTarget,
         val playbackTarget: PlaybackTarget?,
         val episodeContext: EpisodeContext?,
-        val media: MetadataView,
         val progress: WatchProgressView?,
         val watchedAt: String?,
         val lastActivityAt: String?,
+        val origins: List<String>,
     )
 
     data class WatchlistItem(
         val id: String,
+        val media: MetadataView,
         val detailsTarget: DetailsTarget,
         val playbackTarget: PlaybackTarget?,
-        val media: MetadataView,
-        val addedAt: String,
+        val episodeContext: EpisodeContext?,
+        val addedAt: String?,
+        val origins: List<String>,
     )
 
     data class RatingItem(
         val id: String,
+        val media: MetadataView,
         val detailsTarget: DetailsTarget,
         val playbackTarget: PlaybackTarget?,
-        val media: MetadataView,
+        val episodeContext: EpisodeContext?,
         val value: Int,
-        val ratedAt: String,
+        val ratedAt: String?,
+        val origins: List<String>,
     )
 
     data class LibrarySection(
         val id: String,
         val label: String,
+        val order: Int,
         val itemCount: Int,
         val items: List<LibrarySectionItem> = emptyList(),
     )
 
+    data class LibraryItemState(
+        val addedAt: String?,
+        val watchedAt: String?,
+        val ratedAt: String?,
+        val rating: Int?,
+        val lastActivityAt: String?,
+    )
+
     data class LibrarySectionItem(
         val id: String,
+        val media: MetadataView,
         val detailsTarget: DetailsTarget,
         val playbackTarget: PlaybackTarget?,
         val episodeContext: EpisodeContext?,
-        val media: MetadataView,
-        val progress: WatchProgressView?,
-        val rating: RatingStateView?,
-        val watchedAt: String?,
-        val addedAt: String?,
+        val state: LibraryItemState,
+        val origins: List<String>,
     )
 
     data class CanonicalWatchCollectionResponse<T>(
@@ -691,13 +708,6 @@ class CrispyBackendClient(
         val sections: List<HomeSection>,
     )
 
-    data class NativeLibrary(
-        val continueWatching: List<WatchDerivedItem>,
-        val history: List<WatchDerivedItem>,
-        val watchlist: List<WatchlistItem>,
-        val ratings: List<RatingItem>,
-    )
-
     data class ProviderLibraryFolder(
         val id: String,
         val label: String,
@@ -732,47 +742,11 @@ class CrispyBackendClient(
         val providers: List<ProviderAuthState>,
     )
 
-    data class CanonicalLibraryItem(
-        val key: String,
-        val mediaKey: String?,
-        val contentId: String,
-        val contentType: String,
-        val externalIds: MetadataExternalIds?,
-        val title: String,
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val addedAt: String,
-        val providers: List<String>,
-        val folderIds: List<String>,
-        val media: MetadataView?,
-    )
-
-    data class CanonicalLibrary(
-        val source: String,
-        val generatedAt: String?,
-        val continueWatching: List<WatchDerivedItem>,
-        val history: List<WatchDerivedItem>,
-        val watchlist: List<WatchlistItem>,
-        val ratings: List<RatingItem>,
-        val items: List<CanonicalLibraryItem>,
-    )
-
-    data class LibraryDiagnostics(
-        val source: String,
-        val generatedAt: String?,
-        val providers: List<ProviderLibrarySnapshot>,
-    )
-
     data class ProfileLibraryResponse(
         val profileId: String,
         val source: String,
         val generatedAt: String?,
         val auth: LibraryAuth,
-        val canonical: CanonicalLibrary,
-        val native: NativeLibrary?,
-        val diagnostics: LibraryDiagnostics,
         val sections: List<LibrarySection> = emptyList(),
     )
 

@@ -40,7 +40,6 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.player.WatchProviderAuthState
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -57,14 +56,24 @@ data class LibrarySectionItemUi(
     val id: String,
     val detailsTitleId: String,
     val detailsTitleMediaType: String,
+    val highlightEpisodeId: String?,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
-    val seasonNumber: Int?,
-    val episodeNumber: Int?,
+    val playbackContentId: String?,
+    val playbackMediaType: String?,
+    val playbackSeasonNumber: Int?,
+    val playbackEpisodeNumber: Int?,
+    val playbackAbsoluteEpisodeNumber: Int?,
+    val addedAt: String?,
+    val watchedAt: String?,
+    val ratedAt: String?,
+    val rating: Int?,
+    val lastActivityAt: String?,
+    val origins: List<String>,
 ) {
     val stableKey: String
-        get() = "$detailsTitleMediaType:$detailsTitleId:${seasonNumber ?: -1}:${episodeNumber ?: -1}"
+        get() = id
 }
 
 @Immutable
@@ -80,7 +89,6 @@ data class LibraryUiState(
     val isRefreshing: Boolean = false,
     val statusMessage: String = "",
     val sections: List<LibrarySectionUi> = emptyList(),
-    val authState: WatchProviderAuthState = WatchProviderAuthState(),
     val selectedSectionId: String? = null,
 )
 
@@ -103,20 +111,6 @@ class LibraryViewModel internal constructor(
         refreshJob =
             viewModelScope.launch {
                 _uiState.update { it.copy(isRefreshing = true) }
-
-                val authState = loadAuthState()
-                _uiState.update { it.copy(authState = authState) }
-
-                if (!authState.traktAuthenticated && !authState.simklAuthenticated) {
-                    _uiState.update {
-                        it.copy(
-                            isRefreshing = false,
-                            statusMessage = "Connect Trakt or Simkl in Settings to load your library.",
-                            sections = emptyList(),
-                        )
-                    }
-                    return@launch
-                }
 
                 val sections = withContext(Dispatchers.IO) {
                     runCatching { loadLibrarySections() }.getOrNull()
@@ -142,11 +136,21 @@ class LibraryViewModel internal constructor(
                                 id = item.id,
                                 detailsTitleId = item.detailsTarget.titleId,
                                 detailsTitleMediaType = item.detailsTarget.titleMediaType,
+                                highlightEpisodeId = item.detailsTarget.highlightEpisodeId,
                                 title = item.media.title ?: item.detailsTarget.titleId,
                                 posterUrl = item.media.images.posterUrl,
                                 backdropUrl = item.media.images.backdropUrl,
-                                seasonNumber = item.episodeContext?.seasonNumber,
-                                episodeNumber = item.episodeContext?.episodeNumber,
+                                playbackContentId = item.playbackTarget?.contentId,
+                                playbackMediaType = item.playbackTarget?.mediaType,
+                                playbackSeasonNumber = item.playbackTarget?.seasonNumber,
+                                playbackEpisodeNumber = item.playbackTarget?.episodeNumber,
+                                playbackAbsoluteEpisodeNumber = item.playbackTarget?.absoluteEpisodeNumber,
+                                addedAt = item.state.addedAt,
+                                watchedAt = item.state.watchedAt,
+                                ratedAt = item.state.ratedAt,
+                                rating = item.state.rating,
+                                lastActivityAt = item.state.lastActivityAt,
+                                origins = item.origins,
                             )
                         },
                     )
@@ -171,21 +175,6 @@ class LibraryViewModel internal constructor(
         _uiState.update { current ->
             val nextId = if (current.selectedSectionId == sectionId) null else sectionId
             current.copy(selectedSectionId = nextId)
-        }
-    }
-
-    private suspend fun loadAuthState(): WatchProviderAuthState {
-        val backendContext = getBackendContext() ?: return WatchProviderAuthState()
-        return try {
-            val states = backend.getProviderAuthState(backendContext.accessToken, backendContext.profileId)
-            val trakt = states.firstOrNull { it.provider.equals("trakt", ignoreCase = true) }
-            val simkl = states.firstOrNull { it.provider.equals("simkl", ignoreCase = true) }
-            WatchProviderAuthState(
-                traktAuthenticated = trakt?.connected == true,
-                simklAuthenticated = simkl?.connected == true,
-            )
-        } catch (_: Throwable) {
-            WatchProviderAuthState()
         }
     }
 
@@ -253,9 +242,6 @@ internal fun LibraryRouteContent(
     val selectedSectionId = uiState.selectedSectionId
     val selectedSection = sections.firstOrNull { it.id == selectedSectionId }
     val items = selectedSection?.items.orEmpty()
-    val hasTrakt = uiState.authState.traktAuthenticated
-    val hasSimkl = uiState.authState.simklAuthenticated
-    val hasProvider = hasTrakt || hasSimkl
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val gridState = rememberLazyGridState()
@@ -295,7 +281,7 @@ internal fun LibraryRouteContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }, key = "filters") {
-                if (hasProvider && sections.isNotEmpty()) {
+                if (sections.isNotEmpty()) {
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -321,18 +307,7 @@ internal fun LibraryRouteContent(
                 }
             }
 
-            if (!hasProvider) {
-                item(span = { GridItemSpan(maxLineSpan) }, key = "provider-auth") {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
-                            Text(
-                                text = "Connect Trakt or Simkl in Settings to load your library.",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
-                }
-            } else if (items.isEmpty()) {
+            if (items.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }, key = "section-empty") {
                     val emptyMessage =
                         if (sections.isEmpty()) "No library sections available."

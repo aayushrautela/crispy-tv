@@ -102,7 +102,13 @@ class DetailsViewModel internal constructor(
             val enrichedDetails = result.details
 
             _uiState.update { state ->
-                val pendingSeason = pendingEpisodeNavigation?.season
+                val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId
+                val pendingSeason =
+                    pendingHighlightEpisodeId?.let { highlightEpisodeId ->
+                        result.details?.videos?.firstOrNull { video ->
+                            video.id.equals(highlightEpisodeId, ignoreCase = true)
+                        }?.season
+                    }
                 val selectedSeason =
                     when {
                         pendingSeason != null && pendingSeason in result.seasons -> pendingSeason
@@ -248,20 +254,29 @@ class DetailsViewModel internal constructor(
     }
 
     fun requestEpisodeNavigation(
-        initialSeason: Int?,
-        initialEpisode: Int?,
+        highlightEpisodeId: String?,
         autoOpenEpisode: Boolean,
     ) {
-        if (initialSeason == null && initialEpisode == null) return
+        val normalizedHighlightEpisodeId = highlightEpisodeId?.trim()?.ifBlank { null } ?: return
         pendingEpisodeNavigation =
             PendingEpisodeNavigation(
-                season = initialSeason,
-                episode = initialEpisode,
+                highlightEpisodeId = normalizedHighlightEpisodeId,
                 autoOpenEpisode = autoOpenEpisode,
             )
 
         val currentState = _uiState.value
-        val targetSeason = initialSeason ?: currentState.selectedSeasonOrFirst ?: return
+        val targetSeason =
+            currentState.seasonEpisodes.firstOrNull { episode ->
+                episode.id.equals(normalizedHighlightEpisodeId, ignoreCase = true)
+            }?.season
+                ?: seasonEpisodesCache.values.asSequence().flatten().firstOrNull { episode ->
+                    episode.id.equals(normalizedHighlightEpisodeId, ignoreCase = true)
+                }?.season
+                ?: currentState.details?.videos?.firstOrNull { episode ->
+                    episode.id.equals(normalizedHighlightEpisodeId, ignoreCase = true)
+                }?.season
+                ?: currentState.selectedSeasonOrFirst
+                ?: return
         if (targetSeason != currentState.selectedSeasonOrFirst && targetSeason in currentState.seasons) {
             onSeasonSelected(targetSeason)
             return
@@ -955,13 +970,13 @@ class DetailsViewModel internal constructor(
 
     private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
         val pending = pendingEpisodeNavigation ?: return
-        val selectedSeason = _uiState.value.selectedSeasonOrFirst
-        if (pending.season != null && pending.season != selectedSeason) return
+        val target = videos.firstOrNull { video ->
+            video.id.equals(pending.highlightEpisodeId, ignoreCase = true)
+        } ?: return
         pendingEpisodeNavigation = null
 
-        if (!pending.autoOpenEpisode || pending.episode == null) return
+        if (!pending.autoOpenEpisode) return
 
-        val target = videos.firstOrNull { video -> video.episode == pending.episode }
         target?.let { video -> onOpenStreamSelectorForEpisode(video.id) }
     }
 
@@ -986,7 +1001,6 @@ class DetailsViewModel internal constructor(
 }
 
 private data class PendingEpisodeNavigation(
-    val season: Int?,
-    val episode: Int?,
+    val highlightEpisodeId: String,
     val autoOpenEpisode: Boolean,
 )

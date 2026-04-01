@@ -71,9 +71,11 @@ class HomeWatchActivityService {
             playbackContentId = entry.playbackContentId,
             detailsTitleId = entry.detailsTitleId,
             detailsTitleMediaType = entry.detailsTitleMediaType,
+            highlightEpisodeId = entry.highlightEpisodeId,
             playbackMediaType = entry.playbackMediaType,
             playbackSeasonNumber = entry.playbackSeasonNumber,
             playbackEpisodeNumber = entry.playbackEpisodeNumber,
+            playbackAbsoluteEpisodeNumber = entry.playbackAbsoluteEpisodeNumber,
         )
     }
 }

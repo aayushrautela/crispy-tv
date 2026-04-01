@@ -201,6 +201,10 @@ class LocalWatchHistoryStore(
                     progressPercent = 100.0,
                     lastUpdatedEpochMs = item.watchedAtEpochMs,
                     provider = WatchProvider.LOCAL,
+                    detailsTitleId = item.contentId,
+                    detailsTitleMediaType = item.contentType.label,
+                    playbackSeasonNumber = item.season,
+                    playbackEpisodeNumber = item.episode,
                 )
             }
     }

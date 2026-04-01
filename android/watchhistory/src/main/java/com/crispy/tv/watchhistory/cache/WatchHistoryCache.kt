@@ -155,6 +155,13 @@ class WatchHistoryCache(
                     .put("parentProviderId", entry.parentProviderId)
                     .put("absoluteEpisodeNumber", entry.absoluteEpisodeNumber)
                     .put("playbackContentId", entry.playbackContentId)
+                    .put("detailsTitleId", entry.detailsTitleId)
+                    .put("detailsTitleMediaType", entry.detailsTitleMediaType)
+                    .put("highlightEpisodeId", entry.highlightEpisodeId)
+                    .put("playbackMediaType", entry.playbackMediaType)
+                    .put("playbackSeasonNumber", entry.playbackSeasonNumber)
+                    .put("playbackEpisodeNumber", entry.playbackEpisodeNumber)
+                    .put("playbackAbsoluteEpisodeNumber", entry.playbackAbsoluteEpisodeNumber)
             )
         }
 
@@ -301,7 +308,14 @@ class WatchHistoryCache(
             val parentProvider = obj.optString("parentProvider").trim().ifEmpty { null }
             val parentProviderId = obj.optString("parentProviderId").trim().ifEmpty { null }
             val absoluteEpisodeNumber = obj.optInt("absoluteEpisodeNumber", 0).takeIf { it > 0 }
-            val playbackContentId = obj.optString("playbackContentId").trim().ifEmpty { contentId }
+            val playbackContentId = obj.optString("playbackContentId").trim().ifEmpty { null }
+            val detailsTitleId = obj.optString("detailsTitleId").trim().ifEmpty { contentId }
+            val detailsTitleMediaType = obj.optString("detailsTitleMediaType").trim().ifEmpty { contentType.label }
+            val highlightEpisodeId = obj.optString("highlightEpisodeId").trim().ifEmpty { null }
+            val playbackMediaType = obj.optString("playbackMediaType").trim().ifEmpty { null }
+            val playbackSeasonNumber = obj.optInt("playbackSeasonNumber", 0).takeIf { it > 0 }
+            val playbackEpisodeNumber = obj.optInt("playbackEpisodeNumber", 0).takeIf { it > 0 }
+            val playbackAbsoluteEpisodeNumber = obj.optInt("playbackAbsoluteEpisodeNumber", 0).takeIf { it > 0 }
 
             entries.add(
                 ContinueWatchingEntry(
@@ -325,6 +339,13 @@ class WatchHistoryCache(
                     parentProviderId = parentProviderId,
                     absoluteEpisodeNumber = absoluteEpisodeNumber,
                     playbackContentId = playbackContentId,
+                    detailsTitleId = detailsTitleId,
+                    detailsTitleMediaType = detailsTitleMediaType,
+                    highlightEpisodeId = highlightEpisodeId,
+                    playbackMediaType = playbackMediaType,
+                    playbackSeasonNumber = playbackSeasonNumber,
+                    playbackEpisodeNumber = playbackEpisodeNumber,
+                    playbackAbsoluteEpisodeNumber = playbackAbsoluteEpisodeNumber,
                 )
             )
         }

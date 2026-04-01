@@ -268,6 +268,10 @@ internal class SimklWatchHistoryProvider(
                     lastUpdatedEpochMs = pausedAtEpochMs,
                     provider = source,
                     providerPlaybackId = playbackId,
+                    detailsTitleId = contentId,
+                    detailsTitleMediaType = MetadataLabMediaType.MOVIE.label,
+                    playbackContentId = contentId,
+                    playbackMediaType = "movie",
                 )
             }
 
@@ -297,6 +301,10 @@ internal class SimklWatchHistoryProvider(
                     lastUpdatedEpochMs = pausedAtEpochMs,
                     provider = source,
                     providerPlaybackId = playbackId,
+                    detailsTitleId = contentId,
+                    detailsTitleMediaType = MetadataLabMediaType.ANIME.label,
+                    playbackSeasonNumber = season,
+                    playbackEpisodeNumber = episode,
                 )
             }
 

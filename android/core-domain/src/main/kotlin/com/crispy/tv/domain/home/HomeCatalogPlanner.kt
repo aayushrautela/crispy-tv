@@ -14,6 +14,7 @@ data class HomeCatalogItem(
     val description: String? = null,
     val detailsContentId: String = id,
     val detailsMediaType: String = type,
+    val highlightEpisodeId: String? = null,
 )
 
 enum class HomeCatalogSource(val key: String) {
@@ -92,6 +93,7 @@ data class HomeCatalogHeroItem(
     val type: String,
     val detailsContentId: String = id,
     val detailsMediaType: String = type,
+    val highlightEpisodeId: String? = null,
 )
 
 data class HomeCatalogHeroResult(

@@ -73,7 +73,14 @@ data class ContinueWatchingEntry(
     val parentProvider: String? = null,
     val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
-    val playbackContentId: String = contentId,
+    val playbackContentId: String? = null,
+    val detailsTitleId: String,
+    val detailsTitleMediaType: String,
+    val highlightEpisodeId: String? = null,
+    val playbackMediaType: String? = null,
+    val playbackSeasonNumber: Int? = null,
+    val playbackEpisodeNumber: Int? = null,
+    val playbackAbsoluteEpisodeNumber: Int? = null,
 )
 
 data class ContinueWatchingResult(
@@ -103,12 +110,14 @@ data class CanonicalContinueWatchingItem(
     val parentProvider: String? = null,
     val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
-    val playbackContentId: String = contentId,
-    val detailsTitleId: String = contentId,
-    val detailsTitleMediaType: String = contentType.label,
-    val playbackMediaType: String = contentType.label,
-    val playbackSeasonNumber: Int? = season,
-    val playbackEpisodeNumber: Int? = episode,
+    val playbackContentId: String?,
+    val detailsTitleId: String,
+    val detailsTitleMediaType: String,
+    val highlightEpisodeId: String?,
+    val playbackMediaType: String?,
+    val playbackSeasonNumber: Int?,
+    val playbackEpisodeNumber: Int?,
+    val playbackAbsoluteEpisodeNumber: Int?,
 ) {
     val type: String
         get() = contentType.label
