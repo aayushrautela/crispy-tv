@@ -99,12 +99,12 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
 internal suspend fun CrispyBackendClient.getAiInsightsApi(
     accessToken: String,
     profileId: String,
-    contentId: String,
+    mediaKey: String,
     locale: String? = null,
 ): AiInsightsResponse {
     checkConfigured()
     val payload = JSONObject().apply {
-        put("contentId", contentId.trim())
+        put("mediaKey", mediaKey.trim())
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
     val response = httpClient.postJson(
@@ -173,7 +173,7 @@ internal suspend fun CrispyBackendClient.getMetadataTitleContentApi(
     val json = JSONObject(requireSuccess(response))
     return MetadataTitleContentResponse(
         item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend title content is missing item.")),
-        omdb = parseOmdbContentView(json.optJSONObject("omdb") ?: throw IllegalStateException("Backend title content is missing omdb.")),
+        content = parseMetadataContentView(json.optJSONObject("content") ?: throw IllegalStateException("Backend title content is missing content.")),
     )
 }
 
@@ -253,7 +253,7 @@ internal suspend fun CrispyBackendClient.getNextEpisodeApi(
     currentSeasonNumber: Int,
     currentEpisodeNumber: Int,
     watchedKeys: List<String> = emptyList(),
-    showId: String? = null,
+    showMediaKey: String? = null,
     nowMs: Long? = null,
 ): MetadataNextEpisodeResponse {
     checkConfigured()
@@ -264,8 +264,8 @@ internal suspend fun CrispyBackendClient.getNextEpisodeApi(
             if (watchedKeys.isNotEmpty()) {
                 addQueryParameter("watchedKeys", watchedKeys.joinToString(","))
             }
-            if (!showId.isNullOrBlank()) {
-                addQueryParameter("showId", showId)
+            if (!showMediaKey.isNullOrBlank()) {
+                addQueryParameter("showMediaKey", showMediaKey.trim())
             }
             if (nowMs != null) {
                 addQueryParameter("nowMs", nowMs.toString())

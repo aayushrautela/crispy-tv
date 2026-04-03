@@ -17,12 +17,12 @@ class AiInsightsRepository(
     private val cacheStore: AiInsightsCacheStore,
 ) {
     fun loadCached(
-        contentId: String,
+        mediaKey: String,
         locale: Locale = Locale.getDefault(),
-    ): AiInsightsResult? = cacheStore.load(contentId, locale)
+    ): AiInsightsResult? = cacheStore.load(mediaKey, locale)
 
     suspend fun generate(
-        contentId: String,
+        mediaKey: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
         val session = supabase.ensureValidSession()
@@ -36,7 +36,7 @@ class AiInsightsRepository(
         val payload = backend.getAiInsights(
             accessToken = session.accessToken,
             profileId = profileId,
-            contentId = contentId,
+            mediaKey = mediaKey,
             locale = locale.toLanguageTag(),
         )
         return AiInsightsResult(
@@ -50,7 +50,7 @@ class AiInsightsRepository(
             },
             trivia = payload.trivia,
         ).also { result ->
-            cacheStore.save(contentId, locale, result)
+            cacheStore.save(mediaKey, locale, result)
         }
     }
 

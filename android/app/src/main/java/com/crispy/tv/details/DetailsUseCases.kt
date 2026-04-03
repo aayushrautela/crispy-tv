@@ -24,7 +24,7 @@ import java.util.Locale
 internal data class DetailsScreenLoadResult(
     val details: MediaDetails?,
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
-    val omdbContent: CrispyBackendClient.MetadataTitleContentResponse?,
+    val titleContent: CrispyBackendClient.MetadataTitleContentResponse?,
     val statusMessage: String,
     val providerState: ProviderState,
     val watchCta: WatchCta,
@@ -118,7 +118,7 @@ internal class DetailsUseCases(
         return DetailsScreenLoadResult(
             details = details,
             titleDetail = titleDetail,
-            omdbContent = titleContent,
+            titleContent = titleContent,
             statusMessage = statusMessage,
             providerState = providerState,
             watchCta = watchCta,
@@ -175,17 +175,17 @@ internal class DetailsUseCases(
     }
 
     fun loadCachedAiInsights(
-        contentId: String,
+        mediaKey: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult? {
-        return aiRepository.loadCached(contentId, locale)
+        return aiRepository.loadCached(mediaKey, locale)
     }
 
     suspend fun generateAiInsights(
-        contentId: String,
+        mediaKey: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
-        return aiRepository.generate(contentId, locale)
+        return aiRepository.generate(mediaKey, locale)
     }
 
     suspend fun loadStreams(
@@ -218,16 +218,8 @@ internal class DetailsUseCases(
         details: MediaDetails,
         desired: Boolean,
     ): DetailsMutationResult {
-        val source = userMediaRepository.preferredProvider()
+        val source: WatchProvider? = null
         val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-            return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl).",
-            )
-        }
-
         val request = buildTitleWatchHistoryRequest(enriched)
         val result = userMediaRepository.setInWatchlist(request, desired, source)
         return DetailsMutationResult(
@@ -324,24 +316,8 @@ internal class DetailsUseCases(
         details: MediaDetails,
         rating: Int?,
     ): DetailsMutationResult {
-        val source = userMediaRepository.preferredProvider()
-        if (source == WatchProvider.SIMKL && rating == null) {
-            return DetailsMutationResult(
-                details = details,
-                success = false,
-                statusMessage = "Removing ratings is not supported for Simkl yet.",
-            )
-        }
-
+        val source: WatchProvider? = null
         val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-            return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl).",
-            )
-        }
-
         val request = buildTitleWatchHistoryRequest(enriched)
         val result = userMediaRepository.setRating(request, rating, source)
         return DetailsMutationResult(

@@ -27,7 +27,7 @@ import java.util.Locale
 internal fun buildDetailsRows(
     details: MediaDetails,
     titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
-    omdbContent: CrispyBackendClient.OmdbContentView?,
+    content: CrispyBackendClient.MetadataContentView?,
 ): List<Pair<String, String>> {
     val rows = mutableListOf<Pair<String, String>>()
     val item = titleDetail?.item
@@ -59,27 +59,31 @@ internal fun buildDetailsRows(
             rows += "CREATED BY" to details.creators.joinToString(", ")
         }
     } else {
-        omdbContent?.plot?.takeIf { it.isNotBlank() && !it.equals(details.description, ignoreCase = true) }?.let {
+        content?.description?.takeIf { it.isNotBlank() && !it.equals(details.description, ignoreCase = true) }?.let {
             rows += "PLOT" to it
         }
         item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
 
-        formatLongDate(item?.releaseDate ?: omdbContent?.released)?.let { rows += "RELEASE DATE" to it }
+        formatLongDate(item?.releaseDate ?: content?.released)?.let { rows += "RELEASE DATE" to it }
 
-        (details.runtime?.takeIf { it.isNotBlank() } ?: omdbContent?.runtime?.takeIf { it.isNotBlank() })?.let {
+        (details.runtime?.takeIf { it.isNotBlank() } ?: formatRuntimeMinutes(content?.runtime))?.let {
             rows += "RUNTIME" to it
         }
 
-        omdbContent?.boxOffice?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }?.let {
-            rows += "BOX OFFICE" to it
+        formatCurrency(content?.revenue)?.let {
+            rows += "REVENUE" to it
         }
 
-        val originCountry = omdbContent?.country?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+        formatCurrency(content?.budget)?.let {
+            rows += "BUDGET" to it
+        }
+
+        val originCountry = content?.country?.takeIf { it.isNotBlank() }
             ?: production?.originCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
             ?: production?.productionCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
         originCountry?.let { rows += "ORIGIN COUNTRY" to it }
 
-        val language = omdbContent?.language?.takeIf { it.isNotBlank() && !it.equals("N/A", ignoreCase = true) }
+        val language = content?.language?.takeIf { it.isNotBlank() }
             ?: production?.originalLanguage?.takeIf { it.isNotBlank() }?.uppercase()
         language?.let { rows += "LANGUAGE" to it }
     }
@@ -110,4 +114,9 @@ internal fun formatRuntimeMinutes(minutes: Int?): String? {
         h > 0 -> "$h hr"
         else -> "$m min"
     }
+}
+
+private fun formatCurrency(amount: Long?): String? {
+    val value = amount?.takeIf { it > 0L } ?: return null
+    return NumberFormat.getCurrencyInstance(Locale.US).format(value)
 }

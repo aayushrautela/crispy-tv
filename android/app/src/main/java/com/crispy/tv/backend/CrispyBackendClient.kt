@@ -131,12 +131,6 @@ class CrispyBackendClient(
         ALL("all"),
     }
 
-    enum class LibraryMutationSource(val apiValue: String) {
-        TRAKT("trakt"),
-        SIMKL("simkl"),
-        ALL("all"),
-    }
-
     data class MediaLookupInput(
         val id: String? = null,
         val mediaKey: String? = null,
@@ -398,43 +392,56 @@ class CrispyBackendClient(
         val networks: List<MetadataCompanyView>,
     )
 
-    data class OmdbRatingEntry(
-        val source: String,
-        val value: String,
+    data class MetadataContentIds(
+        val imdb: String?,
+        val tmdb: Int?,
+        val trakt: Int?,
+        val tvdb: Int?,
     )
 
-    data class OmdbContentView(
-        val imdbId: String,
+    data class MetadataContentRatings(
+        val imdbRating: Double?,
+        val imdbVotes: Int?,
+        val tmdbRating: Double?,
+        val metacritic: Int?,
+        val rottenTomatoes: Int?,
+        val letterboxdRating: Double?,
+        val mdblistRating: Double?,
+    )
+
+    data class MetadataContentView(
+        val ids: MetadataContentIds,
         val title: String?,
+        val originalTitle: String?,
         val type: String?,
-        val year: String?,
-        val rated: String?,
-        val released: String?,
-        val runtime: String?,
+        val year: Int?,
+        val description: String?,
+        val score: Double?,
+        val ratings: MetadataContentRatings,
+        val posterUrl: String?,
+        val backdropUrl: String?,
         val genres: List<String>,
-        val directors: List<String>,
-        val writers: List<String>,
-        val actors: List<String>,
-        val plot: String?,
+        val keywords: List<String>,
+        val runtime: Int?,
+        val certification: String?,
+        val released: String?,
         val language: String?,
         val country: String?,
-        val awards: String?,
-        val posterUrl: String?,
-        val ratings: List<OmdbRatingEntry>,
-        val metascore: String?,
-        val imdbRating: String?,
-        val imdbVotes: String?,
-        val boxOffice: String?,
-        val production: String?,
-        val website: String?,
-        val totalSeasons: String?,
-        val response: String?,
-        val error: String?,
+        val seasonCount: Int?,
+        val episodeCount: Int?,
+        val directors: List<String>,
+        val writers: List<String>,
+        val network: String?,
+        val studio: String?,
+        val status: String?,
+        val budget: Long?,
+        val revenue: Long?,
+        val updatedAt: String?,
     )
 
     data class MetadataTitleContentResponse(
         val item: MetadataView,
-        val omdb: OmdbContentView,
+        val content: MetadataContentView,
     )
 
     data class MetadataSeasonDetailResponse(
@@ -705,22 +712,6 @@ class CrispyBackendClient(
         val sections: List<LibrarySection> = emptyList(),
     )
 
-    data class ProviderMutationResult(
-        val provider: String,
-        val status: String,
-        val message: String?,
-    )
-
-    data class LibraryMutationResponse(
-        val source: String,
-        val action: String,
-        val media: MetadataView,
-        val watchlist: Boolean?,
-        val rating: Int?,
-        val results: List<ProviderMutationResult>,
-        val statusMessage: String,
-    )
-
     data class WatchActionResponse(
         val accepted: Boolean,
         val mode: String,
@@ -821,13 +812,13 @@ class CrispyBackendClient(
     suspend fun getAiInsights(
         accessToken: String,
         profileId: String,
-        contentId: String,
+        mediaKey: String,
         locale: String? = null,
     ): AiInsightsResponse {
         return getAiInsightsApi(
             accessToken = accessToken,
             profileId = profileId,
-            contentId = contentId,
+            mediaKey = mediaKey,
             locale = locale,
         )
     }
@@ -866,7 +857,7 @@ class CrispyBackendClient(
         currentSeasonNumber: Int,
         currentEpisodeNumber: Int,
         watchedKeys: List<String> = emptyList(),
-        showId: String? = null,
+        showMediaKey: String? = null,
         nowMs: Long? = null,
     ): MetadataNextEpisodeResponse {
         return getNextEpisodeApi(
@@ -875,7 +866,7 @@ class CrispyBackendClient(
             currentSeasonNumber = currentSeasonNumber,
             currentEpisodeNumber = currentEpisodeNumber,
             watchedKeys = watchedKeys,
-            showId = showId,
+            showMediaKey = showMediaKey,
             nowMs = nowMs,
         )
     }
@@ -907,38 +898,6 @@ class CrispyBackendClient(
             profileId = profileId,
             source = source,
             limitPerFolder = limitPerFolder,
-        )
-    }
-
-    suspend fun setProviderWatchlist(
-        accessToken: String,
-        profileId: String,
-        input: MediaLookupInput,
-        inWatchlist: Boolean,
-        source: LibraryMutationSource? = null,
-    ): LibraryMutationResponse {
-        return setProviderWatchlistApi(
-            accessToken = accessToken,
-            profileId = profileId,
-            input = input,
-            inWatchlist = inWatchlist,
-            source = source,
-        )
-    }
-
-    suspend fun setProviderRating(
-        accessToken: String,
-        profileId: String,
-        input: MediaLookupInput,
-        rating: Int?,
-        source: LibraryMutationSource? = null,
-    ): LibraryMutationResponse {
-        return setProviderRatingApi(
-            accessToken = accessToken,
-            profileId = profileId,
-            input = input,
-            rating = rating,
-            source = source,
         )
     }
 

@@ -1,28 +1,7 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
 import org.json.JSONArray
 import org.json.JSONObject
-
-internal fun JSONObject.putLibraryResolveInput(input: MediaLookupInput) {
-    val effectiveProvider =
-        input.provider?.trim()?.takeIf { it.isNotBlank() }
-            ?: input.tvdbId?.toString()?.let { "tvdb" }
-            ?: input.tmdbId?.toString()?.let { "tmdb" }
-    val effectiveProviderId =
-        input.providerId?.trim()?.takeIf { it.isNotBlank() }
-            ?: input.tvdbId?.toString()
-            ?: input.tmdbId?.toString()
-    if (!input.id.isNullOrBlank()) put("id", input.id.trim())
-    if (!input.imdbId.isNullOrBlank()) put("imdbId", input.imdbId.trim())
-    if (!input.mediaType.isNullOrBlank()) put("mediaType", input.mediaType.trim())
-    if (!effectiveProvider.isNullOrBlank()) put("provider", effectiveProvider)
-    if (!effectiveProviderId.isNullOrBlank()) put("providerId", effectiveProviderId)
-    if (!input.parentProvider.isNullOrBlank()) put("parentProvider", input.parentProvider.trim())
-    if (!input.parentProviderId.isNullOrBlank()) put("parentProviderId", input.parentProviderId.trim())
-    if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
-    if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
-}
 
 internal fun Map<String, Any?>.toJsonObject(): JSONObject {
     val json = JSONObject()
@@ -99,6 +78,14 @@ internal fun JSONObject.optDoubleOrNull(key: String): Double? {
     return when (val value = opt(key)) {
         is Number -> value.toDouble()
         is String -> value.trim().toDoubleOrNull()
+        else -> null
+    }
+}
+
+internal fun JSONObject.optLongOrNull(key: String): Long? {
+    return when (val value = opt(key)) {
+        is Number -> value.toLong()
+        is String -> value.trim().toLongOrNull()
         else -> null
     }
 }

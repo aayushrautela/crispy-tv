@@ -75,7 +75,7 @@ class DetailsViewModel internal constructor(
                 it.copy(
                     isLoading = true,
                     titleDetail = null,
-                    omdbContent = null,
+                    titleContent = null,
                     statusMessage = "Loading...",
                     aiIsLoading = false,
                     aiInsights = null,
@@ -123,7 +123,7 @@ class DetailsViewModel internal constructor(
                     isLoading = false,
                     details = result.details,
                     titleDetail = result.titleDetail,
-                    omdbContent = result.omdbContent,
+                    titleContent = result.titleContent,
                     statusMessage = result.statusMessage,
                     isWatched = result.providerState.isWatched,
                     isInWatchlist = result.providerState.isInWatchlist,
@@ -152,12 +152,12 @@ class DetailsViewModel internal constructor(
 
             val detailsForAi = enrichedDetails
             val aiLocale = Locale.getDefault()
-            val contentId = detailsForAi?.id?.trim()
+            val aiMediaKey = detailsForAi?.mediaKey?.trim()
 
-            if (!contentId.isNullOrBlank()) {
+            if (!aiMediaKey.isNullOrBlank()) {
                 val cached =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.loadCachedAiInsights(contentId, aiLocale)
+                        detailsUseCases.loadCachedAiInsights(aiMediaKey, aiLocale)
                     }
                 if (cached != null) {
                     _uiState.update { it.copy(aiInsights = cached) }
@@ -169,8 +169,8 @@ class DetailsViewModel internal constructor(
     fun onAiInsightsClick() {
         val state = uiState.value
         val details = state.details
-        val contentId = details?.id?.trim()
-        if (details == null || contentId.isNullOrBlank()) {
+        val aiMediaKey = details?.mediaKey?.trim()
+        if (details == null || aiMediaKey.isNullOrBlank()) {
             _uiState.update { it.copy(statusMessage = "AI insights aren't available for this title yet.") }
             return
         }
@@ -184,7 +184,7 @@ class DetailsViewModel internal constructor(
         if (state.aiIsLoading) return
 
         startAiGeneration(
-            contentId = contentId,
+            mediaKey = aiMediaKey,
             locale = Locale.getDefault(),
             showStory = true,
             announce = true,
@@ -196,7 +196,7 @@ class DetailsViewModel internal constructor(
     }
 
     private fun startAiGeneration(
-        contentId: String,
+        mediaKey: String,
         locale: Locale,
         showStory: Boolean,
         announce: Boolean,
@@ -213,7 +213,7 @@ class DetailsViewModel internal constructor(
                 runCatching {
                     withContext(Dispatchers.IO) {
                         detailsUseCases.generateAiInsights(
-                            contentId = contentId,
+                            mediaKey = mediaKey,
                             locale = locale,
                         )
                     }

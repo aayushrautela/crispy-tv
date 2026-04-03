@@ -34,18 +34,20 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.R
+import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.ratings.formatRatingOutOfTen
+import com.crispy.tv.ratings.normalizeRatingText
 import com.crispy.tv.ui.components.skeletonElement
 
 @Composable
 internal fun RatingsSection(
     tmdbRating: String?,
-    omdbContent: CrispyBackendClient.OmdbContentView?,
+    content: CrispyBackendClient.MetadataContentView?,
     isLoading: Boolean,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
 ) {
-    val ratings = remember(tmdbRating, omdbContent) { buildRatings(tmdbRating = tmdbRating, omdbContent = omdbContent) }
+    val ratings = remember(tmdbRating, content) { buildRatings(tmdbRating = tmdbRating, content = content) }
     if (ratings.isEmpty() && !isLoading) return
 
     Spacer(modifier = Modifier.height(18.dp))
@@ -164,7 +166,7 @@ private data class DetailsRatingPill(
 
 private fun buildRatings(
     tmdbRating: String?,
-    omdbContent: CrispyBackendClient.OmdbContentView?,
+    content: CrispyBackendClient.MetadataContentView?,
 ): List<DetailsRatingPill> {
     val ratings = mutableListOf<DetailsRatingPill>()
     tmdbRating?.trim()?.takeIf { it.isNotBlank() }?.let { rating ->
@@ -179,59 +181,77 @@ private fun buildRatings(
             )
     }
 
-    omdbContent?.ratings.orEmpty().forEachIndexed { index, rating ->
-        val source = rating.source.trim()
-        val value = rating.value.trim()
-        if (source.isBlank() || value.isBlank()) return@forEachIndexed
+    val contentRatings = content?.ratings
+    contentRatings?.imdbRating?.let { imdbRating ->
+        formatRatingOutOfTen(formatRating(imdbRating))?.let { score ->
+            ratings +=
+                DetailsRatingPill(
+                    key = "content-imdb",
+                    source = "IMDb",
+                    score = score,
+                    badgeText = "IMDb",
+                    badgeColor = Color(0xFFF5C518),
+                    badgeContentColor = Color(0xFF121212),
+                )
+        }
+    }
 
-        ratings +=
-            when {
-                source.equals("Internet Movie Database", ignoreCase = true) -> {
-                    DetailsRatingPill(
-                        key = "omdb-imdb-$index",
-                        source = "IMDb",
-                        score = value,
-                        badgeText = "IMDb",
-                        badgeColor = Color(0xFFF5C518),
-                        badgeContentColor = Color(0xFF121212),
-                    )
-                }
+    contentRatings?.rottenTomatoes?.let { rottenTomatoes ->
+        normalizeRatingText(rottenTomatoes.toString())?.let { score ->
+            ratings +=
+                DetailsRatingPill(
+                    key = "content-rt",
+                    source = "Rotten Tomatoes",
+                    score = "$score%",
+                    badgeText = null,
+                    badgeColor = Color.Transparent,
+                    badgeContentColor = Color.Unspecified,
+                    badgeLogoRes = R.drawable.ic_rotten_tomatoes,
+                )
+        }
+    }
 
-                source.equals("Rotten Tomatoes", ignoreCase = true) -> {
-                    DetailsRatingPill(
-                        key = "omdb-rt-$index",
-                        source = "Rotten Tomatoes",
-                        score = value,
-                        badgeText = null,
-                        badgeColor = Color.Transparent,
-                        badgeContentColor = Color.Unspecified,
-                        badgeLogoRes = R.drawable.ic_rotten_tomatoes,
-                    )
-                }
+    contentRatings?.metacritic?.let { metacritic ->
+        normalizeRatingText(metacritic.toString())?.let { score ->
+            ratings +=
+                DetailsRatingPill(
+                    key = "content-metacritic",
+                    source = "Metacritic",
+                    score = "$score/100",
+                    badgeText = null,
+                    badgeColor = Color.Transparent,
+                    badgeContentColor = Color.Unspecified,
+                    badgeLogoRes = R.drawable.ic_metacritic,
+                )
+        }
+    }
 
-                source.equals("Metacritic", ignoreCase = true) -> {
-                    DetailsRatingPill(
-                        key = "omdb-mc-$index",
-                        source = "Metacritic",
-                        score = value,
-                        badgeText = null,
-                        badgeColor = Color.Transparent,
-                        badgeContentColor = Color.Unspecified,
-                        badgeLogoRes = R.drawable.ic_metacritic,
-                    )
-                }
+    contentRatings?.letterboxdRating?.let { letterboxdRating ->
+        formatRating(letterboxdRating)?.let { score ->
+            ratings +=
+                DetailsRatingPill(
+                    key = "content-letterboxd",
+                    source = "Letterboxd",
+                    score = "$score/5",
+                    badgeText = "LB",
+                    badgeColor = Color(0xFF202830),
+                    badgeContentColor = Color.White,
+                )
+        }
+    }
 
-                else -> {
-                    DetailsRatingPill(
-                        key = "omdb-$index",
-                        source = source,
-                        score = value,
-                        badgeText = null,
-                        badgeColor = Color(0xFFE2E8F0),
-                        badgeContentColor = Color(0xFF475569),
-                    )
-                }
-            }
+    contentRatings?.mdblistRating?.let { mdblistRating ->
+        formatRatingOutOfTen(formatRating(mdblistRating))?.let { score ->
+            ratings +=
+                DetailsRatingPill(
+                    key = "content-mdblist",
+                    source = "MDBList",
+                    score = score,
+                    badgeText = "MDB",
+                    badgeColor = Color(0xFF4338CA),
+                    badgeContentColor = Color.White,
+                )
+        }
     }
 
     return ratings
@@ -240,4 +260,3 @@ private fun buildRatings(
 private fun formatTmdbRating(value: String): String {
     return formatRatingOutOfTen(value) ?: value.trim()
 }
-

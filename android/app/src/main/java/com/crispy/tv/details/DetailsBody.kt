@@ -63,7 +63,7 @@ internal fun DetailsBody(
 ) {
     val details = uiState.details
     val titleDetail = uiState.titleDetail
-    val omdbContent = uiState.omdbContent?.omdb
+    val titleContent = uiState.titleContent?.content
     val horizontalPadding = responsivePageHorizontalPadding()
     val contentPadding = PaddingValues(horizontal = horizontalPadding)
 
@@ -211,7 +211,7 @@ internal fun DetailsBody(
 
         RatingsSection(
             tmdbRating = details.rating,
-            omdbContent = omdbContent,
+            content = titleContent,
             isLoading = false,
             horizontalPadding = horizontalPadding,
             contentPadding = contentPadding,
@@ -420,7 +420,7 @@ internal fun DetailsBody(
                 }
             }
 
-        val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail, omdbContent = omdbContent)
+        val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail, content = titleContent)
         if (detailRows.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
 

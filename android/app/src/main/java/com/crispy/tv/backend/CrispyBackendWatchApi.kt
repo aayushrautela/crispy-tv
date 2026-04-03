@@ -7,10 +7,7 @@ import com.crispy.tv.backend.CrispyBackendClient.HomeResponse
 import com.crispy.tv.backend.CrispyBackendClient.RatingItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
-import com.crispy.tv.backend.CrispyBackendClient.LibraryMutationResponse
-import com.crispy.tv.backend.CrispyBackendClient.LibraryMutationSource
 import com.crispy.tv.backend.CrispyBackendClient.LibrarySource
-import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.ProfileLibraryResponse
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAuthState
@@ -62,12 +59,12 @@ internal suspend fun CrispyBackendClient.getProviderAuthStateApi(
 ): List<ProviderAuthState> {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/provider-auth/state".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/library".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return parseProviderAuthStates(json.optJSONArray("providers"))
+    return parseLibraryAuth(json.optJSONObject("auth")).providers
 }
 
 internal suspend fun CrispyBackendClient.getProfileLibraryApi(
@@ -100,60 +97,6 @@ internal suspend fun CrispyBackendClient.getProfileLibraryApi(
         auth = parseLibraryAuth(json.optJSONObject("auth")),
         sections = parseLibrarySections(json.optJSONArray("sections")),
     )
-}
-
-internal suspend fun CrispyBackendClient.setProviderWatchlistApi(
-    accessToken: String,
-    profileId: String,
-    input: MediaLookupInput,
-    inWatchlist: Boolean,
-    source: LibraryMutationSource? = null,
-): LibraryMutationResponse {
-    checkConfigured()
-    val payload = JSONObject().apply {
-        put("inWatchlist", inWatchlist)
-        if (source != null) {
-            put("source", source.apiValue)
-        }
-        putLibraryResolveInput(input)
-    }.toString()
-    val response = httpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/library/watchlist".toHttpUrl(),
-        jsonBody = payload,
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return parseLibraryMutationResponse(json)
-}
-
-internal suspend fun CrispyBackendClient.setProviderRatingApi(
-    accessToken: String,
-    profileId: String,
-    input: MediaLookupInput,
-    rating: Int?,
-    source: LibraryMutationSource? = null,
-): LibraryMutationResponse {
-    checkConfigured()
-    val payload = JSONObject().apply {
-        if (source != null) {
-            put("source", source.apiValue)
-        }
-        if (rating != null) {
-            put("rating", rating)
-        } else {
-            put("rating", JSONObject.NULL)
-        }
-        putLibraryResolveInput(input)
-    }.toString()
-    val response = httpClient.postJson(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/library/rating".toHttpUrl(),
-        jsonBody = payload,
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return parseLibraryMutationResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.sendWatchEventApi(

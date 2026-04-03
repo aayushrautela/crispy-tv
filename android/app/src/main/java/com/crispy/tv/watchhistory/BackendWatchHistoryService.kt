@@ -6,7 +6,6 @@ import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
-import com.crispy.tv.backend.CrispyBackendClient.LibraryMutationSource
 import com.crispy.tv.backend.CrispyBackendClient.LibrarySource
 import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
@@ -214,33 +213,7 @@ class BackendWatchHistoryService(
                 accepted = action.accepted,
             )
         }
-
-        val response = try {
-            backend.setProviderWatchlist(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                input = request.toProviderLookupInput(),
-                inWatchlist = inWatchlist,
-                source = source.toLibraryMutationSource(),
-            )
-        } catch (error: Throwable) {
-            return WatchHistoryResult(statusMessage = error.message ?: "Watchlist update failed.")
-        }
-
-        val syncedTrakt = isProviderMutationSuccessful(response, WatchProvider.TRAKT)
-        val syncedSimkl = isProviderMutationSuccessful(response, WatchProvider.SIMKL)
-        if (syncedTrakt) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.TRAKT)
-        if (syncedSimkl) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.SIMKL)
-
-        return WatchHistoryResult(
-            statusMessage = response.statusMessage.ifBlank {
-                if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
-            },
-            authState = authState(),
-            accepted = syncedTrakt || syncedSimkl,
-            syncedToTrakt = syncedTrakt,
-            syncedToSimkl = syncedSimkl,
-        )
+        return WatchHistoryResult(statusMessage = "Provider watchlist sync is unavailable right now.")
     }
 
     override suspend fun setRating(
@@ -287,33 +260,7 @@ class BackendWatchHistoryService(
                 accepted = action.accepted,
             )
         }
-
-        val response = try {
-            backend.setProviderRating(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                input = request.toProviderLookupInput(),
-                rating = rating,
-                source = source.toLibraryMutationSource(),
-            )
-        } catch (error: Throwable) {
-            return WatchHistoryResult(statusMessage = error.message ?: "Rating update failed.")
-        }
-
-        val syncedTrakt = isProviderMutationSuccessful(response, WatchProvider.TRAKT)
-        val syncedSimkl = isProviderMutationSuccessful(response, WatchProvider.SIMKL)
-        if (syncedTrakt) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.TRAKT)
-        if (syncedSimkl) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.SIMKL)
-
-        return WatchHistoryResult(
-            statusMessage = response.statusMessage.ifBlank {
-                if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
-            },
-            authState = authState(),
-            accepted = syncedTrakt || syncedSimkl,
-            syncedToTrakt = syncedTrakt,
-            syncedToSimkl = syncedSimkl,
-        )
+        return WatchHistoryResult(statusMessage = "Provider rating sync is unavailable right now.")
     }
 
     override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryResult {
@@ -1335,30 +1282,11 @@ class BackendWatchHistoryService(
         }
     }
 
-    private fun WatchProvider?.toLibraryMutationSource(): LibraryMutationSource? {
-        return when (this) {
-            WatchProvider.TRAKT -> LibraryMutationSource.TRAKT
-            WatchProvider.SIMKL -> LibraryMutationSource.SIMKL
-            WatchProvider.LOCAL,
-            null -> null
-        }
-    }
-
     private fun WatchProviderAuthState.isProviderConnected(provider: WatchProvider): Boolean {
         return when (provider) {
             WatchProvider.TRAKT -> traktAuthenticated
             WatchProvider.SIMKL -> simklAuthenticated
             WatchProvider.LOCAL -> true
-        }
-    }
-
-    private fun isProviderMutationSuccessful(
-        response: CrispyBackendClient.LibraryMutationResponse,
-        provider: WatchProvider,
-    ): Boolean {
-        return response.results.any { result ->
-            result.provider.equals(provider.apiValue(), ignoreCase = true) &&
-                result.status.equals("success", ignoreCase = true)
         }
     }
 
