@@ -16,9 +16,9 @@ import java.util.Locale
 @Immutable
 data class CalendarEpisodeItem(
     val id: String,
+    val mediaKey: String,
+    val localKey: String,
     val highlightEpisodeId: String? = null,
-    val provider: String,
-    val providerId: String,
     val seriesName: String,
     val episodeTitle: String?,
     val overview: String?,
@@ -41,8 +41,8 @@ data class CalendarEpisodeItem(
 @Immutable
 data class CalendarSeriesItem(
     val id: String,
-    val provider: String,
-    val providerId: String,
+    val mediaKey: String,
+    val localKey: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -171,13 +171,13 @@ class CalendarService internal constructor(
         val recentEpisodes =
             (itemsByBucket["recently_released"].orEmpty() + itemsByBucket["up_next"].orEmpty())
                 .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
-                .distinctBy { it.id }
+                .distinctBy { it.localKey }
                 .sortedBy { it.releasedAtMs }
 
         val noScheduledSeries =
             itemsByBucket["no_scheduled"].orEmpty()
                 .map { it.toCalendarSeriesItem() }
-                .distinctBy { it.id }
+                .distinctBy { it.localKey }
 
         return buildList {
             if (thisWeekEpisodes.isNotEmpty()) {
@@ -209,11 +209,12 @@ class CalendarService internal constructor(
         val releaseDate = media.airDate?.trim().takeIf { !it.isNullOrBlank() } ?: return null
         val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate) ?: return null
         val watchedKey = "${media.provider.lowercase(Locale.US)}:${media.providerId.lowercase(Locale.US)}:$season:$episode"
+        val localKey = "${media.provider}:${media.providerId}:$season:$episode"
         return CalendarEpisodeItem(
-            id = "${media.provider}:${media.providerId}:$season:$episode",
+            id = localKey,
+            mediaKey = media.mediaKey,
+            localKey = localKey,
             highlightEpisodeId = null,
-            provider = media.provider,
-            providerId = media.providerId,
             seriesName = media.title,
             episodeTitle = media.episodeTitle,
             overview = media.subtitle,
@@ -234,10 +235,11 @@ class CalendarService internal constructor(
     }
 
     private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
+        val localKey = "${media.provider}:${media.providerId}"
         return CalendarSeriesItem(
-            id = "${media.provider}:${media.providerId}",
-            provider = media.provider,
-            providerId = media.providerId,
+            id = localKey,
+            mediaKey = media.mediaKey,
+            localKey = localKey,
             title = media.title,
             posterUrl = media.posterUrl,
             backdropUrl = media.backdropUrl,
@@ -252,7 +254,7 @@ class CalendarService internal constructor(
         val rawItems = items.filter { it.season != 0 }.take(HOME_THIS_WEEK_RAW_LIMIT)
 
         return rawItems
-            .groupBy { item -> "${item.provider}_${item.providerId}_${item.releaseDate.take(10)}" }
+            .groupBy { item -> "${item.mediaKey}_${item.releaseDate.take(10)}" }
             .values
             .map { group ->
                 val sorted = group.sortedBy { it.episode }
@@ -261,8 +263,10 @@ class CalendarService internal constructor(
                 if (sorted.size == 1) {
                     first
                 } else {
+                    val groupedLocalKey = "group_${first.mediaKey}_${first.releaseDate.take(10)}"
                     first.copy(
-                        id = "group_${first.provider}_${first.providerId}_${first.releaseDate.take(10)}",
+                        id = groupedLocalKey,
+                        localKey = groupedLocalKey,
                         highlightEpisodeId = null,
                         episodeTitle = null,
                         overview = null,

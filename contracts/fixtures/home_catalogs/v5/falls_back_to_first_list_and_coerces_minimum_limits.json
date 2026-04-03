@@ -1,5 +1,5 @@
 {
-  "contract_version": 4,
+  "contract_version": 5,
   "suite": "home_catalogs",
   "case_id": "falls_back_to_first_list_and_coerces_minimum_limits",
   "input": {
@@ -19,27 +19,23 @@
           "media_types": ["series"],
           "items": [
             {
-              "id": "show-1",
+              "media_key": "tmdb:series:95396",
               "title": "Severance",
               "poster_url": "https://img/severance.jpg",
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "series",
-              "provider": "tmdb",
-              "provider_id": "95396",
               "rating": null,
               "year": "2022",
               "description": null
             },
             {
-              "id": "show-2",
+              "media_key": "tmdb:series:125988",
               "title": "Silo",
               "poster_url": "https://img/silo.jpg",
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "series",
-              "provider": "tmdb",
-              "provider_id": "125988",
               "rating": null,
               "year": "2023",
               "description": null
@@ -58,14 +54,12 @@
           "media_types": ["movie"],
           "items": [
             {
-              "id": "movie-1",
+              "media_key": "tmdb:movie:157336",
               "title": "Arrival",
               "poster_url": "https://img/arrival.jpg",
               "backdrop_url": null,
               "addon_id": "supabase",
               "type": "movie",
-              "provider": "tmdb",
-              "provider_id": "157336",
               "rating": "8.0",
               "year": "2016",
               "description": "First contact"
@@ -91,7 +85,7 @@
       "hero_result": {
         "items": [
           {
-            "id": "show-1",
+            "media_key": "tmdb:series:95396",
             "title": "Severance",
             "description": "Staff picks",
             "rating": null,
@@ -99,9 +93,7 @@
             "genres": [],
             "backdrop_url": "https://img/severance.jpg",
             "addon_id": "supabase",
-            "type": "series",
-            "provider": "tmdb",
-            "provider_id": "95396"
+            "type": "series"
           }
         ],
         "status_message": ""
@@ -142,14 +134,12 @@
     "page": {
       "items": [
         {
-          "id": "show-1",
+          "media_key": "tmdb:series:95396",
           "title": "Severance",
           "poster_url": "https://img/severance.jpg",
           "backdrop_url": null,
           "addon_id": "supabase",
           "type": "series",
-          "provider": "tmdb",
-          "provider_id": "95396",
           "rating": null,
           "year": "2022",
           "description": null

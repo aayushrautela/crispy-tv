@@ -237,28 +237,14 @@ class HomeViewModel internal constructor(
         refresh(forceForegroundLoading = false)
     }
 
-    fun hideContinueWatchingItem(item: CanonicalContinueWatchingItem) {
-        suppressKeys(
-            item.id,
-            continueWatchingContentKey(type = item.type, provider = item.provider, providerId = item.providerId),
-        )
-        updateWideRailSection(item.sectionKey()) { current ->
-            val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
-            current.copy(
-                items = remainingItems,
-                statusMessage = if (remainingItems.isEmpty()) "" else "Hidden ${item.title}.",
-            )
-        }
-    }
-
     fun removeContinueWatchingItem(item: CanonicalContinueWatchingItem) {
         if (!item.dismissible) return
         suppressKeys(
             item.id,
-            continueWatchingContentKey(type = item.type, provider = item.provider, providerId = item.providerId),
+            continueWatchingContentKey(item),
         )
         updateWideRailSection(item.sectionKey()) { current ->
-            val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
+            val remainingItems = current.items.filterNot { it.continueWatchingItem?.localKey == item.localKey }
             current.copy(
                 items = remainingItems,
                 statusMessage = if (remainingItems.isEmpty()) "" else "Removing ${item.title}...",
@@ -279,12 +265,7 @@ class HomeViewModel internal constructor(
                             val dismissId = item.id.trim()
                             watchHistoryService.removeFromPlayback(
                                 playbackId = dismissId,
-                                source =
-                                    when (item.provider.trim().lowercase(Locale.US)) {
-                                        "trakt" -> WatchProvider.TRAKT
-                                        "simkl" -> WatchProvider.SIMKL
-                                        else -> null
-                                    },
+                                source = item.source.takeUnless { it == WatchProvider.LOCAL },
                             )
                         }
 
@@ -683,6 +664,7 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
 
         return PlaybackIdentity(
             contentId = null,
+            mediaKey = mediaKey,
             imdbId = normalizedImdb,
             tmdbId = null,
             contentType = contentType,
@@ -761,7 +743,7 @@ private fun CanonicalContinueWatchingItem.sectionKey(): String {
 
 private fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
     return HomeWideRailItemUi(
-        key = "${type}:${id}",
+        key = "${type}:${localKey}",
         title = title,
         subtitle = buildHomeWatchActivitySubtitle(nowMs),
         imageUrl = backdropUrl ?: posterUrl,
@@ -773,7 +755,7 @@ private fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideR
 
 private fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
     return HomeWideRailItemUi(
-        key = "${type}:${id}",
+        key = "${type}:${localKey}",
         title = seriesName,
         subtitle = buildCalendarSecondaryText(),
         imageUrl = thumbnailUrl ?: backdropUrl ?: posterUrl,
@@ -852,6 +834,10 @@ class ContinueWatchingSuppressionStore(context: Context) {
 }
 
 private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
+    val normalizedMediaKey = entry.mediaKey?.trim().orEmpty()
+    if (normalizedMediaKey.isNotEmpty()) {
+        return normalizedMediaKey
+    }
     return continueWatchingContentKey(entry.type, entry.provider, entry.providerId)
 }
 
@@ -880,6 +866,7 @@ private fun CanonicalContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest
     val resolvedContentType = type.toMetadataLabMediaType()
     return WatchHistoryRequest(
         contentId = providerId,
+        mediaKey = mediaKey,
         contentType = resolvedContentType,
         title = title,
         season = season,

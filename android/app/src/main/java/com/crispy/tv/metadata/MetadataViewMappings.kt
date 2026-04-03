@@ -7,7 +7,6 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.ratings.formatRating
-import java.util.Locale
 
 internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
     val itemDetails = item.toMediaDetails()
@@ -30,6 +29,7 @@ internal fun CrispyBackendClient.MetadataTitleDetailResponse.seasonNumbers(): Li
 internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
     return MediaDetails(
         id = id,
+        mediaKey = mediaKey,
         imdbId = externalIds.imdb,
         mediaType = normalizedCatalogMediaType(),
         title = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: id,
@@ -168,13 +168,14 @@ internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): 
 
 internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
     val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedMediaKey = mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val lookupProvider = parentProvider?.trim()?.takeIf { it.isNotBlank() } ?: provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val lookupProviderId = parentProviderId?.trim()?.takeIf { it.isNotBlank() } ?: providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedType = normalizedCatalogMediaType()
     val normalizedPosterUrl = images.posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val itemId = id?.trim()?.takeIf { it.isNotBlank() } ?: "$normalizedType:${lookupProvider.lowercase(Locale.US)}:${lookupProviderId}"
     return CatalogItem(
-        id = itemId,
+        id = normalizedMediaKey,
+        mediaKey = normalizedMediaKey,
         title = itemTitle,
         posterUrl = normalizedPosterUrl,
         backdropUrl = images.backdropUrl,

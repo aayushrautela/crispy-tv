@@ -404,6 +404,7 @@ class PlayerSessionViewModel(
         val nextIdentity =
             PlaybackIdentity(
                 contentId = details.id,
+                mediaKey = details.mediaKey,
                 imdbId = details.imdbId,
                 tmdbId = if (nextMediaType == MetadataLabMediaType.MOVIE) details.tmdbId ?: nextEpisode?.tmdbId else null,
                 contentType = nextMediaType,
@@ -457,19 +458,16 @@ class PlayerSessionViewModel(
     private suspend fun loadInitialMetadata() {
         val rawId = rawPlaybackId ?: return
         val snapshotDetails = _uiState.value.details
-        val canonicalContentId =
-            launchSnapshotState?.contentId?.trim()?.takeIf { it.isNotBlank() }
-                ?: activeIdentity?.contentId?.trim()?.takeIf { it.isNotBlank() }
-
-        val backendTitleId =
-            canonicalContentId
-                ?: snapshotDetails?.id?.trim()?.takeIf { it.isNotBlank() && !it.startsWith("tt", ignoreCase = true) && !it.startsWith("tmdb:", ignoreCase = true) }
+        val mediaKey =
+            launchSnapshotState?.mediaKey?.trim()?.takeIf { it.isNotBlank() }
+                ?: activeIdentity?.mediaKey?.trim()?.takeIf { it.isNotBlank() }
+                ?: snapshotDetails?.mediaKey?.trim()?.takeIf { it.isNotBlank() }
         val session = withContext(Dispatchers.IO) { runCatching { supabase.ensureValidSession() }.getOrNull() }
         val backendDetail =
-            if (session != null && backendTitleId != null) {
+            if (session != null && mediaKey != null) {
                 withContext(Dispatchers.IO) {
                     runCatching {
-                        backendClient.getMetadataTitleDetail(accessToken = session.accessToken, id = backendTitleId)
+                        backendClient.getMetadataTitleDetail(accessToken = session.accessToken, mediaKey = mediaKey)
                     }.getOrNull()
                 }
             } else {
@@ -574,13 +572,26 @@ class PlayerSessionViewModel(
             val response =
                 runCatching {
                     withContext(Dispatchers.IO) {
+                        val mediaKey = details.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
                         backendClient.listMetadataEpisodes(
                             accessToken = session.accessToken,
-                            id = details.id,
+                            mediaKey = mediaKey,
                             seasonNumber = season,
                         )
                     }
                 }.getOrElse {
+                    _uiState.update { current ->
+                        if (current.selectedSeason != season) {
+                            current
+                        } else {
+                            current.copy(
+                                episodesIsLoading = false,
+                                episodesStatusMessage = "Failed to load episodes.",
+                            )
+                        }
+                    }
+                    return@launch
+                } ?: run {
                     _uiState.update { current ->
                         if (current.selectedSeason != season) {
                             current
@@ -1055,6 +1066,7 @@ private fun buildFallbackDetails(
     val normalizedArtworkUrl = artworkUrl?.trim()?.ifBlank { null }
     return MediaDetails(
         id = contentId,
+        mediaKey = identity?.mediaKey,
         imdbId = identity?.imdbId,
         mediaType = mediaType,
         title = identity?.showTitle?.takeIf { mediaType == "series" } ?: normalizedTitle,

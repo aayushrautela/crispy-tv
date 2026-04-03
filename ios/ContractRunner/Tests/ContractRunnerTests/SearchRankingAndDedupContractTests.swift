@@ -43,8 +43,7 @@ final class SearchRankingAndDedupContractTests: XCTestCase {
                     }
                     return NormalizedSearchItem(
                         mediaType: try requireString(item, "media_type", fixture: fixtureURL),
-                        provider: try requireString(item, "provider", fixture: fixtureURL),
-                        providerId: try requireString(item, "provider_id", fixture: fixtureURL),
+                        itemKey: try requireString(item, "item_key", fixture: fixtureURL),
                         title: try requireString(item, "title", fixture: fixtureURL),
                         year: optionalInt(item, "year"),
                         imageUrl: optionalString(item, "image_url"),

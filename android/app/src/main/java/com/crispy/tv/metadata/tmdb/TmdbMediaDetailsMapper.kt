@@ -70,6 +70,7 @@ internal fun JSONObject.toFallbackMediaDetails(
 
     return MediaDetails(
         id = normalizedContentId,
+        mediaKey = normalizedContentId,
         imdbId = imdbId,
         mediaType = mediaType.toCatalogType(),
         title = title,

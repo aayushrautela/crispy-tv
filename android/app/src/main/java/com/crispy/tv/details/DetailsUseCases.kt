@@ -33,9 +33,6 @@ internal data class DetailsScreenLoadResult(
 )
 
 data class RuntimeDetailsEntry(
-    val provider: String,
-    val providerId: String,
-    val mediaType: String,
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
     val absoluteEpisodeNumber: Int? = null,
@@ -69,32 +66,16 @@ internal class DetailsUseCases(
     }
 
     suspend fun loadScreen(
-        itemId: String,
+        mediaKey: String,
         requestedMediaType: MetadataLabMediaType,
         runtimeEntry: RuntimeDetailsEntry?,
         nowMs: Long,
     ): DetailsScreenLoadResult {
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
-        val resolvedItemId =
-            if (session != null && runtimeEntry != null) {
-                runCatching {
-                    catalogRepository.resolveTitle(
-                        accessToken = session.accessToken,
-                        provider = runtimeEntry.provider,
-                        providerId = runtimeEntry.providerId,
-                        mediaType = runtimeEntry.mediaType,
-                        seasonNumber = runtimeEntry.seasonNumber,
-                        episodeNumber = runtimeEntry.episodeNumber,
-                        absoluteEpisodeNumber = runtimeEntry.absoluteEpisodeNumber,
-                    ).item.id
-                }.getOrNull()?.trim()?.takeIf { it.isNotBlank() } ?: itemId
-            } else {
-                itemId
-            }
         val titleDetailResult =
             session?.let {
                 runCatching {
-                    catalogRepository.getTitleDetail(accessToken = it.accessToken, id = resolvedItemId)
+                    catalogRepository.getTitleDetail(accessToken = it.accessToken, mediaKey = mediaKey)
                 }
             }
         val titleDetail = titleDetailResult?.getOrNull()
@@ -102,14 +83,14 @@ internal class DetailsUseCases(
         val titleContentResult =
             session?.let {
                 runCatching {
-                    catalogRepository.getTitleContent(accessToken = it.accessToken, id = resolvedItemId)
+                    catalogRepository.getTitleContent(accessToken = it.accessToken, mediaKey = mediaKey)
                 }
             }
         val titleContent = titleContentResult?.getOrNull()
         val titleContentError = titleContentResult?.exceptionOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
-        val providerState = watchCtaResolver.resolveProviderState(details, resolvedItemId)
+        val providerState = watchCtaResolver.resolveProviderState(details, mediaKey)
         val (watchCta, continueVideoId) = watchCtaResolver.resolveWatchCta(details, providerState, nowMs)
 
         val seasons =
@@ -147,7 +128,7 @@ internal class DetailsUseCases(
     }
 
     suspend fun loadSeasonEpisodes(
-        itemId: String,
+        mediaKey: String,
         season: Int,
         details: MediaDetails,
     ): DetailsSeasonEpisodesResult {
@@ -158,7 +139,7 @@ internal class DetailsUseCases(
             runCatching {
                 catalogRepository.listEpisodes(
                     accessToken = session.accessToken,
-                    id = itemId,
+                    mediaKey = mediaKey,
                     seasonNumber = season,
                 )
             }.getOrElse {
@@ -313,6 +294,7 @@ internal class DetailsUseCases(
         val request =
             WatchHistoryRequest(
                 contentId = enriched.id,
+                mediaKey = enriched.mediaKey,
                 contentType = contentType,
                 title = enriched.title,
                 season = season,
@@ -373,6 +355,7 @@ internal class DetailsUseCases(
         val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
         return WatchHistoryRequest(
             contentId = details.id,
+            mediaKey = details.mediaKey,
             contentType = contentType,
             title = details.title,
             remoteImdbId = details.imdbId,

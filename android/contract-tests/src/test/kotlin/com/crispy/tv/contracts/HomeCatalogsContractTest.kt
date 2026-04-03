@@ -100,7 +100,7 @@ class HomeCatalogsContractTest {
 
     private fun parseItem(json: JsonObject, path: Path): HomeCatalogItem {
         return HomeCatalogItem(
-            id = json.requireString("id", path),
+            mediaKey = json.requireString("media_key", path),
             title = json.requireString("title", path),
             posterUrl = json.optionalString("poster_url", path),
             backdropUrl = json.optionalString("backdrop_url", path),
@@ -109,8 +109,6 @@ class HomeCatalogsContractTest {
             rating = json.optionalString("rating", path),
             year = json.optionalString("year", path),
             description = json.optionalString("description", path),
-            provider = json.requireString("provider", path),
-            providerId = json.requireString("provider_id", path),
         )
     }
 
@@ -131,7 +129,7 @@ class HomeCatalogsContractTest {
 
     private fun parseHeroItem(json: JsonObject, path: Path): HomeCatalogHeroItem {
         return HomeCatalogHeroItem(
-            id = json.requireString("id", path),
+            mediaKey = json.requireString("media_key", path),
             title = json.requireString("title", path),
             description = json.requireString("description", path),
             rating = json.optionalString("rating", path),
@@ -140,8 +138,6 @@ class HomeCatalogsContractTest {
             backdropUrl = json.requireString("backdrop_url", path),
             addonId = json.requireString("addon_id", path),
             type = json.requireString("type", path),
-            provider = json.requireString("provider", path),
-            providerId = json.requireString("provider_id", path),
         )
     }
 

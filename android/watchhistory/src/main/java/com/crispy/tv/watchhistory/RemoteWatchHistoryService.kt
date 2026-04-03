@@ -972,6 +972,8 @@ class RemoteWatchHistoryService(
                     movies +=
                         ContinueWatchingEntry(
                             id = "local:movie:$id",
+                            mediaKey = id,
+                            localKey = "local:movie:$id",
                             provider = "local",
                             providerId = id,
                             mediaType = "movie",
@@ -1027,6 +1029,8 @@ class RemoteWatchHistoryService(
             latestInProgressEpisodeByShow.values.map {
                 ContinueWatchingEntry(
                     id = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
+                    mediaKey = it.showId,
+                    localKey = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
                     provider = "local",
                     providerId = it.showId,
                     mediaType = it.contentType.label,
@@ -1076,6 +1080,8 @@ class RemoteWatchHistoryService(
             placeholders +=
                     ContinueWatchingEntry(
                         id = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
+                        mediaKey = showId,
+                        localKey = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
                         provider = "local",
                         providerId = showId,
                         mediaType = episodicType.label,

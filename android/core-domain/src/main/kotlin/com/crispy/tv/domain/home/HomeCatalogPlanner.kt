@@ -3,7 +3,7 @@ package com.crispy.tv.domain.home
 import java.util.Locale
 
 data class HomeCatalogItem(
-    val id: String,
+    val mediaKey: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -12,8 +12,6 @@ data class HomeCatalogItem(
     val rating: String? = null,
     val year: String? = null,
     val description: String? = null,
-    val provider: String,
-    val providerId: String,
 )
 
 enum class HomeCatalogSource(val key: String) {
@@ -82,7 +80,7 @@ data class HomeCatalogSnapshot(
 )
 
 data class HomeCatalogHeroItem(
-    val id: String,
+    val mediaKey: String,
     val title: String,
     val description: String,
     val rating: String?,
@@ -91,8 +89,6 @@ data class HomeCatalogHeroItem(
     val backdropUrl: String,
     val addonId: String,
     val type: String,
-    val provider: String,
-    val providerId: String,
 )
 
 data class HomeCatalogHeroResult(
@@ -320,7 +316,7 @@ private fun buildHeroResult(
                 val backdrop = item.backdropUrl ?: item.posterUrl
                 if (backdrop.isNullOrBlank()) return@mapNotNull null
                 HomeCatalogHeroItem(
-                    id = item.id,
+                    mediaKey = item.mediaKey,
                     title = item.title,
                     description = item.description ?: fallbackDescription,
                     rating = item.rating,
@@ -329,8 +325,6 @@ private fun buildHeroResult(
                     backdropUrl = backdrop,
                     addonId = item.addonId,
                     type = item.type,
-                    provider = item.provider,
-                    providerId = item.providerId,
                 )
             }
             .take(targetCount)

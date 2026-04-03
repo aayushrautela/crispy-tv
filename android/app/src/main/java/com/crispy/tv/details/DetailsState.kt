@@ -18,7 +18,7 @@ data class EpisodeWatchState(
 
 @Immutable
 data class DetailsUiState(
-    val itemId: String,
+    val mediaKey: String,
     val isLoading: Boolean = true,
     val details: MediaDetails? = null,
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,

@@ -53,8 +53,7 @@ class SearchRankingAndDedupContractTest {
                             ?: error("$caseId: expected.items[$index] must be object")
                     NormalizedSearchItem(
                         mediaType = item.requireString("media_type", path),
-                        provider = item.requireString("provider", path),
-                        providerId = item.requireString("provider_id", path),
+                        itemKey = item.requireString("item_key", path),
                         title = item.requireString("title", path),
                         year = item.optionalInt("year", path),
                         imageUrl = item.optionalString("image_url", path),

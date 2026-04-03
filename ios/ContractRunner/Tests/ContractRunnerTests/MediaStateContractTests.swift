@@ -28,7 +28,8 @@ final class MediaStateContractTests: XCTestCase {
 
     private func parseNormalized(_ object: [String: Any], fixture: URL) throws -> MediaStateNormalized {
         return MediaStateNormalized(
-            cardFamily: try requireString(object, "card_family", fixture: fixture),
+            cardFamily: optionalString(object, "card_family"),
+            mediaKey: optionalString(object, "media_key"),
             mediaType: optionalString(object, "media_type"),
             itemId: optionalString(object, "item_id"),
             provider: optionalString(object, "provider"),
@@ -42,7 +43,8 @@ final class MediaStateContractTests: XCTestCase {
             lastActivityAt: optionalString(object, "last_activity_at"),
             origins: try optionalArrayOfStrings(object, "origins", fixture: fixture),
             dismissible: optionalBool(object, "dismissible"),
-            layout: optionalString(object, "layout")
+            layout: optionalString(object, "layout"),
+            routeKind: optionalString(object, "route_kind")
         )
     }
 }

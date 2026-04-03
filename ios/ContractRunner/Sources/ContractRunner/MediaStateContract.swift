@@ -1,7 +1,8 @@
 import Foundation
 
 public struct MediaStateNormalized: Equatable {
-    public let cardFamily: String
+    public let cardFamily: String?
+    public let mediaKey: String?
     public let mediaType: String?
     public let itemId: String?
     public let provider: String?
@@ -16,9 +17,11 @@ public struct MediaStateNormalized: Equatable {
     public let origins: [String]?
     public let dismissible: Bool?
     public let layout: String?
+    public let routeKind: String?
 
     public init(
-        cardFamily: String,
+        cardFamily: String? = nil,
+        mediaKey: String? = nil,
         mediaType: String? = nil,
         itemId: String? = nil,
         provider: String? = nil,
@@ -32,9 +35,11 @@ public struct MediaStateNormalized: Equatable {
         lastActivityAt: String? = nil,
         origins: [String]? = nil,
         dismissible: Bool? = nil,
-        layout: String? = nil
+        layout: String? = nil,
+        routeKind: String? = nil
     ) {
         self.cardFamily = cardFamily
+        self.mediaKey = mediaKey
         self.mediaType = mediaType
         self.itemId = itemId
         self.provider = provider
@@ -49,6 +54,7 @@ public struct MediaStateNormalized: Equatable {
         self.origins = origins
         self.dismissible = dismissible
         self.layout = layout
+        self.routeKind = routeKind
     }
 }
 
@@ -72,13 +78,16 @@ public func normalizeMediaStateCard(payload: [String: Any], kind: String) -> Med
         return normalizeLibraryItem(payload)
     case "home_snapshot_section":
         return normalizeHomeSnapshotSection(payload)
+    case "title_route":
+        return normalizeTitleRoute(payload)
     default:
         return nil
     }
 }
 
 private func normalizeCard(payload: [String: Any], requireBackdrop: Bool) -> MediaStateNormalized? {
-    guard let mediaType = stringValue(payload, "mediaType"),
+    guard let mediaKey = stringValue(payload, "mediaKey"),
+          let mediaType = stringValue(payload, "mediaType"),
           let provider = stringValue(payload, "provider"),
           let providerId = stringValue(payload, "providerId"),
           let title = stringValue(payload, "title") else {
@@ -94,6 +103,7 @@ private func normalizeCard(payload: [String: Any], requireBackdrop: Bool) -> Med
     }
     return MediaStateNormalized(
         cardFamily: requireBackdrop ? "landscape" : "regular",
+        mediaKey: mediaKey,
         mediaType: mediaType,
         itemId: nil,
         provider: provider,
@@ -106,7 +116,8 @@ private func normalizeCard(payload: [String: Any], requireBackdrop: Bool) -> Med
 }
 
 private func normalizeMetadataCard(_ payload: [String: Any]) -> MediaStateNormalized? {
-    guard let mediaType = stringValue(payload, "mediaType"),
+    guard let mediaKey = stringValue(payload, "mediaKey"),
+          let mediaType = stringValue(payload, "mediaType"),
           let provider = stringValue(payload, "provider"),
           let providerId = stringValue(payload, "providerId") else {
         return nil
@@ -121,6 +132,7 @@ private func normalizeMetadataCard(_ payload: [String: Any]) -> MediaStateNormal
     let backdropUrl = stringValue(payload, "backdropUrl") ?? images.flatMap({ stringValue($0, "backdropUrl") })
     return MediaStateNormalized(
         cardFamily: "regular",
+        mediaKey: mediaKey,
         mediaType: mediaType,
         itemId: nil,
         provider: provider,
@@ -151,6 +163,7 @@ private func normalizeContinueWatching(_ payload: [String: Any]) -> MediaStateNo
     let progressPercent = doubleValue(progress, "progressPercent") ?? 0
     return MediaStateNormalized(
         cardFamily: normalizedMedia.cardFamily,
+        mediaKey: normalizedMedia.mediaKey,
         mediaType: normalizedMedia.mediaType,
         itemId: id,
         provider: normalizedMedia.provider,
@@ -180,6 +193,7 @@ private func normalizeWatchItem(_ payload: [String: Any], stateKey: String) -> M
     }
     return MediaStateNormalized(
         cardFamily: normalizedMedia.cardFamily,
+        mediaKey: normalizedMedia.mediaKey,
         mediaType: normalizedMedia.mediaType,
         itemId: nil,
         provider: normalizedMedia.provider,
@@ -211,6 +225,7 @@ private func normalizeLibraryItem(_ payload: [String: Any]) -> MediaStateNormali
     }
     return MediaStateNormalized(
         cardFamily: normalizedMedia.cardFamily,
+        mediaKey: normalizedMedia.mediaKey,
         mediaType: normalizedMedia.mediaType,
         itemId: itemId,
         provider: normalizedMedia.provider,
@@ -229,7 +244,16 @@ private func normalizeHomeSnapshotSection(_ payload: [String: Any]) -> MediaStat
           let items = payload["items"] as? [Any], !items.isEmpty else {
         return nil
     }
-    return MediaStateNormalized(cardFamily: "regular", layout: layout)
+    return MediaStateNormalized(layout: layout)
+}
+
+private func normalizeTitleRoute(_ payload: [String: Any]) -> MediaStateNormalized? {
+    guard let mediaKey = stringValue(payload, "mediaKey"),
+          let path = stringValue(payload, "path"),
+          path == "/v1/metadata/titles/\(mediaKey)" else {
+        return nil
+    }
+    return MediaStateNormalized(mediaKey: mediaKey, routeKind: "title")
 }
 
 private func stringValue(_ object: [String: Any]?, _ key: String) -> String? {

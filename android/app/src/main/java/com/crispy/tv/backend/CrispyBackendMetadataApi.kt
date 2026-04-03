@@ -126,7 +126,7 @@ internal suspend fun CrispyBackendClient.resolveMetadataApi(
 ): MetadataResolveResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = metadataLookupUrl("$baseUrl/v1/metadata/resolve", input, includeMediaKey = false),
+        url = metadataLookupUrl("$baseUrl/v1/metadata/resolve", input, includeMediaKey = true),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -137,11 +137,11 @@ internal suspend fun CrispyBackendClient.resolveMetadataApi(
 
 internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
     accessToken: String,
-    id: String,
+    mediaKey: String,
 ): MetadataTitleDetailResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/metadata/titles/${id.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -162,11 +162,11 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
 
 internal suspend fun CrispyBackendClient.getMetadataTitleContentApi(
     accessToken: String,
-    id: String,
+    mediaKey: String,
 ): MetadataTitleContentResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/metadata/titles/${id.trim()}/content".toHttpUrl(),
+        url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/content".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -179,12 +179,12 @@ internal suspend fun CrispyBackendClient.getMetadataTitleContentApi(
 
 internal suspend fun CrispyBackendClient.getMetadataSeasonDetailApi(
     accessToken: String,
-    id: String,
+    mediaKey: String,
     seasonNumber: Int,
 ): MetadataSeasonDetailResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/metadata/titles/${id.trim()}/seasons/$seasonNumber".toHttpUrl(),
+        url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/seasons/$seasonNumber".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -220,11 +220,11 @@ internal suspend fun CrispyBackendClient.getMetadataPersonDetailApi(
 
 internal suspend fun CrispyBackendClient.listMetadataEpisodesApi(
     accessToken: String,
-    id: String,
+    mediaKey: String,
     seasonNumber: Int? = null,
 ): MetadataEpisodeListResponse {
     checkConfigured()
-    val url = "$baseUrl/v1/metadata/titles/${id.trim()}/episodes".toHttpUrl().newBuilder()
+    val url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/episodes".toHttpUrl().newBuilder()
         .apply {
             if (seasonNumber != null) {
                 addQueryParameter("seasonNumber", seasonNumber.toString())
@@ -249,7 +249,7 @@ internal suspend fun CrispyBackendClient.listMetadataEpisodesApi(
 
 internal suspend fun CrispyBackendClient.getNextEpisodeApi(
     accessToken: String,
-    id: String,
+    mediaKey: String,
     currentSeasonNumber: Int,
     currentEpisodeNumber: Int,
     watchedKeys: List<String> = emptyList(),
@@ -257,7 +257,7 @@ internal suspend fun CrispyBackendClient.getNextEpisodeApi(
     nowMs: Long? = null,
 ): MetadataNextEpisodeResponse {
     checkConfigured()
-    val url = "$baseUrl/v1/metadata/titles/${id.trim()}/next-episode".toHttpUrl().newBuilder()
+    val url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/next-episode".toHttpUrl().newBuilder()
         .addQueryParameter("currentSeasonNumber", currentSeasonNumber.toString())
         .addQueryParameter("currentEpisodeNumber", currentEpisodeNumber.toString())
         .apply {
@@ -292,7 +292,7 @@ internal suspend fun CrispyBackendClient.resolvePlaybackApi(
 ): PlaybackResolveResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = metadataLookupUrl("$baseUrl/v1/playback/resolve", input, includeMediaKey = false),
+        url = metadataLookupUrl("$baseUrl/v1/playback/resolve", input, includeMediaKey = true),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )

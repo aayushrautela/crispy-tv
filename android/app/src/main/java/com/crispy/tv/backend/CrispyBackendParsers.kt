@@ -168,7 +168,12 @@ internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMet
         throw IllegalStateException("Backend metadata item is missing regular-card fields.")
     }
     val genre = json.optJSONArray("genres")?.optString(0)?.trim().takeUnless { it.isNullOrBlank() }
+    val mediaKey = json.optNullableString("mediaKey")
+    if (mediaKey.isNullOrBlank()) {
+        throw IllegalStateException("Backend metadata item is missing a mediaKey.")
+    }
     return BackendMetadataItem(
+        mediaKey = mediaKey,
         title = title,
         summary = json.optString("summary").trim().ifBlank { null },
         posterUrl = posterUrl,
@@ -235,6 +240,7 @@ internal fun CrispyBackendClient.parseMetadataCardViews(array: JSONArray?): List
 internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): MetadataCardView {
     return MetadataCardView(
         id = json.optNullableString("id"),
+        mediaKey = json.optNullableString("mediaKey"),
         mediaType = json.optNullableString("mediaType") ?: "movie",
         kind = json.optNullableString("kind") ?: "title",
         tmdbId = json.optIntOrNull("tmdbId"),
@@ -415,6 +421,7 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
             add(
                 MetadataPersonKnownForItem(
                     id = item.optNullableString("id"),
+                    mediaKey = item.optNullableString("mediaKey"),
                     mediaType = item.optNullableString("mediaType") ?: "movie",
                     tmdbId = item.optIntOrNull("tmdbId"),
                     title = title,
@@ -681,6 +688,7 @@ internal fun CrispyBackendClient.parseRuntimeMediaCard(
     json: JSONObject,
     requireBackdrop: Boolean,
 ): RuntimeMediaCard {
+    val mediaKey = json.optNullableString("mediaKey")
     val mediaType = json.optString("mediaType").trim()
     val provider = json.optNullableString("provider")
     val providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null }
@@ -689,13 +697,14 @@ internal fun CrispyBackendClient.parseRuntimeMediaCard(
         ?: json.optJSONObject("images").optNullableString("posterUrl")
     val backdropUrl = json.optNullableString("backdropUrl")
         ?: json.optJSONObject("images").optNullableString("backdropUrl")
-    if (mediaType.isBlank() || provider.isNullOrBlank() || providerId.isNullOrBlank() || title.isNullOrBlank() || posterUrl.isNullOrBlank()) {
+    if (mediaKey.isNullOrBlank() || mediaType.isBlank() || provider.isNullOrBlank() || providerId.isNullOrBlank() || title.isNullOrBlank() || posterUrl.isNullOrBlank()) {
         throw IllegalStateException("Runtime media card is missing required fields.")
     }
     if (requireBackdrop && backdropUrl.isNullOrBlank()) {
         throw IllegalStateException("Landscape runtime media card is missing backdropUrl.")
     }
     return RuntimeMediaCard(
+        mediaKey = mediaKey,
         mediaType = mediaType,
         provider = provider,
         providerId = providerId,

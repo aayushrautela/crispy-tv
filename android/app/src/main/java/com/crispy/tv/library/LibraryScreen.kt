@@ -54,9 +54,8 @@ import kotlinx.coroutines.withContext
 @Immutable
 data class LibrarySectionItemUi(
     val id: String,
+    val mediaKey: String,
     val mediaType: String,
-    val provider: String,
-    val providerId: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -129,9 +128,8 @@ class LibraryViewModel internal constructor(
                         items = section.items.map { item ->
                             LibrarySectionItemUi(
                                 id = item.id,
+                                mediaKey = item.media.mediaKey,
                                 mediaType = item.media.mediaType,
-                                provider = item.media.provider,
-                                providerId = item.media.providerId,
                                 title = item.media.title,
                                 posterUrl = item.media.posterUrl,
                                 backdropUrl = item.media.backdropUrl,

@@ -79,8 +79,15 @@ internal class WatchCtaResolver(
         return snapshot.entries
             .asSequence()
             .filter { entry ->
-                entry.provider.equals(details.provider, ignoreCase = true) &&
-                    entry.providerId.equals(details.providerId, ignoreCase = true) &&
+                val matchesIdentity =
+                    when {
+                        !details.mediaKey.isNullOrBlank() -> entry.mediaKey.equals(details.mediaKey, ignoreCase = true)
+                        else -> {
+                            entry.provider.equals(details.provider, ignoreCase = true) &&
+                                entry.providerId.equals(details.providerId, ignoreCase = true)
+                        }
+                    }
+                matchesIdentity &&
                     matchesMediaType(expectedType, entry.type.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
             }
             .sortedWith(
@@ -186,6 +193,7 @@ internal class WatchCtaResolver(
         val isEpisodic = requestedMediaType != MetadataLabMediaType.MOVIE
         return com.crispy.tv.player.PlaybackIdentity(
             contentId = resolvedDetails?.id?.trim()?.ifBlank { null },
+            mediaKey = resolvedDetails?.mediaKey,
             imdbId = resolvedDetails?.imdbId,
             tmdbId = resolvedDetails?.tmdbId?.takeIf { requestedMediaType == MetadataLabMediaType.MOVIE },
             contentType = requestedMediaType,

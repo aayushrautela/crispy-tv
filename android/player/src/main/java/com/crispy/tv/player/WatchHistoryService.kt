@@ -31,6 +31,7 @@ data class WatchHistoryEntry(
 
 data class WatchHistoryRequest(
     val contentId: String,
+    val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String? = null,
     val season: Int? = null,
@@ -55,6 +56,8 @@ data class WatchHistoryResult(
 
 data class ContinueWatchingEntry(
     val id: String,
+    val mediaKey: String? = null,
+    val localKey: String = id,
     val provider: String,
     val providerId: String,
     val mediaType: String,
@@ -82,6 +85,8 @@ data class ContinueWatchingResult(
 
 data class CanonicalContinueWatchingItem(
     val id: String,
+    val mediaKey: String? = null,
+    val localKey: String = id,
     val provider: String,
     val providerId: String,
     val mediaType: String,
@@ -128,6 +133,7 @@ data class CanonicalWatchStateSnapshot(
 
 data class CanonicalProviderLibraryItem(
     val contentId: String,
+    val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String,
     val posterUrl: String? = null,
@@ -161,6 +167,7 @@ data class ProviderLibraryItem(
     val provider: WatchProvider,
     val folderId: String,
     val contentId: String,
+    val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String,
     val posterUrl: String? = null,
@@ -249,6 +256,7 @@ interface ProviderSessionBackend {
 
 data class PlaybackIdentity(
     val contentId: String? = null,
+    val mediaKey: String? = null,
     val imdbId: String?,
     val tmdbId: Int? = null,
     val contentType: MetadataLabMediaType,

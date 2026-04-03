@@ -36,17 +36,15 @@ public struct TmdbSearchResultInput: Equatable {
 
 public struct NormalizedSearchItem: Equatable {
     public let mediaType: String
-    public let provider: String
-    public let providerId: String
+    public let itemKey: String
     public let title: String
     public let year: Int?
     public let imageUrl: String?
     public let rating: Double?
 
-    public init(mediaType: String, provider: String, providerId: String, title: String, year: Int?, imageUrl: String?, rating: Double?) {
+    public init(mediaType: String, itemKey: String, title: String, year: Int?, imageUrl: String?, rating: Double?) {
         self.mediaType = mediaType
-        self.provider = provider
-        self.providerId = providerId
+        self.itemKey = itemKey
         self.title = title
         self.year = year
         self.imageUrl = imageUrl
@@ -80,9 +78,8 @@ public func normalizeTmdbSearchResults(_ results: [TmdbSearchResultInput]) -> [N
             continue
         }
 
-        let provider = "tmdb"
-        let providerId = String(tmdbId)
-        let key = "\(type):\(providerId)"
+        let itemKey = "tmdb:\(type):\(tmdbId)"
+        let key = itemKey
         if !seenKeys.insert(key).inserted {
             continue
         }
@@ -115,8 +112,7 @@ public func normalizeTmdbSearchResults(_ results: [TmdbSearchResultInput]) -> [N
         normalized.append(
             NormalizedSearchItem(
                 mediaType: type,
-                provider: provider,
-                providerId: providerId,
+                itemKey: itemKey,
                 title: title,
                 year: year,
                 imageUrl: imageUrl,

@@ -47,7 +47,8 @@ class MediaStateContractTest {
 
     private fun parseNormalized(normalized: JsonObject, path: java.nio.file.Path): MediaStateNormalized {
         return MediaStateNormalized(
-            cardFamily = normalized.requireString("card_family", path),
+            cardFamily = normalized.optionalString("card_family", path),
+            mediaKey = normalized.optionalString("media_key", path),
             mediaType = normalized.optionalString("media_type", path),
             itemId = normalized.optionalString("item_id", path),
             provider = normalized.optionalString("provider", path),
@@ -62,6 +63,7 @@ class MediaStateContractTest {
             origins = normalized.optionalStringArray("origins", path),
             dismissible = normalized.optionalBoolean("dismissible"),
             layout = normalized.optionalString("layout", path),
+            routeKind = normalized.optionalString("route_kind", path),
         )
     }
 }

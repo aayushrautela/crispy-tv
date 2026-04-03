@@ -27,6 +27,7 @@ data class CatalogSectionRef(
 @Immutable
 data class CatalogItem(
     val id: String,
+    val mediaKey: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,

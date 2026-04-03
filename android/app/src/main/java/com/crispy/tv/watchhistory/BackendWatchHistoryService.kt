@@ -1114,6 +1114,8 @@ class BackendWatchHistoryService(
                 "movie" -> {
                     movies += ContinueWatchingEntry(
                         id = "local:movie:$id",
+                        mediaKey = id,
+                        localKey = "local:movie:$id",
                         provider = "local",
                         providerId = id,
                         mediaType = "movie",
@@ -1166,6 +1168,8 @@ class BackendWatchHistoryService(
         val seriesEntries = latestInProgressEpisodeByShow.values.map {
             ContinueWatchingEntry(
                 id = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
+                mediaKey = it.showId,
+                localKey = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
                 provider = "local",
                 providerId = it.showId,
                 mediaType = if (it.contentType == MetadataLabMediaType.ANIME) "anime" else "series",
@@ -1215,6 +1219,8 @@ class BackendWatchHistoryService(
 
             placeholders += ContinueWatchingEntry(
                 id = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
+                mediaKey = showId,
+                localKey = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
                 provider = "local",
                 providerId = showId,
                 mediaType = if (episodicType == MetadataLabMediaType.ANIME) "anime" else "series",
@@ -1367,6 +1373,7 @@ class BackendWatchHistoryService(
     private fun WatchHistoryRequest.toProviderLookupInput(): MediaLookupInput {
         return MediaLookupInput(
             id = contentId,
+            mediaKey = mediaKey?.trim()?.ifBlank { null },
             mediaType = contentType.toBackendMediaType(this),
             imdbId = remoteImdbId,
             seasonNumber = season,
@@ -1382,6 +1389,7 @@ class BackendWatchHistoryService(
     private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
         val normalizedImdb = normalizedImdbIdOrNull(imdbId)
         val normalizedContentId = contentId?.trim()?.takeIf { it.isNotBlank() }
+        val normalizedMediaKey = mediaKey?.trim()?.takeIf { it.isNotBlank() }
         val mediaType = when (contentType) {
             MetadataLabMediaType.MOVIE -> "movie"
             MetadataLabMediaType.SERIES -> if (season != null && episode != null) "episode" else "show"
@@ -1389,6 +1397,7 @@ class BackendWatchHistoryService(
         }
         return MediaLookupInput(
             id = normalizedContentId,
+            mediaKey = normalizedMediaKey,
             mediaType = mediaType,
             imdbId = normalizedImdb,
             seasonNumber = season,
@@ -1399,7 +1408,8 @@ class BackendWatchHistoryService(
             parentProviderId = parentProviderId,
             absoluteEpisodeNumber = absoluteEpisodeNumber,
         ).takeIf {
-            it.id != null ||
+            it.mediaKey != null ||
+                it.id != null ||
                 it.imdbId != null ||
                 (it.provider != null && it.providerId != null) ||
                 (it.parentProvider != null && it.parentProviderId != null)
@@ -1409,6 +1419,7 @@ class BackendWatchHistoryService(
     private fun NormalizedWatchRequest.toPlaybackLookupInput(): MediaLookupInput {
         return MediaLookupInput(
             id = contentId,
+            mediaKey = mediaKey?.trim()?.ifBlank { null },
             mediaType = when (contentType) {
                 MetadataLabMediaType.MOVIE -> "movie"
                 MetadataLabMediaType.SERIES,
@@ -1442,6 +1453,8 @@ class BackendWatchHistoryService(
                 add(
                     ContinueWatchingEntry(
                         id = item.id,
+                        mediaKey = item.media.mediaKey,
+                        localKey = item.media.mediaKey,
                         provider = item.media.provider,
                         providerId = item.media.providerId,
                         mediaType = item.media.mediaType,
@@ -1477,6 +1490,8 @@ class BackendWatchHistoryService(
     private fun ContinueWatchingEntry.toCanonicalContinueWatchingItem(): CanonicalContinueWatchingItem {
         return CanonicalContinueWatchingItem(
             id = id,
+            mediaKey = mediaKey,
+            localKey = localKey,
             provider = provider,
             providerId = providerId,
             mediaType = mediaType,
@@ -1521,6 +1536,7 @@ class BackendWatchHistoryService(
                             provider = provider,
                             folderId = section.id,
                             contentId = item.media.providerId,
+                            mediaKey = item.media.mediaKey,
                             contentType = item.media.mediaType.toMetadataLabMediaType(),
                             title = item.media.title,
                             posterUrl = item.media.posterUrl,
@@ -1545,6 +1561,7 @@ class BackendWatchHistoryService(
         val resolvedContentId = media.providerId.trim()
         return CanonicalProviderLibraryItem(
             contentId = resolvedContentId,
+            mediaKey = media.mediaKey,
             contentType = media.mediaType.toMetadataLabMediaType(),
             title = media.title.trim(),
             posterUrl = media.posterUrl,
@@ -1557,6 +1574,7 @@ class BackendWatchHistoryService(
     private fun ProviderLibraryItem.toCanonicalProviderLibraryItem(): CanonicalProviderLibraryItem {
         return CanonicalProviderLibraryItem(
             contentId = contentId.trim(),
+            mediaKey = mediaKey,
             contentType = contentType,
             title = title.trim().ifBlank { contentId.trim() },
             posterUrl = posterUrl,

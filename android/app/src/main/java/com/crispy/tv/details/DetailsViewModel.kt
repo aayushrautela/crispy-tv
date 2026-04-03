@@ -39,13 +39,13 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 class DetailsViewModel internal constructor(
-    private val itemId: String,
+    private val mediaKey: String,
     private val mediaType: String,
     private val runtimeEntry: RuntimeDetailsEntry?,
     private val detailsUseCases: DetailsUseCases,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
+    private val _uiState = MutableStateFlow(DetailsUiState(mediaKey = mediaKey))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
     private val _navigationEvents = MutableSharedFlow<DetailsNavigationEvent>(extraBufferCapacity = 1)
     val navigationEvents: SharedFlow<DetailsNavigationEvent> = _navigationEvents.asSharedFlow()
@@ -94,7 +94,7 @@ class DetailsViewModel internal constructor(
             val result =
                 withContext(Dispatchers.IO) {
                     detailsUseCases.loadScreen(
-                        itemId = itemId,
+                        mediaKey = mediaKey,
                         requestedMediaType = requestedMediaType,
                         runtimeEntry = runtimeEntry,
                         nowMs = nowMs,
@@ -356,7 +356,7 @@ class DetailsViewModel internal constructor(
                 val result =
                     withContext(Dispatchers.IO) {
                         detailsUseCases.loadSeasonEpisodes(
-                            itemId = itemId,
+                            mediaKey = mediaKey,
                             season = season,
                             details = details,
                         )
@@ -789,6 +789,7 @@ class DetailsViewModel internal constructor(
                     launchSnapshot =
                         PlayerLaunchSnapshot(
                             contentId = enriched.id,
+                            mediaKey = enriched.mediaKey,
                             imdbId = enriched.imdbId,
                             seasonNumber = season,
                             episodeNumber = episode,
@@ -984,7 +985,7 @@ class DetailsViewModel internal constructor(
 
     companion object {
         internal fun factory(
-            itemId: String,
+            mediaKey: String,
             mediaType: String,
             runtimeEntry: RuntimeDetailsEntry?,
             detailsUseCases: DetailsUseCases,
@@ -993,7 +994,7 @@ class DetailsViewModel internal constructor(
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     return DetailsViewModel(
-                        itemId = itemId,
+                        mediaKey = mediaKey,
                         mediaType = mediaType,
                         runtimeEntry = runtimeEntry,
                         detailsUseCases = detailsUseCases,

@@ -260,6 +260,8 @@ internal class SimklWatchHistoryProvider(
                 val title = movie.optString("title").trim().ifBlank { contentId }
                 ContinueWatchingEntry(
                     id = playbackId ?: "${source.name.lowercase()}:movie:$contentId",
+                    mediaKey = contentId,
+                    localKey = "${source.name.lowercase()}:movie:$contentId",
                     provider = "simkl",
                     providerId = contentId,
                     mediaType = "movie",
@@ -290,6 +292,8 @@ internal class SimklWatchHistoryProvider(
 
                 ContinueWatchingEntry(
                     id = playbackId ?: "${source.name.lowercase()}:anime:$contentId:${season ?: -1}:${episode ?: -1}",
+                    mediaKey = contentId,
+                    localKey = "${source.name.lowercase()}:anime:$contentId:${season ?: -1}:${episode ?: -1}",
                     provider = "simkl",
                     providerId = contentId,
                     mediaType = "anime",
@@ -377,6 +381,7 @@ internal class SimklWatchHistoryProvider(
                     provider = source,
                     folderId = folderId,
                     contentId = contentId,
+                    mediaKey = contentId,
                     contentType = contentType,
                     title = title,
                     posterUrl = posterUrl,
@@ -419,6 +424,7 @@ internal class SimklWatchHistoryProvider(
                     provider = source,
                     folderId = FOLDER_RATINGS,
                     contentId = contentId,
+                    mediaKey = contentId,
                     contentType = contentType,
                     title = title,
                     posterUrl = posterUrl,
@@ -448,6 +454,7 @@ internal class SimklWatchHistoryProvider(
             provider = source,
             folderId = folderId,
             contentId = providerId,
+            mediaKey = mediaKey,
             contentType = when (mediaType.lowercase(Locale.US)) {
                 "anime" -> MetadataLabMediaType.ANIME
                 "series" -> MetadataLabMediaType.SERIES

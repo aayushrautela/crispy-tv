@@ -1,11 +1,12 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "media_state_contract",
-  "case_id": "watched_item_requires_regular_media_and_origins",
+  "case_id": "watched_item_requires_media_key_and_origins",
   "input": {
     "kind": "watched_item",
     "payload": {
       "media": {
+        "mediaKey": "tmdb:movie:13",
         "mediaType": "movie",
         "provider": "tmdb",
         "providerId": "13",
@@ -20,6 +21,7 @@
     "valid": true,
     "normalized": {
       "card_family": "regular",
+      "media_key": "tmdb:movie:13",
       "media_type": "movie",
       "item_id": null,
       "provider": "tmdb",
@@ -33,7 +35,8 @@
       "last_activity_at": null,
       "origins": ["trakt"],
       "dismissible": null,
-      "layout": null
+      "layout": null,
+      "route_kind": null
     }
   }
 }

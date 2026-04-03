@@ -136,6 +136,8 @@ class WatchHistoryCache(
             entriesJson.put(
                 JSONObject()
                     .put("id", entry.id)
+                    .put("mediaKey", entry.mediaKey)
+                    .put("localKey", entry.localKey)
                     .put("provider", entry.provider)
                     .put("providerId", entry.providerId)
                     .put("mediaType", entry.mediaType)
@@ -188,6 +190,7 @@ class WatchHistoryCache(
                     .put("provider", item.provider.name)
                     .put("folderId", item.folderId)
                     .put("contentId", item.contentId)
+                    .put("mediaKey", item.mediaKey)
                     .put("contentType", item.contentType.name)
                     .put("title", item.title)
                     .put("posterUrl", item.posterUrl)
@@ -282,6 +285,8 @@ class WatchHistoryCache(
             val id = obj.optString("id").trim()
             val runtimeProvider = obj.optString("provider").trim()
             val runtimeProviderId = obj.optString("providerId").trim()
+            val mediaKey = obj.optString("mediaKey").trim().ifBlank { null }
+            val localKey = obj.optString("localKey").trim().ifBlank { mediaKey ?: id }
             val mediaType = obj.optString("mediaType").trim()
             val title = obj.optString("title").trim()
             if (id.isBlank() || runtimeProvider.isBlank() || runtimeProviderId.isBlank() || mediaType.isBlank() || title.isBlank()) continue
@@ -302,6 +307,8 @@ class WatchHistoryCache(
             entries.add(
                 ContinueWatchingEntry(
                     id = id,
+                    mediaKey = mediaKey,
+                    localKey = localKey,
                     provider = runtimeProvider,
                     providerId = runtimeProviderId,
                     mediaType = mediaType,
@@ -370,6 +377,7 @@ class WatchHistoryCache(
             val obj = itemsArray.optJSONObject(index) ?: continue
             val folderId = obj.optString("folderId").trim()
             val contentId = obj.optString("contentId").trim()
+            val mediaKey = obj.optString("mediaKey").trim().ifBlank { null }
             if (folderId.isBlank() || contentId.isBlank()) continue
             val contentType = runCatching { MetadataLabMediaType.valueOf(obj.optString("contentType").trim()) }.getOrNull() ?: continue
             val title = obj.optString("title").trim().ifEmpty { contentId }
@@ -386,6 +394,7 @@ class WatchHistoryCache(
                     provider = providerValue,
                     folderId = folderId,
                     contentId = contentId,
+                    mediaKey = mediaKey,
                     contentType = contentType,
                     title = title,
                     posterUrl = posterUrl,

@@ -251,6 +251,8 @@ internal class TraktWatchHistoryProvider(
                     traktBatch.add(
                         ContinueWatchingEntry(
                             id = playbackId ?: "trakt:movie:$contentId",
+                            mediaKey = contentId,
+                            localKey = "trakt:movie:$contentId",
                             provider = "trakt",
                             providerId = contentId,
                             mediaType = "movie",
@@ -302,6 +304,8 @@ internal class TraktWatchHistoryProvider(
                                         traktBatch.add(
                                             ContinueWatchingEntry(
                                                 id = playbackId ?: "trakt:series:$contentId:${next.season}:${next.episode}",
+                                                mediaKey = contentId,
+                                                localKey = "trakt:series:$contentId:${next.season}:${next.episode}",
                                                 provider = "trakt",
                                                 providerId = contentId,
                                                 mediaType = "series",
@@ -327,6 +331,8 @@ internal class TraktWatchHistoryProvider(
                     traktBatch.add(
                         ContinueWatchingEntry(
                             id = playbackId ?: "trakt:series:$contentId:${episodeSeason ?: -1}:${episodeNumber ?: -1}",
+                            mediaKey = contentId,
+                            localKey = "trakt:series:$contentId:${episodeSeason ?: -1}:${episodeNumber ?: -1}",
                             provider = "trakt",
                             providerId = contentId,
                             mediaType = "series",
@@ -440,6 +446,8 @@ internal class TraktWatchHistoryProvider(
                 traktBatch.add(
                     ContinueWatchingEntry(
                         id = "trakt:series:${candidate.contentId}:${next.season}:${next.episode}",
+                        mediaKey = candidate.contentId,
+                        localKey = "trakt:series:${candidate.contentId}:${next.season}:${next.episode}",
                         provider = "trakt",
                         providerId = candidate.contentId,
                         mediaType = "series",
@@ -531,6 +539,7 @@ internal class TraktWatchHistoryProvider(
                     provider = WatchProvider.TRAKT,
                     folderId = "continue-watching",
                     contentId = it.providerId,
+                    mediaKey = it.mediaKey,
                     contentType = when (it.mediaType.lowercase(Locale.US)) {
                         "anime" -> MetadataLabMediaType.ANIME
                         "series" -> MetadataLabMediaType.SERIES
@@ -691,6 +700,7 @@ internal class TraktWatchHistoryProvider(
                         provider = WatchProvider.TRAKT,
                         folderId = folderId,
                         contentId = contentId,
+                        mediaKey = contentId,
                         contentType = contentType,
                         title = title,
                         posterUrl = posterUrl,
@@ -741,6 +751,7 @@ internal class TraktWatchHistoryProvider(
                         provider = WatchProvider.TRAKT,
                         folderId = folderId,
                         contentId = contentId,
+                        mediaKey = contentId,
                         contentType = contentType,
                         title = title,
                         posterUrl = posterUrl,

@@ -1,10 +1,11 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "media_state_contract",
-  "case_id": "search_result_requires_regular_card_fields_and_no_legacy_id",
+  "case_id": "regular_card_requires_media_key_and_supporting_metadata",
   "input": {
     "kind": "regular_card",
     "payload": {
+      "mediaKey": "tmdb:movie:550",
       "mediaType": "movie",
       "provider": "tmdb",
       "providerId": "550",
@@ -17,6 +18,7 @@
     "valid": true,
     "normalized": {
       "card_family": "regular",
+      "media_key": "tmdb:movie:550",
       "media_type": "movie",
       "item_id": null,
       "provider": "tmdb",
@@ -30,7 +32,8 @@
       "last_activity_at": null,
       "origins": null,
       "dismissible": null,
-      "layout": null
+      "layout": null,
+      "route_kind": null
     }
   }
 }

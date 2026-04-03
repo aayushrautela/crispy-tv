@@ -26,6 +26,7 @@ data class PlayerEpisodeSnapshot(
 @Immutable
 data class PlayerLaunchSnapshot(
     val contentId: String,
+    val mediaKey: String? = null,
     val imdbId: String? = null,
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
@@ -54,6 +55,7 @@ data class PlayerLaunchSnapshot(
     fun toJsonString(): String {
         return JSONObject()
             .put("content_id", contentId)
+            .put("media_key", mediaKey)
             .put("imdb_id", imdbId)
             .put("season_number", seasonNumber)
             .put("episode_number", episodeNumber)
@@ -106,6 +108,7 @@ data class PlayerLaunchSnapshot(
     fun toMediaDetails(): MediaDetails {
         return MediaDetails(
             id = contentId,
+            mediaKey = mediaKey,
             imdbId = imdbId,
             mediaType = mediaType,
             title = title,
@@ -145,6 +148,7 @@ data class PlayerLaunchSnapshot(
                 val json = JSONObject(raw)
                 PlayerLaunchSnapshot(
                     contentId = json.optString("content_id").trim(),
+                    mediaKey = json.optString("media_key").trim().ifBlank { null },
                     imdbId = json.optString("imdb_id").trim().ifBlank { null },
                     seasonNumber = json.optInt("season_number").takeIf { it > 0 },
                     episodeNumber = json.optInt("episode_number").takeIf { it > 0 },

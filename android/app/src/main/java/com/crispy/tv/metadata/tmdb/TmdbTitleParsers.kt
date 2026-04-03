@@ -76,7 +76,8 @@ internal fun parseSimilarCatalogItems(
 
             add(
                 CatalogItem(
-                    id = "tmdb:$id",
+                    id = "tmdb:${mediaType.toCatalogType()}:$id",
+                    mediaKey = "tmdb:${mediaType.toCatalogType()}:$id",
                     title = title,
                     posterUrl = TmdbApi.imageUrl(item.optStringNonBlank("poster_path"), "w500"),
                     backdropUrl = TmdbApi.imageUrl(item.optStringNonBlank("backdrop_path"), "w780"),
@@ -108,7 +109,8 @@ internal fun parseCollection(collection: JSONObject?): TmdbCollection? {
             val title = item.optStringNonBlank("title") ?: item.optStringNonBlank("original_title") ?: continue
             add(
                 CatalogItem(
-                    id = "tmdb:$itemId",
+                    id = "tmdb:movie:$itemId",
+                    mediaKey = "tmdb:movie:$itemId",
                     title = title,
                     posterUrl = TmdbApi.imageUrl(item.optStringNonBlank("poster_path"), "w500"),
                     backdropUrl = TmdbApi.imageUrl(item.optStringNonBlank("backdrop_path"), "w780"),

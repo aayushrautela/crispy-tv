@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 2
     },
     "suite": {
       "const": "media_state_contract"
@@ -39,7 +39,8 @@
             "watchlist_item",
             "rating_item",
             "library_item",
-            "home_snapshot_section"
+            "home_snapshot_section",
+            "title_route"
           ]
         },
         "payload": {
@@ -65,10 +66,20 @@
           ],
           "properties": {
             "card_family": {
-              "type": "string",
+              "type": [
+                "string",
+                "null"
+              ],
               "enum": [
                 "regular",
-                "landscape"
+                "landscape",
+                null
+              ]
+            },
+            "media_key": {
+              "type": [
+                "string",
+                "null"
               ]
             },
             "media_type": {
@@ -162,6 +173,16 @@
                 "landscape",
                 "collection",
                 "hero",
+                null
+              ]
+            },
+            "route_kind": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "title",
                 null
               ]
             }

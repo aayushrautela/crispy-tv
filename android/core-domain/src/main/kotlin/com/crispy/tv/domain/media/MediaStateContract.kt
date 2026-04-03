@@ -1,7 +1,8 @@
 package com.crispy.tv.domain.media
 
 data class MediaStateNormalized(
-    val cardFamily: String,
+    val cardFamily: String? = null,
+    val mediaKey: String? = null,
     val mediaType: String? = null,
     val itemId: String? = null,
     val provider: String? = null,
@@ -16,6 +17,7 @@ data class MediaStateNormalized(
     val origins: List<String>? = null,
     val dismissible: Boolean? = null,
     val layout: String? = null,
+    val routeKind: String? = null,
 )
 
 fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStateNormalized? {
@@ -29,11 +31,13 @@ fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStat
         "rating_item" -> normalizeWatchItem(payload, stateKey = "ratedAt")
         "library_item" -> normalizeLibraryItem(payload)
         "home_snapshot_section" -> normalizeHomeSnapshotSection(payload)
+        "title_route" -> normalizeTitleRoute(payload)
         else -> null
     }
 }
 
 private fun normalizeCard(payload: Map<String, Any?>, requireBackdrop: Boolean): MediaStateNormalized? {
+    val mediaKey = payload.stringValue("mediaKey") ?: return null
     val mediaType = payload.stringValue("mediaType") ?: return null
     val provider = payload.stringValue("provider") ?: return null
     val providerId = payload.stringValue("providerId") ?: return null
@@ -43,6 +47,7 @@ private fun normalizeCard(payload: Map<String, Any?>, requireBackdrop: Boolean):
     if (requireBackdrop && backdropUrl.isNullOrBlank()) return null
     return MediaStateNormalized(
         cardFamily = if (requireBackdrop) "landscape" else "regular",
+        mediaKey = mediaKey,
         mediaType = mediaType,
         itemId = null,
         provider = provider,
@@ -55,6 +60,7 @@ private fun normalizeCard(payload: Map<String, Any?>, requireBackdrop: Boolean):
 }
 
 private fun normalizeMetadataCard(payload: Map<String, Any?>): MediaStateNormalized? {
+    val mediaKey = payload.stringValue("mediaKey") ?: return null
     val mediaType = payload.stringValue("mediaType") ?: return null
     val provider = payload.stringValue("provider") ?: return null
     val providerId = payload.stringValue("providerId") ?: return null
@@ -64,6 +70,7 @@ private fun normalizeMetadataCard(payload: Map<String, Any?>): MediaStateNormali
     val backdropUrl = payload.stringValue("backdropUrl") ?: images?.stringValue("backdropUrl")
     return MediaStateNormalized(
         cardFamily = "regular",
+        mediaKey = mediaKey,
         mediaType = mediaType,
         itemId = null,
         provider = provider,
@@ -119,7 +126,14 @@ private fun normalizeHomeSnapshotSection(payload: Map<String, Any?>): MediaState
     if (layout !in setOf("regular", "landscape", "collection", "hero")) return null
     val items = payload["items"] as? List<*> ?: return null
     if (items.isEmpty()) return null
-    return MediaStateNormalized(cardFamily = "regular", layout = layout)
+    return MediaStateNormalized(layout = layout)
+}
+
+private fun normalizeTitleRoute(payload: Map<String, Any?>): MediaStateNormalized? {
+    val mediaKey = payload.stringValue("mediaKey") ?: return null
+    val path = payload.stringValue("path") ?: return null
+    if (path != "/v1/metadata/titles/$mediaKey") return null
+    return MediaStateNormalized(mediaKey = mediaKey, routeKind = "title")
 }
 
 private fun Map<String, Any?>.stringValue(key: String): String? {

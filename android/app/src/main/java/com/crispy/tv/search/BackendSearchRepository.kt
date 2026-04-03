@@ -5,7 +5,6 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import java.util.Locale
 
 class BackendSearchRepository(
     private val supabase: SupabaseAccountClient,
@@ -76,12 +75,14 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
             mediaType.equals("anime", ignoreCase = true) -> "anime"
             mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
             else -> "movie"
-        }
+    }
     val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
     val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return SearchCatalogItem(
-        id = backendCatalogItemId(normalizedType, normalizedProvider, normalizedProviderId),
+        id = normalizedMediaKey,
+        mediaKey = normalizedMediaKey,
         title = title,
         posterUrl = normalizedPosterUrl,
         backdropUrl = backdropUrl,
@@ -95,8 +96,4 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
         provider = normalizedProvider,
         providerId = normalizedProviderId,
     )
-}
-
-private fun backendCatalogItemId(type: String, provider: String, providerId: String): String {
-    return "${type.trim().lowercase(Locale.US)}:${provider.trim().lowercase(Locale.US)}:${providerId.trim()}"
 }

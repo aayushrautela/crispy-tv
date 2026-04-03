@@ -1,10 +1,11 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "media_state_contract",
   "case_id": "landscape_card_requires_backdrop_url",
   "input": {
     "kind": "landscape_card",
     "payload": {
+      "mediaKey": "tmdb:series:66732",
       "mediaType": "series",
       "provider": "tmdb",
       "providerId": "66732",

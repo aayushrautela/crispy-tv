@@ -19,9 +19,8 @@ internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostControlle
             },
             onItemClick = { item ->
                 navController.navigate(
-                    AppRoutes.runtimeDetailsRoute(
-                        provider = item.provider,
-                        providerId = item.providerId,
+                    AppRoutes.homeDetailsRoute(
+                        mediaKey = item.mediaKey,
                         mediaType = item.type,
                     )
                 )

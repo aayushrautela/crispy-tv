@@ -1,12 +1,13 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "media_state_contract",
-  "case_id": "continue_watching_requires_landscape_wrapper_and_dismissible",
+  "case_id": "continue_watching_requires_landscape_media_and_dismissible",
   "input": {
     "kind": "continue_watching_item",
     "payload": {
       "id": "cw-123",
       "media": {
+        "mediaKey": "tmdb:series:1399",
         "mediaType": "series",
         "provider": "tmdb",
         "providerId": "1399",
@@ -33,6 +34,7 @@
     "valid": true,
     "normalized": {
       "card_family": "landscape",
+      "media_key": "tmdb:series:1399",
       "media_type": "series",
       "item_id": "cw-123",
       "provider": "tmdb",
@@ -46,7 +48,8 @@
       "last_activity_at": "2026-04-01T10:15:00Z",
       "origins": ["trakt"],
       "dismissible": false,
-      "layout": null
+      "layout": null,
+      "route_kind": null
     }
   }
 }

@@ -1,10 +1,11 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "media_state_contract",
-  "case_id": "card_like_metadata_item_uses_provider_identity_without_canonical_id",
+  "case_id": "metadata_card_uses_media_key_without_internal_id",
   "input": {
     "kind": "metadata_card",
     "payload": {
+      "mediaKey": "tmdb:movie:680",
       "mediaType": "movie",
       "provider": "tmdb",
       "providerId": "680",
@@ -20,6 +21,7 @@
     "valid": true,
     "normalized": {
       "card_family": "regular",
+      "media_key": "tmdb:movie:680",
       "media_type": "movie",
       "item_id": null,
       "provider": "tmdb",
@@ -33,7 +35,8 @@
       "last_activity_at": null,
       "origins": null,
       "dismissible": null,
-      "layout": null
+      "layout": null,
+      "route_kind": null
     }
   }
 }

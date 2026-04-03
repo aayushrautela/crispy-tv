@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 3
+      "minimum": 4
     },
     "suite": {
       "const": "search_ranking_and_dedup"
@@ -104,8 +104,7 @@
             "type": "object",
               "required": [
                 "media_type",
-                "provider",
-                "provider_id",
+                "item_key",
                 "title"
               ],
               "properties": {
@@ -116,6 +115,10 @@
                     "series",
                     "person"
                   ]
+                },
+                "item_key": {
+                  "type": "string",
+                  "minLength": 1
                 },
                 "provider": {
                   "type": "string",

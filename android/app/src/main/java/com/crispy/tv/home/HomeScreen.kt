@@ -134,7 +134,6 @@ internal fun HomeRoute(
                 wideRailSections = wideRailSections,
                 catalogSections = catalogSections,
                 onRefresh = viewModel::refresh,
-                onHideContinueWatchingItem = viewModel::hideContinueWatchingItem,
                 onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
                 onHeroClick = onHeroClick,
                 onContinueWatchingClick = onContinueWatchingClick,
@@ -159,7 +158,6 @@ private fun HomeScreen(
     wideRailSections: Map<String, HomeWideRailSectionUi>,
     catalogSections: Map<String, HomeCatalogSectionUi>,
     onRefresh: () -> Unit,
-    onHideContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
@@ -266,7 +264,6 @@ private fun HomeScreen(
                                 HomeWideRailSection(
                                     section = section,
                                     onContinueWatchingClick = onContinueWatchingClick,
-                                    onHideContinueWatchingItem = onHideContinueWatchingItem,
                                     onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
                                     onThisWeekClick = onThisWeekClick,
                                     onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,

@@ -19,8 +19,6 @@ import com.crispy.tv.domain.home.planPersonalHomeFeed
 import com.crispy.tv.ratings.formatRatingOutOfTen
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.Locale
-
 private const val DEFAULT_VARIANT_KEY = "default"
 private const val PREVIEW_ITEM_LIMIT = 12
 private const val HOME_CACHE_MAX_AGE_MS = 15 * 60 * 1000L
@@ -38,8 +36,6 @@ data class HomeHeroItem(
     val backdropUrl: String,
     val addonId: String,
     val type: String,
-    val provider: String,
-    val providerId: String,
 )
 
 @Immutable
@@ -58,6 +54,7 @@ data class HomePrimaryFeedLoadResult(
 @Immutable
 data class MediaDetails(
     val id: String,
+    val mediaKey: String? = null,
     val imdbId: String?,
     val mediaType: String,
     val title: String,
@@ -122,9 +119,9 @@ class HomeCatalogService internal constructor(
             heroResult =
                 HomeHeroLoadResult(
                     items =
-                        feedPlan.heroResult.items.map { hero ->
+                        feedPlan.heroResult.items.mapNotNull { hero ->
                             HomeHeroItem(
-                                id = hero.id,
+                                id = hero.mediaKey,
                                 title = hero.title,
                                 description = hero.description,
                                 rating = hero.rating,
@@ -133,8 +130,6 @@ class HomeCatalogService internal constructor(
                                 backdropUrl = hero.backdropUrl,
                                 addonId = hero.addonId,
                                 type = hero.type,
-                                provider = hero.provider,
-                                providerId = hero.providerId,
                             )
                         },
                     statusMessage = feedPlan.heroResult.statusMessage,
@@ -147,7 +142,7 @@ class HomeCatalogService internal constructor(
                             ?.items
                             ?.take(PREVIEW_ITEM_LIMIT)
                             .orEmpty()
-                            .map { item -> item.toCatalogItem() }
+                            .mapNotNull { item -> item.toCatalogItem() }
                     CatalogSectionRef(
                         catalogId = section.catalogId,
                         source = section.source,
@@ -199,7 +194,7 @@ class HomeCatalogService internal constructor(
         val snapshot = loadSnapshot()
         val result = buildCatalogPage(snapshot, sectionCatalogId = section.catalogId, page = page, pageSize = pageSize)
         return CatalogPageResult(
-            items = result.items.map { item -> item.toCatalogItem() },
+            items = result.items.mapNotNull { item -> item.toCatalogItem() },
             statusMessage = result.statusMessage,
             attemptedUrls = listOf(homeAttemptedUrl(snapshot.profileId, section.catalogId, page)),
         )
@@ -316,12 +311,11 @@ class HomeCatalogService internal constructor(
     }
 
     private fun CrispyBackendClient.RuntimeMediaCard.toCatalogItem(): HomeCatalogItem? {
+        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
         val normalizedTitle = title.trim().ifBlank { return null }
-        val normalizedProvider = provider.trim().ifBlank { return null }
-        val normalizedProviderId = providerId.trim().ifBlank { return null }
         val normalizedType = normalizedCatalogType()
         return HomeCatalogItem(
-            id = "$normalizedProvider:$normalizedProviderId:$normalizedType",
+            mediaKey = normalizedMediaKey,
             title = normalizedTitle,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
@@ -330,14 +324,14 @@ class HomeCatalogService internal constructor(
             rating = formatRatingOutOfTen(rating?.toString()),
             year = releaseYear?.toString(),
             description = subtitle,
-            provider = normalizedProvider,
-            providerId = normalizedProviderId,
         )
     }
 
-    private fun HomeCatalogItem.toCatalogItem(): CatalogItem {
+    private fun HomeCatalogItem.toCatalogItem(): CatalogItem? {
+        val runtimeLookup = mediaKey.toRuntimeLookup() ?: return null
         return CatalogItem(
-            id = id,
+            id = mediaKey,
+            mediaKey = mediaKey,
             title = title,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
@@ -346,8 +340,8 @@ class HomeCatalogService internal constructor(
             rating = rating,
             year = year,
             description = description,
-            provider = provider,
-            providerId = providerId,
+            provider = runtimeLookup.provider,
+            providerId = runtimeLookup.providerId,
         )
     }
 
@@ -436,20 +430,18 @@ class HomeCatalogService internal constructor(
                                 .put(
                                     "items",
                                     JSONArray().apply {
-                                        list.items.forEach { item ->
-                                            put(
-                                                JSONObject()
-                                                    .put("id", item.id)
-                                                    .put("title", item.title)
-                                                    .put("poster_url", item.posterUrl)
-                                                    .put("backdrop_url", item.backdropUrl)
-                                                    .put("addon_id", item.addonId)
-                                                    .put("type", item.type)
-                                                    .put("provider", item.provider)
-                                                    .put("provider_id", item.providerId)
-                                                    .put("rating", item.rating)
-                                                    .put("year", item.year)
-                                                    .put("description", item.description)
+                                                list.items.forEach { item ->
+                                                    put(
+                                                        JSONObject()
+                                                            .put("media_key", item.mediaKey)
+                                                            .put("title", item.title)
+                                                            .put("poster_url", item.posterUrl)
+                                                            .put("backdrop_url", item.backdropUrl)
+                                                            .put("addon_id", item.addonId)
+                                                            .put("type", item.type)
+                                                            .put("rating", item.rating)
+                                                            .put("year", item.year)
+                                                            .put("description", item.description)
                                             )
                                         }
                                     },
@@ -509,26 +501,33 @@ class HomeCatalogService internal constructor(
     }
 
     private fun parseCachedItem(json: JSONObject): HomeCatalogItem? {
-        val id = json.optString("id").trim()
+        val mediaKey = json.optString("media_key").trim()
         val title = json.optString("title").trim()
         val addonId = json.optString("addon_id").trim()
         val type = json.optString("type").trim()
-        if (id.isBlank() || title.isBlank() || addonId.isBlank() || type.isBlank()) {
+        if (mediaKey.isBlank() || title.isBlank() || addonId.isBlank() || type.isBlank()) {
             return null
         }
         return HomeCatalogItem(
-            id = id,
+            mediaKey = mediaKey,
             title = title,
             posterUrl = json.optString("poster_url").trim().ifBlank { null },
             backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
             addonId = addonId,
             type = type,
-            provider = json.optString("provider").trim().ifBlank { return null },
-            providerId = json.optString("provider_id").trim().ifBlank { return null },
             rating = json.optString("rating").trim().ifBlank { null },
             year = json.optString("year").trim().ifBlank { null },
             description = json.optString("description").trim().ifBlank { null },
         )
+    }
+
+    private fun String.toRuntimeLookup(): RuntimeLookup? {
+        val parts = trim().split(':').map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.size < 2) return null
+        val provider = parts.first()
+        val providerId = parts.last()
+        if (provider.isBlank() || providerId.isBlank()) return null
+        return RuntimeLookup(provider = provider, providerId = providerId)
     }
 
     private fun homeAttemptedUrl(profileId: String?, catalogId: String? = null, page: Int? = null): String {

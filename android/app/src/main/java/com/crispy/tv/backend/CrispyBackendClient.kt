@@ -77,6 +77,7 @@ class CrispyBackendClient(
     )
 
     data class BackendMetadataItem(
+        val mediaKey: String,
         val title: String,
         val summary: String?,
         val posterUrl: String?,
@@ -315,6 +316,7 @@ class CrispyBackendClient(
 
     data class MetadataCardView(
         val id: String?,
+        val mediaKey: String?,
         val mediaType: String,
         val kind: String,
         val tmdbId: Int?,
@@ -464,6 +466,7 @@ class CrispyBackendClient(
 
     data class MetadataPersonKnownForItem(
         val id: String?,
+        val mediaKey: String?,
         val mediaType: String,
         val tmdbId: Int?,
         val title: String,
@@ -527,6 +530,7 @@ class CrispyBackendClient(
     )
 
     data class RuntimeMediaCard(
+        val mediaKey: String,
         val mediaType: String,
         val provider: String,
         val providerId: String,
@@ -836,29 +840,29 @@ class CrispyBackendClient(
         return resolveMetadataApi(accessToken, input)
     }
 
-    suspend fun getMetadataTitleDetail(accessToken: String, id: String): MetadataTitleDetailResponse {
-        return getMetadataTitleDetailApi(accessToken, id)
+    suspend fun getMetadataTitleDetail(accessToken: String, mediaKey: String): MetadataTitleDetailResponse {
+        return getMetadataTitleDetailApi(accessToken, mediaKey)
     }
 
-    suspend fun getMetadataTitleContent(accessToken: String, id: String): MetadataTitleContentResponse {
-        return getMetadataTitleContentApi(accessToken, id)
+    suspend fun getMetadataTitleContent(accessToken: String, mediaKey: String): MetadataTitleContentResponse {
+        return getMetadataTitleContentApi(accessToken, mediaKey)
     }
 
-    suspend fun getMetadataSeasonDetail(accessToken: String, id: String, seasonNumber: Int): MetadataSeasonDetailResponse {
-        return getMetadataSeasonDetailApi(accessToken, id, seasonNumber)
+    suspend fun getMetadataSeasonDetail(accessToken: String, mediaKey: String, seasonNumber: Int): MetadataSeasonDetailResponse {
+        return getMetadataSeasonDetailApi(accessToken, mediaKey, seasonNumber)
     }
 
     suspend fun getMetadataPersonDetail(accessToken: String, id: String, language: String? = null): MetadataPersonDetail {
         return getMetadataPersonDetailApi(accessToken, id, language)
     }
 
-    suspend fun listMetadataEpisodes(accessToken: String, id: String, seasonNumber: Int? = null): MetadataEpisodeListResponse {
-        return listMetadataEpisodesApi(accessToken, id, seasonNumber)
+    suspend fun listMetadataEpisodes(accessToken: String, mediaKey: String, seasonNumber: Int? = null): MetadataEpisodeListResponse {
+        return listMetadataEpisodesApi(accessToken, mediaKey, seasonNumber)
     }
 
     suspend fun getNextEpisode(
         accessToken: String,
-        id: String,
+        mediaKey: String,
         currentSeasonNumber: Int,
         currentEpisodeNumber: Int,
         watchedKeys: List<String> = emptyList(),
@@ -867,7 +871,7 @@ class CrispyBackendClient(
     ): MetadataNextEpisodeResponse {
         return getNextEpisodeApi(
             accessToken = accessToken,
-            id = id,
+            mediaKey = mediaKey,
             currentSeasonNumber = currentSeasonNumber,
             currentEpisodeNumber = currentEpisodeNumber,
             watchedKeys = watchedKeys,

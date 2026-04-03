@@ -81,7 +81,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         }
 
         return HomeCatalogItem(
-            id: try requireString(object, "id", fixture: fixture),
+            mediaKey: try requireString(object, "media_key", fixture: fixture),
             title: try requireString(object, "title", fixture: fixture),
             posterUrl: optionalString(object, "poster_url"),
             backdropUrl: optionalString(object, "backdrop_url"),
@@ -89,9 +89,7 @@ final class HomeCatalogsContractTests: XCTestCase {
             type: try requireString(object, "type", fixture: fixture),
             rating: optionalString(object, "rating"),
             year: optionalString(object, "year"),
-            description: optionalString(object, "description"),
-            provider: try requireString(object, "provider", fixture: fixture),
-            providerId: try requireString(object, "provider_id", fixture: fixture)
+            description: optionalString(object, "description")
         )
     }
 
@@ -116,7 +114,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         }
 
         return HomeCatalogHeroItem(
-            id: try requireString(object, "id", fixture: fixture),
+            mediaKey: try requireString(object, "media_key", fixture: fixture),
             title: try requireString(object, "title", fixture: fixture),
             description: try requireString(object, "description", fixture: fixture),
             rating: optionalString(object, "rating"),
@@ -124,9 +122,7 @@ final class HomeCatalogsContractTests: XCTestCase {
             genres: try stringArrayValue(try requireArray(object, "genres", fixture: fixture), fixture: fixture, field: "genres"),
             backdropUrl: try requireString(object, "backdrop_url", fixture: fixture),
             addonId: try requireString(object, "addon_id", fixture: fixture),
-            type: try requireString(object, "type", fixture: fixture),
-            provider: try requireString(object, "provider", fixture: fixture),
-            providerId: try requireString(object, "provider_id", fixture: fixture)
+            type: try requireString(object, "type", fixture: fixture)
         )
     }
 

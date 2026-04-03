@@ -1,0 +1,19 @@
+{
+  "contract_version": 2,
+  "suite": "media_state_contract",
+  "case_id": "regular_card_missing_media_key_is_invalid",
+  "input": {
+    "kind": "regular_card",
+    "payload": {
+      "mediaType": "movie",
+      "provider": "tmdb",
+      "providerId": "550",
+      "title": "Fight Club",
+      "posterUrl": "https://img/poster.jpg"
+    }
+  },
+  "expected": {
+    "valid": false,
+    "normalized": null
+  }
+}

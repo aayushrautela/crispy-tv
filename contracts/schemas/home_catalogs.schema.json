@@ -6,7 +6,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 5
     },
     "suite": {
       "const": "home_catalogs"
@@ -205,10 +205,10 @@
     },
     "item": {
       "type": "object",
-      "required": ["id", "title", "poster_url", "backdrop_url", "addon_id", "type", "rating", "year", "description", "provider", "provider_id"],
+      "required": ["media_key", "title", "poster_url", "backdrop_url", "addon_id", "type", "rating", "year", "description"],
       "additionalProperties": false,
       "properties": {
-        "id": {
+        "media_key": {
           "type": "string"
         },
         "title": {
@@ -247,10 +247,10 @@
     },
     "hero_item": {
       "type": "object",
-      "required": ["id", "title", "description", "rating", "year", "genres", "backdrop_url", "addon_id", "type", "provider", "provider_id"],
+      "required": ["media_key", "title", "description", "rating", "year", "genres", "backdrop_url", "addon_id", "type"],
       "additionalProperties": false,
       "properties": {
-        "id": {
+        "media_key": {
           "type": "string"
         },
         "title": {

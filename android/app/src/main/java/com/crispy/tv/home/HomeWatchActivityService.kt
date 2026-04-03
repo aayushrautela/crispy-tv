@@ -2,7 +2,6 @@ package com.crispy.tv.home
 
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.CanonicalContinueWatchingResult
-import java.util.Locale
 
 class HomeWatchActivityService {
 
@@ -46,9 +45,9 @@ class HomeWatchActivityService {
 
     private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
         return CanonicalContinueWatchingItem(
-            id = entry.id.trim().ifBlank {
-                "${entry.provider.lowercase(Locale.US)}:${entry.providerId}:${entry.mediaType.lowercase(Locale.US)}:${entry.season ?: -1}:${entry.episode ?: -1}"
-            },
+            id = entry.id.trim(),
+            mediaKey = entry.mediaKey,
+            localKey = entry.localKey,
             provider = entry.provider,
             providerId = entry.providerId,
             mediaType = entry.mediaType,

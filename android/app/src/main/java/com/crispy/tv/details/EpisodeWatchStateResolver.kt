@@ -46,6 +46,7 @@ internal class EpisodeWatchStateResolver(
                     userMediaRepository.getLocalWatchProgress(
                         PlaybackIdentity(
                             contentId = details.id,
+                            mediaKey = details.mediaKey,
                             imdbId = details.imdbId,
                             tmdbId = null,
                             contentType = contentType,
@@ -81,6 +82,7 @@ internal class EpisodeWatchStateResolver(
         val canonical = userMediaRepository.getCanonicalWatchState(
             PlaybackIdentity(
                 contentId = details.id,
+                mediaKey = details.mediaKey,
                 imdbId = details.imdbId,
                 tmdbId = null,
                 contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,

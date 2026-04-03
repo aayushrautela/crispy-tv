@@ -1,5 +1,5 @@
 {
-  "contract_version": 4,
+  "contract_version": 5,
   "suite": "home_catalogs",
   "case_id": "empty_snapshot_propagates_status",
   "input": {

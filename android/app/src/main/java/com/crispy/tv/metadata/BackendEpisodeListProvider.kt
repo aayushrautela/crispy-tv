@@ -22,15 +22,15 @@ internal class BackendEpisodeListProvider(
             return null
         }
 
-        val canonicalId = contentId.trim()
-        if (canonicalId.isBlank()) return null
+        val mediaKey = contentId.trim()
+        if (mediaKey.isBlank()) return null
 
         val session = supabaseAccountClient.ensureValidSession() ?: return null
 
         val response = runCatching {
             backendClient.listMetadataEpisodes(
                 accessToken = session.accessToken,
-                id = canonicalId,
+                mediaKey = mediaKey,
                 seasonNumber = seasonHint,
             )
         }.getOrNull() ?: return null

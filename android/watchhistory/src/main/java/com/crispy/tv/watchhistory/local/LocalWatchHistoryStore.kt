@@ -120,6 +120,7 @@ class LocalWatchHistoryStore(
 
         return NormalizedWatchRequest(
             contentId = contentId,
+            mediaKey = request.mediaKey?.trim()?.ifBlank { null },
             contentType = request.contentType,
             title = title,
             season = season,
@@ -194,6 +195,8 @@ class LocalWatchHistoryStore(
             .map { item ->
                 ContinueWatchingEntry(
                     id = "local:${item.contentType.label}:${item.contentId}:${item.season ?: -1}:${item.episode ?: -1}",
+                    mediaKey = item.contentId,
+                    localKey = "local:${item.contentType.label}:${item.contentId}:${item.season ?: -1}:${item.episode ?: -1}",
                     provider = "local",
                     providerId = item.contentId,
                     mediaType = item.contentType.label,
@@ -216,6 +219,7 @@ class LocalWatchHistoryStore(
 
 data class NormalizedWatchRequest(
     val contentId: String,
+    val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String,
     val season: Int?,

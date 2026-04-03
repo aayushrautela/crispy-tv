@@ -48,7 +48,7 @@ The spec version documents the contract surface. Each suite owns its own
 - `home_catalogs`
   - Plan home-screen hero shelves, header sections, discover catalog refs, and paged catalog results from deterministic snapshot input.
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
-  - `contract_version` 4 requires provider-based identity on catalog and hero items via `provider` + `provider_id`.
+  - `contract_version` 5 requires `media_key` on client-facing title items. `provider` and `provider_id` are supporting metadata only when present and do not define client routing.
   - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
@@ -68,7 +68,7 @@ The spec version documents the contract surface. Each suite owns its own
   - Include `person` results (no filtering).
   - Type mapping: TMDB `movie` -> `movie`, TMDB `tv` -> `series`, TMDB `person` -> `person` (unknown media types are ignored).
   - Dedupe key is `(type, tmdb_id)`; keep the first occurrence.
-  - `contract_version` 3 removes canonical `id` output and emits client navigation identity as `media_type + provider + provider_id` with `provider = tmdb` and `provider_id = <tmdb_id>`.
+  - `contract_version` 4 removes provider-derived route identity and emits opaque client `item_key` values. Title results use title-route keys, while people remain a separate route class with distinct keys.
   - Image URLs use `w500` for movie/series posters and `h632` for person profiles.
   - `year` is parsed from the first 4 digits of `release_date`/`first_air_date` when present; invalid/missing yields `null`.
 - `sync_planner`
@@ -82,11 +82,13 @@ The spec version documents the contract surface. Each suite owns its own
   - Logical storage namespace/versioning and schema mismatch behavior.
 - `media_state_contract`
   - Validate exact backend payload-shape rules from `CLIENT_SERVER_MEDIA_STATE_CONTRACT.md` for client-facing runtime and card-like metadata surfaces.
-  - Regular-card surfaces require provider-based identity via `mediaType + provider + providerId`, plus `title` and `posterUrl`.
+  - `contract_version` 2 requires `media.mediaKey` for every media-bearing title surface that can open title details. `mediaType`, `provider`, and `providerId` remain supporting metadata only.
+  - Regular-card surfaces require `mediaKey`, `mediaType`, `provider`, `providerId`, `title`, and `posterUrl`.
   - Landscape-card surfaces require the same fields plus `backdropUrl`.
   - Continue-watching items require `id`, `media`, `progress`, `watchedAt`, `lastActivityAt`, `origins`, and `dismissible`; dismissal UI must honor backend `dismissible`.
   - Watched/watchlist/ratings items require `media` and `origins`, plus their relevant state fields.
-  - Search results, `similar`, `collection.parts`, and person `knownFor` are card-like provider-based items and must not require legacy canonical ids.
+  - Search results, `similar`, `collection.parts`, and other card-like title metadata items are `mediaKey`-based and must not require internal canonical ids.
+  - Title metadata routes use `/v1/metadata/titles/:mediaKey` and nested title-content routes hang off that same public key rather than internal ids.
   - Home snapshot sections preserve exact backend `layout` values: `regular`, `landscape`, `collection`, `hero`.
 
 ## Breaking Changes

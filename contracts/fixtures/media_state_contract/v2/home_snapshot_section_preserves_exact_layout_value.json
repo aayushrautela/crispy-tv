@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "media_state_contract",
   "case_id": "home_snapshot_section_preserves_exact_layout_value",
   "input": {
@@ -12,6 +12,7 @@
       "title": "Trending Now",
       "items": [
         {
+          "mediaKey": "tmdb:movie:550",
           "mediaType": "movie",
           "provider": "tmdb",
           "providerId": "550",
@@ -24,7 +25,8 @@
   "expected": {
     "valid": true,
     "normalized": {
-      "card_family": "regular",
+      "card_family": null,
+      "media_key": null,
       "media_type": null,
       "item_id": null,
       "provider": null,
@@ -38,7 +40,8 @@
       "last_activity_at": null,
       "origins": null,
       "dismissible": null,
-      "layout": "collection"
+      "layout": "collection",
+      "route_kind": null
     }
   }
 }
