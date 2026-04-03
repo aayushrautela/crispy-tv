@@ -7,6 +7,7 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.ratings.formatRating
+import java.util.Locale
 
 internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
     val itemDetails = item.toMediaDetails()

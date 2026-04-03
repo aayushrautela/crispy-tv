@@ -19,6 +19,7 @@ import com.crispy.tv.domain.home.planPersonalHomeFeed
 import com.crispy.tv.ratings.formatRatingOutOfTen
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 private const val DEFAULT_VARIANT_KEY = "default"
 private const val PREVIEW_ITEM_LIMIT = 12
 private const val HOME_CACHE_MAX_AGE_MS = 15 * 60 * 1000L
@@ -542,5 +543,10 @@ class HomeCatalogService internal constructor(
     private data class BackendContext(
         val accessToken: String,
         val profileId: String,
+    )
+
+    private data class RuntimeLookup(
+        val provider: String,
+        val providerId: String,
     )
 }
