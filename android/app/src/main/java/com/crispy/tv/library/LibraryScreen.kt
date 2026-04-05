@@ -18,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -27,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -40,6 +40,7 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.ui.components.LoadingIndicator
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -50,6 +51,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val LIBRARY_PAGE_SIZE = 60
 
 @Immutable
 data class LibrarySectionItemUi(
@@ -75,15 +78,20 @@ data class LibrarySectionUi(
     val id: String,
     val label: String,
     val itemCount: Int,
-    val items: List<LibrarySectionItemUi>,
 )
 
 @Immutable
 data class LibraryUiState(
     val isRefreshing: Boolean = false,
+    val isLoadingSection: Boolean = false,
+    val isLoadingMore: Boolean = false,
     val statusMessage: String = "",
+    val sectionStatusMessage: String = "",
     val sections: List<LibrarySectionUi> = emptyList(),
     val selectedSectionId: String? = null,
+    val sectionItems: List<LibrarySectionItemUi> = emptyList(),
+    val nextCursor: String? = null,
+    val hasMore: Boolean = false,
 )
 
 class LibraryViewModel internal constructor(
@@ -95,6 +103,8 @@ class LibraryViewModel internal constructor(
     val uiState: StateFlow<LibraryUiState> = _uiState
 
     private var refreshJob: Job? = null
+    private var sectionJob: Job? = null
+    private var loadMoreJob: Job? = null
 
     init {
         refresh()
@@ -104,13 +114,16 @@ class LibraryViewModel internal constructor(
         if (refreshJob?.isActive == true) return
         refreshJob =
             viewModelScope.launch {
-                _uiState.update { it.copy(isRefreshing = true) }
-
-                val sections = withContext(Dispatchers.IO) {
-                    runCatching { loadLibrarySections() }.getOrNull()
+                _uiState.update {
+                    it.copy(
+                        isRefreshing = true,
+                        statusMessage = if (it.sections.isEmpty()) "" else it.statusMessage,
+                    )
                 }
 
-                if (sections == null) {
+                val result = withContext(Dispatchers.IO) { runCatching { loadLibraryDiscovery() } }
+                val discovery = result.getOrNull()
+                if (discovery == null) {
                     _uiState.update {
                         it.copy(
                             isRefreshing = false,
@@ -120,59 +133,208 @@ class LibraryViewModel internal constructor(
                     return@launch
                 }
 
-                val sectionUis = sections.map { section ->
-                    LibrarySectionUi(
-                        id = section.id,
-                        label = section.label,
-                        itemCount = section.itemCount,
-                        items = section.items.map { item ->
-                            LibrarySectionItemUi(
-                                id = item.id,
-                                mediaKey = item.media.mediaKey,
-                                mediaType = item.media.mediaType,
-                                title = item.media.title,
-                                posterUrl = item.media.posterUrl,
-                                backdropUrl = item.media.backdropUrl,
-                                addedAt = item.state.addedAt,
-                                watchedAt = item.state.watchedAt,
-                                ratedAt = item.state.ratedAt,
-                                rating = item.state.rating,
-                                lastActivityAt = item.state.lastActivityAt,
-                                origins = item.origins,
-                            )
-                        },
-                    )
-                }
-
-                val selectedId = _uiState.value.selectedSectionId
-                    ?.takeIf { id -> sectionUis.any { it.id == id } }
-                    ?: sectionUis.firstOrNull()?.id
+                val previousSelection = _uiState.value.selectedSectionId
+                val selectedSectionId = previousSelection?.takeIf { id -> discovery.any { it.id == id } }
+                    ?: discovery.firstOrNull()?.id
 
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
-                        statusMessage = if (sectionUis.isEmpty()) "No library sections available." else "",
-                        sections = sectionUis,
-                        selectedSectionId = selectedId,
+                        statusMessage = if (discovery.isEmpty()) "No library sections available." else "",
+                        sections = discovery,
+                        selectedSectionId = selectedSectionId,
+                        sectionItems = if (selectedSectionId == it.selectedSectionId) it.sectionItems else emptyList(),
+                        sectionStatusMessage = if (selectedSectionId == it.selectedSectionId) it.sectionStatusMessage else "",
+                        isLoadingMore = false,
+                        nextCursor = if (selectedSectionId == it.selectedSectionId) it.nextCursor else null,
+                        hasMore = if (selectedSectionId == it.selectedSectionId) it.hasMore else false,
                     )
                 }
+
+                if (selectedSectionId == null) {
+                    _uiState.update {
+                        it.copy(
+                            sectionItems = emptyList(),
+                            isLoadingSection = false,
+                            isLoadingMore = false,
+                            sectionStatusMessage = "",
+                            nextCursor = null,
+                            hasMore = false,
+                        )
+                    }
+                    return@launch
+                }
+
+                loadSelectedSection(reset = true)
             }
     }
 
     fun selectSection(sectionId: String) {
-        _uiState.update { current ->
-            val nextId = if (current.selectedSectionId == sectionId) null else sectionId
-            current.copy(selectedSectionId = nextId)
+        val normalized = sectionId.trim()
+        if (normalized.isEmpty()) return
+        val current = _uiState.value
+        if (current.selectedSectionId == normalized) return
+
+        _uiState.update {
+            it.copy(
+                selectedSectionId = normalized,
+                sectionItems = emptyList(),
+                sectionStatusMessage = "",
+                isLoadingSection = false,
+                isLoadingMore = false,
+                nextCursor = null,
+                hasMore = false,
+            )
+        }
+        loadSelectedSection(reset = true)
+    }
+
+    fun loadMore() {
+        val state = _uiState.value
+        if (state.isLoadingSection || state.isLoadingMore || !state.hasMore) return
+        if (state.selectedSectionId.isNullOrBlank()) return
+        if (state.nextCursor.isNullOrBlank()) return
+        loadSelectedSection(reset = false)
+    }
+
+    private fun loadSelectedSection(reset: Boolean) {
+        val state = _uiState.value
+        val sectionId = state.selectedSectionId ?: return
+        if (reset) {
+            sectionJob?.cancel()
+            loadMoreJob?.cancel()
+        }
+        val activeJob = if (reset) sectionJob else loadMoreJob
+        if (activeJob?.isActive == true) return
+
+        val job =
+            viewModelScope.launch {
+                val before = _uiState.value
+                val cursor = if (reset) null else before.nextCursor
+                if (!reset && cursor.isNullOrBlank()) {
+                    return@launch
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isLoadingSection = if (reset) true else it.isLoadingSection,
+                        isLoadingMore = if (reset) false else true,
+                        sectionStatusMessage = if (reset && it.sectionItems.isEmpty()) "Loading..." else it.sectionStatusMessage,
+                        sectionItems = if (reset) emptyList() else it.sectionItems,
+                        nextCursor = if (reset) null else it.nextCursor,
+                        hasMore = if (reset) false else it.hasMore,
+                    )
+                }
+
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        loadLibrarySectionPage(
+                            sectionId = sectionId,
+                            limit = LIBRARY_PAGE_SIZE,
+                            cursor = cursor,
+                        )
+                    }
+                }
+                val page = result.getOrNull()
+                val currentState = _uiState.value
+                if (currentState.selectedSectionId != sectionId) {
+                    return@launch
+                }
+
+                if (page == null) {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingSection = false,
+                            isLoadingMore = false,
+                            sectionStatusMessage = if (it.sectionItems.isEmpty()) {
+                                "Failed to load ${selectedSectionLabel(it, sectionId)}."
+                            } else {
+                                "Failed to load more items."
+                            },
+                        )
+                    }
+                    return@launch
+                }
+
+                val mergedItems = if (reset) {
+                    page.items
+                } else {
+                    mergeSectionItems(currentState.sectionItems, page.items)
+                }
+                val statusMessage = when {
+                    mergedItems.isEmpty() -> "No items in ${selectedSectionLabel(currentState, sectionId)} yet."
+                    else -> ""
+                }
+
+                _uiState.update {
+                    it.copy(
+                        isLoadingSection = false,
+                        isLoadingMore = false,
+                        sectionItems = mergedItems,
+                        sectionStatusMessage = statusMessage,
+                        nextCursor = page.nextCursor,
+                        hasMore = page.hasMore,
+                    )
+                }
+            }
+
+        if (reset) {
+            sectionJob = job
+        } else {
+            loadMoreJob = job
         }
     }
 
-    private suspend fun loadLibrarySections(): List<CrispyBackendClient.LibrarySection> {
+    private suspend fun loadLibraryDiscovery(): List<LibrarySectionUi> {
         val backendContext = getBackendContext() ?: return emptyList()
         val response = backend.getProfileLibrary(
             accessToken = backendContext.accessToken,
             profileId = backendContext.profileId,
         )
         return response.sections
+            .sortedBy { it.order }
+            .map { section ->
+                LibrarySectionUi(
+                    id = section.id,
+                    label = section.label,
+                    itemCount = section.itemCount,
+                )
+            }
+    }
+
+    private suspend fun loadLibrarySectionPage(
+        sectionId: String,
+        limit: Int,
+        cursor: String?,
+    ): LibrarySectionPageUi {
+        val backendContext = getBackendContext() ?: return LibrarySectionPageUi()
+        val response = backend.getProfileLibrarySectionPage(
+            accessToken = backendContext.accessToken,
+            profileId = backendContext.profileId,
+            sectionId = sectionId,
+            limit = limit,
+            cursor = cursor,
+        )
+        return LibrarySectionPageUi(
+            items = response.items.map { item ->
+                LibrarySectionItemUi(
+                    id = item.id,
+                    mediaKey = item.media.mediaKey,
+                    mediaType = item.media.mediaType,
+                    title = item.media.title,
+                    posterUrl = item.media.posterUrl,
+                    backdropUrl = item.media.backdropUrl,
+                    addedAt = item.state.addedAt,
+                    watchedAt = item.state.watchedAt,
+                    ratedAt = item.state.ratedAt,
+                    rating = item.state.rating,
+                    lastActivityAt = item.state.lastActivityAt,
+                    origins = item.origins,
+                )
+            },
+            nextCursor = response.pageInfo.nextCursor,
+            hasMore = response.pageInfo.hasMore,
+        )
     }
 
     private suspend fun getBackendContext(): BackendContext? {
@@ -196,6 +358,12 @@ class LibraryViewModel internal constructor(
         val profileId: String,
     )
 
+    private data class LibrarySectionPageUi(
+        val items: List<LibrarySectionItemUi> = emptyList(),
+        val nextCursor: String? = null,
+        val hasMore: Boolean = false,
+    )
+
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -216,6 +384,26 @@ class LibraryViewModel internal constructor(
     }
 }
 
+private fun mergeSectionItems(
+    existing: List<LibrarySectionItemUi>,
+    incoming: List<LibrarySectionItemUi>,
+): List<LibrarySectionItemUi> {
+    if (existing.isEmpty()) return incoming
+    if (incoming.isEmpty()) return existing
+    val seen = HashSet<String>(existing.size + incoming.size)
+    val merged = ArrayList<LibrarySectionItemUi>(existing.size + incoming.size)
+    (existing + incoming).forEach { item ->
+        if (seen.add(item.stableKey)) {
+            merged += item
+        }
+    }
+    return merged
+}
+
+private fun selectedSectionLabel(state: LibraryUiState, sectionId: String): String {
+    return state.sections.firstOrNull { it.id == sectionId }?.label ?: "this section"
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun LibraryRouteContent(
@@ -223,13 +411,14 @@ internal fun LibraryRouteContent(
     onRefresh: () -> Unit,
     onItemClick: (LibrarySectionItemUi) -> Unit,
     onSelectSection: (String) -> Unit,
+    onLoadMore: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
     val sections = uiState.sections
     val selectedSectionId = uiState.selectedSectionId
     val selectedSection = sections.firstOrNull { it.id == selectedSectionId }
-    val items = selectedSection?.items.orEmpty()
+    val items = uiState.sectionItems
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val gridState = rememberLazyGridState()
@@ -286,20 +475,34 @@ internal fun LibraryRouteContent(
             }
 
             item(span = { GridItemSpan(maxLineSpan) }, key = "status") {
-                if (uiState.statusMessage.isNotBlank()) {
+                val message = uiState.statusMessage.ifBlank { uiState.sectionStatusMessage }
+                if (message.isNotBlank()) {
                     Text(
-                        text = uiState.statusMessage,
+                        text = message,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            if (items.isEmpty()) {
+            if (uiState.isLoadingSection && items.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "section-loading") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Dimensions.ListItemPadding),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        LoadingIndicator()
+                    }
+                }
+            } else if (items.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }, key = "section-empty") {
-                    val emptyMessage =
-                        if (sections.isEmpty()) "No library sections available."
-                        else "No items in ${selectedSection?.label ?: "this section"} yet."
+                    val emptyMessage = when {
+                        sections.isEmpty() -> "No library sections available."
+                        selectedSection != null -> "No items in ${selectedSection.label} yet."
+                        else -> "No library sections available."
+                    }
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
                             Text(
@@ -324,6 +527,32 @@ internal fun LibraryRouteContent(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onItemClick(item) },
                     )
+                }
+
+                if (uiState.isLoadingMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "load-more-loading") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Dimensions.ListItemPadding),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            LoadingIndicator()
+                        }
+                    }
+                } else if (uiState.hasMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "load-more") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FilledTonalButton(onClick = onLoadMore) {
+                                Text("Load more")
+                            }
+                        }
+                    }
                 }
             }
         }

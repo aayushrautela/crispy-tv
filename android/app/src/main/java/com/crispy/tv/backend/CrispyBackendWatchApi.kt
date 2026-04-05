@@ -94,6 +94,41 @@ internal suspend fun CrispyBackendClient.getProfileLibraryApi(
     )
 }
 
+internal suspend fun CrispyBackendClient.getProfileLibrarySectionPageApi(
+    accessToken: String,
+    profileId: String,
+    sectionId: String,
+    limit: Int,
+    cursor: String? = null,
+): ProfileLibrarySectionPageResponse {
+    checkConfigured()
+    val url = "$baseUrl/v1/profiles/${profileId.trim()}/library/sections/${sectionId.trim()}".toHttpUrl().newBuilder()
+        .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
+        .apply {
+            val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
+            if (nextCursor != null) {
+                addQueryParameter("cursor", nextCursor)
+            }
+        }
+        .build()
+    val response = httpClient.get(
+        url = url,
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = JSONObject(requireSuccess(response))
+    return ProfileLibrarySectionPageResponse(
+        profileId = json.optString("profileId").trim(),
+        source = json.optString("source").trim(),
+        generatedAt = json.optNullableString("generatedAt"),
+        section = requireNotNull(parseLibrarySection(json.optJSONObject("section"), 0)) {
+            "Library section page missing section payload."
+        },
+        items = parseLibrarySectionItems(json.optJSONArray("items")),
+        pageInfo = parsePageInfo(json.optJSONObject("pageInfo")),
+    )
+}
+
 internal suspend fun CrispyBackendClient.sendWatchEventApi(
     accessToken: String,
     profileId: String,

@@ -20,7 +20,6 @@ import com.crispy.tv.player.CanonicalWatchStateSnapshot
 import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.ProviderExternalIds
 import com.crispy.tv.player.ProviderAuthActionResult
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
@@ -371,18 +370,26 @@ class BackendWatchHistoryService(
 
         val backendContext = getBackendContext()
             ?: return ProviderLibrarySnapshot(statusMessage = connectLibraryMessage(source))
+        val sectionLimit = limitPerFolder.coerceAtLeast(1)
 
         return try {
-            val response = backend.getProfileLibrary(
+            val discovery = backend.getProfileLibrary(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
             )
-            val authProviders = persistAuthState(response.auth.providers)
-            val mapped = response.sections.toProviderLibrarySnapshot(source)
+            val authProviders = persistAuthState(discovery.auth.providers)
+            if (!authProviders.isProviderConnected(source)) {
+                return ProviderLibrarySnapshot(statusMessage = connectLibraryMessage(source))
+            }
+            val mapped = loadProviderLibrarySnapshot(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                provider = source,
+                sections = discovery.sections,
+                limitPerSection = sectionLimit,
+            )
             val status = when {
-                mapped.folders.isNotEmpty() || mapped.items.isNotEmpty() -> mapped.statusMessage
-                !authProviders.isProviderConnected(source) -> connectLibraryMessage(source)
-                mapped.statusMessage.isNotBlank() -> mapped.statusMessage
+                mapped.folders.isNotEmpty() || mapped.items.isNotEmpty() -> ""
                 else -> "No ${providerLabel(source)} library data available."
             }
             val result = mapped.copy(statusMessage = status)
@@ -403,29 +410,28 @@ class BackendWatchHistoryService(
         }
 
         val backendContext = getBackendContext() ?: return emptyList()
+        val sectionLimit = limitPerFolder.coerceAtLeast(1)
         return try {
-            val authProviders = persistAuthState(
-                backend.getProviderAuthState(
-                    accessToken = backendContext.accessToken,
-                    profileId = backendContext.profileId,
-                )
-            )
-            if (!authProviders.isProviderConnected(source)) {
-                return emptyList()
-            }
-            val providerOrigin = source.apiValue()
-            val response = backend.getProfileLibrary(
+            val discovery = backend.getProfileLibrary(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
             )
-            response.sections
+            val authProviders = persistAuthState(discovery.auth.providers)
+            if (!authProviders.isProviderConnected(source)) {
+                return emptyList()
+            }
+            loadProviderLibraryPages(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                sections = discovery.sections,
+                limitPerSection = sectionLimit,
+            )
                 .asSequence()
-                .flatMap { section ->
-                    section.items.asSequence()
-                        .filter { item -> item.origins.any { it.equals(providerOrigin, ignoreCase = true) } }
-                        .map { item -> section to item }
+                .flatMap { (section, items) ->
+                    items.asSequence()
+                        .filter { item -> item.origins.any { it.equals(source.apiValue(), ignoreCase = true) } }
+                        .map { item -> item.toCanonicalProviderLibraryItem(section.id) }
                 }
-                .map { (section, item) -> item.toCanonicalProviderLibraryItem(section.id) }
                 .toList()
         } catch (_: Throwable) {
             emptyList()
@@ -806,22 +812,81 @@ class BackendWatchHistoryService(
     private suspend fun listCanonicalLibrarySnapshot(source: WatchProvider): ProviderLibrarySnapshot {
         val backendContext = getBackendContext()
             ?: return ProviderLibrarySnapshot(statusMessage = connectLibraryMessage(source))
+        val sectionLimit = 250
 
         return try {
-            val response = backend.getProfileLibrary(
+            val discovery = backend.getProfileLibrary(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
             )
-            val authState = persistAuthState(response.auth.providers)
+            val authState = persistAuthState(discovery.auth.providers)
             if (!authState.isProviderConnected(source)) {
                 return ProviderLibrarySnapshot(statusMessage = connectLibraryMessage(source))
             }
-            val snapshot = response.sections.toProviderLibrarySnapshot(source)
+            val snapshot = loadProviderLibrarySnapshot(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                provider = source,
+                sections = discovery.sections,
+                limitPerSection = sectionLimit,
+            )
             watchHistoryCache.writeProviderLibraryCache(source, snapshot)
             snapshot
         } catch (_: Throwable) {
             val cached = getCachedProviderLibrary(limitPerFolder = 0, source = source)
             cached.copy(statusMessage = "${providerLabel(source)} temporarily unavailable. ${cached.statusMessage}")
+        }
+    }
+
+    private suspend fun loadProviderLibrarySnapshot(
+        accessToken: String,
+        profileId: String,
+        provider: WatchProvider,
+        sections: List<CrispyBackendClient.LibrarySection>,
+        limitPerSection: Int,
+    ): ProviderLibrarySnapshot {
+        val folders = mutableListOf<ProviderLibraryFolder>()
+        val items = mutableListOf<ProviderLibraryItem>()
+        for ((section, pageItems) in loadProviderLibraryPages(accessToken, profileId, sections, limitPerSection)) {
+            val filteredItems = pageItems
+                .filter { item -> item.origins.any { it.equals(provider.apiValue(), ignoreCase = true) } }
+                .map { item -> item.toProviderLibraryItem(provider = provider, folderId = section.id) }
+                .sortedByDescending { it.addedAtEpochMs }
+            if (filteredItems.isEmpty()) {
+                continue
+            }
+            folders += ProviderLibraryFolder(
+                id = section.id,
+                label = section.label,
+                provider = provider,
+                itemCount = filteredItems.size,
+            )
+            items += filteredItems
+        }
+        return ProviderLibrarySnapshot(
+            statusMessage = "",
+            folders = folders.sortedBy { it.label.lowercase(Locale.US) },
+            items = items.sortedByDescending { it.addedAtEpochMs },
+        )
+    }
+
+    private suspend fun loadProviderLibraryPages(
+        accessToken: String,
+        profileId: String,
+        sections: List<CrispyBackendClient.LibrarySection>,
+        limitPerSection: Int,
+    ): List<Pair<CrispyBackendClient.LibrarySection, List<CrispyBackendClient.LibrarySectionItem>>> {
+        val requestLimit = limitPerSection.coerceAtLeast(1)
+        return buildList {
+            for (section in sections.sortedBy { it.order }) {
+                val page = backend.getProfileLibrarySectionPage(
+                    accessToken = accessToken,
+                    profileId = profileId,
+                    sectionId = section.id,
+                    limit = requestLimit,
+                )
+                add(section to page.items)
+            }
         }
     }
 
@@ -1426,53 +1491,23 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun CrispyBackendClient.MetadataExternalIds?.toProviderExternalIds(): ProviderExternalIds? {
-        val ids = this ?: return null
-        if (ids.tmdb == null && ids.imdb == null && ids.tvdb == null && ids.kitsu == null) return null
-        return ProviderExternalIds(tmdb = ids.tmdb, imdb = ids.imdb, tvdb = ids.tvdb, kitsu = ids.kitsu)
-    }
-
-    private fun List<CrispyBackendClient.LibrarySection>.toProviderLibrarySnapshot(provider: WatchProvider): ProviderLibrarySnapshot {
-        val providerOrigin = provider.apiValue()
-        val mappedSections =
-            map { section ->
-                val items =
-                    section.items.asSequence()
-                        .filter { item -> item.origins.any { it.equals(providerOrigin, ignoreCase = true) } }
-                        .map { item ->
-                            ProviderLibraryItem(
-                                provider = provider,
-                                folderId = section.id,
-                                contentId = item.media.providerId,
-                                mediaKey = item.media.mediaKey,
-                                contentType = item.media.mediaType.toMetadataLabMediaType(),
-                                title = item.media.title,
-                                posterUrl = item.media.posterUrl,
-                                backdropUrl = item.media.backdropUrl,
-                                externalIds = null,
-                                season = item.media.seasonNumber,
-                                episode = item.media.episodeNumber,
-                                addedAtEpochMs = parseIsoToEpochMs(item.state.addedAt) ?: 0L,
-                            )
-                        }
-                        .sortedByDescending { it.addedAtEpochMs }
-                        .toList()
-                section to items
-            }
-        val folders =
-            mappedSections.map { (section, items) ->
-                ProviderLibraryFolder(
-                    id = section.id,
-                    label = section.label,
-                    provider = provider,
-                    itemCount = items.size,
-                )
-            }.filter { it.itemCount > 0 }
-        val items = mappedSections.flatMap { (_, items) -> items }
-        return ProviderLibrarySnapshot(
-            statusMessage = "",
-            folders = folders,
-            items = items,
+    private fun CrispyBackendClient.LibrarySectionItem.toProviderLibraryItem(
+        provider: WatchProvider,
+        folderId: String,
+    ): ProviderLibraryItem {
+        return ProviderLibraryItem(
+            provider = provider,
+            folderId = folderId,
+            contentId = media.providerId,
+            mediaKey = media.mediaKey,
+            contentType = media.mediaType.toMetadataLabMediaType(),
+            title = media.title,
+            posterUrl = media.posterUrl,
+            backdropUrl = media.backdropUrl,
+            externalIds = null,
+            season = media.seasonNumber,
+            episode = media.episodeNumber,
+            addedAtEpochMs = parseIsoToEpochMs(state.addedAt) ?: 0L,
         )
     }
 

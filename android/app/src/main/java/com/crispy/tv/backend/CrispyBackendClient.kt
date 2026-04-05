@@ -609,7 +609,6 @@ class CrispyBackendClient(
         val label: String,
         val order: Int,
         val itemCount: Int,
-        val items: List<LibrarySectionItem> = emptyList(),
     )
 
     data class LibraryItemState(
@@ -625,6 +624,15 @@ class CrispyBackendClient(
         val media: RuntimeMediaCard,
         val state: LibraryItemState,
         val origins: List<String>,
+    )
+
+    data class ProfileLibrarySectionPageResponse(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val section: LibrarySection,
+        val items: List<LibrarySectionItem>,
+        val pageInfo: PageInfo,
     )
 
     data class CanonicalWatchCollectionResponse<T>(
@@ -956,6 +964,22 @@ class CrispyBackendClient(
         return getProfileLibraryApi(
             accessToken = accessToken,
             profileId = profileId,
+        )
+    }
+
+    suspend fun getProfileLibrarySectionPage(
+        accessToken: String,
+        profileId: String,
+        sectionId: String,
+        limit: Int,
+        cursor: String? = null,
+    ): ProfileLibrarySectionPageResponse {
+        return getProfileLibrarySectionPageApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            sectionId = sectionId,
+            limit = limit,
+            cursor = cursor,
         )
     }
 

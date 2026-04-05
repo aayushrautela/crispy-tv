@@ -1055,20 +1055,23 @@ internal fun CrispyBackendClient.parseLibrarySections(array: JSONArray?): List<L
     return buildList {
         for (index in 0 until safeArray.length()) {
             val section = safeArray.optJSONObject(index) ?: continue
-            val sectionId = section.optString("id").trim()
-            val label = section.optString("label").trim()
-            if (sectionId.isBlank()) continue
-            add(
-                LibrarySection(
-                    id = sectionId,
-                    label = label.ifBlank { sectionId },
-                    order = section.optIntOrNull("order") ?: index,
-                    itemCount = section.optInt("itemCount"),
-                    items = parseLibrarySectionItems(section.optJSONArray("items")),
-                )
-            )
+            val parsed = parseLibrarySection(section, index) ?: continue
+            add(parsed)
         }
     }
+}
+
+internal fun CrispyBackendClient.parseLibrarySection(json: JSONObject?, fallbackOrder: Int): LibrarySection? {
+    val section = json ?: return null
+    val sectionId = section.optString("id").trim()
+    val label = section.optString("label").trim()
+    if (sectionId.isBlank()) return null
+    return LibrarySection(
+        id = sectionId,
+        label = label.ifBlank { sectionId },
+        order = section.optIntOrNull("order") ?: fallbackOrder,
+        itemCount = section.optIntOrNull("itemCount") ?: 0,
+    )
 }
 
 internal fun CrispyBackendClient.parseLibraryItemState(json: JSONObject?): LibraryItemState {

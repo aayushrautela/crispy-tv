@@ -80,6 +80,7 @@ fun LibraryRoute(
                 onRefresh = viewModel::refresh,
                 onItemClick = onItemClick,
                 onSelectSection = viewModel::selectSection,
+                onLoadMore = viewModel::loadMore,
                 scrollToTopRequests = scrollToTopRequests,
                 onScrollToTopConsumed = onScrollToTopConsumed,
             )
