@@ -63,7 +63,13 @@ internal fun Any?.toKotlinValue(): Any? {
 }
 
 internal fun JSONObject?.optNullableString(key: String): String? {
-    return this?.optString(key)?.trim().orEmpty().ifBlank { null }
+    val json = this ?: return null
+    if (!json.has(key) || json.isNull(key)) {
+        return null
+    }
+    return json.optString(key).trim().takeUnless {
+        it.isBlank() || it.equals("null", ignoreCase = true)
+    }
 }
 
 internal fun JSONObject.optIntOrNull(key: String): Int? {

@@ -79,25 +79,16 @@ internal class EpisodeWatchStateResolver(
         cachedEpisodeWatchKeys?.let { return it }
 
         val source = userMediaRepository.preferredProvider()
-        val canonical = userMediaRepository.getCanonicalWatchState(
-            PlaybackIdentity(
-                contentId = details.id,
-                mediaKey = details.mediaKey,
-                imdbId = details.imdbId,
-                tmdbId = null,
-                contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
-                title = details.title,
-                year = details.year?.trim()?.toIntOrNull(),
-                showTitle = details.title,
-                showYear = details.year?.trim()?.toIntOrNull(),
-                provider = details.provider,
-                providerId = details.providerId,
-                parentMediaType = details.parentMediaType,
-                parentProvider = details.parentProvider ?: details.provider,
-                parentProviderId = details.parentProviderId ?: details.providerId,
-                absoluteEpisodeNumber = details.absoluteEpisodeNumber,
-            )
-        )
+        val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+        val canonical =
+            if (mediaKey == null) {
+                null
+            } else {
+                userMediaRepository.getTitleWatchState(
+                    mediaKey = mediaKey,
+                    contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
+                )
+            }
         val canonicalKeys = canonical?.watchedEpisodeKeys.orEmpty().map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
         if (canonicalKeys.isNotEmpty()) {
             return canonicalKeys.also { cachedEpisodeWatchKeys = it }

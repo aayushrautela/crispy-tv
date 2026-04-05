@@ -5,7 +5,6 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.watchhistory.matchesContentId
 import com.crispy.tv.watchhistory.matchesMediaType
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -33,9 +32,8 @@ internal class WatchCtaResolver(
         details: MediaDetails?,
         itemId: String,
     ): ProviderState {
-        val identity = buildPlaybackIdentity(details, itemId)
-        val targetId = (identity.contentId ?: details?.id ?: itemId).trim().lowercase(Locale.US)
-        if (targetId.isBlank()) {
+        val mediaKey = details?.mediaKey?.trim()?.ifBlank { null } ?: itemId.trim().ifBlank { null }
+        if (mediaKey == null) {
             return ProviderState(
                 isWatched = false,
                 watchedAtEpochMs = null,
@@ -45,7 +43,7 @@ internal class WatchCtaResolver(
             )
         }
 
-        val snapshot = userMediaRepository.getCanonicalWatchState(identity)
+        val snapshot = userMediaRepository.getTitleWatchState(mediaKey, requestedMediaType)
         return if (snapshot == null) {
             ProviderState(
                 isWatched = false,
@@ -186,27 +184,5 @@ internal class WatchCtaResolver(
     companion object {
         private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
         private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
-    }
-
-    private fun buildPlaybackIdentity(details: MediaDetails?, itemId: String): com.crispy.tv.player.PlaybackIdentity {
-        val resolvedDetails = details
-        val isEpisodic = requestedMediaType != MetadataLabMediaType.MOVIE
-        return com.crispy.tv.player.PlaybackIdentity(
-            contentId = resolvedDetails?.id?.trim()?.ifBlank { null },
-            mediaKey = resolvedDetails?.mediaKey,
-            imdbId = resolvedDetails?.imdbId,
-            tmdbId = resolvedDetails?.tmdbId?.takeIf { requestedMediaType == MetadataLabMediaType.MOVIE },
-            contentType = requestedMediaType,
-            title = resolvedDetails?.title ?: itemId,
-            year = resolvedDetails?.year?.trim()?.toIntOrNull(),
-            showTitle = if (isEpisodic) resolvedDetails?.title else null,
-            showYear = if (isEpisodic) resolvedDetails?.year?.trim()?.toIntOrNull() else null,
-            provider = resolvedDetails?.provider,
-            providerId = resolvedDetails?.providerId,
-            parentMediaType = if (isEpisodic) resolvedDetails?.parentMediaType else null,
-            parentProvider = resolvedDetails?.parentProvider,
-            parentProviderId = resolvedDetails?.parentProviderId,
-            absoluteEpisodeNumber = resolvedDetails?.absoluteEpisodeNumber,
-        )
     }
 }

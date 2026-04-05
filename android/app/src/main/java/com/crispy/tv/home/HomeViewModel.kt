@@ -862,29 +862,6 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
     return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
 }
 
-private fun CanonicalContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
-    val resolvedContentType = type.toMetadataLabMediaType()
-    return WatchHistoryRequest(
-        contentId = providerId,
-        mediaKey = mediaKey,
-        contentType = resolvedContentType,
-        title = title,
-        season = season,
-        episode = episode,
-        provider = provider,
-        providerId = providerId,
-        parentMediaType =
-            when (resolvedContentType) {
-                MetadataLabMediaType.SERIES -> "show"
-                MetadataLabMediaType.ANIME -> "anime"
-                MetadataLabMediaType.MOVIE -> null
-            },
-        parentProvider = provider,
-        parentProviderId = providerId,
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
-    )
-}
-
 private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
     return when {
         equals("series", ignoreCase = true) -> MetadataLabMediaType.SERIES

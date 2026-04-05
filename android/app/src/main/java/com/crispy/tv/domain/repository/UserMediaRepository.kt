@@ -2,6 +2,7 @@ package com.crispy.tv.domain.repository
 
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.CanonicalWatchStateSnapshot
+import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
@@ -13,6 +14,11 @@ interface UserMediaRepository {
     suspend fun preferredProvider(): WatchProvider?
 
     suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot?
+
+    suspend fun getTitleWatchState(
+        mediaKey: String,
+        contentType: MetadataLabMediaType,
+    ): CanonicalWatchStateSnapshot?
 
     suspend fun getCanonicalContinueWatching(
         limit: Int = 20,
@@ -40,9 +46,19 @@ interface UserMediaRepository {
         source: WatchProvider?,
     ): WatchHistoryResult
 
+    suspend fun setTitleInWatchlist(
+        mediaKey: String,
+        inWatchlist: Boolean,
+    ): WatchHistoryResult
+
     suspend fun setRating(
         request: WatchHistoryRequest,
         rating: Int?,
         source: WatchProvider?,
+    ): WatchHistoryResult
+
+    suspend fun setTitleRating(
+        mediaKey: String,
+        rating: Int?,
     ): WatchHistoryResult
 }

@@ -3,6 +3,7 @@ package com.crispy.tv.data.repository
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.CanonicalWatchStateSnapshot
+import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
@@ -21,6 +22,13 @@ class DefaultUserMediaRepository(
 
     override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
         return watchHistoryService.getCanonicalWatchState(identity)
+    }
+
+    override suspend fun getTitleWatchState(
+        mediaKey: String,
+        contentType: MetadataLabMediaType,
+    ): CanonicalWatchStateSnapshot? {
+        return watchHistoryService.getTitleWatchState(mediaKey, contentType)
     }
 
     override suspend fun getCanonicalContinueWatching(
@@ -65,11 +73,25 @@ class DefaultUserMediaRepository(
         return watchHistoryService.setInWatchlist(request, inWatchlist, source)
     }
 
+    override suspend fun setTitleInWatchlist(
+        mediaKey: String,
+        inWatchlist: Boolean,
+    ): WatchHistoryResult {
+        return watchHistoryService.setTitleInWatchlist(mediaKey, inWatchlist)
+    }
+
     override suspend fun setRating(
         request: WatchHistoryRequest,
         rating: Int?,
         source: WatchProvider?,
     ): WatchHistoryResult {
         return watchHistoryService.setRating(request, rating, source)
+    }
+
+    override suspend fun setTitleRating(
+        mediaKey: String,
+        rating: Int?,
+    ): WatchHistoryResult {
+        return watchHistoryService.setTitleRating(mediaKey, rating)
     }
 }

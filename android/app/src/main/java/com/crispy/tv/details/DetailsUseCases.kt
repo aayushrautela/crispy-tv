@@ -218,13 +218,17 @@ internal class DetailsUseCases(
         details: MediaDetails,
         desired: Boolean,
     ): DetailsMutationResult {
-        val source: WatchProvider? = null
         val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        val request = buildTitleWatchHistoryRequest(enriched)
-        val result = userMediaRepository.setInWatchlist(request, desired, source)
+        val mediaKey = enriched.mediaKey?.trim()?.ifBlank { null }
+            ?: return DetailsMutationResult(
+                details = enriched,
+                success = false,
+                statusMessage = "Title media key is unavailable.",
+            )
+        val result = userMediaRepository.setTitleInWatchlist(mediaKey, desired)
         return DetailsMutationResult(
             details = enriched,
-            success = mutationSucceeded(source, result),
+            success = mutationSucceeded(null, result),
             statusMessage = result.statusMessage,
         )
     }
@@ -316,13 +320,17 @@ internal class DetailsUseCases(
         details: MediaDetails,
         rating: Int?,
     ): DetailsMutationResult {
-        val source: WatchProvider? = null
         val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        val request = buildTitleWatchHistoryRequest(enriched)
-        val result = userMediaRepository.setRating(request, rating, source)
+        val mediaKey = enriched.mediaKey?.trim()?.ifBlank { null }
+            ?: return DetailsMutationResult(
+                details = enriched,
+                success = false,
+                statusMessage = "Title media key is unavailable.",
+            )
+        val result = userMediaRepository.setTitleRating(mediaKey, rating)
         return DetailsMutationResult(
             details = enriched,
-            success = mutationSucceeded(source, result),
+            success = mutationSucceeded(null, result),
             statusMessage = result.statusMessage,
         )
     }

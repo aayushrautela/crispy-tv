@@ -181,7 +181,8 @@ class BackendWatchHistoryService(
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update watchlist.")
 
         if (source == null) {
-            val mediaKey = resolveMediaKey(backendContext.accessToken, request)
+            val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
+                ?: resolveMediaKey(backendContext.accessToken, request)
                 ?: return WatchHistoryResult(statusMessage = "Watchlist update failed.")
             val action = try {
                 if (inWatchlist) {
@@ -214,6 +215,45 @@ class BackendWatchHistoryService(
         return WatchHistoryResult(statusMessage = "Provider watchlist sync is unavailable right now.")
     }
 
+    override suspend fun setTitleInWatchlist(
+        mediaKey: String,
+        inWatchlist: Boolean,
+    ): WatchHistoryResult {
+        val backendContext = getBackendContext()
+            ?: return WatchHistoryResult(statusMessage = "Select a profile to update watchlist.")
+        val normalizedMediaKey = mediaKey.trim().ifBlank {
+            return WatchHistoryResult(statusMessage = "Watchlist update failed.")
+        }
+
+        val action = try {
+            if (inWatchlist) {
+                backend.putNativeWatchlist(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = normalizedMediaKey,
+                )
+            } else {
+                backend.deleteNativeWatchlist(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = normalizedMediaKey,
+                )
+            }
+        } catch (error: Throwable) {
+            return WatchHistoryResult(statusMessage = error.message ?: "Watchlist update failed.")
+        }
+
+        return WatchHistoryResult(
+            statusMessage = if (action.accepted) {
+                if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
+            } else {
+                "Watchlist update failed."
+            },
+            authState = authState(),
+            accepted = action.accepted,
+        )
+    }
+
     override suspend fun setRating(
         request: WatchHistoryRequest,
         rating: Int?,
@@ -227,7 +267,8 @@ class BackendWatchHistoryService(
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
 
         if (source == null) {
-            val mediaKey = resolveMediaKey(backendContext.accessToken, request)
+            val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
+                ?: resolveMediaKey(backendContext.accessToken, request)
                 ?: return WatchHistoryResult(statusMessage = "Rating update failed.")
             val action = try {
                 if (rating == null) {
@@ -259,6 +300,46 @@ class BackendWatchHistoryService(
             )
         }
         return WatchHistoryResult(statusMessage = "Provider rating sync is unavailable right now.")
+    }
+
+    override suspend fun setTitleRating(
+        mediaKey: String,
+        rating: Int?,
+    ): WatchHistoryResult {
+        val backendContext = getBackendContext()
+            ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
+        val normalizedMediaKey = mediaKey.trim().ifBlank {
+            return WatchHistoryResult(statusMessage = "Rating update failed.")
+        }
+
+        val action = try {
+            if (rating == null) {
+                backend.deleteNativeRating(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = normalizedMediaKey,
+                )
+            } else {
+                backend.putNativeRating(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = normalizedMediaKey,
+                    rating = rating.coerceIn(1, 10),
+                )
+            }
+        } catch (error: Throwable) {
+            return WatchHistoryResult(statusMessage = error.message ?: "Rating update failed.")
+        }
+
+        return WatchHistoryResult(
+            statusMessage = if (action.accepted) {
+                if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
+            } else {
+                "Rating update failed."
+            },
+            authState = authState(),
+            accepted = action.accepted,
+        )
     }
 
     override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryResult {
@@ -512,6 +593,30 @@ class BackendWatchHistoryService(
                 } catch (_: Throwable) {
                     null
                 }
+        }
+        return mergeCanonicalWatchState(backendSnapshot, localSnapshot)
+    }
+
+    override suspend fun getTitleWatchState(
+        mediaKey: String,
+        contentType: MetadataLabMediaType,
+    ): CanonicalWatchStateSnapshot? {
+        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+        val localSnapshot = localWatchStateSnapshot(titleStateIdentity(normalizedMediaKey, contentType))
+        val backendContext = getBackendContext()
+        val backendSnapshot =
+            if (backendContext == null) {
+                null
+            } else {
+                try {
+                    backend.getWatchState(
+                        accessToken = backendContext.accessToken,
+                        profileId = backendContext.profileId,
+                        mediaKey = normalizedMediaKey,
+                    ).item.toCanonicalWatchStateSnapshot()
+                } catch (_: Throwable) {
+                    null
+                }
             }
         return mergeCanonicalWatchState(backendSnapshot, localSnapshot)
     }
@@ -670,28 +775,32 @@ class BackendWatchHistoryService(
 
     private suspend fun syncWatchedMutation(request: NormalizedWatchRequest, shouldMark: Boolean): Boolean {
         val backendContext = getBackendContext() ?: return false
-        val resolved = try {
-            backend.resolvePlayback(
-                accessToken = backendContext.accessToken,
-                input = request.toPlaybackLookupInput(),
-            )
-        } catch (_: Throwable) {
-            null
-        } ?: return false
+        val mutationInput =
+            request.toTitleWatchMutationInput()
+                ?: run {
+                    val resolved = try {
+                        backend.resolvePlayback(
+                            accessToken = backendContext.accessToken,
+                            input = request.toPlaybackLookupInput(),
+                        )
+                    } catch (_: Throwable) {
+                        null
+                    } ?: return false
 
-        val item = resolved.item
-        val mutationInput = WatchMutationInput(
-            mediaKey = item.mediaKey,
-            mediaType = item.mediaType,
-            seasonNumber = item.seasonNumber,
-            episodeNumber = item.episodeNumber,
-            provider = item.provider,
-            providerId = item.providerId,
-            parentProvider = item.parentProvider ?: request.parentProvider,
-            parentProviderId = item.parentProviderId ?: request.parentProviderId,
-            absoluteEpisodeNumber = item.absoluteEpisodeNumber ?: request.absoluteEpisodeNumber,
-            occurredAt = Instant.ofEpochMilli(request.watchedAtEpochMs).toString(),
-        )
+                    val item = resolved.item
+                    WatchMutationInput(
+                        mediaKey = item.mediaKey,
+                        mediaType = item.mediaType,
+                        seasonNumber = item.seasonNumber,
+                        episodeNumber = item.episodeNumber,
+                        provider = item.provider,
+                        providerId = item.providerId,
+                        parentProvider = item.parentProvider ?: request.parentProvider,
+                        parentProviderId = item.parentProviderId ?: request.parentProviderId,
+                        absoluteEpisodeNumber = item.absoluteEpisodeNumber ?: request.absoluteEpisodeNumber,
+                        occurredAt = Instant.ofEpochMilli(request.watchedAtEpochMs).toString(),
+                    )
+                }
 
         val response = try {
             if (shouldMark) {
@@ -1414,6 +1523,23 @@ class BackendWatchHistoryService(
         )
     }
 
+    private fun NormalizedWatchRequest.toTitleWatchMutationInput(): WatchMutationInput? {
+        val normalizedMediaKey = mediaKey?.trim()?.ifBlank { null } ?: return null
+        if (season != null || episode != null) {
+            return null
+        }
+        val mediaType = when (contentType) {
+            MetadataLabMediaType.MOVIE -> "movie"
+            MetadataLabMediaType.SERIES -> "show"
+            MetadataLabMediaType.ANIME -> "anime"
+        }
+        return WatchMutationInput(
+            mediaKey = normalizedMediaKey,
+            mediaType = mediaType,
+            occurredAt = Instant.ofEpochMilli(watchedAtEpochMs).toString(),
+        )
+    }
+
     private fun List<CrispyBackendClient.ContinueWatchingItem>.toContinueWatchingEntries(
         provider: WatchProvider,
         nowMs: Long,
@@ -1546,6 +1672,19 @@ class BackendWatchHistoryService(
             isRated = rating != null,
             userRating = rating?.value,
             watchedEpisodeKeys = watchedEpisodeKeys.map { it.trim().lowercase(Locale.US) }.filter { it.isNotBlank() }.toSet(),
+        )
+    }
+
+    private fun titleStateIdentity(
+        mediaKey: String,
+        contentType: MetadataLabMediaType,
+    ): PlaybackIdentity {
+        return PlaybackIdentity(
+            contentId = mediaKey,
+            mediaKey = mediaKey,
+            imdbId = null,
+            contentType = contentType,
+            title = mediaKey,
         )
     }
 

@@ -382,6 +382,13 @@ interface WatchHistoryService {
         return null
     }
 
+    suspend fun getTitleWatchState(
+        mediaKey: String,
+        contentType: MetadataLabMediaType,
+    ): CanonicalWatchStateSnapshot? {
+        return null
+    }
+
     suspend fun getCanonicalProviderLibraryItems(
         limitPerFolder: Int = 200,
         source: WatchProvider,
@@ -425,6 +432,20 @@ interface WatchHistoryService {
 
     suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
         return null
+    }
+
+    suspend fun setTitleInWatchlist(
+        mediaKey: String,
+        inWatchlist: Boolean,
+    ): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watchlist unavailable.")
+    }
+
+    suspend fun setTitleRating(
+        mediaKey: String,
+        rating: Int?,
+    ): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Rating unavailable.")
     }
 
     suspend fun removeLocalWatchProgress(identity: PlaybackIdentity): WatchHistoryResult {
