@@ -43,7 +43,7 @@ class CrispyBackendClient(
         SIMKL("simkl"),
     }
 
-    data class ImportConnection(
+    data class ProviderAccount(
         val id: String,
         val provider: String,
         val status: String,
@@ -63,7 +63,7 @@ class CrispyBackendClient(
         val mode: String,
         val status: String,
         val requestedByUserId: String,
-        val connectionId: String?,
+        val providerAccountId: String?,
         val errorMessage: String?,
         val createdAt: String?,
         val startedAt: String?,
@@ -71,9 +71,8 @@ class CrispyBackendClient(
         val updatedAt: String?,
     )
 
-    data class ImportConnectionsResponse(
-        val connections: List<ImportConnection>,
-        val watchDataOrigin: String?,
+    data class ProviderAccountsResponse(
+        val providerAccounts: List<ProviderAccount>,
     )
 
     data class BackendMetadataItem(
@@ -113,22 +112,13 @@ class CrispyBackendClient(
 
     data class ImportJobsResponse(
         val jobs: List<ImportJob>,
-        val watchDataOrigin: String?,
     )
 
     data class StartImportResult(
         val job: ImportJob,
-        val connection: ImportConnection?,
+        val providerAccount: ProviderAccount?,
         val authUrl: String?,
         val nextAction: String,
-        val watchDataOrigin: String?,
-    )
-
-    enum class LibrarySource(val apiValue: String) {
-        LOCAL("local"),
-        TRAKT("trakt"),
-        SIMKL("simkl"),
-        ALL("all"),
     }
 
     data class MediaLookupInput(
@@ -197,7 +187,7 @@ class CrispyBackendClient(
     )
 
     data class MetadataEpisodePreview(
-        val id: String,
+        val mediaKey: String,
         val mediaType: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
@@ -215,11 +205,13 @@ class CrispyBackendClient(
         val runtimeMinutes: Int?,
         val rating: Double?,
         val images: MetadataImages,
-    )
+    ) {
+        val id: String
+            get() = mediaKey
+    }
 
     data class MetadataView(
-        val id: String,
-        val mediaKey: String?,
+        val mediaKey: String,
         val mediaType: String,
         val kind: String,
         val tmdbId: Int?,
@@ -248,11 +240,13 @@ class CrispyBackendClient(
         val seasonCount: Int?,
         val episodeCount: Int?,
         val nextEpisode: MetadataEpisodePreview?,
-    )
+    ) {
+        val id: String
+            get() = mediaKey
+    }
 
     data class MetadataSeasonView(
-        val id: String,
-        val showId: String,
+        val mediaKey: String,
         val showTmdbId: Int?,
         val provider: String?,
         val providerId: String?,
@@ -265,10 +259,13 @@ class CrispyBackendClient(
         val airDate: String?,
         val episodeCount: Int?,
         val posterUrl: String?,
-    )
+    ) {
+        val id: String
+            get() = mediaKey
+    }
 
     data class MetadataEpisodeView(
-        val id: String,
+        val mediaKey: String,
         val mediaType: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
@@ -286,10 +283,16 @@ class CrispyBackendClient(
         val runtimeMinutes: Int?,
         val rating: Double?,
         val images: MetadataImages,
-        val showId: String?,
+        val showMediaKey: String?,
         val showTitle: String?,
         val showExternalIds: MetadataExternalIds,
-    )
+    ) {
+        val id: String
+            get() = mediaKey
+
+        val showId: String?
+            get() = showMediaKey
+    }
 
     data class MetadataResolveResponse(
         val item: MetadataView,
@@ -349,7 +352,9 @@ class CrispyBackendClient(
 
     data class MetadataPersonRefView(
         val id: String,
-        val tmdbPersonId: Int,
+        val provider: String,
+        val providerId: String,
+        val tmdbPersonId: Int?,
         val name: String,
         val role: String?,
         val department: String?,
@@ -369,14 +374,18 @@ class CrispyBackendClient(
     )
 
     data class MetadataCompanyView(
-        val id: Int,
+        val id: String,
+        val provider: String,
+        val providerId: String,
         val name: String,
         val logoUrl: String?,
         val originCountry: String?,
     )
 
     data class MetadataCollectionView(
-        val id: Int,
+        val id: String,
+        val provider: String,
+        val providerId: String,
         val name: String,
         val posterUrl: String?,
         val backdropUrl: String?,
@@ -472,8 +481,7 @@ class CrispyBackendClient(
     )
 
     data class MetadataPersonKnownForItem(
-        val id: String?,
-        val mediaKey: String?,
+        val mediaKey: String,
         val mediaType: String,
         val tmdbId: Int?,
         val title: String,
@@ -482,10 +490,15 @@ class CrispyBackendClient(
         val releaseYear: Int?,
         val provider: String?,
         val providerId: String?,
-    )
+    ) {
+        val id: String
+            get() = mediaKey
+    }
 
     data class MetadataPersonDetail(
         val id: String,
+        val provider: String,
+        val providerId: String,
         val tmdbPersonId: Int,
         val name: String,
         val knownForDepartment: String?,
@@ -559,8 +572,7 @@ class CrispyBackendClient(
         val id: String,
         val media: RuntimeMediaCard,
         val progress: WatchProgressView?,
-        val watchedAt: String?,
-        val lastActivityAt: String?,
+        val lastActivityAt: String,
         val origins: List<String>,
         val dismissible: Boolean,
     )
@@ -583,9 +595,13 @@ class CrispyBackendClient(
     data class RatingItem(
         val id: String?,
         val media: RuntimeMediaCard,
-        val value: Int,
-        val ratedAt: String?,
+        val rating: RatingStateView,
         val origins: List<String>,
+    )
+
+    data class PageInfo(
+        val nextCursor: String?,
+        val hasMore: Boolean,
     )
 
     data class LibrarySection(
@@ -617,6 +633,7 @@ class CrispyBackendClient(
         val source: String,
         val generatedAt: String?,
         val items: List<T>,
+        val pageInfo: PageInfo,
     )
 
     data class WatchStateResponse(
@@ -656,17 +673,62 @@ class CrispyBackendClient(
         val items: List<CalendarItem>,
     )
 
+    data class HomeRecommendationItem(
+        val media: RuntimeMediaCard,
+        val reason: String?,
+        val score: Double?,
+        val rank: Double,
+        val payload: Map<String, Any?>,
+    )
+
+    data class HomeHeroItem(
+        val mediaKey: String,
+        val mediaType: String,
+        val provider: String,
+        val providerId: String,
+        val title: String,
+        val description: String,
+        val backdropUrl: String,
+        val posterUrl: String?,
+        val logoUrl: String?,
+        val releaseYear: Int?,
+        val rating: Double?,
+        val genre: String?,
+    )
+
+    data class HomeCollectionItem(
+        val mediaType: String,
+        val provider: String,
+        val providerId: String,
+        val title: String,
+        val posterUrl: String,
+        val releaseYear: Int?,
+        val rating: Double?,
+    )
+
+    data class HomeCollectionCard(
+        val title: String,
+        val logoUrl: String,
+        val items: List<HomeCollectionItem>,
+    )
+
     data class HomeSnapshotSection(
         val id: String,
         val title: String,
         val layout: String,
         val sourceKey: String,
-        val items: List<RuntimeMediaCard> = emptyList(),
+        val recommendationItems: List<HomeRecommendationItem> = emptyList(),
+        val heroItems: List<HomeHeroItem> = emptyList(),
+        val collectionItems: List<HomeCollectionCard> = emptyList(),
     )
 
     data class HomeResponse(
         val profileId: String,
+        val source: String,
         val generatedAt: String?,
+        val snapshotGeneratedAt: String?,
+        val continueWatching: List<ContinueWatchingItem>,
+        val thisWeek: List<CalendarItem>,
         val sections: List<HomeSnapshotSection>,
     )
 
@@ -741,7 +803,7 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun listImportConnections(accessToken: String, profileId: String): ImportConnectionsResponse {
+    suspend fun listImportConnections(accessToken: String, profileId: String): ProviderAccountsResponse {
         return listImportConnectionsApi(accessToken, profileId)
     }
 
@@ -823,7 +885,7 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ImportConnection {
+    suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ProviderAccount {
         return disconnectImportConnectionApi(accessToken, profileId, provider)
     }
 
@@ -890,14 +952,10 @@ class CrispyBackendClient(
     suspend fun getProfileLibrary(
         accessToken: String,
         profileId: String,
-        source: LibrarySource? = null,
-        limitPerFolder: Int? = null,
     ): ProfileLibraryResponse {
         return getProfileLibraryApi(
             accessToken = accessToken,
             profileId = profileId,
-            source = source,
-            limitPerFolder = limitPerFolder,
         )
     }
 

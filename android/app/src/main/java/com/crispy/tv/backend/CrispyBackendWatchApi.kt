@@ -7,7 +7,6 @@ import com.crispy.tv.backend.CrispyBackendClient.HomeResponse
 import com.crispy.tv.backend.CrispyBackendClient.RatingItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
-import com.crispy.tv.backend.CrispyBackendClient.LibrarySource
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.ProfileLibraryResponse
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAuthState
@@ -32,7 +31,15 @@ internal suspend fun CrispyBackendClient.getHomeApi(accessToken: String, profile
     val json = JSONObject(requireSuccess(response))
     return HomeResponse(
         profileId = json.optString("profileId").trim(),
+        source = json.optString("source").trim(),
         generatedAt = json.optNullableString("generatedAt"),
+        snapshotGeneratedAt = json.optJSONObject("snapshot")?.optNullableString("generatedAt"),
+        continueWatching = parseContinueWatchingItems(
+            json.optJSONObject("runtime")?.optJSONObject("continueWatching")?.optJSONArray("items")
+        ),
+        thisWeek = parseCalendarItems(
+            json.optJSONObject("runtime")?.optJSONObject("thisWeek")?.optJSONArray("items")
+        ),
         sections = parseHomeSections(json.optJSONObject("snapshot")?.optJSONArray("sections") ?: json.optJSONArray("sections")),
     )
 }
@@ -70,29 +77,17 @@ internal suspend fun CrispyBackendClient.getProviderAuthStateApi(
 internal suspend fun CrispyBackendClient.getProfileLibraryApi(
     accessToken: String,
     profileId: String,
-    source: LibrarySource? = null,
-    limitPerFolder: Int? = null,
 ): ProfileLibraryResponse {
     checkConfigured()
-    val url = "$baseUrl/v1/profiles/${profileId.trim()}/library".toHttpUrl().newBuilder()
-        .apply {
-            if (source != null) {
-                addQueryParameter("source", source.apiValue)
-            }
-            if (limitPerFolder != null) {
-                addQueryParameter("limitPerFolder", limitPerFolder.toString())
-            }
-        }
-        .build()
     val response = httpClient.get(
-        url = url,
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/library".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
     return ProfileLibraryResponse(
         profileId = json.optString("profileId").trim(),
-        source = json.optString("source").trim().ifBlank { source?.apiValue ?: LibrarySource.ALL.apiValue },
+        source = json.optString("source").trim(),
         generatedAt = json.optNullableString("generatedAt"),
         auth = parseLibraryAuth(json.optJSONObject("auth")),
         sections = parseLibrarySections(json.optJSONArray("sections")),
@@ -174,6 +169,7 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
         source = json.optString("source").trim(),
         generatedAt = json.optNullableString("generatedAt"),
         items = parseWatchedItems(json.optJSONArray("items")),
+        pageInfo = parsePageInfo(json.optJSONObject("pageInfo")),
     )
 }
 

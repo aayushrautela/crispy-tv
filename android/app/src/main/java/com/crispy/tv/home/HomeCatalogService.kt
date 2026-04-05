@@ -284,28 +284,77 @@ class HomeCatalogService internal constructor(
                 sections.forEach { section ->
                     section.toCatalogList()?.let(::add)
                 }
+                if (continueWatching.isNotEmpty()) {
+                    runtimeContinueWatchingList()?.let(::add)
+                }
+                if (thisWeek.isNotEmpty()) {
+                    runtimeThisWeekList()?.let(::add)
+                }
             },
             statusMessage = "",
         )
     }
 
     private fun CrispyBackendClient.HomeSnapshotSection.toCatalogList(): HomeCatalogList? {
-        val catalogItems = items.mapNotNull { item -> item.toCatalogItem() }
+        val catalogItems = when (layout.trim().lowercase(Locale.US)) {
+            "hero" -> heroItems.mapNotNull { item -> item.toCatalogItem() }
+            "collection" -> collectionItems.mapNotNull { item -> item.toCatalogItem() }
+            else -> recommendationItems.mapNotNull { item -> item.media.toCatalogItem() }
+        }
         if (catalogItems.isEmpty()) return null
+        val meta = recommendationItems.firstOrNull()?.payload.orEmpty()
         return HomeCatalogList(
             kind = id.normalizedKind(),
-            variantKey = sourceKey.normalizedVariantKey(),
+            variantKey = recommendationVariantKey(id, meta, sourceKey),
             source = HomeCatalogSource.PERSONAL,
             presentation = layout.toPresentation(),
             layout = layout.normalizedBackendLayout(),
             name = title,
             heading = title,
             title = title,
-            subtitle = when (id.trim().lowercase(Locale.US)) {
-                "continue-watching" -> watchSubtitle(id)
-                "this-week", "up-next", "recently-released" -> calendarSubtitle(id)
-                else -> ""
+            subtitle = recommendationSubtitle(meta).ifBlank {
+                when (id.trim().lowercase(Locale.US)) {
+                    "continue-watching" -> watchSubtitle(id)
+                    "this-week", "up-next", "recently-released" -> calendarSubtitle(id)
+                    else -> ""
+                }
             },
+            items = catalogItems,
+            mediaTypes = catalogItems.map { it.type }.toSet(),
+        )
+    }
+
+    private fun CrispyBackendClient.HomeResponse.runtimeContinueWatchingList(): HomeCatalogList? {
+        val catalogItems = continueWatching.mapNotNull { item -> item.media.toCatalogItem() }
+        if (catalogItems.isEmpty()) return null
+        return HomeCatalogList(
+            kind = "continue-watching",
+            variantKey = source.normalizedVariantKey(),
+            source = HomeCatalogSource.PERSONAL,
+            presentation = HomeCatalogPresentation.HERO,
+            layout = "landscape",
+            name = "Continue Watching",
+            heading = "Continue Watching",
+            title = "Continue Watching",
+            subtitle = watchSubtitle("continue-watching"),
+            items = catalogItems,
+            mediaTypes = catalogItems.map { it.type }.toSet(),
+        )
+    }
+
+    private fun CrispyBackendClient.HomeResponse.runtimeThisWeekList(): HomeCatalogList? {
+        val catalogItems = thisWeek.mapNotNull { item -> item.media.toCatalogItem() }
+        if (catalogItems.isEmpty()) return null
+        return HomeCatalogList(
+            kind = "this-week",
+            variantKey = source.normalizedVariantKey(),
+            source = HomeCatalogSource.PERSONAL,
+            presentation = HomeCatalogPresentation.HERO,
+            layout = "landscape",
+            name = "This Week",
+            heading = "This Week",
+            title = "This Week",
+            subtitle = calendarSubtitle("this-week"),
             items = catalogItems,
             mediaTypes = catalogItems.map { it.type }.toSet(),
         )
@@ -325,6 +374,39 @@ class HomeCatalogService internal constructor(
             rating = formatRatingOutOfTen(rating?.toString()),
             year = releaseYear?.toString(),
             description = subtitle,
+        )
+    }
+
+    private fun CrispyBackendClient.HomeHeroItem.toCatalogItem(): HomeCatalogItem? {
+        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+        val normalizedTitle = title.trim().ifBlank { return null }
+        val normalizedType = mediaType.toCatalogType()
+        return HomeCatalogItem(
+            mediaKey = normalizedMediaKey,
+            title = normalizedTitle,
+            posterUrl = posterUrl,
+            backdropUrl = backdropUrl,
+            addonId = "backend",
+            type = normalizedType,
+            rating = formatRatingOutOfTen(rating?.toString()),
+            year = releaseYear?.toString(),
+            description = description,
+        )
+    }
+
+    private fun CrispyBackendClient.HomeCollectionCard.toCatalogItem(): HomeCatalogItem? {
+        val firstItem = items.firstOrNull() ?: return null
+        val mediaKey = "collection:${title.trim().lowercase(Locale.US).replace(' ', '-')}"
+        return HomeCatalogItem(
+            mediaKey = mediaKey,
+            title = title.trim(),
+            posterUrl = firstItem.posterUrl,
+            backdropUrl = null,
+            addonId = "backend",
+            type = firstItem.mediaType.toCatalogType(),
+            rating = formatRatingOutOfTen(firstItem.rating?.toString()),
+            year = firstItem.releaseYear?.toString(),
+            description = title.trim(),
         )
     }
 
@@ -348,6 +430,15 @@ class HomeCatalogService internal constructor(
 
     private fun CrispyBackendClient.RuntimeMediaCard.normalizedCatalogType(): String {
         val normalizedMediaType = mediaType.trim().lowercase(Locale.US)
+        return when (normalizedMediaType) {
+            "anime" -> "anime"
+            "episode", "show", "tv", "series" -> "series"
+            else -> "movie"
+        }
+    }
+
+    private fun String.toCatalogType(): String {
+        val normalizedMediaType = trim().lowercase(Locale.US)
         return when (normalizedMediaType) {
             "anime" -> "anime"
             "episode", "show", "tv", "series" -> "series"

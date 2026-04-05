@@ -149,8 +149,8 @@ internal class ProviderPortalViewModel(
                     isBusy = false,
                     activeProfileId = context.profile.id,
                     activeProfileName = context.profile.name,
-                    trakt = buildProviderState("trakt", connections?.connections, jobs?.jobs),
-                    simkl = buildProviderState("simkl", connections?.connections, jobs?.jobs),
+                    trakt = buildProviderState("trakt", connections?.providerAccounts, jobs?.jobs),
+                    simkl = buildProviderState("simkl", connections?.providerAccounts, jobs?.jobs),
                     statusMessage =
                         forceMessage
                             ?: errorMessage
@@ -298,15 +298,15 @@ internal class ProviderPortalViewModel(
 
     private fun buildProviderState(
         provider: String,
-        connections: List<CrispyBackendClient.ImportConnection>?,
+        providerAccounts: List<CrispyBackendClient.ProviderAccount>?,
         jobs: List<CrispyBackendClient.ImportJob>?,
     ): ProviderImportUiState {
-        val connection = connections.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
+        val providerAccount = providerAccounts.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         val latestJob = jobs.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         return ProviderImportUiState(
-            connected = connection?.status.equals("connected", ignoreCase = true),
-            connectionStatus = connection?.status?.toDisplayLabel() ?: "Disconnected",
-            externalUsername = connection?.externalUsername,
+            connected = providerAccount?.status.equals("connected", ignoreCase = true),
+            connectionStatus = providerAccount?.status?.toDisplayLabel() ?: "Disconnected",
+            externalUsername = providerAccount?.externalUsername,
             latestJobStatus = latestJob?.status?.toDisplayLabel(),
             latestJobError = latestJob?.errorMessage,
         )

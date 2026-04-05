@@ -1,11 +1,11 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.backend.CrispyBackendClient.ImportConnectionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.ImportJobsResponse
 import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
 import com.crispy.tv.backend.CrispyBackendClient.MeResponse
 import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileSettings
+import com.crispy.tv.backend.CrispyBackendClient.ProviderAccountsResponse
 import com.crispy.tv.backend.CrispyBackendClient.StartImportResult
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -57,7 +57,7 @@ internal suspend fun CrispyBackendClient.createProfileApi(
 internal suspend fun CrispyBackendClient.listImportConnectionsApi(
     accessToken: String,
     profileId: String,
-): ImportConnectionsResponse {
+): ProviderAccountsResponse {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections".toHttpUrl(),
@@ -65,9 +65,8 @@ internal suspend fun CrispyBackendClient.listImportConnectionsApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return ImportConnectionsResponse(
-        connections = parseImportConnections(json.optJSONArray("connections")),
-        watchDataOrigin = json.optJSONObject("watchDataState")?.optString("origin")?.trim().orEmpty().ifBlank { null },
+    return ProviderAccountsResponse(
+        providerAccounts = parseProviderAccounts(json.optJSONArray("providerAccounts")),
     )
 }
 
@@ -81,7 +80,6 @@ internal suspend fun CrispyBackendClient.listImportJobsApi(accessToken: String, 
     val json = JSONObject(requireSuccess(response))
     return ImportJobsResponse(
         jobs = parseImportJobs(json.optJSONArray("jobs")),
-        watchDataOrigin = json.optJSONObject("watchDataState")?.optString("origin")?.trim().orEmpty().ifBlank { null },
     )
 }
 
@@ -101,10 +99,9 @@ internal suspend fun CrispyBackendClient.startImportApi(
     val jobJson = json.optJSONObject("job") ?: throw IllegalStateException("Backend did not return an import job.")
     return StartImportResult(
         job = parseImportJob(jobJson),
-        connection = json.optJSONObject("connection")?.let(::parseImportConnection),
+        providerAccount = json.optJSONObject("providerAccount")?.let(::parseProviderAccount),
         authUrl = json.optString("authUrl").trim().ifBlank { null },
         nextAction = json.optString("nextAction").trim().ifBlank { "queued" },
-        watchDataOrigin = json.optJSONObject("watchDataState")?.optString("origin")?.trim().orEmpty().ifBlank { null },
     )
 }
 
@@ -151,7 +148,7 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
     accessToken: String,
     profileId: String,
     provider: ImportProvider,
-): CrispyBackendClient.ImportConnection {
+): CrispyBackendClient.ProviderAccount {
     checkConfigured()
     val response = httpClient.delete(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections/${provider.apiValue}".toHttpUrl(),
@@ -159,6 +156,6 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    val connectionJson = json.optJSONObject("connection") ?: throw IllegalStateException("Backend did not return a provider connection.")
-    return parseImportConnection(connectionJson)
+    val providerAccountJson = json.optJSONObject("providerAccount") ?: throw IllegalStateException("Backend did not return a provider account.")
+    return parseProviderAccount(providerAccountJson)
 }
