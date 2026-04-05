@@ -119,7 +119,7 @@ class CrispyBackendClient(
         val providerAccount: ProviderAccount?,
         val authUrl: String?,
         val nextAction: String,
-    }
+    )
 
     data class MediaLookupInput(
         val id: String? = null,
