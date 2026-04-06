@@ -1,7 +1,6 @@
 package com.crispy.tv.details
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
@@ -14,14 +13,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -35,8 +32,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -53,6 +50,8 @@ internal fun EpisodeCard(
     onLongPress: () -> Unit = {},
 ) {
     val progressFraction = (watchState.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
+    val overviewLineHeight = MaterialTheme.typography.bodySmall.lineHeight.takeIf { it != TextUnit.Unspecified } ?: 16.sp
+    val overviewHeight = overviewLineHeight * 3
 
     ElevatedCard(
         modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongPress),
@@ -205,12 +204,13 @@ internal fun EpisodeCard(
                 video.overview?.takeIf { it.isNotBlank() }?.let { overview ->
                     Text(
                         text = overview,
+                        modifier = Modifier.heightIn(min = overviewHeight),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
+                } ?: Spacer(modifier = Modifier.height(overviewHeight))
             }
         }
     }

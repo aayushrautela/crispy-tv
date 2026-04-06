@@ -91,7 +91,7 @@ internal class DetailsUseCases(
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
         val providerState = watchCtaResolver.resolveProviderState(details, mediaKey)
-        val (watchCta, continueVideoId) = watchCtaResolver.resolveWatchCta(details, providerState, nowMs)
+        val ctaResolution = watchCtaResolver.resolveWatchCta(details, providerState, nowMs)
 
         val seasons =
             if (details?.mediaType?.toMetadataLabMediaTypeOrNull() == MetadataLabMediaType.MOVIE) {
@@ -121,10 +121,27 @@ internal class DetailsUseCases(
             titleContent = titleContent,
             statusMessage = statusMessage,
             providerState = providerState,
-            watchCta = watchCta,
-            continueVideoId = continueVideoId,
+            watchCta = ctaResolution.watchCta,
+            continueVideoId = ctaResolution.continueVideoId,
             seasons = seasons,
         )
+    }
+
+    suspend fun resolveWatchCta(
+        details: MediaDetails?,
+        providerState: ProviderState,
+        requestedMediaType: MetadataLabMediaType,
+        nowMs: Long,
+    ): WatchCtaResolver.Resolution {
+        return WatchCtaResolver(userMediaRepository, requestedMediaType).resolveWatchCta(details, providerState, nowMs)
+    }
+
+    suspend fun resolveProviderState(
+        details: MediaDetails?,
+        itemId: String,
+        requestedMediaType: MetadataLabMediaType,
+    ): ProviderState {
+        return WatchCtaResolver(userMediaRepository, requestedMediaType).resolveProviderState(details, itemId)
     }
 
     suspend fun loadSeasonEpisodes(

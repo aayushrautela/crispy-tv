@@ -343,7 +343,7 @@ internal fun HeaderInfoSection(
             enabled = !isMutating,
             isInWatchlist = isInWatchlist,
             isWatched = isWatched,
-            showWatched = details.mediaType != "series",
+            showWatched = details.mediaType == "movie",
             isRated = isRated,
             userRating = userRating,
             onToggleWatchlist = onToggleWatchlist,

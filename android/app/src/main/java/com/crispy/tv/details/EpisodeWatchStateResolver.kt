@@ -8,6 +8,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.watchhistory.addEpisodeKey
 import com.crispy.tv.watchhistory.episodeWatchKeyCandidates
+import java.util.Locale
 
 internal class EpisodeWatchStateResolver(
     private val userMediaRepository: UserMediaRepository,
@@ -89,7 +90,10 @@ internal class EpisodeWatchStateResolver(
                     contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
                 )
             }
-        val canonicalKeys = canonical?.watchedEpisodeKeys.orEmpty().map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+        val canonicalKeys =
+            canonical?.watchedEpisodeKeys.orEmpty()
+                .mapNotNull(::normalizeWatchKey)
+                .toSet()
         if (canonicalKeys.isNotEmpty()) {
             return canonicalKeys.also { cachedEpisodeWatchKeys = it }
         }
@@ -97,8 +101,13 @@ internal class EpisodeWatchStateResolver(
         val providerHistoryKeys =
             userMediaRepository.listWatchedEpisodeRecords(source = source).mapNotNull { record ->
                 addEpisodeKey(record.contentId, record.season, record.episode)
-            }.toSet()
+            }.mapNotNull(::normalizeWatchKey).toSet()
 
         return providerHistoryKeys.also { cachedEpisodeWatchKeys = it }
+    }
+
+    private fun normalizeWatchKey(value: String): String? {
+        val normalized = value.trim().lowercase(Locale.US)
+        return normalized.takeIf { it.isNotBlank() }
     }
 }

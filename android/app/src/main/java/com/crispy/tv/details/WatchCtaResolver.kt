@@ -22,6 +22,11 @@ internal class WatchCtaResolver(
     private val requestedMediaType: MetadataLabMediaType,
 ) {
 
+    data class Resolution(
+        val watchCta: WatchCta,
+        val continueVideoId: String?,
+    )
+
     suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
         val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
         if (fromField != null) return details.copy(imdbId = fromField)
@@ -70,20 +75,29 @@ internal class WatchCtaResolver(
     ): CanonicalContinueWatchingItem? {
         val source = userMediaRepository.preferredProvider()
         val targetId = details.id.trim().lowercase(Locale.US)
-        if (targetId.isBlank()) return null
+        val targetMediaKey = details.mediaKey?.trim()?.lowercase(Locale.US)
+        val targetProvider = details.provider?.trim()?.lowercase(Locale.US)
+        val targetProviderId = details.providerId?.trim()?.lowercase(Locale.US)
+        if (targetId.isBlank() && targetMediaKey.isNullOrBlank() && (targetProvider.isNullOrBlank() || targetProviderId.isNullOrBlank())) {
+            return null
+        }
 
         val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowMs = nowMs, source = source)
 
         return snapshot.entries
             .asSequence()
             .filter { entry ->
+                val entryMediaKey = entry.mediaKey?.trim()?.lowercase(Locale.US)
+                val entryProvider = entry.provider.trim().lowercase(Locale.US)
+                val entryProviderId = entry.providerId.trim().lowercase(Locale.US)
+                val entryId = entry.id.trim().lowercase(Locale.US)
                 val matchesIdentity =
                     when {
-                        !details.mediaKey.isNullOrBlank() -> entry.mediaKey.equals(details.mediaKey, ignoreCase = true)
-                        else -> {
-                            entry.provider.equals(details.provider, ignoreCase = true) &&
-                                entry.providerId.equals(details.providerId, ignoreCase = true)
+                        !targetMediaKey.isNullOrBlank() -> entryMediaKey == targetMediaKey || entryId == targetMediaKey
+                        !targetProvider.isNullOrBlank() && !targetProviderId.isNullOrBlank() -> {
+                            (entryProvider == targetProvider && entryProviderId == targetProviderId) || entryId == targetId
                         }
+                        else -> entryId == targetId
                     }
                 matchesIdentity &&
                     matchesMediaType(expectedType, entry.type.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
@@ -98,8 +112,8 @@ internal class WatchCtaResolver(
         details: MediaDetails?,
         providerState: ProviderState,
         nowMs: Long,
-    ): Pair<WatchCta, String?> {
-        if (details == null) return Pair(WatchCta(), null)
+    ): Resolution {
+        if (details == null) return Resolution(WatchCta(), null)
 
         val isSeries = requestedMediaType != MetadataLabMediaType.MOVIE
         val expectedType = requestedMediaType
@@ -117,13 +131,12 @@ internal class WatchCtaResolver(
             val label =
                 if (isSeries) {
                     if (continueSeason != null && continueEpisode != null) {
-                        "Continue (S$continueSeason E$continueEpisode)"
+                        "Continue S$continueSeason:E$continueEpisode"
                     } else {
                         "Continue"
                     }
                 } else {
-                    val progress = continueEntry.progressPercent
-                    "Resume from ${progress.roundToInt()}%"
+                    "Continue"
                 }
 
             val remainingMinutes =
@@ -144,7 +157,7 @@ internal class WatchCtaResolver(
                     null
                 }
 
-            return Pair(
+            return Resolution(
                 WatchCta(
                     kind = WatchCtaKind.CONTINUE,
                     label = label,
@@ -156,8 +169,8 @@ internal class WatchCtaResolver(
             )
         }
 
-        if (!isSeries && providerState.isWatched) {
-            return Pair(
+        if (providerState.isWatched) {
+            return Resolution(
                 WatchCta(
                     kind = WatchCtaKind.REWATCH,
                     label = "Rewatch",
@@ -169,7 +182,7 @@ internal class WatchCtaResolver(
             )
         }
 
-        return Pair(
+        return Resolution(
             WatchCta(
                 kind = WatchCtaKind.WATCH,
                 label = "Watch now",
