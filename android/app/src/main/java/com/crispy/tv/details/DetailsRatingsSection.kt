@@ -185,7 +185,7 @@ private fun buildRatings(
             source = "TMDB",
             score = resolvedTitleRatings?.tmdb?.asOutOfTen() ?: tmdbRating?.trim()?.takeIf { it.isNotBlank() }?.let(::formatTmdbRating),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.rating_tmdb,
+                logoRes = R.raw.tmdb,
                 text = "TMDB",
                 backgroundColor = Color(0xFF01B4E4),
                 contentColor = Color.White,
@@ -196,7 +196,7 @@ private fun buildRatings(
             source = "IMDb",
             score = resolvedTitleRatings?.imdb?.asOutOfTen() ?: contentRatings?.imdbRating?.asOutOfTen(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.rating_imdb,
+                logoRes = R.raw.imdb,
                 text = "IMDb",
                 backgroundColor = Color(0xFFF5C518),
                 contentColor = Color(0xFF121212),
@@ -207,7 +207,7 @@ private fun buildRatings(
             source = "Trakt",
             score = resolvedTitleRatings?.trakt?.asOutOfTen(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.rating_trakt,
+                logoRes = R.raw.trakt,
                 text = "Trakt",
                 backgroundColor = Color(0xFFED1C24),
                 contentColor = Color.White,
@@ -218,7 +218,7 @@ private fun buildRatings(
             source = "Rotten Tomatoes",
             score = resolvedTitleRatings?.rottenTomatoes?.asPercent() ?: contentRatings?.rottenTomatoes?.toDouble()?.asPercent(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.rating_rotten_tomatoes,
+                logoRes = R.raw.rotten_tomatoes,
                 text = "RT",
                 backgroundColor = Color.Transparent,
                 contentColor = Color.Unspecified,
@@ -239,9 +239,10 @@ private fun buildRatings(
             source = "Metacritic",
             score = resolvedTitleRatings?.metacritic?.asOutOfHundred() ?: contentRatings?.metacritic?.toDouble()?.asOutOfHundred(),
             badge = RatingBadgeSpec(
+                logoRes = R.raw.metacritic,
                 text = "MC",
-                backgroundColor = Color(0xFFF2D024),
-                contentColor = Color(0xFF111827),
+                backgroundColor = Color.Transparent,
+                contentColor = Color.Unspecified,
             ),
         ),
         buildRatingPill(
@@ -249,7 +250,7 @@ private fun buildRatings(
             source = "Letterboxd",
             score = resolvedTitleRatings?.letterboxd?.asOutOfFive() ?: contentRatings?.letterboxdRating?.asOutOfFive(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.rating_letterboxd,
+                logoRes = R.raw.letterboxd,
                 text = "LB",
                 backgroundColor = Color(0xFF202830),
                 contentColor = Color.White,
@@ -270,7 +271,7 @@ private fun buildRatings(
             source = "MyAnimeList",
             score = resolvedTitleRatings?.myAnimeList?.asOutOfTen(),
             badge = RatingBadgeSpec(
-                logoRes = R.raw.rating_myanimelist,
+                logoRes = R.raw.myanimelist,
                 text = "MAL",
                 backgroundColor = Color(0xFF2E51A2),
                 contentColor = Color.White,
