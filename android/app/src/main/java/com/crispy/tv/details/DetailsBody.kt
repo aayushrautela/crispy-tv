@@ -21,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -335,17 +334,13 @@ internal fun DetailsBody(
 
                 when {
                     uiState.episodesIsLoading && episodes.isEmpty() -> {
-                        Row(
-                            modifier = Modifier.padding(horizontal = horizontalPadding),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        LazyRow(
+                            contentPadding = contentPadding,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Text(
-                                text = "Loading episodes...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            items(4) {
+                                EpisodeCardSkeleton(modifier = Modifier.width(280.dp))
+                            }
                         }
                     }
 

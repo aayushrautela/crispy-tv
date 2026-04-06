@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CardDefaults
@@ -35,10 +36,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.ui.components.skeletonElement
 import kotlin.math.roundToInt
 
 @Composable
@@ -212,6 +214,68 @@ internal fun EpisodeCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 } ?: Spacer(modifier = Modifier.height(overviewHeight))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EpisodeCardSkeleton(
+    modifier: Modifier = Modifier,
+) {
+    val overviewLineHeight = MaterialTheme.typography.bodySmall.lineHeight.takeIf { it != TextUnit.Unspecified } ?: 16.sp
+    val overviewHeight = with(LocalDensity.current) { (overviewLineHeight * 3).toDp() }
+
+    ElevatedCard(
+        modifier = modifier,
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+    ) {
+        Column {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .skeletonElement(color = DetailsSkeletonColors.Base)
+            )
+
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(0.75f)
+                            .height(18.dp)
+                            .skeletonElement(
+                                shape = RoundedCornerShape(6.dp),
+                                color = DetailsSkeletonColors.Elevated,
+                            )
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(0.4f)
+                            .height(14.dp)
+                            .skeletonElement(
+                                shape = RoundedCornerShape(6.dp),
+                                color = DetailsSkeletonColors.Base,
+                            )
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = overviewHeight)
+                            .skeletonElement(
+                                shape = RoundedCornerShape(6.dp),
+                                color = DetailsSkeletonColors.Base,
+                            )
+                )
             }
         }
     }
