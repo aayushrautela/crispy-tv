@@ -86,23 +86,35 @@ internal fun DetailsBody(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    review.author?.takeIf { it.isNotBlank() } ?: review.username?.takeIf { it.isNotBlank() } ?: "Review",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-
-                review.rating?.let {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = Color(0xFFFFD54F)
+                        Text(
+                            review.author?.takeIf { it.isNotBlank() } ?: review.username?.takeIf { it.isNotBlank() } ?: "Review",
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                        Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
+
+                        review.rating?.let {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFD54F)
+                                )
+                                Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
                     }
+                    ReviewProviderBadge(provider = review.provider)
                 }
 
                 Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)

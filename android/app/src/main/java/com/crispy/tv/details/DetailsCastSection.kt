@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.crispy.tv.R
 import com.crispy.tv.ratings.formatRatingOutOfTen
 
 @Composable
@@ -248,14 +250,60 @@ internal fun MetadataReviewCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                review.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
-                    Text(
-                        text = createdAt.take(10),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    review.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
+                        Text(
+                            text = createdAt.take(10),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    ReviewProviderBadge(provider = review.provider)
                 }
             }
         }
     }
 }
+
+@Composable
+internal fun ReviewProviderBadge(provider: String) {
+    val logoRes = reviewProviderLogoRes(provider) ?: return
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = logoRes,
+                contentDescription = provider.providerLabel(),
+                modifier = Modifier.size(width = 18.dp, height = 18.dp),
+            )
+        }
+    }
+}
+
+private fun reviewProviderLogoRes(provider: String): Int? =
+    when (provider.trim().lowercase()) {
+        "tmdb" -> R.raw.tmdb
+        "trakt" -> R.raw.trakt
+        "tvdb" -> R.raw.tvdb
+        "kitsu" -> R.raw.kitsu
+        else -> null
+    }
+
+private fun String.providerLabel(): String =
+    when (trim().lowercase()) {
+        "tmdb" -> "TMDB review"
+        "trakt" -> "Trakt review"
+        "tvdb" -> "TVDB review"
+        "kitsu" -> "Kitsu review"
+        else -> "Review source"
+    }

@@ -366,6 +366,7 @@ class CrispyBackendClient(
 
     data class MetadataReviewView(
         val id: String,
+        val provider: String,
         val author: String?,
         val username: String?,
         val content: String,

@@ -502,6 +502,7 @@ internal fun CrispyBackendClient.parseMetadataReviewViews(array: JSONArray?): Li
             add(
                 MetadataReviewView(
                     id = id,
+                    provider = item.optString("provider").trim(),
                     author = item.optNullableString("author"),
                     username = item.optNullableString("username"),
                     content = content,
