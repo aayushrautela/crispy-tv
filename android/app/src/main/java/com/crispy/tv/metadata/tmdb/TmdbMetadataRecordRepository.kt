@@ -37,7 +37,7 @@ internal class TmdbMetadataRecordRepository(
                 val creditsDeferred = async { remoteDataSource.fetchCredits(resolvedMediaType, tmdbId, language) }
                 val recommendationsDeferred = async { remoteDataSource.fetchRecommendations(resolvedMediaType, tmdbId, language) }
                 val externalIdsDeferred =
-                    if (resolvedMediaType == MetadataLabMediaType.SERIES) {
+                    if (resolvedMediaType != MetadataLabMediaType.MOVIE) {
                         async { remoteDataSource.fetchExternalIds(resolvedMediaType, tmdbId) }
                     } else {
                         null
@@ -54,6 +54,7 @@ internal class TmdbMetadataRecordRepository(
             when (resolvedMediaType) {
                 MetadataLabMediaType.MOVIE -> details.optStringNonBlank("imdb_id")
                 MetadataLabMediaType.SERIES -> externalIds?.optStringNonBlank("imdb_id")
+                MetadataLabMediaType.ANIME -> externalIds?.optStringNonBlank("imdb_id")
             }?.let(::extractImdbId)
 
         val castPairs = parseMetadataCastPairs(credits)
@@ -73,7 +74,7 @@ internal class TmdbMetadataRecordRepository(
                 emptyList()
             }
         val seasons =
-            if (resolvedMediaType == MetadataLabMediaType.SERIES) {
+            if (resolvedMediaType != MetadataLabMediaType.MOVIE) {
                 parseMetadataSeasons(details, tmdbId)
             } else {
                 emptyList()

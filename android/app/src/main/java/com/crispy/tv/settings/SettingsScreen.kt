@@ -17,15 +17,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.VideoSettings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,9 +69,7 @@ data class SettingsGroup(
 @Composable
 fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
-    onNavigateToMetadataSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
-    onNavigateToAiInsightsSettings: () -> Unit = {},
     onNavigateToProviderPortal: () -> Unit = {},
     onNavigateToAccountsProfiles: () -> Unit = {},
     scrollToTopRequests: StateFlow<Int>,
@@ -137,13 +133,6 @@ fun SettingsScreen(
                             onClick = onNavigateToAccountsProfiles
                         ),
                         SettingsItem(
-                            label = "Metadata",
-                            description = "OMDb API key for ratings pills",
-                            icon = Icons.Outlined.Key,
-                            iconTint = MaterialTheme.colorScheme.tertiary,
-                            onClick = onNavigateToMetadataSettings
-                        ),
-                        SettingsItem(
                             label = "Language & Region",
                             description = "Preferred content language",
                             icon = Icons.Outlined.Language,
@@ -155,13 +144,6 @@ fun SettingsScreen(
                 title = "SYSTEM",
                 items =
                     listOf(
-                        SettingsItem(
-                            label = "AI Insights",
-                            description = "Model and API key",
-                            icon = Icons.Outlined.AutoAwesome,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            onClick = onNavigateToAiInsightsSettings
-                        ),
                         SettingsItem(
                             label = "About",
                             description = "Version, licenses, and credits",

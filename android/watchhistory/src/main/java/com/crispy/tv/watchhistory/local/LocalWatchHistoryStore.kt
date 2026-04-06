@@ -1,7 +1,6 @@
 package com.crispy.tv.watchhistory.local
 
 import android.content.SharedPreferences
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryEntry
@@ -14,7 +13,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
-internal class LocalWatchHistoryStore(
+class LocalWatchHistoryStore(
     private val prefs: SharedPreferences,
 ) {
     fun listLocalHistory(limit: Int, authState: WatchProviderAuthState): WatchHistoryResult {
@@ -56,14 +55,14 @@ internal class LocalWatchHistoryStore(
 
         val normalized =
             entries.mapNotNull { entry ->
-                val contentId = normalizeNuvioMediaId(entry.contentId).contentId.trim()
+                val contentId = entry.contentId.trim()
                 if (contentId.isEmpty()) {
                     return@mapNotNull null
                 }
 
                 val season = entry.season?.takeIf { value -> value > 0 }
                 val episode = entry.episode?.takeIf { value -> value > 0 }
-                if (entry.contentType == MetadataLabMediaType.SERIES && (season == null || episode == null)) {
+                if (entry.contentType != MetadataLabMediaType.MOVIE && (season == null || episode == null)) {
                     return@mapNotNull null
                 }
 
@@ -90,14 +89,13 @@ internal class LocalWatchHistoryStore(
     }
 
     fun normalizeRequest(request: WatchHistoryRequest): NormalizedWatchRequest {
-        val normalizedId = normalizeNuvioMediaId(request.contentId)
-        val contentId = normalizedId.contentId.trim()
+        val contentId = request.contentId.trim()
         require(contentId.isNotEmpty()) { "Content ID is required" }
 
-        val isSeries = request.contentType == MetadataLabMediaType.SERIES
-        val season = if (isSeries) request.season ?: normalizedId.season else null
-        val episode = if (isSeries) request.episode ?: normalizedId.episode else null
-        if (isSeries) {
+        val isEpisodic = request.contentType != MetadataLabMediaType.MOVIE
+        val season = if (isEpisodic) request.season else null
+        val episode = if (isEpisodic) request.episode else null
+        if (isEpisodic) {
             require(season != null && season > 0) { "Season must be a positive number" }
             require(episode != null && episode > 0) { "Episode must be a positive number" }
         }
@@ -114,7 +112,7 @@ internal class LocalWatchHistoryStore(
             request.title
                 ?.trim()
                 ?.takeIf { value -> value.isNotEmpty() }
-                ?: if (isSeries) {
+                ?: if (isEpisodic) {
                     "$contentId S$season E$episode"
                 } else {
                     contentId
@@ -122,12 +120,19 @@ internal class LocalWatchHistoryStore(
 
         return NormalizedWatchRequest(
             contentId = contentId,
+            mediaKey = request.mediaKey?.trim()?.ifBlank { null },
             contentType = request.contentType,
             title = title,
             season = season,
             episode = episode,
             watchedAtEpochMs = System.currentTimeMillis(),
             remoteImdbId = remoteImdbId,
+            provider = request.provider,
+            providerId = request.providerId,
+            parentMediaType = request.parentMediaType,
+            parentProvider = request.parentProvider,
+            parentProviderId = request.parentProviderId,
+            absoluteEpisodeNumber = request.absoluteEpisodeNumber,
         )
     }
 
@@ -189,33 +194,44 @@ internal class LocalWatchHistoryStore(
             .sortedByDescending { it.watchedAtEpochMs }
             .map { item ->
                 ContinueWatchingEntry(
-                    contentId = item.contentId,
-                    contentType = item.contentType,
+                    id = "local:${item.contentType.label}:${item.contentId}:${item.season ?: -1}:${item.episode ?: -1}",
+                    mediaKey = item.contentId,
+                    localKey = "local:${item.contentType.label}:${item.contentId}:${item.season ?: -1}:${item.episode ?: -1}",
+                    provider = "local",
+                    providerId = item.contentId,
+                    mediaType = item.contentType.label,
                     title = item.title,
                     season = item.season,
                     episode = item.episode,
                     progressPercent = 100.0,
                     lastUpdatedEpochMs = item.watchedAtEpochMs,
-                    provider = WatchProvider.LOCAL,
+                    source = WatchProvider.LOCAL,
                 )
             }
     }
 
     private fun watchedKey(contentType: MetadataLabMediaType, contentId: String, season: Int?, episode: Int?): String {
-        val normalizedId = normalizeNuvioMediaId(contentId).contentId.trim().lowercase(Locale.US)
+        val normalizedId = contentId.trim().lowercase(Locale.US)
         val typeKey = contentType.name.lowercase(Locale.US)
         return "$typeKey:$normalizedId::${season ?: -1}::${episode ?: -1}"
     }
 }
 
-internal data class NormalizedWatchRequest(
+data class NormalizedWatchRequest(
     val contentId: String,
+    val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String,
     val season: Int?,
     val episode: Int?,
     val watchedAtEpochMs: Long,
     val remoteImdbId: String?,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 ) {
     fun toLocalWatchedItem(): LocalWatchedItem {
         return LocalWatchedItem(
@@ -229,7 +245,7 @@ internal data class NormalizedWatchRequest(
     }
 }
 
-internal data class LocalWatchedItem(
+data class LocalWatchedItem(
     val contentId: String,
     val contentType: MetadataLabMediaType,
     val title: String,
@@ -269,6 +285,7 @@ internal data class LocalWatchedItem(
                 when (json.optString("content_type").trim().lowercase()) {
                     "movie" -> MetadataLabMediaType.MOVIE
                     "series" -> MetadataLabMediaType.SERIES
+                    "anime" -> MetadataLabMediaType.ANIME
                     else -> return null
                 }
             val title = json.optString("title").trim().ifEmpty { contentId }

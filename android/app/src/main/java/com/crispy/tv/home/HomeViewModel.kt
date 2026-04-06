@@ -11,17 +11,15 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.domain.home.HomeCatalogPresentation
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.player.ContinueWatchingEntry
-import com.crispy.tv.player.ContinueWatchingResult
+import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
@@ -80,7 +78,7 @@ private data class HomeWatchActivitySnapshot(
 
 private data class CatalogSectionLayoutMeta(
     val key: String,
-    val presentation: HomeCatalogPresentation,
+    val layout: String,
 )
 
 private const val CONTINUE_WATCHING_SECTION_KEY = "continueWatching"
@@ -93,7 +91,6 @@ class HomeViewModel internal constructor(
     private val homeWatchActivityService: HomeWatchActivityService,
     private val watchHistoryService: WatchHistoryService,
     private val calendarService: CalendarService,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
     private val suppressionStore: ContinueWatchingSuppressionStore,
 ) : ViewModel() {
     companion object {
@@ -108,29 +105,17 @@ class HomeViewModel internal constructor(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
-                        val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
-                        val calendarMetaEpisodeService =
-                            CalendarMetaEpisodeService(
-                                context = appContext,
-                                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                                httpClient = AppHttp.client(appContext),
-                            )
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
-                            homeWatchActivityService =
-                                HomeWatchActivityService(
-                                    context = appContext,
-                                    tmdbEnrichmentRepository = tmdbEnrichmentRepository,
-                                ),
+                            homeWatchActivityService = HomeWatchActivityService(),
                             watchHistoryService = watchHistoryService,
                             calendarService =
                                 CalendarService(
-                                    watchHistoryService = watchHistoryService,
-                                    tmdbEnrichmentRepository = tmdbEnrichmentRepository,
-                                    metaEpisodeService = calendarMetaEpisodeService,
+                                    supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
+                                    activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                                    backendClient = BackendServicesProvider.backendClient(appContext),
                                 ),
-                            tmdbEnrichmentRepository = tmdbEnrichmentRepository,
                             suppressionStore = ContinueWatchingSuppressionStore(appContext),
                         ) as T
                     }
@@ -201,9 +186,7 @@ class HomeViewModel internal constructor(
                         val primaryDeferred = async { loadPrimarySnapshot() }
                         val watchActivityDeferred =
                             async {
-                                loadWatchActivitySnapshot(
-                                    enrichMetadata = !showForegroundLoading,
-                                )
+                                loadWatchActivitySnapshot()
                             }
                         nextPrimarySnapshot = primaryDeferred.await()
                         nextWatchActivitySnapshot = watchActivityDeferred.await()
@@ -225,7 +208,7 @@ class HomeViewModel internal constructor(
                             viewModelScope.launch {
                                 val refreshedWatchActivitySnapshot =
                                     if (showForegroundLoading) {
-                                        loadWatchActivitySnapshot(enrichMetadata = true)
+                                        loadWatchActivitySnapshot()
                                     } else {
                                         watchActivitySnapshot
                                     }
@@ -254,27 +237,14 @@ class HomeViewModel internal constructor(
         refresh(forceForegroundLoading = false)
     }
 
-    fun hideContinueWatchingItem(item: ContinueWatchingItem) {
+    fun removeContinueWatchingItem(item: CanonicalContinueWatchingItem) {
+        if (!item.dismissible) return
         suppressKeys(
             item.id,
-            continueWatchingContentKey(type = item.type, contentId = item.contentId),
+            continueWatchingContentKey(item),
         )
         updateWideRailSection(item.sectionKey()) { current ->
-            val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
-            current.copy(
-                items = remainingItems,
-                statusMessage = if (remainingItems.isEmpty()) "" else "Hidden ${item.title}.",
-            )
-        }
-    }
-
-    fun removeContinueWatchingItem(item: ContinueWatchingItem) {
-        suppressKeys(
-            item.id,
-            continueWatchingContentKey(type = item.type, contentId = item.contentId),
-        )
-        updateWideRailSection(item.sectionKey()) { current ->
-            val remainingItems = current.items.filterNot { it.continueWatchingItem?.id == item.id }
+            val remainingItems = current.items.filterNot { it.continueWatchingItem?.localKey == item.localKey }
             current.copy(
                 items = remainingItems,
                 statusMessage = if (remainingItems.isEmpty()) "" else "Removing ${item.title}...",
@@ -291,21 +261,11 @@ class HomeViewModel internal constructor(
                             )
                         }
 
-                        item.provider == WatchProvider.LOCAL -> {
-                            if (item.progressPercent < 100.0) {
-                                watchHistoryService.removeLocalWatchProgress(item.toPlaybackIdentity())
-                            } else {
-                                watchHistoryService.unmarkWatched(
-                                    request = item.toUnmarkRequest(),
-                                    source = item.provider,
-                                )
-                            }
-                        }
-
-                        !item.providerPlaybackId.isNullOrBlank() -> {
+                        item.id.isNotBlank() -> {
+                            val dismissId = item.id.trim()
                             watchHistoryService.removeFromPlayback(
-                                playbackId = item.providerPlaybackId,
-                                source = item.provider,
+                                playbackId = dismissId,
+                                source = item.source.takeUnless { it == WatchProvider.LOCAL },
                             )
                         }
 
@@ -408,8 +368,6 @@ class HomeViewModel internal constructor(
                     )
                 }
                 .toList()
-        val enrichedCatalogSections = enrichCollectionShelfPreviewLogos(catalogSections)
-
         val selectedId =
             _heroState.value.selectedId?.takeIf { id -> heroItems.any { it.id == id } }
                 ?: heroItems.firstOrNull()?.id
@@ -422,80 +380,12 @@ class HomeViewModel internal constructor(
                 statusMessage = primaryFeedResult.heroResult.statusMessage,
             ),
             headerPills = headerPills,
-            catalogSections = enrichedCatalogSections,
+            catalogSections = catalogSections,
             catalogStatusMessage = primaryFeedResult.sectionsStatusMessage,
         )
     }
 
-    private suspend fun enrichCollectionShelfPreviewLogos(
-        catalogSections: List<HomeCatalogSectionUi>,
-    ): List<HomeCatalogSectionUi> {
-        if (catalogSections.isEmpty()) {
-            return emptyList()
-        }
-
-        val collectionItemsToEnrich =
-            catalogSections
-                .asSequence()
-                .filter { it.section.presentation == HomeCatalogPresentation.COLLECTION_SHELF }
-                .mapNotNull { sectionUi ->
-                    sectionUi.items.firstOrNull()?.takeIf { item ->
-                        item.logoUrl.isNullOrBlank() && item.id.isNotBlank()
-                    }
-                }
-                .distinctBy { item -> collectionLogoCacheKey(item.type, item.id) }
-                .toList()
-
-        if (collectionItemsToEnrich.isEmpty()) {
-            return catalogSections
-        }
-
-        val logosByKey =
-            withContext(Dispatchers.IO) {
-                coroutineScope {
-                    collectionItemsToEnrich.map { item ->
-                        async {
-                            val logoUrl =
-                                try {
-                                    tmdbEnrichmentRepository
-                                        .loadArtwork(
-                                            rawId = item.id,
-                                            mediaTypeHint = item.type.toMetadataLabMediaType(),
-                                        )
-                                        ?.logoUrl
-                                        ?.trim()
-                                        ?.ifBlank { null }
-                                } catch (error: Throwable) {
-                                    if (error is CancellationException) throw error
-                                    Log.w(TAG, "Failed to load collection logo for ${item.id}", error)
-                                    null
-                                }
-                            collectionLogoCacheKey(item.type, item.id) to logoUrl
-                        }
-                    }.awaitAll().toMap()
-                }
-            }
-
-        return catalogSections.map { sectionUi ->
-            if (sectionUi.section.presentation != HomeCatalogPresentation.COLLECTION_SHELF) {
-                return@map sectionUi
-            }
-
-            val featuredItem = sectionUi.items.firstOrNull() ?: return@map sectionUi
-            val logoUrl = logosByKey[collectionLogoCacheKey(featuredItem.type, featuredItem.id)]
-            if (logoUrl.isNullOrBlank()) {
-                sectionUi
-            } else {
-                sectionUi.copy(
-                    items = listOf(featuredItem.copy(logoUrl = logoUrl)) + sectionUi.items.drop(1),
-                )
-            }
-        }
-    }
-
-    private suspend fun loadWatchActivitySnapshot(
-        enrichMetadata: Boolean,
-    ): HomeWatchActivitySnapshot {
+    private suspend fun loadWatchActivitySnapshot(): HomeWatchActivitySnapshot {
         val sectionLoadStartedAt = System.currentTimeMillis()
         val continueWatchingResult =
             try {
@@ -503,40 +393,16 @@ class HomeViewModel internal constructor(
                     val suppressionMap = suppressionStore.read()
                     suppressedItemsByKey = suppressionMap
 
-                    coroutineScope {
-                        val authStateDeferred = async { watchHistoryService.authState() }
-                        val watchHistoryDeferred = async { watchHistoryService.listLocalHistory(limit = 40) }
-
-                        val authState = authStateDeferred.await()
-                        val selectedSource =
-                            when {
-                                authState.traktAuthenticated -> WatchProvider.TRAKT
-                                authState.simklAuthenticated -> WatchProvider.SIMKL
-                                else -> WatchProvider.LOCAL
-                            }
-                        val providerContinueWatchingDeferred = async {
-                            loadProviderContinueWatching(selectedSource)
-                        }
-
-                        val filteredEntries =
-                            applySuppressionFilter(
-                                entries = watchHistoryDeferred.await().entries,
-                                suppressionMap = suppressionMap,
-                            )
-                        val providerResult = providerContinueWatchingDeferred.await()
-                        val filteredProviderResult =
-                            providerResult.copy(
-                                entries = applyProviderSuppressionFilter(providerResult.entries, suppressionMap),
-                            )
-
-                        homeWatchActivityService.loadWatchActivity(
-                            selectedSource = selectedSource,
-                            localEntries = filteredEntries,
-                            providerResult = filteredProviderResult,
-                            limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-                            enrichMetadata = enrichMetadata,
+                    val providerResult = loadProviderContinueWatching()
+                    val filteredProviderResult =
+                        providerResult.copy(
+                            entries = applyProviderSuppressionFilter(providerResult.entries, suppressionMap),
                         )
-                    }
+
+                    homeWatchActivityService.loadWatchActivity(
+                        providerResult = filteredProviderResult,
+                        limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
+                    )
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -565,7 +431,7 @@ class HomeViewModel internal constructor(
         delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
 
         val nowMs = System.currentTimeMillis()
-        val railItems = continueWatchingResult.items
+        val railItems = continueWatchingResult.entries
         val continueWatchingItems = railItems.filterNot { it.isUpNextPlaceholder }
         val upNextItems = railItems.filter { it.isUpNextPlaceholder }
 
@@ -632,16 +498,11 @@ class HomeViewModel internal constructor(
         )
     }
 
-    private suspend fun loadProviderContinueWatching(selectedSource: WatchProvider): ContinueWatchingResult {
-        return when (selectedSource) {
-            WatchProvider.LOCAL -> ContinueWatchingResult(statusMessage = "")
-            WatchProvider.TRAKT, WatchProvider.SIMKL -> {
-                watchHistoryService.listContinueWatching(
-                    limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-                    source = selectedSource,
-                )
-            }
-        }
+    private suspend fun loadProviderContinueWatching(): CanonicalContinueWatchingResult {
+        return watchHistoryService.getCanonicalContinueWatching(
+            limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
+            source = null,
+        )
     }
 
     private suspend fun delayForMinimumSkeletonVisibility(visibleAtMs: Long) {
@@ -662,7 +523,7 @@ class HomeViewModel internal constructor(
             snapshot.catalogSections.map { sectionUi ->
                 CatalogSectionLayoutMeta(
                     key = sectionUi.section.key,
-                    presentation = sectionUi.section.presentation,
+                    layout = sectionUi.section.layout,
                 )
             }
         _catalogSectionsState.value = snapshot.catalogSections.associateBy { it.section.key }
@@ -736,11 +597,11 @@ class HomeViewModel internal constructor(
         var index = 0
         while (index < catalogSectionLayoutMeta.size) {
             val sectionMeta = catalogSectionLayoutMeta[index]
-            if (sectionMeta.presentation == HomeCatalogPresentation.COLLECTION_SHELF) {
+            if (sectionMeta.layout.equals("collection", ignoreCase = true)) {
                 val groupedKeys = mutableListOf<String>()
                 while (
                     index < catalogSectionLayoutMeta.size &&
-                        catalogSectionLayoutMeta[index].presentation == HomeCatalogPresentation.COLLECTION_SHELF
+                        catalogSectionLayoutMeta[index].layout.equals("collection", ignoreCase = true)
                 ) {
                     groupedKeys += catalogSectionLayoutMeta[index].key
                     index += 1
@@ -761,63 +622,15 @@ class HomeViewModel internal constructor(
         _layoutState.value = HomeLayoutState(blocks = blocks)
     }
 
-    private fun applySuppressionFilter(
-        entries: List<WatchHistoryEntry>,
-        suppressionMap: MutableMap<String, Long>? = suppressedItemsByKey,
-    ): List<WatchHistoryEntry> {
-        if (entries.isEmpty()) return emptyList()
-        val activeSuppressionMap = suppressionMap ?: return entries
-
-        var updated = false
-        val filtered = mutableListOf<WatchHistoryEntry>()
-        entries.forEach { entry ->
-            val episodeKey = continueWatchingKey(entry)
-            val contentKey = continueWatchingContentKey(entry)
-
-            val episodeSuppressedAt = activeSuppressionMap[episodeKey]
-            val contentSuppressedAt = activeSuppressionMap[contentKey]
-
-            val suppressedAt =
-                when {
-                    episodeSuppressedAt == null -> contentSuppressedAt
-                    contentSuppressedAt == null -> episodeSuppressedAt
-                    else -> maxOf(episodeSuppressedAt, contentSuppressedAt)
-                }
-
-            if (suppressedAt == null) {
-                filtered += entry
-                return@forEach
-            }
-
-            if (entry.watchedAtEpochMs > suppressedAt) {
-                if (episodeSuppressedAt != null && entry.watchedAtEpochMs > episodeSuppressedAt) {
-                    activeSuppressionMap.remove(episodeKey)
-                    updated = true
-                }
-                if (contentSuppressedAt != null && entry.watchedAtEpochMs > contentSuppressedAt) {
-                    activeSuppressionMap.remove(contentKey)
-                    updated = true
-                }
-                filtered += entry
-            }
-        }
-
-        if (updated) {
-            suppressionStore.write(activeSuppressionMap)
-        }
-
-        return filtered
-    }
-
     private fun applyProviderSuppressionFilter(
-        entries: List<ContinueWatchingEntry>,
+        entries: List<CanonicalContinueWatchingItem>,
         suppressionMap: MutableMap<String, Long>? = suppressedItemsByKey,
-    ): List<ContinueWatchingEntry> {
+    ): List<CanonicalContinueWatchingItem> {
         if (entries.isEmpty()) return emptyList()
         val activeSuppressionMap = suppressionMap ?: return entries
 
         var updated = false
-        val filtered = mutableListOf<ContinueWatchingEntry>()
+        val filtered = mutableListOf<CanonicalContinueWatchingItem>()
         entries.forEach { entry ->
             val key = continueWatchingContentKey(entry)
             val suppressedAt = activeSuppressionMap[key]
@@ -840,15 +653,18 @@ class HomeViewModel internal constructor(
         return filtered
     }
 
-    private fun ContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity {
+private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity {
         val contentType =
             when (type.lowercase(Locale.US)) {
                 "series" -> MetadataLabMediaType.SERIES
+                "anime" -> MetadataLabMediaType.ANIME
                 else -> MetadataLabMediaType.MOVIE
             }
-        val normalizedImdb = contentId.trim().lowercase(Locale.US).takeIf { it.startsWith("tt") }
+        val normalizedImdb = providerId.lowercase(Locale.US).takeIf { provider.equals("imdb", ignoreCase = true) && it.startsWith("tt") }
 
         return PlaybackIdentity(
+            contentId = null,
+            mediaKey = mediaKey,
             imdbId = normalizedImdb,
             tmdbId = null,
             contentType = contentType,
@@ -856,8 +672,17 @@ class HomeViewModel internal constructor(
             episode = episode,
             title = title,
             year = null,
-            showTitle = if (contentType == MetadataLabMediaType.SERIES) title else null,
+            showTitle = if (contentType != MetadataLabMediaType.MOVIE) title else null,
             showYear = null,
+            provider = provider,
+            providerId = providerId,
+            parentMediaType = if (contentType == MetadataLabMediaType.MOVIE) null else when (type.lowercase(Locale.US)) {
+                "anime" -> "anime"
+                else -> "show"
+            },
+            parentProvider = provider,
+            parentProviderId = providerId,
+            absoluteEpisodeNumber = absoluteEpisodeNumber,
         )
     }
 
@@ -912,13 +737,13 @@ private fun HomeWideRailSectionUi.isVisible(): Boolean {
     return isLoading || items.isNotEmpty() || statusMessage.isNotBlank()
 }
 
-private fun ContinueWatchingItem.sectionKey(): String {
+private fun CanonicalContinueWatchingItem.sectionKey(): String {
     return if (isUpNextPlaceholder) UP_NEXT_SECTION_KEY else CONTINUE_WATCHING_SECTION_KEY
 }
 
-private fun ContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
+private fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
     return HomeWideRailItemUi(
-        key = "${type}:${id}",
+        key = "${type}:${localKey}",
         title = title,
         subtitle = buildHomeWatchActivitySubtitle(nowMs),
         imageUrl = backdropUrl ?: posterUrl,
@@ -930,7 +755,7 @@ private fun ContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi
 
 private fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
     return HomeWideRailItemUi(
-        key = "${type}:${id}",
+        key = "${type}:${localKey}",
         title = seriesName,
         subtitle = buildCalendarSecondaryText(),
         imageUrl = thumbnailUrl ?: backdropUrl ?: posterUrl,
@@ -1008,33 +833,21 @@ class ContinueWatchingSuppressionStore(context: Context) {
     }
 }
 
-private fun continueWatchingKey(entry: WatchHistoryEntry): String {
-    val seasonPart = entry.season?.toString() ?: "-"
-    val episodePart = entry.episode?.toString() ?: "-"
-    return "${entry.contentType.name.lowercase(Locale.US)}:${entry.contentId}:$seasonPart:$episodePart"
+private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
+    val normalizedMediaKey = entry.mediaKey?.trim().orEmpty()
+    if (normalizedMediaKey.isNotEmpty()) {
+        return normalizedMediaKey
+    }
+    return continueWatchingContentKey(entry.type, entry.provider, entry.providerId)
 }
 
-private fun continueWatchingContentKey(entry: WatchHistoryEntry): String {
-    val type = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
-    return "$type:${entry.contentId.lowercase(Locale.US)}"
+private fun continueWatchingContentKey(type: String, provider: String, providerId: String): String {
+    return "${type.trim().lowercase(Locale.US)}:${provider.trim().lowercase(Locale.US)}:${providerId.trim().lowercase(Locale.US)}"
 }
 
-private fun continueWatchingContentKey(entry: ContinueWatchingEntry): String {
-    val type = if (entry.contentType == MetadataLabMediaType.SERIES) "series" else "movie"
-    return "$type:${entry.contentId.lowercase(Locale.US)}"
-}
-
-private fun continueWatchingContentKey(type: String, contentId: String): String {
-    return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
-}
-
-private fun collectionLogoCacheKey(type: String, contentId: String): String {
-    return "${type.trim().lowercase(Locale.US)}:${contentId.trim().lowercase(Locale.US)}"
-}
-
-private fun ContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
+private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
     val seasonEpisode =
-        if (type.equals("series", ignoreCase = true) && season != null && episode != null) {
+        if ((type.equals("series", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {
             String.format(Locale.US, "S%02d:E%02d", season, episode)
         } else {
             null
@@ -1049,20 +862,10 @@ private fun ContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): St
     return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
 }
 
-private fun ContinueWatchingItem.toUnmarkRequest(): WatchHistoryRequest {
-    return WatchHistoryRequest(
-        contentId = contentId,
-        contentType = type.toMetadataLabMediaType(),
-        title = title,
-        season = season,
-        episode = episode,
-    )
-}
-
 private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
-    return if (equals("series", ignoreCase = true)) {
-        MetadataLabMediaType.SERIES
-    } else {
-        MetadataLabMediaType.MOVIE
+    return when {
+        equals("series", ignoreCase = true) -> MetadataLabMediaType.SERIES
+        equals("anime", ignoreCase = true) -> MetadataLabMediaType.ANIME
+        else -> MetadataLabMediaType.MOVIE
     }
 }

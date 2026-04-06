@@ -3,7 +3,7 @@ package com.crispy.tv.domain.home
 import java.util.Locale
 
 data class HomeCatalogItem(
-    val id: String,
+    val mediaKey: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -58,6 +58,7 @@ data class HomeCatalogList(
     val variantKey: String = DEFAULT_VARIANT_KEY,
     val source: HomeCatalogSource,
     val presentation: HomeCatalogPresentation = HomeCatalogPresentation.RAIL,
+    val layout: String? = null,
     val name: String = "",
     val heading: String = "",
     val title: String = "",
@@ -79,7 +80,7 @@ data class HomeCatalogSnapshot(
 )
 
 data class HomeCatalogHeroItem(
-    val id: String,
+    val mediaKey: String,
     val title: String,
     val description: String,
     val rating: String?,
@@ -99,6 +100,7 @@ data class HomeCatalogSection(
     val catalogId: String,
     val source: HomeCatalogSource,
     val presentation: HomeCatalogPresentation,
+    val layout: String? = null,
     val variantKey: String = DEFAULT_VARIANT_KEY,
     val name: String = "",
     val heading: String = "",
@@ -314,7 +316,7 @@ private fun buildHeroResult(
                 val backdrop = item.backdropUrl ?: item.posterUrl
                 if (backdrop.isNullOrBlank()) return@mapNotNull null
                 HomeCatalogHeroItem(
-                    id = item.id,
+                    mediaKey = item.mediaKey,
                     title = item.title,
                     description = item.description ?: fallbackDescription,
                     rating = item.rating,
@@ -357,6 +359,7 @@ private fun HomeCatalogList.toSection(): HomeCatalogSection {
         catalogId = catalogId,
         source = source,
         presentation = presentation,
+        layout = layout,
         variantKey = variantKey,
         name = name,
         heading = heading,

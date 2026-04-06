@@ -51,7 +51,7 @@ fun ProfileIconButton(onClick: () -> Unit) {
             runCatching {
                 val session = supabase.ensureValidSession() ?: supabase.currentSession() ?: return@runCatching null
                 val me = backend.getMe(session.accessToken)
-                val userId = (me.user.supabaseAuthUserId ?: session.userId ?: me.user.id).trim()
+                val userId = (session.userId?.ifBlank { me.user.id } ?: me.user.id).trim()
                 if (userId.isBlank()) {
                     return@runCatching null
                 }

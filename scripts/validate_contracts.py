@@ -21,6 +21,7 @@ SUITE_TO_SCHEMA = {
     "home_catalogs": "home_catalogs.schema.json",
     "catalog_url_building": "catalog_url_building.schema.json",
     "trakt_scrobble_policy": "trakt_scrobble_policy.schema.json",
+    "media_state_contract": "media_state_contract.schema.json",
 }
 
 
@@ -48,7 +49,9 @@ def main() -> int:
 
         suite = fixture.get("suite")
         if suite not in SUITE_TO_SCHEMA:
-            failures.append(f"{fixture_path.relative_to(root)}: unknown suite '{suite}'")
+            failures.append(
+                f"{fixture_path.relative_to(root)}: unknown suite '{suite}'"
+            )
             continue
 
         schema_name = SUITE_TO_SCHEMA[suite]

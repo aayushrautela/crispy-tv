@@ -5,10 +5,11 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.metadata.tmdb.TmdbPersonProfile
-import com.crispy.tv.metadata.tmdb.TmdbPersonRepository
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
+import com.crispy.tv.ratings.formatRating
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,7 +42,7 @@ data class PersonDetailsUiState(
 
 class PersonDetailsViewModel internal constructor(
     private val personId: String,
-    private val personRepository: TmdbPersonRepository,
+    private val personLoader: suspend (String, Locale) -> PersonDetails?,
     private val localeProvider: () -> Locale = { Locale.getDefault() },
 ) : ViewModel() {
 
@@ -66,7 +67,7 @@ class PersonDetailsViewModel internal constructor(
         refreshJob = viewModelScope.launch {
             val person =
                 withContext(Dispatchers.IO) {
-                    personRepository.load(personId = personId, locale = localeProvider())
+                    personLoader(personId, localeProvider())
                 }
 
             if (person == null) {
@@ -77,42 +78,79 @@ class PersonDetailsViewModel internal constructor(
             _uiState.value =
                 PersonDetailsUiState(
                     isLoading = false,
-                    person = person.toUiModel(),
+                    person = person,
                 )
         }
-    }
-
-    private fun TmdbPersonProfile.toUiModel(): PersonDetails {
-        return PersonDetails(
-            tmdbPersonId = tmdbPersonId,
-            name = name,
-            knownForDepartment = knownForDepartment,
-            biography = biography,
-            birthday = birthday,
-            placeOfBirth = placeOfBirth,
-            profileUrl = profileUrl,
-            imdbId = imdbId,
-            instagramId = instagramId,
-            twitterId = twitterId,
-            knownFor = knownFor,
-        )
     }
 
     companion object {
         fun factory(appContext: Context, personId: String): ViewModelProvider.Factory {
             val context = appContext.applicationContext
+            val supabase = SupabaseServicesProvider.accountClient(context)
+            val backend = BackendServicesProvider.backendClient(context)
             return object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (!modelClass.isAssignableFrom(PersonDetailsViewModel::class.java)) {
                         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                     }
 
-                    val personRepository = TmdbServicesProvider.personRepository(context)
+                    val personLoader: suspend (String, Locale) -> PersonDetails? = { requestedPersonId, locale ->
+                        val session = supabase.ensureValidSession()
+                        if (session == null) {
+                            null
+                        } else {
+                            runCatching {
+                                backend.getMetadataPersonDetail(
+                                    accessToken = session.accessToken,
+                                    id = requestedPersonId,
+                                    language = locale.toLanguageTag(),
+                                ).toUiModel()
+                            }.getOrNull()
+                        }
+                    }
 
                     @Suppress("UNCHECKED_CAST")
-                    return PersonDetailsViewModel(personId = personId, personRepository = personRepository) as T
+                    return PersonDetailsViewModel(personId = personId, personLoader = personLoader) as T
                 }
             }
         }
     }
+}
+
+private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails {
+    return PersonDetails(
+        tmdbPersonId = tmdbPersonId,
+        name = name,
+        knownForDepartment = knownForDepartment,
+        biography = biography,
+        birthday = birthday,
+        placeOfBirth = placeOfBirth,
+        profileUrl = profileUrl,
+        imdbId = imdbId,
+        instagramId = instagramId,
+        twitterId = twitterId,
+        knownFor = knownFor.mapNotNull { it.toCatalogItem() },
+    )
+}
+
+private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): CatalogItem? {
+    val type = if (mediaType.equals("movie", ignoreCase = true)) "movie" else "series"
+    val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+    val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    return CatalogItem(
+        id = normalizedMediaKey,
+        mediaKey = normalizedMediaKey,
+        title = title,
+        posterUrl = normalizedPosterUrl,
+        backdropUrl = null,
+        addonId = "tmdb",
+        type = type,
+        rating = formatRating(rating),
+        year = releaseYear?.toString(),
+        genre = null,
+        provider = normalizedProvider,
+        providerId = normalizedProviderId,
+    )
 }

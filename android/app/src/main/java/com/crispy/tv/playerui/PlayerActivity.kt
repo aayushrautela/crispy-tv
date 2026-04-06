@@ -275,13 +275,20 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_PLAYBACK_HEADERS_JSON = "extra_playback_headers_json"
 
         private const val EXTRA_IMDB_ID = "extra_imdb_id"
-        private const val EXTRA_TMDB_ID = "extra_tmdb_id"
+        private const val EXTRA_CONTENT_ID = "extra_content_id"
+        private const val EXTRA_MEDIA_KEY = "extra_media_key"
         private const val EXTRA_MEDIA_TYPE = "extra_media_type"
         private const val EXTRA_SEASON = "extra_season"
         private const val EXTRA_EPISODE = "extra_episode"
         private const val EXTRA_YEAR = "extra_year"
         private const val EXTRA_SHOW_TITLE = "extra_show_title"
         private const val EXTRA_SHOW_YEAR = "extra_show_year"
+        private const val EXTRA_PROVIDER = "extra_provider"
+        private const val EXTRA_PROVIDER_ID = "extra_provider_id"
+        private const val EXTRA_PARENT_MEDIA_TYPE = "extra_parent_media_type"
+        private const val EXTRA_PARENT_PROVIDER = "extra_parent_provider"
+        private const val EXTRA_PARENT_PROVIDER_ID = "extra_parent_provider_id"
+        private const val EXTRA_ABSOLUTE_EPISODE_NUMBER = "extra_absolute_episode_number"
 
         fun intent(
             context: Context,
@@ -300,14 +307,21 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(EXTRA_SUBTITLE, subtitle)
                 .putExtra(EXTRA_ARTWORK_URL, artworkUrl)
                 .putExtra(EXTRA_LAUNCH_SNAPSHOT, launchSnapshot?.toJsonString())
+                .putExtra(EXTRA_CONTENT_ID, identity.contentId)
+                .putExtra(EXTRA_MEDIA_KEY, identity.mediaKey)
                 .putExtra(EXTRA_IMDB_ID, identity.imdbId)
-                .putExtra(EXTRA_TMDB_ID, identity.tmdbId ?: -1)
                 .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
                 .putExtra(EXTRA_SEASON, identity.season ?: -1)
                 .putExtra(EXTRA_EPISODE, identity.episode ?: -1)
                 .putExtra(EXTRA_YEAR, identity.year ?: -1)
                 .putExtra(EXTRA_SHOW_TITLE, identity.showTitle)
                 .putExtra(EXTRA_SHOW_YEAR, identity.showYear ?: -1)
+                .putExtra(EXTRA_PROVIDER, identity.provider)
+                .putExtra(EXTRA_PROVIDER_ID, identity.providerId)
+                .putExtra(EXTRA_PARENT_MEDIA_TYPE, identity.parentMediaType)
+                .putExtra(EXTRA_PARENT_PROVIDER, identity.parentProvider)
+                .putExtra(EXTRA_PARENT_PROVIDER_ID, identity.parentProviderId)
+                .putExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, identity.absoluteEpisodeNumber ?: -1)
         }
 
         private fun parseIdentityFromIntent(intent: Intent, title: String): PlaybackIdentity? {
@@ -315,17 +329,26 @@ class PlayerActivity : ComponentActivity() {
             val contentType = runCatching { MetadataLabMediaType.valueOf(mediaTypeName) }.getOrNull()
                 ?: return null
 
+            val contentId = intent.getStringExtra(EXTRA_CONTENT_ID)?.trim()?.ifBlank { null }
+            val mediaKey = intent.getStringExtra(EXTRA_MEDIA_KEY)?.trim()?.ifBlank { null }
             val imdbId = intent.getStringExtra(EXTRA_IMDB_ID)?.trim()?.ifBlank { null }
-            val tmdbId = intent.getIntExtra(EXTRA_TMDB_ID, -1).takeIf { it > 0 }
             val season = intent.getIntExtra(EXTRA_SEASON, -1).takeIf { it > 0 }
             val episode = intent.getIntExtra(EXTRA_EPISODE, -1).takeIf { it > 0 }
             val year = intent.getIntExtra(EXTRA_YEAR, -1).takeIf { it > 0 }
             val showTitle = intent.getStringExtra(EXTRA_SHOW_TITLE)?.trim()?.ifBlank { null }
             val showYear = intent.getIntExtra(EXTRA_SHOW_YEAR, -1).takeIf { it > 0 }
+            val provider = intent.getStringExtra(EXTRA_PROVIDER)?.trim()?.ifBlank { null }
+            val providerId = intent.getStringExtra(EXTRA_PROVIDER_ID)?.trim()?.ifBlank { null }
+            val parentMediaType = intent.getStringExtra(EXTRA_PARENT_MEDIA_TYPE)?.trim()?.ifBlank { null }
+            val parentProvider = intent.getStringExtra(EXTRA_PARENT_PROVIDER)?.trim()?.ifBlank { null }
+            val parentProviderId = intent.getStringExtra(EXTRA_PARENT_PROVIDER_ID)?.trim()?.ifBlank { null }
+            val absoluteEpisodeNumber = intent.getIntExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, -1).takeIf { it > 0 }
 
             return PlaybackIdentity(
+                contentId = contentId,
+                mediaKey = mediaKey,
                 imdbId = imdbId,
-                tmdbId = tmdbId,
+                tmdbId = null,
                 contentType = contentType,
                 season = season,
                 episode = episode,
@@ -333,6 +356,12 @@ class PlayerActivity : ComponentActivity() {
                 year = year,
                 showTitle = showTitle,
                 showYear = showYear,
+                provider = provider,
+                providerId = providerId,
+                parentMediaType = parentMediaType,
+                parentProvider = parentProvider,
+                parentProviderId = parentProviderId,
+                absoluteEpisodeNumber = absoluteEpisodeNumber,
             )
         }
 

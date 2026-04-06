@@ -5,6 +5,7 @@ import android.util.Log
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.ProviderExternalIds
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.ProviderLibrarySnapshot
@@ -16,7 +17,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal class WatchHistoryCache(
+class WatchHistoryCache(
     context: Context,
 ) {
     private val appContext = context.applicationContext
@@ -26,7 +27,7 @@ internal class WatchHistoryCache(
         limit: Int,
         nowMs: Long,
         source: WatchProvider?,
-        localFallback: () -> List<ContinueWatchingEntry>,
+        localFallback: suspend () -> List<ContinueWatchingEntry>,
         normalize: (List<ContinueWatchingEntry>, Long, Int) -> List<ContinueWatchingEntry>,
     ): ContinueWatchingResult {
         val targetLimit = limit.coerceAtLeast(1)
@@ -134,16 +135,26 @@ internal class WatchHistoryCache(
         for (entry in result.entries) {
             entriesJson.put(
                 JSONObject()
-                    .put("contentId", entry.contentId)
-                    .put("contentType", entry.contentType.name)
+                    .put("id", entry.id)
+                    .put("mediaKey", entry.mediaKey)
+                    .put("localKey", entry.localKey)
+                    .put("provider", entry.provider)
+                    .put("providerId", entry.providerId)
+                    .put("mediaType", entry.mediaType)
                     .put("title", entry.title)
                     .put("season", entry.season)
                     .put("episode", entry.episode)
                     .put("progressPercent", entry.progressPercent)
                     .put("lastUpdatedEpochMs", entry.lastUpdatedEpochMs)
-                    .put("provider", entry.provider.name)
-                    .put("providerPlaybackId", entry.providerPlaybackId)
+                    .put("source", entry.source.name)
                     .put("isUpNextPlaceholder", entry.isUpNextPlaceholder)
+                    .put("posterUrl", entry.posterUrl)
+                    .put("backdropUrl", entry.backdropUrl)
+                    .put("logoUrl", entry.logoUrl)
+                    .put("addonId", entry.addonId)
+                    .put("subtitle", entry.subtitle)
+                    .put("dismissible", entry.dismissible)
+                    .put("absoluteEpisodeNumber", entry.absoluteEpisodeNumber)
             )
         }
 
@@ -179,10 +190,20 @@ internal class WatchHistoryCache(
                     .put("provider", item.provider.name)
                     .put("folderId", item.folderId)
                     .put("contentId", item.contentId)
+                    .put("mediaKey", item.mediaKey)
                     .put("contentType", item.contentType.name)
                     .put("title", item.title)
                     .put("posterUrl", item.posterUrl)
                     .put("backdropUrl", item.backdropUrl)
+                    .put(
+                        "externalIds",
+                        item.externalIds?.let { ids ->
+                            JSONObject()
+                                .put("tmdb", ids.tmdb)
+                                .put("imdb", ids.imdb)
+                                .put("tvdb", ids.tvdb)
+                        },
+                    )
                     .put("season", item.season)
                     .put("episode", item.episode)
                     .put("addedAtEpochMs", item.addedAtEpochMs)
@@ -261,30 +282,50 @@ internal class WatchHistoryCache(
         val entries = mutableListOf<ContinueWatchingEntry>()
         for (index in 0 until entriesArray.length()) {
             val obj = entriesArray.optJSONObject(index) ?: continue
-            val contentId = obj.optString("contentId").trim()
-            if (contentId.isBlank()) continue
-            val contentType = runCatching { MetadataLabMediaType.valueOf(obj.optString("contentType").trim()) }.getOrNull() ?: continue
-            val title = obj.optString("title").trim().ifEmpty { contentId }
+            val id = obj.optString("id").trim()
+            val runtimeProvider = obj.optString("provider").trim()
+            val runtimeProviderId = obj.optString("providerId").trim()
+            val mediaKey = obj.optString("mediaKey").trim().ifBlank { null }
+            val localKey = obj.optString("localKey").trim().ifBlank { mediaKey ?: id }
+            val mediaType = obj.optString("mediaType").trim()
+            val title = obj.optString("title").trim()
+            if (id.isBlank() || runtimeProvider.isBlank() || runtimeProviderId.isBlank() || mediaType.isBlank() || title.isBlank()) continue
             val season = obj.optInt("season", 0).takeIf { it > 0 }
             val episode = obj.optInt("episode", 0).takeIf { it > 0 }
             val progress = obj.optDouble("progressPercent", 0.0)
             val lastUpdated = obj.optLong("lastUpdatedEpochMs", updatedAt)
-            val providerValue = runCatching { WatchProvider.valueOf(obj.optString("provider").trim()) }.getOrNull() ?: provider
-            val playbackId = obj.optString("providerPlaybackId").trim().ifEmpty { null }
+            val sourceValue = runCatching { WatchProvider.valueOf(obj.optString("source").trim()) }.getOrNull() ?: provider
             val isUpNext = obj.optBoolean("isUpNextPlaceholder", false)
+            val posterUrl = obj.optString("posterUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val backdropUrl = obj.optString("backdropUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val logoUrl = obj.optString("logoUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val addonId = obj.optString("addonId").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val subtitle = obj.optString("subtitle").trim().ifEmpty { null }
+            val dismissible = obj.optBoolean("dismissible", false)
+            val absoluteEpisodeNumber = obj.optInt("absoluteEpisodeNumber", 0).takeIf { it > 0 }
 
             entries.add(
                 ContinueWatchingEntry(
-                    contentId = contentId,
-                    contentType = contentType,
+                    id = id,
+                    mediaKey = mediaKey,
+                    localKey = localKey,
+                    provider = runtimeProvider,
+                    providerId = runtimeProviderId,
+                    mediaType = mediaType,
                     title = title,
                     season = season,
                     episode = episode,
                     progressPercent = progress,
                     lastUpdatedEpochMs = lastUpdated,
-                    provider = providerValue,
-                    providerPlaybackId = playbackId,
+                    source = sourceValue,
                     isUpNextPlaceholder = isUpNext,
+                    posterUrl = posterUrl,
+                    backdropUrl = backdropUrl,
+                    logoUrl = logoUrl,
+                    addonId = addonId,
+                    subtitle = subtitle,
+                    dismissible = dismissible,
+                    absoluteEpisodeNumber = absoluteEpisodeNumber,
                 )
             )
         }
@@ -336,11 +377,13 @@ internal class WatchHistoryCache(
             val obj = itemsArray.optJSONObject(index) ?: continue
             val folderId = obj.optString("folderId").trim()
             val contentId = obj.optString("contentId").trim()
+            val mediaKey = obj.optString("mediaKey").trim().ifBlank { null }
             if (folderId.isBlank() || contentId.isBlank()) continue
             val contentType = runCatching { MetadataLabMediaType.valueOf(obj.optString("contentType").trim()) }.getOrNull() ?: continue
             val title = obj.optString("title").trim().ifEmpty { contentId }
             val posterUrl = obj.optString("posterUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
             val backdropUrl = obj.optString("backdropUrl").trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+            val externalIds = obj.optProviderExternalIds()
             val season = obj.optInt("season", 0).takeIf { it > 0 }
             val episode = obj.optInt("episode", 0).takeIf { it > 0 }
             val addedAtEpochMs = obj.optLong("addedAtEpochMs", updatedAt)
@@ -351,10 +394,12 @@ internal class WatchHistoryCache(
                     provider = providerValue,
                     folderId = folderId,
                     contentId = contentId,
+                    mediaKey = mediaKey,
                     contentType = contentType,
                     title = title,
                     posterUrl = posterUrl,
                     backdropUrl = backdropUrl,
+                    externalIds = externalIds,
                     season = season,
                     episode = episode,
                     addedAtEpochMs = addedAtEpochMs,
@@ -372,4 +417,15 @@ internal class WatchHistoryCache(
     private companion object {
         private const val TAG = "WatchHistoryCache"
     }
+}
+
+private fun JSONObject.optProviderExternalIds(): ProviderExternalIds? {
+    val json = optJSONObject("externalIds") ?: return null
+    val tmdb = json.optInt("tmdb").takeIf { it > 0 }
+    val imdb = json.optString("imdb").trim().ifBlank { null }
+    val tvdb = json.optInt("tvdb").takeIf { it > 0 }
+    if (tmdb == null && imdb == null && tvdb == null) {
+        return null
+    }
+    return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb)
 }

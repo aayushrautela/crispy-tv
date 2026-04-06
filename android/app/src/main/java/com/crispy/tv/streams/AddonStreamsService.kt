@@ -216,7 +216,7 @@ class AddonStreamsService(
     }
 
     private fun parseStreamSupport(manifest: JSONObject?): StreamSupport {
-        val defaultTypes = setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
+        val defaultTypes = setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME)
         if (manifest == null) {
             return StreamSupport(supported = true, types = defaultTypes, idPrefixes = emptyMap())
         }
@@ -386,6 +386,7 @@ class AddonStreamsService(
             when (value.lowercase(Locale.US)) {
                 "movie" -> out += MetadataLabMediaType.MOVIE
                 "series", "show", "tv" -> out += MetadataLabMediaType.SERIES
+                "anime" -> out += MetadataLabMediaType.ANIME
             }
         }
         return out
@@ -501,6 +502,7 @@ class AddonStreamsService(
         return when (this) {
             MetadataLabMediaType.MOVIE -> "movie"
             MetadataLabMediaType.SERIES -> "series"
+            MetadataLabMediaType.ANIME -> "series"
         }
     }
 
@@ -558,6 +560,7 @@ class AddonStreamsService(
                 when (mediaType) {
                     MetadataLabMediaType.MOVIE -> "movie"
                     MetadataLabMediaType.SERIES -> "series"
+                    MetadataLabMediaType.ANIME -> "series"
                 }
             return formatIdForIdPrefixes(
                 input = lookupId,

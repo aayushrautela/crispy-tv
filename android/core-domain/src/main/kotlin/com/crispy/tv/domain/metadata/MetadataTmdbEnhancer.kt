@@ -4,11 +4,18 @@ import java.util.Locale
 
 enum class MetadataMediaType {
     MOVIE,
-    SERIES;
+    SERIES,
+    ANIME;
 
     companion object {
         fun fromContractValue(value: String): MetadataMediaType {
-            return if (value.equals("series", ignoreCase = true)) SERIES else MOVIE
+            return when {
+                value.equals("series", ignoreCase = true) ||
+                    value.equals("show", ignoreCase = true) ||
+                    value.equals("tv", ignoreCase = true) -> SERIES
+                value.equals("anime", ignoreCase = true) -> ANIME
+                else -> MOVIE
+            }
         }
     }
 }
@@ -41,7 +48,7 @@ data class MetadataRecord(
 )
 
 fun withDerivedSeasons(meta: MetadataRecord, mediaType: MetadataMediaType): MetadataRecord {
-    if (mediaType != MetadataMediaType.SERIES || meta.seasons.isNotEmpty()) {
+    if ((mediaType != MetadataMediaType.SERIES && mediaType != MetadataMediaType.ANIME) || meta.seasons.isNotEmpty()) {
         return meta
     }
 

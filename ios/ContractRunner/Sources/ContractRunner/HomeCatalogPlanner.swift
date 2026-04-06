@@ -1,7 +1,7 @@
 import Foundation
 
 public struct HomeCatalogItem: Equatable {
-    public let id: String
+    public let mediaKey: String
     public let title: String
     public let posterUrl: String?
     public let backdropUrl: String?
@@ -12,7 +12,7 @@ public struct HomeCatalogItem: Equatable {
     public let description: String?
 
     public init(
-        id: String,
+        mediaKey: String,
         title: String,
         posterUrl: String?,
         backdropUrl: String?,
@@ -22,7 +22,7 @@ public struct HomeCatalogItem: Equatable {
         year: String? = nil,
         description: String? = nil
     ) {
-        self.id = id
+        self.mediaKey = mediaKey
         self.title = title
         self.posterUrl = posterUrl
         self.backdropUrl = backdropUrl
@@ -72,6 +72,7 @@ public struct HomeCatalogList: Equatable {
     public let variantKey: String
     public let source: HomeCatalogSource
     public let presentation: HomeCatalogPresentation
+    public let layout: String?
     public let name: String
     public let heading: String
     public let title: String
@@ -84,6 +85,7 @@ public struct HomeCatalogList: Equatable {
         variantKey: String = "default",
         source: HomeCatalogSource,
         presentation: HomeCatalogPresentation = .rail,
+        layout: String? = nil,
         name: String = "",
         heading: String = "",
         title: String = "",
@@ -95,6 +97,7 @@ public struct HomeCatalogList: Equatable {
         self.variantKey = variantKey
         self.source = source
         self.presentation = presentation
+        self.layout = layout
         self.name = name
         self.heading = heading
         self.title = title
@@ -125,7 +128,7 @@ public struct HomeCatalogSnapshot: Equatable {
 }
 
 public struct HomeCatalogHeroItem: Equatable {
-    public let id: String
+    public let mediaKey: String
     public let title: String
     public let description: String
     public let rating: String?
@@ -136,7 +139,7 @@ public struct HomeCatalogHeroItem: Equatable {
     public let type: String
 
     public init(
-        id: String,
+        mediaKey: String,
         title: String,
         description: String,
         rating: String?,
@@ -146,7 +149,7 @@ public struct HomeCatalogHeroItem: Equatable {
         addonId: String,
         type: String
     ) {
-        self.id = id
+        self.mediaKey = mediaKey
         self.title = title
         self.description = description
         self.rating = rating
@@ -172,6 +175,7 @@ public struct HomeCatalogSection: Equatable {
     public let catalogId: String
     public let source: HomeCatalogSource
     public let presentation: HomeCatalogPresentation
+    public let layout: String?
     public let variantKey: String
     public let name: String
     public let heading: String
@@ -182,6 +186,7 @@ public struct HomeCatalogSection: Equatable {
         catalogId: String,
         source: HomeCatalogSource,
         presentation: HomeCatalogPresentation,
+        layout: String? = nil,
         variantKey: String = "default",
         name: String = "",
         heading: String = "",
@@ -191,6 +196,7 @@ public struct HomeCatalogSection: Equatable {
         self.catalogId = catalogId
         self.source = source
         self.presentation = presentation
+        self.layout = layout
         self.variantKey = variantKey
         self.name = name
         self.heading = heading
@@ -418,7 +424,7 @@ private func buildHeroResult(snapshot: HomeCatalogSnapshot, limit: Int) -> HomeC
             return nil
         }
         return HomeCatalogHeroItem(
-            id: item.id,
+            mediaKey: item.mediaKey,
             title: item.title,
             description: item.description ?? fallbackDescription,
             rating: item.rating,
@@ -456,6 +462,7 @@ private extension HomeCatalogList {
             catalogId: catalogId,
             source: source,
             presentation: presentation,
+            layout: layout,
             variantKey: variantKey,
             name: name,
             heading: heading,

@@ -69,8 +69,6 @@ internal fun HeaderInfoSection(
     isMutating: Boolean,
     palette: DetailsPaletteColors,
     watchCta: WatchCta,
-    showAiInsights: Boolean,
-    aiInsightsEnabled: Boolean,
     aiInsightsIsLoading: Boolean,
     onAiInsightsClick: () -> Unit,
     onWatchNow: () -> Unit,
@@ -236,39 +234,37 @@ internal fun HeaderInfoSection(
             placeholderColor = Color(0xFF9E9E9E)
         )
 
-        if (showAiInsights) {
-            FilledTonalButton(
-                onClick = onAiInsightsClick,
-                enabled = !aiInsightsIsLoading,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-                colors =
-                    ButtonDefaults.filledTonalButtonColors(
-                        containerColor = palette.pillBackground,
-                        contentColor = palette.onPillBackground,
-                        disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
-                        disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
-                    )
-            ) {
-                if (aiInsightsIsLoading) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(18.dp)
-                                .skeletonElement(shape = androidx.compose.foundation.shape.CircleShape, color = DetailsSkeletonColors.Elevated)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.AutoAwesome,
-                        contentDescription = null
-                    )
-                }
-                Spacer(modifier = Modifier.size(10.dp))
-                Text(if (aiInsightsEnabled) "AI insights" else "Set up AI insights")
+        FilledTonalButton(
+            onClick = onAiInsightsClick,
+            enabled = !aiInsightsIsLoading,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors =
+                ButtonDefaults.filledTonalButtonColors(
+                    containerColor = palette.pillBackground,
+                    contentColor = palette.onPillBackground,
+                    disabledContainerColor = palette.pillBackground.copy(alpha = 0.65f),
+                    disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
+                )
+        ) {
+            if (aiInsightsIsLoading) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(18.dp)
+                            .skeletonElement(shape = androidx.compose.foundation.shape.CircleShape, color = DetailsSkeletonColors.Elevated)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.AutoAwesome,
+                    contentDescription = null
+                )
             }
+            Spacer(modifier = Modifier.size(10.dp))
+            Text("AI insights")
         }
 
         val context = LocalContext.current
@@ -347,7 +343,7 @@ internal fun HeaderInfoSection(
             enabled = !isMutating,
             isInWatchlist = isInWatchlist,
             isWatched = isWatched,
-            showWatched = details.mediaType != "series",
+            showWatched = details.mediaType == "movie",
             isRated = isRated,
             userRating = userRating,
             onToggleWatchlist = onToggleWatchlist,
@@ -358,12 +354,9 @@ internal fun HeaderInfoSection(
             },
             onShare = {
                 val title = details.title
-                val shareType = if (details.mediaType == "movie") "movie" else "tv"
-                val tmdbId = details.id.removePrefix("tmdb:")
                 val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    val shareUrl = "https://www.themoviedb.org/$shareType/$tmdbId"
-                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy: $shareUrl")
+                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out $title on Crispy")
                 }
                 context.startActivity(android.content.Intent.createChooser(intent, "Share $title"))
             }

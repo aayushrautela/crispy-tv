@@ -4,12 +4,15 @@ import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.CrispyHttpClient
 import java.util.Locale
 
 class AiSearchRepository(
     private val supabase: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore,
+    private val backend: CrispyBackendClient,
     @Suppress("UNUSED_PARAMETER") httpClient: CrispyHttpClient,
 ) {
     suspend fun search(
@@ -21,10 +24,6 @@ class AiSearchRepository(
         if (normalizedQuery.isBlank()) {
             return SearchResultsPayload()
         }
-        if (filter == SearchTypeFilter.PEOPLE) {
-            return SearchResultsPayload(message = "AI search supports movies and shows right now.")
-        }
-
         val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             ?: return SearchResultsPayload(message = "Sign in to use AI search.")
 
@@ -33,9 +32,14 @@ class AiSearchRepository(
             return SearchResultsPayload(message = "Select a profile to use AI search.")
         }
 
-        return SearchResultsPayload(
-            message = "AI search is temporarily disabled until it has a backend /v1 replacement.",
+        val payload = backend.searchAiTitles(
+            accessToken = session.accessToken,
+            profileId = profileId,
+            query = normalizedQuery,
+            filter = filter.toBackendAiFilter(),
+            locale = locale.toLanguageTag(),
         )
+        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem() })
     }
 
     companion object {
@@ -44,8 +48,18 @@ class AiSearchRepository(
             return AiSearchRepository(
                 supabase = SupabaseServicesProvider.accountClient(appContext),
                 activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                backend = BackendServicesProvider.backendClient(appContext),
                 httpClient = httpClient,
             )
         }
+    }
+}
+
+private fun SearchTypeFilter.toBackendAiFilter(): String? {
+    return when (this) {
+        SearchTypeFilter.ALL -> null
+        SearchTypeFilter.MOVIES -> "movies"
+        SearchTypeFilter.SERIES -> "series"
+        SearchTypeFilter.ANIME -> "anime"
     }
 }

@@ -15,12 +15,21 @@ data class PlayerEpisodeSnapshot(
     val released: String? = null,
     val overview: String? = null,
     val thumbnailUrl: String? = null,
+    val lookupId: String? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 @Immutable
 data class PlayerLaunchSnapshot(
     val contentId: String,
+    val mediaKey: String? = null,
     val imdbId: String? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
     val mediaType: String,
     val title: String,
     val posterUrl: String? = null,
@@ -36,12 +45,27 @@ data class PlayerLaunchSnapshot(
     val selectedSeason: Int? = null,
     val seasonEpisodes: List<PlayerEpisodeSnapshot> = emptyList(),
     val currentEpisodeId: String? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 ) {
     fun toJsonString(): String {
         return JSONObject()
             .put("content_id", contentId)
+            .put("media_key", mediaKey)
             .put("imdb_id", imdbId)
+            .put("season_number", seasonNumber)
+            .put("episode_number", episodeNumber)
             .put("media_type", mediaType)
+            .put("provider", provider)
+            .put("provider_id", providerId)
+            .put("parent_media_type", parentMediaType)
+            .put("parent_provider", parentProvider)
+            .put("parent_provider_id", parentProviderId)
+            .put("absolute_episode_number", absoluteEpisodeNumber)
             .put("title", title)
             .put("poster_url", posterUrl)
             .put("backdrop_url", backdropUrl)
@@ -67,6 +91,12 @@ data class PlayerLaunchSnapshot(
                                 .put("released", episode.released)
                                 .put("overview", episode.overview)
                                 .put("thumbnail_url", episode.thumbnailUrl)
+                                .put("lookup_id", episode.lookupId)
+                                .put("provider", episode.provider)
+                                .put("provider_id", episode.providerId)
+                                .put("parent_provider", episode.parentProvider)
+                                .put("parent_provider_id", episode.parentProviderId)
+                                .put("absolute_episode_number", episode.absoluteEpisodeNumber)
                         )
                     }
                 },
@@ -78,6 +108,7 @@ data class PlayerLaunchSnapshot(
     fun toMediaDetails(): MediaDetails {
         return MediaDetails(
             id = contentId,
+            mediaKey = mediaKey,
             imdbId = imdbId,
             mediaType = mediaType,
             title = title,
@@ -94,7 +125,17 @@ data class PlayerLaunchSnapshot(
             directors = emptyList(),
             creators = emptyList(),
             videos = seasonEpisodes.map(PlayerEpisodeSnapshot::toMediaVideo),
+            tmdbId = null,
+            showTmdbId = null,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
             addonId = null,
+            provider = provider,
+            providerId = providerId,
+            parentMediaType = parentMediaType,
+            parentProvider = parentProvider,
+            parentProviderId = parentProviderId,
+            absoluteEpisodeNumber = absoluteEpisodeNumber,
         )
     }
 
@@ -107,8 +148,17 @@ data class PlayerLaunchSnapshot(
                 val json = JSONObject(raw)
                 PlayerLaunchSnapshot(
                     contentId = json.optString("content_id").trim(),
+                    mediaKey = json.optString("media_key").trim().ifBlank { null },
                     imdbId = json.optString("imdb_id").trim().ifBlank { null },
+                    seasonNumber = json.optInt("season_number").takeIf { it > 0 },
+                    episodeNumber = json.optInt("episode_number").takeIf { it > 0 },
                     mediaType = json.optString("media_type").trim(),
+                    provider = json.optString("provider").trim().ifBlank { null },
+                    providerId = json.optString("provider_id").trim().ifBlank { null },
+                    parentMediaType = json.optString("parent_media_type").trim().ifBlank { null },
+                    parentProvider = json.optString("parent_provider").trim().ifBlank { null },
+                    parentProviderId = json.optString("parent_provider_id").trim().ifBlank { null },
+                    absoluteEpisodeNumber = json.optInt("absolute_episode_number").takeIf { it > 0 },
                     title = json.optString("title").trim(),
                     posterUrl = json.optString("poster_url").trim().ifBlank { null },
                     backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
@@ -140,6 +190,14 @@ internal fun PlayerEpisodeSnapshot.toMediaVideo(): MediaVideo {
         released = released,
         overview = overview,
         thumbnailUrl = thumbnailUrl,
+        lookupId = lookupId,
+        tmdbId = null,
+        showTmdbId = null,
+        provider = provider,
+        providerId = providerId,
+        parentProvider = parentProvider,
+        parentProviderId = parentProviderId,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
 
@@ -184,6 +242,12 @@ private fun JSONArray?.toEpisodeSnapshots(): List<PlayerEpisodeSnapshot> {
                     released = json.optString("released").trim().ifBlank { null },
                     overview = json.optString("overview").trim().ifBlank { null },
                     thumbnailUrl = json.optString("thumbnail_url").trim().ifBlank { null },
+                    lookupId = json.optString("lookup_id").trim().ifBlank { null },
+                    provider = json.optString("provider").trim().ifBlank { null },
+                    providerId = json.optString("provider_id").trim().ifBlank { null },
+                    parentProvider = json.optString("parent_provider").trim().ifBlank { null },
+                    parentProviderId = json.optString("parent_provider_id").trim().ifBlank { null },
+                    absoluteEpisodeNumber = json.optInt("absolute_episode_number").takeIf { it > 0 },
                 )
             )
         }

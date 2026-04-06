@@ -1,6 +1,8 @@
 package com.crispy.tv.home
 
 import androidx.compose.runtime.Immutable
+import com.crispy.tv.player.CanonicalContinueWatchingItem
+
 @Immutable
 data class HomeLayoutState(
     val blocks: List<HomeContentSectionUi> = emptyList(),
@@ -37,7 +39,7 @@ data class HomeWideRailItemUi(
     val badgeLabel: String? = null,
     val progressFraction: Float? = null,
     val kind: HomeWideRailItemKind,
-    val continueWatchingItem: ContinueWatchingItem? = null,
+    val continueWatchingItem: CanonicalContinueWatchingItem? = null,
     val calendarEpisodeItem: CalendarEpisodeItem? = null,
 )
 

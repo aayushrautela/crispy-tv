@@ -4,6 +4,7 @@ import android.util.Log
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.ProviderExternalIds
 import com.crispy.tv.player.ProviderLibraryFolder
 import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
@@ -76,7 +77,7 @@ internal class SimklWatchHistoryProvider(
             val item = playback.optJSONObject(i) ?: continue
             val entry = parsePlaybackItem(item, nowMs) ?: continue
 
-            if (entry.contentId.isBlank()) continue
+            if (entry.providerId.isBlank()) continue
             if (entry.lastUpdatedEpochMs < staleCutoff) continue
 
             val progress = entry.progressPercent
@@ -117,7 +118,7 @@ internal class SimklWatchHistoryProvider(
                 folderItems = folderItems,
                 status = status,
                 typeId = "anime",
-                contentType = MetadataLabMediaType.SERIES,
+                contentType = MetadataLabMediaType.ANIME,
                 limitPerFolder = limitPerFolder,
             )
         }
@@ -128,7 +129,7 @@ internal class SimklWatchHistoryProvider(
                 buildList {
                     addAll(parseRatingsArray(ratingsResponse.optJSONArray("movies"), MetadataLabMediaType.MOVIE))
                     addAll(parseRatingsArray(ratingsResponse.optJSONArray("shows"), MetadataLabMediaType.SERIES))
-                    addAll(parseRatingsArray(ratingsResponse.optJSONArray("anime"), MetadataLabMediaType.SERIES))
+                    addAll(parseRatingsArray(ratingsResponse.optJSONArray("anime"), MetadataLabMediaType.ANIME))
                 }
             addFolder(folderItems, FOLDER_RATINGS, ratingItems, limitPerFolder)
         }
@@ -195,6 +196,28 @@ internal class SimklWatchHistoryProvider(
 
                 JSONObject().put("shows", JSONArray().put(showObj))
             }
+            MetadataLabMediaType.ANIME -> {
+                val season = request.season ?: return null
+                val episode = request.episode ?: return null
+                if (season <= 0 || episode <= 0) return null
+
+                val episodeObj = JSONObject().put("number", episode)
+                if (watchedAtEpochMs != null) {
+                    episodeObj.put("watched_at", toIsoString(watchedAtEpochMs))
+                }
+
+                val seasonObj =
+                    JSONObject()
+                        .put("number", season)
+                        .put("episodes", JSONArray().put(episodeObj))
+
+                val showObj =
+                    JSONObject()
+                        .put("ids", ids)
+                        .put("seasons", JSONArray().put(seasonObj))
+
+                JSONObject().put("shows", JSONArray().put(showObj))
+            }
         }
     }
 
@@ -236,15 +259,18 @@ internal class SimklWatchHistoryProvider(
                 if (contentId.isEmpty()) return null
                 val title = movie.optString("title").trim().ifBlank { contentId }
                 ContinueWatchingEntry(
-                    contentId = contentId,
-                    contentType = MetadataLabMediaType.MOVIE,
+                    id = playbackId ?: "${source.name.lowercase()}:movie:$contentId",
+                    mediaKey = contentId,
+                    localKey = "${source.name.lowercase()}:movie:$contentId",
+                    provider = "simkl",
+                    providerId = contentId,
+                    mediaType = "movie",
                     title = title,
                     season = null,
                     episode = null,
                     progressPercent = progress,
                     lastUpdatedEpochMs = pausedAtEpochMs,
-                    provider = source,
-                    providerPlaybackId = playbackId,
+                    source = source,
                 )
             }
 
@@ -265,15 +291,18 @@ internal class SimklWatchHistoryProvider(
                         ?: episodeObj.optInt("number", 0).takeIf { it > 0 }
 
                 ContinueWatchingEntry(
-                    contentId = contentId,
-                    contentType = MetadataLabMediaType.SERIES,
+                    id = playbackId ?: "${source.name.lowercase()}:anime:$contentId:${season ?: -1}:${episode ?: -1}",
+                    mediaKey = contentId,
+                    localKey = "${source.name.lowercase()}:anime:$contentId:${season ?: -1}:${episode ?: -1}",
+                    provider = "simkl",
+                    providerId = contentId,
+                    mediaType = "anime",
                     title = title,
                     season = season,
                     episode = episode,
                     progressPercent = progress,
                     lastUpdatedEpochMs = pausedAtEpochMs,
-                    provider = source,
-                    providerPlaybackId = playbackId,
+                    source = source,
                 )
             }
 
@@ -352,10 +381,12 @@ internal class SimklWatchHistoryProvider(
                     provider = source,
                     folderId = folderId,
                     contentId = contentId,
+                    mediaKey = contentId,
                     contentType = contentType,
                     title = title,
                     posterUrl = posterUrl,
                     backdropUrl = backdropUrl,
+                    externalIds = providerExternalIds(ids),
                     addedAtEpochMs = addedAtEpochMs,
                 )
         }
@@ -393,10 +424,12 @@ internal class SimklWatchHistoryProvider(
                     provider = source,
                     folderId = FOLDER_RATINGS,
                     contentId = contentId,
+                    mediaKey = contentId,
                     contentType = contentType,
                     title = title,
                     posterUrl = posterUrl,
                     backdropUrl = backdropUrl,
+                    externalIds = providerExternalIds(ids),
                     addedAtEpochMs = addedAtEpochMs,
                 )
         }
@@ -420,13 +453,44 @@ internal class SimklWatchHistoryProvider(
         return ProviderLibraryItem(
             provider = source,
             folderId = folderId,
-            contentId = contentId,
-            contentType = contentType,
+            contentId = providerId,
+            mediaKey = mediaKey,
+            contentType = when (mediaType.lowercase(Locale.US)) {
+                "anime" -> MetadataLabMediaType.ANIME
+                "series" -> MetadataLabMediaType.SERIES
+                else -> MetadataLabMediaType.MOVIE
+            },
             title = title,
+            externalIds = null,
             season = season,
             episode = episode,
             addedAtEpochMs = lastUpdatedEpochMs,
         )
+    }
+
+    private fun providerExternalIds(ids: JSONObject?): ProviderExternalIds? {
+        if (ids == null) return null
+        val tmdb =
+            when (val raw = ids.opt("tmdb")) {
+                is Number -> raw.toInt().takeIf { it > 0 }
+                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
+                else -> null
+            }
+        val imdb = normalizedImdbIdOrNull(ids.optString("imdb"))
+        val tvdb =
+            when (val raw = ids.opt("tvdb")) {
+                is Number -> raw.toInt().takeIf { it > 0 }
+                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
+                else -> null
+            }
+        val kitsu =
+            when (val raw = ids.opt("kitsu")) {
+                is Number -> raw.toInt().takeIf { it > 0 }
+                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
+                else -> null
+            }
+        if (tmdb == null && imdb == null && tvdb == null && kitsu == null) return null
+        return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb, kitsu = kitsu)
     }
 
     private fun contentIdFromIds(ids: JSONObject?): String {
@@ -480,6 +544,7 @@ internal class SimklWatchHistoryProvider(
         return when (contentType) {
             MetadataLabMediaType.MOVIE -> "movies"
             MetadataLabMediaType.SERIES -> "shows"
+            MetadataLabMediaType.ANIME -> "shows"
         }
     }
 

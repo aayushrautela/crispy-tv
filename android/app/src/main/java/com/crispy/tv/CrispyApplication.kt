@@ -2,6 +2,7 @@ package com.crispy.tv
 
 import android.app.Application
 import android.os.Build
+import com.crispy.tv.app.AppGraph
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.SvgDecoder
@@ -10,6 +11,10 @@ import coil.memory.MemoryCache
 import coil.request.CachePolicy
 
 class CrispyApplication : Application(), ImageLoaderFactory {
+    val appGraph: AppGraph by lazy {
+        AppGraph(this)
+    }
+
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .components {

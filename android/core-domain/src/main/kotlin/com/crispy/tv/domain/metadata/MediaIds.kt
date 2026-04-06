@@ -1,6 +1,6 @@
 package com.crispy.tv.domain.metadata
 
-data class NuvioMediaId(
+data class CrispyMediaId(
     val contentId: String,
     val videoId: String?,
     val isEpisode: Boolean,
@@ -9,6 +9,8 @@ data class NuvioMediaId(
     val kind: String,
     val addonLookupId: String
 )
+
+typealias NuvioMediaId = CrispyMediaId
 
 private val IMDB_ID_REGEX = Regex("^tt\\d+$", RegexOption.IGNORE_CASE)
 private val NUMERIC_ID_REGEX = Regex("^\\d+$")
@@ -20,10 +22,10 @@ private data class EpisodeSuffix(
     val episode: Int?
 )
 
-fun normalizeNuvioMediaId(raw: String): NuvioMediaId {
+fun normalizeMediaId(raw: String): CrispyMediaId {
     val trimmed = raw.trim()
     if (trimmed.isEmpty()) {
-        return NuvioMediaId(
+        return CrispyMediaId(
             contentId = "",
             videoId = null,
             isEpisode = false,
@@ -39,7 +41,7 @@ fun normalizeNuvioMediaId(raw: String): NuvioMediaId {
         val baseId = canonicalizeBaseId(suffix.baseId)
         if (baseId.isNotEmpty()) {
             val videoId = "$baseId:${suffix.season}:${suffix.episode}"
-            return NuvioMediaId(
+            return CrispyMediaId(
                 contentId = baseId,
                 videoId = videoId,
                 isEpisode = true,
@@ -53,7 +55,7 @@ fun normalizeNuvioMediaId(raw: String): NuvioMediaId {
 
     val normalized = canonicalizeBaseId(stripSeriesPrefix(trimmed))
 
-    return NuvioMediaId(
+    return CrispyMediaId(
         contentId = normalized,
         videoId = null,
         isEpisode = false,
@@ -63,6 +65,8 @@ fun normalizeNuvioMediaId(raw: String): NuvioMediaId {
         addonLookupId = normalized
     )
 }
+
+fun normalizeNuvioMediaId(raw: String): NuvioMediaId = normalizeMediaId(raw)
 
 fun formatIdForIdPrefixes(
     input: String,

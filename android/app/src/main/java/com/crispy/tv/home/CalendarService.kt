@@ -2,35 +2,23 @@ package com.crispy.tv.home
 
 import android.util.Log
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbSeasonEpisode
-import com.crispy.tv.player.ContinueWatchingEntry
-import com.crispy.tv.player.ContinueWatchingResult
+import com.crispy.tv.accounts.ActiveProfileStore
+import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.ProviderLibraryItem
-import com.crispy.tv.player.ProviderLibrarySnapshot
-import com.crispy.tv.player.WatchedEpisodeRecord
-import com.crispy.tv.player.WatchHistoryEntry
-import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.player.WatchProviderAuthState
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 
 @Immutable
 data class CalendarEpisodeItem(
     val id: String,
-    val seriesId: String,
+    val mediaKey: String,
+    val localKey: String,
+    val highlightEpisodeId: String? = null,
     val seriesName: String,
     val episodeTitle: String?,
     val overview: String?,
@@ -47,11 +35,14 @@ data class CalendarEpisodeItem(
     val thumbnailUrl: String?,
     val watchedKeys: Set<String> = emptySet(),
     val type: String = "series",
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 @Immutable
 data class CalendarSeriesItem(
     val id: String,
+    val mediaKey: String,
+    val localKey: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -89,9 +80,9 @@ data class ThisWeekResult(
 )
 
 class CalendarService internal constructor(
-    private val watchHistoryService: WatchHistoryService,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
-    private val metaEpisodeService: CalendarMetaEpisodeService,
+    private val supabaseAccountClient: SupabaseAccountClient,
+    private val activeProfileStore: ActiveProfileStore,
+    private val backendClient: CrispyBackendClient,
 ) {
     suspend fun loadCalendar(nowMs: Long): CalendarSnapshot {
         return try {
@@ -122,321 +113,138 @@ class CalendarService internal constructor(
     }
 
     private suspend fun fetchCalendarSnapshot(nowMs: Long): CalendarSnapshot {
-        val zone = ZoneId.systemDefault()
-        val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
-        val authState = watchHistoryService.authState()
-        val selectedSource = preferredCalendarProvider(authState)
-
-        val localHistory = watchHistoryService.listLocalHistory(limit = LOCAL_HISTORY_LIMIT).entries
-        val providerLibrary = loadProviderLibrarySnapshot(selectedSource)
-        val continueWatching = loadContinueWatchingSnapshot(selectedSource, nowMs)
-        val watchedEpisodeKeys = buildWatchedEpisodeKeys(loadWatchedEpisodeRecords(selectedSource))
-
-        val seeds =
-            gatherSeriesSeeds(
-                continueWatching = continueWatching.entries,
-                providerItems = providerLibrary.items,
-                localHistory = localHistory,
-                source = selectedSource,
+        val backendContext = getBackendContext()
+            ?: return CalendarSnapshot(
+                sections = emptyList(),
+                statusMessage = "Sign in and select a profile to load your calendar.",
+                isError = true,
             )
-        if (seeds.isEmpty()) {
-            return CalendarSnapshot(sections = emptyList(), statusMessage = "No shows to track yet.")
-        }
 
-        val results =
-            coroutineScope {
-                val semaphore = Semaphore(SERIES_FETCH_CONCURRENCY)
-                seeds.map { seed ->
-                    async {
-                        semaphore.withPermit {
-                            runCatching { loadSeriesCalendar(seed = seed, nowMs = nowMs) }
-                                .getOrElse { error ->
-                                    Log.w(TAG, "Failed calendar series load for ${seed.id}", error)
-                                    SeriesCalendarLoadResult(
-                                        series =
-                                            CalendarSeriesItem(
-                                                id = seed.id,
-                                                title = seed.title,
-                                                posterUrl = seed.posterUrl,
-                                                backdropUrl = seed.backdropUrl,
-                                                sourceLabel = seed.sourceLabel,
-                                            )
-                                    )
-                                }
-                        }
-                    }
-                }.awaitAll()
-            }
+        val response = backendClient.getCalendar(
+            accessToken = backendContext.accessToken,
+            profileId = backendContext.profileId,
+        )
 
-        val allEpisodes =
-            results
-                .flatMap { it.episodes }
-                .sortedBy { it.releasedAtMs }
-                .take(MAX_TOTAL_EPISODES)
-
-        val thisWeekEpisodes =
-            allEpisodes.filter { episode ->
-                val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
-                isThisWeek(releaseDate, today) && episode.watchedKeys.none(watchedEpisodeKeys::contains)
-            }
-
-        val upcomingEpisodes =
-            allEpisodes.filter { episode ->
-                val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
-                episode.releasedAtMs > nowMs && !isThisWeek(releaseDate, today)
-            }
-
-        val recentEpisodes =
-            allEpisodes.filter { episode ->
-                val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
-                episode.releasedAtMs < nowMs && !isThisWeek(releaseDate, today)
-            }
-
-        val noScheduledSeries =
-            results
-                .filter { it.episodes.isEmpty() }
-                .map { it.series }
-                .take(MAX_NO_SCHEDULED_ITEMS)
-
-        val sections =
-            buildList {
-                if (thisWeekEpisodes.isNotEmpty()) {
-                    add(CalendarSection(CalendarSectionKey.THIS_WEEK, "This Week", episodeItems = thisWeekEpisodes))
-                }
-                if (upcomingEpisodes.isNotEmpty()) {
-                    add(CalendarSection(CalendarSectionKey.UPCOMING, "Upcoming", episodeItems = upcomingEpisodes))
-                }
-                if (recentEpisodes.isNotEmpty()) {
-                    add(CalendarSection(CalendarSectionKey.RECENTLY_RELEASED, "Recently Released", episodeItems = recentEpisodes))
-                }
-                if (noScheduledSeries.isNotEmpty()) {
-                    add(CalendarSection(CalendarSectionKey.NO_SCHEDULED, "Series with No Scheduled Episodes", seriesItems = noScheduledSeries))
-                }
-            }
-
+        val sections = response.toCalendarSections(nowMs)
         return CalendarSnapshot(
             sections = sections,
             statusMessage = if (sections.isEmpty()) "No upcoming episodes found right now." else null,
+            isError = false,
         )
     }
 
-    private suspend fun loadProviderLibrarySnapshot(source: WatchProvider): ProviderLibrarySnapshot {
-        if (source == WatchProvider.LOCAL) {
-            return ProviderLibrarySnapshot(statusMessage = "")
+    private suspend fun getBackendContext(): BackendContext? {
+        if (!supabaseAccountClient.isConfigured() || !backendClient.isConfigured()) {
+            return null
         }
-
-        val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = PROVIDER_LIBRARY_LIMIT, source = source)
-        return if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) cached
-        else watchHistoryService.listProviderLibrary(limitPerFolder = PROVIDER_LIBRARY_LIMIT, source = source)
-    }
-
-    private suspend fun loadContinueWatchingSnapshot(
-        source: WatchProvider,
-        nowMs: Long,
-    ): ContinueWatchingResult {
-        val cached = watchHistoryService.getCachedContinueWatching(limit = CONTINUE_WATCHING_LIMIT, nowMs = nowMs, source = source)
-        return if (cached.entries.isNotEmpty()) cached
-        else watchHistoryService.listContinueWatching(limit = CONTINUE_WATCHING_LIMIT, nowMs = nowMs, source = source)
-    }
-
-    private suspend fun loadWatchedEpisodeRecords(source: WatchProvider): List<WatchedEpisodeRecord> {
-        return watchHistoryService.listWatchedEpisodeRecords(source = source)
-    }
-
-    private fun gatherSeriesSeeds(
-        continueWatching: List<ContinueWatchingEntry>,
-        providerItems: List<ProviderLibraryItem>,
-        localHistory: List<WatchHistoryEntry>,
-        source: WatchProvider,
-    ): List<SeriesSeed> {
-        val seen = linkedSetOf<String>()
-        val result = mutableListOf<SeriesSeed>()
-
-        fun addSeed(
-            contentId: String,
-            title: String,
-            posterUrl: String?,
-            backdropUrl: String?,
-            sourceLabel: String?,
-            addonId: String? = null,
-        ) {
-            val normalized = normalizeSeriesKey(contentId)
-            if (normalized.isBlank() || !seen.add(normalized)) return
-            result += SeriesSeed(normalized, title.ifBlank { normalized }, posterUrl, backdropUrl, sourceLabel, addonId)
-        }
-
-        continueWatching
-            .asSequence()
-            .filter { it.contentType == MetadataLabMediaType.SERIES }
-            .forEach { entry ->
-                addSeed(entry.contentId, entry.title, null, null, "Continue Watching")
-            }
-
-        providerItems
-            .asSequence()
-            .filter {
-                it.provider == source &&
-                    it.contentType == MetadataLabMediaType.SERIES &&
-                    it.folderId in watchlistFolderIds(source)
-            }
-            .sortedByDescending { it.addedAtEpochMs }
-            .forEach { item ->
-                addSeed(item.contentId, item.title, item.posterUrl, item.backdropUrl, "Watchlist")
-            }
-
-        providerItems
-            .asSequence()
-            .filter {
-                it.provider == source &&
-                    it.contentType == MetadataLabMediaType.SERIES &&
-                    it.folderId in libraryFolderIds(source)
-            }
-            .sortedByDescending { it.addedAtEpochMs }
-            .forEach { item ->
-                addSeed(item.contentId, item.title, item.posterUrl, item.backdropUrl, "Library")
-            }
-
-        when (source) {
-            WatchProvider.LOCAL -> {
-                localHistory
-                    .asSequence()
-                    .filter { it.contentType == MetadataLabMediaType.SERIES }
-                    .sortedByDescending { it.watchedAtEpochMs }
-                    .distinctBy { normalizeSeriesKey(it.contentId) }
-                    .take(RECENTLY_WATCHED_SERIES_LIMIT)
-                    .forEach { entry ->
-                        addSeed(entry.contentId, entry.title, null, null, "Recently Watched")
-                    }
-            }
-
-            else -> {
-                providerItems
-                    .asSequence()
-                    .filter {
-                        it.provider == source &&
-                            it.contentType == MetadataLabMediaType.SERIES &&
-                            source.isWatchedFolder(it.folderId)
-                    }
-                    .sortedByDescending { it.addedAtEpochMs }
-                    .distinctBy { normalizeSeriesKey(it.contentId) }
-                    .take(RECENTLY_WATCHED_SERIES_LIMIT)
-                    .forEach { item ->
-                        addSeed(item.contentId, item.title, item.posterUrl, item.backdropUrl, "Recently Watched")
-                    }
+        val session = supabaseAccountClient.ensureValidSession() ?: return null
+        var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
+        if (profileId.isBlank()) {
+            profileId = runCatching {
+                backendClient.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
+            }.getOrDefault("")
+            if (profileId.isNotBlank()) {
+                activeProfileStore.setActiveProfileId(session.userId, profileId)
             }
         }
-
-        return result.take(MAX_SERIES)
-    }
-
-    private suspend fun loadSeriesCalendar(
-        seed: SeriesSeed,
-        nowMs: Long,
-    ): SeriesCalendarLoadResult {
-        val enrichment =
-            runCatching {
-                tmdbEnrichmentRepository.load(
-                    rawId = seed.id,
-                    mediaTypeHint = MetadataLabMediaType.SERIES,
-                    locale = Locale.getDefault(),
-                )
-            }.getOrNull()
-
-        val fallbackDetails = enrichment?.fallbackDetails
-        val resolvedSeriesId = fallbackDetails?.id ?: seed.id
-        val watchKeys = buildSeriesWatchKeys(seed.id, resolvedSeriesId, fallbackDetails?.imdbId)
-
-        val metaEpisodes =
-            metaEpisodeService.getUpcomingEpisodes(
-                seriesId = seed.id,
-                nowMs = nowMs,
-                daysBack = DAYS_BACK,
-                daysAhead = DAYS_AHEAD,
-                maxEpisodes = MAX_EPISODES_PER_SERIES,
-                preferredAddonId = seed.addonId ?: fallbackDetails?.addonId,
-            )
-
-        val series =
-            CalendarSeriesItem(
-                id = resolvedSeriesId,
-                title = fallbackDetails?.title ?: metaEpisodes?.seriesName ?: seed.title,
-                posterUrl = fallbackDetails?.posterUrl ?: metaEpisodes?.posterUrl ?: seed.posterUrl,
-                backdropUrl = fallbackDetails?.backdropUrl ?: metaEpisodes?.backdropUrl ?: seed.backdropUrl,
-                sourceLabel = seed.sourceLabel,
-            )
-
-        val videos = metaEpisodes?.episodes.orEmpty()
-        if (videos.isEmpty()) {
-            return SeriesCalendarLoadResult(series = series)
+        if (profileId.isBlank()) {
+            return null
         }
-
-        val tmdbSeasonDetails =
-            loadTmdbSeasonDetails(
-                tmdbId = enrichment?.enrichment?.tmdbId,
-                seasons = videos.map { it.season }.filter { it > 0 }.distinct().take(MAX_TMDB_SEASONS),
-            )
-
-        val episodes =
-            videos.mapNotNull { video ->
-                if (video.season <= 0 || video.episode <= 0) return@mapNotNull null
-                val releasedAtMs = video.releasedAtMs.takeIf { it > 0L } ?: return@mapNotNull null
-                val tmdbEpisode = tmdbSeasonDetails[video.season to video.episode]
-                val releaseDate = (video.released ?: tmdbEpisode?.airDate)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                CalendarEpisodeItem(
-                    id = "${series.id}:${video.season}:${video.episode}",
-                    seriesId = series.id,
-                    seriesName = series.title,
-                    episodeTitle = tmdbEpisode?.name ?: video.title ?: "Episode ${video.episode}",
-                    overview = tmdbEpisode?.overview ?: video.overview,
-                    season = video.season,
-                    episode = video.episode,
-                    episodeRange = null,
-                    episodeCount = 1,
-                    releaseDate = releaseDate,
-                    releasedAtMs = releasedAtMs,
-                    isReleased = releasedAtMs <= nowMs,
-                    isGroup = false,
-                    posterUrl = series.posterUrl,
-                    backdropUrl = series.backdropUrl,
-                    thumbnailUrl = tmdbEpisode?.stillUrl ?: video.thumbnailUrl,
-                    watchedKeys = watchKeys.mapTo(linkedSetOf()) { key -> "$key:${video.season}:${video.episode}" },
-                )
-            }
-
-        return SeriesCalendarLoadResult(series = series, episodes = episodes)
+        return BackendContext(accessToken = session.accessToken, profileId = profileId)
     }
 
-    private suspend fun loadTmdbSeasonDetails(
-        tmdbId: Int?,
-        seasons: List<Int>,
-    ): Map<Pair<Int, Int>, TmdbSeasonEpisode> {
-        if (tmdbId == null || seasons.isEmpty()) return emptyMap()
+    private fun CrispyBackendClient.CalendarResponse.toCalendarSections(nowMs: Long): List<CalendarSection> {
+        val zone = ZoneId.systemDefault()
+        val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+        val itemsByBucket = items.groupBy { it.bucket.trim().lowercase(Locale.US) }
 
-        return buildMap {
-            seasons.forEach { season ->
-                runCatching {
-                    tmdbEnrichmentRepository.loadSeasonEpisodes(
-                        tmdbId = tmdbId,
-                        seasonNumber = season,
-                        locale = Locale.getDefault(),
-                    )
-                }.getOrDefault(emptyList()).forEach { episode ->
-                    put(episode.seasonNumber to episode.episodeNumber, episode)
+        val thisWeekEpisodes =
+            itemsByBucket["this_week"].orEmpty()
+                .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
+                .sortedBy { it.releasedAtMs }
+
+        val upcomingEpisodes =
+            itemsByBucket["upcoming"].orEmpty()
+                .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
+                .sortedBy { it.releasedAtMs }
+
+        val recentEpisodes =
+            (itemsByBucket["recently_released"].orEmpty() + itemsByBucket["up_next"].orEmpty())
+                .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
+                .distinctBy { it.localKey }
+                .sortedBy { it.releasedAtMs }
+
+        val noScheduledSeries =
+            itemsByBucket["no_scheduled"].orEmpty()
+                .map { it.toCalendarSeriesItem() }
+                .distinctBy { it.localKey }
+
+        return buildList {
+            if (thisWeekEpisodes.isNotEmpty()) {
+                add(CalendarSection(CalendarSectionKey.THIS_WEEK, "This Week", episodeItems = thisWeekEpisodes))
+            }
+            if (upcomingEpisodes.isNotEmpty()) {
+                add(CalendarSection(CalendarSectionKey.UPCOMING, "Upcoming", episodeItems = upcomingEpisodes))
+            }
+            if (recentEpisodes.isNotEmpty()) {
+                val filtered = recentEpisodes.filter { episode ->
+                    val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
+                    !isThisWeek(releaseDate, today)
+                }
+                if (filtered.isNotEmpty()) {
+                    add(CalendarSection(CalendarSectionKey.RECENTLY_RELEASED, "Recently Released", episodeItems = filtered))
                 }
             }
+            if (noScheduledSeries.isNotEmpty()) {
+                add(CalendarSection(CalendarSectionKey.NO_SCHEDULED, "Series with No Scheduled Episodes", seriesItems = noScheduledSeries))
+            }
         }
     }
 
-    private fun buildWatchedEpisodeKeys(records: List<WatchedEpisodeRecord>): Set<String> {
-        return records.mapTo(linkedSetOf()) { record ->
-            "${normalizeSeriesKey(record.contentId)}:${record.season}:${record.episode}"
-        }
+    private fun CrispyBackendClient.CalendarItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem? {
+        val mediaType = media.mediaType.trim().lowercase(Locale.US)
+        if (mediaType != "episode") return null
+        val season = media.seasonNumber ?: return null
+        val episode = media.episodeNumber ?: return null
+        val releaseDate = media.airDate?.trim().takeIf { !it.isNullOrBlank() } ?: return null
+        val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate) ?: return null
+        val watchedKey = "${media.provider.lowercase(Locale.US)}:${media.providerId.lowercase(Locale.US)}:$season:$episode"
+        val localKey = "${media.provider}:${media.providerId}:$season:$episode"
+        return CalendarEpisodeItem(
+            id = localKey,
+            mediaKey = media.mediaKey,
+            localKey = localKey,
+            highlightEpisodeId = null,
+            seriesName = media.title,
+            episodeTitle = media.episodeTitle,
+            overview = media.subtitle,
+            season = season,
+            episode = episode,
+            episodeRange = null,
+            episodeCount = 1,
+            releaseDate = releaseDate,
+            releasedAtMs = releasedAtMs,
+            isReleased = releasedAtMs <= nowMs,
+            isGroup = false,
+            posterUrl = media.posterUrl,
+            backdropUrl = media.backdropUrl,
+            thumbnailUrl = media.backdropUrl,
+            watchedKeys = setOf(watchedKey),
+            absoluteEpisodeNumber = null,
+        )
     }
 
-    private fun buildSeriesWatchKeys(vararg ids: String?): Set<String> {
-        return ids.mapNotNullTo(linkedSetOf()) { id ->
-            id?.takeIf { it.isNotBlank() }?.let(::normalizeSeriesKey)
-        }
+    private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
+        val localKey = "${media.provider}:${media.providerId}"
+        return CalendarSeriesItem(
+            id = localKey,
+            mediaKey = media.mediaKey,
+            localKey = localKey,
+            title = media.title,
+            posterUrl = media.posterUrl,
+            backdropUrl = media.backdropUrl,
+            sourceLabel = null,
+        )
     }
 
     private fun projectHomeThisWeekItems(
@@ -446,7 +254,7 @@ class CalendarService internal constructor(
         val rawItems = items.filter { it.season != 0 }.take(HOME_THIS_WEEK_RAW_LIMIT)
 
         return rawItems
-            .groupBy { item -> "${item.seriesId}_${item.releaseDate.take(10)}" }
+            .groupBy { item -> "${item.mediaKey}_${item.releaseDate.take(10)}" }
             .values
             .map { group ->
                 val sorted = group.sortedBy { it.episode }
@@ -455,8 +263,11 @@ class CalendarService internal constructor(
                 if (sorted.size == 1) {
                     first
                 } else {
+                    val groupedLocalKey = "group_${first.mediaKey}_${first.releaseDate.take(10)}"
                     first.copy(
-                        id = "group_${first.seriesId}_${first.releaseDate.take(10)}",
+                        id = groupedLocalKey,
+                        localKey = groupedLocalKey,
+                        highlightEpisodeId = null,
                         episodeTitle = null,
                         overview = null,
                         episodeRange = "E${first.episode}-E${last.episode}",
@@ -481,71 +292,27 @@ class CalendarService internal constructor(
         return Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
     }
 
-    private fun normalizeSeriesKey(contentId: String): String {
-        return normalizeNuvioMediaId(contentId).contentId.lowercase(Locale.US)
+    private fun parseCalendarReleaseToEpochMs(raw: String?): Long? {
+        val value = raw?.trim().orEmpty()
+        if (value.isBlank()) return null
+        return runCatching { Instant.parse(value).toEpochMilli() }
+            .recoverCatching {
+                LocalDate.parse(value.take(10))
+                    .atStartOfDay(java.time.ZoneOffset.UTC)
+                    .toInstant()
+                    .toEpochMilli()
+            }
+            .getOrNull()
     }
 
-    private fun watchlistFolderIds(source: WatchProvider): Set<String> {
-        return when (source) {
-            WatchProvider.TRAKT -> setOf("watchlist")
-            WatchProvider.SIMKL -> setOf("plantowatch")
-            WatchProvider.LOCAL -> emptySet()
-        }
-    }
-
-    private fun libraryFolderIds(source: WatchProvider): Set<String> {
-        return when (source) {
-            WatchProvider.TRAKT -> setOf("collection")
-            WatchProvider.SIMKL -> setOf("watching")
-            WatchProvider.LOCAL -> emptySet()
-        }
-    }
-
-    private data class SeriesSeed(
-        val id: String,
-        val title: String,
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val sourceLabel: String?,
-        val addonId: String?,
-    )
-
-    private data class SeriesCalendarLoadResult(
-        val series: CalendarSeriesItem,
-        val episodes: List<CalendarEpisodeItem> = emptyList(),
+    private data class BackendContext(
+        val accessToken: String,
+        val profileId: String,
     )
 
     companion object {
         private const val TAG = "CalendarService"
-        private const val CONTINUE_WATCHING_LIMIT = 80
-        private const val LOCAL_HISTORY_LIMIT = 1000
-        private const val PROVIDER_LIBRARY_LIMIT = 1000
-        private const val MAX_SERIES = 300
-        private const val MAX_EPISODES_PER_SERIES = 50
-        private const val MAX_TMDB_SEASONS = 3
-        private const val MAX_TOTAL_EPISODES = 500
-        private const val MAX_NO_SCHEDULED_ITEMS = 20
-        private const val RECENTLY_WATCHED_SERIES_LIMIT = 20
-        private const val DAYS_BACK = 90
-        private const val DAYS_AHEAD = 60
-        private const val SERIES_FETCH_CONCURRENCY = 4
         private const val HOME_THIS_WEEK_RAW_LIMIT = 60
         private const val HOME_THIS_WEEK_RENDER_LIMIT = 20
-    }
-}
-
-private fun preferredCalendarProvider(authState: WatchProviderAuthState): WatchProvider {
-    return when {
-        authState.traktAuthenticated -> WatchProvider.TRAKT
-        authState.simklAuthenticated -> WatchProvider.SIMKL
-        else -> WatchProvider.LOCAL
-    }
-}
-
-private fun WatchProvider.isWatchedFolder(folderId: String): Boolean {
-    return when (this) {
-        WatchProvider.TRAKT -> folderId == "watched"
-        WatchProvider.SIMKL -> folderId.startsWith("completed")
-        WatchProvider.LOCAL -> false
     }
 }

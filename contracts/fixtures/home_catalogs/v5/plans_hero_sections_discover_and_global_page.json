@@ -1,0 +1,221 @@
+{
+  "contract_version": 5,
+  "suite": "home_catalogs",
+  "case_id": "plans_hero_sections_discover_and_global_page",
+  "input": {
+    "snapshot": {
+      "profile_id": "profile-123",
+      "status_message": "",
+      "lists": [
+        {
+          "kind": "hero_similar",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "hero",
+          "name": "hero_similar",
+          "heading": "",
+          "title": "Hero Shelf",
+          "subtitle": "Because you watched sci-fi",
+          "media_types": ["movie"],
+          "items": [
+            {
+              "media_key": "tmdb:movie:157336",
+              "title": "Arrival",
+              "poster_url": null,
+              "backdrop_url": "https://img/arrival-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": "8.0",
+              "year": "2016",
+              "description": null
+            },
+            {
+              "media_key": "tmdb:movie:438631",
+              "title": "Dune",
+              "poster_url": "https://img/dune-poster.jpg",
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": "8.2",
+              "year": "2021",
+              "description": "Sand and prophecy"
+            },
+            {
+              "media_key": "tmdb:movie:999003",
+              "title": "No Art",
+              "poster_url": null,
+              "backdrop_url": null,
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": null,
+              "year": null,
+              "description": null
+            }
+          ]
+        },
+        {
+          "kind": "trending-series",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "rail",
+          "name": "trending-series",
+          "heading": "",
+          "title": "Trending Series",
+          "subtitle": "Binge now",
+          "media_types": ["series"],
+          "items": [
+            {
+              "media_key": "tmdb:series:95396",
+              "title": "Severance",
+              "poster_url": "https://img/severance.jpg",
+              "backdrop_url": "https://img/severance-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "series",
+              "rating": "8.7",
+              "year": "2022",
+              "description": "Work-life split"
+            },
+            {
+              "media_key": "tmdb:series:125988",
+              "title": "Silo",
+              "poster_url": "https://img/silo.jpg",
+              "backdrop_url": "https://img/silo-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "series",
+              "rating": "8.1",
+              "year": "2023",
+              "description": "Underground mystery"
+            }
+          ]
+        },
+        {
+          "kind": "popular-movies",
+          "variant_key": "default",
+          "source": "personal",
+          "presentation": "rail",
+          "name": "popular-movies",
+          "heading": "",
+          "title": "Popular Movies",
+          "subtitle": "Blockbusters",
+          "media_types": ["movie"],
+          "items": [
+            {
+              "media_key": "tmdb:movie:786892",
+              "title": "Furiosa",
+              "poster_url": "https://img/furiosa.jpg",
+              "backdrop_url": "https://img/furiosa-backdrop.jpg",
+              "addon_id": "supabase",
+              "type": "movie",
+              "rating": "7.7",
+              "year": "2024",
+              "description": "Wasteland origin"
+            }
+          ]
+        }
+      ]
+    },
+    "hero_limit": 2,
+    "section_limit": 2,
+    "discover": {
+      "media_type": "series",
+      "limit": 3
+    },
+    "page": {
+      "catalog_id": "personal:trending-series:default",
+      "page": 2,
+      "page_size": 1
+    }
+  },
+  "expected": {
+    "personal_feed": {
+      "hero_result": {
+        "items": [
+          {
+            "media_key": "tmdb:movie:157336",
+            "title": "Arrival",
+            "description": "Because you watched sci-fi",
+            "rating": "8.0",
+            "year": "2016",
+            "genres": [],
+            "backdrop_url": "https://img/arrival-backdrop.jpg",
+            "addon_id": "supabase",
+            "type": "movie"
+          },
+          {
+            "media_key": "tmdb:movie:438631",
+            "title": "Dune",
+            "description": "Sand and prophecy",
+            "rating": "8.2",
+            "year": "2021",
+            "genres": [],
+            "backdrop_url": "https://img/dune-poster.jpg",
+            "addon_id": "supabase",
+            "type": "movie"
+          }
+        ],
+        "status_message": ""
+      },
+      "sections": [
+        {
+          "catalog_id": "personal:trending-series:default",
+          "source": "personal",
+          "presentation": "rail",
+          "variant_key": "default",
+          "name": "trending-series",
+          "heading": "",
+          "title": "Trending Series",
+          "subtitle": "Binge now"
+        },
+        {
+          "catalog_id": "personal:popular-movies:default",
+          "source": "personal",
+          "presentation": "rail",
+          "variant_key": "default",
+          "name": "popular-movies",
+          "heading": "",
+          "title": "Popular Movies",
+          "subtitle": "Blockbusters"
+        }
+      ],
+      "sections_status_message": ""
+    },
+    "discover": {
+      "catalogs": [
+        {
+          "section": {
+            "catalog_id": "personal:trending-series:default",
+            "source": "personal",
+            "presentation": "rail",
+            "variant_key": "default",
+            "name": "trending-series",
+            "heading": "",
+            "title": "Trending Series",
+            "subtitle": "Binge now"
+          },
+          "addon_name": "Supabase",
+          "genres": []
+        }
+      ],
+      "status_message": ""
+    },
+    "page": {
+      "items": [
+        {
+          "media_key": "tmdb:series:125988",
+          "title": "Silo",
+          "poster_url": "https://img/silo.jpg",
+          "backdrop_url": "https://img/silo-backdrop.jpg",
+          "addon_id": "supabase",
+          "type": "series",
+          "rating": "8.1",
+          "year": "2023",
+          "description": "Underground mystery"
+        }
+      ],
+      "status_message": "",
+      "attempted_urls": [
+        "supabase:personal:profile-123:trending-series:default:page=2"
+      ]
+    }
+  }
+}

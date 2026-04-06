@@ -1,0 +1,45 @@
+{
+  "contract_version": 2,
+  "suite": "media_state_contract",
+  "case_id": "library_item_uses_record_id_plus_media_key",
+  "input": {
+    "kind": "library_item",
+    "payload": {
+      "id": "lib-1",
+      "media": {
+        "mediaKey": "tmdb:series:1396",
+        "mediaType": "series",
+        "provider": "tmdb",
+        "providerId": "1396",
+        "title": "Breaking Bad",
+        "posterUrl": "https://img/bb.jpg"
+      },
+      "state": {
+        "watchedAt": "2026-04-01T10:00:00Z"
+      },
+      "origins": ["simkl"]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "regular",
+      "media_key": "tmdb:series:1396",
+      "media_type": "series",
+      "item_id": "lib-1",
+      "provider": "tmdb",
+      "provider_id": "1396",
+      "title": "Breaking Bad",
+      "poster_url": "https://img/bb.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": ["simkl"],
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

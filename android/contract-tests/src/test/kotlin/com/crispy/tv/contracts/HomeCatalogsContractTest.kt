@@ -88,6 +88,7 @@ class HomeCatalogsContractTest {
             source = HomeCatalogSource.fromRaw(json.requireString("source", path))
                 ?: error("${path.fileName}: invalid source"),
             presentation = HomeCatalogPresentation.fromRaw(json.optionalString("presentation", path)),
+            layout = json.optionalString("layout", path),
             name = json.optionalString("name", path).orEmpty(),
             heading = json.optionalString("heading", path).orEmpty(),
             title = json.optionalString("title", path).orEmpty(),
@@ -99,7 +100,7 @@ class HomeCatalogsContractTest {
 
     private fun parseItem(json: JsonObject, path: Path): HomeCatalogItem {
         return HomeCatalogItem(
-            id = json.requireString("id", path),
+            mediaKey = json.requireString("media_key", path),
             title = json.requireString("title", path),
             posterUrl = json.optionalString("poster_url", path),
             backdropUrl = json.optionalString("backdrop_url", path),
@@ -128,7 +129,7 @@ class HomeCatalogsContractTest {
 
     private fun parseHeroItem(json: JsonObject, path: Path): HomeCatalogHeroItem {
         return HomeCatalogHeroItem(
-            id = json.requireString("id", path),
+            mediaKey = json.requireString("media_key", path),
             title = json.requireString("title", path),
             description = json.requireString("description", path),
             rating = json.optionalString("rating", path),
@@ -146,6 +147,7 @@ class HomeCatalogsContractTest {
             source = HomeCatalogSource.fromRaw(json.requireString("source", path))
                 ?: error("${path.fileName}: invalid section source"),
             presentation = HomeCatalogPresentation.fromRaw(json.optionalString("presentation", path)),
+            layout = json.optionalString("layout", path),
             variantKey = json.optionalString("variant_key", path) ?: "default",
             name = json.optionalString("name", path).orEmpty(),
             heading = json.optionalString("heading", path).orEmpty(),

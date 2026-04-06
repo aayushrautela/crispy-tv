@@ -1,0 +1,20 @@
+{
+  "contract_version": 2,
+  "suite": "media_state_contract",
+  "case_id": "landscape_card_requires_backdrop_url",
+  "input": {
+    "kind": "landscape_card",
+    "payload": {
+      "mediaKey": "tmdb:series:66732",
+      "mediaType": "series",
+      "provider": "tmdb",
+      "providerId": "66732",
+      "title": "Stranger Things",
+      "posterUrl": "https://img/stranger-poster.jpg"
+    }
+  },
+  "expected": {
+    "valid": false,
+    "normalized": null
+  }
+}

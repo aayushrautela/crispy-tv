@@ -12,6 +12,7 @@ internal fun MetadataLabMediaType.pathSegment(): String {
     return when (this) {
         MetadataLabMediaType.MOVIE -> "movie"
         MetadataLabMediaType.SERIES -> "tv"
+        MetadataLabMediaType.ANIME -> "tv"
     }
 }
 
@@ -19,6 +20,7 @@ internal fun MetadataLabMediaType.toCatalogType(): String {
     return when (this) {
         MetadataLabMediaType.MOVIE -> "movie"
         MetadataLabMediaType.SERIES -> "series"
+        MetadataLabMediaType.ANIME -> "anime"
     }
 }
 

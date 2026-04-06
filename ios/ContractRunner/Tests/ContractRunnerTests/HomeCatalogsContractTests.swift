@@ -65,6 +65,7 @@ final class HomeCatalogsContractTests: XCTestCase {
             variantKey: optionalString(object, "variant_key") ?? "default",
             source: source,
             presentation: HomeCatalogPresentation.fromRaw(optionalString(object, "presentation")),
+            layout: optionalString(object, "layout"),
             name: optionalString(object, "name") ?? "",
             heading: optionalString(object, "heading") ?? "",
             title: optionalString(object, "title") ?? "",
@@ -80,7 +81,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         }
 
         return HomeCatalogItem(
-            id: try requireString(object, "id", fixture: fixture),
+            mediaKey: try requireString(object, "media_key", fixture: fixture),
             title: try requireString(object, "title", fixture: fixture),
             posterUrl: optionalString(object, "poster_url"),
             backdropUrl: optionalString(object, "backdrop_url"),
@@ -113,7 +114,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         }
 
         return HomeCatalogHeroItem(
-            id: try requireString(object, "id", fixture: fixture),
+            mediaKey: try requireString(object, "media_key", fixture: fixture),
             title: try requireString(object, "title", fixture: fixture),
             description: try requireString(object, "description", fixture: fixture),
             rating: optionalString(object, "rating"),
@@ -138,6 +139,7 @@ final class HomeCatalogsContractTests: XCTestCase {
             catalogId: try requireString(object, "catalog_id", fixture: fixture),
             source: source,
             presentation: HomeCatalogPresentation.fromRaw(optionalString(object, "presentation")),
+            layout: optionalString(object, "layout"),
             variantKey: optionalString(object, "variant_key") ?? "default",
             name: optionalString(object, "name") ?? "",
             heading: optionalString(object, "heading") ?? "",

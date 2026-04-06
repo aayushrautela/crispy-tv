@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "media_state_contract fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "suite": {
+      "const": "media_state_contract"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "kind",
+        "payload"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "regular_card",
+            "landscape_card",
+            "continue_watching_item",
+            "metadata_card",
+            "watched_item",
+            "watchlist_item",
+            "rating_item",
+            "library_item",
+            "home_snapshot_section",
+            "title_route"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "valid",
+        "normalized"
+      ],
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        },
+        "normalized": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "card_family": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "regular",
+                "landscape",
+                null
+              ]
+            },
+            "media_key": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "media_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "item_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "provider_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "poster_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "backdrop_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subtitle": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "progress_percent": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "watched_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "last_activity_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "origins": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "dismissible": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "layout": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "regular",
+                "landscape",
+                "collection",
+                "hero",
+                null
+              ]
+            },
+            "route_kind": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "title",
+                null
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

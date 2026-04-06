@@ -43,15 +43,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
@@ -72,7 +69,6 @@ data class AccountsProfilesUiState(
     val authenticated: Boolean = false,
     val userId: String? = null,
     val email: String? = null,
-    val householdId: String? = null,
     val profiles: List<CrispyBackendClient.Profile> = emptyList(),
     val activeProfileId: String? = null,
     val newProfileNameInput: String = "",
@@ -221,14 +217,6 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            if (!uiState.householdId.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Household: ${uiState.householdId}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -328,7 +316,6 @@ internal class AccountsProfilesViewModel(
     private val backend: CrispyBackendClient,
     private val profileStore: ActiveProfileStore,
     private val profileDataCloudSync: ProfileDataCloudSync,
-    private val householdAddonsCloudSync: HouseholdAddonsCloudSync,
     private val watchHistoryService: WatchHistoryService,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AccountsProfilesUiState(configured = supabase.isConfigured() && backend.isConfigured()))
@@ -362,7 +349,6 @@ internal class AccountsProfilesViewModel(
                         authenticated = false,
                         userId = null,
                         email = null,
-                        householdId = null,
                         profiles = emptyList(),
                         activeProfileId = null
                     )
@@ -387,7 +373,7 @@ internal class AccountsProfilesViewModel(
 
             val profiles = me.profiles
 
-            val userId = me.user.supabaseAuthUserId ?: session.userId ?: me.user.id
+            val userId = session.userId?.ifBlank { me.user.id } ?: me.user.id
             val storedActive = profileStore.getActiveProfileId(userId)
             val resolvedActive =
                 storedActive?.takeIf { id -> profiles.any { it.id == id } }
@@ -399,8 +385,6 @@ internal class AccountsProfilesViewModel(
 
             val settingsSyncError =
                 profileDataCloudSync.pullForActiveProfile().exceptionOrNull()?.message
-            val addonsSyncError =
-                householdAddonsCloudSync.pullToLocal().exceptionOrNull()?.message
             val providerSyncError =
                 runCatching { watchHistoryService.refreshProviderAuthState(forceRefresh = false) }
                     .getOrNull()
@@ -413,13 +397,11 @@ internal class AccountsProfilesViewModel(
                     authenticated = true,
                     userId = userId,
                     email = me.user.email ?: session.email,
-                    householdId = me.household.id,
                     profiles = profiles,
                     activeProfileId = resolvedActive,
                     statusMessage =
                         when {
                             !settingsSyncError.isNullOrBlank() -> "Settings sync failed: $settingsSyncError"
-                            !addonsSyncError.isNullOrBlank() -> "Addons sync failed: $addonsSyncError"
                             !providerSyncError.isNullOrBlank() -> providerSyncError
                             else -> ""
                         }
@@ -565,16 +547,11 @@ internal class AccountsProfilesViewModel(
                         SupabaseServicesProvider.createProfileDataCloudSync(
                             context = safeContext,
                         )
-                    val addonRegistry = MetadataAddonRegistry(safeContext, BuildConfig.METADATA_ADDON_URLS)
-                    val householdAddonsCloudSync =
-                        SupabaseServicesProvider.createHouseholdAddonsCloudSync(safeContext, addonRegistry)
-
                     return AccountsProfilesViewModel(
                         supabase = supabase,
                         backend = backend,
                         profileStore = profileStore,
                         profileDataCloudSync = profileDataCloudSync,
-                        householdAddonsCloudSync = householdAddonsCloudSync,
                         watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(safeContext),
                     ) as T
                 }

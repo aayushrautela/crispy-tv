@@ -10,6 +10,7 @@ data class CatalogSectionRef(
     val catalogId: String,
     val source: HomeCatalogSource,
     val presentation: HomeCatalogPresentation,
+    val layout: String = "",
     val variantKey: String = "default",
     val name: String = "",
     val heading: String = "",
@@ -26,6 +27,7 @@ data class CatalogSectionRef(
 @Immutable
 data class CatalogItem(
     val id: String,
+    val mediaKey: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -35,7 +37,9 @@ data class CatalogItem(
     val rating: String? = null,
     val year: String? = null,
     val genre: String? = null,
-    val description: String? = null
+    val description: String? = null,
+    val provider: String,
+    val providerId: String,
 )
 
 @Immutable

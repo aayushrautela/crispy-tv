@@ -15,10 +15,11 @@ internal class ContinueWatchingNormalizer {
             val normalized =
                 entry.copy(
                     progressPercent = entry.progressPercent.coerceIn(0.0, 100.0),
-                    title = entry.title.trim().ifEmpty { entry.contentId },
-                    contentId = entry.contentId.trim(),
+                    title = entry.title.trim().ifEmpty { entry.providerId },
+                    provider = entry.provider.trim(),
+                    providerId = entry.providerId.trim(),
                 )
-            if (normalized.contentId.isEmpty()) continue
+            if (normalized.provider.isEmpty() || normalized.providerId.isEmpty()) continue
             if (normalized.lastUpdatedEpochMs < staleCutoff) continue
 
             if (normalized.isUpNextPlaceholder) {
@@ -28,7 +29,7 @@ internal class ContinueWatchingNormalizer {
                 if (normalized.progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) continue
             }
 
-            val key = "${normalized.contentType.name}:${normalized.contentId}".lowercase(Locale.US)
+            val key = "${normalized.mediaType}:${normalized.provider}:${normalized.providerId}".lowercase(Locale.US)
             val existing = deduped[key]
             deduped[key] = if (existing == null) normalized else choosePreferred(existing, normalized)
         }
@@ -42,8 +43,9 @@ internal class ContinueWatchingNormalizer {
 
     private fun choosePreferred(current: ContinueWatchingEntry, incoming: ContinueWatchingEntry): ContinueWatchingEntry {
         val sameEpisode =
-            current.contentType == incoming.contentType &&
-                current.contentId.equals(incoming.contentId, ignoreCase = true) &&
+            current.mediaType.equals(incoming.mediaType, ignoreCase = true) &&
+                current.provider.equals(incoming.provider, ignoreCase = true) &&
+                current.providerId.equals(incoming.providerId, ignoreCase = true) &&
                 current.season == incoming.season &&
                 current.episode == incoming.episode &&
                 current.isUpNextPlaceholder == incoming.isUpNextPlaceholder

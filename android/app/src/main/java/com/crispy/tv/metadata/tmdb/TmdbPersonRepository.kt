@@ -91,7 +91,8 @@ internal class TmdbPersonRepository(
                     add(
                         Entry(
                             item = CatalogItem(
-                                id = "tmdb:$tmdbId",
+                                id = "tmdb:$type:$tmdbId",
+                                mediaKey = "tmdb:$type:$tmdbId",
                                 title = title,
                                 posterUrl = TmdbApi.imageUrl(credit.optStringNonBlank("poster_path"), "w500"),
                                 backdropUrl = null,
@@ -100,6 +101,8 @@ internal class TmdbPersonRepository(
                                 rating = formatRating(credit.optDoubleOrNull("vote_average")),
                                 year = year?.toString(),
                                 genre = null,
+                                provider = "tmdb",
+                                providerId = tmdbId.toString(),
                             ),
                             popularity = popularity,
                         )

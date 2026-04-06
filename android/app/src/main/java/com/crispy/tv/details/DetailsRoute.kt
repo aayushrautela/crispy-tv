@@ -7,6 +7,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crispy.tv.app.appGraph
+import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
@@ -15,13 +18,13 @@ import java.util.Locale
 
 @Composable
 fun DetailsRoute(
-    itemId: String,
+    mediaKey: String,
     mediaType: String,
-    initialSeason: Int? = null,
-    initialEpisode: Int? = null,
+    runtimeEntry: RuntimeDetailsEntry? = null,
+    highlightEpisodeId: String? = null,
     autoOpenEpisode: Boolean = false,
     onBack: () -> Unit,
-    onItemClick: (String, String) -> Unit = { _, _ -> },
+    onItemClick: (CatalogItem) -> Unit = {},
     onPersonClick: (String) -> Unit = {},
     onOpenPlayer: (String, Map<String, String>, String, PlaybackIdentity, String?, String?, PlayerLaunchSnapshot?) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
@@ -31,6 +34,7 @@ fun DetailsRoute(
         when (mediaType.trim().lowercase(Locale.US)) {
             "movie" -> "movie"
             "series", "show", "tv" -> "series"
+            "anime" -> "anime"
             else -> ""
         }
     }
@@ -39,15 +43,17 @@ fun DetailsRoute(
         return
     }
 
-    // Important: itemId alone is not globally unique (e.g. TMDB movie vs TV IDs can collide).
-    // Keep mediaType in the key to prevent ViewModel reuse across different titles.
-    val viewModelKey = remember(itemId, normalizedType) {
-        "$normalizedType:$itemId"
+    // Important: mediaKey alone is not guaranteed to be collision-free across differing route classes.
+    // Keep mediaType in the key to prevent ViewModel reuse across different title shapes.
+    val viewModelKey = remember(mediaKey, normalizedType) {
+        "$normalizedType:$mediaKey"
     }
     val viewModel: DetailsViewModel =
         viewModel(
             key = viewModelKey,
-            factory = remember(appContext, itemId, normalizedType) { DetailsViewModel.factory(appContext, itemId, normalizedType) }
+            factory = remember(appContext, mediaKey, normalizedType, runtimeEntry) {
+                appContext.appGraph().detailsViewModelFactory(mediaKey, normalizedType, runtimeEntry)
+            }
         )
     val playbackSettingsRepository = remember(appContext) {
         PlaybackSettingsRepositoryProvider.get(appContext)
@@ -73,10 +79,9 @@ fun DetailsRoute(
         }
     }
 
-    LaunchedEffect(viewModel, initialSeason, initialEpisode, autoOpenEpisode) {
+    LaunchedEffect(viewModel, highlightEpisodeId, autoOpenEpisode) {
         viewModel.requestEpisodeNavigation(
-            initialSeason = initialSeason,
-            initialEpisode = initialEpisode,
+            highlightEpisodeId = highlightEpisodeId,
             autoOpenEpisode = autoOpenEpisode,
         )
     }

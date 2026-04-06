@@ -1,42 +1,29 @@
 package com.crispy.tv.details
 
-import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.BuildConfig
-import com.crispy.tv.PlaybackDependencies
-import com.crispy.tv.ai.AiInsightsRepository
-import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.TmdbImdbIdResolver
-import com.crispy.tv.metadata.omdb.OmdbDetails
-import com.crispy.tv.metadata.omdb.OmdbRepository
-import com.crispy.tv.metadata.omdb.OmdbRepositoryProvider
-import com.crispy.tv.metadata.tmdb.TmdbEnrichment
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
-import com.crispy.tv.metadata.tmdb.TmdbTvDetails
-import com.crispy.tv.network.AppHttp
-import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerEpisodeSnapshot
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
-import com.crispy.tv.player.ProviderLibraryItem
-import com.crispy.tv.player.WatchHistoryRequest
-import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.player.WatchProviderAuthState
-import com.crispy.tv.settings.AiInsightsMode
-import com.crispy.tv.settings.AiInsightsSettingsStore
 import com.crispy.tv.streams.AddonStream
-import com.crispy.tv.streams.AddonStreamsService
-import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
+import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.playback.StreamLookupTarget
+import com.crispy.tv.playback.buildPlayerSubtitle
+import com.crispy.tv.playback.buildStreamStatusMessage
+import com.crispy.tv.playback.findEpisodeForLookupId
+import com.crispy.tv.playback.resolveStreamLookupTarget
+import com.crispy.tv.playback.matchesTarget
+import com.crispy.tv.playback.toUiState
+import com.crispy.tv.playback.toLoadingUiState
+import com.crispy.tv.playback.applyProviderResult
+import com.crispy.tv.playback.finalizeFrom
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,97 +37,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
-import kotlin.math.roundToInt
-
-@Immutable
-data class EpisodeWatchState(
-    val progressPercent: Double = 0.0,
-    val isWatched: Boolean = false,
-)
-
-@Immutable
-data class DetailsUiState(
-    val itemId: String,
-    val isLoading: Boolean = true,
-    val details: MediaDetails? = null,
-    val tmdbIsLoading: Boolean = false,
-    val tmdbEnrichment: TmdbEnrichment? = null,
-    val omdbIsLoading: Boolean = false,
-    val omdbDetails: OmdbDetails? = null,
-    val statusMessage: String = "",
-    val aiMode: AiInsightsMode = AiInsightsMode.ON_DEMAND,
-    val aiConfigured: Boolean = false,
-    val aiIsLoading: Boolean = false,
-    val aiInsights: AiInsightsResult? = null,
-    val aiStoryVisible: Boolean = false,
-    val isWatched: Boolean = false,
-    val isInWatchlist: Boolean = false,
-    val isRated: Boolean = false,
-    val userRating: Int? = null,
-    val isMutating: Boolean = false,
-    val watchCta: WatchCta = WatchCta(),
-    val continueVideoId: String? = null,
-    val selectedSeason: Int? = null,
-    val seasons: List<Int> = emptyList(),
-    val seasonEpisodes: List<MediaVideo> = emptyList(),
-    val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),
-    val episodesIsLoading: Boolean = false,
-    val episodesStatusMessage: String = "",
-    val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
-) {
-    val selectedSeasonOrFirst: Int?
-        get() = selectedSeason ?: seasons.firstOrNull()
-}
-
-@Immutable
-data class StreamProviderUiState(
-    val providerId: String,
-    val providerName: String,
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
-    val streams: List<AddonStream> = emptyList(),
-    val attemptedUrl: String? = null,
-)
-
-@Immutable
-data class StreamSelectorUiState(
-    val visible: Boolean = false,
-    val mediaType: MetadataLabMediaType? = null,
-    val lookupId: String? = null,
-    val headerEpisode: MediaVideo? = null,
-    val selectedProviderId: String? = null,
-    val providers: List<StreamProviderUiState> = emptyList(),
-    val isLoading: Boolean = false,
-) {
-    val totalStreamCount: Int
-        get() = providers.sumOf { provider -> provider.streams.size }
-}
-
-sealed interface DetailsNavigationEvent {
-    data class OpenPlayer(
-        val playbackUrl: String,
-        val playbackHeaders: Map<String, String> = emptyMap(),
-        val title: String,
-        val identity: PlaybackIdentity,
-        val subtitle: String?,
-        val artworkUrl: String?,
-        val launchSnapshot: PlayerLaunchSnapshot?,
-    ) : DetailsNavigationEvent
-}
 
 class DetailsViewModel internal constructor(
-    private val itemId: String,
+    private val mediaKey: String,
     private val mediaType: String,
-    private val watchHistoryService: WatchHistoryService,
-    private val tmdbImdbIdResolver: TmdbImdbIdResolver,
-    private val tmdbEnrichmentRepository: TmdbEnrichmentRepository,
-    private val omdbRepository: OmdbRepository,
-    private val aiSettingsStore: AiInsightsSettingsStore,
-    private val aiRepository: AiInsightsRepository,
-    private val addonStreamsService: AddonStreamsService,
+    private val runtimeEntry: RuntimeDetailsEntry?,
+    private val detailsUseCases: DetailsUseCases,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
+    private val _uiState = MutableStateFlow(DetailsUiState(mediaKey = mediaKey))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
     private val _navigationEvents = MutableSharedFlow<DetailsNavigationEvent>(extraBufferCapacity = 1)
     val navigationEvents: SharedFlow<DetailsNavigationEvent> = _navigationEvents.asSharedFlow()
@@ -151,10 +56,7 @@ class DetailsViewModel internal constructor(
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
-    private var omdbJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
-    private var resolvedTmdbId: Int? = null
-    private var cachedEpisodeWatchKeys: Set<String>? = null
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
 
     init {
@@ -164,23 +66,17 @@ class DetailsViewModel internal constructor(
     fun reload() {
         viewModelScope.launch {
             val nowMs = System.currentTimeMillis()
-            val aiSnapshot = aiSettingsStore.loadSnapshot()
 
             episodesJob?.cancel()
-            omdbJob?.cancel()
             seasonEpisodesCache.clear()
-            resolvedTmdbId = null
-            cachedEpisodeWatchKeys = null
+            detailsUseCases.clearEpisodeWatchStateCache()
 
             _uiState.update {
                 it.copy(
                     isLoading = true,
-                    tmdbIsLoading = true,
+                    titleDetail = null,
+                    titleContent = null,
                     statusMessage = "Loading...",
-                    omdbIsLoading = false,
-                    omdbDetails = null,
-                    aiMode = aiSnapshot.settings.mode,
-                    aiConfigured = aiSnapshot.openRouterKey.isNotBlank(),
                     aiIsLoading = false,
                     aiInsights = null,
                     aiStoryVisible = false,
@@ -195,109 +91,80 @@ class DetailsViewModel internal constructor(
                 )
             }
 
-            val tmdbResult =
+            val result =
                 withContext(Dispatchers.IO) {
-                    tmdbEnrichmentRepository.load(rawId = itemId, mediaTypeHint = requestedMediaType)
+                    detailsUseCases.loadScreen(
+                        mediaKey = mediaKey,
+                        requestedMediaType = requestedMediaType,
+                        runtimeEntry = runtimeEntry,
+                        nowMs = nowMs,
+                    )
                 }
 
-            val tmdbEnrichment = tmdbResult?.enrichment
-            val tmdbFallbackDetails = tmdbResult?.fallbackDetails
-            resolvedTmdbId = tmdbEnrichment?.tmdbId
-
-            var mergedDetails: MediaDetails? = tmdbFallbackDetails
-
-            mergedDetails =
-                withContext(Dispatchers.IO) {
-                    mergedDetails?.let { details ->
-                        if (details.imdbId == null && tmdbEnrichment?.imdbId != null) {
-                            details.copy(imdbId = tmdbEnrichment.imdbId)
-                        } else {
-                            details
-                        }
-                    }
-                }
-
-            val enrichedDetails =
-                withContext(Dispatchers.IO) {
-                    mergedDetails?.let { details ->
-                        if (details.imdbId == null) ensureImdbId(details) else details
-                    }
-                }
-
-            val providerState =
-                withContext(Dispatchers.IO) {
-                    resolveProviderState(enrichedDetails)
-                }
-
-            val (watchCta, continueVideoId) =
-                withContext(Dispatchers.IO) {
-                    resolveWatchCta(enrichedDetails, providerState, nowMs)
-                }
+            val enrichedDetails = result.details
 
             _uiState.update { state ->
-                val details = enrichedDetails
-                val isSeries = details?.mediaType?.trim()?.equals("series", ignoreCase = true) == true
-                val seasonCount = (tmdbEnrichment?.titleDetails as? TmdbTvDetails)?.numberOfSeasons ?: 0
-                val seasons = if (isSeries && seasonCount > 0) (1..seasonCount).toList() else emptyList()
-                val pendingSeason = pendingEpisodeNavigation?.season
+                val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId
+                val pendingSeason =
+                    pendingHighlightEpisodeId?.let { highlightEpisodeId ->
+                result.details?.videos?.firstOrNull { video ->
+                    video.id.equals(highlightEpisodeId, ignoreCase = true)
+                }?.season
+                    }
                 val selectedSeason =
                     when {
-                        pendingSeason != null && pendingSeason in seasons -> pendingSeason
-                        state.selectedSeason != null && state.selectedSeason in seasons -> state.selectedSeason
-                        seasons.isNotEmpty() -> seasons.first()
-                        else -> null
-                    }
+                        pendingSeason != null && pendingSeason in result.seasons -> pendingSeason
+                        state.selectedSeason != null && state.selectedSeason in result.seasons -> state.selectedSeason
+                        result.seasons.isNotEmpty() -> result.seasons.first()
+                    else -> null
+                }
 
-                val statusMessage =
-                    when {
-                        details != null -> ""
-                        else -> "Unable to load details."
-                    }
+                val selectedSeasonEpisodes =
+                    selectedSeason?.let { seasonEpisodesCache[it] }
+                        ?: state.seasonEpisodes.takeIf { selectedSeason == state.selectedSeasonOrFirst }
+
                 state.copy(
                     isLoading = false,
-                    tmdbIsLoading = false,
-                    details = details,
-                    tmdbEnrichment = tmdbEnrichment,
-                    statusMessage = statusMessage,
-                    isWatched = providerState.isWatched,
-                    isInWatchlist = providerState.isInWatchlist,
-                    isRated = providerState.isRated,
-                    userRating = providerState.userRating,
-                    watchCta = watchCta,
-                    continueVideoId = continueVideoId,
-                    seasons = seasons,
+                    details = result.details,
+                    titleDetail = result.titleDetail,
+                    titleContent = result.titleContent,
+                    statusMessage = result.statusMessage,
+                    isWatched = result.providerState.isWatched,
+                    isInWatchlist = result.providerState.isInWatchlist,
+                    isRated = result.providerState.isRated,
+                    userRating = result.providerState.userRating,
+                    watchCta = result.watchCta,
+                    continueVideoId = result.continueVideoId,
+                    seasons = result.seasons,
                     selectedSeason = selectedSeason,
-                    seasonEpisodes = emptyList(),
+                    seasonEpisodes = selectedSeasonEpisodes.orEmpty(),
                     episodeWatchStates = emptyMap(),
-                    episodesIsLoading = false,
+                    episodesIsLoading = selectedSeason != null && selectedSeasonEpisodes == null,
                     episodesStatusMessage = "",
                 )
             }
 
-            loadOmdbRatings(enrichedDetails)
-
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
-            if (enrichedDetails?.mediaType?.trim()?.equals("series", ignoreCase = true) == true && seasonToLoad != null) {
+            if (
+                enrichedDetails?.mediaType
+                    ?.toMetadataLabMediaTypeOrNull()
+                    ?.let { it != MetadataLabMediaType.MOVIE }
+                    == true && seasonToLoad != null
+            ) {
                 loadEpisodesForSeason(seasonToLoad, force = true)
             }
 
-            val tmdbId = tmdbEnrichment?.tmdbId
             val detailsForAi = enrichedDetails
-            val aiMode = aiSnapshot.settings.mode
-            val aiConfigured = aiSnapshot.openRouterKey.isNotBlank()
             val aiLocale = Locale.getDefault()
+            val aiMediaKey = detailsForAi?.mediaKey?.trim()
 
-            if (tmdbId != null && detailsForAi != null && aiMode != AiInsightsMode.OFF) {
-                val cached = withContext(Dispatchers.IO) { aiRepository.loadCached(tmdbId, requestedMediaType, aiLocale) }
+            if (!aiMediaKey.isNullOrBlank()) {
+                val cached =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.loadCachedAiInsights(aiMediaKey, aiLocale)
+                    }
                 if (cached != null) {
                     _uiState.update { it.copy(aiInsights = cached) }
-                } else if (aiMode == AiInsightsMode.ALWAYS && aiConfigured) {
-                    startAiGeneration(
-                        tmdbId = tmdbId,
-                        locale = aiLocale,
-                        showStory = false,
-                        announce = false,
-                    )
                 }
             }
         }
@@ -305,19 +172,10 @@ class DetailsViewModel internal constructor(
 
     fun onAiInsightsClick() {
         val state = uiState.value
-        if (state.aiMode == AiInsightsMode.OFF) {
-            _uiState.update { it.copy(statusMessage = "AI insights are off. Enable them in Settings > AI Insights.") }
-            return
-        }
-        if (!state.aiConfigured) {
-            _uiState.update { it.copy(statusMessage = "Add an OpenRouter key in Settings > AI Insights.") }
-            return
-        }
-
         val details = state.details
-        val tmdbId = state.tmdbEnrichment?.tmdbId
-        if (details == null || tmdbId == null) {
-            _uiState.update { it.copy(statusMessage = "TMDB data isn't ready yet. Try again in a moment.") }
+        val aiMediaKey = details?.mediaKey?.trim()
+        if (details == null || aiMediaKey.isNullOrBlank()) {
+            _uiState.update { it.copy(statusMessage = "AI insights aren't available for this title yet.") }
             return
         }
 
@@ -330,7 +188,7 @@ class DetailsViewModel internal constructor(
         if (state.aiIsLoading) return
 
         startAiGeneration(
-            tmdbId = tmdbId,
+            mediaKey = aiMediaKey,
             locale = Locale.getDefault(),
             showStory = true,
             announce = true,
@@ -342,7 +200,7 @@ class DetailsViewModel internal constructor(
     }
 
     private fun startAiGeneration(
-        tmdbId: Int,
+        mediaKey: String,
         locale: Locale,
         showStory: Boolean,
         announce: Boolean,
@@ -358,9 +216,8 @@ class DetailsViewModel internal constructor(
 
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        aiRepository.generate(
-                            tmdbId = tmdbId,
-                            mediaType = requestedMediaType,
+                        detailsUseCases.generateAiInsights(
+                            mediaKey = mediaKey,
                             locale = locale,
                         )
                     }
@@ -403,20 +260,29 @@ class DetailsViewModel internal constructor(
     }
 
     fun requestEpisodeNavigation(
-        initialSeason: Int?,
-        initialEpisode: Int?,
+        highlightEpisodeId: String?,
         autoOpenEpisode: Boolean,
     ) {
-        if (initialSeason == null && initialEpisode == null) return
+        val normalizedHighlightEpisodeId = highlightEpisodeId?.trim()?.ifBlank { null } ?: return
         pendingEpisodeNavigation =
             PendingEpisodeNavigation(
-                season = initialSeason,
-                episode = initialEpisode,
+                highlightEpisodeId = normalizedHighlightEpisodeId,
                 autoOpenEpisode = autoOpenEpisode,
             )
 
         val currentState = _uiState.value
-        val targetSeason = initialSeason ?: currentState.selectedSeasonOrFirst ?: return
+        val targetSeason =
+            currentState.seasonEpisodes.firstOrNull { episode ->
+                episode.id.equals(normalizedHighlightEpisodeId, ignoreCase = true)
+            }?.season
+                ?: seasonEpisodesCache.values.asSequence().flatten().firstOrNull { episode ->
+                    episode.id.equals(normalizedHighlightEpisodeId, ignoreCase = true)
+                }?.season
+                ?: currentState.details?.videos?.firstOrNull { episode ->
+                    episode.id.equals(normalizedHighlightEpisodeId, ignoreCase = true)
+                }?.season
+                ?: currentState.selectedSeasonOrFirst
+                ?: return
         if (targetSeason != currentState.selectedSeasonOrFirst && targetSeason in currentState.seasons) {
             onSeasonSelected(targetSeason)
             return
@@ -463,9 +329,7 @@ class DetailsViewModel internal constructor(
     ) {
         val state = _uiState.value
         val details = state.details ?: return
-        val tmdb = state.tmdbEnrichment ?: return
-        if (details.mediaType.trim().equals("series", ignoreCase = true).not()) return
-        if (tmdb.mediaType != MetadataLabMediaType.SERIES) return
+        if (details.mediaType.toMetadataLabMediaTypeOrNull()?.let { it != MetadataLabMediaType.MOVIE } != true) return
 
         val cached = if (!force) seasonEpisodesCache[season] else null
         if (cached != null) {
@@ -493,54 +357,45 @@ class DetailsViewModel internal constructor(
 
         episodesJob =
             viewModelScope.launch {
-                val episodes =
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            tmdbEnrichmentRepository.loadSeasonEpisodes(tmdbId = tmdb.tmdbId, seasonNumber = season)
-                        }
-                    }.getOrElse {
-                        _uiState.update { current ->
-                            if (current.selectedSeasonOrFirst != season) current
-                            else current.copy(
-                                episodesIsLoading = false,
-                                episodesStatusMessage = "Failed to load episodes.",
-                            )
-                        }
-                        return@launch
+                val result =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.loadSeasonEpisodes(
+                            mediaKey = mediaKey,
+                            season = season,
+                            details = details,
+                        )
                     }
 
-                val videos =
-                    episodes
-                        .mapNotNull { ep ->
-                            val lookupId = buildEpisodeLookupId(details = details, season = ep.seasonNumber, episode = ep.episodeNumber)
-                                ?: return@mapNotNull null
-                            MediaVideo(
-                                id = lookupId,
-                                title = ep.name,
-                                season = ep.seasonNumber,
-                                episode = ep.episodeNumber,
-                                released = ep.airDate,
-                                overview = ep.overview,
-                                thumbnailUrl = ep.stillUrl,
-                            )
-                        }
-                        .sortedWith(
-                            compareBy<MediaVideo>({ it.episode ?: Int.MAX_VALUE }, { it.title.lowercase(Locale.US) }, { it.id })
+                if (result.errorMessage != null) {
+                    _uiState.update { current ->
+                        if (current.selectedSeasonOrFirst != season) current
+                        else current.copy(
+                            episodesIsLoading = false,
+                            episodesStatusMessage = result.errorMessage,
                         )
+                    }
+                    return@launch
+                }
 
-                seasonEpisodesCache[season] = videos
-                val episodeWatchStates = withContext(Dispatchers.IO) { resolveEpisodeWatchStates(details, videos) }
+                seasonEpisodesCache[season] = result.videos
+                result.effectiveSeasonNumber
+                    ?.takeIf { it != season }
+                    ?.let { effectiveSeason ->
+                        seasonEpisodesCache[effectiveSeason] = result.videos
+                    }
 
                 _uiState.update { current ->
-                    if (current.selectedSeasonOrFirst != season) current
+                    val resolvedSeason = result.effectiveSeasonNumber ?: season
+                    if (current.selectedSeasonOrFirst != season && current.selectedSeasonOrFirst != resolvedSeason) current
                     else current.copy(
-                        seasonEpisodes = videos,
-                        episodeWatchStates = episodeWatchStates,
+                        selectedSeason = resolvedSeason,
+                        seasonEpisodes = result.videos,
+                        episodeWatchStates = result.episodeWatchStates,
                         episodesIsLoading = false,
-                        episodesStatusMessage = if (videos.isEmpty()) "No episodes found." else "",
+                        episodesStatusMessage = if (result.videos.isEmpty()) "No episodes found." else "",
                     )
                 }
-                maybeConsumePendingEpisodeNavigation(videos)
+                maybeConsumePendingEpisodeNavigation(result.videos)
             }
     }
 
@@ -552,27 +407,16 @@ class DetailsViewModel internal constructor(
         episodesJob =
             viewModelScope.launch {
                 val details = _uiState.value.details ?: return@launch
-                val episodeWatchStates = withContext(Dispatchers.IO) { resolveEpisodeWatchStates(details, videos) }
+                val episodeWatchStates =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.resolveEpisodeWatchStates(details, videos)
+                    }
                 _uiState.update { current ->
                     if (current.selectedSeasonOrFirst != season) current
                     else current.copy(episodeWatchStates = episodeWatchStates)
                 }
                 maybeConsumePendingEpisodeNavigation(videos)
             }
-    }
-
-    private fun buildEpisodeLookupId(
-        details: MediaDetails,
-        season: Int,
-        episode: Int,
-    ): String? {
-        if (season <= 0 || episode <= 0) return null
-        val base = details.imdbId?.trim().takeIf { !it.isNullOrBlank() }
-            ?: details.id.trim().takeIf { it.isNotBlank() }
-            ?: return null
-        val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
-        if (canonicalBase.isBlank()) return null
-        return "$canonicalBase:$season:$episode"
     }
 
     fun onOpenStreamSelectorForEpisode(videoId: String) {
@@ -582,14 +426,17 @@ class DetailsViewModel internal constructor(
             _uiState.update { it.copy(statusMessage = "Details are still loading.") }
             return
         }
+        val episode =
+            state.seasonEpisodes.firstOrNull { it.id.equals(videoId.trim(), ignoreCase = true) }
+                ?: seasonEpisodesCache.values.asSequence().flatten().firstOrNull { it.id.equals(videoId.trim(), ignoreCase = true) }
         val target =
             StreamLookupTarget(
                 mediaType = requestedMediaType,
-                lookupId = videoId.trim(),
+                lookupId = episode?.lookupId?.trim().orEmpty(),
             )
         openStreamSelectorWithTarget(
             target = target,
-            headerEpisode = findEpisodeForLookupId(target.lookupId, state.seasonEpisodes),
+            headerEpisode = episode,
             blankIdMessage = "This episode does not have a stream lookup id.",
         )
     }
@@ -637,7 +484,7 @@ class DetailsViewModel internal constructor(
         streamLoadJob =
             viewModelScope.launch {
                 runCatching {
-                    addonStreamsService.loadStreams(
+                    detailsUseCases.loadStreams(
                         mediaType = target.mediaType,
                         lookupId = target.lookupId,
                         onProvidersResolved = { providers ->
@@ -717,18 +564,6 @@ class DetailsViewModel internal constructor(
             }
     }
 
-    private fun findEpisodeForLookupId(
-        lookupId: String,
-        currentEpisodes: List<MediaVideo>,
-    ): MediaVideo? {
-        val normalizedLookupId = lookupId.trim()
-        if (normalizedLookupId.isBlank()) return null
-
-        return sequenceOf(currentEpisodes.asSequence(), seasonEpisodesCache.values.asSequence().flatten())
-            .flatten()
-            .firstOrNull { episode -> episode.id.equals(normalizedLookupId, ignoreCase = true) }
-    }
-
     fun onDismissStreamSelector() {
         _uiState.update { state ->
             state.copy(
@@ -778,7 +613,7 @@ class DetailsViewModel internal constructor(
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    addonStreamsService.loadProviderStreams(
+                    detailsUseCases.loadProviderStreams(
                         mediaType = mediaType,
                         lookupId = lookupId,
                         providerId = normalizedProviderId,
@@ -865,7 +700,6 @@ class DetailsViewModel internal constructor(
         }
 
         val initialDetails = currentState.details
-        val lookupId = currentState.streamSelector.lookupId
 
         viewModelScope.launch {
             val details = initialDetails
@@ -873,40 +707,66 @@ class DetailsViewModel internal constructor(
 
             val enriched =
                 withContext(Dispatchers.IO) {
-                    ensureImdbId(details)
+                    detailsUseCases.ensureImdbId(details, requestedMediaType)
                 }
             if (enriched.imdbId != details.imdbId) {
                 _uiState.update { it.copy(details = enriched) }
             }
 
             val resolvedMediaType = enriched.mediaType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
+            val targetEpisode =
+                currentState.streamSelector.headerEpisode
+                    ?: findEpisodeForLookupId(
+                        lookupId = currentState.streamSelector.lookupId.orEmpty(),
+                        currentEpisodes = currentState.seasonEpisodes,
+                    )
+            val resolvedLookupId =
+                currentState.streamSelector.lookupId
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: targetEpisode?.lookupId?.trim()?.takeIf { it.isNotBlank() }
+                    ?: resolveStreamLookupTarget(
+                        details = enriched,
+                        selectedSeason = currentState.selectedSeasonOrFirst,
+                        seasonEpisodes = currentState.seasonEpisodes,
+                        fallbackMediaType = requestedMediaType,
+                    ).lookupId
             val normalizedLookupId =
                 normalizeNuvioMediaId(
-                    lookupId
-                        ?.trim()
-                        ?.takeIf { it.isNotBlank() }
-                        ?: enriched.id,
+                    resolvedLookupId,
                 )
 
-            val season = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.season else null
-            val episode = if (resolvedMediaType == MetadataLabMediaType.SERIES) normalizedLookupId.episode else null
+            val isEpisodic = resolvedMediaType != MetadataLabMediaType.MOVIE
+            val parentMediaType =
+                when (resolvedMediaType) {
+                    MetadataLabMediaType.MOVIE -> null
+                    MetadataLabMediaType.SERIES -> "show"
+                    MetadataLabMediaType.ANIME -> "anime"
+                }
+            val season = if (isEpisodic) targetEpisode?.season ?: normalizedLookupId.season else null
+            val episode = if (isEpisodic) targetEpisode?.episode ?: normalizedLookupId.episode else null
 
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
-            val title = selectedEpisodeTitle ?: mediaTitle ?: "Player"
+            val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
-            val tmdbId = extractTmdbIdOrNull(enriched.id) ?: extractTmdbIdOrNull(lookupId)
-
             val identity =
                 PlaybackIdentity(
+                    contentId = enriched.id,
                     imdbId = enriched.imdbId,
-                    tmdbId = tmdbId,
+                    tmdbId = if (resolvedMediaType == MetadataLabMediaType.MOVIE) enriched.tmdbId ?: targetEpisode?.tmdbId else null,
                     contentType = resolvedMediaType,
                     season = season,
                     episode = episode,
                     title = title,
                     year = yearInt,
-                    showTitle = if (resolvedMediaType == MetadataLabMediaType.SERIES) enriched.title else null,
-                    showYear = if (resolvedMediaType == MetadataLabMediaType.SERIES) yearInt else null,
+                    showTitle = if (isEpisodic) enriched.title else null,
+                    showYear = if (isEpisodic) yearInt else null,
+                    provider = targetEpisode?.provider ?: enriched.provider,
+                    providerId = targetEpisode?.providerId ?: enriched.providerId,
+                    parentMediaType = enriched.parentMediaType ?: parentMediaType,
+                    parentProvider = targetEpisode?.parentProvider ?: enriched.parentProvider ?: enriched.provider,
+                    parentProviderId = targetEpisode?.parentProviderId ?: enriched.parentProviderId ?: enriched.providerId,
+                    absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
                 )
             val artworkUrl = enriched.backdropUrl?.trim()?.ifBlank { null } ?: enriched.posterUrl?.trim()?.ifBlank { null }
             val subtitle = buildPlayerSubtitle(
@@ -928,8 +788,17 @@ class DetailsViewModel internal constructor(
                     launchSnapshot =
                         PlayerLaunchSnapshot(
                             contentId = enriched.id,
+                            mediaKey = enriched.mediaKey,
                             imdbId = enriched.imdbId,
+                            seasonNumber = season,
+                            episodeNumber = episode,
                             mediaType = enriched.mediaType,
+                            provider = enriched.provider,
+                            providerId = enriched.providerId,
+                            parentMediaType = enriched.parentMediaType ?: parentMediaType,
+                            parentProvider = enriched.parentProvider ?: enriched.provider,
+                            parentProviderId = enriched.parentProviderId ?: enriched.providerId,
+                            absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
                             title = enriched.title,
                             posterUrl = enriched.posterUrl,
                             backdropUrl = enriched.backdropUrl,
@@ -952,110 +821,37 @@ class DetailsViewModel internal constructor(
                                         released = episodeItem.released,
                                         overview = episodeItem.overview,
                                         thumbnailUrl = episodeItem.thumbnailUrl,
+                                        lookupId = episodeItem.lookupId,
+                                        provider = episodeItem.provider,
+                                        providerId = episodeItem.providerId,
+                                        parentProvider = episodeItem.parentProvider,
+                                        parentProviderId = episodeItem.parentProviderId,
+                                        absoluteEpisodeNumber = episodeItem.absoluteEpisodeNumber,
                                     )
                                 },
-                            currentEpisodeId = lookupId,
+                            currentEpisodeId = targetEpisode?.id,
                         ),
                 )
             )
         }
     }
 
-    private fun buildPlayerSubtitle(
-        mediaType: MetadataLabMediaType,
-        details: MediaDetails,
-        playerTitle: String,
-        season: Int?,
-        episode: Int?,
-    ): String? {
-        return when (mediaType) {
-            MetadataLabMediaType.SERIES -> {
-                val normalizedPlayerTitle = playerTitle.trim().ifBlank { null }
-                val episodeLabel =
-                    when {
-                        season != null && episode != null -> {
-                            "S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
-                        }
-
-                        season != null -> "Season $season"
-                        else -> null
-                    }
-                val seriesTitle =
-                    details.title
-                        .trim()
-                        .ifBlank { null }
-                        ?.takeUnless { it == normalizedPlayerTitle }
-                listOfNotNull(seriesTitle, episodeLabel)
-                    .joinToString(separator = " • ")
-                    .ifBlank { null }
-            }
-
-            MetadataLabMediaType.MOVIE -> details.year?.trim()?.ifBlank { null }
-        }
-    }
-
-    private fun extractTmdbIdOrNull(rawId: String?): Int? {
-        val value = rawId?.trim().orEmpty()
-        if (value.isBlank()) return null
-        val match = TMDB_ID_REGEX.find(value) ?: return null
-        return match.groupValues.getOrNull(1)?.toIntOrNull()
-    }
-
     fun toggleWatchlist() {
         val details = uiState.value.details ?: return
-        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
         viewModelScope.launch {
-            val source =
-                withContext(Dispatchers.IO) {
-                    preferredWatchProvider(watchHistoryService.authState())
-                }
-            if (source == WatchProvider.LOCAL) {
-                _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to use watchlist.") }
-                return@launch
-            }
-
             val desired = !_uiState.value.isInWatchlist
             _uiState.update { it.copy(isMutating = true) }
 
-            val enriched =
-                withContext(Dispatchers.IO) {
-                    ensureImdbId(details)
-                }
-            if (enriched.imdbId != details.imdbId) {
-                _uiState.update { it.copy(details = enriched) }
-            }
-            if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-                _uiState.update {
-                    it.copy(
-                        isMutating = false,
-                        statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl)."
-                    )
-                }
-                return@launch
-            }
-
-            val request =
-                com.crispy.tv.player.WatchHistoryRequest(
-                    contentId = enriched.id,
-                    contentType = mediaType,
-                    title = enriched.title,
-                    remoteImdbId = enriched.imdbId
-                )
             val result =
                 withContext(Dispatchers.IO) {
-                    watchHistoryService.setInWatchlist(request, desired, source)
-                }
-            val success =
-                when (source) {
-                    WatchProvider.TRAKT -> result.syncedToTrakt
-                    WatchProvider.SIMKL -> result.syncedToSimkl
-                    WatchProvider.LOCAL -> false
+                    detailsUseCases.updateWatchlist(details, desired)
                 }
             _uiState.update {
                 it.copy(
                     isMutating = false,
                     statusMessage = result.statusMessage,
-                    isInWatchlist = if (success) desired else it.isInWatchlist
+                    details = result.details,
+                    isInWatchlist = if (result.success) desired else it.isInWatchlist
                 )
             }
         }
@@ -1064,84 +860,43 @@ class DetailsViewModel internal constructor(
     fun toggleWatched() {
         val details = uiState.value.details ?: return
         val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
-        if (mediaType == MetadataLabMediaType.SERIES) {
-            _uiState.update { it.copy(statusMessage = "Marking an entire series as watched isn't supported yet. Mark episodes from the episode list.") }
+        if (mediaType != MetadataLabMediaType.MOVIE) {
+            _uiState.update { it.copy(statusMessage = "Marking an entire episodic title as watched isn't supported yet. Mark episodes from the episode list.") }
             return
         }
         viewModelScope.launch {
-            val source =
-                withContext(Dispatchers.IO) {
-                    preferredWatchProvider(watchHistoryService.authState())
-                }
-
             val desired = !_uiState.value.isWatched
             _uiState.update { it.copy(isMutating = true) }
 
-            val enriched =
-                withContext(Dispatchers.IO) {
-                    ensureImdbId(details)
-                }
-            if (enriched.imdbId != details.imdbId) {
-                _uiState.update { it.copy(details = enriched) }
-            }
-            if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-                _uiState.update {
-                    it.copy(
-                        isMutating = false,
-                        statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl)."
-                    )
-                }
-                return@launch
-            }
-
-            val request =
-                com.crispy.tv.player.WatchHistoryRequest(
-                    contentId = enriched.id,
-                    contentType = mediaType,
-                    title = enriched.title,
-                    remoteImdbId = enriched.imdbId
-                )
             val result =
                 withContext(Dispatchers.IO) {
-                    if (desired) {
-                        watchHistoryService.markWatched(request, source)
-                    } else {
-                        watchHistoryService.unmarkWatched(request, source)
-                    }
+                    detailsUseCases.updateWatched(details, desired)
                 }
-            val success =
-                when (source) {
-                    WatchProvider.TRAKT -> result.syncedToTrakt
-                    WatchProvider.SIMKL -> result.syncedToSimkl
-                    WatchProvider.LOCAL -> true
+            val providerState =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveProviderState(
+                        details = result.details,
+                        itemId = mediaKey,
+                        requestedMediaType = requestedMediaType,
+                    )
+                }
+            val ctaResolution =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveWatchCta(
+                        details = result.details,
+                        providerState = providerState,
+                        requestedMediaType = requestedMediaType,
+                        nowMs = System.currentTimeMillis(),
+                    )
                 }
             _uiState.update {
-                val nextIsWatched = if (success) desired else it.isWatched
-                val nextCta =
-                    when {
-                        it.watchCta.kind == WatchCtaKind.CONTINUE -> it.watchCta
-                        nextIsWatched ->
-                            WatchCta(
-                                kind = WatchCtaKind.REWATCH,
-                                label = "Rewatch",
-                                icon = WatchCtaIcon.REPLAY,
-                                remainingMinutes = null,
-                                lastWatchedAtEpochMs = System.currentTimeMillis(),
-                            )
-                        else ->
-                            WatchCta(
-                                kind = WatchCtaKind.WATCH,
-                                label = "Watch now",
-                                icon = WatchCtaIcon.PLAY,
-                                remainingMinutes = parseRuntimeMinutes(it.details?.runtime),
-                                lastWatchedAtEpochMs = null,
-                            )
-                    }
                 it.copy(
                     isMutating = false,
+                    details = result.details,
                     statusMessage = result.statusMessage,
-                    isWatched = nextIsWatched,
-                    watchCta = nextCta,
+                    isWatched = providerState.isWatched,
+                    watchCta = ctaResolution.watchCta,
+                    continueVideoId = ctaResolution.continueVideoId,
                 )
             }
         }
@@ -1157,25 +912,7 @@ class DetailsViewModel internal constructor(
         }
 
         viewModelScope.launch {
-            val source =
-                withContext(Dispatchers.IO) {
-                    preferredWatchProvider(watchHistoryService.authState())
-                }
             val desired = !(_uiState.value.episodeWatchStates[video.id]?.isWatched ?: false)
-
-            val enriched =
-                withContext(Dispatchers.IO) {
-                    ensureImdbId(details)
-                }
-            if (enriched.imdbId != details.imdbId) {
-                _uiState.update { it.copy(details = enriched) }
-            }
-            if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-                _uiState.update {
-                    it.copy(statusMessage = "Couldn't resolve an IMDb id for this show (required for Simkl).")
-                }
-                return@launch
-            }
 
             _uiState.update {
                 it.copy(
@@ -1188,30 +925,43 @@ class DetailsViewModel internal constructor(
                 )
             }
 
-            val request =
-                WatchHistoryRequest(
-                    contentId = enriched.id,
-                    contentType = MetadataLabMediaType.SERIES,
-                    title = enriched.title,
-                    season = season,
-                    episode = episode,
-                    remoteImdbId = enriched.imdbId,
-                )
             val result =
                 withContext(Dispatchers.IO) {
-                    if (desired) {
-                        watchHistoryService.markWatched(request, source)
-                    } else {
-                        watchHistoryService.unmarkWatched(request, source)
-                    }
+                    detailsUseCases.updateEpisodeWatched(details, video, desired)
                 }
 
-            cachedEpisodeWatchKeys = null
+            detailsUseCases.clearEpisodeWatchStateCache()
             val refreshedEpisodes = _uiState.value.seasonEpisodes
-            val refreshedWatchStates = withContext(Dispatchers.IO) { resolveEpisodeWatchStates(enriched, refreshedEpisodes) }
+            val refreshedWatchStates =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveEpisodeWatchStates(result.details, refreshedEpisodes)
+                }
+            val providerState =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveProviderState(
+                        details = result.details,
+                        itemId = mediaKey,
+                        requestedMediaType = requestedMediaType,
+                    )
+                }
+            val ctaResolution =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveWatchCta(
+                        details = result.details,
+                        providerState = providerState,
+                        requestedMediaType = requestedMediaType,
+                        nowMs = System.currentTimeMillis(),
+                    )
+                }
             _uiState.update {
                 it.copy(
-                    details = enriched,
+                    details = result.details,
+                    isWatched = providerState.isWatched,
+                    isInWatchlist = providerState.isInWatchlist,
+                    isRated = providerState.isRated,
+                    userRating = providerState.userRating,
+                    watchCta = ctaResolution.watchCta,
+                    continueVideoId = ctaResolution.continueVideoId,
                     episodeWatchStates = refreshedWatchStates,
                     statusMessage = result.statusMessage,
                 )
@@ -1221,484 +971,52 @@ class DetailsViewModel internal constructor(
 
     fun setRating(rating: Int?) {
         val details = uiState.value.details ?: return
-        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
         viewModelScope.launch {
-            val source =
-                withContext(Dispatchers.IO) {
-                    preferredWatchProvider(watchHistoryService.authState())
-                }
-            if (source == WatchProvider.LOCAL) {
-                _uiState.update { it.copy(statusMessage = "Connect Trakt or Simkl to rate.") }
-                return@launch
-            }
-            if (source == WatchProvider.SIMKL && rating == null) {
-                _uiState.update { it.copy(statusMessage = "Removing ratings is not supported for Simkl yet.") }
-                return@launch
-            }
-
             _uiState.update { it.copy(isMutating = true) }
 
-            val enriched =
-                withContext(Dispatchers.IO) {
-                    ensureImdbId(details)
-                }
-            if (enriched.imdbId != details.imdbId) {
-                _uiState.update { it.copy(details = enriched) }
-            }
-            if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-                _uiState.update {
-                    it.copy(
-                        isMutating = false,
-                        statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl)."
-                    )
-                }
-                return@launch
-            }
-
-            val request =
-                com.crispy.tv.player.WatchHistoryRequest(
-                    contentId = enriched.id,
-                    contentType = mediaType,
-                    title = enriched.title,
-                    remoteImdbId = enriched.imdbId
-                )
             val result =
                 withContext(Dispatchers.IO) {
-                    watchHistoryService.setRating(request, rating, source)
-                }
-            val success =
-                when (source) {
-                    WatchProvider.TRAKT -> result.syncedToTrakt
-                    WatchProvider.SIMKL -> result.syncedToSimkl
-                    WatchProvider.LOCAL -> false
+                    detailsUseCases.updateRating(details, rating)
                 }
             _uiState.update {
                 it.copy(
                     isMutating = false,
+                    details = result.details,
                     statusMessage = result.statusMessage,
-                    isRated = if (success) rating != null else it.isRated,
-                    userRating = if (success) rating else it.userRating
+                    isRated = if (result.success) rating != null else it.isRated,
+                    userRating = if (result.success) rating else it.userRating
                 )
             }
         }
-    }
-
-    private suspend fun ensureImdbId(details: MediaDetails): MediaDetails {
-        val fromId = details.id.trim().takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
-        val fromField = details.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }?.lowercase(Locale.US)
-        val existing = fromId ?: fromField
-        if (existing != null) {
-            return if (fromField == existing) details else details.copy(imdbId = existing)
-        }
-
-        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
-        val resolved = tmdbImdbIdResolver.resolveImdbId(details.id, mediaType) ?: return details
-        return details.copy(imdbId = resolved)
-    }
-
-    private fun loadOmdbRatings(details: MediaDetails?) {
-        omdbJob?.cancel()
-
-        val imdbId =
-            details
-                ?.imdbId
-                ?.trim()
-                ?.takeIf { it.startsWith("tt", ignoreCase = true) }
-                ?.lowercase(Locale.US)
-
-        if (imdbId == null || !omdbRepository.isConfigured) {
-            _uiState.update { it.copy(omdbIsLoading = false, omdbDetails = null) }
-            return
-        }
-
-        omdbJob =
-            viewModelScope.launch {
-                _uiState.update { it.copy(omdbIsLoading = true, omdbDetails = null) }
-
-                val omdbDetails = withContext(Dispatchers.IO) { omdbRepository.load(imdbId) }
-
-                _uiState.update { state ->
-                    val currentImdbId = state.details?.imdbId?.trim()?.lowercase(Locale.US)
-                    if (currentImdbId != imdbId) {
-                        state
-                    } else {
-                        state.copy(omdbIsLoading = false, omdbDetails = omdbDetails)
-                    }
-                }
-            }
-    }
-
-    private data class ProviderState(
-        val isWatched: Boolean,
-        val watchedAtEpochMs: Long?,
-        val isInWatchlist: Boolean,
-        val isRated: Boolean,
-        val userRating: Int?
-    )
-
-    private suspend fun resolveWatchCta(
-        details: MediaDetails?,
-        providerState: ProviderState,
-        nowMs: Long,
-    ): Pair<WatchCta, String?> {
-        if (details == null) return Pair(WatchCta(), null)
-
-        val isSeries = requestedMediaType == MetadataLabMediaType.SERIES
-        val expectedType = requestedMediaType
-
-        val continueEntry = resolveContinueWatchingEntry(details, expectedType, nowMs)
-        val canContinue =
-            continueEntry != null &&
-                !continueEntry.isUpNextPlaceholder &&
-                continueEntry.progressPercent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
-                continueEntry.progressPercent < CTA_CONTINUE_COMPLETION_PERCENT
-
-        if (canContinue) {
-            val continueSeason = continueEntry.season
-            val continueEpisode = continueEntry.episode
-            val label =
-                if (isSeries) {
-                    if (continueSeason != null && continueEpisode != null) {
-                        "Continue (S$continueSeason E$continueEpisode)"
-                    } else {
-                        "Continue"
-                    }
-                } else {
-                    val progress = continueEntry.progressPercent
-                    "Resume from ${progress.roundToInt()}%"
-                }
-
-            val remainingMinutes =
-                parseRuntimeMinutes(details.runtime)?.let { runtimeMinutes ->
-                    val progress = continueEntry.progressPercent
-                    val remaining = runtimeMinutes.toDouble() * (1.0 - (progress / 100.0))
-                    remaining.roundToInt().coerceAtLeast(0)
-                }
-
-            val continueVideoId =
-                if (isSeries && continueSeason != null && continueEpisode != null) {
-                    buildEpisodeLookupId(
-                        details = details,
-                        season = continueSeason,
-                        episode = continueEpisode,
-                    )
-                } else {
-                    null
-                }
-
-            return Pair(
-                WatchCta(
-                    kind = WatchCtaKind.CONTINUE,
-                    label = label,
-                    icon = WatchCtaIcon.PLAY,
-                    remainingMinutes = remainingMinutes,
-                    lastWatchedAtEpochMs = null,
-                ),
-                continueVideoId,
-            )
-        }
-
-        if (!isSeries && providerState.isWatched) {
-            return Pair(
-                WatchCta(
-                    kind = WatchCtaKind.REWATCH,
-                    label = "Rewatch",
-                    icon = WatchCtaIcon.REPLAY,
-                    remainingMinutes = null,
-                    lastWatchedAtEpochMs = providerState.watchedAtEpochMs,
-                ),
-                null,
-            )
-        }
-
-        return Pair(
-            WatchCta(
-                kind = WatchCtaKind.WATCH,
-                label = "Watch now",
-                icon = WatchCtaIcon.PLAY,
-                remainingMinutes = parseRuntimeMinutes(details.runtime),
-                lastWatchedAtEpochMs = null,
-            ),
-            null,
-        )
-    }
-
-    private suspend fun resolveContinueWatchingEntry(
-        details: MediaDetails,
-        expectedType: MetadataLabMediaType,
-        nowMs: Long,
-    ): ContinueWatchingEntry? {
-        val source = preferredWatchProvider(watchHistoryService.authState())
-
-        val normalizedTargetId = normalizeNuvioMediaId(details.id).contentId.lowercase(Locale.US)
-        val normalizedImdbId =
-            details.imdbId?.let { imdb ->
-                normalizeNuvioMediaId(imdb).contentId.lowercase(Locale.US)
-            }
-
-        fun matchesItemContent(itemContentId: String): Boolean {
-            return matchesContentId(itemContentId, normalizedTargetId) ||
-                (normalizedImdbId != null && matchesContentId(itemContentId, normalizedImdbId))
-        }
-
-        val cached = watchHistoryService.getCachedContinueWatching(limit = 50, nowMs = nowMs, source = source)
-        val snapshot =
-            if (cached.entries.isNotEmpty()) {
-                cached
-            } else {
-                watchHistoryService.listContinueWatching(limit = 50, nowMs = nowMs, source = source)
-            }
-
-        return snapshot.entries
-            .asSequence()
-            .filter { entry ->
-                matchesItemContent(entry.contentId) && matchesMediaType(expectedType, entry.contentType)
-            }
-            .maxByOrNull { it.lastUpdatedEpochMs }
-    }
-
-    private suspend fun resolveProviderState(details: MediaDetails?): ProviderState {
-        val authState = watchHistoryService.authState()
-        val source = preferredWatchProvider(authState)
-        val normalizedTargetId = normalizeNuvioMediaId(details?.id ?: itemId).contentId.lowercase(Locale.US)
-        val normalizedImdbId =
-            details?.imdbId?.let { imdb ->
-                normalizeNuvioMediaId(imdb).contentId.lowercase(Locale.US)
-            }
-        val expectedType = requestedMediaType
-
-        fun matchesItemContent(itemContentId: String): Boolean {
-            return matchesContentId(itemContentId, normalizedTargetId) ||
-                (normalizedImdbId != null && matchesContentId(itemContentId, normalizedImdbId))
-        }
-
-        return when (source) {
-            WatchProvider.LOCAL -> {
-                val local = watchHistoryService.listLocalHistory(limit = 250)
-                val watchedEntry =
-                    local.entries
-                        .asSequence()
-                        .filter { entry ->
-                            matchesItemContent(entry.contentId) && matchesMediaType(expectedType, entry.contentType)
-                        }
-                        .maxByOrNull { it.watchedAtEpochMs }
-
-                val watched = watchedEntry != null
-                ProviderState(
-                    isWatched = watched,
-                    watchedAtEpochMs = watchedEntry?.watchedAtEpochMs,
-                    isInWatchlist = false,
-                    isRated = false,
-                    userRating = null
-                )
-            }
-
-            WatchProvider.TRAKT,
-            WatchProvider.SIMKL -> {
-                val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 250, source = source)
-                val snapshot =
-                    if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) {
-                        cached
-                    } else {
-                        watchHistoryService.listProviderLibrary(limitPerFolder = 250, source = source)
-                    }
-
-                val watchedItem =
-                    snapshot.items.firstOrNull { item ->
-                        item.provider == source &&
-                            source.isWatchedFolder(item.folderId) &&
-                            matchesItemContent(item.contentId) &&
-                            matchesMediaType(expectedType, item.contentType)
-                    }
-
-                val watchedAtEpochMs = watchedItem?.addedAtEpochMs
-                val watched = watchedItem != null
-
-                val watchlistFolderId =
-                    when (source) {
-                        WatchProvider.TRAKT -> "watchlist"
-                        WatchProvider.SIMKL -> "plantowatch"
-                        WatchProvider.LOCAL -> ""
-                    }
-                val inWatchlist =
-                    snapshot.items.any { item ->
-                        item.provider == source &&
-                            item.folderId == watchlistFolderId &&
-                            matchesItemContent(item.contentId) &&
-                            matchesMediaType(expectedType, item.contentType)
-                    }
-
-                val isRated =
-                    snapshot.items.any { item ->
-                        item.provider == source &&
-                            item.folderId == "ratings" &&
-                            matchesItemContent(item.contentId) &&
-                            matchesMediaType(expectedType, item.contentType)
-                    }
-
-                ProviderState(
-                    isWatched = watched,
-                    watchedAtEpochMs = watchedAtEpochMs,
-                    isInWatchlist = inWatchlist,
-                    isRated = isRated,
-                    userRating = null
-                )
-            }
-        }
-    }
-
-    private fun matchesMediaType(expected: MetadataLabMediaType?, actual: MetadataLabMediaType): Boolean {
-        return expected == null || expected == actual
-    }
-
-    // resolveWatchedState removed in favor of resolveProviderState.
-
-    private fun matchesContentId(candidate: String, targetNormalizedId: String): Boolean {
-        return normalizeNuvioMediaId(candidate).contentId.lowercase(Locale.US) == targetNormalizedId
-    }
-
-    private suspend fun resolveEpisodeWatchStates(
-        details: MediaDetails,
-        videos: List<MediaVideo>,
-    ): Map<String, EpisodeWatchState> {
-        if (videos.isEmpty()) return emptyMap()
-
-        val watchedKeys = resolveEpisodeWatchKeys()
-        val yearInt = details.year?.trim()?.toIntOrNull()
-        return videos.associate { video ->
-            val season = video.season
-            val episode = video.episode
-            if (season == null || episode == null) {
-                video.id to EpisodeWatchState()
-            } else {
-                val watchedByHistory =
-                    episodeWatchKeyCandidates(details, season, episode).any { key -> watchedKeys.contains(key) }
-                val localProgress =
-                    watchHistoryService.getLocalWatchProgress(
-                        PlaybackIdentity(
-                            imdbId = details.imdbId,
-                            tmdbId = resolvedTmdbId,
-                            contentType = MetadataLabMediaType.SERIES,
-                            season = season,
-                            episode = episode,
-                            title = video.title,
-                            year = yearInt,
-                            showTitle = details.title,
-                            showYear = yearInt,
-                        )
-                    )
-                val progressPercent = localProgress?.progressPercent ?: 0.0
-                val isWatched = watchedByHistory || progressPercent >= CTA_CONTINUE_COMPLETION_PERCENT
-                video.id to
-                    EpisodeWatchState(
-                        progressPercent = if (isWatched) maxOf(progressPercent, 100.0) else progressPercent,
-                        isWatched = isWatched,
-                    )
-            }
-        }
-    }
-
-    private suspend fun resolveEpisodeWatchKeys(): Set<String> {
-        cachedEpisodeWatchKeys?.let { return it }
-
-        val localHistoryKeys =
-            watchHistoryService
-                .listLocalHistory(limit = 1000)
-                .entries
-                .mapNotNull { entry ->
-                    val season = entry.season ?: return@mapNotNull null
-                    val episode = entry.episode ?: return@mapNotNull null
-                    "${normalizeNuvioMediaId(entry.contentId).contentId.lowercase(Locale.US)}:$season:$episode"
-                }
-
-        val source = preferredWatchProvider(watchHistoryService.authState())
-        val providerHistoryKeys =
-            if (source == WatchProvider.LOCAL) {
-                emptyList()
-            } else {
-                val cached = watchHistoryService.getCachedProviderLibrary(limitPerFolder = 1000, source = source)
-                val snapshot =
-                    if (cached.items.isNotEmpty() || cached.folders.isNotEmpty()) {
-                        cached
-                    } else {
-                        watchHistoryService.listProviderLibrary(limitPerFolder = 1000, source = source)
-                    }
-                snapshot.items.mapNotNull { item -> item.toEpisodeWatchKey(source) }
-            }
-
-        val combined = LinkedHashSet<String>(localHistoryKeys.size + providerHistoryKeys.size)
-        combined += localHistoryKeys
-        combined += providerHistoryKeys
-        return combined.also { cachedEpisodeWatchKeys = it }
     }
 
     private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
         val pending = pendingEpisodeNavigation ?: return
-        val selectedSeason = _uiState.value.selectedSeasonOrFirst
-        if (pending.season != null && pending.season != selectedSeason) return
+        val target = videos.firstOrNull { video ->
+            video.id.equals(pending.highlightEpisodeId, ignoreCase = true)
+        } ?: return
         pendingEpisodeNavigation = null
 
-        if (!pending.autoOpenEpisode || pending.episode == null) return
+        if (!pending.autoOpenEpisode) return
 
-        val target = videos.firstOrNull { video -> video.episode == pending.episode }
         target?.let { video -> onOpenStreamSelectorForEpisode(video.id) }
     }
 
-    private fun episodeWatchKeyCandidates(
-        details: MediaDetails,
-        season: Int,
-        episode: Int,
-    ): Set<String> {
-        return buildSet {
-            addEpisodeKey(details.id, season, episode)?.let(::add)
-            details.imdbId?.let { imdbId -> addEpisodeKey(imdbId, season, episode)?.let(::add) }
-            itemId.takeIf { it != details.id }?.let { originalId -> addEpisodeKey(originalId, season, episode)?.let(::add) }
-        }
-    }
-
-    private fun addEpisodeKey(
-        contentId: String,
-        season: Int,
-        episode: Int,
-    ): String? {
-        val normalized = contentId.trim().takeIf { it.isNotBlank() } ?: return null
-        return "${normalizeNuvioMediaId(normalized).contentId.lowercase(Locale.US)}:$season:$episode"
-    }
-
     companion object {
-        private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
-        private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
-
-        private val TMDB_ID_REGEX = Regex("\\btmdb:(?:movie:|show:|tv:)?(\\d+)")
-
-        fun factory(context: Context, itemId: String, mediaType: String): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
+        internal fun factory(
+            mediaKey: String,
+            mediaType: String,
+            runtimeEntry: RuntimeDetailsEntry?,
+            detailsUseCases: DetailsUseCases,
+        ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    val httpClient = AppHttp.client(appContext)
-                    val tmdbImdbIdResolver = TmdbServicesProvider.imdbIdResolver(appContext)
-                    val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
-                    val omdbRepository = OmdbRepositoryProvider.get(appContext)
-                    val addonStreamsService =
-                        AddonStreamsService(
-                            context = appContext,
-                            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                            httpClient = httpClient,
-                        )
-
-                    val aiSettingsStore = AiInsightsSettingsStore(appContext)
-                    val aiRepository = AiInsightsRepository.create(appContext, httpClient)
                     return DetailsViewModel(
-                        itemId = itemId,
+                        mediaKey = mediaKey,
                         mediaType = mediaType,
-                        watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext),
-                        tmdbImdbIdResolver = tmdbImdbIdResolver,
-                        tmdbEnrichmentRepository = tmdbEnrichmentRepository,
-                        omdbRepository = omdbRepository,
-                        aiSettingsStore = aiSettingsStore,
-                        aiRepository = aiRepository,
-                        addonStreamsService = addonStreamsService,
+                        runtimeEntry = runtimeEntry,
+                        detailsUseCases = detailsUseCases,
                     ) as T
                 }
             }
@@ -1706,145 +1024,7 @@ class DetailsViewModel internal constructor(
     }
 }
 
-private fun preferredWatchProvider(authState: WatchProviderAuthState): WatchProvider {
-    return when {
-        authState.traktAuthenticated -> WatchProvider.TRAKT
-        authState.simklAuthenticated -> WatchProvider.SIMKL
-        else -> WatchProvider.LOCAL
-    }
-}
-
 private data class PendingEpisodeNavigation(
-    val season: Int?,
-    val episode: Int?,
+    val highlightEpisodeId: String,
     val autoOpenEpisode: Boolean,
 )
-
-private data class StreamLookupTarget(
-    val mediaType: MetadataLabMediaType,
-    val lookupId: String,
-)
-
-private fun resolveStreamLookupTarget(
-    details: MediaDetails,
-    selectedSeason: Int?,
-    seasonEpisodes: List<MediaVideo>,
-    fallbackMediaType: MetadataLabMediaType,
-): StreamLookupTarget {
-    val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
-    val lookupId =
-        when (mediaType) {
-            MetadataLabMediaType.MOVIE -> details.imdbId?.trim()?.takeIf { it.isNotBlank() } ?: details.id.trim()
-            MetadataLabMediaType.SERIES -> {
-                val fromLoadedEpisodes = seasonEpisodes.firstOrNull { it.id.trim().isNotBlank() }?.id?.trim()
-                if (fromLoadedEpisodes != null) {
-                    fromLoadedEpisodes
-                } else {
-                    val season = selectedSeason ?: seasonEpisodes.firstOrNull()?.season ?: 1
-                    val base = details.imdbId?.trim()?.takeIf { it.isNotBlank() } ?: details.id.trim()
-                    val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
-                    if (canonicalBase.isNotBlank() && season > 0) {
-                        "$canonicalBase:$season:1"
-                    } else {
-                        base
-                    }
-                }
-            }
-        }
-
-    return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
-}
-
-private fun ProviderStreamsResult.toUiState(): StreamProviderUiState {
-    return StreamProviderUiState(
-        providerId = providerId,
-        providerName = providerName,
-        isLoading = false,
-        errorMessage = errorMessage,
-        streams = streams,
-        attemptedUrl = attemptedUrl,
-    )
-}
-
-private fun StreamProviderDescriptor.toLoadingUiState(): StreamProviderUiState {
-    return StreamProviderUiState(
-        providerId = providerId,
-        providerName = providerName,
-        isLoading = true,
-    )
-}
-
-private fun List<StreamProviderUiState>.applyProviderResult(result: ProviderStreamsResult): List<StreamProviderUiState> {
-    var matched = false
-    val updated =
-        map { provider ->
-            if (provider.providerId.equals(result.providerId, ignoreCase = true)) {
-                matched = true
-                result.toUiState()
-            } else {
-                provider
-            }
-        }
-
-    return if (matched) updated else updated + result.toUiState()
-}
-
-private fun List<StreamProviderUiState>.finalizeFrom(results: List<ProviderStreamsResult>): List<StreamProviderUiState> {
-    if (isEmpty()) return emptyList()
-    val byProviderId = results.associateBy { result -> result.providerId.lowercase(Locale.US) }
-
-    return map { provider ->
-        byProviderId[provider.providerId.lowercase(Locale.US)]?.toUiState() ?: provider.copy(isLoading = false)
-    }
-}
-
-private fun StreamSelectorUiState.matchesTarget(target: StreamLookupTarget): Boolean {
-    return mediaType == target.mediaType && lookupId == target.lookupId
-}
-
-private fun buildStreamStatusMessage(
-    providers: List<StreamProviderUiState>,
-    isLoading: Boolean,
-): String {
-    val totalStreams = providers.sumOf { provider -> provider.streams.size }
-    val partialFailure = providers.any { provider -> provider.errorMessage != null }
-
-    if (isLoading) {
-        return if (totalStreams > 0) {
-            "Found $totalStreams stream${if (totalStreams == 1) "" else "s"} so far..."
-        } else {
-            "Fetching streams..."
-        }
-    }
-
-    return when {
-        totalStreams > 0 -> "Found $totalStreams stream${if (totalStreams == 1) "" else "s"}."
-        partialFailure -> "No streams found. Some providers failed to load."
-        providers.isEmpty() -> "No stream providers are available for this title."
-        else -> "No streams found for this title."
-    }
-}
-
-private fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {
-    return when (this?.lowercase(Locale.US)) {
-        "movie" -> MetadataLabMediaType.MOVIE
-        "series", "show", "tv" -> MetadataLabMediaType.SERIES
-        else -> null
-    }
-}
-
-private fun WatchProvider.isWatchedFolder(folderId: String): Boolean {
-    val normalized = folderId.trim().lowercase(Locale.US)
-    return when (this) {
-        WatchProvider.LOCAL -> false
-        WatchProvider.TRAKT -> normalized == "watched"
-        WatchProvider.SIMKL -> normalized.startsWith("completed")
-    }
-}
-
-private fun ProviderLibraryItem.toEpisodeWatchKey(source: WatchProvider): String? {
-    if (provider != source || !source.isWatchedFolder(folderId)) return null
-    val seasonNumber = season ?: return null
-    val episodeNumber = episode ?: return null
-    return "${normalizeNuvioMediaId(contentId).contentId.lowercase(Locale.US)}:$seasonNumber:$episodeNumber"
-}

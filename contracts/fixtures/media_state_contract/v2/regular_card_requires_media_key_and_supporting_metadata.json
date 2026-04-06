@@ -1,0 +1,39 @@
+{
+  "contract_version": 2,
+  "suite": "media_state_contract",
+  "case_id": "regular_card_requires_media_key_and_supporting_metadata",
+  "input": {
+    "kind": "regular_card",
+    "payload": {
+      "mediaKey": "tmdb:movie:550",
+      "mediaType": "movie",
+      "provider": "tmdb",
+      "providerId": "550",
+      "title": "Fight Club",
+      "posterUrl": "https://img/poster.jpg",
+      "subtitle": "Cult classic"
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "regular",
+      "media_key": "tmdb:movie:550",
+      "media_type": "movie",
+      "item_id": null,
+      "provider": "tmdb",
+      "provider_id": "550",
+      "title": "Fight Club",
+      "poster_url": "https://img/poster.jpg",
+      "backdrop_url": null,
+      "subtitle": "Cult classic",
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": null,
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

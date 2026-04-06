@@ -5,29 +5,21 @@ import com.crispy.tv.network.CrispyHttpResponse
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
 
 class CrispyBackendClient(
-    private val httpClient: CrispyHttpClient,
+    internal val httpClient: CrispyHttpClient,
     backendUrl: String,
 ) {
-    private val baseUrl: String = backendUrl.trim().trimEnd('/')
+    internal val baseUrl: String = backendUrl.trim().trimEnd('/')
 
     data class User(
         val id: String,
-        val supabaseAuthUserId: String?,
         val email: String?,
-    )
-
-    data class Household(
-        val id: String,
     )
 
     data class Profile(
         val id: String,
-        val householdId: String,
         val name: String,
         val avatarKey: String?,
         val isKids: Boolean,
@@ -39,7 +31,6 @@ class CrispyBackendClient(
 
     data class MeResponse(
         val user: User,
-        val household: Household,
         val profiles: List<Profile>,
     )
 
@@ -52,7 +43,7 @@ class CrispyBackendClient(
         SIMKL("simkl"),
     }
 
-    data class ImportConnection(
+    data class ProviderAccount(
         val id: String,
         val provider: String,
         val status: String,
@@ -68,12 +59,11 @@ class CrispyBackendClient(
     data class ImportJob(
         val id: String,
         val profileId: String,
-        val householdId: String,
         val provider: String,
         val mode: String,
         val status: String,
         val requestedByUserId: String,
-        val connectionId: String?,
+        val providerAccountId: String?,
         val errorMessage: String?,
         val createdAt: String?,
         val startedAt: String?,
@@ -81,22 +71,720 @@ class CrispyBackendClient(
         val updatedAt: String?,
     )
 
-    data class ImportConnectionsResponse(
-        val connections: List<ImportConnection>,
-        val watchDataOrigin: String?,
+    data class ProviderAccountsResponse(
+        val providerAccounts: List<ProviderAccount>,
+    )
+
+    data class BackendMetadataItem(
+        val mediaKey: String,
+        val title: String,
+        val summary: String?,
+        val posterUrl: String?,
+        val backdropUrl: String?,
+        val logoUrl: String?,
+        val mediaType: String,
+        val rating: String?,
+        val year: String?,
+        val genre: String?,
+        val provider: String?,
+        val providerId: String?,
+    )
+
+    data class MetadataSearchResponse(
+        val items: List<BackendMetadataItem>,
+    )
+
+    data class AiSearchResponse(
+        val items: List<BackendMetadataItem>,
+    )
+
+    data class AiInsightsCard(
+        val type: String,
+        val title: String,
+        val category: String,
+        val content: String,
+    )
+
+    data class AiInsightsResponse(
+        val insights: List<AiInsightsCard>,
+        val trivia: String,
     )
 
     data class ImportJobsResponse(
         val jobs: List<ImportJob>,
-        val watchDataOrigin: String?,
     )
 
     data class StartImportResult(
         val job: ImportJob,
-        val connection: ImportConnection?,
+        val providerAccount: ProviderAccount?,
         val authUrl: String?,
         val nextAction: String,
-        val watchDataOrigin: String?,
+    )
+
+    data class MediaLookupInput(
+        val id: String? = null,
+        val mediaKey: String? = null,
+        val mediaType: String? = null,
+        val tmdbId: Int? = null,
+        val showTmdbId: Int? = null,
+        val imdbId: String? = null,
+        val tvdbId: Int? = null,
+        val provider: String? = null,
+        val providerId: String? = null,
+        val parentProvider: String? = null,
+        val parentProviderId: String? = null,
+        val absoluteEpisodeNumber: Int? = null,
+        val seasonNumber: Int? = null,
+        val episodeNumber: Int? = null,
+    )
+
+    data class WatchMutationInput(
+        val mediaKey: String? = null,
+        val mediaType: String,
+        val provider: String? = null,
+        val providerId: String? = null,
+        val parentProvider: String? = null,
+        val parentProviderId: String? = null,
+        val absoluteEpisodeNumber: Int? = null,
+        val seasonNumber: Int? = null,
+        val episodeNumber: Int? = null,
+        val occurredAt: String? = null,
+        val rating: Int? = null,
+        val payload: Map<String, Any?> = emptyMap(),
+    )
+
+    data class PlaybackEventInput(
+        val clientEventId: String,
+        val eventType: String,
+        val mediaKey: String? = null,
+        val mediaType: String,
+        val provider: String? = null,
+        val providerId: String? = null,
+        val parentProvider: String? = null,
+        val parentProviderId: String? = null,
+        val absoluteEpisodeNumber: Int? = null,
+        val seasonNumber: Int? = null,
+        val episodeNumber: Int? = null,
+        val positionSeconds: Double? = null,
+        val durationSeconds: Double? = null,
+        val rating: Int? = null,
+        val occurredAt: String? = null,
+        val payload: Map<String, Any?> = emptyMap(),
+    )
+
+    data class MetadataImages(
+        val posterUrl: String?,
+        val backdropUrl: String?,
+        val stillUrl: String?,
+        val logoUrl: String?,
+    )
+
+    data class MetadataExternalIds(
+        val tmdb: Int?,
+        val imdb: String?,
+        val tvdb: Int?,
+        val kitsu: Int?,
+    )
+
+    data class MetadataEpisodePreview(
+        val mediaKey: String,
+        val mediaType: String,
+        val tmdbId: Int?,
+        val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val title: String?,
+        val summary: String?,
+        val airDate: String?,
+        val runtimeMinutes: Int?,
+        val rating: Double?,
+        val images: MetadataImages,
+    ) {
+        val id: String
+            get() = mediaKey
+    }
+
+    data class MetadataView(
+        val mediaKey: String,
+        val mediaType: String,
+        val kind: String,
+        val tmdbId: Int?,
+        val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val title: String?,
+        val subtitle: String?,
+        val summary: String?,
+        val overview: String?,
+        val images: MetadataImages,
+        val releaseDate: String?,
+        val releaseYear: Int?,
+        val runtimeMinutes: Int?,
+        val rating: Double?,
+        val certification: String?,
+        val status: String?,
+        val genres: List<String>,
+        val externalIds: MetadataExternalIds,
+        val seasonCount: Int?,
+        val episodeCount: Int?,
+        val nextEpisode: MetadataEpisodePreview?,
+    ) {
+        val id: String
+            get() = mediaKey
+    }
+
+    data class MetadataSeasonView(
+        val mediaKey: String,
+        val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val seasonNumber: Int,
+        val title: String?,
+        val summary: String?,
+        val airDate: String?,
+        val episodeCount: Int?,
+        val posterUrl: String?,
+    ) {
+        val id: String
+            get() = mediaKey
+    }
+
+    data class MetadataEpisodeView(
+        val mediaKey: String,
+        val mediaType: String,
+        val tmdbId: Int?,
+        val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val title: String?,
+        val summary: String?,
+        val airDate: String?,
+        val runtimeMinutes: Int?,
+        val rating: Double?,
+        val images: MetadataImages,
+        val showMediaKey: String?,
+        val showTitle: String?,
+        val showExternalIds: MetadataExternalIds,
+    ) {
+        val id: String
+            get() = mediaKey
+
+        val showId: String?
+            get() = showMediaKey
+    }
+
+    data class MetadataResolveResponse(
+        val item: MetadataView,
+    )
+
+    data class MetadataTitleDetailResponse(
+        val item: MetadataView,
+        val seasons: List<MetadataSeasonView>,
+        val videos: List<MetadataVideoView>,
+        val cast: List<MetadataPersonRefView>,
+        val directors: List<MetadataPersonRefView>,
+        val creators: List<MetadataPersonRefView>,
+        val reviews: List<MetadataReviewView>,
+        val production: MetadataProductionInfoView,
+        val collection: MetadataCollectionView?,
+        val similar: List<MetadataCardView>,
+    )
+
+    data class MetadataCardView(
+        val id: String?,
+        val mediaKey: String?,
+        val mediaType: String,
+        val kind: String,
+        val tmdbId: Int?,
+        val showTmdbId: Int?,
+        val provider: String?,
+        val providerId: String?,
+        val parentMediaType: String?,
+        val parentProvider: String?,
+        val parentProviderId: String?,
+        val absoluteEpisodeNumber: Int?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val title: String?,
+        val subtitle: String?,
+        val summary: String?,
+        val overview: String?,
+        val images: MetadataImages,
+        val releaseDate: String?,
+        val releaseYear: Int?,
+        val runtimeMinutes: Int?,
+        val rating: Double?,
+        val status: String?,
+    )
+
+    data class MetadataVideoView(
+        val id: String,
+        val key: String,
+        val name: String?,
+        val site: String?,
+        val type: String?,
+        val official: Boolean,
+        val publishedAt: String?,
+        val url: String?,
+        val thumbnailUrl: String?,
+    )
+
+    data class MetadataPersonRefView(
+        val id: String,
+        val provider: String,
+        val providerId: String,
+        val tmdbPersonId: Int?,
+        val name: String,
+        val role: String?,
+        val department: String?,
+        val profileUrl: String?,
+    )
+
+    data class MetadataReviewView(
+        val id: String,
+        val author: String?,
+        val username: String?,
+        val content: String,
+        val createdAt: String?,
+        val updatedAt: String?,
+        val url: String?,
+        val rating: Double?,
+        val avatarUrl: String?,
+    )
+
+    data class MetadataCompanyView(
+        val id: String,
+        val provider: String,
+        val providerId: String,
+        val name: String,
+        val logoUrl: String?,
+        val originCountry: String?,
+    )
+
+    data class MetadataCollectionView(
+        val id: String,
+        val provider: String,
+        val providerId: String,
+        val name: String,
+        val posterUrl: String?,
+        val backdropUrl: String?,
+        val parts: List<MetadataCardView>,
+    )
+
+    data class MetadataProductionInfoView(
+        val originalLanguage: String?,
+        val originCountries: List<String>,
+        val spokenLanguages: List<String>,
+        val productionCountries: List<String>,
+        val companies: List<MetadataCompanyView>,
+        val networks: List<MetadataCompanyView>,
+    )
+
+    data class MetadataContentIds(
+        val imdb: String?,
+        val tmdb: Int?,
+        val trakt: Int?,
+        val tvdb: Int?,
+    )
+
+    data class MetadataContentRatings(
+        val imdbRating: Double?,
+        val imdbVotes: Int?,
+        val tmdbRating: Double?,
+        val metacritic: Int?,
+        val rottenTomatoes: Int?,
+        val letterboxdRating: Double?,
+        val mdblistRating: Double?,
+    )
+
+    data class MetadataContentView(
+        val ids: MetadataContentIds,
+        val title: String?,
+        val originalTitle: String?,
+        val type: String?,
+        val year: Int?,
+        val description: String?,
+        val score: Double?,
+        val ratings: MetadataContentRatings,
+        val posterUrl: String?,
+        val backdropUrl: String?,
+        val genres: List<String>,
+        val keywords: List<String>,
+        val runtime: Int?,
+        val certification: String?,
+        val released: String?,
+        val language: String?,
+        val country: String?,
+        val seasonCount: Int?,
+        val episodeCount: Int?,
+        val directors: List<String>,
+        val writers: List<String>,
+        val network: String?,
+        val studio: String?,
+        val status: String?,
+        val budget: Long?,
+        val revenue: Long?,
+        val updatedAt: String?,
+    )
+
+    data class MetadataTitleContentResponse(
+        val item: MetadataView,
+        val content: MetadataContentView,
+    )
+
+    data class MetadataSeasonDetailResponse(
+        val show: MetadataView,
+        val season: MetadataSeasonView,
+        val episodes: List<MetadataEpisodeView>,
+    )
+
+    data class MetadataEpisodeListResponse(
+        val show: MetadataView,
+        val requestedSeasonNumber: Int?,
+        val effectiveSeasonNumber: Int,
+        val includedSeasonNumbers: List<Int>,
+        val episodes: List<MetadataEpisodeView>,
+    )
+
+    data class MetadataNextEpisodeResponse(
+        val show: MetadataView,
+        val currentSeasonNumber: Int,
+        val currentEpisodeNumber: Int,
+        val item: MetadataEpisodeView?,
+    )
+
+    data class PlaybackResolveResponse(
+        val item: MetadataView,
+        val show: MetadataView?,
+        val season: MetadataSeasonView?,
+    )
+
+    data class MetadataPersonKnownForItem(
+        val mediaKey: String,
+        val mediaType: String,
+        val tmdbId: Int?,
+        val title: String,
+        val posterUrl: String?,
+        val rating: Double?,
+        val releaseYear: Int?,
+        val provider: String?,
+        val providerId: String?,
+    ) {
+        val id: String
+            get() = mediaKey
+    }
+
+    data class MetadataPersonDetail(
+        val id: String,
+        val provider: String,
+        val providerId: String,
+        val tmdbPersonId: Int,
+        val name: String,
+        val knownForDepartment: String?,
+        val biography: String?,
+        val birthday: String?,
+        val placeOfBirth: String?,
+        val profileUrl: String?,
+        val imdbId: String?,
+        val instagramId: String?,
+        val twitterId: String?,
+        val knownFor: List<MetadataPersonKnownForItem>,
+    )
+
+    data class ProviderAuthState(
+        val provider: String,
+        val connected: Boolean,
+        val status: String,
+        val externalUsername: String?,
+        val statusMessage: String?,
+    )
+
+    data class WatchProgressView(
+        val positionSeconds: Double?,
+        val durationSeconds: Double?,
+        val progressPercent: Double,
+        val status: String?,
+        val lastPlayedAt: String?,
+    )
+
+    data class ContinueWatchingStateView(
+        val id: String,
+        val positionSeconds: Double?,
+        val durationSeconds: Double?,
+        val progressPercent: Double,
+        val lastActivityAt: String,
+    )
+
+    data class WatchedStateView(
+        val watchedAt: String,
+    )
+
+    data class WatchlistStateView(
+        val addedAt: String,
+    )
+
+    data class RatingStateView(
+        val value: Int,
+        val ratedAt: String,
+    )
+
+    data class RuntimeMediaCard(
+        val mediaKey: String,
+        val mediaType: String,
+        val provider: String,
+        val providerId: String,
+        val title: String,
+        val posterUrl: String,
+        val backdropUrl: String?,
+        val subtitle: String?,
+        val releaseYear: Int?,
+        val rating: Double?,
+        val genre: String?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val episodeTitle: String?,
+        val airDate: String?,
+        val runtimeMinutes: Int?,
+    )
+
+    data class ContinueWatchingItem(
+        val id: String,
+        val media: RuntimeMediaCard,
+        val progress: WatchProgressView?,
+        val lastActivityAt: String,
+        val origins: List<String>,
+        val dismissible: Boolean,
+    )
+
+    data class WatchedItem(
+        val id: String?,
+        val media: RuntimeMediaCard,
+        val watchedAt: String?,
+        val lastActivityAt: String?,
+        val origins: List<String>,
+    )
+
+    data class WatchlistItem(
+        val id: String?,
+        val media: RuntimeMediaCard,
+        val addedAt: String?,
+        val origins: List<String>,
+    )
+
+    data class RatingItem(
+        val id: String?,
+        val media: RuntimeMediaCard,
+        val rating: RatingStateView,
+        val origins: List<String>,
+    )
+
+    data class PageInfo(
+        val nextCursor: String?,
+        val hasMore: Boolean,
+    )
+
+    data class LibrarySection(
+        val id: String,
+        val label: String,
+        val order: Int,
+        val itemCount: Int,
+    )
+
+    data class LibraryItemState(
+        val addedAt: String?,
+        val watchedAt: String?,
+        val ratedAt: String?,
+        val rating: Int?,
+        val lastActivityAt: String?,
+    )
+
+    data class LibrarySectionItem(
+        val id: String,
+        val media: RuntimeMediaCard,
+        val state: LibraryItemState,
+        val origins: List<String>,
+    )
+
+    data class ProfileLibrarySectionPageResponse(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val section: LibrarySection,
+        val items: List<LibrarySectionItem>,
+        val pageInfo: PageInfo,
+    )
+
+    data class CanonicalWatchCollectionResponse<T>(
+        val profileId: String,
+        val kind: String,
+        val source: String,
+        val generatedAt: String?,
+        val items: List<T>,
+        val pageInfo: PageInfo,
+    )
+
+    data class WatchStateResponse(
+        val media: MetadataView,
+        val progress: WatchProgressView?,
+        val continueWatching: ContinueWatchingStateView?,
+        val watched: WatchedStateView?,
+        val watchlist: WatchlistStateView?,
+        val rating: RatingStateView?,
+        val watchedEpisodeKeys: List<String>,
+    )
+
+    data class WatchStateEnvelope(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val item: WatchStateResponse,
+    )
+
+    data class WatchStatesEnvelope(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val items: List<WatchStateResponse>,
+    )
+
+    data class CalendarItem(
+        val bucket: String,
+        val media: RuntimeMediaCard,
+        val watched: Boolean,
+    )
+
+    data class CalendarResponse(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val items: List<CalendarItem>,
+    )
+
+    data class HomeRecommendationItem(
+        val media: RuntimeMediaCard,
+        val reason: String?,
+        val score: Double?,
+        val rank: Double,
+        val payload: Map<String, Any?>,
+    )
+
+    data class HomeHeroItem(
+        val mediaKey: String,
+        val mediaType: String,
+        val provider: String,
+        val providerId: String,
+        val title: String,
+        val description: String,
+        val backdropUrl: String,
+        val posterUrl: String?,
+        val logoUrl: String?,
+        val releaseYear: Int?,
+        val rating: Double?,
+        val genre: String?,
+    )
+
+    data class HomeCollectionItem(
+        val mediaType: String,
+        val provider: String,
+        val providerId: String,
+        val title: String,
+        val posterUrl: String,
+        val releaseYear: Int?,
+        val rating: Double?,
+    )
+
+    data class HomeCollectionCard(
+        val title: String,
+        val logoUrl: String,
+        val items: List<HomeCollectionItem>,
+    )
+
+    data class HomeSnapshotSection(
+        val id: String,
+        val title: String,
+        val layout: String,
+        val sourceKey: String,
+        val recommendationItems: List<HomeRecommendationItem> = emptyList(),
+        val heroItems: List<HomeHeroItem> = emptyList(),
+        val collectionItems: List<HomeCollectionCard> = emptyList(),
+    )
+
+    data class HomeResponse(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val snapshotGeneratedAt: String?,
+        val continueWatching: List<ContinueWatchingItem>,
+        val thisWeek: List<CalendarItem>,
+        val sections: List<HomeSnapshotSection>,
+    )
+
+    data class ProviderLibraryFolder(
+        val id: String,
+        val label: String,
+        val provider: String,
+        val itemCount: Int,
+    )
+
+    data class ProviderLibraryItem(
+        val provider: String,
+        val folderId: String,
+        val contentId: String,
+        val contentType: String,
+        val title: String,
+        val posterUrl: String?,
+        val backdropUrl: String?,
+        val externalIds: MetadataExternalIds?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val addedAt: String?,
+        val media: MetadataView?,
+    )
+
+    data class ProviderLibrarySnapshot(
+        val provider: String,
+        val status: String,
+        val statusMessage: String,
+        val folders: List<ProviderLibraryFolder>,
+        val items: List<ProviderLibraryItem>,
+    )
+
+    data class LibraryAuth(
+        val providers: List<ProviderAuthState>,
+    )
+
+    data class ProfileLibraryResponse(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val auth: LibraryAuth,
+        val sections: List<LibrarySection> = emptyList(),
+    )
+
+    data class WatchActionResponse(
+        val accepted: Boolean,
+        val mode: String,
     )
 
     fun isConfigured(): Boolean {
@@ -104,21 +792,7 @@ class CrispyBackendClient(
     }
 
     suspend fun getMe(accessToken: String): MeResponse {
-        checkConfigured()
-        val response = httpClient.get(
-            url = "$baseUrl/v1/me".toHttpUrl(),
-            headers = authHeaders(accessToken),
-            callTimeoutMs = CALL_TIMEOUT_MS,
-        )
-        val json = JSONObject(requireSuccess(response))
-        val userJson = json.optJSONObject("user") ?: throw IllegalStateException("Backend /v1/me did not return a user.")
-        val householdJson =
-            json.optJSONObject("household") ?: throw IllegalStateException("Backend /v1/me did not return a household.")
-        return MeResponse(
-            user = parseUser(userJson),
-            household = Household(id = householdJson.optString("id").trim().ifEmpty { throw IllegalStateException("Backend /v1/me returned a household without an id.") }),
-            profiles = parseProfiles(json.optJSONArray("profiles")),
-        )
+        return getMeApi(accessToken)
     }
 
     suspend fun createProfile(
@@ -128,112 +802,296 @@ class CrispyBackendClient(
         isKids: Boolean = false,
         avatarKey: String? = null,
     ): Profile {
-        checkConfigured()
-        val payload = JSONObject().put("name", name.trim()).put("isKids", isKids).apply {
-            if (sortOrder != null) {
-                put("sortOrder", sortOrder)
-            }
-            if (!avatarKey.isNullOrBlank()) {
-                put("avatarKey", avatarKey.trim())
-            }
-        }.toString()
-        val response = httpClient.postJson(
-            url = "$baseUrl/v1/profiles".toHttpUrl(),
-            jsonBody = payload,
-            headers = authHeaders(accessToken),
-            callTimeoutMs = CALL_TIMEOUT_MS,
+        return createProfileApi(
+            accessToken = accessToken,
+            name = name,
+            sortOrder = sortOrder,
+            isKids = isKids,
+            avatarKey = avatarKey,
         )
-        val json = JSONObject(requireSuccess(response))
-        val profileJson = json.optJSONObject("profile") ?: throw IllegalStateException("Backend did not return a created profile.")
-        return parseProfile(profileJson)
     }
 
-    suspend fun listImportConnections(accessToken: String, profileId: String): ImportConnectionsResponse {
-        checkConfigured()
-        val response = httpClient.get(
-            url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections".toHttpUrl(),
-            headers = authHeaders(accessToken),
-            callTimeoutMs = CALL_TIMEOUT_MS,
-        )
-        val json = JSONObject(requireSuccess(response))
-        return ImportConnectionsResponse(
-            connections = parseImportConnections(json.optJSONArray("connections")),
-            watchDataOrigin = json.optJSONObject("watchDataState")?.optString("origin")?.trim().orEmpty().ifBlank { null },
-        )
+    suspend fun listImportConnections(accessToken: String, profileId: String): ProviderAccountsResponse {
+        return listImportConnectionsApi(accessToken, profileId)
     }
 
     suspend fun listImportJobs(accessToken: String, profileId: String): ImportJobsResponse {
-        checkConfigured()
-        val response = httpClient.get(
-            url = "$baseUrl/v1/profiles/${profileId.trim()}/imports".toHttpUrl(),
-            headers = authHeaders(accessToken),
-            callTimeoutMs = CALL_TIMEOUT_MS,
-        )
-        val json = JSONObject(requireSuccess(response))
-        return ImportJobsResponse(
-            jobs = parseImportJobs(json.optJSONArray("jobs")),
-            watchDataOrigin = json.optJSONObject("watchDataState")?.optString("origin")?.trim().orEmpty().ifBlank { null },
-        )
+        return listImportJobsApi(accessToken, profileId)
     }
 
     suspend fun startImport(accessToken: String, profileId: String, provider: ImportProvider): StartImportResult {
-        checkConfigured()
-        val response = httpClient.postJson(
-            url = "$baseUrl/v1/profiles/${profileId.trim()}/imports/start".toHttpUrl(),
-            jsonBody = JSONObject().put("provider", provider.apiValue).toString(),
-            headers = authHeaders(accessToken),
-            callTimeoutMs = CALL_TIMEOUT_MS,
-        )
-        val json = JSONObject(requireSuccess(response))
-        val jobJson = json.optJSONObject("job") ?: throw IllegalStateException("Backend did not return an import job.")
-        return StartImportResult(
-            job = parseImportJob(jobJson),
-            connection = json.optJSONObject("connection")?.let(::parseImportConnection),
-            authUrl = json.optString("authUrl").trim().ifBlank { null },
-            nextAction = json.optString("nextAction").trim().ifBlank { "queued" },
-            watchDataOrigin = json.optJSONObject("watchDataState")?.optString("origin")?.trim().orEmpty().ifBlank { null },
-        )
+        return startImportApi(accessToken, profileId, provider)
     }
 
     suspend fun getProfileSettings(accessToken: String, profileId: String): ProfileSettings {
-        checkConfigured()
-        val response = httpClient.get(
-            url = "$baseUrl/v1/profiles/${profileId.trim()}/settings".toHttpUrl(),
-            headers = authHeaders(accessToken),
-            callTimeoutMs = CALL_TIMEOUT_MS,
-        )
-        val json = JSONObject(requireSuccess(response))
-        return ProfileSettings(
-            settings = json.optJSONObject("settings").toStringMap(),
-        )
+        return getProfileSettingsApi(accessToken, profileId)
     }
 
     suspend fun patchProfileSettings(accessToken: String, profileId: String, settings: Map<String, String>): ProfileSettings {
-        checkConfigured()
-        val payload = JSONObject().apply {
-            settings.forEach { (key, value) -> put(key, value) }
-        }.toString()
-        val response = httpClient.execute(
-            request = okhttp3.Request.Builder()
-                .url("$baseUrl/v1/profiles/${profileId.trim()}/settings".toHttpUrl())
-                .headers(authHeaders(accessToken))
-                .patch(payload.toRequestBody(JSON_MEDIA_TYPE))
-                .build(),
-            callTimeoutMs = CALL_TIMEOUT_MS,
-        )
-        val json = JSONObject(requireSuccess(response))
-        return ProfileSettings(
-            settings = json.optJSONObject("settings").toStringMap(),
+        return patchProfileSettingsApi(accessToken, profileId, settings)
+    }
+
+    suspend fun searchTitles(
+        accessToken: String,
+        query: String,
+        filter: String? = null,
+        locale: String? = null,
+        limit: Int = 20,
+    ): MetadataSearchResponse {
+        return searchTitlesApi(
+            accessToken = accessToken,
+            query = query,
+            filter = filter,
+            locale = locale,
+            limit = limit,
         )
     }
 
-    private fun checkConfigured() {
+    suspend fun searchTitlesByGenre(
+        accessToken: String,
+        genre: String,
+        filter: String? = null,
+        locale: String? = null,
+        limit: Int = 20,
+    ): MetadataSearchResponse {
+        return searchTitlesByGenreApi(
+            accessToken = accessToken,
+            genre = genre,
+            filter = filter,
+            locale = locale,
+            limit = limit,
+        )
+    }
+
+    suspend fun searchAiTitles(
+        accessToken: String,
+        profileId: String,
+        query: String,
+        filter: String? = null,
+        locale: String? = null,
+    ): AiSearchResponse {
+        return searchAiTitlesApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            query = query,
+            filter = filter,
+            locale = locale,
+        )
+    }
+
+    suspend fun getAiInsights(
+        accessToken: String,
+        profileId: String,
+        mediaKey: String,
+        locale: String? = null,
+    ): AiInsightsResponse {
+        return getAiInsightsApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            mediaKey = mediaKey,
+            locale = locale,
+        )
+    }
+
+    suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ProviderAccount {
+        return disconnectImportConnectionApi(accessToken, profileId, provider)
+    }
+
+    suspend fun resolveMetadata(accessToken: String, input: MediaLookupInput): MetadataResolveResponse {
+        return resolveMetadataApi(accessToken, input)
+    }
+
+    suspend fun getMetadataTitleDetail(accessToken: String, mediaKey: String): MetadataTitleDetailResponse {
+        return getMetadataTitleDetailApi(accessToken, mediaKey)
+    }
+
+    suspend fun getMetadataTitleContent(accessToken: String, mediaKey: String): MetadataTitleContentResponse {
+        return getMetadataTitleContentApi(accessToken, mediaKey)
+    }
+
+    suspend fun getMetadataSeasonDetail(accessToken: String, mediaKey: String, seasonNumber: Int): MetadataSeasonDetailResponse {
+        return getMetadataSeasonDetailApi(accessToken, mediaKey, seasonNumber)
+    }
+
+    suspend fun getMetadataPersonDetail(accessToken: String, id: String, language: String? = null): MetadataPersonDetail {
+        return getMetadataPersonDetailApi(accessToken, id, language)
+    }
+
+    suspend fun listMetadataEpisodes(accessToken: String, mediaKey: String, seasonNumber: Int? = null): MetadataEpisodeListResponse {
+        return listMetadataEpisodesApi(accessToken, mediaKey, seasonNumber)
+    }
+
+    suspend fun getNextEpisode(
+        accessToken: String,
+        mediaKey: String,
+        currentSeasonNumber: Int,
+        currentEpisodeNumber: Int,
+        watchedKeys: List<String> = emptyList(),
+        showMediaKey: String? = null,
+        nowMs: Long? = null,
+    ): MetadataNextEpisodeResponse {
+        return getNextEpisodeApi(
+            accessToken = accessToken,
+            mediaKey = mediaKey,
+            currentSeasonNumber = currentSeasonNumber,
+            currentEpisodeNumber = currentEpisodeNumber,
+            watchedKeys = watchedKeys,
+            showMediaKey = showMediaKey,
+            nowMs = nowMs,
+        )
+    }
+
+    suspend fun resolvePlayback(accessToken: String, input: MediaLookupInput): PlaybackResolveResponse {
+        return resolvePlaybackApi(accessToken, input)
+    }
+
+    suspend fun getHome(accessToken: String, profileId: String): HomeResponse {
+        return getHomeApi(accessToken, profileId)
+    }
+
+    suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse {
+        return getCalendarApi(accessToken, profileId)
+    }
+
+    suspend fun getProviderAuthState(accessToken: String, profileId: String): List<ProviderAuthState> {
+        return getProviderAuthStateApi(accessToken, profileId)
+    }
+
+    suspend fun getProfileLibrary(
+        accessToken: String,
+        profileId: String,
+    ): ProfileLibraryResponse {
+        return getProfileLibraryApi(
+            accessToken = accessToken,
+            profileId = profileId,
+        )
+    }
+
+    suspend fun getProfileLibrarySectionPage(
+        accessToken: String,
+        profileId: String,
+        sectionId: String,
+        limit: Int,
+        cursor: String? = null,
+    ): ProfileLibrarySectionPageResponse {
+        return getProfileLibrarySectionPageApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            sectionId = sectionId,
+            limit = limit,
+            cursor = cursor,
+        )
+    }
+
+    suspend fun sendWatchEvent(accessToken: String, profileId: String, input: PlaybackEventInput): WatchActionResponse {
+        return sendWatchEventApi(accessToken, profileId, input)
+    }
+
+    suspend fun listContinueWatching(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 20,
+    ): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
+        return listContinueWatchingApi(accessToken, profileId, limit)
+    }
+
+    suspend fun dismissContinueWatching(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
+        return dismissContinueWatchingApi(accessToken, profileId, itemId)
+    }
+
+    suspend fun listWatchHistory(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 50,
+    ): CanonicalWatchCollectionResponse<WatchedItem> {
+        return listWatchHistoryApi(accessToken, profileId, limit)
+    }
+
+    suspend fun listWatchlist(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 50,
+    ): CanonicalWatchCollectionResponse<WatchlistItem> {
+        return listWatchlistApi(accessToken, profileId, limit)
+    }
+
+    suspend fun listRatings(
+        accessToken: String,
+        profileId: String,
+        limit: Int = 50,
+    ): CanonicalWatchCollectionResponse<RatingItem> {
+        return listRatingsApi(accessToken, profileId, limit)
+    }
+
+    suspend fun getWatchState(accessToken: String, profileId: String, mediaKey: String): WatchStateEnvelope {
+        return getWatchStateApi(accessToken, profileId, mediaKey)
+    }
+
+    suspend fun getWatchStates(
+        accessToken: String,
+        profileId: String,
+        mediaKeys: List<String>,
+    ): WatchStatesEnvelope {
+        return getWatchStatesApi(accessToken, profileId, mediaKeys)
+    }
+
+    suspend fun markWatched(accessToken: String, profileId: String, input: WatchMutationInput): WatchActionResponse {
+        return markWatchedApi(accessToken, profileId, input)
+    }
+
+    suspend fun unmarkWatched(accessToken: String, profileId: String, input: WatchMutationInput): WatchActionResponse {
+        return unmarkWatchedApi(accessToken, profileId, input)
+    }
+
+    suspend fun putNativeWatchlist(
+        accessToken: String,
+        profileId: String,
+        mediaKey: String,
+        occurredAt: String? = null,
+        payload: Map<String, Any?> = emptyMap(),
+    ): WatchActionResponse {
+        return putNativeWatchlistApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            mediaKey = mediaKey,
+            occurredAt = occurredAt,
+            payload = payload,
+        )
+    }
+
+    suspend fun deleteNativeWatchlist(accessToken: String, profileId: String, mediaKey: String): WatchActionResponse {
+        return deleteNativeWatchlistApi(accessToken, profileId, mediaKey)
+    }
+
+    suspend fun putNativeRating(
+        accessToken: String,
+        profileId: String,
+        mediaKey: String,
+        rating: Int,
+        occurredAt: String? = null,
+        payload: Map<String, Any?> = emptyMap(),
+    ): WatchActionResponse {
+        return putNativeRatingApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            mediaKey = mediaKey,
+            rating = rating,
+            occurredAt = occurredAt,
+            payload = payload,
+        )
+    }
+
+    suspend fun deleteNativeRating(accessToken: String, profileId: String, mediaKey: String): WatchActionResponse {
+        return deleteNativeRatingApi(accessToken, profileId, mediaKey)
+    }
+
+    internal fun checkConfigured() {
         if (!isConfigured()) {
             throw IllegalStateException("Backend API is not configured.")
         }
     }
 
-    private fun authHeaders(accessToken: String): Headers {
+    internal fun authHeaders(accessToken: String): Headers {
         return Headers.Builder()
             .add("Authorization", "Bearer ${accessToken.trim()}")
             .add("Content-Type", "application/json")
@@ -241,14 +1099,14 @@ class CrispyBackendClient(
             .build()
     }
 
-    private fun requireSuccess(response: CrispyHttpResponse): String {
+    internal fun requireSuccess(response: CrispyHttpResponse): String {
         if (response.code in 200..299) {
             return response.body
         }
         throw IllegalStateException(extractErrorMessage(response.body) ?: "HTTP ${response.code}")
     }
 
-    private fun extractErrorMessage(rawBody: String): String? {
+    internal fun extractErrorMessage(rawBody: String): String? {
         val trimmed = rawBody.trim()
         if (trimmed.isBlank()) {
             return null
@@ -260,121 +1118,40 @@ class CrispyBackendClient(
         } ?: trimmed
     }
 
-    private fun parseUser(json: JSONObject): User {
-        val id = json.optString("id").trim()
-        if (id.isBlank()) {
-            throw IllegalStateException("Backend user is missing an id.")
+    internal val callTimeoutMs: Long
+        get() = CALL_TIMEOUT_MS
+
+    internal val jsonMediaType
+        get() = JSON_MEDIA_TYPE
+
+    internal fun metadataLookupUrl(
+        path: String,
+        input: MediaLookupInput,
+        includeId: Boolean = true,
+        includeMediaKey: Boolean = true,
+        includeImdbId: Boolean = true,
+    ) = path.toHttpUrl().newBuilder()
+        .apply {
+            val effectiveProvider =
+                input.provider?.trim()?.takeIf { it.isNotBlank() }
+                    ?: input.tvdbId?.toString()?.let { "tvdb" }
+                    ?: input.tmdbId?.toString()?.let { "tmdb" }
+            val effectiveProviderId =
+                input.providerId?.trim()?.takeIf { it.isNotBlank() }
+                    ?: input.tvdbId?.toString()
+                    ?: input.tmdbId?.toString()
+            if (includeId && !input.id.isNullOrBlank()) addQueryParameter("id", input.id.trim())
+            if (includeMediaKey && !input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
+            if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
+            if (includeImdbId && !input.imdbId.isNullOrBlank()) addQueryParameter("imdbId", input.imdbId.trim())
+            if (!effectiveProvider.isNullOrBlank()) addQueryParameter("provider", effectiveProvider)
+            if (!effectiveProviderId.isNullOrBlank()) addQueryParameter("providerId", effectiveProviderId)
+            if (!input.parentProvider.isNullOrBlank()) addQueryParameter("parentProvider", input.parentProvider.trim())
+            if (!input.parentProviderId.isNullOrBlank()) addQueryParameter("parentProviderId", input.parentProviderId.trim())
+            if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
+            if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
         }
-        return User(
-            id = id,
-            supabaseAuthUserId = json.optString("supabaseAuthUserId").trim().ifBlank { null },
-            email = json.optString("email").trim().ifBlank { null },
-        )
-    }
-
-    private fun parseProfiles(array: JSONArray?): List<Profile> {
-        val safeArray = array ?: JSONArray()
-        return buildList {
-            for (index in 0 until safeArray.length()) {
-                val profile = safeArray.optJSONObject(index) ?: continue
-                add(parseProfile(profile))
-            }
-        }
-    }
-
-    private fun parseProfile(json: JSONObject): Profile {
-        val id = json.optString("id").trim()
-        val householdId = json.optString("householdId").trim()
-        val name = json.optString("name").trim()
-        if (id.isBlank() || householdId.isBlank() || name.isBlank()) {
-            throw IllegalStateException("Backend profile is missing required fields.")
-        }
-        return Profile(
-            id = id,
-            householdId = householdId,
-            name = name,
-            avatarKey = json.optString("avatarKey").trim().ifBlank { null },
-            isKids = json.optBoolean("isKids", false),
-            sortOrder = json.optInt("sortOrder", 0),
-            createdByUserId = json.optString("createdByUserId").trim().ifBlank { null },
-            createdAt = json.optString("createdAt").trim().ifBlank { null },
-            updatedAt = json.optString("updatedAt").trim().ifBlank { null },
-        )
-    }
-
-    private fun parseImportConnections(array: JSONArray?): List<ImportConnection> {
-        val safeArray = array ?: JSONArray()
-        return buildList {
-            for (index in 0 until safeArray.length()) {
-                val connection = safeArray.optJSONObject(index) ?: continue
-                add(parseImportConnection(connection))
-            }
-        }
-    }
-
-    private fun parseImportConnection(json: JSONObject): ImportConnection {
-        return ImportConnection(
-            id = json.optString("id").trim(),
-            provider = json.optString("provider").trim(),
-            status = json.optString("status").trim(),
-            providerUserId = json.optString("providerUserId").trim().ifBlank { null },
-            externalUsername = json.optString("externalUsername").trim().ifBlank { null },
-            createdAt = json.optString("createdAt").trim().ifBlank { null },
-            updatedAt = json.optString("updatedAt").trim().ifBlank { null },
-            lastUsedAt = json.optString("lastUsedAt").trim().ifBlank { null },
-            lastImportJobId = json.optString("lastImportJobId").trim().ifBlank { null },
-            lastImportCompletedAt = json.optString("lastImportCompletedAt").trim().ifBlank { null },
-        )
-    }
-
-    private fun parseImportJobs(array: JSONArray?): List<ImportJob> {
-        val safeArray = array ?: JSONArray()
-        return buildList {
-            for (index in 0 until safeArray.length()) {
-                val job = safeArray.optJSONObject(index) ?: continue
-                add(parseImportJob(job))
-            }
-        }
-    }
-
-    private fun parseImportJob(json: JSONObject): ImportJob {
-        return ImportJob(
-            id = json.optString("id").trim(),
-            profileId = json.optString("profileId").trim(),
-            householdId = json.optString("householdId").trim(),
-            provider = json.optString("provider").trim(),
-            mode = json.optString("mode").trim(),
-            status = json.optString("status").trim(),
-            requestedByUserId = json.optString("requestedByUserId").trim(),
-            connectionId = json.optString("connectionId").trim().ifBlank { null },
-            errorMessage = json.optJSONObject("errorJson")?.optString("message")?.trim().orEmpty().ifBlank { null },
-            createdAt = json.optString("createdAt").trim().ifBlank { null },
-            startedAt = json.optString("startedAt").trim().ifBlank { null },
-            finishedAt = json.optString("finishedAt").trim().ifBlank { null },
-            updatedAt = json.optString("updatedAt").trim().ifBlank { null },
-        )
-    }
-
-    private fun JSONObject?.toStringMap(): Map<String, String> {
-        val obj = this ?: return emptyMap()
-        val keys = obj.keys()
-        val result = linkedMapOf<String, String>()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            val value = obj.opt(key) ?: continue
-            val normalized =
-                when (value) {
-                    JSONObject.NULL -> null
-                    is String -> value
-                    is Number, is Boolean -> value.toString()
-                    else -> value.toString()
-                }?.trim()
-            if (!normalized.isNullOrBlank()) {
-                result[key] = normalized
-            }
-        }
-        return result
-    }
+        .build()
 
     private companion object {
         private const val CALL_TIMEOUT_MS = 45_000L

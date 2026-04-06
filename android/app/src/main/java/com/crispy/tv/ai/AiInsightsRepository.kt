@@ -4,25 +4,25 @@ import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.CrispyHttpClient
-import com.crispy.tv.player.MetadataLabMediaType
 import java.util.Locale
 
 class AiInsightsRepository(
     private val supabase: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore,
+    private val backend: CrispyBackendClient,
     @Suppress("UNUSED_PARAMETER") httpClient: CrispyHttpClient,
     private val cacheStore: AiInsightsCacheStore,
 ) {
     fun loadCached(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        mediaKey: String,
         locale: Locale = Locale.getDefault(),
-    ): AiInsightsResult? = cacheStore.load(tmdbId, mediaType, locale)
+    ): AiInsightsResult? = cacheStore.load(mediaKey, locale)
 
     suspend fun generate(
-        tmdbId: Int,
-        mediaType: MetadataLabMediaType,
+        mediaKey: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
         val session = supabase.ensureValidSession()
@@ -33,7 +33,25 @@ class AiInsightsRepository(
             throw IllegalStateException("Select a profile to use AI insights.")
         }
 
-        throw IllegalStateException("AI insights are temporarily disabled until they have a backend /v1 replacement.")
+        val payload = backend.getAiInsights(
+            accessToken = session.accessToken,
+            profileId = profileId,
+            mediaKey = mediaKey,
+            locale = locale.toLanguageTag(),
+        )
+        return AiInsightsResult(
+            insights = payload.insights.map { card ->
+                AiInsightCard(
+                    type = card.type,
+                    title = card.title,
+                    category = card.category,
+                    content = card.content,
+                )
+            },
+            trivia = payload.trivia,
+        ).also { result ->
+            cacheStore.save(mediaKey, locale, result)
+        }
     }
 
     companion object {
@@ -42,6 +60,7 @@ class AiInsightsRepository(
             return AiInsightsRepository(
                 supabase = SupabaseServicesProvider.accountClient(appContext),
                 activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                backend = BackendServicesProvider.backendClient(appContext),
                 httpClient = httpClient,
                 cacheStore = AiInsightsCacheStore(appContext),
             )

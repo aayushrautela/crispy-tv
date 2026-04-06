@@ -2,16 +2,16 @@ package com.crispy.tv
 
 import android.content.Context
 import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.metadata.TmdbEpisodeListProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.metadata.BackendEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
 import com.crispy.tv.metadata.RemoteSupabaseSyncLabService
-import com.crispy.tv.metadata.tmdb.TmdbEnrichmentRepository
 import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.streams.AddonStreamsService
-import com.crispy.tv.watchhistory.RemoteWatchHistoryService
+import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackController
@@ -59,16 +59,15 @@ private fun newMetadataResolver(context: Context): MetadataLabResolver {
 
 private fun newWatchHistoryService(context: Context): WatchHistoryService {
     val appContext = context.applicationContext
-    val httpClient = AppHttp.client(appContext)
-    val tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext)
-    val episodeListProvider = TmdbEpisodeListProvider(
-        tmdbEnrichmentRepository = tmdbEnrichmentRepository,
+    val episodeListProvider = BackendEpisodeListProvider(
+        supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
+        backendClient = BackendServicesProvider.backendClient(appContext),
     )
-    return RemoteWatchHistoryService(
+    return BackendWatchHistoryService(
         context = appContext,
-        httpClient = httpClient,
-        traktClientId = BuildConfig.TRAKT_CLIENT_ID,
-        simklClientId = BuildConfig.SIMKL_CLIENT_ID,
+        supabase = SupabaseServicesProvider.accountClient(appContext),
+        backend = BackendServicesProvider.backendClient(appContext),
+        activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
         episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(
@@ -88,8 +87,9 @@ private fun newAddonStreamsService(context: Context): AddonStreamsService {
 
 private fun newEpisodeListProvider(context: Context): EpisodeListProvider {
     val appContext = context.applicationContext
-    return TmdbEpisodeListProvider(
-        tmdbEnrichmentRepository = TmdbServicesProvider.enrichmentRepository(appContext),
+    return BackendEpisodeListProvider(
+        supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
+        backendClient = BackendServicesProvider.backendClient(appContext),
     )
 }
 
@@ -155,11 +155,6 @@ object PlaybackDependencies {
         newEpisodeListProvider(context)
     }
 
-    @Volatile
-    var tmdbEnrichmentRepositoryFactory: (Context) -> TmdbEnrichmentRepository = { context ->
-        TmdbServicesProvider.enrichmentRepository(context.applicationContext)
-    }
-
     fun reset() {
         playbackControllerFactory = { context ->
             NativePlaybackController(context)
@@ -186,8 +181,5 @@ object PlaybackDependencies {
         }
         addonStreamsServiceFactory = { context -> newAddonStreamsService(context) }
         episodeListProviderFactory = { context -> newEpisodeListProvider(context) }
-        tmdbEnrichmentRepositoryFactory = { context ->
-            TmdbServicesProvider.enrichmentRepository(context.applicationContext)
-        }
     }
 }

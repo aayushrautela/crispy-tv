@@ -31,38 +31,115 @@ data class WatchHistoryEntry(
 
 data class WatchHistoryRequest(
     val contentId: String,
+    val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String? = null,
     val season: Int? = null,
     val episode: Int? = null,
-    val remoteImdbId: String? = null
+    val remoteImdbId: String? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 data class WatchHistoryResult(
     val statusMessage: String,
     val entries: List<WatchHistoryEntry> = emptyList(),
     val authState: WatchProviderAuthState = WatchProviderAuthState(),
+    val accepted: Boolean = false,
     val syncedToTrakt: Boolean = false,
     val syncedToSimkl: Boolean = false
 )
 
 data class ContinueWatchingEntry(
-    val contentId: String,
-    val contentType: MetadataLabMediaType,
+    val id: String,
+    val mediaKey: String? = null,
+    val localKey: String = id,
+    val provider: String,
+    val providerId: String,
+    val mediaType: String,
     val title: String,
     val season: Int?,
     val episode: Int?,
     val progressPercent: Double,
     val lastUpdatedEpochMs: Long,
-    val provider: WatchProvider,
-    val providerPlaybackId: String? = null,
-    val isUpNextPlaceholder: Boolean = false
+    val source: WatchProvider,
+    val isUpNextPlaceholder: Boolean = false,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val logoUrl: String? = null,
+    val addonId: String? = null,
+    val subtitle: String? = null,
+    val dismissible: Boolean = false,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 data class ContinueWatchingResult(
     val statusMessage: String,
     val entries: List<ContinueWatchingEntry> = emptyList(),
     val isError: Boolean = false,
+)
+
+data class CanonicalContinueWatchingItem(
+    val id: String,
+    val mediaKey: String? = null,
+    val localKey: String = id,
+    val provider: String,
+    val providerId: String,
+    val mediaType: String,
+    val title: String,
+    val season: Int?,
+    val episode: Int?,
+    val progressPercent: Double,
+    val lastUpdatedEpochMs: Long,
+    val source: WatchProvider,
+    val isUpNextPlaceholder: Boolean = false,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val logoUrl: String? = null,
+    val addonId: String? = null,
+    val subtitle: String? = null,
+    val dismissible: Boolean = false,
+    val absoluteEpisodeNumber: Int? = null,
+) {
+    val type: String
+        get() = when (mediaType.lowercase()) {
+            "show", "tv", "series", "episode" -> MetadataLabMediaType.SERIES.label
+            "anime" -> MetadataLabMediaType.ANIME.label
+            else -> MetadataLabMediaType.MOVIE.label
+        }
+
+    val watchedAtEpochMs: Long
+        get() = lastUpdatedEpochMs
+}
+
+data class CanonicalContinueWatchingResult(
+    val statusMessage: String,
+    val entries: List<CanonicalContinueWatchingItem> = emptyList(),
+    val isError: Boolean = false,
+)
+
+data class CanonicalWatchStateSnapshot(
+    val isWatched: Boolean,
+    val watchedAtEpochMs: Long?,
+    val isInWatchlist: Boolean,
+    val isRated: Boolean,
+    val userRating: Int?,
+    val watchedEpisodeKeys: Set<String> = emptySet(),
+)
+
+data class CanonicalProviderLibraryItem(
+    val contentId: String,
+    val mediaKey: String? = null,
+    val contentType: MetadataLabMediaType,
+    val title: String,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val folderIds: Set<String> = emptySet(),
+    val addedAtEpochMs: Long = 0L,
 )
 
 data class WatchedEpisodeRecord(
@@ -79,14 +156,23 @@ data class ProviderLibraryFolder(
     val itemCount: Int
 )
 
+data class ProviderExternalIds(
+    val tmdb: Int? = null,
+    val imdb: String? = null,
+    val tvdb: Int? = null,
+    val kitsu: Int? = null,
+)
+
 data class ProviderLibraryItem(
     val provider: WatchProvider,
     val folderId: String,
     val contentId: String,
+    val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
+    val externalIds: ProviderExternalIds? = null,
     val season: Int? = null,
     val episode: Int? = null,
     val addedAtEpochMs: Long = System.currentTimeMillis()
@@ -169,6 +255,8 @@ interface ProviderSessionBackend {
 }
 
 data class PlaybackIdentity(
+    val contentId: String? = null,
+    val mediaKey: String? = null,
     val imdbId: String?,
     val tmdbId: Int? = null,
     val contentType: MetadataLabMediaType,
@@ -177,7 +265,13 @@ data class PlaybackIdentity(
     val title: String,
     val year: Int? = null,
     val showTitle: String? = null,
-    val showYear: Int? = null
+    val showYear: Int? = null,
+    val provider: String? = null,
+    val providerId: String? = null,
+    val parentMediaType: String? = null,
+    val parentProvider: String? = null,
+    val parentProviderId: String? = null,
+    val absoluteEpisodeNumber: Int? = null,
 )
 
 data class WatchProgressSnapshot(
@@ -263,6 +357,14 @@ interface WatchHistoryService {
         return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.", isError = true)
     }
 
+    suspend fun getCanonicalContinueWatching(
+        limit: Int = 20,
+        nowMs: Long = System.currentTimeMillis(),
+        source: WatchProvider? = null,
+    ): CanonicalContinueWatchingResult {
+        return CanonicalContinueWatchingResult(statusMessage = "Canonical continue watching unavailable.", isError = true)
+    }
+
     suspend fun listWatchedEpisodeRecords(
         source: WatchProvider? = null,
     ): List<WatchedEpisodeRecord> {
@@ -274,6 +376,31 @@ interface WatchHistoryService {
         source: WatchProvider? = null
     ): ProviderLibrarySnapshot {
         return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
+    }
+
+    suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
+        return null
+    }
+
+    suspend fun getTitleWatchState(
+        mediaKey: String,
+        contentType: MetadataLabMediaType,
+    ): CanonicalWatchStateSnapshot? {
+        return null
+    }
+
+    suspend fun getCanonicalProviderLibraryItems(
+        limitPerFolder: Int = 200,
+        source: WatchProvider,
+    ): List<CanonicalProviderLibraryItem> {
+        return emptyList()
+    }
+
+    suspend fun getCachedCanonicalProviderLibraryItems(
+        limitPerFolder: Int = 200,
+        source: WatchProvider,
+    ): List<CanonicalProviderLibraryItem> {
+        return emptyList()
     }
 
     suspend fun getCachedProviderLibrary(
@@ -305,6 +432,20 @@ interface WatchHistoryService {
 
     suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
         return null
+    }
+
+    suspend fun setTitleInWatchlist(
+        mediaKey: String,
+        inWatchlist: Boolean,
+    ): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Watchlist unavailable.")
+    }
+
+    suspend fun setTitleRating(
+        mediaKey: String,
+        rating: Int?,
+    ): WatchHistoryResult {
+        return WatchHistoryResult(statusMessage = "Rating unavailable.")
     }
 
     suspend fun removeLocalWatchProgress(identity: PlaybackIdentity): WatchHistoryResult {

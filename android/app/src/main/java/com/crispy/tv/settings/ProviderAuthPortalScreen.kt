@@ -101,6 +101,14 @@ internal class ProviderPortalViewModel(
         startImport(CrispyBackendClient.ImportProvider.SIMKL)
     }
 
+    fun disconnectTrakt() {
+        disconnectProvider(CrispyBackendClient.ImportProvider.TRAKT)
+    }
+
+    fun disconnectSimkl() {
+        disconnectProvider(CrispyBackendClient.ImportProvider.SIMKL)
+    }
+
     fun consumePendingExternalUrl() {
         _uiState.update { it.copy(pendingExternalUrl = null) }
     }
@@ -141,12 +149,12 @@ internal class ProviderPortalViewModel(
                     isBusy = false,
                     activeProfileId = context.profile.id,
                     activeProfileName = context.profile.name,
-                    trakt = buildProviderState("trakt", connections?.connections, jobs?.jobs),
-                    simkl = buildProviderState("simkl", connections?.connections, jobs?.jobs),
+                    trakt = buildProviderState("trakt", connections?.providerAccounts, jobs?.jobs),
+                    simkl = buildProviderState("simkl", connections?.providerAccounts, jobs?.jobs),
                     statusMessage =
                         forceMessage
                             ?: errorMessage
-                            ?: "Imports run against ${context.profile.name}. Disconnect is temporarily unavailable until a backend revoke route exists.",
+                            ?: "Imports run against ${context.profile.name}. Connect a provider to import watch history, playback, watchlist, and ratings.",
                 )
             }
         }
@@ -195,6 +203,39 @@ internal class ProviderPortalViewModel(
         }
     }
 
+    private fun disconnectProvider(provider: CrispyBackendClient.ImportProvider) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
+            val context = resolveActiveProfileContext() ?: return@launch
+            val providerLabel = providerLabel(provider.apiValue)
+            val disconnected =
+                runCatching {
+                    backend.disconnectImportConnection(
+                        accessToken = context.session.accessToken,
+                        profileId = context.profile.id,
+                        provider = provider,
+                    )
+                }
+
+            val message =
+                disconnected.fold(
+                    onSuccess = { "$providerLabel disconnected from ${context.profile.name}." },
+                    onFailure = { it.message ?: "Unable to disconnect $providerLabel." },
+                )
+
+            if (disconnected.isSuccess) {
+                refreshImportState(forceMessage = message)
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isBusy = false,
+                        statusMessage = message,
+                    )
+                }
+            }
+        }
+    }
+
     private suspend fun resolveActiveProfileContext(): ActiveProfileContext? {
         if (!supabase.isConfigured() || !backend.isConfigured()) {
             _uiState.update {
@@ -230,7 +271,7 @@ internal class ProviderPortalViewModel(
             return null
         }
 
-        val userKey = me.user.supabaseAuthUserId ?: session.userId ?: me.user.id
+        val userKey = session.userId?.ifBlank { me.user.id } ?: me.user.id
         val storedProfileId = activeProfileStore.getActiveProfileId(userKey)
         val profile = me.profiles.firstOrNull { it.id == storedProfileId } ?: me.profiles.firstOrNull()
         if (profile == null) {
@@ -257,15 +298,15 @@ internal class ProviderPortalViewModel(
 
     private fun buildProviderState(
         provider: String,
-        connections: List<CrispyBackendClient.ImportConnection>?,
+        providerAccounts: List<CrispyBackendClient.ProviderAccount>?,
         jobs: List<CrispyBackendClient.ImportJob>?,
     ): ProviderImportUiState {
-        val connection = connections.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
+        val providerAccount = providerAccounts.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         val latestJob = jobs.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         return ProviderImportUiState(
-            connected = connection?.status.equals("connected", ignoreCase = true),
-            connectionStatus = connection?.status?.toDisplayLabel() ?: "Disconnected",
-            externalUsername = connection?.externalUsername,
+            connected = providerAccount?.status.equals("connected", ignoreCase = true),
+            connectionStatus = providerAccount?.status?.toDisplayLabel() ?: "Disconnected",
+            externalUsername = providerAccount?.externalUsername,
             latestJobStatus = latestJob?.status?.toDisplayLabel(),
             latestJobError = latestJob?.errorMessage,
         )
@@ -319,6 +360,8 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
         uiState = uiState,
         onConnectTrakt = viewModel::connectTrakt,
         onConnectSimkl = viewModel::connectSimkl,
+        onDisconnectTrakt = viewModel::disconnectTrakt,
+        onDisconnectSimkl = viewModel::disconnectSimkl,
         onRefresh = { viewModel.refreshImportState() },
         onBack = onBack,
     )
@@ -330,6 +373,8 @@ private fun ProviderAuthPortalScreen(
     uiState: ProviderPortalUiState,
     onConnectTrakt: () -> Unit,
     onConnectSimkl: () -> Unit,
+    onDisconnectTrakt: () -> Unit,
+    onDisconnectSimkl: () -> Unit,
     onRefresh: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -397,6 +442,8 @@ private fun ProviderAuthPortalScreen(
                     actionLabel = if (uiState.trakt.connected) "Run import" else "Connect & import",
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
                     onAction = onConnectTrakt,
+                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.trakt.connected,
+                    onDisconnect = onDisconnectTrakt,
                 )
             }
 
@@ -407,6 +454,8 @@ private fun ProviderAuthPortalScreen(
                     actionLabel = if (uiState.simkl.connected) "Run import" else "Connect & import",
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
                     onAction = onConnectSimkl,
+                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.simkl.connected,
+                    onDisconnect = onDisconnectSimkl,
                 )
             }
 
@@ -430,6 +479,8 @@ private fun ProviderCard(
     actionLabel: String,
     actionEnabled: Boolean,
     onAction: () -> Unit,
+    disconnectEnabled: Boolean,
+    onDisconnect: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -469,16 +520,19 @@ private fun ProviderCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Text(
-                text = "Disconnect is not available on the backend yet.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Button(
                 onClick = onAction,
                 enabled = actionEnabled,
             ) {
                 Text(actionLabel)
+            }
+            if (state.connected) {
+                OutlinedButton(
+                    onClick = onDisconnect,
+                    enabled = disconnectEnabled,
+                ) {
+                    Text("Disconnect")
+                }
             }
         }
     }

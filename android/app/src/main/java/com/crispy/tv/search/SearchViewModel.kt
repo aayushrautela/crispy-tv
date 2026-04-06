@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +19,7 @@ enum class SearchTypeFilter {
     ALL,
     MOVIES,
     SERIES,
-    PEOPLE;
+    ANIME;
 
     val label: String
         get() =
@@ -28,7 +27,7 @@ enum class SearchTypeFilter {
                 ALL -> "All"
                 MOVIES -> "Movies"
                 SERIES -> "Series"
-                PEOPLE -> "People"
+                ANIME -> "Anime"
             }
 }
 
@@ -55,18 +54,14 @@ data class SearchUiState(
     val availableFilters: List<SearchTypeFilter>
         get() =
             if (selectedGenre == null) {
-                if (searchMode == SearchMode.AI) {
-                    listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES)
-                } else {
-                    SearchTypeFilter.entries
-                }
+                SearchTypeFilter.entries
             } else {
-                listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES)
+                listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES, SearchTypeFilter.ANIME)
             }
 }
 
 class SearchViewModel(
-    private val searchRepository: TmdbSearchRepository,
+    private val searchRepository: BackendSearchRepository,
     private val aiSearchRepository: AiSearchRepository,
     private val searchHistoryStore: SearchHistoryStore,
     private val localeProvider: () -> Locale = { Locale.getDefault() },
@@ -338,16 +333,11 @@ class SearchViewModel(
     }
 
     private fun normalizeFilterForGenre(filter: SearchTypeFilter): SearchTypeFilter {
-        return if (filter == SearchTypeFilter.PEOPLE) SearchTypeFilter.ALL else filter
+        return filter
     }
 
     private fun normalizeFilterForMode(filter: SearchTypeFilter, mode: SearchMode): SearchTypeFilter {
-        val genreResolved = normalizeFilterForGenre(filter)
-        return if (mode == SearchMode.AI && genreResolved == SearchTypeFilter.PEOPLE) {
-            SearchTypeFilter.ALL
-        } else {
-            genreResolved
-        }
+        return normalizeFilterForGenre(filter)
     }
 
     companion object {
@@ -361,7 +351,7 @@ class SearchViewModel(
 
                     val httpClient = AppHttp.client(context)
                     val viewModel = SearchViewModel(
-                        searchRepository = TmdbServicesProvider.searchRepository(context),
+                        searchRepository = BackendSearchRepository.create(context),
                         aiSearchRepository = AiSearchRepository.create(context, httpClient),
                         searchHistoryStore = SearchHistoryStore(context),
                     )
