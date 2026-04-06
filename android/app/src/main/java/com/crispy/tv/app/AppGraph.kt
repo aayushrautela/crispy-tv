@@ -8,7 +8,6 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.data.repository.DefaultCatalogRepository
 import com.crispy.tv.data.repository.DefaultSessionRepository
 import com.crispy.tv.data.repository.DefaultUserMediaRepository

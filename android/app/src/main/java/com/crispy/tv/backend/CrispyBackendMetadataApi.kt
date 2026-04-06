@@ -11,6 +11,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataSearchResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataSeasonDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleContentResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleReviewsResponse
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
