@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
@@ -51,7 +52,7 @@ internal fun EpisodeCard(
 ) {
     val progressFraction = (watchState.progressPercent / 100.0).coerceIn(0.0, 1.0).toFloat()
     val overviewLineHeight = MaterialTheme.typography.bodySmall.lineHeight.takeIf { it != TextUnit.Unspecified } ?: 16.sp
-    val overviewHeight = overviewLineHeight * 3
+    val overviewHeight = with(LocalDensity.current) { (overviewLineHeight * 3).toDp() }
 
     ElevatedCard(
         modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongPress),
