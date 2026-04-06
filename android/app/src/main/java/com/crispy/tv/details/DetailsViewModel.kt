@@ -75,6 +75,7 @@ class DetailsViewModel internal constructor(
                 it.copy(
                     isLoading = true,
                     titleDetail = null,
+                    titleReviews = null,
                     titleContent = null,
                     statusMessage = "Loading...",
                     aiIsLoading = false,
@@ -127,6 +128,7 @@ class DetailsViewModel internal constructor(
                     isLoading = false,
                     details = result.details,
                     titleDetail = result.titleDetail,
+                    titleReviews = result.titleReviews,
                     titleContent = result.titleContent,
                     statusMessage = result.statusMessage,
                     isWatched = result.providerState.isWatched,

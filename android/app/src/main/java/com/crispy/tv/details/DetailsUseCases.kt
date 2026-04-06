@@ -2,6 +2,7 @@ package com.crispy.tv.details
 
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
@@ -24,6 +25,7 @@ import java.util.Locale
 internal data class DetailsScreenLoadResult(
     val details: MediaDetails?,
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
+    val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse?,
     val titleContent: CrispyBackendClient.MetadataTitleContentResponse?,
     val statusMessage: String,
     val providerState: ProviderState,
@@ -58,6 +60,8 @@ internal class DetailsUseCases(
     private val userMediaRepository: UserMediaRepository,
     private val aiRepository: AiInsightsRepository,
     private val addonStreamsService: AddonStreamsService,
+    private val activeProfileStore: ActiveProfileStore,
+    private val backendClient: CrispyBackendClient,
 ) {
     private val episodeWatchStateResolver = EpisodeWatchStateResolver(userMediaRepository)
 
@@ -72,6 +76,7 @@ internal class DetailsUseCases(
         nowMs: Long,
     ): DetailsScreenLoadResult {
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val profileId = session?.let { resolveProfileId(it.accessToken, it.userId) }
         val titleDetailResult =
             session?.let {
                 runCatching {
@@ -80,6 +85,17 @@ internal class DetailsUseCases(
             }
         val titleDetail = titleDetailResult?.getOrNull()
         val titleDetailError = titleDetailResult?.exceptionOrNull()
+        val titleReviewsResult =
+            session?.takeIf { !profileId.isNullOrBlank() }?.let {
+                runCatching {
+                    catalogRepository.getTitleReviews(
+                        accessToken = it.accessToken,
+                        profileId = checkNotNull(profileId),
+                        mediaKey = mediaKey,
+                    )
+                }
+            }
+        val titleReviews = titleReviewsResult?.getOrNull()
         val titleContentResult =
             session?.let {
                 runCatching {
@@ -118,6 +134,7 @@ internal class DetailsUseCases(
         return DetailsScreenLoadResult(
             details = details,
             titleDetail = titleDetail,
+            titleReviews = titleReviews,
             titleContent = titleContent,
             statusMessage = statusMessage,
             providerState = providerState,
@@ -125,6 +142,21 @@ internal class DetailsUseCases(
             continueVideoId = ctaResolution.continueVideoId,
             seasons = seasons,
         )
+    }
+
+    private suspend fun resolveProfileId(accessToken: String, userId: String): String? {
+        var profileId = activeProfileStore.getActiveProfileId(userId).orEmpty().trim()
+        if (profileId.isBlank()) {
+            profileId = try {
+                backendClient.getMe(accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
+            } catch (_: Throwable) {
+                ""
+            }
+            if (profileId.isNotBlank()) {
+                activeProfileStore.setActiveProfileId(userId, profileId)
+            }
+        }
+        return profileId.ifBlank { null }
     }
 
     suspend fun resolveWatchCta(

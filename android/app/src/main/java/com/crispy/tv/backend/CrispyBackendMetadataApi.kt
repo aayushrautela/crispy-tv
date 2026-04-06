@@ -153,10 +153,26 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
         cast = parseMetadataPersonRefViews(json.optJSONArray("cast")),
         directors = parseMetadataPersonRefViews(json.optJSONArray("directors")),
         creators = parseMetadataPersonRefViews(json.optJSONArray("creators")),
-        reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
         production = parseMetadataProductionInfoView(json.optJSONObject("production")),
         collection = parseMetadataCollectionView(json.optJSONObject("collection")),
         similar = parseMetadataCardViews(json.optJSONArray("similar")),
+    )
+}
+
+internal suspend fun CrispyBackendClient.getMetadataTitleReviewsApi(
+    accessToken: String,
+    profileId: String,
+    mediaKey: String,
+): MetadataTitleReviewsResponse {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/metadata/titles/${mediaKey.trim()}/reviews".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = JSONObject(requireSuccess(response))
+    return MetadataTitleReviewsResponse(
+        reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
     )
 }
 

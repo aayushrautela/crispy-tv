@@ -305,10 +305,13 @@ class CrispyBackendClient(
         val cast: List<MetadataPersonRefView>,
         val directors: List<MetadataPersonRefView>,
         val creators: List<MetadataPersonRefView>,
-        val reviews: List<MetadataReviewView>,
         val production: MetadataProductionInfoView,
         val collection: MetadataCollectionView?,
         val similar: List<MetadataCardView>,
+    )
+
+    data class MetadataTitleReviewsResponse(
+        val reviews: List<MetadataReviewView>,
     )
 
     data class MetadataCardView(
@@ -903,6 +906,18 @@ class CrispyBackendClient(
 
     suspend fun getMetadataTitleDetail(accessToken: String, mediaKey: String): MetadataTitleDetailResponse {
         return getMetadataTitleDetailApi(accessToken, mediaKey)
+    }
+
+    suspend fun getMetadataTitleReviews(
+        accessToken: String,
+        profileId: String,
+        mediaKey: String,
+    ): MetadataTitleReviewsResponse {
+        return getMetadataTitleReviewsApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            mediaKey = mediaKey,
+        )
     }
 
     suspend fun getMetadataTitleContent(accessToken: String, mediaKey: String): MetadataTitleContentResponse {

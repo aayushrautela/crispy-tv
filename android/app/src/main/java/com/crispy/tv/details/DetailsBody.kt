@@ -257,7 +257,7 @@ internal fun DetailsBody(
             }
         }
 
-        val reviews = titleDetail?.reviews.orEmpty()
+        val reviews = uiState.titleReviews?.reviews.orEmpty()
         if (reviews.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
