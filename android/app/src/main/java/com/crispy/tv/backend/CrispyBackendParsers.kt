@@ -36,6 +36,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonRefView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataProductionInfoView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataReviewView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataSeasonView
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatings
 import com.crispy.tv.backend.CrispyBackendClient.MetadataVideoView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataView
 import com.crispy.tv.backend.CrispyBackendClient.PageInfo
@@ -589,6 +590,21 @@ internal fun CrispyBackendClient.parseMetadataContentRatings(json: JSONObject?):
         rottenTomatoes = safe.optIntOrNull("rottenTomatoes"),
         letterboxdRating = safe.optDoubleOrNull("letterboxdRating"),
         mdblistRating = safe.optDoubleOrNull("mdblistRating"),
+    )
+}
+
+internal fun CrispyBackendClient.parseMetadataTitleRatings(json: JSONObject?): MetadataTitleRatings {
+    val safe = json ?: JSONObject()
+    return MetadataTitleRatings(
+        imdb = safe.optDoubleOrNull("imdb"),
+        tmdb = safe.optDoubleOrNull("tmdb"),
+        trakt = safe.optDoubleOrNull("trakt"),
+        metacritic = safe.optDoubleOrNull("metacritic"),
+        rottenTomatoes = safe.optDoubleOrNull("rottenTomatoes"),
+        audience = safe.optDoubleOrNull("audience"),
+        letterboxd = safe.optDoubleOrNull("letterboxd"),
+        rogerEbert = safe.optDoubleOrNull("rogerEbert"),
+        myAnimeList = safe.optDoubleOrNull("myAnimeList"),
     )
 }
 

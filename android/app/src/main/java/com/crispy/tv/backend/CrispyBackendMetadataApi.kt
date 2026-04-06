@@ -11,6 +11,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataSearchResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataSeasonDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleContentResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleReviewsResponse
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -191,6 +192,23 @@ internal suspend fun CrispyBackendClient.getMetadataTitleContentApi(
     return MetadataTitleContentResponse(
         item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend title content is missing item.")),
         content = parseMetadataContentView(json.optJSONObject("content") ?: throw IllegalStateException("Backend title content is missing content.")),
+    )
+}
+
+internal suspend fun CrispyBackendClient.getMetadataTitleRatingsApi(
+    accessToken: String,
+    profileId: String,
+    mediaKey: String,
+): MetadataTitleRatingsResponse {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/metadata/titles/${mediaKey.trim()}/ratings".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = JSONObject(requireSuccess(response))
+    return MetadataTitleRatingsResponse(
+        ratings = parseMetadataTitleRatings(json.optJSONObject("ratings")),
     )
 }
 

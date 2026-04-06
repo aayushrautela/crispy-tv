@@ -63,6 +63,7 @@ internal fun DetailsBody(
     val details = uiState.details
     val titleDetail = uiState.titleDetail
     val titleContent = uiState.titleContent?.content
+    val titleRatings = uiState.titleRatings?.ratings
     val horizontalPadding = responsivePageHorizontalPadding()
     val contentPadding = PaddingValues(horizontal = horizontalPadding)
 
@@ -211,6 +212,7 @@ internal fun DetailsBody(
         RatingsSection(
             tmdbRating = details.rating,
             content = titleContent,
+            titleRatings = titleRatings,
             isLoading = false,
             horizontalPadding = horizontalPadding,
             contentPadding = contentPadding,

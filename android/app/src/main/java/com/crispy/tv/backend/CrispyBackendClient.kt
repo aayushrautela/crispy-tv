@@ -456,6 +456,22 @@ class CrispyBackendClient(
         val content: MetadataContentView,
     )
 
+    data class MetadataTitleRatings(
+        val imdb: Double?,
+        val tmdb: Double?,
+        val trakt: Double?,
+        val metacritic: Double?,
+        val rottenTomatoes: Double?,
+        val audience: Double?,
+        val letterboxd: Double?,
+        val rogerEbert: Double?,
+        val myAnimeList: Double?,
+    )
+
+    data class MetadataTitleRatingsResponse(
+        val ratings: MetadataTitleRatings,
+    )
+
     data class MetadataSeasonDetailResponse(
         val show: MetadataView,
         val season: MetadataSeasonView,
@@ -922,6 +938,18 @@ class CrispyBackendClient(
 
     suspend fun getMetadataTitleContent(accessToken: String, mediaKey: String): MetadataTitleContentResponse {
         return getMetadataTitleContentApi(accessToken, mediaKey)
+    }
+
+    suspend fun getMetadataTitleRatings(
+        accessToken: String,
+        profileId: String,
+        mediaKey: String,
+    ): MetadataTitleRatingsResponse {
+        return getMetadataTitleRatingsApi(
+            accessToken = accessToken,
+            profileId = profileId,
+            mediaKey = mediaKey,
+        )
     }
 
     suspend fun getMetadataSeasonDetail(accessToken: String, mediaKey: String, seasonNumber: Int): MetadataSeasonDetailResponse {

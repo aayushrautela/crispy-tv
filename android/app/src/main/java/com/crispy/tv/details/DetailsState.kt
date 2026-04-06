@@ -24,6 +24,7 @@ data class DetailsUiState(
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
     val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse? = null,
     val titleContent: CrispyBackendClient.MetadataTitleContentResponse? = null,
+    val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse? = null,
     val statusMessage: String = "",
     val aiIsLoading: Boolean = false,
     val aiInsights: AiInsightsResult? = null,

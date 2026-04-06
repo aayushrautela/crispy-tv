@@ -32,6 +32,18 @@ class DefaultCatalogRepository(
         return backendClient.getMetadataTitleContent(accessToken = accessToken, mediaKey = mediaKey)
     }
 
+    override suspend fun getTitleRatings(
+        accessToken: String,
+        profileId: String,
+        mediaKey: String,
+    ): CrispyBackendClient.MetadataTitleRatingsResponse {
+        return backendClient.getMetadataTitleRatings(
+            accessToken = accessToken,
+            profileId = profileId,
+            mediaKey = mediaKey,
+        )
+    }
+
     override suspend fun listEpisodes(
         accessToken: String,
         mediaKey: String,

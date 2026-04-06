@@ -27,6 +27,7 @@ internal data class DetailsScreenLoadResult(
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
     val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse?,
     val titleContent: CrispyBackendClient.MetadataTitleContentResponse?,
+    val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse?,
     val statusMessage: String,
     val providerState: ProviderState,
     val watchCta: WatchCta,
@@ -104,6 +105,17 @@ internal class DetailsUseCases(
             }
         val titleContent = titleContentResult?.getOrNull()
         val titleContentError = titleContentResult?.exceptionOrNull()
+        val titleRatingsResult =
+            session?.takeIf { !profileId.isNullOrBlank() }?.let {
+                runCatching {
+                    catalogRepository.getTitleRatings(
+                        accessToken = it.accessToken,
+                        profileId = checkNotNull(profileId),
+                        mediaKey = mediaKey,
+                    )
+                }
+            }
+        val titleRatings = titleRatingsResult?.getOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
         val providerState = watchCtaResolver.resolveProviderState(details, mediaKey)
@@ -136,6 +148,7 @@ internal class DetailsUseCases(
             titleDetail = titleDetail,
             titleReviews = titleReviews,
             titleContent = titleContent,
+            titleRatings = titleRatings,
             statusMessage = statusMessage,
             providerState = providerState,
             watchCta = ctaResolution.watchCta,
