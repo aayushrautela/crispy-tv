@@ -11,18 +11,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -272,22 +269,11 @@ internal fun MetadataReviewCard(
 @Composable
 internal fun ReviewProviderBadge(provider: String) {
     val logoRes = reviewProviderLogoRes(provider) ?: return
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            AsyncImage(
-                model = logoRes,
-                contentDescription = provider.providerLabel(),
-                modifier = Modifier.size(width = 18.dp, height = 18.dp),
-            )
-        }
-    }
+    AsyncImage(
+        model = logoRes,
+        contentDescription = provider.providerLabel(),
+        modifier = Modifier.size(width = 24.dp, height = 24.dp),
+    )
 }
 
 private fun reviewProviderLogoRes(provider: String): Int? =
