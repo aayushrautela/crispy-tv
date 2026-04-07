@@ -80,7 +80,7 @@ internal fun HeroSection(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
-    val heroHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(340.dp, 520.dp)
+    val heroHeight = (configuration.screenHeightDp.dp * 0.43f).coerceIn(300.dp, 440.dp)
     val screenWidthPx = remember(configuration.screenWidthDp, density) {
         with(density) { configuration.screenWidthDp.dp.toPx() }
     }
@@ -111,7 +111,7 @@ internal fun HeroSection(
                                 colorStops =
                                     arrayOf(
                                         0f to Color.Transparent,
-                                        0.58f to Color.Transparent,
+                                        0.66f to Color.Transparent,
                                         1f to palette.pageBackground
                                     ),
                                 startY = 0f,
@@ -218,7 +218,7 @@ internal fun HeroSection(
                         colorStops =
                             arrayOf(
                                 0f to Color.Transparent,
-                                0.58f to Color.Transparent,
+                                0.66f to Color.Transparent,
                                 1f to palette.pageBackground
                             ),
                         startY = 0f,
@@ -234,7 +234,7 @@ internal fun HeroSection(
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 160.dp)
+                    .padding(bottom = 136.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
                     .clickable { onToggleTrailer() },
                 color = Color.Black.copy(alpha = 0.34f),
@@ -259,8 +259,8 @@ internal fun HeroSection(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = horizontalPadding)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val logoUrl = details.logoUrl?.trim().orEmpty()
@@ -269,8 +269,8 @@ internal fun HeroSection(
                     model = logoUrl,
                     contentDescription = details.title,
                     modifier = Modifier
-                        .fillMaxWidth(0.84f)
-                        .height(110.dp),
+                        .fillMaxWidth(0.81f)
+                        .height(104.dp),
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.Center
                 )

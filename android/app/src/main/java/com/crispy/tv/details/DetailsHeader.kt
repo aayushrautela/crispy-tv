@@ -21,12 +21,13 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -44,14 +45,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.appendInlineContent
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ratings.normalizeRatingText
 import com.crispy.tv.ui.components.skeletonElement
@@ -155,7 +162,7 @@ internal fun HeaderInfoSection(
     }
 
 
-    val genre = details.genres.firstOrNull()?.trim().orEmpty()
+    val genre = details.genres.take(2).joinToString(" / ") { it.trim() }
 
     var showRatingDialog by rememberSaveable { mutableStateOf(false) }
     var pendingRating by rememberSaveable { mutableStateOf(0f) }
@@ -215,7 +222,7 @@ internal fun HeaderInfoSection(
             .padding(horizontal = horizontalPadding)
             .padding(top = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (genre.isNotBlank()) {
             Text(
@@ -519,7 +526,8 @@ private fun HeaderMetaRow(
             Surface(
                 shape = MaterialTheme.shapes.small,
                 color = palette.pillBackground,
-                contentColor = palette.onPillBackground
+                contentColor = palette.onPillBackground,
+                border = BorderStroke(1.dp, palette.onPillBackground.copy(alpha = 0.3f))
             ) {
                 Text(
                     text = certification,
@@ -560,6 +568,40 @@ internal fun ExpandableDescription(
 
     var textLayoutResult by remember(content) { mutableStateOf<TextLayoutResult?>(null) }
     val canExpand = (textLayoutResult?.hasVisualOverflow == true) || expanded
+    val toggleDescriptionLabel = if (expanded) "Collapse description" else "Expand description"
+    val inlineToggleId = "description_toggle"
+    val inlineText =
+        remember(content, canExpand) {
+            buildAnnotatedString {
+                append(content)
+                if (canExpand) {
+                    append(' ')
+                    appendInlineContent(inlineToggleId, toggleDescriptionLabel)
+                }
+            }
+        }
+    val inlineToggleContent =
+        if (canExpand) {
+            mapOf(
+                inlineToggleId to
+                    androidx.compose.foundation.text.InlineTextContent(
+                        Placeholder(
+                            width = 18.sp,
+                            height = 18.sp,
+                            placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter,
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = toggleDescriptionLabel,
+                            modifier = Modifier.size(18.dp),
+                            tint = textColor.copy(alpha = 0.82f),
+                        )
+                    }
+            )
+        } else {
+            emptyMap()
+        }
 
     Column(
         modifier = Modifier
@@ -569,25 +611,22 @@ internal fun ExpandableDescription(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = content,
+            text = inlineText,
             style = MaterialTheme.typography.bodyMedium,
             color = textColor,
+            modifier =
+                if (canExpand) {
+                    Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(role = Role.Button) { expanded = !expanded }
+                } else {
+                    Modifier
+                },
             textAlign = textAlign,
             maxLines = if (expanded) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis,
+            inlineContent = inlineToggleContent,
             onTextLayout = { textLayoutResult = it }
         )
-        if (canExpand) {
-            Icon(
-                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse description" else "Expand description",
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable { expanded = !expanded }
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                tint = textColor.copy(alpha = 0.82f),
-            )
-        }
     }
 }
