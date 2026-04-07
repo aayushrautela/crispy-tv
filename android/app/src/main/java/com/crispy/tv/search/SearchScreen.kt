@@ -113,7 +113,7 @@ fun SearchRoute(
                 uiState = uiState,
                 gridState = resultsGridState,
                 pageHorizontalPadding = pageHorizontalPadding,
-                onFilterChange = viewModel::setFilter,
+                onCategoryChange = viewModel::setCategory,
                 onItemClick = onItemClick,
                 emptyMessage = uiState.statusMessage,
                 modifier = contentModifier,
@@ -248,7 +248,7 @@ private fun SearchResultsContent(
     uiState: SearchUiState,
     gridState: LazyGridState,
     pageHorizontalPadding: Dp,
-    onFilterChange: (SearchTypeFilter) -> Unit,
+    onCategoryChange: (SearchCategory) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     emptyMessage: String?,
     modifier: Modifier = Modifier,
@@ -260,21 +260,21 @@ private fun SearchResultsContent(
         modifier = modifier,
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            SearchFilterRow(
-                availableFilters = uiState.availableFilters,
-                selectedFilter = uiState.filter,
-                onFilterChange = onFilterChange,
+            SearchCategoryRow(
+                availableCategories = uiState.availableCategories,
+                selectedCategory = uiState.category,
+                onCategoryChange = onCategoryChange,
             )
         }
 
         when {
-            uiState.isLoading -> {
+            uiState.isLoading && uiState.visibleResults.isEmpty() -> {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SearchLoadingIndicator()
                 }
             }
 
-            uiState.results.isEmpty() -> {
+            uiState.visibleResults.isEmpty() -> {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SearchEmptyState(
                         text = emptyMessage ?: if (uiState.searchMode == SearchMode.AI) "No AI matches found." else "No results",
@@ -283,8 +283,13 @@ private fun SearchResultsContent(
             }
 
             else -> {
+                if (uiState.isLoading) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        SearchLoadingIndicator(compact = true)
+                    }
+                }
                 gridItems(
-                    items = uiState.results,
+                    items = uiState.visibleResults,
                     key = { "${it.type}:${it.id}" },
                 ) { item ->
                     PosterCard(
@@ -302,20 +307,20 @@ private fun SearchResultsContent(
 }
 
 @Composable
-private fun SearchFilterRow(
-    availableFilters: List<SearchTypeFilter>,
-    selectedFilter: SearchTypeFilter,
-    onFilterChange: (SearchTypeFilter) -> Unit,
+private fun SearchCategoryRow(
+    availableCategories: List<SearchCategory>,
+    selectedCategory: SearchCategory,
+    onCategoryChange: (SearchCategory) -> Unit,
 ) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(availableFilters, key = { it.name }) { filter ->
+        items(availableCategories, key = { it.name }) { category ->
             FilterChip(
-                selected = selectedFilter == filter,
-                onClick = { onFilterChange(filter) },
-                label = { Text(filter.label) },
+                selected = selectedCategory == category,
+                onClick = { onCategoryChange(category) },
+                label = { Text(category.label) },
             )
         }
     }
@@ -398,11 +403,11 @@ private fun SearchEmptyState(text: String) {
 }
 
 @Composable
-private fun SearchLoadingIndicator() {
+private fun SearchLoadingIndicator(compact: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 24.dp),
+            .padding(vertical = if (compact) 8.dp else 24.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {

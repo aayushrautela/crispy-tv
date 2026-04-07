@@ -90,12 +90,12 @@ class CrispyBackendClient(
         val providerId: String?,
     )
 
-    data class MetadataSearchResponse(
-        val items: List<BackendMetadataItem>,
-    )
-
-    data class AiSearchResponse(
-        val items: List<BackendMetadataItem>,
+    data class SearchResultsResponse(
+        val query: String,
+        val all: List<BackendMetadataItem>,
+        val movies: List<BackendMetadataItem>,
+        val series: List<BackendMetadataItem>,
+        val anime: List<BackendMetadataItem>,
     )
 
     data class AiInsightsCard(
@@ -854,14 +854,12 @@ class CrispyBackendClient(
     suspend fun searchTitles(
         accessToken: String,
         query: String,
-        filter: String? = null,
         locale: String? = null,
         limit: Int = 20,
-    ): MetadataSearchResponse {
+    ): SearchResultsResponse {
         return searchTitlesApi(
             accessToken = accessToken,
             query = query,
-            filter = filter,
             locale = locale,
             limit = limit,
         )
@@ -870,14 +868,12 @@ class CrispyBackendClient(
     suspend fun searchTitlesByGenre(
         accessToken: String,
         genre: String,
-        filter: String? = null,
         locale: String? = null,
         limit: Int = 20,
-    ): MetadataSearchResponse {
+    ): SearchResultsResponse {
         return searchTitlesByGenreApi(
             accessToken = accessToken,
             genre = genre,
-            filter = filter,
             locale = locale,
             limit = limit,
         )
@@ -887,14 +883,12 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         query: String,
-        filter: String? = null,
         locale: String? = null,
-    ): AiSearchResponse {
+    ): SearchResultsResponse {
         return searchAiTitlesApi(
             accessToken = accessToken,
             profileId = profileId,
             query = query,
-            filter = filter,
             locale = locale,
         )
     }

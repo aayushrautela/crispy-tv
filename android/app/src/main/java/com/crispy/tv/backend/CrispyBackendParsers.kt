@@ -47,6 +47,7 @@ import com.crispy.tv.backend.CrispyBackendClient.ProviderLibraryFolder
 import com.crispy.tv.backend.CrispyBackendClient.ProviderLibraryItem
 import com.crispy.tv.backend.CrispyBackendClient.ProviderLibrarySnapshot
 import com.crispy.tv.backend.CrispyBackendClient.RatingStateView
+import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.User
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchProgressView
@@ -157,6 +158,16 @@ internal fun CrispyBackendClient.parseMetadataItems(array: JSONArray?): List<Bac
             add(parseMetadataItem(item))
         }
     }
+}
+
+internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): SearchResultsResponse {
+    return SearchResultsResponse(
+        query = json.optString("query").trim(),
+        all = parseMetadataItems(json.optJSONArray("all")),
+        movies = parseMetadataItems(json.optJSONArray("movies")),
+        series = parseMetadataItems(json.optJSONArray("series")),
+        anime = parseMetadataItems(json.optJSONArray("anime")),
+    )
 }
 
 internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMetadataItem {

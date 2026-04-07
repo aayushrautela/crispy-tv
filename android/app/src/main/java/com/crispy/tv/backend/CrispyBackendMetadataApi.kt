@@ -1,13 +1,12 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.AiInsightsResponse
-import com.crispy.tv.backend.CrispyBackendClient.AiSearchResponse
 import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodeListResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataNextEpisodeResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.MetadataResolveResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataSearchResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataSeasonDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleContentResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
@@ -20,17 +19,13 @@ import org.json.JSONObject
 internal suspend fun CrispyBackendClient.searchTitlesApi(
     accessToken: String,
     query: String,
-    filter: String? = null,
     locale: String? = null,
     limit: Int = 20,
-): MetadataSearchResponse {
+): SearchResultsResponse {
     checkConfigured()
     val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
         .addQueryParameter("query", query.trim())
         .apply {
-            if (!filter.isNullOrBlank()) {
-                addQueryParameter("filter", filter)
-            }
             if (!locale.isNullOrBlank()) {
                 addQueryParameter("locale", locale)
             }
@@ -43,23 +38,19 @@ internal suspend fun CrispyBackendClient.searchTitlesApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return MetadataSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    return parseSearchResultsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.searchTitlesByGenreApi(
     accessToken: String,
     genre: String,
-    filter: String? = null,
     locale: String? = null,
     limit: Int = 20,
-): MetadataSearchResponse {
+): SearchResultsResponse {
     checkConfigured()
     val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
         .addQueryParameter("genre", genre.trim())
         .apply {
-            if (!filter.isNullOrBlank()) {
-                addQueryParameter("filter", filter)
-            }
             if (!locale.isNullOrBlank()) {
                 addQueryParameter("locale", locale)
             }
@@ -72,20 +63,18 @@ internal suspend fun CrispyBackendClient.searchTitlesByGenreApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return MetadataSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    return parseSearchResultsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.searchAiTitlesApi(
     accessToken: String,
     profileId: String,
     query: String,
-    filter: String? = null,
     locale: String? = null,
-): AiSearchResponse {
+): SearchResultsResponse {
     checkConfigured()
     val payload = JSONObject().apply {
         put("query", query.trim())
-        if (!filter.isNullOrBlank()) put("filter", filter)
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
     val response = httpClient.postJson(
@@ -95,7 +84,7 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return AiSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    return parseSearchResultsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.getAiInsightsApi(

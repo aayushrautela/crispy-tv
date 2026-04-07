@@ -13,7 +13,6 @@ class BackendSearchRepository(
 ) {
     suspend fun search(
         query: String,
-        filter: SearchTypeFilter,
         locale: Locale = Locale.getDefault(),
     ): SearchResultsPayload {
         val normalizedQuery = query.trim()
@@ -27,15 +26,13 @@ class BackendSearchRepository(
         val payload = backend.searchTitles(
             accessToken = session.accessToken,
             query = normalizedQuery,
-            filter = filter.toBackendSearchFilter(),
             locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem() })
+        return payload.toSearchResultsPayload()
     }
 
     suspend fun discoverByGenre(
         genreSuggestion: SearchGenreSuggestion,
-        filter: SearchTypeFilter,
         locale: Locale = Locale.getDefault(),
     ): SearchResultsPayload {
         val session = runCatching { supabase.ensureValidSession() }.getOrNull()
@@ -44,10 +41,9 @@ class BackendSearchRepository(
         val payload = backend.searchTitlesByGenre(
             accessToken = session.accessToken,
             genre = genreSuggestion.label,
-            filter = filter.toBackendSearchFilter(),
             locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem(defaultGenre = genreSuggestion.label) })
+        return payload.toSearchResultsPayload(defaultGenre = genreSuggestion.label)
     }
 
     companion object {
@@ -58,15 +54,6 @@ class BackendSearchRepository(
                 backend = BackendServicesProvider.backendClient(appContext),
             )
         }
-    }
-}
-
-private fun SearchTypeFilter.toBackendSearchFilter(): String? {
-    return when (this) {
-        SearchTypeFilter.ALL -> null
-        SearchTypeFilter.MOVIES -> "movies"
-        SearchTypeFilter.SERIES -> "series"
-        SearchTypeFilter.ANIME -> "anime"
     }
 }
 

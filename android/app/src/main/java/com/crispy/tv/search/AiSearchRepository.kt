@@ -17,7 +17,6 @@ class AiSearchRepository(
 ) {
     suspend fun search(
         query: String,
-        filter: SearchTypeFilter,
         locale: Locale = Locale.getDefault(),
     ): SearchResultsPayload {
         val normalizedQuery = query.trim()
@@ -36,10 +35,9 @@ class AiSearchRepository(
             accessToken = session.accessToken,
             profileId = profileId,
             query = normalizedQuery,
-            filter = filter.toBackendAiFilter(),
             locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem() })
+        return payload.toSearchResultsPayload()
     }
 
     companion object {
@@ -52,14 +50,5 @@ class AiSearchRepository(
                 httpClient = httpClient,
             )
         }
-    }
-}
-
-private fun SearchTypeFilter.toBackendAiFilter(): String? {
-    return when (this) {
-        SearchTypeFilter.ALL -> null
-        SearchTypeFilter.MOVIES -> "movies"
-        SearchTypeFilter.SERIES -> "series"
-        SearchTypeFilter.ANIME -> "anime"
     }
 }
