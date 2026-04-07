@@ -478,7 +478,7 @@ class PlayerSessionViewModel(
         val fetchedDetails = backendDetails ?: return
 
         val seasons =
-            if (backendDetail?.seasonNumbers()?.isNotEmpty() == true) {
+            if (backendDetail.seasonNumbers().isNotEmpty()) {
                 backendDetail.seasonNumbers()
             } else {
                 emptyList()

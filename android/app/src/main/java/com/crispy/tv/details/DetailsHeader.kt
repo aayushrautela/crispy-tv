@@ -236,6 +236,7 @@ internal fun HeaderInfoSection(
 
         ExpandableDescription(
             text = details.description,
+            modifier = Modifier.padding(bottom = 4.dp),
             textAlign = TextAlign.Center,
             textColor = palette.onPageBackground.copy(alpha = 0.9f),
             placeholderColor = Color(0xFF9E9E9E)
@@ -550,6 +551,7 @@ private fun HeaderMetaRow(
 @Composable
 internal fun ExpandableDescription(
     text: String?,
+    modifier: Modifier = Modifier,
     textAlign: TextAlign = TextAlign.Start,
     textColor: Color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground,
     placeholderColor: Color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
@@ -604,7 +606,7 @@ internal fun ExpandableDescription(
         }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .animateContentSize()
             .padding(horizontal = 4.dp),

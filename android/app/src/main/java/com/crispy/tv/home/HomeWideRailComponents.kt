@@ -273,7 +273,7 @@ internal fun HomeWideRailCard(
                         onDetailsClick()
                     },
                 )
-                onRemoveClick?.let { removeAction ->
+                onRemoveClick.let { removeAction ->
                     ListItem(
                         headlineContent = { Text("Remove") },
                         modifier = Modifier.clickable {

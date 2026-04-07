@@ -168,7 +168,7 @@ private data class DetailsRatingPill(
     val badgeColor: Color,
     val badgeContentColor: Color,
     val badgeIcon: ImageVector? = null,
-    @RawRes val badgeLogoRes: Int? = null,
+    @param:RawRes val badgeLogoRes: Int? = null,
 )
 
 private fun buildRatings(
@@ -296,7 +296,7 @@ private fun formatTmdbRating(value: String): String {
 
 @Stable
 private data class RatingBadgeSpec(
-    @RawRes val logoRes: Int? = null,
+    @param:RawRes val logoRes: Int? = null,
     val text: String,
     val backgroundColor: Color,
     val contentColor: Color,

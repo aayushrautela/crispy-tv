@@ -1003,7 +1003,7 @@ class DetailsViewModel internal constructor(
 
         if (!pending.autoOpenEpisode) return
 
-        target?.let { video -> onOpenStreamSelectorForEpisode(video.id) }
+        onOpenStreamSelectorForEpisode(target.id)
     }
 
     companion object {
