@@ -701,7 +701,7 @@ class CrispyBackendClient(
         val items: List<CalendarItem>,
     )
 
-    data class HomeRecommendationItem(
+    data class RecommendationItem(
         val media: RuntimeMediaCard,
         val reason: String?,
         val score: Double?,
@@ -709,7 +709,7 @@ class CrispyBackendClient(
         val payload: Map<String, Any?>,
     )
 
-    data class HomeHeroItem(
+    data class RecommendationHeroItem(
         val mediaKey: String,
         val mediaType: String,
         val provider: String,
@@ -724,7 +724,7 @@ class CrispyBackendClient(
         val genre: String?,
     )
 
-    data class HomeCollectionItem(
+    data class RecommendationCollectionItem(
         val mediaType: String,
         val provider: String,
         val providerId: String,
@@ -734,30 +734,31 @@ class CrispyBackendClient(
         val rating: Double?,
     )
 
-    data class HomeCollectionCard(
+    data class RecommendationCollectionCard(
         val title: String,
         val logoUrl: String,
-        val items: List<HomeCollectionItem>,
+        val items: List<RecommendationCollectionItem>,
     )
 
-    data class HomeSnapshotSection(
+    data class RecommendationSection(
         val id: String,
         val title: String,
         val layout: String,
         val sourceKey: String,
-        val recommendationItems: List<HomeRecommendationItem> = emptyList(),
-        val heroItems: List<HomeHeroItem> = emptyList(),
-        val collectionItems: List<HomeCollectionCard> = emptyList(),
+        val recommendationItems: List<RecommendationItem> = emptyList(),
+        val heroItems: List<RecommendationHeroItem> = emptyList(),
+        val collectionItems: List<RecommendationCollectionCard> = emptyList(),
     )
 
-    data class HomeResponse(
+    data class RecommendationsResponse(
         val profileId: String,
+        val sourceKey: String,
+        val algorithmVersion: String,
         val source: String,
         val generatedAt: String?,
-        val snapshotGeneratedAt: String?,
-        val continueWatching: List<ContinueWatchingItem>,
-        val thisWeek: List<CalendarItem>,
-        val sections: List<HomeSnapshotSection>,
+        val expiresAt: String?,
+        val updatedAt: String?,
+        val sections: List<RecommendationSection>,
     )
 
     data class ProviderLibraryFolder(
@@ -983,12 +984,16 @@ class CrispyBackendClient(
         return resolvePlaybackApi(accessToken, input)
     }
 
-    suspend fun getHome(accessToken: String, profileId: String): HomeResponse {
-        return getHomeApi(accessToken, profileId)
+    suspend fun getRecommendations(accessToken: String, profileId: String): RecommendationsResponse? {
+        return getRecommendationsApi(accessToken, profileId)
     }
 
     suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse {
         return getCalendarApi(accessToken, profileId)
+    }
+
+    suspend fun getCalendarThisWeek(accessToken: String, profileId: String): CalendarResponse {
+        return getCalendarThisWeekApi(accessToken, profileId)
     }
 
     suspend fun getProviderAuthState(accessToken: String, profileId: String): List<ProviderAuthState> {

@@ -98,18 +98,16 @@ class CalendarService internal constructor(
     }
 
     suspend fun loadThisWeek(nowMs: Long): ThisWeekResult {
-        val snapshot = loadCalendar(nowMs)
-        val rawItems =
-            snapshot.sections
-                .firstOrNull { it.key == CalendarSectionKey.THIS_WEEK }
-                ?.episodeItems
-                .orEmpty()
-
-        return ThisWeekResult(
-            items = projectHomeThisWeekItems(rawItems, nowMs),
-            statusMessage = snapshot.statusMessage,
-            isError = snapshot.isError,
-        )
+        return try {
+            fetchThisWeekResult(nowMs)
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to load this week", error)
+            ThisWeekResult(
+                items = emptyList(),
+                statusMessage = "Unable to load this week right now.",
+                isError = true,
+            )
+        }
     }
 
     private suspend fun fetchCalendarSnapshot(nowMs: Long): CalendarSnapshot {
@@ -129,6 +127,31 @@ class CalendarService internal constructor(
         return CalendarSnapshot(
             sections = sections,
             statusMessage = if (sections.isEmpty()) "No upcoming episodes found right now." else null,
+            isError = false,
+        )
+    }
+
+    private suspend fun fetchThisWeekResult(nowMs: Long): ThisWeekResult {
+        val backendContext = getBackendContext()
+            ?: return ThisWeekResult(
+                items = emptyList(),
+                statusMessage = "Sign in and select a profile to load this week.",
+                isError = true,
+            )
+
+        val response = backendClient.getCalendarThisWeek(
+            accessToken = backendContext.accessToken,
+            profileId = backendContext.profileId,
+        )
+        val rawItems =
+            response.items
+                .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
+                .sortedBy { it.releasedAtMs }
+
+        val projected = projectHomeThisWeekItems(rawItems, nowMs)
+        return ThisWeekResult(
+            items = projected,
+            statusMessage = if (projected.isEmpty()) "No episodes airing this week right now." else null,
             isError = false,
         )
     }

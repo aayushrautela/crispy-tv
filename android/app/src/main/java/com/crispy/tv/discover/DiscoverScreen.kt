@@ -61,7 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.home.HomeCatalogService
+import com.crispy.tv.home.RecommendationCatalogService
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -103,7 +103,7 @@ data class DiscoverUiState(
 }
 
 class DiscoverViewModel(
-    private val homeCatalogService: HomeCatalogService
+    private val recommendationCatalogService: RecommendationCatalogService
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DiscoverUiState())
@@ -156,7 +156,7 @@ class DiscoverViewModel(
 
                 val catalogsResult =
                     withContext(Dispatchers.IO) {
-                        homeCatalogService.listDiscoverCatalogs(
+                        recommendationCatalogService.listDiscoverCatalogs(
                             mediaType = filterSnapshot.mediaType
                         )
                     }
@@ -195,7 +195,7 @@ class DiscoverViewModel(
                 val result =
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            homeCatalogService.fetchCatalogPage(
+                            recommendationCatalogService.fetchCatalogPage(
                                 section = catalog.section,
                                 page = nextPage,
                                 pageSize = pageSize,
@@ -255,7 +255,7 @@ class DiscoverViewModel(
                 val result =
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            homeCatalogService.fetchCatalogPage(
+                            recommendationCatalogService.fetchCatalogPage(
                                 section = catalog.section,
                                 page = 1,
                                 pageSize = pageSize,
@@ -287,7 +287,7 @@ class DiscoverViewModel(
                     if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
-                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext)
+                            recommendationCatalogService = SupabaseServicesProvider.recommendationCatalogService(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

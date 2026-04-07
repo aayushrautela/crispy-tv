@@ -8,26 +8,23 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.domain.home.HomeCatalogPresentation
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProvider
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,7 +84,7 @@ private const val THIS_WEEK_SECTION_KEY = "thisWeek"
 private const val CATALOG_STATUS_SECTION_KEY = "catalogStatus"
 
 class HomeViewModel internal constructor(
-    private val homeCatalogService: HomeCatalogService,
+    private val recommendationCatalogService: RecommendationCatalogService,
     private val homeWatchActivityService: HomeWatchActivityService,
     private val watchHistoryService: WatchHistoryService,
     private val calendarService: CalendarService,
@@ -107,7 +104,7 @@ class HomeViewModel internal constructor(
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
-                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
+                            recommendationCatalogService = SupabaseServicesProvider.recommendationCatalogService(appContext),
                             homeWatchActivityService = HomeWatchActivityService(),
                             watchHistoryService = watchHistoryService,
                             calendarService =
@@ -145,7 +142,6 @@ class HomeViewModel internal constructor(
 
     private var catalogSectionLayoutMeta: List<CatalogSectionLayoutMeta> = emptyList()
     private var catalogStatusMessage: String = ""
-    private var primarySnapshot = HomePrimarySnapshot()
     private var watchActivitySnapshot = HomeWatchActivitySnapshot()
     private var thisWeekSection = defaultWideRailSection(
         key = THIS_WEEK_SECTION_KEY,
@@ -179,25 +175,34 @@ class HomeViewModel internal constructor(
 
         refreshJob =
             viewModelScope.launch {
-                var nextPrimarySnapshot: HomePrimarySnapshot? = null
-                var nextWatchActivitySnapshot: HomeWatchActivitySnapshot? = null
+                val refreshCompletion = CompletableDeferred<Unit>()
                 try {
                     coroutineScope {
-                        val primaryDeferred = async { loadPrimarySnapshot() }
-                        val watchActivityDeferred =
-                            async {
-                                loadWatchActivitySnapshot()
+                        async {
+                            val snapshot = loadPrimarySnapshot()
+                            if (isCurrentRefresh(currentRefreshGeneration)) {
+                                applyPrimarySnapshot(snapshot)
                             }
-                        nextPrimarySnapshot = primaryDeferred.await()
-                        nextWatchActivitySnapshot = watchActivityDeferred.await()
+                        }
+                        async {
+                            val snapshot = loadWatchActivitySnapshot()
+                            if (isCurrentRefresh(currentRefreshGeneration)) {
+                                applyWatchActivitySnapshot(snapshot)
+                            }
+                        }
+                        async {
+                            val section = loadThisWeekSection()
+                            if (isCurrentRefresh(currentRefreshGeneration)) {
+                                applyThisWeekSection(section)
+                            }
+                        }
                     }
                 } finally {
                     if (isCurrentRefresh(currentRefreshGeneration)) {
-                        nextPrimarySnapshot?.let(::applyPrimarySnapshot)
-                        nextWatchActivitySnapshot?.let(::applyWatchActivitySnapshot)
                         _isRefreshing.value = false
                         lastRefreshCompletedAtMs = System.currentTimeMillis()
                     }
+                    refreshCompletion.complete(Unit)
 
                     refreshJob = null
                     if (refreshPending) {
@@ -206,23 +211,15 @@ class HomeViewModel internal constructor(
                     } else if (isCurrentRefresh(currentRefreshGeneration)) {
                         backgroundRefreshJob =
                             viewModelScope.launch {
-                                val refreshedWatchActivitySnapshot =
-                                    if (showForegroundLoading) {
-                                        loadWatchActivitySnapshot()
-                                    } else {
-                                        watchActivitySnapshot
-                                    }
+                                refreshCompletion.await()
+                                val refreshedRecommendations = loadPrimarySnapshot()
+                                val refreshedWatchActivitySnapshot = loadWatchActivitySnapshot()
                                 val refreshedThisWeekSection = loadThisWeekSection()
-                                if (!isCurrentRefresh(currentRefreshGeneration)) {
-                                    return@launch
-                                }
+                                if (!isCurrentRefresh(currentRefreshGeneration)) return@launch
 
-                                if (refreshedWatchActivitySnapshot != watchActivitySnapshot) {
-                                    applyWatchActivitySnapshot(refreshedWatchActivitySnapshot)
-                                }
-                                if (refreshedThisWeekSection != thisWeekSection) {
-                                    applyThisWeekSection(refreshedThisWeekSection)
-                                }
+                                applyPrimarySnapshot(refreshedRecommendations)
+                                applyWatchActivitySnapshot(refreshedWatchActivitySnapshot)
+                                applyThisWeekSection(refreshedThisWeekSection)
                             }
                     }
                 }
@@ -333,7 +330,7 @@ class HomeViewModel internal constructor(
         val primaryFeedResult =
             try {
                 withContext(Dispatchers.IO) {
-                    homeCatalogService.loadPrimaryHomeFeed(heroLimit = 10)
+                    recommendationCatalogService.loadPrimaryHomeFeed(heroLimit = 10)
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -514,7 +511,6 @@ class HomeViewModel internal constructor(
     }
 
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {
-        primarySnapshot = snapshot
         _heroState.value = snapshot.hero
         _headerPillsState.value = snapshot.headerPills
         catalogStatusMessage = snapshot.catalogStatusMessage
@@ -860,12 +856,4 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
         ).toString()
 
     return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
-}
-
-private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
-    return when {
-        equals("series", ignoreCase = true) -> MetadataLabMediaType.SERIES
-        equals("anime", ignoreCase = true) -> MetadataLabMediaType.ANIME
-        else -> MetadataLabMediaType.MOVIE
-    }
 }

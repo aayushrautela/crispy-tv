@@ -3,8 +3,8 @@ package com.crispy.tv.backend
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
 import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
 import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingItem
-import com.crispy.tv.backend.CrispyBackendClient.HomeResponse
 import com.crispy.tv.backend.CrispyBackendClient.RatingItem
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationsResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
@@ -22,26 +22,27 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal suspend fun CrispyBackendClient.getHomeApi(accessToken: String, profileId: String): HomeResponse {
+internal suspend fun CrispyBackendClient.getRecommendationsApi(
+    accessToken: String,
+    profileId: String,
+): RecommendationsResponse? {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/home".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/recommendations".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    return HomeResponse(
-        profileId = json.optString("profileId").trim(),
-        source = json.optString("source").trim(),
-        generatedAt = json.optNullableString("generatedAt"),
-        snapshotGeneratedAt = json.optJSONObject("snapshot")?.optNullableString("generatedAt"),
-        continueWatching = parseContinueWatchingItems(
-            json.optJSONObject("runtime")?.optJSONObject("continueWatching")?.optJSONArray("items")
-        ),
-        thisWeek = parseCalendarItems(
-            json.optJSONObject("runtime")?.optJSONObject("thisWeek")?.optJSONArray("items")
-        ),
-        sections = parseHomeSections(json.optJSONObject("snapshot")?.optJSONArray("sections") ?: json.optJSONArray("sections")),
+    val recommendations = json.optJSONObject("recommendations") ?: return null
+    return RecommendationsResponse(
+        profileId = recommendations.optString("profileId").trim(),
+        sourceKey = recommendations.optString("sourceKey").trim(),
+        algorithmVersion = recommendations.optString("algorithmVersion").trim(),
+        source = recommendations.optString("source").trim(),
+        generatedAt = recommendations.optNullableString("generatedAt"),
+        expiresAt = recommendations.optNullableString("expiresAt"),
+        updatedAt = recommendations.optNullableString("updatedAt"),
+        sections = parseRecommendationSections(recommendations.optJSONArray("sections")),
     )
 }
 
@@ -49,6 +50,22 @@ internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, pro
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/calendar".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = JSONObject(requireSuccess(response))
+    return CalendarResponse(
+        profileId = json.optString("profileId").trim(),
+        source = json.optString("source").trim(),
+        generatedAt = json.optNullableString("generatedAt"),
+        items = parseCalendarItems(json.optJSONArray("items")),
+    )
+}
+
+internal suspend fun CrispyBackendClient.getCalendarThisWeekApi(accessToken: String, profileId: String): CalendarResponse {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/calendar/this-week".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )

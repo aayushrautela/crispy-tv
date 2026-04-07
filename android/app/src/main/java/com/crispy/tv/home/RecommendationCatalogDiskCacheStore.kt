@@ -6,7 +6,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
-internal class HomeCatalogDiskCacheStore(appContext: Context) {
+internal class RecommendationCatalogDiskCacheStore(appContext: Context) {
     private val cacheDirectory = appContext.filesDir.resolve(CACHE_DIRECTORY_NAME).also { directory ->
         if (!directory.exists()) {
             directory.mkdirs()
@@ -68,6 +68,6 @@ internal class HomeCatalogDiskCacheStore(appContext: Context) {
     }
 
     private companion object {
-        private const val CACHE_DIRECTORY_NAME = "home_catalog_cache"
+        private const val CACHE_DIRECTORY_NAME = "recommendation_catalog_cache"
     }
 }

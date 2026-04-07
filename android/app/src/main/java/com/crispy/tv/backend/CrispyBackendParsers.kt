@@ -5,11 +5,11 @@ import com.crispy.tv.backend.CrispyBackendClient.BackendMetadataItem
 import com.crispy.tv.backend.CrispyBackendClient.CalendarItem
 import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
 import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingStateView
-import com.crispy.tv.backend.CrispyBackendClient.HomeCollectionCard
-import com.crispy.tv.backend.CrispyBackendClient.HomeCollectionItem
-import com.crispy.tv.backend.CrispyBackendClient.HomeHeroItem
-import com.crispy.tv.backend.CrispyBackendClient.HomeRecommendationItem
-import com.crispy.tv.backend.CrispyBackendClient.HomeSnapshotSection
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationCollectionCard
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationCollectionItem
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationHeroItem
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationItem
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationSection
 import com.crispy.tv.backend.CrispyBackendClient.ImportJob
 import com.crispy.tv.backend.CrispyBackendClient.LibraryItemState
 import com.crispy.tv.backend.CrispyBackendClient.LibrarySection
@@ -962,14 +962,14 @@ internal fun CrispyBackendClient.parseCalendarItems(array: JSONArray?): List<Cal
     }
 }
 
-internal fun CrispyBackendClient.parseHomeRecommendationItems(array: JSONArray?, requireBackdrop: Boolean): List<HomeRecommendationItem> {
+internal fun CrispyBackendClient.parseRecommendationItems(array: JSONArray?, requireBackdrop: Boolean): List<RecommendationItem> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
             val mediaJson = item.optJSONObject("media") ?: continue
             add(
-                HomeRecommendationItem(
+                RecommendationItem(
                     media = parseRuntimeMediaCard(mediaJson, requireBackdrop = requireBackdrop),
                     reason = item.optNullableString("reason"),
                     score = item.optDoubleOrNull("score"),
@@ -981,7 +981,7 @@ internal fun CrispyBackendClient.parseHomeRecommendationItems(array: JSONArray?,
     }
 }
 
-internal fun CrispyBackendClient.parseHomeHeroItems(array: JSONArray?): List<HomeHeroItem> {
+internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?): List<RecommendationHeroItem> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
@@ -994,7 +994,7 @@ internal fun CrispyBackendClient.parseHomeHeroItems(array: JSONArray?): List<Hom
             val description = item.optString("description").trim().ifBlank { continue }
             val backdropUrl = item.optString("backdropUrl").trim().ifBlank { continue }
             add(
-                HomeHeroItem(
+                RecommendationHeroItem(
                     mediaKey = mediaKey,
                     mediaType = mediaType,
                     provider = provider,
@@ -1013,7 +1013,7 @@ internal fun CrispyBackendClient.parseHomeHeroItems(array: JSONArray?): List<Hom
     }
 }
 
-internal fun CrispyBackendClient.parseHomeCollectionCards(array: JSONArray?): List<HomeCollectionCard> {
+internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONArray?): List<RecommendationCollectionCard> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
@@ -1030,7 +1030,7 @@ internal fun CrispyBackendClient.parseHomeCollectionCards(array: JSONArray?): Li
                     val partTitle = part.optString("title").trim().ifBlank { continue }
                     val posterUrl = part.optString("posterUrl").trim().ifBlank { continue }
                     add(
-                        HomeCollectionItem(
+                        RecommendationCollectionItem(
                             mediaType = mediaType,
                             provider = provider,
                             providerId = providerId,
@@ -1043,13 +1043,13 @@ internal fun CrispyBackendClient.parseHomeCollectionCards(array: JSONArray?): Li
                 }
             }
             if (items.isNotEmpty()) {
-                add(HomeCollectionCard(title = title, logoUrl = logoUrl, items = items))
+                add(RecommendationCollectionCard(title = title, logoUrl = logoUrl, items = items))
             }
         }
     }
 }
 
-internal fun CrispyBackendClient.parseHomeSections(array: JSONArray?): List<HomeSnapshotSection> {
+internal fun CrispyBackendClient.parseRecommendationSections(array: JSONArray?): List<RecommendationSection> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
@@ -1060,18 +1060,18 @@ internal fun CrispyBackendClient.parseHomeSections(array: JSONArray?): List<Home
             val layout = section.optString("layout").trim().ifBlank { "regular" }
             val sourceKey = section.optString("sourceKey").trim().ifBlank { section.optString("source").trim() }
             add(
-                HomeSnapshotSection(
+                RecommendationSection(
                     id = id,
                     title = title,
                     layout = layout,
                     sourceKey = sourceKey,
                     recommendationItems = when (layout) {
-                        "regular" -> parseHomeRecommendationItems(items, requireBackdrop = false)
-                        "landscape" -> parseHomeRecommendationItems(items, requireBackdrop = true)
+                        "regular" -> parseRecommendationItems(items, requireBackdrop = false)
+                        "landscape" -> parseRecommendationItems(items, requireBackdrop = true)
                         else -> emptyList()
                     },
-                    heroItems = if (layout == "hero") parseHomeHeroItems(items) else emptyList(),
-                    collectionItems = if (layout == "collection") parseHomeCollectionCards(items) else emptyList(),
+                    heroItems = if (layout == "hero") parseRecommendationHeroItems(items) else emptyList(),
+                    collectionItems = if (layout == "collection") parseRecommendationCollectionCards(items) else emptyList(),
                 )
             )
         }

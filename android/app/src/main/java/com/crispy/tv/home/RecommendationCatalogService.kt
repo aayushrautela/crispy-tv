@@ -22,8 +22,8 @@ import org.json.JSONObject
 import java.util.Locale
 private const val DEFAULT_VARIANT_KEY = "default"
 private const val PREVIEW_ITEM_LIMIT = 12
-private const val HOME_CACHE_MAX_AGE_MS = 15 * 60 * 1000L
-private const val GLOBAL_CACHE_KEY = "home_snapshot:last"
+private const val RECOMMENDATION_CACHE_MAX_AGE_MS = 15 * 60 * 1000L
+private const val GLOBAL_CACHE_KEY = "recommendations_snapshot:last"
 private const val DISCOVER_ADDON_NAME = "Crispy"
 
 @Immutable
@@ -104,11 +104,11 @@ data class MediaVideo(
     val absoluteEpisodeNumber: Int? = null,
 )
 
-class HomeCatalogService internal constructor(
+class RecommendationCatalogService internal constructor(
     private val supabaseAccountClient: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore,
     private val backendClient: CrispyBackendClient,
-    private val diskCacheStore: HomeCatalogDiskCacheStore,
+    private val diskCacheStore: RecommendationCatalogDiskCacheStore,
 ) {
     suspend fun loadPrimaryHomeFeed(
         heroLimit: Int = 10,
@@ -197,7 +197,7 @@ class HomeCatalogService internal constructor(
         return CatalogPageResult(
             items = result.items.mapNotNull { item -> item.toCatalogItem() },
             statusMessage = result.statusMessage,
-            attemptedUrls = listOf(homeAttemptedUrl(snapshot.profileId, section.catalogId, page)),
+            attemptedUrls = listOf(recommendationsAttemptedUrl(snapshot.profileId, section.catalogId, page)),
         )
     }
 
@@ -205,20 +205,20 @@ class HomeCatalogService internal constructor(
         val backendContext = getBackendContext()
         if (backendContext == null) {
             return readCachedSnapshot(profileId = null, maxAgeMs = null)
-                ?: emptySnapshot("Sign in and select a profile to load home.")
+                ?: emptySnapshot("Sign in and select a profile to load recommendations.")
         }
 
         return runCatching {
-            val response = backendClient.getHome(
+            val response = backendClient.getRecommendations(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
             )
-            val snapshot = response.toSnapshot()
+            val snapshot = response?.toSnapshot() ?: emptySnapshot("No recommendations available right now.")
             writeCachedSnapshot(backendContext.profileId, snapshot)
             snapshot
         }.getOrElse { error ->
-            readCachedSnapshot(profileId = backendContext.profileId, maxAgeMs = HOME_CACHE_MAX_AGE_MS)
-                ?: emptySnapshot(error.message ?: "Failed to load home feed.")
+            readCachedSnapshot(profileId = backendContext.profileId, maxAgeMs = RECOMMENDATION_CACHE_MAX_AGE_MS)
+                ?: emptySnapshot(error.message ?: "Failed to load recommendations.")
         }
     }
 
@@ -266,7 +266,7 @@ class HomeCatalogService internal constructor(
     }
 
     private fun cacheKey(profileId: String): String {
-        return "home_snapshot:${profileId.trim()}"
+        return "recommendations_snapshot:${profileId.trim()}"
     }
 
     private fun emptySnapshot(statusMessage: String): HomeCatalogSnapshot {
@@ -277,25 +277,19 @@ class HomeCatalogService internal constructor(
         )
     }
 
-    private fun CrispyBackendClient.HomeResponse.toSnapshot(): HomeCatalogSnapshot {
+    private fun CrispyBackendClient.RecommendationsResponse.toSnapshot(): HomeCatalogSnapshot {
         return HomeCatalogSnapshot(
             profileId = profileId.takeIf { it.isNotBlank() },
             lists = buildList {
                 sections.forEach { section ->
                     section.toCatalogList()?.let(::add)
                 }
-                if (continueWatching.isNotEmpty()) {
-                    runtimeContinueWatchingList()?.let(::add)
-                }
-                if (thisWeek.isNotEmpty()) {
-                    runtimeThisWeekList()?.let(::add)
-                }
             },
-            statusMessage = "",
+            statusMessage = if (sections.isEmpty()) "No recommendations available right now." else "",
         )
     }
 
-    private fun CrispyBackendClient.HomeSnapshotSection.toCatalogList(): HomeCatalogList? {
+    private fun CrispyBackendClient.RecommendationSection.toCatalogList(): HomeCatalogList? {
         val catalogItems = when (layout.trim().lowercase(Locale.US)) {
             "hero" -> heroItems.mapNotNull { item -> item.toCatalogItem() }
             "collection" -> collectionItems.mapNotNull { item -> item.toCatalogItem() }
@@ -312,49 +306,7 @@ class HomeCatalogService internal constructor(
             name = title,
             heading = title,
             title = title,
-            subtitle = recommendationSubtitle(meta).ifBlank {
-                when (id.trim().lowercase(Locale.US)) {
-                    "continue-watching" -> watchSubtitle(id)
-                    "this-week", "up-next", "recently-released" -> calendarSubtitle(id)
-                    else -> ""
-                }
-            },
-            items = catalogItems,
-            mediaTypes = catalogItems.map { it.type }.toSet(),
-        )
-    }
-
-    private fun CrispyBackendClient.HomeResponse.runtimeContinueWatchingList(): HomeCatalogList? {
-        val catalogItems = continueWatching.mapNotNull { item -> item.media.toCatalogItem() }
-        if (catalogItems.isEmpty()) return null
-        return HomeCatalogList(
-            kind = "continue-watching",
-            variantKey = source.normalizedVariantKey(),
-            source = HomeCatalogSource.PERSONAL,
-            presentation = HomeCatalogPresentation.HERO,
-            layout = "landscape",
-            name = "Continue Watching",
-            heading = "Continue Watching",
-            title = "Continue Watching",
-            subtitle = watchSubtitle("continue-watching"),
-            items = catalogItems,
-            mediaTypes = catalogItems.map { it.type }.toSet(),
-        )
-    }
-
-    private fun CrispyBackendClient.HomeResponse.runtimeThisWeekList(): HomeCatalogList? {
-        val catalogItems = thisWeek.mapNotNull { item -> item.media.toCatalogItem() }
-        if (catalogItems.isEmpty()) return null
-        return HomeCatalogList(
-            kind = "this-week",
-            variantKey = source.normalizedVariantKey(),
-            source = HomeCatalogSource.PERSONAL,
-            presentation = HomeCatalogPresentation.HERO,
-            layout = "landscape",
-            name = "This Week",
-            heading = "This Week",
-            title = "This Week",
-            subtitle = calendarSubtitle("this-week"),
+            subtitle = recommendationSubtitle(meta).ifBlank { defaultRecommendationSubtitle(id) },
             items = catalogItems,
             mediaTypes = catalogItems.map { it.type }.toSet(),
         )
@@ -377,7 +329,7 @@ class HomeCatalogService internal constructor(
         )
     }
 
-    private fun CrispyBackendClient.HomeHeroItem.toCatalogItem(): HomeCatalogItem? {
+    private fun CrispyBackendClient.RecommendationHeroItem.toCatalogItem(): HomeCatalogItem? {
         val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
         val normalizedTitle = title.trim().ifBlank { return null }
         val normalizedType = mediaType.toCatalogType()
@@ -394,7 +346,7 @@ class HomeCatalogService internal constructor(
         )
     }
 
-    private fun CrispyBackendClient.HomeCollectionCard.toCatalogItem(): HomeCatalogItem? {
+    private fun CrispyBackendClient.RecommendationCollectionCard.toCatalogItem(): HomeCatalogItem? {
         val firstItem = items.firstOrNull() ?: return null
         val mediaKey = "collection:${title.trim().lowercase(Locale.US).replace(' ', '-')}"
         return HomeCatalogItem(
@@ -471,15 +423,7 @@ class HomeCatalogService internal constructor(
         }
     }
 
-    private fun watchSubtitle(sectionId: String): String {
-        return when (sectionId.trim().lowercase(Locale.US)) {
-            "continue-watching" -> "Pick up where you left off."
-            "recent-history" -> "Recently watched on your profile."
-            else -> ""
-        }
-    }
-
-    private fun calendarSubtitle(sectionId: String): String {
+    private fun defaultRecommendationSubtitle(sectionId: String): String {
         return when (sectionId.trim().lowercase(Locale.US)) {
             "up-next" -> "Upcoming episodes to keep moving."
             "this-week" -> "Episodes airing this week."
@@ -622,8 +566,8 @@ class HomeCatalogService internal constructor(
         return RuntimeLookup(provider = provider, providerId = providerId)
     }
 
-    private fun homeAttemptedUrl(profileId: String?, catalogId: String? = null, page: Int? = null): String {
-        val base = "backend:/v1/profiles/${profileId.orEmpty()}/home"
+    private fun recommendationsAttemptedUrl(profileId: String?, catalogId: String? = null, page: Int? = null): String {
+        val base = "backend:/v1/profiles/${profileId.orEmpty()}/recommendations"
         val suffix = buildList {
             catalogId?.trim()?.takeIf { it.isNotBlank() }?.let { add("catalogId=$it") }
             page?.let { add("page=$it") }
