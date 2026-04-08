@@ -291,28 +291,28 @@ class LibraryViewModel internal constructor(
                 profileId = backendContext.profileId,
                 limit = limit,
                 cursor = cursor,
-            ).toLibrarySectionPageUi()
+            ).toWatchedSectionPageUi()
 
             SECTION_WATCHLIST -> backend.listWatchlist(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
                 limit = limit,
                 cursor = cursor,
-            ).toLibrarySectionPageUi()
+            ).toWatchlistSectionPageUi()
 
             SECTION_RATINGS -> backend.listRatings(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
                 limit = limit,
                 cursor = cursor,
-            ).toLibrarySectionPageUi()
+            ).toRatingsSectionPageUi()
 
             else -> LibrarySectionPageUi()
         }
         return response
     }
 
-    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.toLibrarySectionPageUi(): LibrarySectionPageUi {
+    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.toWatchedSectionPageUi(): LibrarySectionPageUi {
         return LibrarySectionPageUi(
             items = items.map { item ->
                 LibrarySectionItemUi(
@@ -335,7 +335,7 @@ class LibraryViewModel internal constructor(
         )
     }
 
-    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.toLibrarySectionPageUi(): LibrarySectionPageUi {
+    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.toWatchlistSectionPageUi(): LibrarySectionPageUi {
         return LibrarySectionPageUi(
             items = items.map { item ->
                 LibrarySectionItemUi(
@@ -358,7 +358,7 @@ class LibraryViewModel internal constructor(
         )
     }
 
-    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.RatingItem>.toLibrarySectionPageUi(): LibrarySectionPageUi {
+    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.RatingItem>.toRatingsSectionPageUi(): LibrarySectionPageUi {
         return LibrarySectionPageUi(
             items = items.map { item ->
                 LibrarySectionItemUi(
