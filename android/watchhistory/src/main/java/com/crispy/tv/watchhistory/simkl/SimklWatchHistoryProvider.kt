@@ -45,7 +45,7 @@ internal class SimklWatchHistoryProvider(
         val typeKey = typeKeyFor(normalized.contentType) ?: return false
 
         return if (inWatchlist) {
-            simklService.addToList(typeKey = typeKey, imdbId = imdbId, status = STATUS_PLAN_TO_WATCH)
+            simklService.addToList(typeKey = typeKey, imdbId = imdbId, status = SIMKL_STATUS_PLAN_TO_WATCH)
         } else {
             simklService.removeFromList(typeKey = typeKey, imdbId = imdbId)
         }
@@ -304,6 +304,7 @@ internal class SimklWatchHistoryProvider(
     }
 
     private companion object {
+        private const val SIMKL_STATUS_PLAN_TO_WATCH = "plantowatch"
         private const val TAG = "SimklWatchHistoryProvider"
     }
 }
