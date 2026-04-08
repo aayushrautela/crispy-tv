@@ -2,8 +2,8 @@ package com.crispy.tv.watchhistory
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.backend.BackendContext
+import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
 import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
@@ -39,9 +39,8 @@ import java.util.Locale
 
 class BackendWatchHistoryService(
     context: Context,
-    private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
-    private val activeProfileStore: ActiveProfileStore,
+    private val backendContextResolver: BackendContextResolver,
     private val episodeListProvider: EpisodeListProvider,
     private val config: WatchHistoryConfig = WatchHistoryConfig(),
 ) : WatchHistoryService {
@@ -924,25 +923,10 @@ class BackendWatchHistoryService(
     }
 
     private suspend fun getBackendContext(): BackendContext? {
-        if (!supabase.isConfigured() || !backend.isConfigured()) {
+        if (!backend.isConfigured()) {
             return null
         }
-        val session = supabase.ensureValidSession() ?: return null
-        var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
-        if (profileId.isBlank()) {
-            profileId = try {
-                backend.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
-            } catch (_: Throwable) {
-                ""
-            }
-            if (profileId.isNotBlank()) {
-                activeProfileStore.setActiveProfileId(session.userId, profileId)
-            }
-        }
-        if (profileId.isBlank()) {
-            return null
-        }
-        return BackendContext(accessToken = session.accessToken, profileId = profileId)
+        return backendContextResolver.resolve()
     }
 
     private fun loadStoredAuthState(): WatchProviderAuthState {
@@ -1185,11 +1169,6 @@ class BackendWatchHistoryService(
         val type: String,
         val id: String,
         val episodeId: String?,
-    )
-
-    private data class BackendContext(
-        val accessToken: String,
-        val profileId: String,
     )
 
     private fun normalizedImdbIdOrNull(raw: String?): String? {

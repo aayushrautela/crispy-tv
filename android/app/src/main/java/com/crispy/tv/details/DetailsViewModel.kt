@@ -56,18 +56,27 @@ class DetailsViewModel internal constructor(
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
+    private var reloadJob: Job? = null
+    private var secondaryContentJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
+    @Volatile
+    private var reloadGeneration: Long = 0L
 
     init {
         reload()
     }
 
     fun reload() {
-        viewModelScope.launch {
+        reloadJob?.cancel()
+        val generation = ++reloadGeneration
+        reloadJob = viewModelScope.launch {
             val nowMs = System.currentTimeMillis()
 
+            aiJob?.cancel()
+            streamLoadJob?.cancel()
             episodesJob?.cancel()
+            secondaryContentJob?.cancel()
             seasonEpisodesCache.clear()
             detailsUseCases.clearEpisodeWatchStateCache()
 
@@ -78,7 +87,8 @@ class DetailsViewModel internal constructor(
                     titleReviews = null,
                     titleContent = null,
                     titleRatings = null,
-                    statusMessage = "Loading...",
+                    secondaryContentIsLoading = false,
+                    statusMessage = "",
                     aiIsLoading = false,
                     aiInsights = null,
                     aiStoryVisible = false,
@@ -102,6 +112,7 @@ class DetailsViewModel internal constructor(
                         nowMs = nowMs,
                     )
                 }
+            if (!isCurrentGeneration(generation)) return@launch
 
             val enrichedDetails = result.details
 
@@ -129,9 +140,6 @@ class DetailsViewModel internal constructor(
                     isLoading = false,
                     details = result.details,
                     titleDetail = result.titleDetail,
-                    titleReviews = result.titleReviews,
-                    titleContent = result.titleContent,
-                    titleRatings = result.titleRatings,
                     statusMessage = result.statusMessage,
                     isWatched = result.providerState.isWatched,
                     isInWatchlist = result.providerState.isInWatchlist,
@@ -146,6 +154,10 @@ class DetailsViewModel internal constructor(
                     episodesIsLoading = selectedSeason != null && selectedSeasonEpisodes == null,
                     episodesStatusMessage = "",
                 )
+            }
+
+            if (enrichedDetails != null) {
+                loadSecondaryContent(generation)
             }
 
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
@@ -167,11 +179,38 @@ class DetailsViewModel internal constructor(
                     withContext(Dispatchers.IO) {
                         detailsUseCases.loadCachedAiInsights(aiMediaKey, aiLocale)
                     }
-                if (cached != null) {
+                if (cached != null && isCurrentGeneration(generation)) {
                     _uiState.update { it.copy(aiInsights = cached) }
                 }
             }
         }
+    }
+
+    private fun loadSecondaryContent(generation: Long) {
+        secondaryContentJob?.cancel()
+        _uiState.update { it.copy(secondaryContentIsLoading = true) }
+
+        secondaryContentJob =
+            viewModelScope.launch {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.loadSecondaryContent(mediaKey = mediaKey)
+                    }
+                if (!isCurrentGeneration(generation)) return@launch
+
+                _uiState.update {
+                    it.copy(
+                        secondaryContentIsLoading = false,
+                        titleReviews = result.titleReviews,
+                        titleContent = result.titleContent,
+                        titleRatings = result.titleRatings,
+                    )
+                }
+            }
+    }
+
+    private fun isCurrentGeneration(generation: Long): Boolean {
+        return generation == reloadGeneration
     }
 
     fun onAiInsightsClick() {

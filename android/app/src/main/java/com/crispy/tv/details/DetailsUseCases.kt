@@ -2,7 +2,7 @@ package com.crispy.tv.details
 
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
-import com.crispy.tv.accounts.ActiveProfileStore
+import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
@@ -21,18 +21,22 @@ import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 internal data class DetailsScreenLoadResult(
     val details: MediaDetails?,
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
-    val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse?,
-    val titleContent: CrispyBackendClient.MetadataTitleContentResponse?,
-    val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse?,
     val statusMessage: String,
     val providerState: ProviderState,
     val watchCta: WatchCta,
     val continueVideoId: String?,
     val seasons: List<Int>,
+)
+
+internal data class DetailsSecondaryLoadResult(
+    val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse?,
+    val titleContent: CrispyBackendClient.MetadataTitleContentResponse?,
+    val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse?,
 )
 
 data class RuntimeDetailsEntry(
@@ -61,10 +65,10 @@ internal class DetailsUseCases(
     private val userMediaRepository: UserMediaRepository,
     private val aiRepository: AiInsightsRepository,
     private val addonStreamsService: AddonStreamsService,
-    private val activeProfileStore: ActiveProfileStore,
-    private val backendClient: CrispyBackendClient,
+    private val backendContextResolver: BackendContextResolver,
 ) {
     private val episodeWatchStateResolver = EpisodeWatchStateResolver(userMediaRepository)
+    private val cachedBaseResults = ConcurrentHashMap<String, DetailsScreenLoadResult>()
 
     fun clearEpisodeWatchStateCache() {
         episodeWatchStateResolver.clearCache()
@@ -76,46 +80,29 @@ internal class DetailsUseCases(
         runtimeEntry: RuntimeDetailsEntry?,
         nowMs: Long,
     ): DetailsScreenLoadResult {
+        val cacheKey = detailsCacheKey(mediaKey, requestedMediaType)
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
-        val profileId = session?.let { resolveProfileId(it.accessToken, it.userId) }
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+        val profileId = backendContext?.profileId
+        cachedBaseResults[cacheKey]?.takeIf { cached -> cached.details != null && accessToken != null }?.let { cached ->
+            val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
+            val providerState = watchCtaResolver.resolveProviderState(cached.details, mediaKey)
+            val ctaResolution = watchCtaResolver.resolveWatchCta(cached.details, providerState, nowMs)
+            return cached.copy(
+                providerState = providerState,
+                watchCta = ctaResolution.watchCta,
+                continueVideoId = ctaResolution.continueVideoId,
+            )
+        }
         val titleDetailResult =
-            session?.let {
+            accessToken?.let {
                 runCatching {
-                    catalogRepository.getTitleDetail(accessToken = it.accessToken, mediaKey = mediaKey)
+                    catalogRepository.getTitleDetail(accessToken = it, mediaKey = mediaKey)
                 }
             }
         val titleDetail = titleDetailResult?.getOrNull()
         val titleDetailError = titleDetailResult?.exceptionOrNull()
-        val titleReviewsResult =
-            session?.takeIf { !profileId.isNullOrBlank() }?.let {
-                runCatching {
-                    catalogRepository.getTitleReviews(
-                        accessToken = it.accessToken,
-                        profileId = checkNotNull(profileId),
-                        mediaKey = mediaKey,
-                    )
-                }
-            }
-        val titleReviews = titleReviewsResult?.getOrNull()
-        val titleContentResult =
-            session?.let {
-                runCatching {
-                    catalogRepository.getTitleContent(accessToken = it.accessToken, mediaKey = mediaKey)
-                }
-            }
-        val titleContent = titleContentResult?.getOrNull()
-        val titleContentError = titleContentResult?.exceptionOrNull()
-        val titleRatingsResult =
-            session?.takeIf { !profileId.isNullOrBlank() }?.let {
-                runCatching {
-                    catalogRepository.getTitleRatings(
-                        accessToken = it.accessToken,
-                        profileId = checkNotNull(profileId),
-                        mediaKey = mediaKey,
-                    )
-                }
-            }
-        val titleRatings = titleRatingsResult?.getOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
         val providerState = watchCtaResolver.resolveProviderState(details, mediaKey)
@@ -137,39 +124,68 @@ internal class DetailsUseCases(
         val statusMessage =
             when {
                 details != null -> ""
-                session == null -> "Sign in to load details."
+                accessToken == null -> "Sign in to load details."
                 titleDetailError != null -> titleDetailError.message ?: "Unable to load details."
-                titleContentError != null -> titleContentError.message ?: "Unable to load details."
                 else -> "Unable to load details."
             }
 
-        return DetailsScreenLoadResult(
+        val result = DetailsScreenLoadResult(
             details = details,
             titleDetail = titleDetail,
-            titleReviews = titleReviews,
-            titleContent = titleContent,
-            titleRatings = titleRatings,
             statusMessage = statusMessage,
             providerState = providerState,
             watchCta = ctaResolution.watchCta,
             continueVideoId = ctaResolution.continueVideoId,
             seasons = seasons,
         )
+        if (result.details != null) {
+            cachedBaseResults[cacheKey] = result
+        } else {
+            cachedBaseResults.remove(cacheKey)
+        }
+        return result
     }
 
-    private suspend fun resolveProfileId(accessToken: String, userId: String): String? {
-        var profileId = activeProfileStore.getActiveProfileId(userId).orEmpty().trim()
-        if (profileId.isBlank()) {
-            profileId = try {
-                backendClient.getMe(accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
-            } catch (_: Throwable) {
-                ""
+    suspend fun loadSecondaryContent(
+        mediaKey: String,
+    ): DetailsSecondaryLoadResult {
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
+        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+        val profileId = backendContext?.profileId
+
+        val titleReviews =
+            accessToken?.takeIf { !profileId.isNullOrBlank() }?.let {
+                runCatching {
+                    catalogRepository.getTitleReviews(
+                        accessToken = it,
+                        profileId = checkNotNull(profileId),
+                        mediaKey = mediaKey,
+                    )
+                }.getOrNull()
             }
-            if (profileId.isNotBlank()) {
-                activeProfileStore.setActiveProfileId(userId, profileId)
+        val titleContent =
+            accessToken?.let {
+                runCatching {
+                    catalogRepository.getTitleContent(accessToken = it, mediaKey = mediaKey)
+                }.getOrNull()
             }
-        }
-        return profileId.ifBlank { null }
+        val titleRatings =
+            accessToken?.takeIf { !profileId.isNullOrBlank() }?.let {
+                runCatching {
+                    catalogRepository.getTitleRatings(
+                        accessToken = it,
+                        profileId = checkNotNull(profileId),
+                        mediaKey = mediaKey,
+                    )
+                }.getOrNull()
+            }
+
+        return DetailsSecondaryLoadResult(
+            titleReviews = titleReviews,
+            titleContent = titleContent,
+            titleRatings = titleRatings,
+        )
     }
 
     suspend fun resolveWatchCta(
@@ -234,6 +250,13 @@ internal class DetailsUseCases(
         requestedMediaType: MetadataLabMediaType,
     ): MediaDetails {
         return WatchCtaResolver(userMediaRepository, requestedMediaType).ensureImdbId(details)
+    }
+
+    private fun detailsCacheKey(
+        mediaKey: String,
+        requestedMediaType: MetadataLabMediaType,
+    ): String {
+        return "${requestedMediaType.name.lowercase(Locale.US)}:${mediaKey.trim()}"
     }
 
     fun loadCachedAiInsights(

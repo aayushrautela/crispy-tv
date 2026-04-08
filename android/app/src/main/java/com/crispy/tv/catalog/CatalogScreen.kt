@@ -2,11 +2,16 @@ package com.crispy.tv.catalog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -35,6 +40,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -121,7 +127,7 @@ fun CatalogRoute(
                 when (refreshState) {
                     is LoadState.Loading -> {
                         if (pagingItems.itemCount == 0) {
-                            LoadingIndicator(modifier = Modifier.align(Alignment.Center).size(48.dp))
+                            CatalogLoadingSkeleton(modifier = Modifier.fillMaxSize())
                         }
                     }
 
@@ -143,3 +149,45 @@ fun CatalogRoute(
         }
     }
 }
+
+@Composable
+private fun CatalogLoadingSkeleton(modifier: Modifier = Modifier) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 124.dp),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(CATALOG_SKELETON_COUNT) {
+            CatalogPosterSkeleton(modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun CatalogPosterSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .width(80.dp)
+                .height(12.dp)
+                .skeletonElement(pulse = false),
+        )
+    }
+}
+
+private const val CATALOG_SKELETON_COUNT = 12

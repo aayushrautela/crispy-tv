@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val SEED_COLOR_CACHE_MAX_ENTRIES = 96
-private const val SEED_COLOR_EXTRACTION_TIMEOUT_MS = 150L
+private const val SEED_COLOR_EXTRACTION_TIMEOUT_MS = 500L
 
 private object DetailsSeedColorCache {
     private val cache =

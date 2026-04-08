@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Locale
@@ -269,8 +272,8 @@ private fun SearchResultsContent(
 
         when {
             uiState.isLoading && uiState.visibleResults.isEmpty() -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SearchLoadingIndicator()
+                items(SEARCH_SKELETON_COUNT, span = { GridItemSpan(1) }, key = { index -> "search-skeleton-$index" }) {
+                    SearchPosterSkeleton(modifier = Modifier.fillMaxWidth())
                 }
             }
 
@@ -414,3 +417,31 @@ private fun SearchLoadingIndicator(compact: Boolean = false) {
         CircularProgressIndicator()
     }
 }
+
+@Composable
+private fun SearchPosterSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .width(76.dp)
+                .height(12.dp)
+                .skeletonElement(pulse = false),
+        )
+    }
+}
+
+private const val SEARCH_SKELETON_COUNT = 9

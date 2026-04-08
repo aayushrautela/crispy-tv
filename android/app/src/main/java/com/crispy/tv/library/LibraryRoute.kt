@@ -18,6 +18,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -43,6 +44,7 @@ fun LibraryRoute(
             },
         )
     val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+    val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val scrollBehavior = appBarScrollBehavior()
 
     Scaffold(
@@ -77,10 +79,10 @@ fun LibraryRoute(
         ) {
             LibraryRouteContent(
                 uiState = uiState,
-                onRefresh = viewModel::refresh,
+                pagingItems = pagingItems,
+                onRefresh = { pagingItems.refresh() },
                 onItemClick = onItemClick,
                 onSelectSection = viewModel::selectSection,
-                onLoadMore = viewModel::loadMore,
                 scrollToTopRequests = scrollToTopRequests,
                 onScrollToTopConsumed = onScrollToTopConsumed,
             )

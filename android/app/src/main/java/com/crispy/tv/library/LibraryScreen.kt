@@ -4,16 +4,27 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.paging.LoadState
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -36,24 +47,33 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
-import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendContextResolver
+import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private const val LIBRARY_PAGE_SIZE = 60
+internal const val LIBRARY_SECTION_HISTORY = "history"
+internal const val LIBRARY_SECTION_WATCHLIST = "watchlist"
+internal const val LIBRARY_SECTION_RATINGS = "ratings"
+
+private val LIBRARY_SECTIONS =
+    listOf(
+        LibrarySectionUi(id = LIBRARY_SECTION_HISTORY, label = "History"),
+        LibrarySectionUi(id = LIBRARY_SECTION_WATCHLIST, label = "Watchlist"),
+        LibrarySectionUi(id = LIBRARY_SECTION_RATINGS, label = "Ratings"),
+    )
 
 @Immutable
 data class LibrarySectionItemUi(
@@ -82,337 +102,54 @@ data class LibrarySectionUi(
 
 @Immutable
 data class LibraryUiState(
-    val isRefreshing: Boolean = false,
-    val isLoadingSection: Boolean = false,
-    val isLoadingMore: Boolean = false,
-    val statusMessage: String = "",
-    val sectionStatusMessage: String = "",
-    val sections: List<LibrarySectionUi> = emptyList(),
-    val selectedSectionId: String? = null,
-    val sectionItems: List<LibrarySectionItemUi> = emptyList(),
-    val nextCursor: String? = null,
-    val hasMore: Boolean = false,
+    val sections: List<LibrarySectionUi> = LIBRARY_SECTIONS,
+    val selectedSectionId: String = LIBRARY_SECTIONS.first().id,
 )
 
 class LibraryViewModel internal constructor(
-    private val supabase: SupabaseAccountClient,
-    private val activeProfileStore: ActiveProfileStore,
     private val backend: CrispyBackendClient,
+    private val backendContextResolver: BackendContextResolver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
 
-    private var refreshJob: Job? = null
-    private var sectionJob: Job? = null
-    private var loadMoreJob: Job? = null
-
-    private val sections = listOf(
-        LibrarySectionUi(id = SECTION_HISTORY, label = "History"),
-        LibrarySectionUi(id = SECTION_WATCHLIST, label = "Watchlist"),
-        LibrarySectionUi(id = SECTION_RATINGS, label = "Ratings"),
-    )
-
-    init {
-        refresh()
-    }
-
-    fun refresh() {
-        if (refreshJob?.isActive == true) return
-        refreshJob =
-            viewModelScope.launch {
-                _uiState.update {
-                    it.copy(
-                        isRefreshing = true,
-                        statusMessage = "",
-                    )
-                }
-
-                val previousSelection = _uiState.value.selectedSectionId
-                val selectedSectionId = previousSelection?.takeIf { id -> sections.any { it.id == id } }
-                    ?: sections.firstOrNull()?.id
-
-                _uiState.update {
-                    it.copy(
-                        isRefreshing = false,
-                        statusMessage = if (sections.isEmpty()) "No library sections available." else "",
-                        sections = sections,
-                        selectedSectionId = selectedSectionId,
-                        sectionItems = if (selectedSectionId == it.selectedSectionId) it.sectionItems else emptyList(),
-                        sectionStatusMessage = if (selectedSectionId == it.selectedSectionId) it.sectionStatusMessage else "",
-                        isLoadingMore = false,
-                        nextCursor = if (selectedSectionId == it.selectedSectionId) it.nextCursor else null,
-                        hasMore = if (selectedSectionId == it.selectedSectionId) it.hasMore else false,
-                    )
-                }
-
-                if (selectedSectionId == null || sections.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            sectionItems = emptyList(),
-                            isLoadingSection = false,
-                            isLoadingMore = false,
-                            sectionStatusMessage = "",
-                            nextCursor = null,
-                            hasMore = false,
+    val items: Flow<PagingData<LibrarySectionItemUi>> =
+        _uiState
+            .map { it.selectedSectionId }
+            .distinctUntilChanged()
+            .flatMapLatest { sectionId ->
+                Pager(
+                    config =
+                        PagingConfig(
+                            pageSize = LIBRARY_PAGE_SIZE,
+                            initialLoadSize = LIBRARY_PAGE_SIZE,
+                            prefetchDistance = 10,
+                            enablePlaceholders = false,
+                        ),
+                    pagingSourceFactory = {
+                        LibraryPagingSource(
+                            backend = backend,
+                            backendContextResolver = backendContextResolver,
+                            sectionId = sectionId,
                         )
-                    }
-                    return@launch
-                }
-
-                loadSelectedSection(reset = true)
-            }
-    }
+                    },
+                ).flow
+            }.cachedIn(viewModelScope)
 
     fun selectSection(sectionId: String) {
         val normalized = sectionId.trim()
         if (normalized.isEmpty()) return
         val current = _uiState.value
-        if (current.selectedSectionId == normalized) return
+        if (current.selectedSectionId == normalized || current.sections.none { it.id == normalized }) return
 
         _uiState.update {
             it.copy(
                 selectedSectionId = normalized,
-                sectionItems = emptyList(),
-                sectionStatusMessage = "",
-                isLoadingSection = false,
-                isLoadingMore = false,
-                nextCursor = null,
-                hasMore = false,
             )
         }
-        loadSelectedSection(reset = true)
     }
-
-    fun loadMore() {
-        val state = _uiState.value
-        if (state.isLoadingSection || state.isLoadingMore || !state.hasMore) return
-        if (state.selectedSectionId.isNullOrBlank()) return
-        if (state.nextCursor.isNullOrBlank()) return
-        loadSelectedSection(reset = false)
-    }
-
-    private fun loadSelectedSection(reset: Boolean) {
-        val state = _uiState.value
-        val sectionId = state.selectedSectionId ?: return
-        if (reset) {
-            sectionJob?.cancel()
-            loadMoreJob?.cancel()
-        }
-        val activeJob = if (reset) sectionJob else loadMoreJob
-        if (activeJob?.isActive == true) return
-
-        val job =
-            viewModelScope.launch {
-                val before = _uiState.value
-                val cursor = if (reset) null else before.nextCursor
-                if (!reset && cursor.isNullOrBlank()) {
-                    return@launch
-                }
-
-                _uiState.update {
-                    it.copy(
-                        isLoadingSection = if (reset) true else it.isLoadingSection,
-                        isLoadingMore = if (reset) false else true,
-                        sectionStatusMessage = if (reset && it.sectionItems.isEmpty()) "Loading..." else it.sectionStatusMessage,
-                        sectionItems = if (reset) emptyList() else it.sectionItems,
-                        nextCursor = if (reset) null else it.nextCursor,
-                        hasMore = if (reset) false else it.hasMore,
-                    )
-                }
-
-                val result = withContext(Dispatchers.IO) {
-                    runCatching {
-                        loadLibrarySectionPage(
-                            sectionId = sectionId,
-                            limit = LIBRARY_PAGE_SIZE,
-                            cursor = cursor,
-                        )
-                    }
-                }
-                val page = result.getOrNull()
-                val currentState = _uiState.value
-                if (currentState.selectedSectionId != sectionId) {
-                    return@launch
-                }
-
-                if (page == null) {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingSection = false,
-                            isLoadingMore = false,
-                            sectionStatusMessage = if (it.sectionItems.isEmpty()) {
-                                "Failed to load ${selectedSectionLabel(it, sectionId)}."
-                            } else {
-                                "Failed to load more items."
-                            },
-                        )
-                    }
-                    return@launch
-                }
-
-                val mergedItems = if (reset) {
-                    page.items
-                } else {
-                    mergeSectionItems(currentState.sectionItems, page.items)
-                }
-                val statusMessage = when {
-                    mergedItems.isEmpty() -> "No items in ${selectedSectionLabel(currentState, sectionId)} yet."
-                    else -> ""
-                }
-
-                _uiState.update {
-                    it.copy(
-                        isLoadingSection = false,
-                        isLoadingMore = false,
-                        sectionItems = mergedItems,
-                        sectionStatusMessage = statusMessage,
-                        nextCursor = page.nextCursor,
-                        hasMore = page.hasMore,
-                    )
-                }
-            }
-
-        if (reset) {
-            sectionJob = job
-        } else {
-            loadMoreJob = job
-        }
-    }
-
-    private suspend fun loadLibrarySectionPage(
-        sectionId: String,
-        limit: Int,
-        cursor: String?,
-    ): LibrarySectionPageUi {
-        val backendContext = getBackendContext() ?: return LibrarySectionPageUi()
-        val response = when (sectionId) {
-            SECTION_HISTORY -> backend.listWatchHistory(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                limit = limit,
-                cursor = cursor,
-            ).toWatchedSectionPageUi()
-
-            SECTION_WATCHLIST -> backend.listWatchlist(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                limit = limit,
-                cursor = cursor,
-            ).toWatchlistSectionPageUi()
-
-            SECTION_RATINGS -> backend.listRatings(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                limit = limit,
-                cursor = cursor,
-            ).toRatingsSectionPageUi()
-
-            else -> LibrarySectionPageUi()
-        }
-        return response
-    }
-
-    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.toWatchedSectionPageUi(): LibrarySectionPageUi {
-        return LibrarySectionPageUi(
-            items = items.map { item ->
-                LibrarySectionItemUi(
-                    id = item.id ?: item.media.mediaKey,
-                    mediaKey = item.media.mediaKey,
-                    mediaType = item.media.mediaType,
-                    title = item.media.title,
-                    posterUrl = item.media.posterUrl,
-                    backdropUrl = item.media.backdropUrl,
-                    addedAt = null,
-                    watchedAt = item.watchedAt,
-                    ratedAt = null,
-                    rating = null,
-                    lastActivityAt = item.lastActivityAt,
-                    origins = item.origins,
-                )
-            },
-            nextCursor = pageInfo.nextCursor,
-            hasMore = pageInfo.hasMore,
-        )
-    }
-
-    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.toWatchlistSectionPageUi(): LibrarySectionPageUi {
-        return LibrarySectionPageUi(
-            items = items.map { item ->
-                LibrarySectionItemUi(
-                    id = item.id ?: item.media.mediaKey,
-                    mediaKey = item.media.mediaKey,
-                    mediaType = item.media.mediaType,
-                    title = item.media.title,
-                    posterUrl = item.media.posterUrl,
-                    backdropUrl = item.media.backdropUrl,
-                    addedAt = item.addedAt,
-                    watchedAt = null,
-                    ratedAt = null,
-                    rating = null,
-                    lastActivityAt = item.addedAt,
-                    origins = item.origins,
-                )
-            },
-            nextCursor = pageInfo.nextCursor,
-            hasMore = pageInfo.hasMore,
-        )
-    }
-
-    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.RatingItem>.toRatingsSectionPageUi(): LibrarySectionPageUi {
-        return LibrarySectionPageUi(
-            items = items.map { item ->
-                LibrarySectionItemUi(
-                    id = item.id ?: item.media.mediaKey,
-                    mediaKey = item.media.mediaKey,
-                    mediaType = item.media.mediaType,
-                    title = item.media.title,
-                    posterUrl = item.media.posterUrl,
-                    backdropUrl = item.media.backdropUrl,
-                    addedAt = null,
-                    watchedAt = null,
-                    ratedAt = item.rating.ratedAt,
-                    rating = item.rating.value,
-                    lastActivityAt = item.rating.ratedAt,
-                    origins = item.origins,
-                )
-            },
-            nextCursor = pageInfo.nextCursor,
-            hasMore = pageInfo.hasMore,
-        )
-    }
-
-    private suspend fun getBackendContext(): BackendContext? {
-        if (!supabase.isConfigured() || !backend.isConfigured()) return null
-        val session = supabase.ensureValidSession() ?: return null
-        var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
-        if (profileId.isBlank()) {
-            profileId = try {
-                backend.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
-            } catch (_: Throwable) { "" }
-            if (profileId.isNotBlank()) {
-                activeProfileStore.setActiveProfileId(session.userId, profileId)
-            }
-        }
-        if (profileId.isBlank()) return null
-        return BackendContext(accessToken = session.accessToken, profileId = profileId)
-    }
-
-    private data class BackendContext(
-        val accessToken: String,
-        val profileId: String,
-    )
-
-    private data class LibrarySectionPageUi(
-        val items: List<LibrarySectionItemUi> = emptyList(),
-        val nextCursor: String? = null,
-        val hasMore: Boolean = false,
-    )
 
     companion object {
-        private const val SECTION_HISTORY = "history"
-        private const val SECTION_WATCHLIST = "watchlist"
-        private const val SECTION_RATINGS = "ratings"
-
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {
@@ -420,9 +157,8 @@ class LibraryViewModel internal constructor(
                     if (modelClass.isAssignableFrom(LibraryViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return LibraryViewModel(
-                            supabase = SupabaseServicesProvider.accountClient(appContext),
-                            activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                             backend = BackendServicesProvider.backendClient(appContext),
+                            backendContextResolver = BackendContextResolverProvider.get(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -432,45 +168,27 @@ class LibraryViewModel internal constructor(
     }
 }
 
-private fun mergeSectionItems(
-    existing: List<LibrarySectionItemUi>,
-    incoming: List<LibrarySectionItemUi>,
-): List<LibrarySectionItemUi> {
-    if (existing.isEmpty()) return incoming
-    if (incoming.isEmpty()) return existing
-    val seen = HashSet<String>(existing.size + incoming.size)
-    val merged = ArrayList<LibrarySectionItemUi>(existing.size + incoming.size)
-    (existing + incoming).forEach { item ->
-        if (seen.add(item.stableKey)) {
-            merged += item
-        }
-    }
-    return merged
-}
-
-private fun selectedSectionLabel(state: LibraryUiState, sectionId: String): String {
-    return state.sections.firstOrNull { it.id == sectionId }?.label ?: "this section"
-}
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun LibraryRouteContent(
     uiState: LibraryUiState,
+    pagingItems: LazyPagingItems<LibrarySectionItemUi>,
     onRefresh: () -> Unit,
     onItemClick: (LibrarySectionItemUi) -> Unit,
     onSelectSection: (String) -> Unit,
-    onLoadMore: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
     val sections = uiState.sections
     val selectedSectionId = uiState.selectedSectionId
     val selectedSection = sections.firstOrNull { it.id == selectedSectionId }
-    val items = uiState.sectionItems
     val pullToRefreshState = rememberPullToRefreshState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val gridState = rememberLazyGridState()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val refreshState = pagingItems.loadState.refresh
+    val appendState = pagingItems.loadState.append
+    val isRefreshing = refreshState is LoadState.Loading && pagingItems.itemCount > 0
 
     LaunchedEffect(scrollToTopRequest) {
         if (scrollToTopRequest > 0) {
@@ -480,14 +198,14 @@ internal fun LibraryRouteContent(
     }
 
     PullToRefreshBox(
-        isRefreshing = uiState.isRefreshing,
+        isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),
         state = pullToRefreshState,
         indicator = {
             Indicator(
                 state = pullToRefreshState,
-                isRefreshing = uiState.isRefreshing,
+                isRefreshing = isRefreshing,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         },
@@ -523,7 +241,18 @@ internal fun LibraryRouteContent(
             }
 
             item(span = { GridItemSpan(maxLineSpan) }, key = "status") {
-                val message = uiState.statusMessage.ifBlank { uiState.sectionStatusMessage }
+                val message =
+                    when {
+                        refreshState is LoadState.Error && pagingItems.itemCount > 0 -> {
+                            refreshState.error.message ?: "Failed to refresh ${selectedSection?.label ?: "this section"}."
+                        }
+
+                        appendState is LoadState.Error -> {
+                            appendState.error.message ?: "Failed to load more items."
+                        }
+
+                        else -> ""
+                    }
                 if (message.isNotBlank()) {
                     Text(
                         text = message,
@@ -533,38 +262,37 @@ internal fun LibraryRouteContent(
                 }
             }
 
-            if (uiState.isLoadingSection && items.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }, key = "section-loading") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Dimensions.ListItemPadding),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        LoadingIndicator()
-                    }
+            if (refreshState is LoadState.Loading && pagingItems.itemCount == 0) {
+                items(LIBRARY_SKELETON_COUNT, span = { GridItemSpan(1) }, key = { index -> "library-skeleton-$index" }) {
+                    LibraryPosterSkeleton(modifier = Modifier.fillMaxWidth())
                 }
-            } else if (items.isEmpty()) {
+            } else if (pagingItems.itemCount == 0) {
                 item(span = { GridItemSpan(maxLineSpan) }, key = "section-empty") {
-                    val emptyMessage = when {
-                        sections.isEmpty() -> "No library sections available."
-                        selectedSection != null -> "No items in ${selectedSection.label} yet."
-                        else -> "No library sections available."
-                    }
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Box(modifier = Modifier.padding(Dimensions.ListItemPadding)) {
+                        Column(modifier = Modifier.padding(Dimensions.ListItemPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
-                                text = emptyMessage,
+                                text =
+                                    if (refreshState is LoadState.Error) {
+                                        refreshState.error.message ?: "Failed to load ${selectedSection?.label ?: "this section"}."
+                                    } else {
+                                        "No items in ${selectedSection?.label ?: "this section"} yet."
+                                    },
                                 style = MaterialTheme.typography.bodyMedium,
                             )
+                            if (refreshState is LoadState.Error) {
+                                FilledTonalButton(onClick = onRefresh) {
+                                    Text("Retry")
+                                }
+                            }
                         }
                     }
                 }
             } else {
-                gridItems(
-                    items = items,
-                    key = { item -> item.stableKey },
-                ) { item ->
+                items(
+                    count = pagingItems.itemCount,
+                    key = pagingItems.itemKey { it.stableKey },
+                ) { index ->
+                    val item = pagingItems[index] ?: return@items
                     PosterCard(
                         title = item.title,
                         posterUrl = item.posterUrl,
@@ -577,7 +305,7 @@ internal fun LibraryRouteContent(
                     )
                 }
 
-                if (uiState.isLoadingMore) {
+                if (appendState is LoadState.Loading) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "load-more-loading") {
                         Box(
                             modifier = Modifier
@@ -588,16 +316,16 @@ internal fun LibraryRouteContent(
                             LoadingIndicator()
                         }
                     }
-                } else if (uiState.hasMore) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "load-more") {
+                } else if (appendState is LoadState.Error) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "append-error") {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            FilledTonalButton(onClick = onLoadMore) {
-                                Text("Load more")
+                            FilledTonalButton(onClick = { pagingItems.retry() }) {
+                                Text("Retry")
                             }
                         }
                     }
@@ -606,3 +334,31 @@ internal fun LibraryRouteContent(
         }
     }
 }
+
+@Composable
+private fun LibraryPosterSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .width(72.dp)
+                .height(12.dp)
+                .skeletonElement(pulse = false),
+        )
+    }
+}
+
+private const val LIBRARY_SKELETON_COUNT = 9

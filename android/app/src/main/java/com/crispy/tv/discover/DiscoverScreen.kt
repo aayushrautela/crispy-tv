@@ -14,15 +14,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.paging.LoadState
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
@@ -58,6 +67,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.crispy.tv.catalog.CatalogPagingSource
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.DiscoverCatalogRef
@@ -66,18 +76,22 @@ import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 enum class DiscoverTypeFilter(val label: String, val mediaType: String?) {
     All(label = "All", mediaType = null),
@@ -92,11 +106,6 @@ data class DiscoverUiState(
     val statusMessage: String = "",
     val catalogs: List<DiscoverCatalogRef> = emptyList(),
     val selectedCatalogKey: String? = null,
-    val results: List<CatalogItem> = emptyList(),
-    val isLoadingResults: Boolean = false,
-    val isLoadingMore: Boolean = false,
-    val page: Int = 1,
-    val hasMore: Boolean = false
 ) {
     val selectedCatalog: DiscoverCatalogRef?
         get() = catalogs.firstOrNull { it.key == selectedCatalogKey }
@@ -109,9 +118,31 @@ class DiscoverViewModel(
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState
 
-    private var refreshJob: Job? = null
-    private var resultsJob: Job? = null
-    private var loadMoreJob: Job? = null
+    val items: Flow<PagingData<CatalogItem>> =
+        _uiState
+            .map { it.selectedCatalog }
+            .distinctUntilChanged()
+            .flatMapLatest { selectedCatalog ->
+                if (selectedCatalog == null) {
+                    flowOf(PagingData.empty())
+                } else {
+                    Pager(
+                        config =
+                            PagingConfig(
+                                pageSize = PAGE_SIZE,
+                                initialLoadSize = PAGE_SIZE,
+                                prefetchDistance = 10,
+                                enablePlaceholders = false,
+                            ),
+                        pagingSourceFactory = {
+                            CatalogPagingSource(
+                                recommendationCatalogService = recommendationCatalogService,
+                                section = selectedCatalog.section,
+                            )
+                        },
+                    ).flow
+                }
+            }.cachedIn(viewModelScope)
 
     init {
         refresh()
@@ -119,164 +150,53 @@ class DiscoverViewModel(
 
     fun setTypeFilter(filter: DiscoverTypeFilter) {
         _uiState.update { it.copy(typeFilter = filter) }
-        refresh(preserveContent = false)
+        refresh(preserveCatalogs = false)
     }
 
     fun selectCatalog(catalog: DiscoverCatalogRef) {
         _uiState.update { it.copy(selectedCatalogKey = catalog.key) }
-        loadFirstPage(clearResults = true, keepRefreshing = false)
     }
 
     fun refresh() {
-        refresh(preserveContent = true)
+        refresh(preserveCatalogs = true)
     }
 
-    private fun refresh(preserveContent: Boolean) {
-        refreshJob?.cancel()
-        resultsJob?.cancel()
-        loadMoreJob?.cancel()
-        refreshJob =
-            viewModelScope.launch {
-                val filterSnapshot = uiState.value.typeFilter
-                val priorSelected = uiState.value.selectedCatalogKey
-
-                _uiState.update {
-                    it.copy(
-                        isRefreshing = true,
-                        statusMessage = if (preserveContent && it.catalogs.isNotEmpty()) it.statusMessage else "Loading discover catalogs...",
-                        catalogs = if (preserveContent) it.catalogs else emptyList(),
-                        selectedCatalogKey = if (preserveContent) it.selectedCatalogKey else null,
-                        results = if (preserveContent) it.results else emptyList(),
-                        isLoadingResults = preserveContent && it.results.isNotEmpty(),
-                        isLoadingMore = false,
-                        page = if (preserveContent) it.page else 1,
-                        hasMore = if (preserveContent) it.hasMore else false,
-                    )
-                }
-
-                val catalogsResult =
-                    withContext(Dispatchers.IO) {
-                        recommendationCatalogService.listDiscoverCatalogs(
-                            mediaType = filterSnapshot.mediaType
-                        )
-                    }
-                val catalogs = catalogsResult.first
-                val statusMessage = catalogsResult.second
-                val selectedKey =
-                    priorSelected?.takeIf { key -> catalogs.any { it.key == key } }
-                        ?: catalogs.firstOrNull()?.key
-
-                _uiState.update {
-                    it.copy(
-                        catalogs = catalogs,
-                        selectedCatalogKey = selectedKey,
-                        statusMessage = statusMessage,
-                    )
-                }
-
-                loadFirstPage(clearResults = !preserveContent, keepRefreshing = true)
-            }
-    }
-
-    fun loadMore() {
+    private fun refresh(preserveCatalogs: Boolean) {
         val snapshot = uiState.value
-        if (snapshot.isLoadingResults || snapshot.isLoadingMore || !snapshot.hasMore) {
-            return
+        val filterSnapshot = snapshot.typeFilter
+        val priorSelected = snapshot.selectedCatalogKey
+
+        _uiState.update {
+            it.copy(
+                isRefreshing = true,
+                statusMessage = if (preserveCatalogs && it.catalogs.isNotEmpty()) it.statusMessage else "",
+                catalogs = if (preserveCatalogs) it.catalogs else emptyList(),
+                selectedCatalogKey = if (preserveCatalogs) it.selectedCatalogKey else null,
+            )
         }
-        val catalog = snapshot.selectedCatalog ?: return
 
-        loadMoreJob?.cancel()
-        loadMoreJob =
-            viewModelScope.launch {
-                val pageSize = PAGE_SIZE
-                val nextPage = (snapshot.page + 1).coerceAtLeast(2)
-                _uiState.update { it.copy(isLoadingMore = true) }
-
-                val result =
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            recommendationCatalogService.fetchCatalogPage(
-                                section = catalog.section,
-                                page = nextPage,
-                                pageSize = pageSize,
-                            )
-                        }
-                    }
-
-                val pageResult = result.getOrNull()
-                val newItems = pageResult?.items.orEmpty()
-                val merged = dedupItems(snapshot.results + newItems)
-                val hasMore = newItems.size >= pageSize
-
-                _uiState.update {
-                    it.copy(
-                        results = merged,
-                        isLoadingMore = false,
-                        page = nextPage,
-                        hasMore = hasMore,
-                        statusMessage = pageResult?.statusMessage ?: (result.exceptionOrNull()?.message ?: it.statusMessage)
+        viewModelScope.launch {
+            val catalogsResult =
+                withContext(Dispatchers.IO) {
+                    recommendationCatalogService.listDiscoverCatalogs(
+                        mediaType = filterSnapshot.mediaType,
                     )
                 }
+            val catalogs = catalogsResult.first
+            val statusMessage = catalogsResult.second
+            val selectedKey =
+                priorSelected?.takeIf { key -> catalogs.any { it.key == key } }
+                    ?: catalogs.firstOrNull()?.key
+
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    catalogs = catalogs,
+                    selectedCatalogKey = selectedKey,
+                    statusMessage = statusMessage,
+                )
             }
-    }
-
-    private fun loadFirstPage(clearResults: Boolean, keepRefreshing: Boolean) {
-        resultsJob?.cancel()
-        resultsJob =
-            viewModelScope.launch {
-                val snapshot = uiState.value
-                val catalog = snapshot.selectedCatalog
-                if (catalog == null) {
-                    _uiState.update {
-                        it.copy(
-                            results = emptyList(),
-                            isLoadingResults = false,
-                            isLoadingMore = false,
-                            hasMore = false,
-                            page = 1,
-                            isRefreshing = false,
-                        )
-                    }
-                    return@launch
-                }
-
-                _uiState.update {
-                    it.copy(
-                        isLoadingResults = true,
-                        isLoadingMore = false,
-                        results = if (clearResults) emptyList() else it.results,
-                        page = 1,
-                        hasMore = if (clearResults) false else it.hasMore,
-                        statusMessage = if (clearResults || it.statusMessage.isBlank()) "Loading..." else it.statusMessage,
-                    )
-                }
-
-                val pageSize = PAGE_SIZE
-                val result =
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            recommendationCatalogService.fetchCatalogPage(
-                                section = catalog.section,
-                                page = 1,
-                                pageSize = pageSize,
-                            )
-                        }
-                    }
-                val pageResult = result.getOrNull()
-                val items = dedupItems(pageResult?.items.orEmpty())
-                val hasMore = (pageResult?.items?.size ?: 0) >= pageSize
-
-                _uiState.update {
-                    it.copy(
-                        results = items,
-                        isLoadingResults = false,
-                        isRefreshing = if (keepRefreshing) false else it.isRefreshing,
-                        page = 1,
-                        hasMore = hasMore,
-                        statusMessage = pageResult?.statusMessage ?: (result.exceptionOrNull()?.message ?: "Failed to load"),
-                    )
-                }
-            }
+        }
     }
 
     companion object {
@@ -299,21 +219,6 @@ class DiscoverViewModel(
 
 private const val PAGE_SIZE = 60
 
-private fun dedupItems(items: List<CatalogItem>): List<CatalogItem> {
-    if (items.isEmpty()) {
-        return emptyList()
-    }
-    val seen = HashSet<String>(items.size)
-    val output = ArrayList<CatalogItem>(items.size)
-    items.forEach { item ->
-        val key = "${item.type.lowercase(Locale.US)}:${item.id}"
-        if (seen.add(key)) {
-            output += item
-        }
-    }
-    return output
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverRoute(
@@ -331,6 +236,7 @@ fun DiscoverRoute(
             }
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pagingItems = viewModel.items.collectAsLazyPagingItems()
     val scrollBehavior = appBarScrollBehavior()
 
     Scaffold(
@@ -359,10 +265,13 @@ fun DiscoverRoute(
         ) {
             DiscoverScreen(
                 uiState = uiState,
-                onRefresh = viewModel::refresh,
+                pagingItems = pagingItems,
+                onRefresh = {
+                    viewModel.refresh()
+                    pagingItems.refresh()
+                },
                 onTypeFilterClick = viewModel::setTypeFilter,
                 onCatalogClick = viewModel::selectCatalog,
-                onLoadMore = viewModel::loadMore,
                 onItemClick = onItemClick,
                 scrollToTopRequests = scrollToTopRequests,
                 onScrollToTopConsumed = onScrollToTopConsumed,
@@ -380,10 +289,10 @@ private enum class DiscoverSheet {
 @Composable
 private fun DiscoverScreen(
     uiState: DiscoverUiState,
+    pagingItems: LazyPagingItems<CatalogItem>,
     onRefresh: () -> Unit,
     onTypeFilterClick: (DiscoverTypeFilter) -> Unit,
     onCatalogClick: (DiscoverCatalogRef) -> Unit,
-    onLoadMore: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
@@ -394,6 +303,21 @@ private fun DiscoverScreen(
     val pullToRefreshState = rememberPullToRefreshState()
     val gridState = rememberLazyGridState()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val refreshState = pagingItems.loadState.refresh
+    val appendState = pagingItems.loadState.append
+    val isRefreshing = uiState.isRefreshing || (refreshState is LoadState.Loading && pagingItems.itemCount > 0)
+    val pagingStatusMessage =
+        when {
+            refreshState is LoadState.Error && pagingItems.itemCount > 0 -> {
+                refreshState.error.message ?: "Failed to refresh results."
+            }
+
+            appendState is LoadState.Error -> {
+                appendState.error.message ?: "Failed to load more results."
+            }
+
+            else -> ""
+        }
 
     LaunchedEffect(scrollToTopRequest) {
         if (scrollToTopRequest > 0) {
@@ -403,14 +327,14 @@ private fun DiscoverScreen(
     }
 
     PullToRefreshBox(
-        isRefreshing = uiState.isRefreshing,
+        isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize(),
         state = pullToRefreshState,
         indicator = {
             Indicator(
                 state = pullToRefreshState,
-                isRefreshing = uiState.isRefreshing,
+                isRefreshing = isRefreshing,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         },
@@ -487,51 +411,53 @@ private fun DiscoverScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                        }
-                    }
-                }
 
-                if (uiState.isLoadingResults && uiState.results.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                LoadingIndicator(modifier = Modifier.size(18.dp))
+                            if (pagingStatusMessage.isNotBlank() && pagingStatusMessage != uiState.statusMessage) {
                                 Text(
-                                    text = "Discovering...",
+                                    text = pagingStatusMessage,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
-                } else if (uiState.results.isEmpty()) {
+                }
+
+                if ((uiState.isRefreshing && uiState.catalogs.isEmpty()) || (refreshState is LoadState.Loading && pagingItems.itemCount == 0 && selectedCatalog != null)) {
+                    items(DISCOVER_SKELETON_COUNT, span = { GridItemSpan(1) }, key = { index -> "discover-skeleton-$index" }) {
+                        DiscoverPosterSkeleton(modifier = Modifier.fillMaxWidth())
+                    }
+                } else if (pagingItems.itemCount == 0) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (selectedCatalog == null) "Select a catalog to start discovering" else "No content found",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier.padding(Dimensions.ListItemPadding),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text =
+                                        when {
+                                            selectedCatalog == null -> "Select a catalog to start discovering"
+                                            refreshState is LoadState.Error -> refreshState.error.message ?: "Failed to load results."
+                                            else -> "No content found"
+                                        },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (refreshState is LoadState.Error) {
+                                    FilledTonalButton(onClick = onRefresh) {
+                                        Text("Retry")
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
-                    gridItems(
-                        items = uiState.results,
-                        key = { "${it.type}:${it.id}" }
-                    ) { item ->
+                    items(
+                        count = pagingItems.itemCount,
+                        key = pagingItems.itemKey { "${it.type}:${it.id}" }
+                    ) { index ->
+                        val item = pagingItems[index] ?: return@items
                         PosterCard(
                             title = item.title,
                             posterUrl = item.posterUrl,
@@ -549,7 +475,7 @@ private fun DiscoverScreen(
                     Spacer(Modifier.height(4.dp))
                 }
 
-                if (uiState.isLoadingMore) {
+                if (appendState is LoadState.Loading) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Box(
                             modifier = Modifier
@@ -560,7 +486,7 @@ private fun DiscoverScreen(
                             LoadingIndicator(modifier = Modifier.size(20.dp))
                         }
                     }
-                } else if (uiState.hasMore && uiState.results.isNotEmpty()) {
+                } else if (appendState is LoadState.Error) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Box(
                             modifier = Modifier
@@ -568,8 +494,8 @@ private fun DiscoverScreen(
                                 .padding(vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            FilledTonalButton(onClick = onLoadMore) {
-                                Text("Load more")
+                            FilledTonalButton(onClick = { pagingItems.retry() }) {
+                                Text("Retry")
                             }
                         }
                     }
@@ -695,3 +621,31 @@ private fun DiscoverScreen(
         }
     }
 }
+
+@Composable
+private fun DiscoverPosterSkeleton(modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .skeletonElement(pulse = false),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .width(84.dp)
+                .height(12.dp)
+                .skeletonElement(pulse = false),
+        )
+    }
+}
+
+private const val DISCOVER_SKELETON_COUNT = 9

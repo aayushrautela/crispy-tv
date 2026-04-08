@@ -2,6 +2,7 @@ package com.crispy.tv
 
 import android.content.Context
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.metadata.BackendEpisodeListProvider
 import com.crispy.tv.introskip.IntroSkipService
@@ -65,9 +66,8 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
     )
     return BackendWatchHistoryService(
         context = appContext,
-        supabase = SupabaseServicesProvider.accountClient(appContext),
         backend = BackendServicesProvider.backendClient(appContext),
-        activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+        backendContextResolver = BackendContextResolverProvider.get(appContext),
         episodeListProvider = episodeListProvider,
         config =
             WatchHistoryConfig(

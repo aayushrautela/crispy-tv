@@ -2,6 +2,7 @@ package com.crispy.tv.accounts
 
 import android.content.Context
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
 import com.crispy.tv.home.RecommendationCatalogService
@@ -54,9 +55,8 @@ object SupabaseServicesProvider {
             val appContext = context.applicationContext
             val created =
                 RecommendationCatalogService(
-                    supabaseAccountClient = accountClient(appContext),
-                    activeProfileStore = activeProfileStore(appContext),
                     backendClient = BackendServicesProvider.backendClient(appContext),
+                    backendContextResolver = BackendContextResolverProvider.get(appContext),
                     diskCacheStore = RecommendationCatalogDiskCacheStore(appContext),
                 )
             recommendationCatalogService = created

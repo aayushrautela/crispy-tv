@@ -2,8 +2,8 @@ package com.crispy.tv.home
 
 import android.util.Log
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.backend.BackendContext
+import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.MetadataLabMediaType
 import java.time.DayOfWeek
@@ -80,20 +80,33 @@ data class ThisWeekResult(
 )
 
 class CalendarService internal constructor(
-    private val supabaseAccountClient: SupabaseAccountClient,
-    private val activeProfileStore: ActiveProfileStore,
     private val backendClient: CrispyBackendClient,
+    private val backendContextResolver: BackendContextResolver,
 ) {
+    @Volatile
+    private var cachedCalendarSnapshot: CachedCalendarSnapshot? = null
+
     suspend fun loadCalendar(nowMs: Long): CalendarSnapshot {
+        val backendContext = getBackendContext()
+        val cachedSnapshot =
+            backendContext
+                ?.let { context -> cachedCalendarSnapshot?.takeIf { it.profileId == context.profileId }?.snapshot }
         return try {
-            fetchCalendarSnapshot(nowMs)
+            val freshSnapshot = fetchCalendarSnapshot(nowMs, backendContext)
+            if (!freshSnapshot.isError) {
+                backendContext?.let { context ->
+                    cachedCalendarSnapshot = CachedCalendarSnapshot(profileId = context.profileId, snapshot = freshSnapshot)
+                }
+            }
+            freshSnapshot
         } catch (error: Exception) {
             Log.w(TAG, "Failed to load calendar", error)
-            CalendarSnapshot(
-                sections = emptyList(),
-                statusMessage = "Unable to load your calendar right now.",
-                isError = true,
-            )
+            cachedSnapshot
+                ?: CalendarSnapshot(
+                    sections = emptyList(),
+                    statusMessage = "Unable to load your calendar right now.",
+                    isError = true,
+                )
         }
     }
 
@@ -110,8 +123,11 @@ class CalendarService internal constructor(
         }
     }
 
-    private suspend fun fetchCalendarSnapshot(nowMs: Long): CalendarSnapshot {
-        val backendContext = getBackendContext()
+    private suspend fun fetchCalendarSnapshot(
+        nowMs: Long,
+        backendContext: BackendContext? = null,
+    ): CalendarSnapshot {
+        val resolvedBackendContext = backendContext ?: getBackendContext()
             ?: return CalendarSnapshot(
                 sections = emptyList(),
                 statusMessage = "Sign in and select a profile to load your calendar.",
@@ -119,8 +135,8 @@ class CalendarService internal constructor(
             )
 
         val response = backendClient.getCalendar(
-            accessToken = backendContext.accessToken,
-            profileId = backendContext.profileId,
+            accessToken = resolvedBackendContext.accessToken,
+            profileId = resolvedBackendContext.profileId,
         )
 
         val sections = response.toCalendarSections(nowMs)
@@ -157,23 +173,7 @@ class CalendarService internal constructor(
     }
 
     private suspend fun getBackendContext(): BackendContext? {
-        if (!supabaseAccountClient.isConfigured() || !backendClient.isConfigured()) {
-            return null
-        }
-        val session = supabaseAccountClient.ensureValidSession() ?: return null
-        var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
-        if (profileId.isBlank()) {
-            profileId = runCatching {
-                backendClient.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
-            }.getOrDefault("")
-            if (profileId.isNotBlank()) {
-                activeProfileStore.setActiveProfileId(session.userId, profileId)
-            }
-        }
-        if (profileId.isBlank()) {
-            return null
-        }
-        return BackendContext(accessToken = session.accessToken, profileId = profileId)
+        return backendContextResolver.resolve()
     }
 
     private fun CrispyBackendClient.CalendarResponse.toCalendarSections(nowMs: Long): List<CalendarSection> {
@@ -328,14 +328,14 @@ class CalendarService internal constructor(
             .getOrNull()
     }
 
-    private data class BackendContext(
-        val accessToken: String,
-        val profileId: String,
-    )
-
     companion object {
         private const val TAG = "CalendarService"
         private const val HOME_THIS_WEEK_RAW_LIMIT = 60
         private const val HOME_THIS_WEEK_RENDER_LIMIT = 20
     }
+
+    private data class CachedCalendarSnapshot(
+        val profileId: String,
+        val snapshot: CalendarSnapshot,
+    )
 }

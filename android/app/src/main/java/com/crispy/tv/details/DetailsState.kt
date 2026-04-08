@@ -20,6 +20,7 @@ data class EpisodeWatchState(
 data class DetailsUiState(
     val mediaKey: String,
     val isLoading: Boolean = true,
+    val secondaryContentIsLoading: Boolean = false,
     val details: MediaDetails? = null,
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
     val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse? = null,

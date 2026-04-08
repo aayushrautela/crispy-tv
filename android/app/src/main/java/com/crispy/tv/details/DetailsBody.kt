@@ -225,7 +225,7 @@ internal fun DetailsBody(
             tmdbRating = details.rating,
             content = titleContent,
             titleRatings = titleRatings,
-            isLoading = false,
+            isLoading = uiState.secondaryContentIsLoading,
             horizontalPadding = horizontalPadding,
             contentPadding = contentPadding,
         )
@@ -272,7 +272,7 @@ internal fun DetailsBody(
         }
 
         val reviews = uiState.titleReviews?.reviews.orEmpty()
-        if (reviews.isNotEmpty()) {
+        if (reviews.isNotEmpty() || uiState.secondaryContentIsLoading) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
                 text = "Reviews",
@@ -284,12 +284,18 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(items = reviews, key = { it.id }) { review ->
-                    MetadataReviewCard(
-                        review = review,
-                        modifier = Modifier.width(280.dp),
-                        onClick = { expandedReview = review }
-                    )
+                if (reviews.isNotEmpty()) {
+                    items(items = reviews, key = { it.id }) { review ->
+                        MetadataReviewCard(
+                            review = review,
+                            modifier = Modifier.width(280.dp),
+                            onClick = { expandedReview = review }
+                        )
+                    }
+                } else {
+                    items(2) {
+                        DetailsReviewPlaceholder(modifier = Modifier.width(280.dp))
+                    }
                 }
             }
         }
@@ -430,7 +436,7 @@ internal fun DetailsBody(
             }
 
         val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail, content = titleContent)
-        if (detailRows.isNotEmpty()) {
+        if (detailRows.isNotEmpty() || uiState.secondaryContentIsLoading) {
             Spacer(modifier = Modifier.height(22.dp))
 
             val header = when (details.mediaType) {
@@ -447,31 +453,83 @@ internal fun DetailsBody(
             Spacer(modifier = Modifier.height(12.dp))
 
             Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                detailRows.forEach { (label, value) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.widthIn(min = 100.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = value,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.weight(1f)
-                        )
+                if (detailRows.isNotEmpty()) {
+                    detailRows.forEach { (label, value) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.widthIn(min = 100.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                } else {
+                    repeat(4) {
+                        DetailsRowPlaceholder()
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DetailsReviewPlaceholder(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.55f)
+                .height(18.dp)
+                .skeletonElement(color = DetailsSkeletonColors.Base),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(92.dp)
+                .skeletonElement(color = DetailsSkeletonColors.Base),
+        )
+    }
+}
+
+@Composable
+private fun DetailsRowPlaceholder() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(110.dp)
+                .height(12.dp)
+                .skeletonElement(color = DetailsSkeletonColors.Base),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(12.dp)
+                .skeletonElement(color = DetailsSkeletonColors.Base),
+        )
     }
 }

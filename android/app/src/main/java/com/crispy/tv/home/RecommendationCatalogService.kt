@@ -1,8 +1,8 @@
 package com.crispy.tv.home
 
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.backend.BackendContext
+import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
@@ -105,9 +105,8 @@ data class MediaVideo(
 )
 
 class RecommendationCatalogService internal constructor(
-    private val supabaseAccountClient: SupabaseAccountClient,
-    private val activeProfileStore: ActiveProfileStore,
     private val backendClient: CrispyBackendClient,
+    private val backendContextResolver: BackendContextResolver,
     private val diskCacheStore: RecommendationCatalogDiskCacheStore,
 ) {
     suspend fun loadPrimaryHomeFeed(
@@ -223,23 +222,7 @@ class RecommendationCatalogService internal constructor(
     }
 
     private suspend fun getBackendContext(): BackendContext? {
-        if (!supabaseAccountClient.isConfigured() || !backendClient.isConfigured()) {
-            return null
-        }
-        val session = supabaseAccountClient.ensureValidSession() ?: return null
-        var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
-        if (profileId.isBlank()) {
-            profileId = runCatching {
-                backendClient.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
-            }.getOrDefault("")
-            if (profileId.isNotBlank()) {
-                activeProfileStore.setActiveProfileId(session.userId, profileId)
-            }
-        }
-        if (profileId.isBlank()) {
-            return null
-        }
-        return BackendContext(accessToken = session.accessToken, profileId = profileId)
+        return backendContextResolver.resolve()
     }
 
     private fun writeCachedSnapshot(profileId: String, snapshot: HomeCatalogSnapshot) {
@@ -574,11 +557,6 @@ class RecommendationCatalogService internal constructor(
         }.joinToString("&")
         return if (suffix.isBlank()) base else "$base?$suffix"
     }
-
-    private data class BackendContext(
-        val accessToken: String,
-        val profileId: String,
-    )
 
     private data class RuntimeLookup(
         val provider: String,

@@ -52,6 +52,7 @@ import com.crispy.tv.home.MediaVideo
 import kotlinx.coroutines.delay
 
 private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
+private const val HERO_SEED_GATE_TIMEOUT_MS = 1800L
 
 @Composable
 internal fun DetailsScreen(
@@ -103,11 +104,22 @@ internal fun DetailsScreen(
     }
     var loadedHeroBitmap by remember(imageUrl) { mutableStateOf<Bitmap?>(null) }
     var heroImageLoadFailed by remember(imageUrl) { mutableStateOf(false) }
+    var heroSeedGateTimedOut by remember(imageUrl) { mutableStateOf(false) }
 
-    LaunchedEffect(details, imageUrl, cachedSeed, fallbackSeed, loadedHeroBitmap, heroImageLoadFailed) {
-        seedColor = cachedSeed ?: fallbackSeed
-        isSeedColorResolved = details == null || imageUrl.isNullOrBlank() || cachedSeed != null
+    LaunchedEffect(details, imageUrl, cachedSeed) {
+        heroSeedGateTimedOut = false
         if (details == null || imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
+        delay(HERO_SEED_GATE_TIMEOUT_MS)
+        if (!isSeedColorResolved) {
+            heroSeedGateTimedOut = true
+        }
+    }
+
+    LaunchedEffect(details, imageUrl, cachedSeed, fallbackSeed, loadedHeroBitmap, heroImageLoadFailed, heroSeedGateTimedOut) {
+        seedColor = cachedSeed ?: fallbackSeed
+        isSeedColorResolved = details == null || imageUrl.isNullOrBlank() || cachedSeed != null || heroSeedGateTimedOut
+        if (details == null || imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
+        if (heroSeedGateTimedOut) return@LaunchedEffect
 
         val bitmap = loadedHeroBitmap
         if (bitmap == null && !heroImageLoadFailed) return@LaunchedEffect
@@ -244,13 +256,13 @@ internal fun DetailsScreen(
                         isTrailerPlaying = isTrailerPlaying,
                         isTrailerMuted = userMutedTrailer,
                         onHeroImageLoaded = { bitmap ->
-                            if (cachedSeed == null && loadedHeroBitmap == null) {
+                            if (cachedSeed == null && loadedHeroBitmap == null && !heroSeedGateTimedOut) {
                                 loadedHeroBitmap = bitmap
                                 heroImageLoadFailed = false
                             }
                         },
                         onHeroImageLoadFailed = {
-                            if (cachedSeed == null && loadedHeroBitmap == null) {
+                            if (cachedSeed == null && loadedHeroBitmap == null && !heroSeedGateTimedOut) {
                                 heroImageLoadFailed = true
                             }
                         },
