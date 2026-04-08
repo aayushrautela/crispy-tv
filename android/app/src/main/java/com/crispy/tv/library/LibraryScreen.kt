@@ -316,7 +316,7 @@ class LibraryViewModel internal constructor(
         return LibrarySectionPageUi(
             items = items.map { item ->
                 LibrarySectionItemUi(
-                    id = item.id,
+                    id = item.id ?: item.media.mediaKey,
                     mediaKey = item.media.mediaKey,
                     mediaType = item.media.mediaType,
                     title = item.media.title,
