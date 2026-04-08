@@ -4,9 +4,6 @@ import android.util.Log
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.ProviderExternalIds
-import com.crispy.tv.player.ProviderLibraryFolder
-import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.watchhistory.CONTINUE_WATCHING_COMPLETION_PERCENT
@@ -88,65 +85,6 @@ internal class SimklWatchHistoryProvider(
         }
 
         return results.sortedByDescending { it.lastUpdatedEpochMs }
-    }
-
-    override suspend fun listProviderLibrary(limitPerFolder: Int): Pair<List<ProviderLibraryFolder>, List<ProviderLibraryItem>> {
-        val folderItems = linkedMapOf<String, MutableList<ProviderLibraryItem>>()
-
-        val continueWatching = listContinueWatching(nowMs = System.currentTimeMillis())
-        if (continueWatching.isNotEmpty()) {
-            val items = continueWatching.map { it.toLibraryItem(folderId = FOLDER_CONTINUE_WATCHING) }
-            addFolder(folderItems, FOLDER_CONTINUE_WATCHING, items, limitPerFolder)
-        }
-
-        for (status in STATUSES) {
-            addAllItemsFolderFromEndpoint(
-                folderItems = folderItems,
-                status = status,
-                typeId = "movies",
-                contentType = MetadataLabMediaType.MOVIE,
-                limitPerFolder = limitPerFolder,
-            )
-            addAllItemsFolderFromEndpoint(
-                folderItems = folderItems,
-                status = status,
-                typeId = "shows",
-                contentType = MetadataLabMediaType.SERIES,
-                limitPerFolder = limitPerFolder,
-            )
-            addAllItemsFolderFromEndpoint(
-                folderItems = folderItems,
-                status = status,
-                typeId = "anime",
-                contentType = MetadataLabMediaType.ANIME,
-                limitPerFolder = limitPerFolder,
-            )
-        }
-
-        val ratingsResponse = simklService.getRatingsResponse()
-        if (ratingsResponse is JSONObject) {
-            val ratingItems =
-                buildList {
-                    addAll(parseRatingsArray(ratingsResponse.optJSONArray("movies"), MetadataLabMediaType.MOVIE))
-                    addAll(parseRatingsArray(ratingsResponse.optJSONArray("shows"), MetadataLabMediaType.SERIES))
-                    addAll(parseRatingsArray(ratingsResponse.optJSONArray("anime"), MetadataLabMediaType.ANIME))
-                }
-            addFolder(folderItems, FOLDER_RATINGS, ratingItems, limitPerFolder)
-        }
-
-        val folders =
-            folderItems.mapNotNull { (id, items) ->
-                if (items.isEmpty()) return@mapNotNull null
-                ProviderLibraryFolder(
-                    id = id,
-                    label = folderLabel(id),
-                    provider = source,
-                    itemCount = items.size,
-                )
-            }
-
-        val items = folderItems.values.flatten()
-        return folders to items
     }
 
     private fun normalizeContentRequest(request: WatchHistoryRequest): NormalizedContentRequest {
@@ -310,189 +248,6 @@ internal class SimklWatchHistoryProvider(
         }
     }
 
-    private fun addAllItemsFolder(
-        folderItems: LinkedHashMap<String, MutableList<ProviderLibraryItem>>,
-        status: String,
-        typeId: String,
-        contentType: MetadataLabMediaType,
-        array: JSONArray?,
-        limitPerFolder: Int,
-    ) {
-        if (array == null || array.length() == 0) return
-
-        val folderId = "$status-$typeId"
-        val items = parseAllItemsArray(array = array, folderId = folderId, contentType = contentType)
-        addFolder(folderItems, folderId, items, limitPerFolder)
-    }
-
-    private suspend fun addAllItemsFolderFromEndpoint(
-        folderItems: LinkedHashMap<String, MutableList<ProviderLibraryItem>>,
-        status: String,
-        typeId: String,
-        contentType: MetadataLabMediaType,
-        limitPerFolder: Int,
-    ) {
-        val response = simklService.getAllItemsResponse(type = typeId, status = status)
-        val array =
-            when (response) {
-                is JSONArray -> response
-                is JSONObject -> response.optJSONArray(typeId)
-                else -> null
-            }
-
-        addAllItemsFolder(
-            folderItems = folderItems,
-            status = status,
-            typeId = typeId,
-            contentType = contentType,
-            array = array,
-            limitPerFolder = limitPerFolder,
-        )
-    }
-
-    private fun parseAllItemsArray(array: JSONArray, folderId: String, contentType: MetadataLabMediaType): List<ProviderLibraryItem> {
-        val nowMs = System.currentTimeMillis()
-        val results = ArrayList<ProviderLibraryItem>(array.length())
-
-        for (i in 0 until array.length()) {
-            val wrapper = array.optJSONObject(i) ?: continue
-
-            val content =
-                wrapper.optJSONObject("movie")
-                    ?: wrapper.optJSONObject("show")
-                    ?: wrapper.optJSONObject("anime")
-                    ?: wrapper
-
-            val ids = content.optJSONObject("ids") ?: wrapper.optJSONObject("ids")
-            val contentId = contentIdFromIds(ids)
-            if (contentId.isEmpty()) continue
-
-            val title = content.optString("title").trim().ifBlank { contentId }
-            val posterUrl = content.optString("poster").trim().ifBlank { null }
-            val backdropUrl = content.optString("fanart").trim().ifBlank { null }
-
-            val addedAtEpochMs =
-                parseIsoToEpochMs(wrapper.optString("last_watched_at"))
-                    ?: parseIsoToEpochMs(wrapper.optString("added_to_watchlist_at"))
-                    ?: nowMs
-
-            results +=
-                ProviderLibraryItem(
-                    provider = source,
-                    folderId = folderId,
-                    contentId = contentId,
-                    mediaKey = contentId,
-                    contentType = contentType,
-                    title = title,
-                    posterUrl = posterUrl,
-                    backdropUrl = backdropUrl,
-                    externalIds = providerExternalIds(ids),
-                    addedAtEpochMs = addedAtEpochMs,
-                )
-        }
-
-        return results
-    }
-
-    private fun parseRatingsArray(array: JSONArray?, contentType: MetadataLabMediaType): List<ProviderLibraryItem> {
-        if (array == null || array.length() == 0) return emptyList()
-
-        val nowMs = System.currentTimeMillis()
-        val results = ArrayList<ProviderLibraryItem>(array.length())
-
-        for (i in 0 until array.length()) {
-            val wrapper = array.optJSONObject(i) ?: continue
-
-            val content =
-                wrapper.optJSONObject("movie")
-                    ?: wrapper.optJSONObject("show")
-                    ?: wrapper.optJSONObject("anime")
-                    ?: wrapper
-
-            val ids = content.optJSONObject("ids") ?: wrapper.optJSONObject("ids")
-            val contentId = contentIdFromIds(ids)
-            if (contentId.isEmpty()) continue
-
-            val title = content.optString("title").trim().ifBlank { contentId }
-            val posterUrl = content.optString("poster").trim().ifBlank { null }
-            val backdropUrl = content.optString("fanart").trim().ifBlank { null }
-
-            val addedAtEpochMs = parseIsoToEpochMs(wrapper.optString("rated_at")) ?: nowMs
-
-            results +=
-                ProviderLibraryItem(
-                    provider = source,
-                    folderId = FOLDER_RATINGS,
-                    contentId = contentId,
-                    mediaKey = contentId,
-                    contentType = contentType,
-                    title = title,
-                    posterUrl = posterUrl,
-                    backdropUrl = backdropUrl,
-                    externalIds = providerExternalIds(ids),
-                    addedAtEpochMs = addedAtEpochMs,
-                )
-        }
-
-        return results
-    }
-
-    private fun addFolder(
-        folderItems: LinkedHashMap<String, MutableList<ProviderLibraryItem>>,
-        folderId: String,
-        items: List<ProviderLibraryItem>,
-        limitPerFolder: Int,
-    ) {
-        if (items.isEmpty()) return
-        val limit = limitPerFolder.coerceAtLeast(1)
-        val bucket = folderItems.getOrPut(folderId) { mutableListOf() }
-        bucket.addAll(items.take(limit))
-    }
-
-    private fun ContinueWatchingEntry.toLibraryItem(folderId: String): ProviderLibraryItem {
-        return ProviderLibraryItem(
-            provider = source,
-            folderId = folderId,
-            contentId = providerId,
-            mediaKey = mediaKey,
-            contentType = when (mediaType.lowercase(Locale.US)) {
-                "anime" -> MetadataLabMediaType.ANIME
-                "series" -> MetadataLabMediaType.SERIES
-                else -> MetadataLabMediaType.MOVIE
-            },
-            title = title,
-            externalIds = null,
-            season = season,
-            episode = episode,
-            addedAtEpochMs = lastUpdatedEpochMs,
-        )
-    }
-
-    private fun providerExternalIds(ids: JSONObject?): ProviderExternalIds? {
-        if (ids == null) return null
-        val tmdb =
-            when (val raw = ids.opt("tmdb")) {
-                is Number -> raw.toInt().takeIf { it > 0 }
-                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
-                else -> null
-            }
-        val imdb = normalizedImdbIdOrNull(ids.optString("imdb"))
-        val tvdb =
-            when (val raw = ids.opt("tvdb")) {
-                is Number -> raw.toInt().takeIf { it > 0 }
-                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
-                else -> null
-            }
-        val kitsu =
-            when (val raw = ids.opt("kitsu")) {
-                is Number -> raw.toInt().takeIf { it > 0 }
-                is String -> raw.trim().toIntOrNull()?.takeIf { it > 0 }
-                else -> null
-            }
-        if (tmdb == null && imdb == null && tvdb == null && kitsu == null) return null
-        return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb, kitsu = kitsu)
-    }
-
     private fun contentIdFromIds(ids: JSONObject?): String {
         if (ids == null) return ""
 
@@ -548,19 +303,7 @@ internal class SimklWatchHistoryProvider(
         }
     }
 
-    private fun folderLabel(id: String): String {
-        return id.replace('-', ' ')
-            .replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase(Locale.US) else c.toString() }
-    }
-
     private companion object {
         private const val TAG = "SimklWatchHistoryProvider"
-
-        private const val FOLDER_CONTINUE_WATCHING = "continue-watching"
-        private const val FOLDER_RATINGS = "ratings"
-
-        private const val STATUS_PLAN_TO_WATCH = "plantowatch"
-
-        private val STATUSES = listOf("watching", "plantowatch", "completed", "hold", "dropped")
     }
 }

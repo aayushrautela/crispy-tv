@@ -18,6 +18,7 @@ import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 data class TrailerPlaybackSource(
     val videoUrl: String,
@@ -27,22 +28,29 @@ data class TrailerPlaybackSource(
 object YouTubeTrailerExtractor {
     private val cache = ConcurrentHashMap<String, TrailerPlaybackSource>()
     private val initLock = Any()
+    private const val VIEWPORT_WIDTH_BUCKET_PX = 160
+    private const val VIEWPORT_HEIGHT_BUCKET_PX = 90
 
     @Volatile
     private var initialized = false
 
-    fun resolve(videoId: String): TrailerPlaybackSource? {
+    fun resolve(
+        videoId: String,
+        viewportWidthPx: Int,
+        viewportHeightPx: Int,
+    ): TrailerPlaybackSource? {
         val key = videoId.trim()
         if (key.isBlank()) return null
-        cache[key]?.let { return it }
+        val cacheKey = buildCacheKey(key, viewportWidthPx, viewportHeightPx)
+        cache[cacheKey]?.let { return it }
 
         ensureInitialized()
 
         val url = "https://www.youtube.com/watch?v=$key"
         return runCatching {
             val info = StreamInfo.getInfo(url)
-            pickBestSource(info)
-        }.getOrNull()?.also { cache[key] = it }
+            pickBestSource(info, viewportWidthPx)
+        }.getOrNull()?.also { cache[cacheKey] = it }
     }
 
     private fun ensureInitialized() {
@@ -54,8 +62,14 @@ object YouTubeTrailerExtractor {
         }
     }
 
-    private fun pickBestSource(info: StreamInfo): TrailerPlaybackSource? {
-        val adaptiveVideo = pickBestVideoOnly(info.videoOnlyStreams)
+    private fun pickBestSource(info: StreamInfo, viewportWidthPx: Int): TrailerPlaybackSource? {
+        val targetWidthPx = viewportWidthPx.coerceAtLeast(1)
+        val muxed = pickBestMuxed(info.videoStreams, targetWidthPx)
+        if (muxed != null && videoMatchesViewport(muxed, targetWidthPx)) {
+            return TrailerPlaybackSource(videoUrl = muxed.content)
+        }
+
+        val adaptiveVideo = pickBestVideoOnly(info.videoOnlyStreams, targetWidthPx)
         val adaptiveAudio = pickBestAudio(info.audioStreams)
         if (adaptiveVideo != null && adaptiveAudio != null) {
             return TrailerPlaybackSource(
@@ -64,8 +78,8 @@ object YouTubeTrailerExtractor {
             )
         }
 
-        pickBestMuxed(info.videoStreams)?.let { muxed ->
-            return TrailerPlaybackSource(videoUrl = muxed.content)
+        muxed?.let {
+            return TrailerPlaybackSource(videoUrl = it.content)
         }
 
         return adaptiveVideo?.let { video ->
@@ -73,13 +87,14 @@ object YouTubeTrailerExtractor {
         }
     }
 
-    private fun pickBestMuxed(streams: List<VideoStream>): VideoStream? {
+    private fun pickBestMuxed(streams: List<VideoStream>, targetWidthPx: Int): VideoStream? {
         return streams
             .asSequence()
             .filter { it.isUrl }
             .filterNot { it.isVideoOnly() }
             .sortedWith(
-                compareByDescending<VideoStream> { videoHeight(it) }
+                compareBy<VideoStream> { videoViewportPenalty(it, targetWidthPx) }
+                    .thenByDescending { videoWidth(it) }
                     .thenByDescending { it.fps }
                     .thenByDescending { it.bitrate }
                     .thenBy { videoFormatRank(it.format) }
@@ -87,13 +102,14 @@ object YouTubeTrailerExtractor {
             .firstOrNull()
     }
 
-    private fun pickBestVideoOnly(streams: List<VideoStream>): VideoStream? {
+    private fun pickBestVideoOnly(streams: List<VideoStream>, targetWidthPx: Int): VideoStream? {
         return streams
             .asSequence()
             .filter { it.isUrl }
             .filter { it.isVideoOnly() }
             .sortedWith(
-                compareByDescending<VideoStream> { videoHeight(it) }
+                compareBy<VideoStream> { videoViewportPenalty(it, targetWidthPx) }
+                    .thenByDescending { videoWidth(it) }
                     .thenByDescending { it.fps }
                     .thenByDescending { it.bitrate }
                     .thenBy { videoFormatRank(it.format) }
@@ -118,10 +134,53 @@ object YouTubeTrailerExtractor {
         return parseHeightFromResolution(stream.getResolution())
     }
 
+    private fun videoWidth(stream: VideoStream): Int {
+        val match = DIMENSION_REGEX.find(stream.getResolution().orEmpty())
+        val parsedWidth = match?.groupValues?.getOrNull(1)?.toIntOrNull()
+        if (parsedWidth != null && parsedWidth > 0) return parsedWidth
+
+        val height = videoHeight(stream)
+        return if (height > 0) {
+            (height * (16f / 9f)).roundToInt()
+        } else {
+            0
+        }
+    }
+
+    private fun videoViewportPenalty(stream: VideoStream, targetWidthPx: Int): Int {
+        val width = videoWidth(stream)
+        if (width <= 0) return Int.MAX_VALUE / 4
+
+        val preferredUpperBound = (targetWidthPx * 1.18f).roundToInt().coerceAtLeast(targetWidthPx)
+        return when {
+            width in targetWidthPx..preferredUpperBound -> width - targetWidthPx
+            width < targetWidthPx -> 5_000 + (targetWidthPx - width)
+            else -> 10_000 + (width - preferredUpperBound)
+        }
+    }
+
+    private fun videoMatchesViewport(stream: VideoStream, targetWidthPx: Int): Boolean {
+        val width = videoWidth(stream)
+        if (width <= 0) return false
+        val preferredUpperBound = (targetWidthPx * 1.18f).roundToInt().coerceAtLeast(targetWidthPx)
+        return width in targetWidthPx..preferredUpperBound
+    }
+
     private fun parseHeightFromResolution(resolution: String?): Int {
         if (resolution.isNullOrBlank()) return 0
         val match = HEIGHT_REGEX.find(resolution) ?: return 0
         return match.groupValues.getOrNull(1)?.toIntOrNull() ?: 0
+    }
+
+    private fun buildCacheKey(videoId: String, viewportWidthPx: Int, viewportHeightPx: Int): String {
+        val widthBucket = bucketViewportDimension(viewportWidthPx, VIEWPORT_WIDTH_BUCKET_PX)
+        val heightBucket = bucketViewportDimension(viewportHeightPx, VIEWPORT_HEIGHT_BUCKET_PX)
+        return "$videoId:${widthBucket}x$heightBucket"
+    }
+
+    private fun bucketViewportDimension(value: Int, step: Int): Int {
+        val clampedValue = value.coerceAtLeast(1)
+        return ((clampedValue + step - 1) / step) * step
     }
 
     private fun videoFormatRank(format: MediaFormat?): Int {
@@ -151,6 +210,7 @@ object YouTubeTrailerExtractor {
     }
 
     private val HEIGHT_REGEX = Regex("(\\d{2,4})p")
+    private val DIMENSION_REGEX = Regex("(\\d{2,4})x(\\d{2,4})")
 
     private object OkHttpNewPipeDownloader : Downloader() {
         private val client =

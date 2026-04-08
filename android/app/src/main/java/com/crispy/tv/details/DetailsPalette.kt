@@ -1,18 +1,12 @@
 package com.crispy.tv.details
 
+import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.graphics.drawable.toBitmap
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -22,8 +16,10 @@ import com.materialkolor.ktx.themeColor
 import com.materialkolor.rememberDynamicColorScheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val SEED_COLOR_CACHE_MAX_ENTRIES = 96
+private const val SEED_COLOR_EXTRACTION_TIMEOUT_MS = 150L
 
 private object DetailsSeedColorCache {
     private val cache =
@@ -56,12 +52,6 @@ internal data class DetailsPaletteColors(
 )
 
 @Stable
-internal data class DetailsTheming(
-    val colorScheme: ColorScheme,
-    val seedColor: Color,
-    val isSeedColorResolved: Boolean,
-)
-
 internal fun detailsPaletteFromScheme(scheme: ColorScheme): DetailsPaletteColors {
     return DetailsPaletteColors(
         pageBackground = scheme.background,
@@ -73,74 +63,66 @@ internal fun detailsPaletteFromScheme(scheme: ColorScheme): DetailsPaletteColors
     )
 }
 
-@Composable
-internal fun rememberDetailsTheming(imageUrl: String?): DetailsTheming {
-    val baseScheme = MaterialTheme.colorScheme
-    val fallbackSeed = baseScheme.primary
+internal fun cachedDetailsSeedColor(imageUrl: String?): Color? {
+    if (imageUrl.isNullOrBlank()) return null
+    return DetailsSeedColorCache.get(imageUrl)
+}
 
-    val cachedSeed =
-        remember(imageUrl) {
-            if (imageUrl.isNullOrBlank()) {
-                null
-            } else {
-                DetailsSeedColorCache.get(imageUrl)
+internal fun cacheDetailsSeedColor(imageUrl: String, seedColor: Color) {
+    DetailsSeedColorCache.put(imageUrl, seedColor)
+}
+
+internal suspend fun computeDetailsSeedColor(
+    bitmap: Bitmap,
+    fallbackSeed: Color,
+): Color? {
+    return runCatching {
+        withTimeoutOrNull(SEED_COLOR_EXTRACTION_TIMEOUT_MS) {
+            withContext(Dispatchers.Default) {
+                bitmap
+                    .asImageBitmap()
+                    .themeColor(fallback = fallbackSeed, filter = true, maxColors = 128)
             }
         }
+    }.getOrNull()
+}
 
-    var seedColor by remember(imageUrl, fallbackSeed) { mutableStateOf(cachedSeed ?: fallbackSeed) }
-    var isSeedColorResolved by
-        remember(imageUrl, fallbackSeed) {
-            mutableStateOf(imageUrl.isNullOrBlank() || cachedSeed != null)
-        }
-
-    val context = LocalContext.current
+internal suspend fun loadDetailsSeedColor(
+    context: Context,
+    imageUrl: String,
+    fallbackSeed: Color,
+): Color? {
     val imageLoader = context.imageLoader
+    val computedSeed =
+        runCatching {
+            val request =
+                ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    // Keep this small: quantization + scoring is proportional to pixel count.
+                    .size(128)
+                    .allowHardware(false)
+                    .build()
 
-    LaunchedEffect(imageUrl, fallbackSeed) {
-        seedColor = cachedSeed ?: fallbackSeed
-        isSeedColorResolved = imageUrl.isNullOrBlank() || cachedSeed != null
-        if (imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
+            val result = imageLoader.execute(request)
+            val drawable = (result as? SuccessResult)?.drawable ?: return@runCatching null
+            computeDetailsSeedColor(
+                bitmap = androidx.core.graphics.drawable.toBitmap(drawable),
+                fallbackSeed = fallbackSeed,
+            )
+        }.getOrNull()
 
-        val computedSeed =
-            runCatching {
-                val request =
-                    ImageRequest.Builder(context)
-                        .data(imageUrl)
-                        // Keep this small: quantization + scoring is proportional to pixel count.
-                        .size(128)
-                        .allowHardware(false)
-                        .build()
-
-                val result = imageLoader.execute(request)
-                val drawable = (result as? SuccessResult)?.drawable ?: return@runCatching null
-                val bitmap = drawable.toBitmap()
-
-                withContext(Dispatchers.Default) {
-                    bitmap
-                        .asImageBitmap()
-                        .themeColor(fallback = fallbackSeed, filter = true, maxColors = 128)
-                }
-            }.getOrNull()
-
-        seedColor = computedSeed ?: fallbackSeed
-        if (computedSeed != null) {
-            DetailsSeedColorCache.put(imageUrl, computedSeed)
-        }
-
-        isSeedColorResolved = true
+    if (computedSeed != null) {
+        cacheDetailsSeedColor(imageUrl, computedSeed)
     }
+    return computedSeed
+}
 
-    val detailsScheme =
-        rememberDynamicColorScheme(
-            seedColor = seedColor,
-            isDark = true,
-            specVersion = ColorSpec.SpecVersion.SPEC_2025,
-            style = PaletteStyle.TonalSpot,
-        )
-
-    return DetailsTheming(
-        colorScheme = detailsScheme,
+@Composable
+internal fun rememberDetailsColorScheme(seedColor: Color): ColorScheme {
+    return rememberDynamicColorScheme(
         seedColor = seedColor,
-        isSeedColorResolved = isSeedColorResolved,
+        isDark = true,
+        specVersion = ColorSpec.SpecVersion.SPEC_2025,
+        style = PaletteStyle.TonalSpot,
     )
 }

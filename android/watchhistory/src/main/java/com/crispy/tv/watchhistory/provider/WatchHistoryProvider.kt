@@ -4,8 +4,6 @@ import com.crispy.tv.player.ContinueWatchingEntry
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.ProviderCommentQuery
 import com.crispy.tv.player.ProviderCommentResult
-import com.crispy.tv.player.ProviderLibraryFolder
-import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.watchhistory.local.NormalizedWatchRequest
@@ -28,8 +26,6 @@ internal interface WatchHistoryProvider {
     suspend fun removeFromPlayback(playbackId: String): Boolean
 
     suspend fun listContinueWatching(nowMs: Long): List<ContinueWatchingEntry>
-
-    suspend fun listProviderLibrary(limitPerFolder: Int): Pair<List<ProviderLibraryFolder>, List<ProviderLibraryItem>>
 
     suspend fun fetchComments(query: ProviderCommentQuery): ProviderCommentResult {
         return ProviderCommentResult(statusMessage = "Comments unavailable.")

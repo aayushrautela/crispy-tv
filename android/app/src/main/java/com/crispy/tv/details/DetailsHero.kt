@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.media3.common.C
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,7 +58,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.drawable.toBitmap
+import coil.compose.AsyncImagePainter
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
@@ -67,33 +72,42 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+internal fun detailsHeroBackdropSize(screenWidthPx: Float): String {
+    return if (screenWidthPx > 1280f) "original" else "w1280"
+}
+
+internal fun detailsHeroImageUrl(details: MediaDetails?, backdropSize: String): String? {
+    return details?.backdropUrl?.let { TmdbApi.resizedImageUrl(it, size = backdropSize) }
+        ?: details?.posterUrl
+}
+
 @Composable
 internal fun HeroSection(
     details: MediaDetails?,
+    imageUrl: String?,
     palette: DetailsPaletteColors,
     trailerKey: String?,
     showTrailer: Boolean,
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
+    onHeroImageLoaded: (Bitmap) -> Unit,
+    onHeroImageLoadFailed: () -> Unit,
     onToggleTrailer: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
     val heroHeight = (configuration.screenHeightDp.dp * 0.43f).coerceIn(300.dp, 440.dp)
-    val screenWidthPx = remember(configuration.screenWidthDp, density) {
-        with(density) { configuration.screenWidthDp.dp.toPx() }
-    }
-    val backdropSize = if (screenWidthPx > 1280f) "original" else "w1280"
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(heroHeight)
     ) {
+        val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
 
-        if (details == null) {
+        if (details == null && imageUrl.isNullOrBlank()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -139,14 +153,20 @@ internal fun HeroSection(
             return@BoxWithConstraints
         }
 
-        val imageUrl = remember(details.backdropUrl, details.posterUrl, backdropSize) {
-            details.backdropUrl?.let { TmdbApi.resizedImageUrl(it, size = backdropSize) }
-                ?: details.posterUrl
+        val imagePainter = rememberAsyncImagePainter(model = imageUrl)
+        LaunchedEffect(imageUrl, imagePainter.state) {
+            when (val state = imagePainter.state) {
+                is AsyncImagePainter.State.Success -> {
+                    onHeroImageLoaded(state.result.drawable.toBitmap(width = 128, height = 128))
+                }
+                is AsyncImagePainter.State.Error -> onHeroImageLoadFailed()
+                else -> Unit
+            }
         }
         if (!imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = details.title,
+            Image(
+                painter = imagePainter,
+                contentDescription = details?.title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
@@ -157,22 +177,30 @@ internal fun HeroSection(
             ) {}
         }
 
+        if (details == null) {
+            return@BoxWithConstraints
+        }
+
         val hasTrailer = !trailerKey.isNullOrBlank()
         var trailerIsPlaying by remember(trailerKey) { mutableStateOf(false) }
+        var trailerHasRenderedFirstFrame by remember(trailerKey) { mutableStateOf(false) }
         val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying
 
         if (showTrailer && hasTrailer) {
             HeroYouTubeTrailerLayer(
                 modifier = Modifier.fillMaxSize(),
                 trailerKey = trailerKey,
+                viewportWidthPx = widthPx,
+                viewportHeightPx = heightPx.toInt(),
                 shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
-                onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 },
+                onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
+                onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
             )
         }
 
         val coverAlpha by animateFloatAsState(
-            targetValue = if (shouldAttemptPlayback && trailerIsPlaying) 0f else 1f,
+            targetValue = if (showTrailer && hasTrailer && trailerHasRenderedFirstFrame) 0f else 1f,
             animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
             label = "hero_trailer_cover_alpha",
         )
@@ -292,12 +320,16 @@ internal fun HeroSection(
 private fun HeroYouTubeTrailerLayer(
     modifier: Modifier,
     trailerKey: String,
+    viewportWidthPx: Int,
+    viewportHeightPx: Int,
     shouldPlay: Boolean,
     isMuted: Boolean,
+    onFirstFrameRendered: () -> Unit,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
 ) {
     val context = LocalContext.current
 
+    val latestOnFirstFrameRendered = rememberUpdatedState(onFirstFrameRendered)
     val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
     val latestShouldPlay = rememberUpdatedState(shouldPlay)
 
@@ -311,7 +343,11 @@ private fun HeroYouTubeTrailerLayer(
         if (!shouldPlay) return@LaunchedEffect
         if (source != null) return@LaunchedEffect
         source = withContext(Dispatchers.IO) {
-            YouTubeTrailerExtractor.resolve(trailerKey)
+            YouTubeTrailerExtractor.resolve(
+                videoId = trailerKey,
+                viewportWidthPx = viewportWidthPx,
+                viewportHeightPx = viewportHeightPx,
+            )
         }
     }
 
@@ -348,6 +384,7 @@ private fun HeroYouTubeTrailerLayer(
             object : Player.Listener {
                 override fun onRenderedFirstFrame() {
                     hasRenderedFirstFrame = true
+                    latestOnFirstFrameRendered.value()
                     if (latestShouldPlay.value) {
                         sendState(1)
                     }

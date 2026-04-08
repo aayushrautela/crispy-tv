@@ -19,14 +19,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.crispy.tv.details.cachedDetailsSeedColor
 import com.crispy.tv.details.detailsPaletteFromScheme
-import com.crispy.tv.details.rememberDetailsTheming
+import com.crispy.tv.details.rememberDetailsColorScheme
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import kotlin.math.roundToInt
@@ -39,9 +41,24 @@ fun PlayerRoute(
     onBack: () -> Unit,
 ) {
     val uiState by session.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val imageUrl = uiState.backdropUrl ?: uiState.artworkUrl
-    val theming = rememberDetailsTheming(imageUrl = imageUrl)
-    val colorScheme = if (theming.isSeedColorResolved || !imageUrl.isNullOrBlank()) theming.colorScheme else MaterialTheme.colorScheme
+    val baseScheme = MaterialTheme.colorScheme
+    val fallbackSeed = baseScheme.primary
+    val cachedSeed = remember(imageUrl) { cachedDetailsSeedColor(imageUrl) }
+    var seedColor by remember(imageUrl, fallbackSeed) { mutableStateOf(cachedSeed ?: fallbackSeed) }
+
+    LaunchedEffect(imageUrl, cachedSeed, fallbackSeed) {
+        seedColor = cachedSeed ?: fallbackSeed
+        if (imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
+        seedColor = com.crispy.tv.details.loadDetailsSeedColor(
+            context = context,
+            imageUrl = imageUrl,
+            fallbackSeed = fallbackSeed,
+        ) ?: fallbackSeed
+    }
+
+    val colorScheme = rememberDetailsColorScheme(seedColor = seedColor)
     val palette = remember(colorScheme) { detailsPaletteFromScheme(colorScheme) }
     var videoBounds by remember { mutableStateOf<Rect?>(null) }
     val updateVideoBounds: (Rect) -> Unit = { bounds ->

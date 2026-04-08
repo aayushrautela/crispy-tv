@@ -532,14 +532,6 @@ class CrispyBackendClient(
         val knownFor: List<MetadataPersonKnownForItem>,
     )
 
-    data class ProviderAuthState(
-        val provider: String,
-        val connected: Boolean,
-        val status: String,
-        val externalUsername: String?,
-        val statusMessage: String?,
-    )
-
     data class WatchProgressView(
         val positionSeconds: Double?,
         val durationSeconds: Double?,
@@ -622,37 +614,6 @@ class CrispyBackendClient(
     data class PageInfo(
         val nextCursor: String?,
         val hasMore: Boolean,
-    )
-
-    data class LibrarySection(
-        val id: String,
-        val label: String,
-        val order: Int,
-        val itemCount: Int,
-    )
-
-    data class LibraryItemState(
-        val addedAt: String?,
-        val watchedAt: String?,
-        val ratedAt: String?,
-        val rating: Int?,
-        val lastActivityAt: String?,
-    )
-
-    data class LibrarySectionItem(
-        val id: String,
-        val media: RuntimeMediaCard,
-        val state: LibraryItemState,
-        val origins: List<String>,
-    )
-
-    data class ProfileLibrarySectionPageResponse(
-        val profileId: String,
-        val source: String,
-        val generatedAt: String?,
-        val section: LibrarySection,
-        val items: List<LibrarySectionItem>,
-        val pageInfo: PageInfo,
     )
 
     data class CanonicalWatchCollectionResponse<T>(
@@ -759,48 +720,6 @@ class CrispyBackendClient(
         val expiresAt: String?,
         val updatedAt: String?,
         val sections: List<RecommendationSection>,
-    )
-
-    data class ProviderLibraryFolder(
-        val id: String,
-        val label: String,
-        val provider: String,
-        val itemCount: Int,
-    )
-
-    data class ProviderLibraryItem(
-        val provider: String,
-        val folderId: String,
-        val contentId: String,
-        val contentType: String,
-        val title: String,
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val externalIds: MetadataExternalIds?,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val addedAt: String?,
-        val media: MetadataView?,
-    )
-
-    data class ProviderLibrarySnapshot(
-        val provider: String,
-        val status: String,
-        val statusMessage: String,
-        val folders: List<ProviderLibraryFolder>,
-        val items: List<ProviderLibraryItem>,
-    )
-
-    data class LibraryAuth(
-        val providers: List<ProviderAuthState>,
-    )
-
-    data class ProfileLibraryResponse(
-        val profileId: String,
-        val source: String,
-        val generatedAt: String?,
-        val auth: LibraryAuth,
-        val sections: List<LibrarySection> = emptyList(),
     )
 
     data class WatchActionResponse(
@@ -996,36 +915,6 @@ class CrispyBackendClient(
         return getCalendarThisWeekApi(accessToken, profileId)
     }
 
-    suspend fun getProviderAuthState(accessToken: String, profileId: String): List<ProviderAuthState> {
-        return getProviderAuthStateApi(accessToken, profileId)
-    }
-
-    suspend fun getProfileLibrary(
-        accessToken: String,
-        profileId: String,
-    ): ProfileLibraryResponse {
-        return getProfileLibraryApi(
-            accessToken = accessToken,
-            profileId = profileId,
-        )
-    }
-
-    suspend fun getProfileLibrarySectionPage(
-        accessToken: String,
-        profileId: String,
-        sectionId: String,
-        limit: Int,
-        cursor: String? = null,
-    ): ProfileLibrarySectionPageResponse {
-        return getProfileLibrarySectionPageApi(
-            accessToken = accessToken,
-            profileId = profileId,
-            sectionId = sectionId,
-            limit = limit,
-            cursor = cursor,
-        )
-    }
-
     suspend fun sendWatchEvent(accessToken: String, profileId: String, input: PlaybackEventInput): WatchActionResponse {
         return sendWatchEventApi(accessToken, profileId, input)
     }
@@ -1034,8 +923,9 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 20,
+        cursor: String? = null,
     ): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
-        return listContinueWatchingApi(accessToken, profileId, limit)
+        return listContinueWatchingApi(accessToken, profileId, limit, cursor)
     }
 
     suspend fun dismissContinueWatching(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
@@ -1046,24 +936,27 @@ class CrispyBackendClient(
         accessToken: String,
         profileId: String,
         limit: Int = 50,
+        cursor: String? = null,
     ): CanonicalWatchCollectionResponse<WatchedItem> {
-        return listWatchHistoryApi(accessToken, profileId, limit)
+        return listWatchHistoryApi(accessToken, profileId, limit, cursor)
     }
 
     suspend fun listWatchlist(
         accessToken: String,
         profileId: String,
         limit: Int = 50,
+        cursor: String? = null,
     ): CanonicalWatchCollectionResponse<WatchlistItem> {
-        return listWatchlistApi(accessToken, profileId, limit)
+        return listWatchlistApi(accessToken, profileId, limit, cursor)
     }
 
     suspend fun listRatings(
         accessToken: String,
         profileId: String,
         limit: Int = 50,
+        cursor: String? = null,
     ): CanonicalWatchCollectionResponse<RatingItem> {
-        return listRatingsApi(accessToken, profileId, limit)
+        return listRatingsApi(accessToken, profileId, limit, cursor)
     }
 
     suspend fun getWatchState(accessToken: String, profileId: String, mediaKey: String): WatchStateEnvelope {

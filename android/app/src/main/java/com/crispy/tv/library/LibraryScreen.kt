@@ -41,6 +41,7 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -77,7 +78,6 @@ data class LibrarySectionItemUi(
 data class LibrarySectionUi(
     val id: String,
     val label: String,
-    val itemCount: Int,
 )
 
 @Immutable
@@ -106,6 +106,12 @@ class LibraryViewModel internal constructor(
     private var sectionJob: Job? = null
     private var loadMoreJob: Job? = null
 
+    private val sections = listOf(
+        LibrarySectionUi(id = SECTION_HISTORY, label = "History"),
+        LibrarySectionUi(id = SECTION_WATCHLIST, label = "Watchlist"),
+        LibrarySectionUi(id = SECTION_RATINGS, label = "Ratings"),
+    )
+
     init {
         refresh()
     }
@@ -117,31 +123,19 @@ class LibraryViewModel internal constructor(
                 _uiState.update {
                     it.copy(
                         isRefreshing = true,
-                        statusMessage = if (it.sections.isEmpty()) "" else it.statusMessage,
+                        statusMessage = "",
                     )
                 }
 
-                val result = withContext(Dispatchers.IO) { runCatching { loadLibraryDiscovery() } }
-                val discovery = result.getOrNull()
-                if (discovery == null) {
-                    _uiState.update {
-                        it.copy(
-                            isRefreshing = false,
-                            statusMessage = "Library temporarily unavailable.",
-                        )
-                    }
-                    return@launch
-                }
-
                 val previousSelection = _uiState.value.selectedSectionId
-                val selectedSectionId = previousSelection?.takeIf { id -> discovery.any { it.id == id } }
-                    ?: discovery.firstOrNull()?.id
+                val selectedSectionId = previousSelection?.takeIf { id -> sections.any { it.id == id } }
+                    ?: sections.firstOrNull()?.id
 
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
-                        statusMessage = if (discovery.isEmpty()) "No library sections available." else "",
-                        sections = discovery,
+                        statusMessage = if (sections.isEmpty()) "No library sections available." else "",
+                        sections = sections,
                         selectedSectionId = selectedSectionId,
                         sectionItems = if (selectedSectionId == it.selectedSectionId) it.sectionItems else emptyList(),
                         sectionStatusMessage = if (selectedSectionId == it.selectedSectionId) it.sectionStatusMessage else "",
@@ -151,7 +145,7 @@ class LibraryViewModel internal constructor(
                     )
                 }
 
-                if (selectedSectionId == null) {
+                if (selectedSectionId == null || sections.isEmpty()) {
                     _uiState.update {
                         it.copy(
                             sectionItems = emptyList(),
@@ -285,38 +279,42 @@ class LibraryViewModel internal constructor(
         }
     }
 
-    private suspend fun loadLibraryDiscovery(): List<LibrarySectionUi> {
-        val backendContext = getBackendContext() ?: return emptyList()
-        val response = backend.getProfileLibrary(
-            accessToken = backendContext.accessToken,
-            profileId = backendContext.profileId,
-        )
-        return response.sections
-            .sortedBy { it.order }
-            .map { section ->
-                LibrarySectionUi(
-                    id = section.id,
-                    label = section.label,
-                    itemCount = section.itemCount,
-                )
-            }
-    }
-
     private suspend fun loadLibrarySectionPage(
         sectionId: String,
         limit: Int,
         cursor: String?,
     ): LibrarySectionPageUi {
         val backendContext = getBackendContext() ?: return LibrarySectionPageUi()
-        val response = backend.getProfileLibrarySectionPage(
-            accessToken = backendContext.accessToken,
-            profileId = backendContext.profileId,
-            sectionId = sectionId,
-            limit = limit,
-            cursor = cursor,
-        )
+        val response = when (sectionId) {
+            SECTION_HISTORY -> backend.listWatchHistory(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                limit = limit,
+                cursor = cursor,
+            ).toLibrarySectionPageUi()
+
+            SECTION_WATCHLIST -> backend.listWatchlist(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                limit = limit,
+                cursor = cursor,
+            ).toLibrarySectionPageUi()
+
+            SECTION_RATINGS -> backend.listRatings(
+                accessToken = backendContext.accessToken,
+                profileId = backendContext.profileId,
+                limit = limit,
+                cursor = cursor,
+            ).toLibrarySectionPageUi()
+
+            else -> LibrarySectionPageUi()
+        }
+        return response
+    }
+
+    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.toLibrarySectionPageUi(): LibrarySectionPageUi {
         return LibrarySectionPageUi(
-            items = response.items.map { item ->
+            items = items.map { item ->
                 LibrarySectionItemUi(
                     id = item.id,
                     mediaKey = item.media.mediaKey,
@@ -324,16 +322,62 @@ class LibraryViewModel internal constructor(
                     title = item.media.title,
                     posterUrl = item.media.posterUrl,
                     backdropUrl = item.media.backdropUrl,
-                    addedAt = item.state.addedAt,
-                    watchedAt = item.state.watchedAt,
-                    ratedAt = item.state.ratedAt,
-                    rating = item.state.rating,
-                    lastActivityAt = item.state.lastActivityAt,
+                    addedAt = null,
+                    watchedAt = item.watchedAt,
+                    ratedAt = null,
+                    rating = null,
+                    lastActivityAt = item.lastActivityAt,
                     origins = item.origins,
                 )
             },
-            nextCursor = response.pageInfo.nextCursor,
-            hasMore = response.pageInfo.hasMore,
+            nextCursor = pageInfo.nextCursor,
+            hasMore = pageInfo.hasMore,
+        )
+    }
+
+    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.toLibrarySectionPageUi(): LibrarySectionPageUi {
+        return LibrarySectionPageUi(
+            items = items.map { item ->
+                LibrarySectionItemUi(
+                    id = item.id ?: item.media.mediaKey,
+                    mediaKey = item.media.mediaKey,
+                    mediaType = item.media.mediaType,
+                    title = item.media.title,
+                    posterUrl = item.media.posterUrl,
+                    backdropUrl = item.media.backdropUrl,
+                    addedAt = item.addedAt,
+                    watchedAt = null,
+                    ratedAt = null,
+                    rating = null,
+                    lastActivityAt = item.addedAt,
+                    origins = item.origins,
+                )
+            },
+            nextCursor = pageInfo.nextCursor,
+            hasMore = pageInfo.hasMore,
+        )
+    }
+
+    private fun CanonicalWatchCollectionResponse<CrispyBackendClient.RatingItem>.toLibrarySectionPageUi(): LibrarySectionPageUi {
+        return LibrarySectionPageUi(
+            items = items.map { item ->
+                LibrarySectionItemUi(
+                    id = item.id ?: item.media.mediaKey,
+                    mediaKey = item.media.mediaKey,
+                    mediaType = item.media.mediaType,
+                    title = item.media.title,
+                    posterUrl = item.media.posterUrl,
+                    backdropUrl = item.media.backdropUrl,
+                    addedAt = null,
+                    watchedAt = null,
+                    ratedAt = item.rating.ratedAt,
+                    rating = item.rating.value,
+                    lastActivityAt = item.rating.ratedAt,
+                    origins = item.origins,
+                )
+            },
+            nextCursor = pageInfo.nextCursor,
+            hasMore = pageInfo.hasMore,
         )
     }
 
@@ -365,6 +409,10 @@ class LibraryViewModel internal constructor(
     )
 
     companion object {
+        private const val SECTION_HISTORY = "history"
+        private const val SECTION_WATCHLIST = "watchlist"
+        private const val SECTION_RATINGS = "ratings"
+
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {
@@ -467,7 +515,7 @@ internal fun LibraryRouteContent(
                             FilterChip(
                                 selected = section.id == selectedSectionId,
                                 onClick = { onSelectSection(section.id) },
-                                label = { Text("${section.label} (${section.itemCount})") },
+                                label = { Text(section.label) },
                             )
                         }
                     }

@@ -10,9 +10,6 @@ import com.crispy.tv.player.ProviderAuthActionResult
 import com.crispy.tv.player.ProviderAuthStartResult
 import com.crispy.tv.player.ProviderCommentQuery
 import com.crispy.tv.player.ProviderCommentResult
-import com.crispy.tv.player.ProviderLibraryFolder
-import com.crispy.tv.player.ProviderLibraryItem
-import com.crispy.tv.player.ProviderLibrarySnapshot
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchedEpisodeRecord
 import com.crispy.tv.player.WatchHistoryEntry
@@ -240,8 +237,6 @@ class RemoteWatchHistoryService(
                 WatchProvider.TRAKT, WatchProvider.LOCAL -> false
                 null -> simklProvider.setInWatchlist(request, inWatchlist)
             }
-        if (syncedTrakt) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.TRAKT)
-        if (syncedSimkl) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.SIMKL)
 
         val statusMessage = if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
 
@@ -271,8 +266,6 @@ class RemoteWatchHistoryService(
                 WatchProvider.TRAKT, WatchProvider.LOCAL -> false
                 null -> simklProvider.setRating(request, ratingValue)
             }
-        if (syncedTrakt) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.TRAKT)
-        if (syncedSimkl) watchHistoryCache.invalidateProviderLibraryCache(WatchProvider.SIMKL)
 
         val verb = if (ratingValue == null) "Removed rating" else "Rated $ratingValue/10"
         val statusMessage = "$verb."
@@ -457,103 +450,6 @@ class RemoteWatchHistoryService(
         }
     }
 
-    override suspend fun listProviderLibrary(limitPerFolder: Int, source: WatchProvider?): ProviderLibrarySnapshot {
-        if (source != null) {
-            if (source == WatchProvider.LOCAL) {
-                return ProviderLibrarySnapshot(statusMessage = "Local source selected. Provider library unavailable.")
-            }
-
-            val provider = providerRouter.providerFor(source)
-            val selected =
-                if (provider != null && provider.hasAccessToken() && provider.hasClientId()) {
-                    try {
-                        provider.listProviderLibrary(limitPerFolder)
-                    } catch (_: Throwable) {
-                        val cached = getCachedProviderLibrary(limitPerFolder = limitPerFolder, source = source)
-                        val prefix = if (source == WatchProvider.TRAKT) "Trakt" else "Simkl"
-                        return cached.copy(statusMessage = "$prefix temporarily unavailable. ${cached.statusMessage}")
-                    }
-                } else {
-                    emptyList<ProviderLibraryFolder>() to emptyList()
-                }
-
-            val status =
-                when (source) {
-                    WatchProvider.LOCAL -> "Local source selected. Provider library unavailable."
-                    WatchProvider.TRAKT -> {
-                        if (traktClientId.isBlank()) {
-                            "Trakt client ID missing. Set TRAKT_CLIENT_ID in gradle.properties."
-                        } else if (sessionStore.traktAccessToken().isBlank()) {
-                            "Connect Trakt to load provider library."
-                        } else if (selected.first.isNotEmpty()) {
-                            ""
-                        } else {
-                            "No Trakt library data available."
-                        }
-                    }
-
-                    WatchProvider.SIMKL -> {
-                        if (simklClientId.isBlank()) {
-                            "Simkl client ID missing. Set SIMKL_CLIENT_ID in gradle.properties."
-                        } else if (sessionStore.simklAccessToken().isBlank()) {
-                            "Connect Simkl to load provider library."
-                        } else if (selected.first.isNotEmpty()) {
-                            ""
-                        } else {
-                            "No Simkl library data available."
-                        }
-                    }
-                }
-
-            val snapshot =
-                ProviderLibrarySnapshot(
-                    statusMessage = status,
-                    folders = selected.first.sortedBy { it.label.lowercase(Locale.US) },
-                    items = selected.second.sortedByDescending { it.addedAtEpochMs },
-                )
-            watchHistoryCache.writeProviderLibraryCache(source, snapshot)
-            return snapshot
-        }
-
-        val folders = mutableListOf<ProviderLibraryFolder>()
-        val items = mutableListOf<ProviderLibraryItem>()
-
-        if (traktProvider.hasAccessToken() && traktProvider.hasClientId()) {
-            runCatching { traktProvider.listProviderLibrary(limitPerFolder) }
-                .onSuccess {
-                    folders += it.first
-                    items += it.second
-                }
-        }
-        if (simklProvider.hasAccessToken() && simklProvider.hasClientId()) {
-            runCatching { simklProvider.listProviderLibrary(limitPerFolder) }
-                .onSuccess {
-                    folders += it.first
-                    items += it.second
-                }
-        }
-
-        if (folders.isEmpty()) {
-            val cached = getCachedProviderLibrary(limitPerFolder = limitPerFolder, source = null)
-            if (cached.folders.isNotEmpty() || cached.items.isNotEmpty()) {
-                return cached
-            }
-        }
-
-        val status =
-            when {
-                folders.isNotEmpty() -> ""
-                authState().traktAuthenticated || authState().simklAuthenticated -> "No provider library data available."
-                else -> "Connect Trakt or Simkl to load provider library."
-            }
-
-        return ProviderLibrarySnapshot(
-            statusMessage = status,
-            folders = folders.sortedBy { it.label.lowercase(Locale.US) },
-            items = items.sortedByDescending { it.addedAtEpochMs },
-        )
-    }
-
     override suspend fun getCachedContinueWatching(limit: Int, nowMs: Long, source: WatchProvider?): ContinueWatchingResult {
         return watchHistoryCache.getCachedContinueWatching(
             limit = limit,
@@ -564,10 +460,6 @@ class RemoteWatchHistoryService(
                 entries.sortedByDescending { it.lastUpdatedEpochMs }.take(targetLimit)
             },
         )
-    }
-
-    override suspend fun getCachedProviderLibrary(limitPerFolder: Int, source: WatchProvider?): ProviderLibrarySnapshot {
-        return watchHistoryCache.getCachedProviderLibrary(limitPerFolder = limitPerFolder, source = source)
     }
 
     override suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {

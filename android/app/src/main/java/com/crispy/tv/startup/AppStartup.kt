@@ -2,7 +2,6 @@ package com.crispy.tv.startup
 
 import android.content.Context
 import com.crispy.tv.sync.ProgressSyncScheduler
-import com.crispy.tv.sync.ProviderSyncScheduler
 import java.util.concurrent.atomic.AtomicBoolean
 
 object AppStartup {
@@ -12,8 +11,6 @@ object AppStartup {
         if (ran.getAndSet(true)) {
             return
         }
-
-        ProviderSyncScheduler.ensureScheduled(context)
 
         ProgressSyncScheduler.ensureScheduled(context)
     }

@@ -10,9 +10,6 @@ import com.crispy.tv.player.ProviderComment
 import com.crispy.tv.player.ProviderCommentQuery
 import com.crispy.tv.player.ProviderCommentResult
 import com.crispy.tv.player.ProviderCommentScope
-import com.crispy.tv.player.ProviderExternalIds
-import com.crispy.tv.player.ProviderLibraryFolder
-import com.crispy.tv.player.ProviderLibraryItem
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.watchhistory.CONTINUE_WATCHING_COMPLETION_PERCENT
@@ -67,10 +64,6 @@ internal class TraktWatchHistoryProvider(
 
     override suspend fun listContinueWatching(nowMs: Long): List<ContinueWatchingEntry> {
         return fetchTraktContinueWatching(nowMs)
-    }
-
-    override suspend fun listProviderLibrary(limitPerFolder: Int): Pair<List<ProviderLibraryFolder>, List<ProviderLibraryItem>> {
-        return fetchTraktLibrary(limitPerFolder)
     }
 
     override suspend fun fetchComments(query: ProviderCommentQuery): ProviderCommentResult {
@@ -528,92 +521,6 @@ internal class TraktWatchHistoryProvider(
         }
     }
 
-    private suspend fun fetchTraktLibrary(limitPerFolder: Int): Pair<List<ProviderLibraryFolder>, List<ProviderLibraryItem>> {
-        val folderItems = linkedMapOf<String, MutableList<ProviderLibraryItem>>()
-
-        addTraktFolder(
-            folderItems,
-            "continue-watching",
-            fetchTraktContinueWatching(System.currentTimeMillis()).map {
-                ProviderLibraryItem(
-                    provider = WatchProvider.TRAKT,
-                    folderId = "continue-watching",
-                    contentId = it.providerId,
-                    mediaKey = it.mediaKey,
-                    contentType = when (it.mediaType.lowercase(Locale.US)) {
-                        "anime" -> MetadataLabMediaType.ANIME
-                        "series" -> MetadataLabMediaType.SERIES
-                        else -> MetadataLabMediaType.MOVIE
-                    },
-                    title = it.title,
-                    externalIds = null,
-                    season = it.season,
-                    episode = it.episode,
-                    addedAtEpochMs = it.lastUpdatedEpochMs,
-                )
-            },
-            limitPerFolder,
-        )
-
-        addTraktFolder(folderItems, "watched", traktHistoryItems(), limitPerFolder)
-        addTraktFolder(folderItems, "watchlist", traktWatchlistItems(), limitPerFolder)
-        addTraktFolder(folderItems, "collection", traktCollectionItems(), limitPerFolder)
-        addTraktFolder(folderItems, "ratings", traktRatingsItems(), limitPerFolder)
-
-        val folders =
-            folderItems.entries
-                .filter { it.value.isNotEmpty() }
-                .map { (id, values) ->
-                    ProviderLibraryFolder(
-                        id = id,
-                        label = id.replace('-', ' ').replaceFirstChar { it.uppercase() },
-                        provider = WatchProvider.TRAKT,
-                        itemCount = values.size,
-                    )
-                }
-        return folders to folderItems.values.flatten()
-    }
-
-    private fun addTraktFolder(
-        bucket: LinkedHashMap<String, MutableList<ProviderLibraryItem>>,
-        id: String,
-        values: List<ProviderLibraryItem>,
-        limit: Int,
-    ) {
-        if (values.isEmpty()) return
-        val capped = values.take(limit.coerceAtLeast(1))
-        val folderId = id
-        bucket.getOrPut(folderId) { mutableListOf() }.addAll(capped.map { it.copy(folderId = folderId) })
-    }
-
-    private suspend fun traktHistoryItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/watched/movies?extended=images") ?: JSONArray()
-        val shows = traktGetArray("/sync/watched/shows?extended=images") ?: JSONArray()
-        return parseTraktItemsFromWatched(movies, MetadataLabMediaType.MOVIE, "watched") +
-            parseTraktItemsFromWatched(shows, MetadataLabMediaType.SERIES, "watched")
-    }
-
-    private suspend fun traktWatchlistItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/watchlist/movies?extended=images") ?: JSONArray()
-        val shows = traktGetArray("/sync/watchlist/shows?extended=images") ?: JSONArray()
-        return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "watchlist") +
-            parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "watchlist")
-    }
-
-    private suspend fun traktCollectionItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/collection/movies?extended=images") ?: JSONArray()
-        val shows = traktGetArray("/sync/collection/shows?extended=images") ?: JSONArray()
-        return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "collection") +
-            parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "collection")
-    }
-
-    private suspend fun traktRatingsItems(): List<ProviderLibraryItem> {
-        val movies = traktGetArray("/sync/ratings/movies?extended=images") ?: JSONArray()
-        val shows = traktGetArray("/sync/ratings/shows?extended=images") ?: JSONArray()
-        return parseTraktItemsFromList(movies, "movie", MetadataLabMediaType.MOVIE, "ratings") +
-            parseTraktItemsFromList(shows, "show", MetadataLabMediaType.SERIES, "ratings")
-    }
-
     private fun traktPosterUrl(images: JSONObject?): String? {
         return traktExtractImageUrl(images, "poster")
             ?: traktExtractImageUrl(images, "thumb")
@@ -623,15 +530,6 @@ internal class TraktWatchHistoryProvider(
         return traktExtractImageUrl(images, "fanart")
             ?: traktExtractImageUrl(images, "background")
             ?: traktExtractImageUrl(images, "banner")
-    }
-
-    private fun traktExternalIds(ids: JSONObject?): ProviderExternalIds? {
-        if (ids == null) return null
-        val tmdb = ids.optInt("tmdb").takeIf { it > 0 }
-        val imdb = normalizedImdbIdOrNull(ids.optString("imdb"))
-        val tvdb = ids.optInt("tvdb").takeIf { it > 0 }
-        if (tmdb == null && imdb == null && tvdb == null) return null
-        return ProviderExternalIds(tmdb = tmdb, imdb = imdb, tvdb = tvdb)
     }
 
     private fun traktExtractImageUrl(images: JSONObject?, key: String): String? {
@@ -672,99 +570,6 @@ internal class TraktWatchHistoryProvider(
             // Trakt sometimes returns host/path without scheme (e.g. walter.trakt.tv/...).
             // Coil expects a fully-qualified URL, so assume https.
             else -> "https://$trimmed"
-        }
-    }
-
-    private fun parseTraktItemsFromWatched(
-        array: JSONArray,
-        contentType: MetadataLabMediaType,
-        folderId: String,
-    ): List<ProviderLibraryItem> {
-        var skippedNoId = 0
-        return buildList {
-            for (index in 0 until array.length()) {
-                val obj = array.optJSONObject(index) ?: continue
-                val node = if (contentType == MetadataLabMediaType.MOVIE) obj.optJSONObject("movie") else obj.optJSONObject("show")
-                val contentId = normalizedContentIdFromIds(node?.optJSONObject("ids"))
-                if (contentId.isEmpty()) {
-                    skippedNoId++
-                    continue
-                }
-                val title = node?.optString("title")?.trim().orEmpty().ifBlank { contentId }
-                val images = node?.optJSONObject("images")
-                val posterUrl = traktPosterUrl(images)
-                val backdropUrl = traktBackdropUrl(images)
-                val addedAt = parseIsoToEpochMs(obj.optString("last_watched_at")) ?: System.currentTimeMillis()
-                add(
-                    ProviderLibraryItem(
-                        provider = WatchProvider.TRAKT,
-                        folderId = folderId,
-                        contentId = contentId,
-                        mediaKey = contentId,
-                        contentType = contentType,
-                        title = title,
-                        posterUrl = posterUrl,
-                        backdropUrl = backdropUrl,
-                        externalIds = traktExternalIds(node?.optJSONObject("ids")),
-                        addedAtEpochMs = addedAt,
-                    )
-                )
-            }
-        }.also {
-            if (skippedNoId > 0) {
-                Log.d(TAG, "parseTraktItemsFromWatched($folderId, $contentType): skipped $skippedNoId items with no supported id (imdb/tmdb)")
-            }
-        }
-    }
-
-    private fun parseTraktItemsFromList(
-        array: JSONArray,
-        key: String,
-        contentType: MetadataLabMediaType,
-        folderId: String,
-    ): List<ProviderLibraryItem> {
-        var skippedNoNode = 0
-        var skippedNoId = 0
-        return buildList {
-            for (index in 0 until array.length()) {
-                val obj = array.optJSONObject(index) ?: continue
-                val node = obj.optJSONObject(key) ?: run {
-                    skippedNoNode++
-                    continue
-                }
-                val contentId = normalizedContentIdFromIds(node.optJSONObject("ids"))
-                if (contentId.isEmpty()) {
-                    skippedNoId++
-                    continue
-                }
-                val title = node.optString("title").trim().ifEmpty { contentId }
-                val images = node.optJSONObject("images")
-                val posterUrl = traktPosterUrl(images)
-                val backdropUrl = traktBackdropUrl(images)
-                val addedAt =
-                    parseIsoToEpochMs(obj.optString("listed_at"))
-                        ?: parseIsoToEpochMs(obj.optString("rated_at"))
-                        ?: parseIsoToEpochMs(obj.optString("collected_at"))
-                        ?: System.currentTimeMillis()
-                add(
-                    ProviderLibraryItem(
-                        provider = WatchProvider.TRAKT,
-                        folderId = folderId,
-                        contentId = contentId,
-                        mediaKey = contentId,
-                        contentType = contentType,
-                        title = title,
-                        posterUrl = posterUrl,
-                        backdropUrl = backdropUrl,
-                        externalIds = traktExternalIds(node.optJSONObject("ids")),
-                        addedAtEpochMs = addedAt,
-                    )
-                )
-            }
-        }.also {
-            if (skippedNoNode > 0 || skippedNoId > 0) {
-                Log.d(TAG, "parseTraktItemsFromList($folderId, $key): skipped noNode=$skippedNoNode, noId=$skippedNoId out of ${array.length()}")
-            }
         }
     }
 

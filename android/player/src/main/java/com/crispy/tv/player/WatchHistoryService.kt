@@ -131,57 +131,11 @@ data class CanonicalWatchStateSnapshot(
     val watchedEpisodeKeys: Set<String> = emptySet(),
 )
 
-data class CanonicalProviderLibraryItem(
-    val contentId: String,
-    val mediaKey: String? = null,
-    val contentType: MetadataLabMediaType,
-    val title: String,
-    val posterUrl: String? = null,
-    val backdropUrl: String? = null,
-    val folderIds: Set<String> = emptySet(),
-    val addedAtEpochMs: Long = 0L,
-)
-
 data class WatchedEpisodeRecord(
     val contentId: String,
     val season: Int,
     val episode: Int,
     val watchedAtEpochMs: Long,
-)
-
-data class ProviderLibraryFolder(
-    val id: String,
-    val label: String,
-    val provider: WatchProvider,
-    val itemCount: Int
-)
-
-data class ProviderExternalIds(
-    val tmdb: Int? = null,
-    val imdb: String? = null,
-    val tvdb: Int? = null,
-    val kitsu: Int? = null,
-)
-
-data class ProviderLibraryItem(
-    val provider: WatchProvider,
-    val folderId: String,
-    val contentId: String,
-    val mediaKey: String? = null,
-    val contentType: MetadataLabMediaType,
-    val title: String,
-    val posterUrl: String? = null,
-    val backdropUrl: String? = null,
-    val externalIds: ProviderExternalIds? = null,
-    val season: Int? = null,
-    val episode: Int? = null,
-    val addedAtEpochMs: Long = System.currentTimeMillis()
-)
-
-data class ProviderLibrarySnapshot(
-    val statusMessage: String,
-    val folders: List<ProviderLibraryFolder> = emptyList(),
-    val items: List<ProviderLibraryItem> = emptyList()
 )
 
 enum class ProviderCommentScope {
@@ -371,13 +325,6 @@ interface WatchHistoryService {
         return emptyList()
     }
 
-    suspend fun listProviderLibrary(
-        limitPerFolder: Int = 200,
-        source: WatchProvider? = null
-    ): ProviderLibrarySnapshot {
-        return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
-    }
-
     suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
         return null
     }
@@ -387,27 +334,6 @@ interface WatchHistoryService {
         contentType: MetadataLabMediaType,
     ): CanonicalWatchStateSnapshot? {
         return null
-    }
-
-    suspend fun getCanonicalProviderLibraryItems(
-        limitPerFolder: Int = 200,
-        source: WatchProvider,
-    ): List<CanonicalProviderLibraryItem> {
-        return emptyList()
-    }
-
-    suspend fun getCachedCanonicalProviderLibraryItems(
-        limitPerFolder: Int = 200,
-        source: WatchProvider,
-    ): List<CanonicalProviderLibraryItem> {
-        return emptyList()
-    }
-
-    suspend fun getCachedProviderLibrary(
-        limitPerFolder: Int = 200,
-        source: WatchProvider? = null
-    ): ProviderLibrarySnapshot {
-        return ProviderLibrarySnapshot(statusMessage = "Cached provider library unavailable.")
     }
 
     suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {
@@ -524,13 +450,6 @@ object UnavailableWatchHistoryService : WatchHistoryService {
         source: WatchProvider?
     ): ContinueWatchingResult {
         return ContinueWatchingResult(statusMessage = "Watch history service unavailable.", isError = true)
-    }
-
-    override suspend fun listProviderLibrary(
-        limitPerFolder: Int,
-        source: WatchProvider?
-    ): ProviderLibrarySnapshot {
-        return ProviderLibrarySnapshot(statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {

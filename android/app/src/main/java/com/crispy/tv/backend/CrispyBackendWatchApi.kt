@@ -8,9 +8,6 @@ import com.crispy.tv.backend.CrispyBackendClient.RecommendationsResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
-import com.crispy.tv.backend.CrispyBackendClient.ProfileLibraryResponse
-import com.crispy.tv.backend.CrispyBackendClient.ProfileLibrarySectionPageResponse
-import com.crispy.tv.backend.CrispyBackendClient.ProviderAuthState
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchMutationInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
@@ -78,75 +75,6 @@ internal suspend fun CrispyBackendClient.getCalendarThisWeekApi(accessToken: Str
     )
 }
 
-internal suspend fun CrispyBackendClient.getProviderAuthStateApi(
-    accessToken: String,
-    profileId: String,
-): List<ProviderAuthState> {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/library".toHttpUrl(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return parseLibraryAuth(json.optJSONObject("auth")).providers
-}
-
-internal suspend fun CrispyBackendClient.getProfileLibraryApi(
-    accessToken: String,
-    profileId: String,
-): ProfileLibraryResponse {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/library".toHttpUrl(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return ProfileLibraryResponse(
-        profileId = json.optString("profileId").trim(),
-        source = json.optString("source").trim(),
-        generatedAt = json.optNullableString("generatedAt"),
-        auth = parseLibraryAuth(json.optJSONObject("auth")),
-        sections = parseLibrarySections(json.optJSONArray("sections")),
-    )
-}
-
-internal suspend fun CrispyBackendClient.getProfileLibrarySectionPageApi(
-    accessToken: String,
-    profileId: String,
-    sectionId: String,
-    limit: Int,
-    cursor: String? = null,
-): ProfileLibrarySectionPageResponse {
-    checkConfigured()
-    val url = "$baseUrl/v1/profiles/${profileId.trim()}/library/sections/${sectionId.trim()}".toHttpUrl().newBuilder()
-        .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
-        .apply {
-            val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
-            if (nextCursor != null) {
-                addQueryParameter("cursor", nextCursor)
-            }
-        }
-        .build()
-    val response = httpClient.get(
-        url = url,
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return ProfileLibrarySectionPageResponse(
-        profileId = json.optString("profileId").trim(),
-        source = json.optString("source").trim(),
-        generatedAt = json.optNullableString("generatedAt"),
-        section = requireNotNull(parseLibrarySection(json.optJSONObject("section"), 0)) {
-            "Library section page missing section payload."
-        },
-        items = parseLibrarySectionItems(json.optJSONArray("items")),
-        pageInfo = parsePageInfo(json.optJSONObject("pageInfo")),
-    )
-}
-
 internal suspend fun CrispyBackendClient.sendWatchEventApi(
     accessToken: String,
     profileId: String,
@@ -184,8 +112,9 @@ internal suspend fun CrispyBackendClient.listContinueWatchingApi(
     accessToken: String,
     profileId: String,
     limit: Int = 20,
+    cursor: String? = null,
 ): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
-    return listContinueWatchingItemsApi(accessToken, profileId, path = "continue-watching", limit = limit)
+    return listContinueWatchingItemsApi(accessToken, profileId, path = "continue-watching", limit = limit, cursor = cursor)
 }
 
 internal suspend fun CrispyBackendClient.dismissContinueWatchingApi(
@@ -206,11 +135,18 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
     accessToken: String,
     profileId: String,
     limit: Int = 50,
+    cursor: String? = null,
 ): CanonicalWatchCollectionResponse<WatchedItem> {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watched".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.toString())
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/history".toHttpUrl().newBuilder()
+            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
+            .apply {
+                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
+                if (nextCursor != null) {
+                    addQueryParameter("cursor", nextCursor)
+                }
+            }
             .build(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -230,11 +166,18 @@ internal suspend fun CrispyBackendClient.listWatchlistApi(
     accessToken: String,
     profileId: String,
     limit: Int = 50,
+    cursor: String? = null,
 ): CanonicalWatchCollectionResponse<WatchlistItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.toString())
+            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
+            .apply {
+                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
+                if (nextCursor != null) {
+                    addQueryParameter("cursor", nextCursor)
+                }
+            }
             .build(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -247,11 +190,18 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
     accessToken: String,
     profileId: String,
     limit: Int = 50,
+    cursor: String? = null,
 ): CanonicalWatchCollectionResponse<RatingItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/ratings".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.toString())
+            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
+            .apply {
+                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
+                if (nextCursor != null) {
+                    addQueryParameter("cursor", nextCursor)
+                }
+            }
             .build(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -403,11 +353,18 @@ private suspend fun CrispyBackendClient.listContinueWatchingItemsApi(
     profileId: String,
     path: String,
     limit: Int,
+    cursor: String?,
 ): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.toString())
+            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
+            .apply {
+                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
+                if (nextCursor != null) {
+                    addQueryParameter("cursor", nextCursor)
+                }
+            }
             .build(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
