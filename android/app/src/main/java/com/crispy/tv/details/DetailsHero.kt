@@ -117,21 +117,9 @@ internal fun HeroSection(
                     )
             ) {
                 // Bottom fade to merge hero into the page background.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colorStops =
-                                    arrayOf(
-                                        0f to Color.Transparent,
-                                        0.66f to Color.Transparent,
-                                        1f to palette.pageBackground
-                                    ),
-                                startY = 0f,
-                                endY = heightPx
-                            )
-                        )
+                HeroBottomFade(
+                    pageBackground = palette.pageBackground,
+                    heightPx = heightPx,
                 )
 
                 Column(
@@ -178,6 +166,10 @@ internal fun HeroSection(
         }
 
         if (details == null) {
+            HeroBottomFade(
+                pageBackground = palette.pageBackground,
+                heightPx = heightPx,
+            )
             return@BoxWithConstraints
         }
 
@@ -238,21 +230,9 @@ internal fun HeroSection(
         )
 
         // Bottom fade to merge hero into the page background.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops =
-                            arrayOf(
-                                0f to Color.Transparent,
-                                0.66f to Color.Transparent,
-                                1f to palette.pageBackground
-                            ),
-                        startY = 0f,
-                        endY = heightPx
-                    )
-                )
+        HeroBottomFade(
+            pageBackground = palette.pageBackground,
+            heightPx = heightPx,
         )
 
         if (hasTrailer) {
@@ -314,6 +294,29 @@ internal fun HeroSection(
             }
         }
     }
+}
+
+@Composable
+private fun HeroBottomFade(
+    pageBackground: Color,
+    heightPx: Float,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to Color.Transparent,
+                            0.66f to Color.Transparent,
+                            1f to pageBackground
+                        ),
+                    startY = 0f,
+                    endY = heightPx
+                )
+            )
+    )
 }
 
 @Composable
