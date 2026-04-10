@@ -181,7 +181,7 @@ dependencies {
     implementation("androidx.paging:paging-runtime:3.4.2")
     implementation("androidx.paging:paging-compose:3.4.2")
 
-    implementation(platform("androidx.compose:compose-bom:2026.04.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.03.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -202,7 +202,7 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.10.2")
 
-    androidTestImplementation(platform("androidx.compose:compose-bom:2026.04.00"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.03.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.compose.ui:ui-test")
     androidTestImplementation("androidx.test:core-ktx:1.6.1")
