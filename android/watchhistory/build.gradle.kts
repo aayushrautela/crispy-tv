@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace = "com.crispy.tv.watchhistory"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26

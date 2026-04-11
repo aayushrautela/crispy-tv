@@ -25,22 +25,24 @@ class BackendContextResolver(
         }
 
         val session = supabaseAccountClient.ensureValidSession() ?: return null
-        cachedContext?.takeIf { it.matches(session.userId, session.accessToken) }?.let {
+        val userId = session.userId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val accessToken = session.accessToken.trim().takeIf { it.isNotBlank() } ?: return null
+        cachedContext?.takeIf { it.matches(userId, accessToken) }?.let {
             return BackendContext(accessToken = it.accessToken, profileId = it.profileId)
         }
 
         return resolveMutex.withLock {
-            cachedContext?.takeIf { it.matches(session.userId, session.accessToken) }?.let {
+            cachedContext?.takeIf { it.matches(userId, accessToken) }?.let {
                 return@withLock BackendContext(accessToken = it.accessToken, profileId = it.profileId)
             }
 
-            var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
+            var profileId = activeProfileStore.getActiveProfileId(userId).orEmpty().trim()
             if (profileId.isBlank()) {
                 profileId = runCatching {
-                    backendClient.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
+                    backendClient.getMe(accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
                 }.getOrDefault("")
                 if (profileId.isNotBlank()) {
-                    activeProfileStore.setActiveProfileId(session.userId, profileId)
+                    activeProfileStore.setActiveProfileId(userId, profileId)
                 }
             }
 
@@ -50,13 +52,13 @@ class BackendContextResolver(
             }
 
             cachedContext = CachedBackendContext(
-                userId = session.userId,
-                accessToken = session.accessToken,
+                userId = userId,
+                accessToken = accessToken,
                 profileId = profileId,
             )
 
             BackendContext(
-                accessToken = session.accessToken,
+                accessToken = accessToken,
                 profileId = profileId,
             )
         }
