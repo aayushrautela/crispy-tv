@@ -301,6 +301,8 @@ class CrispyBackendClient(
     data class MetadataTitleDetailResponse(
         val item: MetadataView,
         val seasons: List<MetadataSeasonView>,
+        val episodes: List<MetadataEpisodeView>,
+        val nextEpisode: MetadataEpisodeView?,
         val videos: List<MetadataVideoView>,
         val cast: List<MetadataPersonRefView>,
         val directors: List<MetadataPersonRefView>,

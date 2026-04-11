@@ -9,6 +9,7 @@ import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.metadata.episodesForSeason
 import com.crispy.tv.metadata.seasonNumbers
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
@@ -112,13 +113,7 @@ internal class DetailsUseCases(
             if (details?.mediaType?.toMetadataLabMediaTypeOrNull() == MetadataLabMediaType.MOVIE) {
                 emptyList()
             } else {
-                val backendSeasons = titleDetail?.seasonNumbers().orEmpty()
-                val seasonCount = titleDetail?.item?.seasonCount ?: 0
-                when {
-                    backendSeasons.isNotEmpty() -> backendSeasons
-                    seasonCount > 0 -> (1..seasonCount).toList()
-                    else -> emptyList()
-                }
+                titleDetail?.seasonNumbers().orEmpty()
             }
 
         val statusMessage =
@@ -209,7 +204,21 @@ internal class DetailsUseCases(
         mediaKey: String,
         season: Int,
         details: MediaDetails,
+        titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
     ): DetailsSeasonEpisodesResult {
+        titleDetail
+            ?.episodesForSeason(season)
+            ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { videos ->
+                return DetailsSeasonEpisodesResult(
+                    videos = videos,
+                    episodeWatchStates = resolveEpisodeWatchStates(details, videos),
+                    effectiveSeasonNumber = season,
+                    includedSeasonNumbers = titleDetail.seasonNumbers(),
+                )
+            }
+
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
             ?: return DetailsSeasonEpisodesResult(errorMessage = "Sign in to load episodes.")
 

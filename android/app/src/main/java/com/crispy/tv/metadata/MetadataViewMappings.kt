@@ -11,7 +11,8 @@ import java.util.Locale
 
 internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
     val itemDetails = item.toMediaDetails()
-    val mergedVideos = (itemDetails.videos + videos.mapNotNull { it.toMediaVideo() }).distinctBy { it.id }
+    val episodeVideos = listOfNotNull(nextEpisode?.toMediaVideo())
+    val mergedVideos = (episodeVideos + videos.mapNotNull { it.toMediaVideo() }).distinctBy { it.id }
     return itemDetails.copy(
         cast = cast.map { it.name },
         directors = directors.map { it.name },
@@ -22,9 +23,13 @@ internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): M
 
 internal fun CrispyBackendClient.MetadataTitleDetailResponse.seasonNumbers(): List<Int> {
     val seasonNumbers = seasons.map { it.seasonNumber }.filter { it > 0 }.distinct().sorted()
-    if (seasonNumbers.isNotEmpty()) return seasonNumbers
-    val seasonCount = item.seasonCount ?: return emptyList()
-    return if (seasonCount > 0) (1..seasonCount).toList() else emptyList()
+    return seasonNumbers
+}
+
+internal fun CrispyBackendClient.MetadataTitleDetailResponse.episodesForSeason(seasonNumber: Int): List<CrispyBackendClient.MetadataEpisodeView> {
+    return episodes
+        .filter { it.seasonNumber == seasonNumber }
+        .sortedWith(compareBy<CrispyBackendClient.MetadataEpisodeView>({ it.episodeNumber ?: Int.MAX_VALUE }, { it.title ?: "" }, { it.id }))
 }
 
 internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {

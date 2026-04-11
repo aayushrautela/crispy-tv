@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.metadata.episodesForSeason
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerEpisodeSnapshot
@@ -120,20 +121,42 @@ class DetailsViewModel internal constructor(
                 val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId
                 val pendingSeason =
                     pendingHighlightEpisodeId?.let { highlightEpisodeId ->
-                result.details?.videos?.firstOrNull { video ->
-                    video.id.equals(highlightEpisodeId, ignoreCase = true)
-                }?.season
+                        result.titleDetail
+                            ?.episodes
+                            ?.firstOrNull { episode ->
+                                episode.id.equals(highlightEpisodeId, ignoreCase = true)
+                            }
+                            ?.seasonNumber
                     }
                 val selectedSeason =
                     when {
                         pendingSeason != null && pendingSeason in result.seasons -> pendingSeason
                         state.selectedSeason != null && state.selectedSeason in result.seasons -> state.selectedSeason
                         result.seasons.isNotEmpty() -> result.seasons.first()
-                    else -> null
+                        else -> null
+                    }
+
+                result.titleDetail?.let { titleDetail ->
+                    result.seasons.forEach { season ->
+                        val seasonEpisodes = titleDetail.episodesForSeason(season).mapNotNull { it.toMediaVideo() }
+                        if (seasonEpisodes.isNotEmpty()) {
+                            seasonEpisodesCache[season] = seasonEpisodes
+                        }
+                    }
+                }
+
+                val titleDetailEpisodes =
+                    selectedSeason
+                        ?.let { season -> result.titleDetail?.episodesForSeason(season) }
+                        .orEmpty()
+                        .mapNotNull { it.toMediaVideo() }
+                if (selectedSeason != null && titleDetailEpisodes.isNotEmpty()) {
+                    seasonEpisodesCache[selectedSeason] = titleDetailEpisodes
                 }
 
                 val selectedSeasonEpisodes =
                     selectedSeason?.let { seasonEpisodesCache[it] }
+                        ?: titleDetailEpisodes.takeIf { it.isNotEmpty() }
                         ?: state.seasonEpisodes.takeIf { selectedSeason == state.selectedSeasonOrFirst }
 
                 state.copy(
@@ -151,7 +174,7 @@ class DetailsViewModel internal constructor(
                     selectedSeason = selectedSeason,
                     seasonEpisodes = selectedSeasonEpisodes.orEmpty(),
                     episodeWatchStates = emptyMap(),
-                    episodesIsLoading = selectedSeason != null && selectedSeasonEpisodes == null,
+                    episodesIsLoading = false,
                     episodesStatusMessage = "",
                 )
             }
@@ -165,9 +188,14 @@ class DetailsViewModel internal constructor(
                 enrichedDetails?.mediaType
                     ?.toMetadataLabMediaTypeOrNull()
                     ?.let { it != MetadataLabMediaType.MOVIE }
-                    == true && seasonToLoad != null
+                == true && seasonToLoad != null
             ) {
-                loadEpisodesForSeason(seasonToLoad, force = true)
+                val cachedEpisodes = seasonEpisodesCache[seasonToLoad]
+                if (cachedEpisodes != null) {
+                    loadEpisodeWatchStatesForSeason(seasonToLoad, cachedEpisodes)
+                } else {
+                    loadEpisodesForSeason(seasonToLoad, force = true)
+                }
             }
 
             val detailsForAi = enrichedDetails
@@ -406,6 +434,7 @@ class DetailsViewModel internal constructor(
                             mediaKey = mediaKey,
                             season = season,
                             details = details,
+                            titleDetail = _uiState.value.titleDetail,
                         )
                     }
 
