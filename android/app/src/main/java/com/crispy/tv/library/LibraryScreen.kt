@@ -55,6 +55,7 @@ import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -113,6 +114,7 @@ class LibraryViewModel internal constructor(
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val items: Flow<PagingData<LibrarySectionItemUi>> =
         _uiState
             .map { it.selectedSectionId }

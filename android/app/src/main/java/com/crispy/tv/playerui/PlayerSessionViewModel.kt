@@ -477,7 +477,7 @@ class PlayerSessionViewModel(
 
         val backendDetails = backendDetail?.toMediaDetails()
         val fetchedDetails = backendDetails ?: return
-        val titleDetail = backendDetail ?: return
+        val titleDetail = backendDetail
 
         val seasons =
             if (titleDetail.seasonNumbers().isNotEmpty()) {
