@@ -6,17 +6,17 @@ import com.crispy.tv.player.CanonicalContinueWatchingResult
 class HomeWatchActivityService {
 
     suspend fun loadWatchActivity(
-        providerResult: CanonicalContinueWatchingResult,
+        canonicalResult: CanonicalContinueWatchingResult,
         limit: Int = 20,
     ): CanonicalContinueWatchingResult {
-        return if (providerResult.entries.isNotEmpty()) {
-            loadContinueWatchingItems(providerResult.entries, limit).copy(
-                statusMessage = providerResult.statusMessage,
-                isError = providerResult.isError,
+        return if (canonicalResult.entries.isNotEmpty()) {
+            loadContinueWatchingItems(canonicalResult.entries, limit).copy(
+                statusMessage = canonicalResult.statusMessage,
+                isError = canonicalResult.isError,
             )
-        } else if (providerResult.isError) {
+        } else if (canonicalResult.isError) {
             CanonicalContinueWatchingResult(
-                statusMessage = providerResult.statusMessage,
+                statusMessage = canonicalResult.statusMessage,
                 isError = true,
             )
         } else {

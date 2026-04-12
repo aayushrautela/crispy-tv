@@ -54,6 +54,7 @@ internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, pro
     return CalendarResponse(
         profileId = json.optString("profileId").trim(),
         source = json.optString("source").trim(),
+        kind = null,
         generatedAt = json.optNullableString("generatedAt"),
         items = parseCalendarItems(json.optJSONArray("items")),
     )
@@ -70,6 +71,7 @@ internal suspend fun CrispyBackendClient.getCalendarThisWeekApi(accessToken: Str
     return CalendarResponse(
         profileId = json.optString("profileId").trim(),
         source = json.optString("source").trim(),
+        kind = json.optNullableString("kind"),
         generatedAt = json.optNullableString("generatedAt"),
         items = parseCalendarItems(json.optJSONArray("items")),
     )

@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "media_state_contract",
   "case_id": "watched_item_requires_media_key_and_origins",
   "input": {

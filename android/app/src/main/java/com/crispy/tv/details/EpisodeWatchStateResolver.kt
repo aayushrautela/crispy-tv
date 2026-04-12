@@ -79,7 +79,6 @@ internal class EpisodeWatchStateResolver(
     private suspend fun resolveWatchKeys(details: MediaDetails): Set<String> {
         cachedEpisodeWatchKeys?.let { return it }
 
-        val source = userMediaRepository.preferredProvider()
         val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
         val canonical =
             if (mediaKey == null) {
@@ -99,7 +98,7 @@ internal class EpisodeWatchStateResolver(
         }
 
         val providerHistoryKeys =
-            userMediaRepository.listWatchedEpisodeRecords(source = source).mapNotNull { record ->
+            userMediaRepository.listWatchedEpisodeRecords().mapNotNull { record ->
                 addEpisodeKey(record.contentId, record.season, record.episode)
             }.mapNotNull(::normalizeWatchKey).toSet()
 

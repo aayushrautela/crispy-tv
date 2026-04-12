@@ -1,0 +1,94 @@
+{
+  "contract_version": 1,
+  "suite": "calendar_contract",
+  "case_id": "calendar_response_matches_server_contract",
+  "input": {
+    "route": "calendar",
+    "payload": {
+      "profileId": "profile-123",
+      "source": "canonical_calendar",
+      "generatedAt": "2026-04-12T00:00:00Z",
+      "items": [
+        {
+          "bucket": "no_scheduled",
+          "media": {
+            "mediaType": "episode",
+            "mediaKey": "tmdb:episode:1001",
+            "provider": "tmdb",
+            "providerId": "1001",
+            "title": "Sunrise, Sunset",
+            "posterUrl": "https://img/episode.jpg",
+            "backdropUrl": "https://img/episode-backdrop.jpg",
+            "releaseYear": 2026,
+            "rating": 8.1,
+            "genre": "Drama",
+            "seasonNumber": 1,
+            "episodeNumber": 3,
+            "episodeTitle": "Sunrise, Sunset",
+            "airDate": null,
+            "runtimeMinutes": 48
+          },
+          "relatedShow": {
+            "mediaType": "series",
+            "mediaKey": "tmdb:series:500",
+            "provider": "tmdb",
+            "providerId": "500",
+            "title": "The Morning Bell",
+            "posterUrl": "https://img/show.jpg",
+            "releaseYear": 2026,
+            "rating": 8.3,
+            "genre": "Drama",
+            "subtitle": "Series"
+          },
+          "airDate": null,
+          "watched": false
+        }
+      ]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "profile_id": "profile-123",
+      "source": "canonical_calendar",
+      "generated_at": "2026-04-12T00:00:00Z",
+      "kind": null,
+      "items": [
+        {
+          "bucket": "no_scheduled",
+          "media": {
+            "media_type": "episode",
+            "media_key": "tmdb:episode:1001",
+            "provider": "tmdb",
+            "provider_id": "1001",
+            "title": "Sunrise, Sunset",
+            "poster_url": "https://img/episode.jpg",
+            "backdrop_url": "https://img/episode-backdrop.jpg",
+            "release_year": 2026,
+            "rating": 8.1,
+            "genre": "Drama",
+            "season_number": 1,
+            "episode_number": 3,
+            "episode_title": "Sunrise, Sunset",
+            "air_date": null,
+            "runtime_minutes": 48
+          },
+          "related_show": {
+            "media_type": "series",
+            "media_key": "tmdb:series:500",
+            "provider": "tmdb",
+            "provider_id": "500",
+            "title": "The Morning Bell",
+            "poster_url": "https://img/show.jpg",
+            "release_year": 2026,
+            "rating": 8.3,
+            "genre": "Drama",
+            "subtitle": "Series"
+          },
+          "air_date": null,
+          "watched": false
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "media_state_contract",
   "case_id": "continue_watching_requires_landscape_media_and_dismissible",
   "input": {
@@ -24,7 +24,6 @@
       "progress": {
         "progressPercent": 47.5
       },
-      "watchedAt": "2026-04-01T10:00:00Z",
       "lastActivityAt": "2026-04-01T10:15:00Z",
       "origins": ["trakt"],
       "dismissible": false
@@ -44,7 +43,7 @@
       "backdrop_url": "https://img/backdrop.jpg",
       "subtitle": "S3 E9",
       "progress_percent": 47.5,
-      "watched_at": "2026-04-01T10:00:00Z",
+      "watched_at": null,
       "last_activity_at": "2026-04-01T10:15:00Z",
       "origins": ["trakt"],
       "dismissible": false,

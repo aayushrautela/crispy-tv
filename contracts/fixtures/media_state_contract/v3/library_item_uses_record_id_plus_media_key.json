@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "media_state_contract",
   "case_id": "library_item_uses_record_id_plus_media_key",
   "input": {

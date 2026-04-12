@@ -1,0 +1,95 @@
+{
+  "contract_version": 1,
+  "suite": "calendar_contract",
+  "case_id": "this_week_response_requires_kind",
+  "input": {
+    "route": "this-week",
+    "payload": {
+      "profileId": "profile-123",
+      "source": "canonical_calendar",
+      "kind": "this-week",
+      "generatedAt": "2026-04-12T00:00:00Z",
+      "items": [
+        {
+          "bucket": "this_week",
+          "media": {
+            "mediaType": "episode",
+            "mediaKey": "tmdb:episode:2002",
+            "provider": "tmdb",
+            "providerId": "2002",
+            "title": "The Return",
+            "posterUrl": "https://img/return.jpg",
+            "backdropUrl": "https://img/return-backdrop.jpg",
+            "releaseYear": 2026,
+            "rating": 8.9,
+            "genre": "Sci-Fi",
+            "seasonNumber": 2,
+            "episodeNumber": 1,
+            "episodeTitle": "The Return",
+            "airDate": "2026-04-15T02:00:00Z",
+            "runtimeMinutes": 52
+          },
+          "relatedShow": {
+            "mediaType": "series",
+            "mediaKey": "tmdb:series:900",
+            "provider": "tmdb",
+            "providerId": "900",
+            "title": "Orbit Station",
+            "posterUrl": "https://img/orbit.jpg",
+            "releaseYear": 2024,
+            "rating": 8.6,
+            "genre": "Sci-Fi",
+            "subtitle": "Series"
+          },
+          "airDate": "2026-04-15T02:00:00Z",
+          "watched": true
+        }
+      ]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "profile_id": "profile-123",
+      "source": "canonical_calendar",
+      "generated_at": "2026-04-12T00:00:00Z",
+      "kind": "this-week",
+      "items": [
+        {
+          "bucket": "this_week",
+          "media": {
+            "media_type": "episode",
+            "media_key": "tmdb:episode:2002",
+            "provider": "tmdb",
+            "provider_id": "2002",
+            "title": "The Return",
+            "poster_url": "https://img/return.jpg",
+            "backdrop_url": "https://img/return-backdrop.jpg",
+            "release_year": 2026,
+            "rating": 8.9,
+            "genre": "Sci-Fi",
+            "season_number": 2,
+            "episode_number": 1,
+            "episode_title": "The Return",
+            "air_date": "2026-04-15T02:00:00Z",
+            "runtime_minutes": 52
+          },
+          "related_show": {
+            "media_type": "series",
+            "media_key": "tmdb:series:900",
+            "provider": "tmdb",
+            "provider_id": "900",
+            "title": "Orbit Station",
+            "poster_url": "https://img/orbit.jpg",
+            "release_year": 2024,
+            "rating": 8.6,
+            "genre": "Sci-Fi",
+            "subtitle": "Series"
+          },
+          "air_date": "2026-04-15T02:00:00Z",
+          "watched": true
+        }
+      ]
+    }
+  }
+}

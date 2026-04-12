@@ -390,14 +390,14 @@ class HomeViewModel internal constructor(
                     val suppressionMap = suppressionStore.read()
                     suppressedItemsByKey = suppressionMap
 
-                    val providerResult = loadProviderContinueWatching()
-                    val filteredProviderResult =
-                        providerResult.copy(
-                            entries = applyProviderSuppressionFilter(providerResult.entries, suppressionMap),
+                    val canonicalResult = loadCanonicalContinueWatching()
+                    val filteredCanonicalResult =
+                        canonicalResult.copy(
+                            entries = applyProviderSuppressionFilter(canonicalResult.entries, suppressionMap),
                         )
 
                     homeWatchActivityService.loadWatchActivity(
-                        providerResult = filteredProviderResult,
+                        canonicalResult = filteredCanonicalResult,
                         limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
                     )
                 }
@@ -495,10 +495,9 @@ class HomeViewModel internal constructor(
         )
     }
 
-    private suspend fun loadProviderContinueWatching(): CanonicalContinueWatchingResult {
+    private suspend fun loadCanonicalContinueWatching(): CanonicalContinueWatchingResult {
         return watchHistoryService.getCanonicalContinueWatching(
             limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-            source = null,
         )
     }
 

@@ -22,6 +22,8 @@ SUITE_TO_SCHEMA = {
     "catalog_url_building": "catalog_url_building.schema.json",
     "trakt_scrobble_policy": "trakt_scrobble_policy.schema.json",
     "media_state_contract": "media_state_contract.schema.json",
+    "watch_collections_contract": "watch_collections_contract.schema.json",
+    "calendar_contract": "calendar_contract.schema.json",
 }
 
 

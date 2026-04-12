@@ -148,7 +148,7 @@ private func normalizeContinueWatching(_ payload: [String: Any]) -> MediaStateNo
     guard let id = stringValue(payload, "id"),
           let media = objectValue(payload, "media"),
           let normalizedMedia = normalizeCard(payload: media, requireBackdrop: true),
-          let watchedAt = stringValue(payload, "watchedAt"),
+          payload.keys.contains("progress"),
           let lastActivityAt = stringValue(payload, "lastActivityAt"),
           let originsValue = payload["origins"] as? [Any],
           let dismissible = payload["dismissible"] as? Bool else {
@@ -173,7 +173,6 @@ private func normalizeContinueWatching(_ payload: [String: Any]) -> MediaStateNo
         backdropUrl: normalizedMedia.backdropUrl,
         subtitle: normalizedMedia.subtitle,
         progressPercent: progressPercent,
-        watchedAt: watchedAt,
         lastActivityAt: lastActivityAt,
         origins: origins,
         dismissible: dismissible

@@ -68,6 +68,8 @@ data class CalendarSection(
 @Immutable
 data class CalendarSnapshot(
     val sections: List<CalendarSection>,
+    val source: String? = null,
+    val generatedAt: String? = null,
     val statusMessage: String? = null,
     val isError: Boolean = false,
 )
@@ -75,6 +77,9 @@ data class CalendarSnapshot(
 @Immutable
 data class ThisWeekResult(
     val items: List<CalendarEpisodeItem>,
+    val source: String? = null,
+    val kind: String? = null,
+    val generatedAt: String? = null,
     val statusMessage: String?,
     val isError: Boolean = false,
 )
@@ -142,6 +147,8 @@ class CalendarService internal constructor(
         val sections = response.toCalendarSections(nowMs)
         return CalendarSnapshot(
             sections = sections,
+            source = response.source,
+            generatedAt = response.generatedAt,
             statusMessage = if (sections.isEmpty()) "No upcoming episodes found right now." else null,
             isError = false,
         )
@@ -167,6 +174,9 @@ class CalendarService internal constructor(
         val projected = projectHomeThisWeekItems(rawItems, nowMs)
         return ThisWeekResult(
             items = projected,
+            source = response.source,
+            kind = response.kind,
+            generatedAt = response.generatedAt,
             statusMessage = if (projected.isEmpty()) "No episodes airing this week right now." else null,
             isError = false,
         )
@@ -229,7 +239,7 @@ class CalendarService internal constructor(
         if (mediaType != "episode") return null
         val season = media.seasonNumber ?: return null
         val episode = media.episodeNumber ?: return null
-        val releaseDate = media.airDate?.trim().takeIf { !it.isNullOrBlank() } ?: return null
+        val releaseDate = airDate?.trim().takeIf { !it.isNullOrBlank() } ?: media.airDate?.trim().takeIf { !it.isNullOrBlank() } ?: return null
         val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate) ?: return null
         val watchedKey = "${media.provider.lowercase(Locale.US)}:${media.providerId.lowercase(Locale.US)}:$season:$episode"
         val localKey = "${media.provider}:${media.providerId}:$season:$episode"
@@ -238,7 +248,7 @@ class CalendarService internal constructor(
             mediaKey = media.mediaKey,
             localKey = localKey,
             highlightEpisodeId = null,
-            seriesName = media.title,
+            seriesName = relatedShow.title,
             episodeTitle = media.episodeTitle,
             overview = media.subtitle,
             season = season,
@@ -258,13 +268,13 @@ class CalendarService internal constructor(
     }
 
     private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
-        val localKey = "${media.provider}:${media.providerId}"
+        val localKey = "${relatedShow.provider}:${relatedShow.providerId}"
         return CalendarSeriesItem(
             id = localKey,
-            mediaKey = media.mediaKey,
+            mediaKey = relatedShow.mediaKey,
             localKey = localKey,
-            title = media.title,
-            posterUrl = media.posterUrl,
+            title = relatedShow.title,
+            posterUrl = relatedShow.posterUrl,
             backdropUrl = media.backdropUrl,
             sourceLabel = null,
         )

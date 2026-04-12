@@ -86,7 +86,7 @@ private fun normalizeContinueWatching(payload: Map<String, Any?>): MediaStateNor
     val id = payload.stringValue("id") ?: return null
     val media = payload.objectValue("media") ?: return null
     val normalizedMedia = normalizeCard(media, requireBackdrop = true) ?: return null
-    val watchedAt = payload.stringValue("watchedAt") ?: return null
+    if (!payload.containsKey("progress")) return null
     val lastActivityAt = payload.stringValue("lastActivityAt") ?: return null
     val origins = payload.stringList("origins") ?: return null
     val dismissible = payload.booleanValue("dismissible") ?: return null
@@ -94,7 +94,6 @@ private fun normalizeContinueWatching(payload: Map<String, Any?>): MediaStateNor
     return normalizedMedia.copy(
         itemId = id,
         progressPercent = progressPercent,
-        watchedAt = watchedAt,
         lastActivityAt = lastActivityAt,
         origins = origins,
         dismissible = dismissible,

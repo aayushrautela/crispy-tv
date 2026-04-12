@@ -23,10 +23,9 @@ interface UserMediaRepository {
     suspend fun getCanonicalContinueWatching(
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
-        source: WatchProvider? = null,
     ): CanonicalContinueWatchingResult
 
-    suspend fun listWatchedEpisodeRecords(source: WatchProvider?): List<WatchedEpisodeRecord>
+    suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord>
 
     suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot?
 

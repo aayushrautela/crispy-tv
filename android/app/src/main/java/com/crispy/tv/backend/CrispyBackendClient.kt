@@ -654,12 +654,15 @@ class CrispyBackendClient(
     data class CalendarItem(
         val bucket: String,
         val media: RuntimeMediaCard,
+        val relatedShow: RuntimeMediaCard,
+        val airDate: String?,
         val watched: Boolean,
     )
 
     data class CalendarResponse(
         val profileId: String,
         val source: String,
+        val kind: String?,
         val generatedAt: String?,
         val items: List<CalendarItem>,
     )

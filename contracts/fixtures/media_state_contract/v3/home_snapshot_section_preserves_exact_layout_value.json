@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "media_state_contract",
   "case_id": "home_snapshot_section_preserves_exact_layout_value",
   "input": {

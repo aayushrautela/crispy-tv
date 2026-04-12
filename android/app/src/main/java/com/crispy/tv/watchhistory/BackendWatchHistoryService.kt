@@ -414,55 +414,16 @@ class BackendWatchHistoryService(
         )
     }
 
-    override suspend fun listWatchedEpisodeRecords(source: WatchProvider?): List<WatchedEpisodeRecord> {
-        return when (source) {
-            WatchProvider.LOCAL -> localWatchedEpisodeRecords()
-            WatchProvider.TRAKT,
-            WatchProvider.SIMKL -> canonicalWatchedEpisodeRecords(source)
-            null -> {
-                val auth = authState()
-                when {
-                    auth.traktAuthenticated -> canonicalWatchedEpisodeRecords(WatchProvider.TRAKT)
-                    auth.simklAuthenticated -> canonicalWatchedEpisodeRecords(WatchProvider.SIMKL)
-                    else -> emptyList()
-                }
-            }
-        }
+    override suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
+        return canonicalWatchedEpisodeRecords()
     }
 
     override suspend fun getCanonicalContinueWatching(
         limit: Int,
         nowMs: Long,
-        source: WatchProvider?,
     ): CanonicalContinueWatchingResult {
         val targetLimit = limit.coerceAtLeast(1)
-        return when (source) {
-            WatchProvider.LOCAL -> {
-                val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
-                CanonicalContinueWatchingResult(
-                    statusMessage = if (local.isNotEmpty()) "" else "No local continue watching entries yet.",
-                    entries = local.map { it.toCanonicalContinueWatchingItem() },
-                )
-            }
-
-            WatchProvider.TRAKT,
-            WatchProvider.SIMKL -> listCanonicalBackendContinueWatchingItems(source, targetLimit, nowMs)
-
-            null -> {
-                val auth = authState()
-                when {
-                    auth.traktAuthenticated -> listCanonicalBackendContinueWatchingItems(WatchProvider.TRAKT, targetLimit, nowMs)
-                    auth.simklAuthenticated -> listCanonicalBackendContinueWatchingItems(WatchProvider.SIMKL, targetLimit, nowMs)
-                    else -> {
-                        val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
-                        CanonicalContinueWatchingResult(
-                            statusMessage = if (local.isNotEmpty()) "" else "No continue watching entries yet.",
-                            entries = local.map { it.toCanonicalContinueWatchingItem() },
-                        )
-                    }
-                }
-            }
-        }
+        return listCanonicalBackendContinueWatchingItems(targetLimit, nowMs)
     }
 
     override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
@@ -736,11 +697,7 @@ class BackendWatchHistoryService(
                     profileId = backendContext.profileId,
                     limit = limit.coerceAtLeast(1),
                 ).items
-                .toContinueWatchingEntries(
-                    provider = source,
-                    nowMs = nowMs,
-                    limit = limit,
-                )
+                .toProviderContinueWatchingEntries(source, nowMs, limit)
             val status = when {
                 entries.isNotEmpty() -> ""
                 else -> "No ${providerLabel(source)} continue watching entries available."
@@ -758,66 +715,46 @@ class BackendWatchHistoryService(
     }
 
     private suspend fun listCanonicalBackendContinueWatchingItems(
-        source: WatchProvider,
         limit: Int,
         nowMs: Long,
     ): CanonicalContinueWatchingResult {
         val backendContext = getBackendContext()
             ?: return CanonicalContinueWatchingResult(
-                statusMessage = connectContinueWatchingMessage(source),
+                statusMessage = "Sign in and select a profile to load continue watching.",
                 isError = true,
             )
 
         return try {
-            val authState = refreshAuthState(backendContext)
-            if (!authState.isProviderConnected(source)) {
-                return CanonicalContinueWatchingResult(
-                    statusMessage = connectContinueWatchingMessage(source),
-                    isError = true,
-                )
-            }
-
             val entries = backend
                 .listContinueWatching(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
                     limit = limit.coerceAtLeast(1),
                 ).items
-                .toCanonicalContinueWatchingItems(
-                    provider = source,
-                    nowMs = nowMs,
-                    limit = limit,
-                )
-            val status = when {
-                entries.isNotEmpty() -> ""
-                else -> "No ${providerLabel(source)} continue watching entries available."
-            }
+                .toCanonicalContinueWatchingItems(nowMs = nowMs, limit = limit)
+            val status = if (entries.isNotEmpty()) "" else "No continue watching entries available."
             CanonicalContinueWatchingResult(statusMessage = status, entries = entries)
         } catch (_: Throwable) {
-            val cached = getCachedContinueWatching(limit = limit, nowMs = nowMs, source = source)
             CanonicalContinueWatchingResult(
-                statusMessage = "${providerLabel(source)} temporarily unavailable. ${cached.statusMessage}",
-                entries = cached.entries.map { it.toCanonicalContinueWatchingItem() },
+                statusMessage = "Continue watching temporarily unavailable.",
+                entries = emptyList(),
                 isError = true,
             )
         }
     }
 
-    private suspend fun canonicalWatchedEpisodeRecords(source: WatchProvider): List<WatchedEpisodeRecord> {
-        val providerOrigin = source.apiValue()
+    private suspend fun canonicalWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
         return listCanonicalWatchHistory(limit = 1000)
             .asSequence()
             .filter { item ->
-                if (item.origins.none { it.equals(providerOrigin, ignoreCase = true) }) {
-                    return@filter false
-                }
                 item.media.mediaType.equals("episode", ignoreCase = true) &&
                     item.media.seasonNumber != null &&
                     item.media.episodeNumber != null
             }
             .map { item ->
+                val canonicalContentId = item.media.mediaKey.trim().ifBlank { item.media.providerId }
                 WatchedEpisodeRecord(
-                    contentId = item.media.providerId,
+                    contentId = canonicalContentId,
                     season = item.media.seasonNumber ?: 1,
                     episode = item.media.episodeNumber ?: 1,
                     watchedAtEpochMs =
@@ -1330,15 +1267,12 @@ class BackendWatchHistoryService(
     }
 
     private fun List<CrispyBackendClient.ContinueWatchingItem>.toContinueWatchingEntries(
-        provider: WatchProvider,
         nowMs: Long,
         limit: Int,
     ): List<ContinueWatchingEntry> {
         val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
-        val providerOrigin = provider.apiValue()
         return buildList {
             for (item in this@toContinueWatchingEntries) {
-                if (item.origins.none { it.equals(providerOrigin, ignoreCase = true) }) continue
                 val updatedAt =
                     parseIsoToEpochMs(item.lastActivityAt)
                         ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
@@ -1357,7 +1291,7 @@ class BackendWatchHistoryService(
                         episode = item.media.episodeNumber,
                         progressPercent = item.progress?.progressPercent ?: 0.0,
                         lastUpdatedEpochMs = updatedAt,
-                        source = provider,
+                        source = item.origins.firstNotNullOfOrNull(::originToProvider) ?: WatchProvider.LOCAL,
                         posterUrl = item.media.posterUrl,
                         backdropUrl = item.media.backdropUrl,
                         logoUrl = null,
@@ -1373,12 +1307,33 @@ class BackendWatchHistoryService(
             .take(limit)
     }
 
-    private fun List<CrispyBackendClient.ContinueWatchingItem>.toCanonicalContinueWatchingItems(
+    private fun List<CrispyBackendClient.ContinueWatchingItem>.toProviderContinueWatchingEntries(
         provider: WatchProvider,
         nowMs: Long,
         limit: Int,
+    ): List<ContinueWatchingEntry> {
+        val providerOrigin = provider.apiValue()
+        return asSequence()
+            .filter { item -> item.origins.any { it.equals(providerOrigin, ignoreCase = true) } }
+            .toList()
+            .toContinueWatchingEntries(nowMs = nowMs, limit = limit)
+            .map { it.copy(source = provider) }
+    }
+
+    private fun List<CrispyBackendClient.ContinueWatchingItem>.toCanonicalContinueWatchingItems(
+        nowMs: Long,
+        limit: Int,
     ): List<CanonicalContinueWatchingItem> {
-        return toContinueWatchingEntries(provider, nowMs, limit).map { it.toCanonicalContinueWatchingItem() }
+        return toContinueWatchingEntries(nowMs, limit).map { it.toCanonicalContinueWatchingItem() }
+    }
+
+    private fun originToProvider(origin: String): WatchProvider? {
+        return when (origin.trim().lowercase(Locale.US)) {
+            "trakt" -> WatchProvider.TRAKT
+            "simkl" -> WatchProvider.SIMKL
+            "local", "native" -> WatchProvider.LOCAL
+            else -> null
+        }
     }
 
     private fun ContinueWatchingEntry.toCanonicalContinueWatchingItem(): CanonicalContinueWatchingItem {

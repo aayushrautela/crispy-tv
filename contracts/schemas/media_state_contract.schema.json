@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 2
+      "minimum": 3
     },
     "suite": {
       "const": "media_state_contract"

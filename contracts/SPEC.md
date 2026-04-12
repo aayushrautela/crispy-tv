@@ -82,14 +82,25 @@ The spec version documents the contract surface. Each suite owns its own
   - Logical storage namespace/versioning and schema mismatch behavior.
 - `media_state_contract`
   - Validate exact backend payload-shape rules from `CLIENT_SERVER_MEDIA_STATE_CONTRACT.md` for client-facing runtime and card-like metadata surfaces.
-  - `contract_version` 2 requires `media.mediaKey` for every media-bearing title surface that can open title details. `mediaType`, `provider`, and `providerId` remain supporting metadata only.
+  - `contract_version` 3 requires `media.mediaKey` for every media-bearing title surface that can open title details. `mediaType`, `provider`, and `providerId` remain supporting metadata only.
   - Regular-card surfaces require `mediaKey`, `mediaType`, `provider`, `providerId`, `title`, and `posterUrl`.
   - Landscape-card surfaces require the same fields plus `backdropUrl`.
-  - Continue-watching items require `id`, `media`, `progress`, `watchedAt`, `lastActivityAt`, `origins`, and `dismissible`; dismissal UI must honor backend `dismissible`.
+  - Continue-watching items require `id`, `media`, `progress`, `lastActivityAt`, `origins`, and `dismissible`; they do not require `watchedAt`, and dismissal UI must honor backend `dismissible`.
   - Watched/watchlist/ratings items require `media` and `origins`, plus their relevant state fields.
   - Search results, `similar`, `collection.parts`, and other card-like title metadata items are `mediaKey`-based and must not require internal canonical ids.
   - Title metadata routes use `/v1/metadata/titles/:mediaKey` and nested title-content routes hang off that same public key rather than internal ids.
   - Home snapshot sections preserve exact backend `layout` values: `regular`, `landscape`, `collection`, `hero`.
+- `watch_collections_contract`
+  - Validate public `/v1/profiles/:profileId/watch/*` collection envelopes against the server contract.
+  - Collection envelopes preserve exact server fields: `profileId`, `kind`, `source`, `generatedAt`, `items`, and `pageInfo`.
+  - Collection `source` is `canonical_watch`; `kind` values are `continue-watching`, `history`, `watchlist`, and `ratings`.
+  - Continue-watching items require landscape media plus `progress`, `lastActivityAt`, `origins`, and `dismissible`.
+  - History/watchlist/ratings items require regular media plus their respective server state objects/fields.
+- `calendar_contract`
+  - Validate public `/v1/profiles/:profileId/calendar` and `/calendar/this-week` responses against the server contract.
+  - Calendar envelopes preserve exact server fields: `profileId`, `source`, `generatedAt`, and `items`; `this-week` additionally requires `kind: this-week`.
+  - Calendar items require `bucket`, landscape `media`, regular `relatedShow`, `airDate`, and `watched`.
+  - Calendar `source` is `canonical_calendar`; valid buckets are `up_next`, `this_week`, `upcoming`, `recently_released`, and `no_scheduled`.
 
 ## Breaking Changes
 

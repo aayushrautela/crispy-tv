@@ -925,10 +925,13 @@ internal fun CrispyBackendClient.parseCalendarItems(array: JSONArray?): List<Cal
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
             val mediaJson = item.optJSONObject("media") ?: continue
+            val relatedShowJson = item.optJSONObject("relatedShow") ?: continue
             add(
                 CalendarItem(
                     bucket = item.optString("bucket").trim(),
                     media = parseRuntimeMediaCard(mediaJson, requireBackdrop = true),
+                    relatedShow = parseRuntimeMediaCard(relatedShowJson, requireBackdrop = false),
+                    airDate = item.optNullableString("airDate"),
                     watched = item.optBoolean("watched", false),
                 )
             )

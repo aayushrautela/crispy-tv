@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "watch_collections_contract fixture",
+  "type": "object",
+  "required": ["contract_version", "suite", "case_id", "input", "expected"],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "watch_collections_contract"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": ["payload"],
+      "properties": {
+        "payload": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": ["valid", "normalized"],
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        },
+        "normalized": {
+          "type": ["object", "null"],
+          "required": ["profile_id", "kind", "source", "generated_at", "items", "page_info"],
+          "properties": {
+            "profile_id": { "type": "string" },
+            "kind": { "type": "string" },
+            "source": { "type": "string" },
+            "generated_at": { "type": "string" },
+            "items": { "type": "array", "items": { "type": "object" } },
+            "page_info": {
+              "type": "object",
+              "required": ["next_cursor", "has_more"],
+              "properties": {
+                "next_cursor": { "type": ["string", "null"] },
+                "has_more": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

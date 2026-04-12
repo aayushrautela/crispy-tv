@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "media_state_contract",
   "case_id": "regular_card_missing_media_key_is_invalid",
   "input": {

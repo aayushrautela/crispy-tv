@@ -73,7 +73,6 @@ internal class WatchCtaResolver(
         expectedType: MetadataLabMediaType,
         nowMs: Long,
     ): CanonicalContinueWatchingItem? {
-        val source = userMediaRepository.preferredProvider()
         val targetId = details.id.trim().lowercase(Locale.US)
         val targetMediaKey = details.mediaKey?.trim()?.lowercase(Locale.US)
         val targetProvider = details.provider?.trim()?.lowercase(Locale.US)
@@ -82,7 +81,7 @@ internal class WatchCtaResolver(
             return null
         }
 
-        val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowMs = nowMs, source = source)
+        val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowMs = nowMs)
 
         return snapshot.entries
             .asSequence()

@@ -1,0 +1,68 @@
+{
+  "contract_version": 1,
+  "suite": "watch_collections_contract",
+  "case_id": "watchlist_collection_matches_server_contract",
+  "input": {
+    "payload": {
+      "profileId": "profile-123",
+      "kind": "watchlist",
+      "source": "canonical_watch",
+      "generatedAt": "2026-04-12T00:00:00Z",
+      "items": [
+        {
+          "id": "watchlist-1",
+          "media": {
+            "mediaType": "movie",
+            "mediaKey": "tmdb:movie:603",
+            "provider": "tmdb",
+            "providerId": "603",
+            "title": "The Matrix",
+            "posterUrl": "https://img/matrix.jpg",
+            "releaseYear": 1999,
+            "rating": 8.7,
+            "genre": "Action",
+            "subtitle": "1999 · 136 min"
+          },
+          "addedAt": "2026-04-08T12:00:00Z",
+          "origins": ["watchlist"]
+        }
+      ],
+      "pageInfo": {
+        "nextCursor": null,
+        "hasMore": false
+      }
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "profile_id": "profile-123",
+      "kind": "watchlist",
+      "source": "canonical_watch",
+      "generated_at": "2026-04-12T00:00:00Z",
+      "items": [
+        {
+          "id": "watchlist-1",
+          "media": {
+            "media_type": "movie",
+            "media_key": "tmdb:movie:603",
+            "provider": "tmdb",
+            "provider_id": "603",
+            "title": "The Matrix",
+            "poster_url": "https://img/matrix.jpg",
+            "release_year": 1999,
+            "rating": 8.7,
+            "genre": "Action",
+            "subtitle": "1999 · 136 min"
+          },
+          "added_at": "2026-04-08T12:00:00Z",
+          "origins": ["watchlist"]
+        }
+      ],
+      "page_info": {
+        "next_cursor": null,
+        "has_more": false
+      }
+    }
+  }
+}

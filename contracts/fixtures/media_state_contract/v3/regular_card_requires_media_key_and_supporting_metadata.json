@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "suite": "media_state_contract",
   "case_id": "regular_card_requires_media_key_and_supporting_metadata",
   "input": {

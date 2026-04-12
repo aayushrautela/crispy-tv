@@ -421,32 +421,11 @@ class RemoteWatchHistoryService(
         return ContinueWatchingResult(statusMessage = status, entries = merged)
     }
 
-    override suspend fun listWatchedEpisodeRecords(source: WatchProvider?): List<WatchedEpisodeRecord> {
-        return when (source) {
-            WatchProvider.TRAKT -> listTraktWatchedEpisodeRecords()
-            WatchProvider.SIMKL -> emptyList()
-            WatchProvider.LOCAL -> {
-                localStore
-                    .listLocalHistory(limit = Int.MAX_VALUE, authState = authState())
-                    .entries
-                    .mapNotNull { entry ->
-                        val season = entry.season ?: return@mapNotNull null
-                        val episode = entry.episode ?: return@mapNotNull null
-                        WatchedEpisodeRecord(
-                            contentId = entry.contentId,
-                            season = season,
-                            episode = episode,
-                            watchedAtEpochMs = entry.watchedAtEpochMs,
-                        )
-                    }
-            }
-            null -> {
-                if (authState().traktAuthenticated) {
-                    listTraktWatchedEpisodeRecords()
-                } else {
-                    emptyList()
-                }
-            }
+    override suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
+        return if (authState().traktAuthenticated) {
+            listTraktWatchedEpisodeRecords()
+        } else {
+            emptyList()
         }
     }
 

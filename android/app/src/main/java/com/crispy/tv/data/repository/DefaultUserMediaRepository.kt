@@ -34,17 +34,15 @@ class DefaultUserMediaRepository(
     override suspend fun getCanonicalContinueWatching(
         limit: Int,
         nowMs: Long,
-        source: WatchProvider?,
     ): CanonicalContinueWatchingResult {
         return watchHistoryService.getCanonicalContinueWatching(
             limit = limit,
             nowMs = nowMs,
-            source = source,
         )
     }
 
-    override suspend fun listWatchedEpisodeRecords(source: WatchProvider?): List<WatchedEpisodeRecord> {
-        return watchHistoryService.listWatchedEpisodeRecords(source)
+    override suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
+        return watchHistoryService.listWatchedEpisodeRecords()
     }
 
     override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {

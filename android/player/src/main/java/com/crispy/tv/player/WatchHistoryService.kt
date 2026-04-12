@@ -314,14 +314,11 @@ interface WatchHistoryService {
     suspend fun getCanonicalContinueWatching(
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
-        source: WatchProvider? = null,
     ): CanonicalContinueWatchingResult {
         return CanonicalContinueWatchingResult(statusMessage = "Canonical continue watching unavailable.", isError = true)
     }
 
-    suspend fun listWatchedEpisodeRecords(
-        source: WatchProvider? = null,
-    ): List<WatchedEpisodeRecord> {
+    suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
         return emptyList()
     }
 

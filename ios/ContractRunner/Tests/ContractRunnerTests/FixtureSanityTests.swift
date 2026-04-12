@@ -6,6 +6,9 @@ final class FixtureSanityTests: XCTestCase {
         let suites = [
             "player_machine",
             "continue_watching",
+            "media_state_contract",
+            "watch_collections_contract",
+            "calendar_contract",
             "next_episode",
             "trakt_scrobble_policy",
             "media_ids",
