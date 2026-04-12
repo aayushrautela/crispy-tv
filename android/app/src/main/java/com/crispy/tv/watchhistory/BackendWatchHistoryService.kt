@@ -1,37 +1,23 @@
 package com.crispy.tv.watchhistory
 
 import android.content.Context
-import android.content.SharedPreferences
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
 import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
-import com.crispy.tv.backend.CrispyBackendClient.ProviderAccount
 import com.crispy.tv.backend.CrispyBackendClient.WatchMutationInput
-import com.crispy.tv.domain.watch.findNextEpisode
-import com.crispy.tv.player.ContinueWatchingEntry
-import com.crispy.tv.player.ContinueWatchingResult
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.CanonicalWatchStateSnapshot
 import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.ProviderAuthActionResult
 import com.crispy.tv.player.WatchedEpisodeRecord
-import com.crispy.tv.player.WatchHistoryEntry
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProgressSnapshot
-import com.crispy.tv.player.WatchProvider
-import com.crispy.tv.player.WatchProviderAuthState
-import com.crispy.tv.player.WatchProviderSession
-import com.crispy.tv.watchhistory.cache.WatchHistoryCache
-import com.crispy.tv.watchhistory.local.LocalWatchHistoryStore
-import com.crispy.tv.watchhistory.local.NormalizedWatchRequest
 import com.crispy.tv.watchhistory.progress.WatchProgress
 import com.crispy.tv.watchhistory.progress.WatchProgressStore
 import java.time.Instant
@@ -45,169 +31,55 @@ class BackendWatchHistoryService(
     private val config: WatchHistoryConfig = WatchHistoryConfig(),
 ) : WatchHistoryService {
     private val appContext = context.applicationContext
-    private val prefs: SharedPreferences =
-        appContext.getSharedPreferences(WATCH_HISTORY_PREFS_NAME, Context.MODE_PRIVATE)
-    private val localStore = LocalWatchHistoryStore(prefs)
-    private val watchHistoryCache = WatchHistoryCache(appContext)
     private val watchProgressStore =
         WatchProgressStore(
             prefs = appContext.getSharedPreferences(WATCH_PROGRESS_PREFS_NAME, Context.MODE_PRIVATE),
         )
     private val appVersion = config.appVersion.trim().ifBlank { "dev" }
 
-    @Volatile
-    private var cachedAuthState: WatchProviderAuthState? = null
-
-    init {
-        migrateLegacyWatchHistoryPrefsIfNeeded(appContext)
-        cachedAuthState = loadStoredAuthState()
+    override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryResult {
+        return syncWatchedMutation(request, shouldMark = true)
     }
 
-    override fun clearCachedProviderAuthState() {
-        watchHistoryCache.clearProviderCaches(WatchProvider.TRAKT)
-        watchHistoryCache.clearProviderCaches(WatchProvider.SIMKL)
-        clearStoredAuthState()
-    }
-
-    override suspend fun disconnectProvider(provider: WatchProvider): ProviderAuthActionResult {
-        if (provider == WatchProvider.LOCAL) {
-            return ProviderAuthActionResult(
-                success = false,
-                statusMessage = "Local provider does not support disconnect.",
-                authState = authState(),
-            )
-        }
-
-        val backendContext = getBackendContext() ?: return ProviderAuthActionResult(
-            success = false,
-            statusMessage = "Select a profile to disconnect ${providerLabel(provider)}.",
-            authState = authState(),
-        )
-
-        return try {
-            backend.disconnectImportConnection(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                provider = provider.toImportProvider(),
-            )
-            watchHistoryCache.clearProviderCaches(provider)
-            val refreshed = try {
-                backend.listImportConnections(backendContext.accessToken, backendContext.profileId).providerAccounts
-            } catch (_: Throwable) {
-                null
-            }
-            val nextAuthState =
-                if (refreshed != null) {
-                    persistAuthState(refreshed)
-                } else {
-                    clearProvider(provider)
-                }
-            ProviderAuthActionResult(
-                success = true,
-                statusMessage = "${providerLabel(provider)} disconnected from Crispy.",
-                authState = nextAuthState,
-            )
-        } catch (error: Throwable) {
-            ProviderAuthActionResult(
-                success = false,
-                statusMessage = error.message ?: "${providerLabel(provider)} disconnect failed.",
-                authState = authState(),
-            )
-        }
-    }
-
-    override fun authState(): WatchProviderAuthState {
-        return cachedAuthState ?: loadStoredAuthState().also { cachedAuthState = it }
-    }
-
-    override suspend fun refreshProviderAuthState(forceRefresh: Boolean): ProviderAuthActionResult {
-        val backendContext = getBackendContext() ?: return ProviderAuthActionResult(
-            success = !forceRefresh,
-            statusMessage = "",
-            authState = clearStoredAuthState(),
-        )
-
-        return try {
-            val authProviders = backend.listImportConnections(backendContext.accessToken, backendContext.profileId).providerAccounts
-            ProviderAuthActionResult(
-                success = true,
-                statusMessage = "",
-                authState = persistAuthState(authProviders),
-            )
-        } catch (error: Throwable) {
-            ProviderAuthActionResult(
-                success = false,
-                statusMessage = error.message ?: "Failed to load provider status.",
-                authState = authState(),
-            )
-        }
-    }
-
-    override suspend fun listLocalHistory(limit: Int): WatchHistoryResult {
-        return localStore.listLocalHistory(limit = limit, authState = authState())
-    }
-
-    override suspend fun exportLocalHistory(): List<WatchHistoryEntry> {
-        return localStore.exportLocalHistory()
-    }
-
-    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryResult {
-        return localStore.replaceLocalHistory(entries = entries, authState = authState())
-    }
-
-    override suspend fun markWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryResult {
-        return updateWatchedState(request = request, source = source, shouldMark = true)
-    }
-
-    override suspend fun unmarkWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryResult {
-        return updateWatchedState(request = request, source = source, shouldMark = false)
+    override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryResult {
+        return syncWatchedMutation(request, shouldMark = false)
     }
 
     override suspend fun setInWatchlist(
         request: WatchHistoryRequest,
         inWatchlist: Boolean,
-        source: WatchProvider?,
     ): WatchHistoryResult {
-        if (source == WatchProvider.LOCAL) {
-            return WatchHistoryResult(statusMessage = "Watchlist is unavailable for local watch history.")
-        }
-
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update watchlist.")
-
-        if (source == null) {
-            val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
-                ?: resolveMediaKey(backendContext.accessToken, request)
-                ?: return WatchHistoryResult(statusMessage = "Watchlist update failed.")
-            val action = try {
-                if (inWatchlist) {
-                    backend.putNativeWatchlist(
-                        accessToken = backendContext.accessToken,
-                        profileId = backendContext.profileId,
-                        mediaKey = mediaKey,
-                    )
-                } else {
-                    backend.deleteNativeWatchlist(
-                        accessToken = backendContext.accessToken,
-                        profileId = backendContext.profileId,
-                        mediaKey = mediaKey,
-                    )
-                }
-            } catch (error: Throwable) {
-                return WatchHistoryResult(statusMessage = error.message ?: "Watchlist update failed.")
+        val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
+            ?: resolveMediaKey(backendContext.accessToken, request)
+            ?: return WatchHistoryResult(statusMessage = "Watchlist update failed.")
+        val action = try {
+            if (inWatchlist) {
+                backend.putNativeWatchlist(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = mediaKey,
+                )
+            } else {
+                backend.deleteNativeWatchlist(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = mediaKey,
+                )
             }
-
-            return WatchHistoryResult(
-                statusMessage = if (action.accepted) {
-                    if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
-                } else {
-                    "Watchlist update failed."
-                },
-                authState = authState(),
-                accepted = action.accepted,
-            )
+        } catch (error: Throwable) {
+            return WatchHistoryResult(statusMessage = error.message ?: "Watchlist update failed.")
         }
-        return WatchHistoryResult(statusMessage = "Provider watchlist sync is unavailable right now.")
+
+        return WatchHistoryResult(
+            statusMessage = if (action.accepted) {
+                if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
+            } else {
+                "Watchlist update failed."
+            },
+            accepted = action.accepted,
+        )
     }
 
     override suspend fun setTitleInWatchlist(
@@ -244,7 +116,6 @@ class BackendWatchHistoryService(
             } else {
                 "Watchlist update failed."
             },
-            authState = authState(),
             accepted = action.accepted,
         )
     }
@@ -252,49 +123,39 @@ class BackendWatchHistoryService(
     override suspend fun setRating(
         request: WatchHistoryRequest,
         rating: Int?,
-        source: WatchProvider?,
     ): WatchHistoryResult {
-        if (source == WatchProvider.LOCAL) {
-            return WatchHistoryResult(statusMessage = "Rating is unavailable for local watch history.")
-        }
-
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
-
-        if (source == null) {
-            val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
-                ?: resolveMediaKey(backendContext.accessToken, request)
-                ?: return WatchHistoryResult(statusMessage = "Rating update failed.")
-            val action = try {
-                if (rating == null) {
-                    backend.deleteNativeRating(
-                        accessToken = backendContext.accessToken,
-                        profileId = backendContext.profileId,
-                        mediaKey = mediaKey,
-                    )
-                } else {
-                    backend.putNativeRating(
-                        accessToken = backendContext.accessToken,
-                        profileId = backendContext.profileId,
-                        mediaKey = mediaKey,
-                        rating = rating.coerceIn(1, 10),
-                    )
-                }
-            } catch (error: Throwable) {
-                return WatchHistoryResult(statusMessage = error.message ?: "Rating update failed.")
+        val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
+            ?: resolveMediaKey(backendContext.accessToken, request)
+            ?: return WatchHistoryResult(statusMessage = "Rating update failed.")
+        val action = try {
+            if (rating == null) {
+                backend.deleteNativeRating(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = mediaKey,
+                )
+            } else {
+                backend.putNativeRating(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    mediaKey = mediaKey,
+                    rating = rating.coerceIn(1, 10),
+                )
             }
-
-            return WatchHistoryResult(
-                statusMessage = if (action.accepted) {
-                    if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
-                } else {
-                    "Rating update failed."
-                },
-                authState = authState(),
-                accepted = action.accepted,
-            )
+        } catch (error: Throwable) {
+            return WatchHistoryResult(statusMessage = error.message ?: "Rating update failed.")
         }
-        return WatchHistoryResult(statusMessage = "Provider rating sync is unavailable right now.")
+
+        return WatchHistoryResult(
+            statusMessage = if (action.accepted) {
+                if (rating == null) "Removed rating." else "Rated ${rating.coerceIn(1, 10)}/10."
+            } else {
+                "Rating update failed."
+            },
+            accepted = action.accepted,
+        )
     }
 
     override suspend fun setTitleRating(
@@ -332,12 +193,11 @@ class BackendWatchHistoryService(
             } else {
                 "Rating update failed."
             },
-            authState = authState(),
             accepted = action.accepted,
         )
     }
 
-    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryResult {
+    override suspend fun removeFromPlayback(playbackId: String): WatchHistoryResult {
         val trimmedId = playbackId.trim()
         if (trimmedId.isEmpty()) {
             return WatchHistoryResult(statusMessage = "Playback id missing.")
@@ -353,64 +213,12 @@ class BackendWatchHistoryService(
                 itemId = trimmedId,
             )
         } catch (_: Throwable) {
-            return WatchHistoryResult(statusMessage = "Continue watching removal failed.", authState = authState())
+            return WatchHistoryResult(statusMessage = "Continue watching removal failed.")
         }
 
-        val synced = action.accepted
         return WatchHistoryResult(
-            statusMessage = if (synced) "Removed from continue watching." else "Continue watching removal unavailable.",
-            authState = authState(),
-            accepted = synced,
-            syncedToTrakt = synced && source == WatchProvider.TRAKT,
-            syncedToSimkl = synced && source == WatchProvider.SIMKL,
-        )
-    }
-
-    override suspend fun listContinueWatching(limit: Int, nowMs: Long, source: WatchProvider?): ContinueWatchingResult {
-        val targetLimit = limit.coerceAtLeast(1)
-
-        return when (source) {
-            WatchProvider.LOCAL -> {
-                val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
-                ContinueWatchingResult(
-                    statusMessage = if (local.isNotEmpty()) "" else "No local continue watching entries yet.",
-                    entries = local,
-                )
-            }
-
-            WatchProvider.TRAKT,
-            WatchProvider.SIMKL -> listCanonicalBackendContinueWatching(source, targetLimit, nowMs)
-
-            null -> {
-                val auth = authState()
-                when {
-                    auth.traktAuthenticated -> listCanonicalBackendContinueWatching(WatchProvider.TRAKT, targetLimit, nowMs)
-                    auth.simklAuthenticated -> listCanonicalBackendContinueWatching(WatchProvider.SIMKL, targetLimit, nowMs)
-                    else -> {
-                        val local = listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = targetLimit)
-                        ContinueWatchingResult(
-                            statusMessage = if (local.isNotEmpty()) "" else "No continue watching entries yet.",
-                            entries = local,
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    override suspend fun getCachedContinueWatching(
-        limit: Int,
-        nowMs: Long,
-        source: WatchProvider?,
-    ): ContinueWatchingResult {
-        return watchHistoryCache.getCachedContinueWatching(
-            limit = limit,
-            nowMs = nowMs,
-            source = source,
-            localFallback = { listContinueWatchingFromLocalProgress(nowMs = nowMs, limit = limit.coerceAtLeast(1)) },
-            normalize = { entries, _, targetLimit ->
-                entries.sortedByDescending { it.lastUpdatedEpochMs }.take(targetLimit)
-            },
+            statusMessage = if (action.accepted) "Removed from continue watching." else "Continue watching removal unavailable.",
+            accepted = action.accepted,
         )
     }
 
@@ -427,7 +235,6 @@ class BackendWatchHistoryService(
     }
 
     override suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
-        val localSnapshot = localWatchStateSnapshot(identity)
         val backendContext = getBackendContext()
         val input = identity.toPlaybackLookupInput()
         val backendSnapshot =
@@ -439,7 +246,7 @@ class BackendWatchHistoryService(
                         backend.resolvePlayback(
                             accessToken = backendContext.accessToken,
                             input = input,
-                        ).item.mediaKey.trim().takeIf { it.isNotBlank() } ?: return mergeCanonicalWatchState(null, localSnapshot)
+                        ).item.mediaKey.trim().takeIf { it.isNotBlank() } ?: return null
                     val envelope = backend.getWatchState(
                         accessToken = backendContext.accessToken,
                         profileId = backendContext.profileId,
@@ -450,7 +257,7 @@ class BackendWatchHistoryService(
                     null
                 }
         }
-        return mergeCanonicalWatchState(backendSnapshot, localSnapshot)
+        return backendSnapshot
     }
 
     override suspend fun getTitleWatchState(
@@ -458,7 +265,6 @@ class BackendWatchHistoryService(
         contentType: MetadataLabMediaType,
     ): CanonicalWatchStateSnapshot? {
         val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
-        val localSnapshot = localWatchStateSnapshot(titleStateIdentity(normalizedMediaKey, contentType))
         val backendContext = getBackendContext()
         val backendSnapshot =
             if (backendContext == null) {
@@ -474,7 +280,7 @@ class BackendWatchHistoryService(
                     null
                 }
             }
-        return mergeCanonicalWatchState(backendSnapshot, localSnapshot)
+        return backendSnapshot
     }
 
     override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
@@ -567,57 +373,6 @@ class BackendWatchHistoryService(
         )
     }
 
-    private suspend fun updateWatchedState(
-        request: WatchHistoryRequest,
-        source: WatchProvider?,
-        shouldMark: Boolean,
-    ): WatchHistoryResult {
-        val normalized = runCatching { localStore.normalizeRequest(request) }.getOrElse { error ->
-            return WatchHistoryResult(statusMessage = error.message ?: "Invalid watch history request.")
-        }
-
-        val updated =
-            if (shouldMark) {
-                localStore.upsertEntry(localStore.loadEntries(), normalized.toLocalWatchedItem())
-            } else {
-                localStore.removeEntry(localStore.loadEntries(), normalized)
-            }
-        localStore.saveEntries(updated)
-
-        val synced =
-            if (source == WatchProvider.LOCAL) {
-                false
-            } else {
-                syncWatchedMutation(normalized, shouldMark)
-            }
-
-        val accepted =
-            when (source) {
-                WatchProvider.LOCAL -> true
-                WatchProvider.TRAKT,
-                WatchProvider.SIMKL,
-                null -> synced
-            }
-
-        val successStatus = if (shouldMark) "Marked watched." else "Removed from watched."
-        val failureStatus =
-            when (source) {
-                WatchProvider.LOCAL -> successStatus
-                WatchProvider.TRAKT -> "Trakt watched sync failed."
-                WatchProvider.SIMKL -> "Simkl watched sync failed."
-                null -> "Watched update failed."
-            }
-
-        return WatchHistoryResult(
-            statusMessage = if (accepted) successStatus else failureStatus,
-            entries = updated.sortedByDescending { it.watchedAtEpochMs }.map { it.toPublicEntry() },
-            authState = authState(),
-            accepted = accepted,
-            syncedToTrakt = synced && source == WatchProvider.TRAKT,
-            syncedToSimkl = synced && source == WatchProvider.SIMKL,
-        )
-    }
-
     private suspend fun resolveMediaKey(accessToken: String, request: WatchHistoryRequest): String? {
         return try {
             backend.resolvePlayback(
@@ -629,34 +384,10 @@ class BackendWatchHistoryService(
         }
     }
 
-    private suspend fun syncWatchedMutation(request: NormalizedWatchRequest, shouldMark: Boolean): Boolean {
-        val backendContext = getBackendContext() ?: return false
-        val mutationInput =
-            request.toTitleWatchMutationInput()
-                ?: run {
-                    val resolved = try {
-                        backend.resolvePlayback(
-                            accessToken = backendContext.accessToken,
-                            input = request.toPlaybackLookupInput(),
-                        )
-                    } catch (_: Throwable) {
-                        null
-                    } ?: return false
-
-                    val item = resolved.item
-                    WatchMutationInput(
-                        mediaKey = item.mediaKey,
-                        mediaType = item.mediaType,
-                        seasonNumber = item.seasonNumber,
-                        episodeNumber = item.episodeNumber,
-                        provider = item.provider,
-                        providerId = item.providerId,
-                        parentProvider = item.parentProvider ?: request.parentProvider,
-                        parentProviderId = item.parentProviderId ?: request.parentProviderId,
-                        absoluteEpisodeNumber = item.absoluteEpisodeNumber ?: request.absoluteEpisodeNumber,
-                        occurredAt = Instant.ofEpochMilli(request.watchedAtEpochMs).toString(),
-                    )
-                }
+    private suspend fun syncWatchedMutation(request: WatchHistoryRequest, shouldMark: Boolean): WatchHistoryResult {
+        val backendContext = getBackendContext() ?: return WatchHistoryResult(statusMessage = "Select a profile to update watched state.")
+        val mutationInput = buildWatchMutationInput(request, backendContext)
+            ?: return WatchHistoryResult(statusMessage = "Watched update failed.")
 
         val response = try {
             if (shouldMark) {
@@ -666,52 +397,16 @@ class BackendWatchHistoryService(
             }
         } catch (_: Throwable) {
             null
-        } ?: return false
+        } ?: return WatchHistoryResult(statusMessage = "Watched update failed.")
 
-        return response.accepted
-    }
-
-    private suspend fun listCanonicalBackendContinueWatching(
-        source: WatchProvider,
-        limit: Int,
-        nowMs: Long,
-    ): ContinueWatchingResult {
-        val backendContext = getBackendContext()
-            ?: return ContinueWatchingResult(
-                statusMessage = connectContinueWatchingMessage(source),
-                isError = true,
-            )
-
-        return try {
-            val authState = refreshAuthState(backendContext)
-            if (!authState.isProviderConnected(source)) {
-                return ContinueWatchingResult(
-                    statusMessage = connectContinueWatchingMessage(source),
-                    isError = true,
-                )
-            }
-
-            val entries = backend
-                .listContinueWatching(
-                    accessToken = backendContext.accessToken,
-                    profileId = backendContext.profileId,
-                    limit = limit.coerceAtLeast(1),
-                ).items
-                .toProviderContinueWatchingEntries(source, nowMs, limit)
-            val status = when {
-                entries.isNotEmpty() -> ""
-                else -> "No ${providerLabel(source)} continue watching entries available."
-            }
-            val result = ContinueWatchingResult(statusMessage = status, entries = entries)
-            watchHistoryCache.writeContinueWatchingCache(source, result)
-            result
-        } catch (_: Throwable) {
-            val cached = getCachedContinueWatching(limit = limit, nowMs = nowMs, source = source)
-            cached.copy(
-                statusMessage = "${providerLabel(source)} temporarily unavailable. ${cached.statusMessage}",
-                isError = true,
-            )
-        }
+        return WatchHistoryResult(
+            statusMessage = if (response.accepted) {
+                if (shouldMark) "Marked watched." else "Removed from watched."
+            } else {
+                "Watched update failed."
+            },
+            accepted = response.accepted,
+        )
     }
 
     private suspend fun listCanonicalBackendContinueWatchingItems(
@@ -778,22 +473,6 @@ class BackendWatchHistoryService(
         } catch (_: Throwable) {
             emptyList()
         }
-    }
-
-    private fun localWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
-        return localStore
-            .listLocalHistory(limit = Int.MAX_VALUE, authState = authState())
-            .entries
-            .mapNotNull { entry ->
-                val season = entry.season ?: return@mapNotNull null
-                val episode = entry.episode ?: return@mapNotNull null
-                WatchedEpisodeRecord(
-                    contentId = entry.contentId,
-                    season = season,
-                    episode = episode,
-                    watchedAtEpochMs = entry.watchedAtEpochMs,
-                )
-            }
     }
 
     private suspend fun sendPlaybackEvent(
@@ -866,224 +545,6 @@ class BackendWatchHistoryService(
         return backendContextResolver.resolve()
     }
 
-    private fun loadStoredAuthState(): WatchProviderAuthState {
-        val traktConnected = prefs.getBoolean(KEY_BACKEND_TRAKT_CONNECTED, false)
-        val simklConnected = prefs.getBoolean(KEY_BACKEND_SIMKL_CONNECTED, false)
-        val traktHandle = prefs.getString(KEY_BACKEND_TRAKT_USERNAME, null)?.trim().orEmpty().ifBlank { null }
-        val simklHandle = prefs.getString(KEY_BACKEND_SIMKL_USERNAME, null)?.trim().orEmpty().ifBlank { null }
-        return WatchProviderAuthState(
-            traktAuthenticated = traktConnected,
-            simklAuthenticated = simklConnected,
-            traktSession = traktHandle?.let { WatchProviderSession(accessToken = BACKEND_SESSION_TOKEN, userHandle = it) },
-            simklSession = simklHandle?.let { WatchProviderSession(accessToken = BACKEND_SESSION_TOKEN, userHandle = it) },
-        )
-    }
-
-    private suspend fun refreshAuthState(backendContext: BackendContext): WatchProviderAuthState {
-        val accounts = backend.listImportConnections(backendContext.accessToken, backendContext.profileId).providerAccounts
-        return persistAuthState(accounts)
-    }
-
-    private fun persistAuthState(accounts: List<ProviderAccount>): WatchProviderAuthState {
-        val trakt = accounts.firstOrNull { it.provider.equals(WatchProvider.TRAKT.apiValue(), ignoreCase = true) }
-        val simkl = accounts.firstOrNull { it.provider.equals(WatchProvider.SIMKL.apiValue(), ignoreCase = true) }
-        prefs.edit()
-            .putBoolean(KEY_BACKEND_TRAKT_CONNECTED, trakt?.isConnected() == true)
-            .putBoolean(KEY_BACKEND_SIMKL_CONNECTED, simkl?.isConnected() == true)
-            .putString(KEY_BACKEND_TRAKT_USERNAME, trakt?.externalUsername)
-            .putString(KEY_BACKEND_SIMKL_USERNAME, simkl?.externalUsername)
-            .apply()
-        return loadStoredAuthState().also { cachedAuthState = it }
-    }
-
-    private fun clearStoredAuthState(): WatchProviderAuthState {
-        prefs.edit()
-            .remove(KEY_BACKEND_TRAKT_CONNECTED)
-            .remove(KEY_BACKEND_SIMKL_CONNECTED)
-            .remove(KEY_BACKEND_TRAKT_USERNAME)
-            .remove(KEY_BACKEND_SIMKL_USERNAME)
-            .apply()
-        return loadStoredAuthState().also { cachedAuthState = it }
-    }
-
-    private fun clearProvider(provider: WatchProvider): WatchProviderAuthState {
-        when (provider) {
-            WatchProvider.TRAKT -> prefs.edit().remove(KEY_BACKEND_TRAKT_CONNECTED).remove(KEY_BACKEND_TRAKT_USERNAME).apply()
-            WatchProvider.SIMKL -> prefs.edit().remove(KEY_BACKEND_SIMKL_CONNECTED).remove(KEY_BACKEND_SIMKL_USERNAME).apply()
-            WatchProvider.LOCAL -> Unit
-        }
-        return loadStoredAuthState().also { cachedAuthState = it }
-    }
-
-    private suspend fun listContinueWatchingFromLocalProgress(nowMs: Long, limit: Int): List<ContinueWatchingEntry> {
-        val removed = watchProgressStore.getContinueWatchingRemoved()
-        val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
-
-        data class EpisodicCandidate(
-            val showId: String,
-            val contentType: MetadataLabMediaType,
-            val season: Int,
-            val episode: Int,
-            val progressPercent: Double,
-            val lastUpdatedEpochMs: Long,
-        )
-
-        val movies = ArrayList<ContinueWatchingEntry>()
-        val latestInProgressEpisodeByShow = LinkedHashMap<String, EpisodicCandidate>()
-        val maxWatchedEpisodeByShow = LinkedHashMap<String, Pair<Int, Int>>()
-        val watchedSetByShow = LinkedHashMap<String, MutableSet<String>>()
-        val latestWatchedAtByShow = LinkedHashMap<String, Long>()
-        val contentTypeByShow = LinkedHashMap<String, MetadataLabMediaType>()
-
-        for ((rawKey, progress) in watchProgressStore.getAllWatchProgress()) {
-            val parts = rawKey.split(':')
-            if (parts.size < 2) continue
-
-            val type = parts[0]
-            val id = parts[1]
-            if (id.isBlank()) continue
-
-            val baseKey = "$type:$id"
-            val removedAt = removed[baseKey]
-            if (removedAt != null && progress.lastUpdatedEpochMs <= removedAt) {
-                continue
-            }
-
-            val lastUpdated = progress.lastUpdatedEpochMs
-            if (lastUpdated <= 0L || lastUpdated < staleCutoff) continue
-
-            val percent = progress.progressPercentOrZero()
-            if (percent < CONTINUE_WATCHING_MIN_PROGRESS_PERCENT) continue
-
-            when (type) {
-                "movie" -> {
-                    movies += ContinueWatchingEntry(
-                        id = "local:movie:$id",
-                        mediaKey = id,
-                        localKey = "local:movie:$id",
-                        provider = "local",
-                        providerId = id,
-                        mediaType = "movie",
-                        title = id,
-                        season = null,
-                        episode = null,
-                        progressPercent = percent,
-                        lastUpdatedEpochMs = lastUpdated,
-                        source = WatchProvider.LOCAL,
-                    )
-                }
-
-                "series", "anime" -> {
-                    if (parts.size < 4) continue
-                    val season = parts[parts.size - 2].toIntOrNull()?.takeIf { it > 0 } ?: continue
-                    val episode = parts[parts.size - 1].toIntOrNull()?.takeIf { it > 0 } ?: continue
-                    val contentType = if (type == "anime") MetadataLabMediaType.ANIME else MetadataLabMediaType.SERIES
-                    contentTypeByShow[id] = contentType
-
-                    if (percent >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-                        val watchedKey = "$id:$season:$episode"
-                        watchedSetByShow.getOrPut(id) { linkedSetOf() }.add(watchedKey)
-                        val existingMax = maxWatchedEpisodeByShow[id]
-                        val nextMax = season to episode
-                        if (existingMax == null ||
-                            nextMax.first > existingMax.first ||
-                            (nextMax.first == existingMax.first && nextMax.second > existingMax.second)
-                        ) {
-                            maxWatchedEpisodeByShow[id] = nextMax
-                        }
-                        latestWatchedAtByShow[id] = maxOf(latestWatchedAtByShow[id] ?: 0L, lastUpdated)
-                    } else {
-                        val candidate = EpisodicCandidate(
-                            showId = id,
-                            contentType = contentType,
-                            season = season,
-                            episode = episode,
-                            progressPercent = percent,
-                            lastUpdatedEpochMs = lastUpdated,
-                        )
-                        val existing = latestInProgressEpisodeByShow[id]
-                        if (existing == null || candidate.lastUpdatedEpochMs > existing.lastUpdatedEpochMs) {
-                            latestInProgressEpisodeByShow[id] = candidate
-                        }
-                    }
-                }
-            }
-        }
-
-        val seriesEntries = latestInProgressEpisodeByShow.values.map {
-            ContinueWatchingEntry(
-                id = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
-                mediaKey = it.showId,
-                localKey = "local:${it.contentType.label}:${it.showId}:${it.season}:${it.episode}",
-                provider = "local",
-                providerId = it.showId,
-                mediaType = if (it.contentType == MetadataLabMediaType.ANIME) "anime" else "series",
-                title = it.showId,
-                season = it.season,
-                episode = it.episode,
-                progressPercent = it.progressPercent,
-                lastUpdatedEpochMs = it.lastUpdatedEpochMs,
-                source = WatchProvider.LOCAL,
-            )
-        }
-
-        val placeholderCandidates =
-            maxWatchedEpisodeByShow
-                .filterKeys { it !in latestInProgressEpisodeByShow.keys }
-                .entries
-                .sortedByDescending { (showId, _) -> latestWatchedAtByShow[showId] ?: 0L }
-
-        val placeholders = ArrayList<ContinueWatchingEntry>()
-        for ((showId, maxEpisode) in placeholderCandidates) {
-            if (movies.size + seriesEntries.size + placeholders.size >= limit) break
-            val lastWatchedAt = latestWatchedAtByShow[showId] ?: 0L
-            if (lastWatchedAt < staleCutoff) continue
-            val episodicType = contentTypeByShow[showId] ?: MetadataLabMediaType.SERIES
-
-            val episodeList = try {
-                episodeListProvider.fetchEpisodeList(
-                    mediaType = when (episodicType) {
-                        MetadataLabMediaType.MOVIE -> "movie"
-                        MetadataLabMediaType.SERIES -> "series"
-                        MetadataLabMediaType.ANIME -> "anime"
-                    },
-                    contentId = showId,
-                    seasonHint = null,
-                )
-            } catch (_: Throwable) {
-                null
-            } ?: continue
-
-            val next = findNextEpisode(
-                currentSeason = maxEpisode.first,
-                currentEpisode = maxEpisode.second,
-                episodes = episodeList,
-                watchedSet = watchedSetByShow[showId],
-                showId = showId,
-            ) ?: continue
-
-            placeholders += ContinueWatchingEntry(
-                id = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
-                mediaKey = showId,
-                localKey = "local:${episodicType.label}:$showId:${next.season}:${next.episode}",
-                provider = "local",
-                providerId = showId,
-                mediaType = if (episodicType == MetadataLabMediaType.ANIME) "anime" else "series",
-                title = showId,
-                season = next.season,
-                episode = next.episode,
-                progressPercent = 0.0,
-                lastUpdatedEpochMs = lastWatchedAt,
-                source = WatchProvider.LOCAL,
-                isUpNextPlaceholder = true,
-            )
-        }
-
-        return (movies + seriesEntries + placeholders)
-            .sortedByDescending { it.lastUpdatedEpochMs }
-            .take(limit)
-    }
-
     private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
         val type = when (identity.contentType) {
             MetadataLabMediaType.MOVIE -> "movie"
@@ -1135,46 +596,6 @@ class BackendWatchHistoryService(
         return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
     }
 
-    private fun providerLabel(provider: WatchProvider): String {
-        return when (provider) {
-            WatchProvider.TRAKT -> "Trakt"
-            WatchProvider.SIMKL -> "Simkl"
-            WatchProvider.LOCAL -> "Local"
-        }
-    }
-
-    private fun connectContinueWatchingMessage(provider: WatchProvider): String {
-        return "Connect ${providerLabel(provider)} to load continue watching."
-    }
-
-    private fun WatchProvider.apiValue(): String {
-        return when (this) {
-            WatchProvider.TRAKT -> "trakt"
-            WatchProvider.SIMKL -> "simkl"
-            WatchProvider.LOCAL -> "local"
-        }
-    }
-
-    private fun WatchProvider.toImportProvider(): ImportProvider {
-        return when (this) {
-            WatchProvider.TRAKT -> ImportProvider.TRAKT
-            WatchProvider.SIMKL -> ImportProvider.SIMKL
-            WatchProvider.LOCAL -> throw IllegalArgumentException("Local provider has no backend import provider.")
-        }
-    }
-
-    private fun WatchProviderAuthState.isProviderConnected(provider: WatchProvider): Boolean {
-        return when (provider) {
-            WatchProvider.TRAKT -> traktAuthenticated
-            WatchProvider.SIMKL -> simklAuthenticated
-            WatchProvider.LOCAL -> true
-        }
-    }
-
-    private fun ProviderAccount.isConnected(): Boolean {
-        return status.equals("connected", ignoreCase = true)
-    }
-
     private fun MetadataLabMediaType.toBackendMediaType(request: WatchHistoryRequest): String {
         return when (this) {
             MetadataLabMediaType.MOVIE -> "movie"
@@ -1196,6 +617,43 @@ class BackendWatchHistoryService(
             parentProvider = parentProvider,
             parentProviderId = parentProviderId,
             absoluteEpisodeNumber = absoluteEpisodeNumber,
+        )
+    }
+
+    private suspend fun buildWatchMutationInput(
+        request: WatchHistoryRequest,
+        backendContext: BackendContext,
+    ): WatchMutationInput? {
+        val directMediaKey = request.mediaKey?.trim()?.ifBlank { null }
+        if (directMediaKey != null && request.season == null && request.episode == null) {
+            return WatchMutationInput(
+                mediaKey = directMediaKey,
+                mediaType = request.contentType.toBackendMediaType(request),
+                occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
+            )
+        }
+
+        val resolved = try {
+            backend.resolvePlayback(
+                accessToken = backendContext.accessToken,
+                input = request.toProviderLookupInput(),
+            )
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+
+        val item = resolved.item
+        return WatchMutationInput(
+            mediaKey = item.mediaKey,
+            mediaType = item.mediaType,
+            seasonNumber = item.seasonNumber,
+            episodeNumber = item.episodeNumber,
+            provider = item.provider,
+            providerId = item.providerId,
+            parentProvider = item.parentProvider ?: request.parentProvider,
+            parentProviderId = item.parentProviderId ?: request.parentProviderId,
+            absoluteEpisodeNumber = item.absoluteEpisodeNumber ?: request.absoluteEpisodeNumber,
+            occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
         )
     }
 
@@ -1229,57 +687,18 @@ class BackendWatchHistoryService(
         }
     }
 
-    private fun NormalizedWatchRequest.toPlaybackLookupInput(): MediaLookupInput {
-        return MediaLookupInput(
-            id = contentId,
-            mediaKey = mediaKey?.trim()?.ifBlank { null },
-            mediaType = when (contentType) {
-                MetadataLabMediaType.MOVIE -> "movie"
-                MetadataLabMediaType.SERIES,
-                MetadataLabMediaType.ANIME -> "episode"
-            },
-            imdbId = remoteImdbId,
-            seasonNumber = season,
-            episodeNumber = episode,
-            provider = provider,
-            providerId = providerId,
-            parentProvider = parentProvider,
-            parentProviderId = parentProviderId,
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
-        )
-    }
-
-    private fun NormalizedWatchRequest.toTitleWatchMutationInput(): WatchMutationInput? {
-        val normalizedMediaKey = mediaKey?.trim()?.ifBlank { null } ?: return null
-        if (season != null || episode != null) {
-            return null
-        }
-        val mediaType = when (contentType) {
-            MetadataLabMediaType.MOVIE -> "movie"
-            MetadataLabMediaType.SERIES -> "show"
-            MetadataLabMediaType.ANIME -> "anime"
-        }
-        return WatchMutationInput(
-            mediaKey = normalizedMediaKey,
-            mediaType = mediaType,
-            occurredAt = Instant.ofEpochMilli(watchedAtEpochMs).toString(),
-        )
-    }
-
     private fun List<CrispyBackendClient.ContinueWatchingItem>.toContinueWatchingEntries(
         nowMs: Long,
         limit: Int,
-    ): List<ContinueWatchingEntry> {
-        val staleCutoff = nowMs - STALE_PLAYBACK_WINDOW_MS
+    ): List<CanonicalContinueWatchingItem> {
         return buildList {
             for (item in this@toContinueWatchingEntries) {
                 val updatedAt =
                     parseIsoToEpochMs(item.lastActivityAt)
                         ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
                         ?: nowMs
-                if (updatedAt < staleCutoff) continue
                 add(
-                    ContinueWatchingEntry(
+                    CanonicalContinueWatchingItem(
                         id = item.id,
                         mediaKey = item.media.mediaKey,
                         localKey = item.media.mediaKey,
@@ -1291,7 +710,6 @@ class BackendWatchHistoryService(
                         episode = item.media.episodeNumber,
                         progressPercent = item.progress?.progressPercent ?: 0.0,
                         lastUpdatedEpochMs = updatedAt,
-                        source = item.origins.firstNotNullOfOrNull(::originToProvider) ?: WatchProvider.LOCAL,
                         posterUrl = item.media.posterUrl,
                         backdropUrl = item.media.backdropUrl,
                         logoUrl = null,
@@ -1307,58 +725,11 @@ class BackendWatchHistoryService(
             .take(limit)
     }
 
-    private fun List<CrispyBackendClient.ContinueWatchingItem>.toProviderContinueWatchingEntries(
-        provider: WatchProvider,
-        nowMs: Long,
-        limit: Int,
-    ): List<ContinueWatchingEntry> {
-        val providerOrigin = provider.apiValue()
-        return asSequence()
-            .filter { item -> item.origins.any { it.equals(providerOrigin, ignoreCase = true) } }
-            .toList()
-            .toContinueWatchingEntries(nowMs = nowMs, limit = limit)
-            .map { it.copy(source = provider) }
-    }
-
     private fun List<CrispyBackendClient.ContinueWatchingItem>.toCanonicalContinueWatchingItems(
         nowMs: Long,
         limit: Int,
     ): List<CanonicalContinueWatchingItem> {
-        return toContinueWatchingEntries(nowMs, limit).map { it.toCanonicalContinueWatchingItem() }
-    }
-
-    private fun originToProvider(origin: String): WatchProvider? {
-        return when (origin.trim().lowercase(Locale.US)) {
-            "trakt" -> WatchProvider.TRAKT
-            "simkl" -> WatchProvider.SIMKL
-            "local", "native" -> WatchProvider.LOCAL
-            else -> null
-        }
-    }
-
-    private fun ContinueWatchingEntry.toCanonicalContinueWatchingItem(): CanonicalContinueWatchingItem {
-        return CanonicalContinueWatchingItem(
-            id = id,
-            mediaKey = mediaKey,
-            localKey = localKey,
-            provider = provider,
-            providerId = providerId,
-            mediaType = mediaType,
-            title = title,
-            season = season,
-            episode = episode,
-            progressPercent = progressPercent,
-            lastUpdatedEpochMs = lastUpdatedEpochMs,
-            source = source,
-            isUpNextPlaceholder = isUpNextPlaceholder,
-            posterUrl = posterUrl,
-            backdropUrl = backdropUrl,
-            logoUrl = logoUrl,
-            addonId = addonId,
-            subtitle = subtitle,
-            dismissible = dismissible,
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
-        )
+        return toContinueWatchingEntries(nowMs, limit)
     }
 
     private fun CrispyBackendClient.WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {
@@ -1385,71 +756,6 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun mergeCanonicalWatchState(
-        backendSnapshot: CanonicalWatchStateSnapshot?,
-        localSnapshot: CanonicalWatchStateSnapshot?,
-    ): CanonicalWatchStateSnapshot? {
-        if (backendSnapshot == null && localSnapshot == null) return null
-        val backend = backendSnapshot ?: CanonicalWatchStateSnapshot(
-            isWatched = false,
-            watchedAtEpochMs = null,
-            isInWatchlist = false,
-            isRated = false,
-            userRating = null,
-        )
-        val local = localSnapshot ?: CanonicalWatchStateSnapshot(
-            isWatched = false,
-            watchedAtEpochMs = null,
-            isInWatchlist = false,
-            isRated = false,
-            userRating = null,
-        )
-        return CanonicalWatchStateSnapshot(
-            isWatched = backend.isWatched || local.isWatched,
-            watchedAtEpochMs = listOfNotNull(backend.watchedAtEpochMs, local.watchedAtEpochMs).maxOrNull(),
-            isInWatchlist = backend.isInWatchlist,
-            isRated = backend.isRated,
-            userRating = backend.userRating,
-            watchedEpisodeKeys = backend.watchedEpisodeKeys + local.watchedEpisodeKeys,
-        )
-    }
-
-    private fun localWatchStateSnapshot(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
-        val normalizedContentId = identity.contentId?.trim()?.lowercase(Locale.US).takeUnless { it.isNullOrBlank() } ?: return null
-        val matchingEntries =
-            localStore.loadEntries().filter { item ->
-                item.contentType == identity.contentType &&
-                    item.contentId.trim().lowercase(Locale.US) == normalizedContentId
-            }
-        if (matchingEntries.isEmpty()) return null
-
-        val exactEntries =
-            if (identity.contentType == MetadataLabMediaType.MOVIE || identity.season == null || identity.episode == null) {
-                matchingEntries
-            } else {
-                matchingEntries.filter { it.season == identity.season && it.episode == identity.episode }
-            }
-        val watchedEntries = exactEntries.ifEmpty { matchingEntries }
-        val watchedEpisodeKeys =
-            if (identity.contentType == MetadataLabMediaType.MOVIE) {
-                emptySet()
-            } else {
-                matchingEntries.mapNotNull { item ->
-                    val season = item.season ?: return@mapNotNull null
-                    val episode = item.episode ?: return@mapNotNull null
-                    addEpisodeKey(item.contentId, season, episode)
-                }.toSet()
-            }
-        return CanonicalWatchStateSnapshot(
-            isWatched = watchedEntries.isNotEmpty(),
-            watchedAtEpochMs = watchedEntries.maxOfOrNull { it.watchedAtEpochMs },
-            isInWatchlist = false,
-            isRated = false,
-            userRating = null,
-            watchedEpisodeKeys = watchedEpisodeKeys,
-        )
-    }
-
     private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
         return when (trim().lowercase(Locale.US)) {
             "show", "series", "tv", "episode" -> MetadataLabMediaType.SERIES
@@ -1460,10 +766,5 @@ class BackendWatchHistoryService(
 
     private companion object {
         private const val WATCH_PROGRESS_PREFS_NAME = "watch_progress"
-        private const val BACKEND_SESSION_TOKEN = "backend"
-        private const val KEY_BACKEND_TRAKT_CONNECTED = "backend_provider_trakt_connected"
-        private const val KEY_BACKEND_SIMKL_CONNECTED = "backend_provider_simkl_connected"
-        private const val KEY_BACKEND_TRAKT_USERNAME = "backend_provider_trakt_username"
-        private const val KEY_BACKEND_SIMKL_USERNAME = "backend_provider_simkl_username"
     }
 }

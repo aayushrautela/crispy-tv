@@ -342,7 +342,6 @@ internal class AccountsProfilesViewModel(
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             if (session == null) {
-                watchHistoryService.clearCachedProviderAuthState()
                 _uiState.update {
                     it.copy(
                         isBusy = false,
@@ -385,11 +384,6 @@ internal class AccountsProfilesViewModel(
 
             val settingsSyncError =
                 profileDataCloudSync.pullForActiveProfile().exceptionOrNull()?.message
-            val providerSyncError =
-                runCatching { watchHistoryService.refreshProviderAuthState(forceRefresh = false) }
-                    .getOrNull()
-                    ?.statusMessage
-                    ?.takeIf { it.isNotBlank() }
 
             _uiState.update {
                 it.copy(
@@ -402,7 +396,6 @@ internal class AccountsProfilesViewModel(
                     statusMessage =
                         when {
                             !settingsSyncError.isNullOrBlank() -> "Settings sync failed: $settingsSyncError"
-                            !providerSyncError.isNullOrBlank() -> providerSyncError
                             else -> ""
                         }
                 )
@@ -465,7 +458,6 @@ internal class AccountsProfilesViewModel(
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             runCatching { supabase.signOut() }
             profileStore.clear(userId)
-            watchHistoryService.clearCachedProviderAuthState()
             refresh()
         }
     }
@@ -475,15 +467,10 @@ internal class AccountsProfilesViewModel(
         if (userId.isNullOrBlank()) return
         profileStore.setActiveProfileId(userId, profileId)
         _uiState.update { it.copy(activeProfileId = profileId, statusMessage = "") }
-        watchHistoryService.clearCachedProviderAuthState()
 
         viewModelScope.launch {
             profileDataCloudSync.pullForActiveProfile().onFailure {
                 _uiState.update { s -> s.copy(statusMessage = "Settings sync failed: ${it.message.orEmpty()}") }
-            }
-            val providerRefresh = watchHistoryService.refreshProviderAuthState(forceRefresh = false)
-            if (providerRefresh.statusMessage.isNotBlank()) {
-                _uiState.update { it.copy(statusMessage = providerRefresh.statusMessage) }
             }
         }
     }

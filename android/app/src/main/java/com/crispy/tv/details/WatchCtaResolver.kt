@@ -120,7 +120,6 @@ internal class WatchCtaResolver(
         val continueEntry = resolveContinueWatchingEntry(details, expectedType, nowMs)
         val canContinue =
             continueEntry != null &&
-                !continueEntry.isUpNextPlaceholder &&
                 continueEntry.progressPercent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
                 continueEntry.progressPercent < CTA_CONTINUE_COMPLETION_PERCENT
 

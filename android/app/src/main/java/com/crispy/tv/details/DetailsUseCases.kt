@@ -17,7 +17,6 @@ import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
-import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
@@ -331,26 +330,18 @@ internal class DetailsUseCases(
         details: MediaDetails,
         desired: Boolean,
     ): DetailsMutationResult {
-        val source = userMediaRepository.preferredProvider()
         val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-            return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl).",
-            )
-        }
 
         val request = buildTitleWatchHistoryRequest(enriched)
         val result =
             if (desired) {
-                userMediaRepository.markWatched(request, source)
+                userMediaRepository.markWatched(request)
             } else {
-                userMediaRepository.unmarkWatched(request, source)
+                userMediaRepository.unmarkWatched(request)
             }
         return DetailsMutationResult(
             details = enriched,
-            success = mutationSucceeded(source, result),
+            success = mutationSucceeded(result),
             statusMessage = result.statusMessage,
         )
     }
@@ -360,15 +351,7 @@ internal class DetailsUseCases(
         video: MediaVideo,
         desired: Boolean,
     ): DetailsMutationResult {
-        val source = userMediaRepository.preferredProvider()
         val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES)
-        if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-            return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Couldn't resolve an IMDb id for this show (required for Simkl).",
-            )
-        }
 
         val season = video.season ?: return DetailsMutationResult(
             details = enriched,
@@ -399,13 +382,13 @@ internal class DetailsUseCases(
             )
         val result =
             if (desired) {
-                userMediaRepository.markWatched(request, source)
+                userMediaRepository.markWatched(request)
             } else {
-                userMediaRepository.unmarkWatched(request, source)
+                userMediaRepository.unmarkWatched(request)
             }
         return DetailsMutationResult(
             details = enriched,
-            success = mutationSucceeded(source, result),
+            success = mutationSucceeded(result),
             statusMessage = result.statusMessage,
         )
     }
@@ -446,16 +429,8 @@ internal class DetailsUseCases(
         )
     }
 
-    private fun mutationSucceeded(
-        source: WatchProvider?,
-        result: WatchHistoryResult,
-    ): Boolean {
-        return when (source) {
-            WatchProvider.TRAKT -> result.syncedToTrakt
-            WatchProvider.SIMKL -> result.syncedToSimkl
-            WatchProvider.LOCAL -> true
-            null -> result.accepted
-        }
+    private fun mutationSucceeded(result: WatchHistoryResult): Boolean {
+        return result.accepted
     }
 
     private fun parentMediaTypeFor(contentType: MetadataLabMediaType): String? {

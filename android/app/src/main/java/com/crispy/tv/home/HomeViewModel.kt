@@ -20,7 +20,6 @@ import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -251,26 +250,13 @@ class HomeViewModel internal constructor(
         viewModelScope.launch {
             val removalResult =
                 withContext(Dispatchers.IO) {
-                    when {
-                        item.isUpNextPlaceholder -> {
-                            com.crispy.tv.player.WatchHistoryResult(
-                                statusMessage = "Removed ${item.title} from Continue Watching.",
-                            )
-                        }
-
-                        item.id.isNotBlank() -> {
-                            val dismissId = item.id.trim()
-                            watchHistoryService.removeFromPlayback(
-                                playbackId = dismissId,
-                                source = item.source.takeUnless { it == WatchProvider.LOCAL },
-                            )
-                        }
-
-                        else -> {
-                            com.crispy.tv.player.WatchHistoryResult(
-                                statusMessage = "Removed ${item.title} from Continue Watching.",
-                            )
-                        }
+                    if (item.id.isNotBlank()) {
+                        val dismissId = item.id.trim()
+                        watchHistoryService.removeFromPlayback(playbackId = dismissId)
+                    } else {
+                        com.crispy.tv.player.WatchHistoryResult(
+                            statusMessage = "Removed ${item.title} from Continue Watching.",
+                        )
                     }
                 }
 
@@ -429,8 +415,7 @@ class HomeViewModel internal constructor(
 
         val nowMs = System.currentTimeMillis()
         val railItems = continueWatchingResult.entries
-        val continueWatchingItems = railItems.filterNot { it.isUpNextPlaceholder }
-        val upNextItems = railItems.filter { it.isUpNextPlaceholder }
+        val continueWatchingItems = railItems
 
         return HomeWatchActivitySnapshot(
             continueWatching =
@@ -451,10 +436,7 @@ class HomeViewModel internal constructor(
                     key = UP_NEXT_SECTION_KEY,
                     title = "Up Next",
                     kind = HomeWideRailSectionKind.UP_NEXT,
-                ).copy(
-                    items = upNextItems.map { item -> item.toWideRailItem(nowMs) },
-                    isLoading = false,
-                ),
+                ).copy(isLoading = false),
         )
     }
 
@@ -733,7 +715,7 @@ private fun HomeWideRailSectionUi.isVisible(): Boolean {
 }
 
 private fun CanonicalContinueWatchingItem.sectionKey(): String {
-    return if (isUpNextPlaceholder) UP_NEXT_SECTION_KEY else CONTINUE_WATCHING_SECTION_KEY
+    return CONTINUE_WATCHING_SECTION_KEY
 }
 
 private fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {

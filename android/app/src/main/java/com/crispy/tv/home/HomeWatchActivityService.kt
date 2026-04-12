@@ -56,8 +56,6 @@ class HomeWatchActivityService {
             episode = entry.episode,
             lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
             progressPercent = entry.progressPercent,
-            source = entry.source,
-            isUpNextPlaceholder = entry.isUpNextPlaceholder,
             backdropUrl = entry.backdropUrl,
             posterUrl = entry.posterUrl,
             logoUrl = entry.logoUrl,
