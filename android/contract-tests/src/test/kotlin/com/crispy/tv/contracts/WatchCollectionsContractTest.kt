@@ -189,6 +189,6 @@ private fun JsonElement.toKotlinValue(): Any? {
         is JsonNull -> null
         is JsonObject -> toKotlinMap()
         is kotlinx.serialization.json.JsonArray -> map { element -> element.toKotlinValue() }
-        is JsonPrimitive -> booleanOrNull ?: intOrNull ?: doubleOrNull ?: content
+        is JsonPrimitive -> if (isString) content else booleanOrNull ?: intOrNull ?: doubleOrNull ?: content
     }
 }
