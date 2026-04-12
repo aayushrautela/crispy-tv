@@ -765,6 +765,7 @@ class BackendWatchHistoryService(
     }
 
     private companion object {
+        private const val CONTINUE_WATCHING_COMPLETION_PERCENT = 85.0
         private const val WATCH_PROGRESS_PREFS_NAME = "watch_progress"
     }
 }

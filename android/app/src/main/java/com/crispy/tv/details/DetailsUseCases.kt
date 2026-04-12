@@ -321,7 +321,7 @@ internal class DetailsUseCases(
         val result = userMediaRepository.setTitleInWatchlist(mediaKey, desired)
         return DetailsMutationResult(
             details = enriched,
-            success = mutationSucceeded(null, result),
+            success = mutationSucceeded(result),
             statusMessage = result.statusMessage,
         )
     }
@@ -407,7 +407,7 @@ internal class DetailsUseCases(
         val result = userMediaRepository.setTitleRating(mediaKey, rating)
         return DetailsMutationResult(
             details = enriched,
-            success = mutationSucceeded(null, result),
+            success = mutationSucceeded(result),
             statusMessage = result.statusMessage,
         )
     }
