@@ -87,11 +87,15 @@ internal suspend fun CrispyBackendClient.startImportApi(
     accessToken: String,
     profileId: String,
     provider: ImportProvider,
+    action: String,
 ): StartImportResult {
     checkConfigured()
     val response = httpClient.postJson(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/imports/start".toHttpUrl(),
-        jsonBody = JSONObject().put("provider", provider.apiValue).toString(),
+        jsonBody = JSONObject()
+            .put("provider", provider.apiValue)
+            .put("action", action)
+            .toString(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )

@@ -289,7 +289,7 @@ public func normalizeCalendarEnvelope(payload: [String: Any], route: String) -> 
         kind = nil
     }
 
-    guard let items = mapStrict(itemValues, transform: { value in
+    guard let items = mapStrict(itemValues, transform: { value -> CalendarContractItem? in
         guard let object = value as? [String: Any] else { return nil }
         return parseCalendarItem(object)
     }) else {

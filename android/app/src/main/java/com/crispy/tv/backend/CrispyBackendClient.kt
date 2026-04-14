@@ -766,8 +766,13 @@ class CrispyBackendClient(
         return listImportJobsApi(accessToken, profileId)
     }
 
-    suspend fun startImport(accessToken: String, profileId: String, provider: ImportProvider): StartImportResult {
-        return startImportApi(accessToken, profileId, provider)
+    suspend fun startImport(
+        accessToken: String,
+        profileId: String,
+        provider: ImportProvider,
+        action: String,
+    ): StartImportResult {
+        return startImportApi(accessToken, profileId, provider, action)
     }
 
     suspend fun getProfileSettings(accessToken: String, profileId: String): ProfileSettings {

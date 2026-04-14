@@ -96,11 +96,27 @@ internal class ProviderPortalViewModel(
     }
 
     fun connectTrakt() {
-        startImport(CrispyBackendClient.ImportProvider.TRAKT)
+        startImport(CrispyBackendClient.ImportProvider.TRAKT, action = "connect")
     }
 
     fun connectSimkl() {
-        startImport(CrispyBackendClient.ImportProvider.SIMKL)
+        startImport(CrispyBackendClient.ImportProvider.SIMKL, action = "connect")
+    }
+
+    fun reconnectTrakt() {
+        startImport(CrispyBackendClient.ImportProvider.TRAKT, action = "reconnect")
+    }
+
+    fun reconnectSimkl() {
+        startImport(CrispyBackendClient.ImportProvider.SIMKL, action = "reconnect")
+    }
+
+    fun importTraktNow() {
+        startImport(CrispyBackendClient.ImportProvider.TRAKT, action = "import")
+    }
+
+    fun importSimklNow() {
+        startImport(CrispyBackendClient.ImportProvider.SIMKL, action = "import")
     }
 
     fun disconnectTrakt() {
@@ -162,7 +178,7 @@ internal class ProviderPortalViewModel(
         }
     }
 
-    private fun startImport(provider: CrispyBackendClient.ImportProvider) {
+    private fun startImport(provider: CrispyBackendClient.ImportProvider, action: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             val context = resolveActiveProfileContext() ?: return@launch
@@ -172,6 +188,7 @@ internal class ProviderPortalViewModel(
                         accessToken = context.session.accessToken,
                         profileId = context.profile.id,
                         provider = provider,
+                        action = action,
                     )
                 }
 
@@ -365,6 +382,10 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
         uiState = uiState,
         onConnectTrakt = viewModel::connectTrakt,
         onConnectSimkl = viewModel::connectSimkl,
+        onReconnectTrakt = viewModel::reconnectTrakt,
+        onReconnectSimkl = viewModel::reconnectSimkl,
+        onImportTrakt = viewModel::importTraktNow,
+        onImportSimkl = viewModel::importSimklNow,
         onDisconnectTrakt = viewModel::disconnectTrakt,
         onDisconnectSimkl = viewModel::disconnectSimkl,
         onRefresh = { viewModel.refreshImportState() },
@@ -378,6 +399,10 @@ private fun ProviderAuthPortalScreen(
     uiState: ProviderPortalUiState,
     onConnectTrakt: () -> Unit,
     onConnectSimkl: () -> Unit,
+    onReconnectTrakt: () -> Unit,
+    onReconnectSimkl: () -> Unit,
+    onImportTrakt: () -> Unit,
+    onImportSimkl: () -> Unit,
     onDisconnectTrakt: () -> Unit,
     onDisconnectSimkl: () -> Unit,
     onRefresh: () -> Unit,
@@ -446,7 +471,11 @@ private fun ProviderAuthPortalScreen(
                     state = uiState.trakt,
                     actionLabel = uiState.trakt.primaryActionLabel,
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
-                    onAction = onConnectTrakt,
+                    onAction = when (uiState.trakt.primaryActionLabel) {
+                        "Reconnect" -> onReconnectTrakt
+                        "Import now" -> onImportTrakt
+                        else -> onConnectTrakt
+                    },
                     disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.trakt.canDisconnect,
                     onDisconnect = onDisconnectTrakt,
                 )
@@ -458,7 +487,11 @@ private fun ProviderAuthPortalScreen(
                     state = uiState.simkl,
                     actionLabel = uiState.simkl.primaryActionLabel,
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
-                    onAction = onConnectSimkl,
+                    onAction = when (uiState.simkl.primaryActionLabel) {
+                        "Reconnect" -> onReconnectSimkl
+                        "Import now" -> onImportSimkl
+                        else -> onConnectSimkl
+                    },
                     disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.simkl.canDisconnect,
                     onDisconnect = onDisconnectSimkl,
                 )
