@@ -66,7 +66,7 @@ internal suspend fun CrispyBackendClient.listImportConnectionsApi(
     )
     val json = JSONObject(requireSuccess(response))
     return ProviderAccountsResponse(
-        providerAccounts = parseProviderAccounts(json.optJSONArray("providerAccounts")),
+        providerStates = parseProviderStates(json.optJSONArray("providerStates")),
     )
 }
 
@@ -97,9 +97,10 @@ internal suspend fun CrispyBackendClient.startImportApi(
     )
     val json = JSONObject(requireSuccess(response))
     val jobJson = json.optJSONObject("job") ?: throw IllegalStateException("Backend did not return an import job.")
+    val providerStateJson = json.optJSONObject("providerState") ?: throw IllegalStateException("Backend did not return a provider state.")
     return StartImportResult(
         job = parseImportJob(jobJson),
-        providerAccount = json.optJSONObject("providerAccount")?.let(::parseProviderAccount),
+        providerState = parseProviderState(providerStateJson),
         authUrl = json.optString("authUrl").trim().ifBlank { null },
         nextAction = json.optString("nextAction").trim().ifBlank { "queued" },
     )
@@ -148,7 +149,7 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
     accessToken: String,
     profileId: String,
     provider: ImportProvider,
-): CrispyBackendClient.ProviderAccount {
+): CrispyBackendClient.ProviderState {
     checkConfigured()
     val response = httpClient.delete(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections/${provider.apiValue}".toHttpUrl(),
@@ -156,6 +157,6 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = JSONObject(requireSuccess(response))
-    val providerAccountJson = json.optJSONObject("providerAccount") ?: throw IllegalStateException("Backend did not return a provider account.")
-    return parseProviderAccount(providerAccountJson)
+    val providerStateJson = json.optJSONObject("providerState") ?: throw IllegalStateException("Backend did not return a provider state.")
+    return parseProviderState(providerStateJson)
 }

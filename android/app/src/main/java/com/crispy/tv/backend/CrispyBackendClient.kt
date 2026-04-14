@@ -43,16 +43,18 @@ class CrispyBackendClient(
         SIMKL("simkl"),
     }
 
-    data class ProviderAccount(
-        val id: String,
+    data class ProviderState(
         val provider: String,
-        val status: String,
-        val providerUserId: String?,
+        val providerAccountId: String?,
+        val connectionState: String,
+        val accountStatus: String?,
+        val primaryAction: String,
+        val canImport: Boolean,
+        val canReconnect: Boolean,
+        val canDisconnect: Boolean,
         val externalUsername: String?,
-        val createdAt: String?,
-        val updatedAt: String?,
-        val lastUsedAt: String?,
-        val lastImportJobId: String?,
+        val statusLabel: String,
+        val statusMessage: String?,
         val lastImportCompletedAt: String?,
     )
 
@@ -72,7 +74,7 @@ class CrispyBackendClient(
     )
 
     data class ProviderAccountsResponse(
-        val providerAccounts: List<ProviderAccount>,
+        val providerStates: List<ProviderState>,
     )
 
     data class BackendMetadataItem(
@@ -116,7 +118,7 @@ class CrispyBackendClient(
 
     data class StartImportResult(
         val job: ImportJob,
-        val providerAccount: ProviderAccount?,
+        val providerState: ProviderState,
         val authUrl: String?,
         val nextAction: String,
     )
@@ -832,7 +834,7 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ProviderAccount {
+    suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ProviderState {
         return disconnectImportConnectionApi(accessToken, profileId, provider)
     }
 

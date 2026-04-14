@@ -37,7 +37,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataVideoView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataView
 import com.crispy.tv.backend.CrispyBackendClient.PageInfo
 import com.crispy.tv.backend.CrispyBackendClient.Profile
-import com.crispy.tv.backend.CrispyBackendClient.ProviderAccount
+import com.crispy.tv.backend.CrispyBackendClient.ProviderState
 import com.crispy.tv.backend.CrispyBackendClient.RatingStateView
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.User
@@ -90,27 +90,29 @@ internal fun CrispyBackendClient.parseProfile(json: JSONObject): Profile {
     )
 }
 
-internal fun CrispyBackendClient.parseProviderAccounts(array: JSONArray?): List<ProviderAccount> {
+internal fun CrispyBackendClient.parseProviderStates(array: JSONArray?): List<ProviderState> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
-            val providerAccount = safeArray.optJSONObject(index) ?: continue
-            add(parseProviderAccount(providerAccount))
+            val providerState = safeArray.optJSONObject(index) ?: continue
+            add(parseProviderState(providerState))
         }
     }
 }
 
-internal fun CrispyBackendClient.parseProviderAccount(json: JSONObject): ProviderAccount {
-    return ProviderAccount(
-        id = json.optString("id").trim(),
+internal fun CrispyBackendClient.parseProviderState(json: JSONObject): ProviderState {
+    return ProviderState(
         provider = json.optString("provider").trim(),
-        status = json.optString("status").trim(),
-        providerUserId = json.optString("providerUserId").trim().ifBlank { null },
+        providerAccountId = json.optString("providerAccountId").trim().ifBlank { null },
+        connectionState = json.optString("connectionState").trim(),
+        accountStatus = json.optString("accountStatus").trim().ifBlank { null },
+        primaryAction = json.optString("primaryAction").trim(),
+        canImport = json.optBoolean("canImport", false),
+        canReconnect = json.optBoolean("canReconnect", false),
+        canDisconnect = json.optBoolean("canDisconnect", false),
         externalUsername = json.optString("externalUsername").trim().ifBlank { null },
-        createdAt = json.optString("createdAt").trim().ifBlank { null },
-        updatedAt = json.optString("updatedAt").trim().ifBlank { null },
-        lastUsedAt = json.optString("lastUsedAt").trim().ifBlank { null },
-        lastImportJobId = json.optString("lastImportJobId").trim().ifBlank { null },
+        statusLabel = json.optString("statusLabel").trim(),
+        statusMessage = json.optString("statusMessage").trim().ifBlank { null },
         lastImportCompletedAt = json.optString("lastImportCompletedAt").trim().ifBlank { null },
     )
 }
