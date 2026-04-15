@@ -45,7 +45,6 @@ class CrispyBackendClient(
 
     data class ProviderState(
         val provider: String,
-        val providerAccountId: String?,
         val connectionState: String,
         val accountStatus: String?,
         val primaryAction: String,
@@ -65,7 +64,6 @@ class CrispyBackendClient(
         val mode: String,
         val status: String,
         val requestedByUserId: String,
-        val providerAccountId: String?,
         val errorMessage: String?,
         val createdAt: String?,
         val startedAt: String?,

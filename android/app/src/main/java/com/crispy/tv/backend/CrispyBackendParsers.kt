@@ -103,7 +103,6 @@ internal fun CrispyBackendClient.parseProviderStates(array: JSONArray?): List<Pr
 internal fun CrispyBackendClient.parseProviderState(json: JSONObject): ProviderState {
     return ProviderState(
         provider = json.optString("provider").trim(),
-        providerAccountId = json.optString("providerAccountId").trim().ifBlank { null },
         connectionState = json.optString("connectionState").trim(),
         accountStatus = json.optString("accountStatus").trim().ifBlank { null },
         primaryAction = json.optString("primaryAction").trim(),
@@ -135,7 +134,6 @@ internal fun CrispyBackendClient.parseImportJob(json: JSONObject): ImportJob {
         mode = json.optString("mode").trim(),
         status = json.optString("status").trim(),
         requestedByUserId = json.optString("requestedByUserId").trim(),
-        providerAccountId = json.optString("providerAccountId").trim().ifBlank { null },
         errorMessage = json.optJSONObject("errorJson")?.optString("message")?.trim().orEmpty().ifBlank { null },
         createdAt = json.optString("createdAt").trim().ifBlank { null },
         startedAt = json.optString("startedAt").trim().ifBlank { null },
