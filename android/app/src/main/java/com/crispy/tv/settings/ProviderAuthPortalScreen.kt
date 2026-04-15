@@ -324,7 +324,7 @@ internal class ProviderPortalViewModel(
         val providerState = providerStates.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         val latestJob = jobs.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         return ProviderImportUiState(
-            primaryActionLabel = providerState?.primaryAction.toActionLabel() ?: "Connect",
+            primaryActionLabel = providerState?.primaryAction.toActionLabel(),
             connectionStatus = providerState?.statusLabel ?: "Not connected",
             statusMessage = providerState?.statusMessage,
             externalUsername = providerState?.externalUsername,
