@@ -929,7 +929,7 @@ internal fun CrispyBackendClient.parseCalendarItems(array: JSONArray?): List<Cal
             add(
                 CalendarItem(
                     bucket = item.optString("bucket").trim(),
-                    media = parseRuntimeMediaCard(mediaJson, requireBackdrop = true),
+                    media = parseRuntimeMediaCard(mediaJson, requireBackdrop = false),
                     relatedShow = parseRuntimeMediaCard(relatedShowJson, requireBackdrop = false),
                     airDate = item.optNullableString("airDate"),
                     watched = item.optBoolean("watched", false),

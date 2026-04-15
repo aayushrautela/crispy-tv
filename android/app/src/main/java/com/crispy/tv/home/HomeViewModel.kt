@@ -744,8 +744,9 @@ private fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
 
 private fun CalendarEpisodeItem.buildCalendarBadgeLabel(): String? {
     if (isReleased) return "Released"
+    val normalizedReleaseDate = releaseDate ?: return null
     return try {
-        val date = LocalDate.parse(releaseDate.take(10))
+        val date = LocalDate.parse(normalizedReleaseDate.take(10))
         "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
     } catch (_: Exception) {
         null
@@ -762,10 +763,13 @@ private fun CalendarEpisodeItem.buildCalendarSecondaryText(): String {
         }?.trim()
 
     val episodeLabel =
-        if (episodeRange != null) {
-            "S${season} ${episodeRange}"
-        } else {
-            "S${season} E${episode}"
+        when {
+            episodeRange != null && season != null -> "S${season} ${episodeRange}"
+            season != null && episode != null -> "S${season} E${episode}"
+            episodeRange != null -> episodeRange
+            episode != null -> "Episode ${episode}"
+            releaseDate != null -> releaseDate.take(10)
+            else -> "Upcoming episode"
         }
     return if (supportingText.isNullOrBlank()) {
         episodeLabel
