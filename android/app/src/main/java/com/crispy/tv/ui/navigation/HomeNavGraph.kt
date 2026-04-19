@@ -32,7 +32,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onContinueWatchingClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.mediaKey ?: item.id,
+                        mediaKey = item.mediaKey,
                         mediaType = item.type,
                         seasonNumber = item.season,
                         episodeNumber = item.episode,

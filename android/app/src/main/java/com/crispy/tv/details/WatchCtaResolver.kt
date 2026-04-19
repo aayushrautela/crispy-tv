@@ -84,7 +84,7 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
   return snapshot.entries
     .asSequence()
     .filter { entry ->
-      val entryMediaKey = entry.mediaKey?.trim()?.lowercase(Locale.US)
+      val entryMediaKey = entry.mediaKey.trim().lowercase(Locale.US)
       val entryId = entry.id.trim().lowercase(Locale.US)
       val matchesIdentity =
         when {
