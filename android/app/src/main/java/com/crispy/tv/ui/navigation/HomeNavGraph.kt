@@ -32,11 +32,25 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onContinueWatchingClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.mediaKey,
+                        mediaKey = item.titleMediaKey,
                         mediaType = item.type,
                         seasonNumber = item.season,
                         episodeNumber = item.episode,
                         absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+                        autoOpenEpisode = true,
+                    )
+                )
+            },
+            onContinueWatchingOpenDetails = { item ->
+                navController.navigate(
+                    AppRoutes.homeDetailsRoute(
+                        mediaKey = item.titleMediaKey,
+                        mediaType = item.type,
+                        seasonNumber = item.season,
+                        episodeNumber = item.episode,
+                        absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+                        highlightEpisodeId = "${item.season}:${item.episode}",
+                        autoOpenEpisode = false,
                     )
                 )
             },
@@ -196,13 +210,13 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
 private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeItem) {
     navigate(
         AppRoutes.homeDetailsRoute(
-            mediaKey = item.mediaKey,
+            mediaKey = item.titleMediaKey,
             mediaType = item.type,
             seasonNumber = item.season,
             episodeNumber = item.episode,
             absoluteEpisodeNumber = item.absoluteEpisodeNumber,
             highlightEpisodeId = item.highlightEpisodeId.takeIf { !item.isGroup },
-            autoOpenEpisode = item.isReleased && !item.isGroup,
+            autoOpenEpisode = false,
         )
     )
 }

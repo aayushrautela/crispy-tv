@@ -45,6 +45,7 @@ private const val HOME_WIDE_SKELETON_COUNT = 3
 internal fun HomeWideRailSection(
     section: HomeWideRailSectionUi,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
     onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
@@ -88,18 +89,14 @@ internal fun HomeWideRailSection(
                             },
                             onDetailsClick = {
                                 when (item.kind) {
-                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
+                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingOpenDetails)
                                     HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
                                 }
                             },
                             onRemoveClick =
                                 if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
                                     item.continueWatchingItem?.let { continueWatchingItem ->
-                                        if (continueWatchingItem.dismissible) {
-                                            { onRemoveContinueWatchingItem(continueWatchingItem) }
-                                        } else {
-                                            null
-                                        }
+                                        { onRemoveContinueWatchingItem(continueWatchingItem) }
                                     }
                                 } else {
                                     null
@@ -258,7 +255,7 @@ internal fun HomeWideRailCard(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
                 ListItem(
-                    headlineContent = { Text("Details") },
+                    headlineContent = { Text("Open details") },
                     supportingContent = {
                         if (item.subtitle.isNotBlank()) {
                             Text(
@@ -274,13 +271,15 @@ internal fun HomeWideRailCard(
                     },
                 )
                 onRemoveClick.let { removeAction ->
-                    ListItem(
-                        headlineContent = { Text("Remove") },
-                        modifier = Modifier.clickable {
-                            actionSheetVisible = false
-                            removeAction()
-                        },
-                    )
+                    if (removeAction != null) {
+                        ListItem(
+                            headlineContent = { Text("Remove") },
+                            modifier = Modifier.clickable {
+                                actionSheetVisible = false
+                                removeAction()
+                            },
+                        )
+                    }
                 }
             }
         }

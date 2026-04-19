@@ -41,11 +41,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.crispy.tv.details.StreamProviderUiState
-import com.crispy.tv.details.StreamSelectorUiState
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.StreamProviderUiState
+import com.crispy.tv.streams.StreamSelectorUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -48,6 +48,7 @@ import kotlin.math.roundToInt
 internal fun EpisodeCard(
     video: MediaVideo,
     watchState: EpisodeWatchState,
+    isHighlighted: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onLongPress: () -> Unit = {},
@@ -60,8 +61,9 @@ internal fun EpisodeCard(
         modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongPress),
         colors =
             CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-            )
+                containerColor = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isHighlighted) 8.dp else 2.dp),
     ) {
         Column {
             Box(

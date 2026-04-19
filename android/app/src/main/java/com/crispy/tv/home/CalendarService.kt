@@ -13,7 +13,8 @@ import java.util.Locale
 @Immutable
 data class CalendarEpisodeItem(
     val id: String,
-    val mediaKey: String,
+    val titleMediaKey: String,
+    val playbackMediaKey: String,
     val localKey: String,
     val highlightEpisodeId: String? = null,
     val seriesName: String,
@@ -241,7 +242,8 @@ class CalendarService internal constructor(
         val localKey = "${media.provider}:${media.providerId}$localKeySuffix"
         return CalendarEpisodeItem(
             id = localKey,
-            mediaKey = media.mediaKey,
+            titleMediaKey = relatedShow.mediaKey,
+            playbackMediaKey = media.mediaKey,
             localKey = localKey,
             highlightEpisodeId = null,
             seriesName = relatedShow.title,
@@ -283,7 +285,7 @@ class CalendarService internal constructor(
         val rawItems = items.take(HOME_THIS_WEEK_RAW_LIMIT)
 
         return rawItems
-            .groupBy { item -> "${item.mediaKey}_${item.releaseDate?.take(10).orEmpty()}" }
+            .groupBy { item -> "${item.titleMediaKey}_${item.releaseDate?.take(10).orEmpty()}" }
             .values
             .map { group ->
                 val sorted = group.sortedWith(compareBy(nullsLast()) { it.episode })
@@ -292,7 +294,7 @@ class CalendarService internal constructor(
                 if (sorted.size == 1) {
                     first
                 } else {
-                    val groupedLocalKey = "group_${first.mediaKey}_${first.releaseDate?.take(10).orEmpty()}"
+                    val groupedLocalKey = "group_${first.titleMediaKey}_${first.releaseDate?.take(10).orEmpty()}"
                     first.copy(
                         id = groupedLocalKey,
                         localKey = groupedLocalKey,

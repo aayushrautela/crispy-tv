@@ -14,6 +14,7 @@ import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerEpisodeSnapshot
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.StreamSelectorUiState
 import com.crispy.tv.streams.StreamProviderDescriptor
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.StreamLookupTarget
@@ -97,6 +98,7 @@ class DetailsViewModel internal constructor(
                     watchCta = WatchCta(),
                     continueVideoId = null,
                     seasons = emptyList(),
+                    highlightedEpisodeId = null,
                     seasonEpisodes = emptyList(),
                     episodeWatchStates = emptyMap(),
                     episodesIsLoading = false,
@@ -117,11 +119,15 @@ class DetailsViewModel internal constructor(
             if (!isCurrentGeneration(generation)) return@launch
 
             val enrichedDetails = result.details
+            val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
+                videos = result.titleDetail?.episodes.orEmpty().mapNotNull { it.toMediaVideo() },
+                runtimeEntry = runtimeEntry,
+            )
 
             _uiState.update { state ->
-                val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId
+                val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: runtimeEpisodeTarget?.episodeId
                 val pendingSeason =
-                    pendingHighlightEpisodeId?.let { highlightEpisodeId ->
+                    runtimeEpisodeTarget?.seasonNumber ?: pendingHighlightEpisodeId?.let { highlightEpisodeId ->
                         result.titleDetail
                             ?.episodes
                             ?.firstOrNull { episode ->
@@ -173,6 +179,7 @@ class DetailsViewModel internal constructor(
                     continueVideoId = result.continueVideoId,
                     seasons = result.seasons,
                     selectedSeason = selectedSeason,
+                    highlightedEpisodeId = pendingHighlightEpisodeId,
                     seasonEpisodes = selectedSeasonEpisodes.orEmpty(),
                     episodeWatchStates = emptyMap(),
                     episodesIsLoading = false,
@@ -341,6 +348,7 @@ class DetailsViewModel internal constructor(
                 highlightEpisodeId = normalizedHighlightEpisodeId,
                 autoOpenEpisode = autoOpenEpisode,
             )
+        _uiState.update { it.copy(highlightedEpisodeId = normalizedHighlightEpisodeId) }
 
         val currentState = _uiState.value
         val targetSeason =
@@ -462,6 +470,7 @@ class DetailsViewModel internal constructor(
                     if (current.selectedSeasonOrFirst != season && current.selectedSeasonOrFirst != resolvedSeason) current
                     else current.copy(
                         selectedSeason = resolvedSeason,
+                        highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
                         seasonEpisodes = result.videos,
                         episodeWatchStates = result.episodeWatchStates,
                         episodesIsLoading = false,
@@ -486,7 +495,10 @@ class DetailsViewModel internal constructor(
                     }
                 _uiState.update { current ->
                     if (current.selectedSeasonOrFirst != season) current
-                    else current.copy(episodeWatchStates = episodeWatchStates)
+                    else current.copy(
+                        highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
+                        episodeWatchStates = episodeWatchStates,
+                    )
                 }
                 maybeConsumePendingEpisodeNavigation(videos)
             }
@@ -1063,6 +1075,7 @@ val identity =
         val target = videos.firstOrNull { video ->
             video.id.equals(pending.highlightEpisodeId, ignoreCase = true)
         } ?: return
+        _uiState.update { it.copy(highlightedEpisodeId = target.id) }
         pendingEpisodeNavigation = null
 
         if (!pending.autoOpenEpisode) return

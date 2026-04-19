@@ -8,7 +8,7 @@ import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
-import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.StreamSelectorUiState
 
 @Immutable
 data class EpisodeWatchState(
@@ -39,6 +39,7 @@ data class DetailsUiState(
     val continueVideoId: String? = null,
     val selectedSeason: Int? = null,
     val seasons: List<Int> = emptyList(),
+    val highlightedEpisodeId: String? = null,
     val seasonEpisodes: List<MediaVideo> = emptyList(),
     val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),
     val episodesIsLoading: Boolean = false,
@@ -47,30 +48,6 @@ data class DetailsUiState(
 ) {
     val selectedSeasonOrFirst: Int?
         get() = selectedSeason ?: seasons.firstOrNull()
-}
-
-@Immutable
-data class StreamProviderUiState(
-    val providerId: String,
-    val providerName: String,
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
-    val streams: List<AddonStream> = emptyList(),
-    val attemptedUrl: String? = null,
-)
-
-@Immutable
-data class StreamSelectorUiState(
-    val visible: Boolean = false,
-    val mediaType: MetadataLabMediaType? = null,
-    val lookupId: String? = null,
-    val headerEpisode: MediaVideo? = null,
-    val selectedProviderId: String? = null,
-    val providers: List<StreamProviderUiState> = emptyList(),
-    val isLoading: Boolean = false,
-) {
-    val totalStreamCount: Int
-        get() = providers.sumOf { provider -> provider.streams.size }
 }
 
 sealed interface DetailsNavigationEvent {

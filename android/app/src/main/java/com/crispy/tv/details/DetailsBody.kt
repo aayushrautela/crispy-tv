@@ -382,6 +382,7 @@ internal fun DetailsBody(
                                 EpisodeCard(
                                     video = video,
                                     watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
+                                    isHighlighted = video.id == uiState.highlightedEpisodeId,
                                     modifier = Modifier.width(280.dp),
                                     onClick = { onEpisodeClick(video.id) },
                                     onLongPress = { selectedEpisodeAction = video },

@@ -28,8 +28,9 @@ data class WatchHistoryResult(
 
 data class CanonicalContinueWatchingItem(
     val id: String,
-    val mediaKey: String,
-    val localKey: String = mediaKey,
+    val titleMediaKey: String,
+    val playbackMediaKey: String,
+    val localKey: String = titleMediaKey,
     val mediaType: String,
     val title: String,
     val season: Int?,
@@ -41,7 +42,6 @@ data class CanonicalContinueWatchingItem(
     val logoUrl: String? = null,
     val addonId: String? = null,
     val subtitle: String? = null,
-    val dismissible: Boolean = false,
     val absoluteEpisodeNumber: Int? = null,
 ) {
     val type: String

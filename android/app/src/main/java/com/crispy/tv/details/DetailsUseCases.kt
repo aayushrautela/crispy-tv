@@ -45,6 +45,11 @@ data class RuntimeDetailsEntry(
     val absoluteEpisodeNumber: Int? = null,
 )
 
+internal data class RuntimeEpisodeTarget(
+    val episodeId: String,
+    val seasonNumber: Int?,
+)
+
 internal data class DetailsSeasonEpisodesResult(
     val videos: List<MediaVideo> = emptyList(),
     val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),
@@ -138,6 +143,53 @@ internal class DetailsUseCases(
             cachedBaseResults.remove(cacheKey)
         }
         return result
+    }
+
+    fun resolveRuntimeEpisodeTarget(
+        videos: List<MediaVideo>,
+        runtimeEntry: RuntimeDetailsEntry?,
+    ): RuntimeEpisodeTarget? {
+        if (runtimeEntry == null || videos.isEmpty()) return null
+
+        val seasonNumber = runtimeEntry.seasonNumber
+        val episodeNumber = runtimeEntry.episodeNumber
+        val absoluteEpisodeNumber = runtimeEntry.absoluteEpisodeNumber
+
+        val exactMatch =
+            videos.firstOrNull { video ->
+                val seasonMatches = seasonNumber == null || video.season == seasonNumber
+                val episodeMatches = episodeNumber == null || video.episode == episodeNumber
+                val absoluteMatches = absoluteEpisodeNumber == null || video.absoluteEpisodeNumber == absoluteEpisodeNumber
+                seasonMatches && episodeMatches && absoluteMatches
+            }
+        if (exactMatch != null) {
+            return RuntimeEpisodeTarget(
+                episodeId = exactMatch.id,
+                seasonNumber = exactMatch.season,
+            )
+        }
+
+        val absoluteMatch =
+            absoluteEpisodeNumber?.let { absolute ->
+                videos.firstOrNull { video -> video.absoluteEpisodeNumber == absolute }
+            }
+        if (absoluteMatch != null) {
+            return RuntimeEpisodeTarget(
+                episodeId = absoluteMatch.id,
+                seasonNumber = absoluteMatch.season,
+            )
+        }
+
+        val seasonEpisodeMatch =
+            videos.firstOrNull { video ->
+                video.season == seasonNumber && video.episode == episodeNumber
+            }
+        return seasonEpisodeMatch?.let { video ->
+            RuntimeEpisodeTarget(
+                episodeId = video.id,
+                seasonNumber = video.season,
+            )
+        }
     }
 
     suspend fun loadSecondaryContent(

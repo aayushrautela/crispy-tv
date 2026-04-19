@@ -1,7 +1,5 @@
 package com.crispy.tv.playback
 
-import com.crispy.tv.details.StreamProviderUiState
-import com.crispy.tv.details.StreamSelectorUiState
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
@@ -9,6 +7,8 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
+import com.crispy.tv.streams.StreamProviderUiState
+import com.crispy.tv.streams.StreamSelectorUiState
 import java.util.Locale
 
 val TMDB_ID_REGEX: Regex = Regex("\\btmdb:(?:movie:|show:|tv:)?(\\d+)", RegexOption.IGNORE_CASE)

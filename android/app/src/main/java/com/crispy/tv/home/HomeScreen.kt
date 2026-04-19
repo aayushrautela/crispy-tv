@@ -61,6 +61,7 @@ private val HomeTopSectionSpacing = 16.dp
 internal fun HomeRoute(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
@@ -137,6 +138,7 @@ internal fun HomeRoute(
                 onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
                 onHeroClick = onHeroClick,
                 onContinueWatchingClick = onContinueWatchingClick,
+                onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
                 onThisWeekClick = onThisWeekClick,
                 onThisWeekSeeAllClick = onThisWeekSeeAllClick,
                 onCatalogItemClick = onCatalogItemClick,
@@ -161,6 +163,7 @@ private fun HomeScreen(
     onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
@@ -264,6 +267,7 @@ private fun HomeScreen(
                                 HomeWideRailSection(
                                     section = section,
                                     onContinueWatchingClick = onContinueWatchingClick,
+                                    onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
                                     onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
                                     onThisWeekClick = onThisWeekClick,
                                     onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,

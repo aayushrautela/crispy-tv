@@ -234,7 +234,6 @@ class HomeViewModel internal constructor(
     }
 
     fun removeContinueWatchingItem(item: CanonicalContinueWatchingItem) {
-        if (!item.dismissible) return
         suppressKeys(
             item.id,
             continueWatchingContentKey(item),
@@ -639,7 +638,7 @@ private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity
         }
 
     return PlaybackIdentity(
-        mediaKey = mediaKey,
+        mediaKey = playbackMediaKey,
         contentType = contentType,
         season = season,
         episode = episode,
@@ -805,7 +804,7 @@ class ContinueWatchingSuppressionStore(context: Context) {
 }
 
 private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-  return entry.mediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
+  return entry.titleMediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
 }
 
 private fun continueWatchingContentKey(type: String, provider: String, providerId: String): String {

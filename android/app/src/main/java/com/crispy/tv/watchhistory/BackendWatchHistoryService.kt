@@ -666,25 +666,25 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
                     parseIsoToEpochMs(item.lastActivityAt)
                         ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
                         ?: nowMs
-add(
-            CanonicalContinueWatchingItem(
-                id = item.id,
-                mediaKey = item.media.mediaKey,
-                mediaType = item.media.mediaType,
-                title = item.media.episodeTitle ?: item.media.title,
-                season = item.media.seasonNumber,
-                episode = item.media.episodeNumber,
-                progressPercent = item.progress?.progressPercent ?: 0.0,
-                lastUpdatedEpochMs = updatedAt,
-                posterUrl = item.media.posterUrl,
-                backdropUrl = item.media.backdropUrl,
-                logoUrl = null,
-                addonId = "backend",
-                subtitle = item.media.subtitle,
-                dismissible = item.dismissible,
-                absoluteEpisodeNumber = null,
-            )
-        )
+                add(
+                    CanonicalContinueWatchingItem(
+                        id = item.id,
+                        titleMediaKey = item.media.toTitleMediaKey(),
+                        playbackMediaKey = item.media.mediaKey,
+                        mediaType = item.media.mediaType,
+                        title = item.media.episodeTitle ?: item.media.title,
+                        season = item.media.seasonNumber,
+                        episode = item.media.episodeNumber,
+                        progressPercent = item.progress?.progressPercent ?: 0.0,
+                        lastUpdatedEpochMs = updatedAt,
+                        posterUrl = item.media.posterUrl,
+                        backdropUrl = item.media.backdropUrl,
+                        logoUrl = null,
+                        addonId = "backend",
+                        subtitle = item.media.subtitle,
+                        absoluteEpisodeNumber = null,
+                    )
+                )
             }
         }
             .sortedByDescending { it.lastUpdatedEpochMs }
@@ -726,6 +726,20 @@ private fun titleStateIdentity(
             "anime" -> MetadataLabMediaType.ANIME
             else -> MetadataLabMediaType.MOVIE
         }
+    }
+
+    private fun CrispyBackendClient.RuntimeMediaCard.toTitleMediaKey(): String {
+        val normalizedProvider = provider.trim()
+        val normalizedProviderId = providerId.trim()
+        if (normalizedProvider.isBlank() || normalizedProviderId.isBlank()) {
+            return mediaKey
+        }
+        val titleMediaType =
+            when (mediaType.trim().lowercase(Locale.US)) {
+                "movie" -> "movie"
+                else -> "show"
+            }
+        return "$titleMediaType:$normalizedProvider:$normalizedProviderId"
     }
 
     private companion object {
