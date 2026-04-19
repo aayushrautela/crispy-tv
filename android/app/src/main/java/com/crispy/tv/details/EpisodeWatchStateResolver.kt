@@ -92,7 +92,7 @@ val localProgress =
 
         val providerHistoryKeys =
             userMediaRepository.listWatchedEpisodeRecords().mapNotNull { record ->
-                addEpisodeKey(record.mediaKey, record.season, record.episode)
+                addEpisodeKey(record.contentId, record.season, record.episode)
             }.mapNotNull(::normalizeWatchKey).toSet()
 
         return providerHistoryKeys.also { cachedEpisodeWatchKeys = it }

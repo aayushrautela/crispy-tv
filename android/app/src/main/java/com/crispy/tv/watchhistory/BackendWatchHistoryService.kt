@@ -445,19 +445,22 @@ val next =
                     item.media.seasonNumber != null &&
                     item.media.episodeNumber != null
             }
-.map { item ->
-      val canonicalMediaKey = item.media.mediaKey.trim().ifBlank { return@map null }
-      WatchedEpisodeRecord(
-        mediaKey = canonicalMediaKey,
-        season = item.media.seasonNumber ?: 1,
-        episode = item.media.episodeNumber ?: 1,
-        watchedAtEpochMs =
-          parseIsoToEpochMs(item.watchedAt)
-            ?: parseIsoToEpochMs(item.lastActivityAt)
-            ?: 0L,
-      )
-    }
-            .filter { it.watchedAtEpochMs > 0L }
+            .mapNotNull { item ->
+                val canonicalMediaKey = item.media.mediaKey.trim().ifBlank { return@mapNotNull null }
+                val watchedAtEpochMs =
+                    parseIsoToEpochMs(item.watchedAt)
+                        ?: parseIsoToEpochMs(item.lastActivityAt)
+                        ?: 0L
+                if (watchedAtEpochMs <= 0L) {
+                    return@mapNotNull null
+                }
+                WatchedEpisodeRecord(
+                    contentId = canonicalMediaKey,
+                    season = item.media.seasonNumber ?: 1,
+                    episode = item.media.episodeNumber ?: 1,
+                    watchedAtEpochMs = watchedAtEpochMs,
+                )
+            }
             .toList()
     }
 
@@ -490,6 +493,7 @@ val next =
         val playbackInput = PlaybackEventInput(
             clientEventId = buildClientEventId(identity, eventType),
             eventType = eventType,
+            mediaKey = identity.mediaKey,
             mediaType = mediaType,
             seasonNumber = identity.season,
             episodeNumber = identity.episode,
@@ -600,7 +604,6 @@ private fun WatchHistoryRequest.toProviderLookupInput(): MediaLookupInput {
         mediaType = contentType.toBackendMediaType(this),
         seasonNumber = season,
         episodeNumber = episode,
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
 
@@ -650,7 +653,6 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
         mediaType = mediaType,
         seasonNumber = season,
         episodeNumber = episode,
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
     ).takeIf { it.mediaKey != null || it.tmdbId != null }
 }
 
@@ -668,8 +670,6 @@ add(
             CanonicalContinueWatchingItem(
                 id = item.id,
                 mediaKey = item.media.mediaKey,
-                provider = item.media.provider,
-                providerId = item.media.providerId,
                 mediaType = item.media.mediaType,
                 title = item.media.episodeTitle ?: item.media.title,
                 season = item.media.seasonNumber,

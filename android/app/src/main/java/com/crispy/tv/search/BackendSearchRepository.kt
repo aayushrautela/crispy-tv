@@ -58,30 +58,30 @@ class BackendSearchRepository(
 }
 
 internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
-  val normalizedType =
-    when {
-      mediaType.equals("anime", ignoreCase = true) -> "anime"
-      mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
-      else -> "movie"
-    }
-  val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() }
-  val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() }
-  val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
-  val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
-  return SearchCatalogItem(
-    id = normalizedMediaKey,
-    mediaKey = normalizedMediaKey,
-    title = title,
-    posterUrl = normalizedPosterUrl,
-    backdropUrl = backdropUrl,
-    logoUrl = logoUrl,
-    addonId = "backend",
-    type = normalizedType,
-    rating = rating,
-    year = year,
-    genre = genre ?: defaultGenre,
-    description = summary,
-    provider = normalizedProvider,
-    providerId = normalizedProviderId,
-  )
+    val normalizedType =
+        when {
+            mediaType.equals("anime", ignoreCase = true) -> "anime"
+            mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+            else -> "movie"
+        }
+    val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    return SearchCatalogItem(
+        id = normalizedMediaKey,
+        mediaKey = normalizedMediaKey,
+        title = title,
+        posterUrl = normalizedPosterUrl,
+        backdropUrl = backdropUrl,
+        logoUrl = logoUrl,
+        addonId = "backend",
+        type = normalizedType,
+        rating = rating,
+        year = year,
+        genre = genre ?: defaultGenre,
+        description = summary,
+        provider = normalizedProvider,
+        providerId = normalizedProviderId,
+    )
 }

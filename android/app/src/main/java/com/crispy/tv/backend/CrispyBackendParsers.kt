@@ -713,16 +713,23 @@ internal fun CrispyBackendClient.parseRuntimeMediaCard(
 ): RuntimeMediaCard {
     val mediaKey = json.optNullableString("mediaKey")
     val mediaType = json.optString("mediaType").trim()
-    val provider = json.optNullableString("provider")
+    val provider = json.optNullableString("provider")?.trim()?.ifBlank { null }
     val providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null }
     val title = json.optNullableString("title")
     val posterUrl = json.optNullableString("posterUrl")
         ?: json.optJSONObject("images").optNullableString("posterUrl")
     val backdropUrl = json.optNullableString("backdropUrl")
         ?: json.optJSONObject("images").optNullableString("backdropUrl")
-if (mediaKey.isNullOrBlank() || mediaType.isBlank() || title.isNullOrBlank() || posterUrl.isNullOrBlank()) {
-    throw IllegalStateException("Runtime media card is missing required fields.")
-  }
+    if (
+        mediaKey.isNullOrBlank() ||
+        mediaType.isBlank() ||
+        provider.isNullOrBlank() ||
+        providerId.isNullOrBlank() ||
+        title.isNullOrBlank() ||
+        posterUrl.isNullOrBlank()
+    ) {
+        throw IllegalStateException("Runtime media card is missing required fields.")
+    }
     if (requireBackdrop && backdropUrl.isNullOrBlank()) {
         throw IllegalStateException("Landscape runtime media card is missing backdropUrl.")
     }

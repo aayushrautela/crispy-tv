@@ -15,6 +15,6 @@ internal fun AddonStream.toPlaybackSource(): PlaybackSource? {
 
 internal fun buildPlaybackRawId(identity: PlaybackIdentity?, snapshot: PlayerLaunchSnapshot?): String? {
     snapshot?.contentId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
-    identity?.contentId?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
+    identity?.mediaKey?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
     return null
 }

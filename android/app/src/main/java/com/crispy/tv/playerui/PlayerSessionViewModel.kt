@@ -1073,7 +1073,7 @@ private fun buildFallbackDetails(
     artworkUrl: String?,
     identity: PlaybackIdentity?,
 ): MediaDetails? {
-    val contentId = identity?.contentId?.trim()?.takeIf { it.isNotBlank() } ?: rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val contentId = identity?.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedTitle = title.trim().ifBlank { return null }
     val mediaType =
         when (identity?.contentType) {
@@ -1085,7 +1085,7 @@ private fun buildFallbackDetails(
     return MediaDetails(
         id = contentId,
         mediaKey = identity?.mediaKey,
-        imdbId = identity?.imdbId,
+        imdbId = null,
         mediaType = mediaType,
         title = identity?.showTitle?.takeIf { mediaType == "series" } ?: normalizedTitle,
         posterUrl = normalizedArtworkUrl,
@@ -1106,11 +1106,11 @@ private fun buildFallbackDetails(
         seasonNumber = identity?.season,
         episodeNumber = identity?.episode,
         addonId = null,
-        provider = identity?.provider,
-        providerId = identity?.providerId,
+        provider = null,
+        providerId = null,
         parentMediaType = identity?.parentMediaType,
-        parentProvider = identity?.parentProvider,
-        parentProviderId = identity?.parentProviderId,
+        parentProvider = null,
+        parentProviderId = null,
         absoluteEpisodeNumber = identity?.absoluteEpisodeNumber,
     )
 }
