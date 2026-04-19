@@ -10,18 +10,11 @@ data class WatchHistoryEntry(
 )
 
 data class WatchHistoryRequest(
-    val contentId: String,
     val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String? = null,
     val season: Int? = null,
     val episode: Int? = null,
-    val remoteImdbId: String? = null,
-    val provider: String? = null,
-    val providerId: String? = null,
-    val parentMediaType: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
 )
 
@@ -35,10 +28,8 @@ data class WatchHistoryResult(
 
 data class CanonicalContinueWatchingItem(
     val id: String,
-    val mediaKey: String? = null,
-    val localKey: String = id,
-    val provider: String,
-    val providerId: String,
+    val mediaKey: String,
+    val localKey: String = mediaKey,
     val mediaType: String,
     val title: String,
     val season: Int?,
@@ -54,14 +45,14 @@ data class CanonicalContinueWatchingItem(
     val absoluteEpisodeNumber: Int? = null,
 ) {
     val type: String
-        get() = when (mediaType.lowercase()) {
-            "show", "tv", "series", "episode" -> MetadataLabMediaType.SERIES.label
-            "anime" -> MetadataLabMediaType.ANIME.label
-            else -> MetadataLabMediaType.MOVIE.label
-        }
+    get() = when (mediaType.lowercase()) {
+        "show", "tv", "series", "episode" -> MetadataLabMediaType.SERIES.label
+        "anime" -> MetadataLabMediaType.ANIME.label
+        else -> MetadataLabMediaType.MOVIE.label
+    }
 
     val watchedAtEpochMs: Long
-        get() = lastUpdatedEpochMs
+    get() = lastUpdatedEpochMs
 }
 
 data class CanonicalContinueWatchingResult(
@@ -119,9 +110,7 @@ data class ProviderCommentResult(
 
 
 data class PlaybackIdentity(
-    val contentId: String? = null,
-    val mediaKey: String? = null,
-    val imdbId: String?,
+    val mediaKey: String?,
     val tmdbId: Int? = null,
     val contentType: MetadataLabMediaType,
     val season: Int? = null,
@@ -130,11 +119,7 @@ data class PlaybackIdentity(
     val year: Int? = null,
     val showTitle: String? = null,
     val showYear: Int? = null,
-    val provider: String? = null,
-    val providerId: String? = null,
     val parentMediaType: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
 )
 

@@ -631,37 +631,27 @@ class HomeViewModel internal constructor(
     }
 
 private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity {
-        val contentType =
-            when (type.lowercase(Locale.US)) {
-                "series" -> MetadataLabMediaType.SERIES
-                "anime" -> MetadataLabMediaType.ANIME
-                else -> MetadataLabMediaType.MOVIE
-            }
-        val normalizedImdb = providerId.lowercase(Locale.US).takeIf { provider.equals("imdb", ignoreCase = true) && it.startsWith("tt") }
+    val contentType =
+        when (type.lowercase(Locale.US)) {
+            "series" -> MetadataLabMediaType.SERIES
+            "anime" -> MetadataLabMediaType.ANIME
+            else -> MetadataLabMediaType.MOVIE
+        }
 
-        return PlaybackIdentity(
-            contentId = null,
-            mediaKey = mediaKey,
-            imdbId = normalizedImdb,
-            tmdbId = null,
-            contentType = contentType,
-            season = season,
-            episode = episode,
-            title = title,
-            year = null,
-            showTitle = if (contentType != MetadataLabMediaType.MOVIE) title else null,
-            showYear = null,
-            provider = provider,
-            providerId = providerId,
-            parentMediaType = if (contentType == MetadataLabMediaType.MOVIE) null else when (type.lowercase(Locale.US)) {
-                "anime" -> "anime"
-                else -> "show"
-            },
-            parentProvider = provider,
-            parentProviderId = providerId,
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
-        )
-    }
+    return PlaybackIdentity(
+        mediaKey = mediaKey,
+        contentType = contentType,
+        season = season,
+        episode = episode,
+        title = title,
+        showTitle = if (contentType != MetadataLabMediaType.MOVIE) title else null,
+        parentMediaType = if (contentType == MetadataLabMediaType.MOVIE) null else when (type.lowercase(Locale.US)) {
+            "anime" -> "anime"
+            else -> "show"
+        },
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
+    )
+}
 
     private fun suppressKeys(vararg keys: String) {
         val suppressionMap = suppressedItemsByKey ?: mutableMapOf<String, Long>().also { suppressedItemsByKey = it }
@@ -815,11 +805,7 @@ class ContinueWatchingSuppressionStore(context: Context) {
 }
 
 private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-    val normalizedMediaKey = entry.mediaKey?.trim().orEmpty()
-    if (normalizedMediaKey.isNotEmpty()) {
-        return normalizedMediaKey
-    }
-    return continueWatchingContentKey(entry.type, entry.provider, entry.providerId)
+  return entry.mediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
 }
 
 private fun continueWatchingContentKey(type: String, provider: String, providerId: String): String {

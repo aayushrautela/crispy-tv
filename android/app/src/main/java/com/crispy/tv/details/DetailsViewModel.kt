@@ -822,25 +822,20 @@ class DetailsViewModel internal constructor(
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
             val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
-            val identity =
-                PlaybackIdentity(
-                    contentId = enriched.id,
-                    imdbId = enriched.imdbId,
-                    tmdbId = if (resolvedMediaType == MetadataLabMediaType.MOVIE) enriched.tmdbId ?: targetEpisode?.tmdbId else null,
-                    contentType = resolvedMediaType,
-                    season = season,
-                    episode = episode,
-                    title = title,
-                    year = yearInt,
-                    showTitle = if (isEpisodic) enriched.title else null,
-                    showYear = if (isEpisodic) yearInt else null,
-                    provider = targetEpisode?.provider ?: enriched.provider,
-                    providerId = targetEpisode?.providerId ?: enriched.providerId,
-                    parentMediaType = enriched.parentMediaType ?: parentMediaType,
-                    parentProvider = targetEpisode?.parentProvider ?: enriched.parentProvider ?: enriched.provider,
-                    parentProviderId = targetEpisode?.parentProviderId ?: enriched.parentProviderId ?: enriched.providerId,
-                    absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
-                )
+val identity =
+            PlaybackIdentity(
+                mediaKey = enriched.mediaKey,
+                tmdbId = if (resolvedMediaType == MetadataLabMediaType.MOVIE) enriched.tmdbId ?: targetEpisode?.tmdbId else null,
+                contentType = resolvedMediaType,
+                season = season,
+                episode = episode,
+                title = title,
+                year = yearInt,
+                showTitle = if (isEpisodic) enriched.title else null,
+                showYear = if (isEpisodic) yearInt else null,
+                parentMediaType = enriched.parentMediaType ?: parentMediaType,
+                absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
+            )
             val artworkUrl = enriched.backdropUrl?.trim()?.ifBlank { null } ?: enriched.posterUrl?.trim()?.ifBlank { null }
             val subtitle = buildPlayerSubtitle(
                 mediaType = resolvedMediaType,

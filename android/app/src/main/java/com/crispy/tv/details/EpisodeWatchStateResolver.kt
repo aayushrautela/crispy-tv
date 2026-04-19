@@ -43,28 +43,21 @@ internal class EpisodeWatchStateResolver(
             } else {
                 val watchedByHistory =
                     episodeWatchKeyCandidates(details, season, episode).any { key -> watchedKeys.contains(key) }
-                val localProgress =
-                    userMediaRepository.getLocalWatchProgress(
-                        PlaybackIdentity(
-                            contentId = details.id,
-                            mediaKey = details.mediaKey,
-                            imdbId = details.imdbId,
-                            tmdbId = null,
-                            contentType = contentType,
-                            season = season,
-                            episode = episode,
-                            title = video.title,
-                            year = yearInt,
-                            showTitle = if (contentType == MetadataLabMediaType.MOVIE) null else details.title,
-                            showYear = if (contentType == MetadataLabMediaType.MOVIE) null else yearInt,
-                            provider = video.provider ?: details.provider,
-                            providerId = video.providerId ?: details.providerId,
-                            parentMediaType = parentMediaType,
-                            parentProvider = video.parentProvider ?: details.parentProvider ?: details.provider,
-                            parentProviderId = video.parentProviderId ?: details.parentProviderId ?: details.providerId,
-                            absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
-                        )
-                    )
+val localProgress =
+            userMediaRepository.getLocalWatchProgress(
+                PlaybackIdentity(
+                    mediaKey = details.mediaKey,
+                    contentType = contentType,
+                    season = season,
+                    episode = episode,
+                    title = video.title,
+                    year = yearInt,
+                    showTitle = if (contentType == MetadataLabMediaType.MOVIE) null else details.title,
+                    showYear = if (contentType == MetadataLabMediaType.MOVIE) null else yearInt,
+                    parentMediaType = parentMediaType,
+                    absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
+                )
+            )
                 val progressPercent = localProgress?.progressPercent ?: 0.0
                 val isWatched = watchedByHistory || progressPercent >= completionPercent
                 video.id to
@@ -99,7 +92,7 @@ internal class EpisodeWatchStateResolver(
 
         val providerHistoryKeys =
             userMediaRepository.listWatchedEpisodeRecords().mapNotNull { record ->
-                addEpisodeKey(record.contentId, record.season, record.episode)
+                addEpisodeKey(record.mediaKey, record.season, record.episode)
             }.mapNotNull(::normalizeWatchKey).toSet()
 
         return providerHistoryKeys.also { cachedEpisodeWatchKeys = it }

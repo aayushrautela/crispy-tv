@@ -2,7 +2,6 @@ package com.crispy.tv.metadata
 
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.domain.metadata.normalizeMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
@@ -76,13 +75,12 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
                 episode != null -> "Episode $episode"
                 else -> canonicalId
             }
-    val showLookupBase = canonicalProviderLookupId(parentProvider, parentProviderId)
-    val lookupId =
-        if (season != null && episode != null && showLookupBase != null) {
-            "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
-        } else {
-            null
-        }
+val lookupId =
+    if (season != null && episode != null && showTmdbId != null) {
+      "tmdb:${showTmdbId}:$season:$episode"
+    } else {
+      null
+    }
     return MediaVideo(
         id = canonicalId,
         title = titleText,
@@ -103,40 +101,38 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
 }
 
 internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVideo? {
-    val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
-    val season = seasonNumber
-    val episode = episodeNumber
-    val titleText =
-        title?.trim()?.takeIf { it.isNotBlank() }
-            ?: when {
-                episode != null -> "Episode $episode"
-                else -> canonicalId
-            }
-    val showLookupBase =
-        canonicalProviderLookupId(parentProvider, parentProviderId)
-    val lookupId =
-        if (season != null && episode != null && showLookupBase != null) {
-            "${normalizeMediaId(showLookupBase).contentId}:$season:$episode"
-        } else {
-            null
-        }
-    return MediaVideo(
-        id = canonicalId,
-        title = titleText,
-        season = season,
-        episode = episode,
-        released = airDate,
-        overview = summary,
-        thumbnailUrl = images.stillUrl ?: images.posterUrl,
-        lookupId = lookupId,
-        tmdbId = tmdbId,
-        showTmdbId = showTmdbId,
-        provider = provider,
-        providerId = providerId,
-        parentProvider = parentProvider,
-        parentProviderId = parentProviderId,
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
-    )
+  val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
+  val season = seasonNumber
+  val episode = episodeNumber
+  val titleText =
+    title?.trim()?.takeIf { it.isNotBlank() }
+      ?: when {
+        episode != null -> "Episode $episode"
+        else -> canonicalId
+      }
+  val lookupId =
+    if (season != null && episode != null && showTmdbId != null) {
+      "tmdb:${showTmdbId}:$season:$episode"
+    } else {
+      null
+    }
+  return MediaVideo(
+    id = canonicalId,
+    title = titleText,
+    season = season,
+    episode = episode,
+    released = airDate,
+    overview = summary,
+    thumbnailUrl = images.stillUrl ?: images.posterUrl,
+    lookupId = lookupId,
+    tmdbId = tmdbId,
+    showTmdbId = showTmdbId,
+    provider = provider,
+    providerId = providerId,
+    parentProvider = parentProvider,
+    parentProviderId = parentProviderId,
+    absoluteEpisodeNumber = absoluteEpisodeNumber,
+  )
 }
 
 internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
@@ -197,28 +193,11 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
     )
 }
 
-internal fun MediaDetails.providerBaseLookupId(): String? {
-    return canonicalProviderLookupId(parentProvider, parentProviderId)
-        ?: canonicalProviderLookupId(provider, providerId)
-}
-
-internal fun CrispyBackendClient.MetadataView.providerBaseLookupId(): String? {
-    return canonicalProviderLookupId(parentProvider, parentProviderId)
-        ?: canonicalProviderLookupId(provider, providerId)
-}
-
 internal fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {
-    return when (this?.lowercase(Locale.US)) {
-        "movie" -> MetadataLabMediaType.MOVIE
-        "series", "show", "tv" -> MetadataLabMediaType.SERIES
-        "anime" -> MetadataLabMediaType.ANIME
-        else -> null
-    }
-}
-
-private fun canonicalProviderLookupId(provider: String?, providerId: String?): String? {
-    val normalizedProvider = provider?.trim()?.lowercase(Locale.US).orEmpty()
-    val normalizedProviderId = providerId?.trim().orEmpty()
-    if (normalizedProvider.isBlank() || normalizedProviderId.isBlank()) return null
-    return "$normalizedProvider:$normalizedProviderId"
+  return when (this?.lowercase(Locale.US)) {
+    "movie" -> MetadataLabMediaType.MOVIE
+    "series", "show", "tv" -> MetadataLabMediaType.SERIES
+    "anime" -> MetadataLabMediaType.ANIME
+    else -> null
+  }
 }

@@ -68,44 +68,37 @@ internal class WatchCtaResolver(
         }
     }
 
-    suspend fun resolveContinueWatchingEntry(
-        details: MediaDetails,
-        expectedType: MetadataLabMediaType,
-        nowMs: Long,
-    ): CanonicalContinueWatchingItem? {
-        val targetId = details.id.trim().lowercase(Locale.US)
-        val targetMediaKey = details.mediaKey?.trim()?.lowercase(Locale.US)
-        val targetProvider = details.provider?.trim()?.lowercase(Locale.US)
-        val targetProviderId = details.providerId?.trim()?.lowercase(Locale.US)
-        if (targetId.isBlank() && targetMediaKey.isNullOrBlank() && (targetProvider.isNullOrBlank() || targetProviderId.isNullOrBlank())) {
-            return null
-        }
-
-        val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowMs = nowMs)
-
-        return snapshot.entries
-            .asSequence()
-            .filter { entry ->
-                val entryMediaKey = entry.mediaKey?.trim()?.lowercase(Locale.US)
-                val entryProvider = entry.provider.trim().lowercase(Locale.US)
-                val entryProviderId = entry.providerId.trim().lowercase(Locale.US)
-                val entryId = entry.id.trim().lowercase(Locale.US)
-                val matchesIdentity =
-                    when {
-                        !targetMediaKey.isNullOrBlank() -> entryMediaKey == targetMediaKey || entryId == targetMediaKey
-                        !targetProvider.isNullOrBlank() && !targetProviderId.isNullOrBlank() -> {
-                            (entryProvider == targetProvider && entryProviderId == targetProviderId) || entryId == targetId
-                        }
-                        else -> entryId == targetId
-                    }
-                matchesIdentity &&
-                    matchesMediaType(expectedType, entry.type.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-            }
-            .sortedWith(
-                compareByDescending<CanonicalContinueWatchingItem> { it.lastUpdatedEpochMs }
-            )
-            .firstOrNull()
+suspend fun resolveContinueWatchingEntry(
+    details: MediaDetails,
+    expectedType: MetadataLabMediaType,
+    nowMs: Long,
+  ): CanonicalContinueWatchingItem? {
+    val targetId = details.id.trim().lowercase(Locale.US)
+    val targetMediaKey = details.mediaKey?.trim()?.lowercase(Locale.US)
+    if (targetId.isBlank() && targetMediaKey.isNullOrBlank()) {
+      return null
     }
+
+val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowMs = nowMs)
+
+  return snapshot.entries
+    .asSequence()
+    .filter { entry ->
+      val entryMediaKey = entry.mediaKey?.trim()?.lowercase(Locale.US)
+      val entryId = entry.id.trim().lowercase(Locale.US)
+      val matchesIdentity =
+        when {
+          !targetMediaKey.isNullOrBlank() -> entryMediaKey == targetMediaKey || entryId == targetMediaKey
+          else -> entryId == targetId
+        }
+      matchesIdentity &&
+        matchesMediaType(expectedType, entry.type.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
+    }
+    .sortedWith(
+      compareByDescending<CanonicalContinueWatchingItem> { it.lastUpdatedEpochMs }
+    )
+    .firstOrNull()
+}
 
     suspend fun resolveWatchCta(
         details: MediaDetails?,

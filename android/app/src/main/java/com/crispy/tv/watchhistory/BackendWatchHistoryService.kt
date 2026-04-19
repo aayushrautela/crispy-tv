@@ -335,13 +335,12 @@ class BackendWatchHistoryService(
             type = parts.type,
             episodeId = parts.episodeId,
         )
-        val next =
+val next =
             (existing ?: WatchProgress(currentTimeSeconds = 0.0, durationSeconds = durationSeconds, lastUpdatedEpochMs = 0L))
-                .copy(
-                    currentTimeSeconds = currentSeconds.coerceIn(0.0, durationSeconds),
-                    durationSeconds = durationSeconds,
-                    remoteImdbId = existing?.remoteImdbId ?: normalizedImdbIdOrNull(identity.imdbId),
-                )
+            .copy(
+                currentTimeSeconds = currentSeconds.coerceIn(0.0, durationSeconds),
+                durationSeconds = durationSeconds,
+            )
 
         watchProgressStore.setWatchProgress(
             id = parts.id,
@@ -446,18 +445,18 @@ class BackendWatchHistoryService(
                     item.media.seasonNumber != null &&
                     item.media.episodeNumber != null
             }
-            .map { item ->
-                val canonicalContentId = item.media.mediaKey.trim().ifBlank { item.media.providerId }
-                WatchedEpisodeRecord(
-                    contentId = canonicalContentId,
-                    season = item.media.seasonNumber ?: 1,
-                    episode = item.media.episodeNumber ?: 1,
-                    watchedAtEpochMs =
-                        parseIsoToEpochMs(item.watchedAt)
-                            ?: parseIsoToEpochMs(item.lastActivityAt)
-                            ?: 0L,
-                )
-            }
+.map { item ->
+      val canonicalMediaKey = item.media.mediaKey.trim().ifBlank { return@map null }
+      WatchedEpisodeRecord(
+        mediaKey = canonicalMediaKey,
+        season = item.media.seasonNumber ?: 1,
+        episode = item.media.episodeNumber ?: 1,
+        watchedAtEpochMs =
+          parseIsoToEpochMs(item.watchedAt)
+            ?: parseIsoToEpochMs(item.lastActivityAt)
+            ?: 0L,
+      )
+    }
             .filter { it.watchedAtEpochMs > 0L }
             .toList()
     }
@@ -494,10 +493,6 @@ class BackendWatchHistoryService(
             mediaType = mediaType,
             seasonNumber = identity.season,
             episodeNumber = identity.episode,
-            provider = identity.provider,
-            providerId = identity.providerId,
-            parentProvider = identity.parentProvider,
-            parentProviderId = identity.parentProviderId,
             absoluteEpisodeNumber = identity.absoluteEpisodeNumber,
             positionSeconds = positionMs.coerceAtLeast(0L).toDouble() / 1000.0,
             durationSeconds = durationMs.coerceAtLeast(0L).toDouble() / 1000.0,
@@ -520,23 +515,18 @@ class BackendWatchHistoryService(
         }
     }
 
-    private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): String {
-        val suffix =
-            listOf(
-                identity.contentId?.trim()?.takeIf { it.isNotBlank() },
-                identity.imdbId?.trim()?.takeIf { it.isNotBlank() },
-                identity.season?.toString(),
-                identity.episode?.toString(),
-                identity.provider?.trim()?.takeIf { it.isNotBlank() },
-                identity.providerId?.trim()?.takeIf { it.isNotBlank() },
-                identity.parentProvider?.trim()?.takeIf { it.isNotBlank() },
-                identity.parentProviderId?.trim()?.takeIf { it.isNotBlank() },
-                identity.absoluteEpisodeNumber?.toString(),
-            ).filterNotNull()
-                .joinToString(":")
-                .ifBlank { identity.title.trim().replace(' ', '_') }
-        return "$eventType:$suffix:${System.currentTimeMillis()}"
-    }
+private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): String {
+    val suffix =
+        listOfNotNull(
+            identity.mediaKey?.trim()?.takeIf { it.isNotBlank() },
+            identity.season?.toString(),
+            identity.episode?.toString(),
+            identity.absoluteEpisodeNumber?.toString(),
+        ).filterNot { it.isBlank() }
+            .joinToString(":")
+            .ifBlank { identity.title.trim().replace(' ', '_') }
+    return "$eventType:$suffix:${System.currentTimeMillis()}"
+}
 
     private suspend fun getBackendContext(): BackendContext? {
         if (!backend.isConfigured()) {
@@ -545,23 +535,23 @@ class BackendWatchHistoryService(
         return backendContextResolver.resolve()
     }
 
-    private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
-        val type = when (identity.contentType) {
-            MetadataLabMediaType.MOVIE -> "movie"
-            MetadataLabMediaType.SERIES -> "series"
-            MetadataLabMediaType.ANIME -> "anime"
+private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
+    val type = when (identity.contentType) {
+        MetadataLabMediaType.MOVIE -> "movie"
+        MetadataLabMediaType.SERIES -> "series"
+        MetadataLabMediaType.ANIME -> "anime"
+    }
+
+    val mediaKey = identity.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val episodeId =
+        if (identity.contentType != MetadataLabMediaType.MOVIE && identity.season != null && identity.episode != null) {
+            "$mediaKey:${identity.season}:${identity.episode}"
+        } else {
+            null
         }
 
-        val id = identity.contentId?.trim()?.takeIf { it.isNotBlank() } ?: normalizedImdbIdOrNull(identity.imdbId) ?: return null
-        val episodeId =
-            if (identity.contentType != MetadataLabMediaType.MOVIE && identity.season != null && identity.episode != null) {
-                "$id:${identity.season}:${identity.episode}"
-            } else {
-                null
-            }
-
-        return ProgressKeyParts(type = type, id = id, episodeId = episodeId)
-    }
+    return ProgressKeyParts(type = type, id = mediaKey, episodeId = episodeId)
+}
 
     private data class ProgressKeyParts(
         val type: String,
@@ -604,21 +594,15 @@ class BackendWatchHistoryService(
         }
     }
 
-    private fun WatchHistoryRequest.toProviderLookupInput(): MediaLookupInput {
-        return MediaLookupInput(
-            id = contentId,
-            mediaKey = mediaKey?.trim()?.ifBlank { null },
-            mediaType = contentType.toBackendMediaType(this),
-            imdbId = remoteImdbId,
-            seasonNumber = season,
-            episodeNumber = episode,
-            provider = provider,
-            providerId = providerId,
-            parentProvider = parentProvider,
-            parentProviderId = parentProviderId,
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
-        )
-    }
+private fun WatchHistoryRequest.toProviderLookupInput(): MediaLookupInput {
+    return MediaLookupInput(
+        mediaKey = mediaKey?.trim()?.ifBlank { null },
+        mediaType = contentType.toBackendMediaType(this),
+        seasonNumber = season,
+        episodeNumber = episode,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
+    )
+}
 
     private suspend fun buildWatchMutationInput(
         request: WatchHistoryRequest,
@@ -642,50 +626,33 @@ class BackendWatchHistoryService(
             null
         } ?: return null
 
-        val item = resolved.item
-        return WatchMutationInput(
-            mediaKey = item.mediaKey,
-            mediaType = item.mediaType,
-            seasonNumber = item.seasonNumber,
-            episodeNumber = item.episodeNumber,
-            provider = item.provider,
-            providerId = item.providerId,
-            parentProvider = item.parentProvider ?: request.parentProvider,
-            parentProviderId = item.parentProviderId ?: request.parentProviderId,
-            absoluteEpisodeNumber = item.absoluteEpisodeNumber ?: request.absoluteEpisodeNumber,
-            occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
-        )
+val item = resolved.item
+    return WatchMutationInput(
+        mediaKey = item.mediaKey,
+        mediaType = item.mediaType,
+        seasonNumber = item.seasonNumber,
+        episodeNumber = item.episodeNumber,
+        absoluteEpisodeNumber = item.absoluteEpisodeNumber ?: request.absoluteEpisodeNumber,
+        occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
+    )
     }
 
-    private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
-        val normalizedImdb = normalizedImdbIdOrNull(imdbId)
-        val normalizedContentId = contentId?.trim()?.takeIf { it.isNotBlank() }
-        val normalizedMediaKey = mediaKey?.trim()?.takeIf { it.isNotBlank() }
-        val mediaType = when (contentType) {
-            MetadataLabMediaType.MOVIE -> "movie"
-            MetadataLabMediaType.SERIES -> if (season != null && episode != null) "episode" else "show"
-            MetadataLabMediaType.ANIME -> if (season != null && episode != null) "episode" else "anime"
-        }
-        return MediaLookupInput(
-            id = normalizedContentId,
-            mediaKey = normalizedMediaKey,
-            mediaType = mediaType,
-            imdbId = normalizedImdb,
-            seasonNumber = season,
-            episodeNumber = episode,
-            provider = provider,
-            providerId = providerId,
-            parentProvider = parentProvider,
-            parentProviderId = parentProviderId,
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
-        ).takeIf {
-            it.mediaKey != null ||
-                it.id != null ||
-                it.imdbId != null ||
-                (it.provider != null && it.providerId != null) ||
-                (it.parentProvider != null && it.parentProviderId != null)
-        }
+private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
+    val normalizedMediaKey = mediaKey?.trim()?.takeIf { it.isNotBlank() }
+    val mediaType = when (contentType) {
+        MetadataLabMediaType.MOVIE -> "movie"
+        MetadataLabMediaType.SERIES -> if (season != null && episode != null) "episode" else "show"
+        MetadataLabMediaType.ANIME -> if (season != null && episode != null) "episode" else "anime"
     }
+    return MediaLookupInput(
+        mediaKey = normalizedMediaKey,
+        tmdbId = tmdbId,
+        mediaType = mediaType,
+        seasonNumber = season,
+        episodeNumber = episode,
+        absoluteEpisodeNumber = absoluteEpisodeNumber,
+    ).takeIf { it.mediaKey != null || it.tmdbId != null }
+}
 
     private fun List<CrispyBackendClient.ContinueWatchingItem>.toContinueWatchingEntries(
         nowMs: Long,
@@ -697,28 +664,27 @@ class BackendWatchHistoryService(
                     parseIsoToEpochMs(item.lastActivityAt)
                         ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
                         ?: nowMs
-                add(
-                    CanonicalContinueWatchingItem(
-                        id = item.id,
-                        mediaKey = item.media.mediaKey,
-                        localKey = item.media.mediaKey,
-                        provider = item.media.provider,
-                        providerId = item.media.providerId,
-                        mediaType = item.media.mediaType,
-                        title = item.media.episodeTitle ?: item.media.title,
-                        season = item.media.seasonNumber,
-                        episode = item.media.episodeNumber,
-                        progressPercent = item.progress?.progressPercent ?: 0.0,
-                        lastUpdatedEpochMs = updatedAt,
-                        posterUrl = item.media.posterUrl,
-                        backdropUrl = item.media.backdropUrl,
-                        logoUrl = null,
-                        addonId = "backend",
-                        subtitle = item.media.subtitle,
-                        dismissible = item.dismissible,
-                        absoluteEpisodeNumber = null,
-                    )
-                )
+add(
+            CanonicalContinueWatchingItem(
+                id = item.id,
+                mediaKey = item.media.mediaKey,
+                provider = item.media.provider,
+                providerId = item.media.providerId,
+                mediaType = item.media.mediaType,
+                title = item.media.episodeTitle ?: item.media.title,
+                season = item.media.seasonNumber,
+                episode = item.media.episodeNumber,
+                progressPercent = item.progress?.progressPercent ?: 0.0,
+                lastUpdatedEpochMs = updatedAt,
+                posterUrl = item.media.posterUrl,
+                backdropUrl = item.media.backdropUrl,
+                logoUrl = null,
+                addonId = "backend",
+                subtitle = item.media.subtitle,
+                dismissible = item.dismissible,
+                absoluteEpisodeNumber = null,
+            )
+        )
             }
         }
             .sortedByDescending { it.lastUpdatedEpochMs }
@@ -743,18 +709,16 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun titleStateIdentity(
-        mediaKey: String,
-        contentType: MetadataLabMediaType,
-    ): PlaybackIdentity {
-        return PlaybackIdentity(
-            contentId = mediaKey,
-            mediaKey = mediaKey,
-            imdbId = null,
-            contentType = contentType,
-            title = mediaKey,
-        )
-    }
+private fun titleStateIdentity(
+    mediaKey: String,
+    contentType: MetadataLabMediaType,
+): PlaybackIdentity {
+    return PlaybackIdentity(
+        mediaKey = mediaKey,
+        contentType = contentType,
+        title = mediaKey,
+    )
+}
 
     private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
         return when (trim().lowercase(Locale.US)) {

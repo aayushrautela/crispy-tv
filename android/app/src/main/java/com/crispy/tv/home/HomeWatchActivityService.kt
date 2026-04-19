@@ -43,26 +43,24 @@ class HomeWatchActivityService {
         )
     }
 
-    private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
-        return CanonicalContinueWatchingItem(
-            id = entry.id.trim(),
-            mediaKey = entry.mediaKey,
-            localKey = entry.localKey,
-            provider = entry.provider,
-            providerId = entry.providerId,
-            mediaType = entry.mediaType,
-            title = entry.title,
-            season = entry.season,
-            episode = entry.episode,
-            lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
-            progressPercent = entry.progressPercent,
-            backdropUrl = entry.backdropUrl,
-            posterUrl = entry.posterUrl,
-            logoUrl = entry.logoUrl,
-            addonId = entry.addonId,
-            subtitle = entry.subtitle,
-            dismissible = entry.dismissible,
-            absoluteEpisodeNumber = entry.absoluteEpisodeNumber,
-        )
-    }
+private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
+  return CanonicalContinueWatchingItem(
+    id = entry.id.trim(),
+    mediaKey = entry.mediaKey,
+    localKey = entry.localKey,
+    mediaType = entry.mediaType,
+    title = entry.title,
+    season = entry.season,
+    episode = entry.episode,
+    lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
+    progressPercent = entry.progressPercent,
+    backdropUrl = entry.backdropUrl,
+    posterUrl = entry.posterUrl,
+    logoUrl = entry.logoUrl,
+    addonId = entry.addonId,
+    subtitle = entry.subtitle,
+    dismissible = entry.dismissible,
+    absoluteEpisodeNumber = entry.absoluteEpisodeNumber,
+  )
+}
 }

@@ -307,18 +307,79 @@ internal class DetailsUseCases(
         )
     }
 
-    suspend fun updateWatchlist(
-        details: MediaDetails,
-        desired: Boolean,
-    ): DetailsMutationResult {
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        val mediaKey = enriched.mediaKey?.trim()?.ifBlank { null }
-            ?: return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Title media key is unavailable.",
-            )
-        val result = userMediaRepository.setTitleInWatchlist(mediaKey, desired)
+suspend fun updateWatchlist(
+    details: MediaDetails,
+    desired: Boolean,
+  ): DetailsMutationResult {
+    val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+      ?: return DetailsMutationResult(
+        details = details,
+        success = false,
+        statusMessage = "Title media key is unavailable.",
+      )
+    val result = userMediaRepository.setTitleInWatchlist(mediaKey, desired)
+    return DetailsMutationResult(
+      details = details,
+      success = mutationSucceeded(result),
+      statusMessage = result.statusMessage,
+    )
+  }
+
+suspend fun updateWatched(
+    details: MediaDetails,
+    desired: Boolean,
+  ): DetailsMutationResult {
+    val request = buildTitleWatchHistoryRequest(details)
+    val result =
+      if (desired) {
+        userMediaRepository.markWatched(request)
+      } else {
+        userMediaRepository.unmarkWatched(request)
+      }
+    return DetailsMutationResult(
+      details = details,
+      success = mutationSucceeded(result),
+      statusMessage = result.statusMessage,
+    )
+  }
+
+suspend fun updateEpisodeWatched(
+    details: MediaDetails,
+    video: MediaVideo,
+    desired: Boolean,
+  ): DetailsMutationResult {
+    val season = video.season ?: return DetailsMutationResult(
+      details = details,
+      success = false,
+      statusMessage = "Episode metadata is incomplete.",
+    )
+    val episode = video.episode ?: return DetailsMutationResult(
+      details = details,
+      success = false,
+      statusMessage = "Episode metadata is incomplete.",
+    )
+    val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
+    val request =
+      WatchHistoryRequest(
+        mediaKey = details.mediaKey,
+        contentType = contentType,
+        title = details.title,
+        season = season,
+        episode = episode,
+        absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
+      )
+    val result =
+      if (desired) {
+        userMediaRepository.markWatched(request)
+      } else {
+        userMediaRepository.unmarkWatched(request)
+      }
+    return DetailsMutationResult(
+      details = details,
+      success = mutationSucceeded(result),
+      statusMessage = result.statusMessage,
+    )
+  }
         return DetailsMutationResult(
             details = enriched,
             success = mutationSucceeded(result),
@@ -326,108 +387,33 @@ internal class DetailsUseCases(
         )
     }
 
-    suspend fun updateWatched(
-        details: MediaDetails,
-        desired: Boolean,
-    ): DetailsMutationResult {
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
+suspend fun updateRating(
+    details: MediaDetails,
+    rating: Int?,
+  ): DetailsMutationResult {
+    val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+      ?: return DetailsMutationResult(
+        details = details,
+        success = false,
+        statusMessage = "Title media key is unavailable.",
+      )
+    val result = userMediaRepository.setTitleRating(mediaKey, rating)
+    return DetailsMutationResult(
+      details = details,
+      success = mutationSucceeded(result),
+      statusMessage = result.statusMessage,
+    )
+  }
 
-        val request = buildTitleWatchHistoryRequest(enriched)
-        val result =
-            if (desired) {
-                userMediaRepository.markWatched(request)
-            } else {
-                userMediaRepository.unmarkWatched(request)
-            }
-        return DetailsMutationResult(
-            details = enriched,
-            success = mutationSucceeded(result),
-            statusMessage = result.statusMessage,
-        )
-    }
-
-    suspend fun updateEpisodeWatched(
-        details: MediaDetails,
-        video: MediaVideo,
-        desired: Boolean,
-    ): DetailsMutationResult {
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES)
-
-        val season = video.season ?: return DetailsMutationResult(
-            details = enriched,
-            success = false,
-            statusMessage = "Episode metadata is incomplete.",
-        )
-        val episode = video.episode ?: return DetailsMutationResult(
-            details = enriched,
-            success = false,
-            statusMessage = "Episode metadata is incomplete.",
-        )
-        val contentType = enriched.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
-        val request =
-            WatchHistoryRequest(
-                contentId = enriched.id,
-                mediaKey = enriched.mediaKey,
-                contentType = contentType,
-                title = enriched.title,
-                season = season,
-                episode = episode,
-                remoteImdbId = enriched.imdbId,
-                provider = video.provider ?: enriched.provider,
-                providerId = video.providerId ?: enriched.providerId,
-                parentMediaType = parentMediaTypeFor(contentType),
-                parentProvider = video.parentProvider ?: enriched.parentProvider ?: enriched.provider,
-                parentProviderId = video.parentProviderId ?: enriched.parentProviderId ?: enriched.providerId,
-                absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
-            )
-        val result =
-            if (desired) {
-                userMediaRepository.markWatched(request)
-            } else {
-                userMediaRepository.unmarkWatched(request)
-            }
-        return DetailsMutationResult(
-            details = enriched,
-            success = mutationSucceeded(result),
-            statusMessage = result.statusMessage,
-        )
-    }
-
-    suspend fun updateRating(
-        details: MediaDetails,
-        rating: Int?,
-    ): DetailsMutationResult {
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        val mediaKey = enriched.mediaKey?.trim()?.ifBlank { null }
-            ?: return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Title media key is unavailable.",
-            )
-        val result = userMediaRepository.setTitleRating(mediaKey, rating)
-        return DetailsMutationResult(
-            details = enriched,
-            success = mutationSucceeded(result),
-            statusMessage = result.statusMessage,
-        )
-    }
-
-    private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRequest {
-        val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
-        return WatchHistoryRequest(
-            contentId = details.id,
-            mediaKey = details.mediaKey,
-            contentType = contentType,
-            title = details.title,
-            remoteImdbId = details.imdbId,
-            provider = details.provider,
-            providerId = details.providerId,
-            parentMediaType = details.parentMediaType,
-            parentProvider = details.parentProvider,
-            parentProviderId = details.parentProviderId,
-            absoluteEpisodeNumber = details.absoluteEpisodeNumber,
-        )
-    }
+private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRequest {
+    val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+    return WatchHistoryRequest(
+        mediaKey = details.mediaKey,
+        contentType = contentType,
+        title = details.title,
+        absoluteEpisodeNumber = details.absoluteEpisodeNumber,
+    )
+}
 
     private fun mutationSucceeded(result: WatchHistoryResult): Boolean {
         return result.accepted

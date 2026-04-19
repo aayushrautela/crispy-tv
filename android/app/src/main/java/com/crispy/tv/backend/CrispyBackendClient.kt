@@ -121,56 +121,39 @@ class CrispyBackendClient(
         val nextAction: String,
     )
 
-    data class MediaLookupInput(
-        val id: String? = null,
-        val mediaKey: String? = null,
-        val mediaType: String? = null,
-        val tmdbId: Int? = null,
-        val showTmdbId: Int? = null,
-        val imdbId: String? = null,
-        val tvdbId: Int? = null,
-        val provider: String? = null,
-        val providerId: String? = null,
-        val parentProvider: String? = null,
-        val parentProviderId: String? = null,
-        val absoluteEpisodeNumber: Int? = null,
-        val seasonNumber: Int? = null,
-        val episodeNumber: Int? = null,
-    )
+data class MediaLookupInput(
+    val mediaKey: String? = null,
+    val mediaType: String? = null,
+    val tmdbId: Int? = null,
+    val showTmdbId: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+)
 
-    data class WatchMutationInput(
-        val mediaKey: String? = null,
-        val mediaType: String,
-        val provider: String? = null,
-        val providerId: String? = null,
-        val parentProvider: String? = null,
-        val parentProviderId: String? = null,
-        val absoluteEpisodeNumber: Int? = null,
-        val seasonNumber: Int? = null,
-        val episodeNumber: Int? = null,
-        val occurredAt: String? = null,
-        val rating: Int? = null,
-        val payload: Map<String, Any?> = emptyMap(),
-    )
+data class WatchMutationInput(
+    val mediaKey: String? = null,
+    val mediaType: String,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val absoluteEpisodeNumber: Int? = null,
+    val occurredAt: String? = null,
+    val rating: Int? = null,
+    val payload: Map<String, Any?> = emptyMap(),
+)
 
-    data class PlaybackEventInput(
-        val clientEventId: String,
-        val eventType: String,
-        val mediaKey: String? = null,
-        val mediaType: String,
-        val provider: String? = null,
-        val providerId: String? = null,
-        val parentProvider: String? = null,
-        val parentProviderId: String? = null,
-        val absoluteEpisodeNumber: Int? = null,
-        val seasonNumber: Int? = null,
-        val episodeNumber: Int? = null,
-        val positionSeconds: Double? = null,
-        val durationSeconds: Double? = null,
-        val rating: Int? = null,
-        val occurredAt: String? = null,
-        val payload: Map<String, Any?> = emptyMap(),
-    )
+data class PlaybackEventInput(
+    val clientEventId: String,
+    val eventType: String,
+    val mediaKey: String? = null,
+    val mediaType: String,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val absoluteEpisodeNumber: Int? = null,
+    val positionSeconds: Double? = null,
+    val durationSeconds: Double? = null,
+    val occurredAt: String? = null,
+    val payload: Map<String, Any?> = emptyMap(),
+)
 
     data class MetadataImages(
         val posterUrl: String?,
@@ -1070,34 +1053,18 @@ class CrispyBackendClient(
     internal val jsonMediaType
         get() = JSON_MEDIA_TYPE
 
-    internal fun metadataLookupUrl(
-        path: String,
-        input: MediaLookupInput,
-        includeId: Boolean = true,
-        includeMediaKey: Boolean = true,
-        includeImdbId: Boolean = true,
-    ) = path.toHttpUrl().newBuilder()
-        .apply {
-            val effectiveProvider =
-                input.provider?.trim()?.takeIf { it.isNotBlank() }
-                    ?: input.tvdbId?.toString()?.let { "tvdb" }
-                    ?: input.tmdbId?.toString()?.let { "tmdb" }
-            val effectiveProviderId =
-                input.providerId?.trim()?.takeIf { it.isNotBlank() }
-                    ?: input.tvdbId?.toString()
-                    ?: input.tmdbId?.toString()
-            if (includeId && !input.id.isNullOrBlank()) addQueryParameter("id", input.id.trim())
-            if (includeMediaKey && !input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
-            if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
-            if (includeImdbId && !input.imdbId.isNullOrBlank()) addQueryParameter("imdbId", input.imdbId.trim())
-            if (!effectiveProvider.isNullOrBlank()) addQueryParameter("provider", effectiveProvider)
-            if (!effectiveProviderId.isNullOrBlank()) addQueryParameter("providerId", effectiveProviderId)
-            if (!input.parentProvider.isNullOrBlank()) addQueryParameter("parentProvider", input.parentProvider.trim())
-            if (!input.parentProviderId.isNullOrBlank()) addQueryParameter("parentProviderId", input.parentProviderId.trim())
-            if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
-            if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
-        }
-        .build()
+internal fun metadataLookupUrl(
+    path: String,
+    input: MediaLookupInput,
+) = path.toHttpUrl().newBuilder()
+    .apply {
+        if (!input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
+        if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
+        if (input.tmdbId != null) addQueryParameter("tmdbId", input.tmdbId.toString())
+        if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
+        if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
+    }
+    .build()
 
     private companion object {
         private const val CALL_TIMEOUT_MS = 45_000L

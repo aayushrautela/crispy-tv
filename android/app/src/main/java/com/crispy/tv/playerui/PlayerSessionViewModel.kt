@@ -404,9 +404,7 @@ class PlayerSessionViewModel(
         val nextSubtitle = buildPlayerSubtitle(nextMediaType, details, nextTitle, nextSeason, nextEpisodeNumber)
         val nextIdentity =
             PlaybackIdentity(
-                contentId = details.id,
                 mediaKey = details.mediaKey,
-                imdbId = details.imdbId,
                 tmdbId = if (nextMediaType == MetadataLabMediaType.MOVIE) details.tmdbId ?: nextEpisode?.tmdbId else null,
                 contentType = nextMediaType,
                 season = nextSeason,
@@ -415,11 +413,7 @@ class PlayerSessionViewModel(
                 year = details.year?.trim()?.toIntOrNull(),
                 showTitle = if (isEpisodic) details.title else null,
                 showYear = if (isEpisodic) details.year?.trim()?.toIntOrNull() else null,
-                provider = nextEpisode?.provider ?: details.provider,
-                providerId = nextEpisode?.providerId ?: details.providerId,
                 parentMediaType = details.parentMediaType ?: parentMediaType,
-                parentProvider = nextEpisode?.parentProvider ?: details.parentProvider ?: details.provider,
-                parentProviderId = nextEpisode?.parentProviderId ?: details.parentProviderId ?: details.providerId,
                 absoluteEpisodeNumber = nextEpisode?.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
             )
 

@@ -2,10 +2,8 @@ package com.crispy.tv.playback
 
 import com.crispy.tv.details.StreamProviderUiState
 import com.crispy.tv.details.StreamSelectorUiState
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.providerBaseLookupId
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.streams.AddonStream
@@ -29,26 +27,25 @@ fun resolveStreamLookupTarget(
     fallbackMediaType: MetadataLabMediaType,
 ): StreamLookupTarget {
     val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
-    val lookupId =
-        when (mediaType) {
-            MetadataLabMediaType.MOVIE -> details.providerBaseLookupId().orEmpty()
-            MetadataLabMediaType.SERIES,
-            MetadataLabMediaType.ANIME -> {
-                val fromLoadedEpisodes = seasonEpisodes.firstOrNull { !it.lookupId.isNullOrBlank() }?.lookupId?.trim()
-                if (fromLoadedEpisodes != null) {
-                    fromLoadedEpisodes
-                } else {
-                    val season = selectedSeason ?: seasonEpisodes.firstOrNull()?.season ?: 1
-                    val base = details.providerBaseLookupId().orEmpty()
-                    val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
-                    if (canonicalBase.isNotBlank() && season > 0) {
-                        "$canonicalBase:$season:1"
-                    } else {
-                        base
-                    }
-                }
-            }
+val lookupId =
+    when (mediaType) {
+      MetadataLabMediaType.MOVIE -> details.tmdbId?.let { "tmdb:$it" }.orEmpty()
+      MetadataLabMediaType.SERIES,
+      MetadataLabMediaType.ANIME -> {
+        val fromLoadedEpisodes = seasonEpisodes.firstOrNull { !it.lookupId.isNullOrBlank() }?.lookupId?.trim()
+        if (fromLoadedEpisodes != null) {
+          fromLoadedEpisodes
+        } else {
+          val season = selectedSeason ?: seasonEpisodes.firstOrNull()?.season ?: 1
+          val base = details.showTmdbId?.let { "tmdb:$it" }.orEmpty()
+          if (base.isNotBlank() && season > 0) {
+            "$base:$season:1"
+          } else {
+            base
+          }
         }
+      }
+    }
 
     return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
 }
@@ -70,15 +67,13 @@ fun findEpisodeForLookupId(
 }
 
 fun buildEpisodeLookupId(
-    details: MediaDetails,
-    season: Int,
-    episode: Int,
+  details: MediaDetails,
+  season: Int,
+  episode: Int,
 ): String? {
-    if (season <= 0 || episode <= 0) return null
-    val base = details.providerBaseLookupId() ?: return null
-    val canonicalBase = normalizeNuvioMediaId(base).contentId.trim()
-    if (canonicalBase.isBlank()) return null
-    return "$canonicalBase:$season:$episode"
+  if (season <= 0 || episode <= 0) return null
+  val showTmdbId = details.showTmdbId ?: return null
+  return "tmdb:$showTmdbId:$season:$episode"
 }
 
 fun buildPlayerSubtitle(

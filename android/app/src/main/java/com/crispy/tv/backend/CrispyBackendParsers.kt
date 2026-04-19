@@ -172,9 +172,9 @@ internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMet
     if (title.isBlank()) {
         throw IllegalStateException("Backend metadata item is missing required fields.")
     }
-    if (mediaType.isBlank() || provider.isNullOrBlank() || providerId.isNullOrBlank() || posterUrl.isNullOrBlank()) {
-        throw IllegalStateException("Backend metadata item is missing regular-card fields.")
-    }
+if (mediaType.isBlank() || posterUrl.isNullOrBlank()) {
+    throw IllegalStateException("Backend metadata item is missing regular-card fields.")
+  }
     val genre = json.optNullableString("genre") ?: json.optJSONArray("genres")?.optString(0)?.trim().takeUnless { it.isNullOrBlank() }
     val mediaKey = json.optNullableString("mediaKey")
     if (mediaKey.isNullOrBlank()) {
@@ -720,9 +720,9 @@ internal fun CrispyBackendClient.parseRuntimeMediaCard(
         ?: json.optJSONObject("images").optNullableString("posterUrl")
     val backdropUrl = json.optNullableString("backdropUrl")
         ?: json.optJSONObject("images").optNullableString("backdropUrl")
-    if (mediaKey.isNullOrBlank() || mediaType.isBlank() || provider.isNullOrBlank() || providerId.isNullOrBlank() || title.isNullOrBlank() || posterUrl.isNullOrBlank()) {
-        throw IllegalStateException("Runtime media card is missing required fields.")
-    }
+if (mediaKey.isNullOrBlank() || mediaType.isBlank() || title.isNullOrBlank() || posterUrl.isNullOrBlank()) {
+    throw IllegalStateException("Runtime media card is missing required fields.")
+  }
     if (requireBackdrop && backdropUrl.isNullOrBlank()) {
         throw IllegalStateException("Landscape runtime media card is missing backdropUrl.")
     }
