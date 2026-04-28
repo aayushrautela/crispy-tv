@@ -78,7 +78,7 @@ class AppGraph(
         )
     }
 
-    fun detailsUseCases(): DetailsUseCases = detailsUseCases
+    internal fun detailsUseCases(): DetailsUseCases = detailsUseCases
 }
 
 fun Context.appGraph(): AppGraph {
