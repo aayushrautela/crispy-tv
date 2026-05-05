@@ -14,17 +14,17 @@
           "media": {
             "mediaType": "movie",
             "mediaKey": "tmdb:movie:157336",
-            "provider": "tmdb",
-            "providerId": "157336",
             "title": "Interstellar",
             "posterUrl": "https://img/interstellar.jpg",
             "releaseYear": 2014,
             "rating": 8.7,
             "genre": "Sci-Fi",
-            "subtitle": "2014 · 169 min"
+            "subtitle": "2014 \u00b7 169 min"
           },
           "watchedAt": "2026-04-10T18:00:00Z",
-          "origins": ["watch_activity"]
+          "origins": [
+            "watch_activity"
+          ]
         }
       ],
       "pageInfo": {
@@ -46,17 +46,17 @@
           "media": {
             "media_type": "movie",
             "media_key": "tmdb:movie:157336",
-            "provider": "tmdb",
-            "provider_id": "157336",
             "title": "Interstellar",
             "poster_url": "https://img/interstellar.jpg",
             "release_year": 2014,
             "rating": 8.7,
             "genre": "Sci-Fi",
-            "subtitle": "2014 · 169 min"
+            "subtitle": "2014 \u00b7 169 min"
           },
           "watched_at": "2026-04-10T18:00:00Z",
-          "origins": ["watch_activity"]
+          "origins": [
+            "watch_activity"
+          ]
         }
       ],
       "page_info": {

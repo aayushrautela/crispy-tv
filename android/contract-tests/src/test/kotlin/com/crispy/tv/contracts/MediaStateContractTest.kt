@@ -51,8 +51,6 @@ class MediaStateContractTest {
             mediaKey = normalized.optionalString("media_key", path),
             mediaType = normalized.optionalString("media_type", path),
             itemId = normalized.optionalString("item_id", path),
-            provider = normalized.optionalString("provider", path),
-            providerId = normalized.optionalString("provider_id", path),
             title = normalized.optionalString("title", path),
             posterUrl = normalized.optionalString("poster_url", path),
             backdropUrl = normalized.optionalString("backdrop_url", path),

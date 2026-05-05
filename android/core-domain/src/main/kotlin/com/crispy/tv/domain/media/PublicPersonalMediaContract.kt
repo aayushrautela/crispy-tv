@@ -3,8 +3,6 @@ package com.crispy.tv.domain.media
 data class ContractRegularCard(
     val mediaType: String,
     val mediaKey: String,
-    val provider: String,
-    val providerId: String,
     val title: String,
     val posterUrl: String,
     val releaseYear: Int?,
@@ -16,8 +14,6 @@ data class ContractRegularCard(
 data class ContractLandscapeCard(
     val mediaType: String,
     val mediaKey: String,
-    val provider: String,
-    val providerId: String,
     val title: String,
     val posterUrl: String,
     val backdropUrl: String,
@@ -251,14 +247,12 @@ private fun parseCalendarItem(payload: Map<String, Any?>): CalendarContractItem?
 }
 
 private fun parseRegularCard(payload: Map<String, Any?>): ContractRegularCard? {
-    if (!payload.hasExactKeys(setOf("mediaType", "mediaKey", "provider", "providerId", "title", "posterUrl", "releaseYear", "rating", "genre", "subtitle"))) {
+    if (!payload.hasExactKeys(setOf("mediaType", "mediaKey", "title", "posterUrl", "releaseYear", "rating", "genre", "subtitle"))) {
         return null
     }
     return ContractRegularCard(
         mediaType = payload.requiredString("mediaType") ?: return null,
         mediaKey = payload.requiredString("mediaKey") ?: return null,
-        provider = payload.requiredString("provider") ?: return null,
-        providerId = payload.requiredString("providerId") ?: return null,
         title = payload.requiredString("title") ?: return null,
         posterUrl = payload.requiredString("posterUrl") ?: return null,
         releaseYear = payload.nullableInt("releaseYear"),
@@ -269,14 +263,12 @@ private fun parseRegularCard(payload: Map<String, Any?>): ContractRegularCard? {
 }
 
 private fun parseLandscapeCard(payload: Map<String, Any?>): ContractLandscapeCard? {
-    if (!payload.hasExactKeys(setOf("mediaType", "mediaKey", "provider", "providerId", "title", "posterUrl", "backdropUrl", "releaseYear", "rating", "genre", "seasonNumber", "episodeNumber", "episodeTitle", "airDate", "runtimeMinutes"))) {
+    if (!payload.hasExactKeys(setOf("mediaType", "mediaKey", "title", "posterUrl", "backdropUrl", "releaseYear", "rating", "genre", "seasonNumber", "episodeNumber", "episodeTitle", "airDate", "runtimeMinutes"))) {
         return null
     }
     return ContractLandscapeCard(
         mediaType = payload.requiredString("mediaType") ?: return null,
         mediaKey = payload.requiredString("mediaKey") ?: return null,
-        provider = payload.requiredString("provider") ?: return null,
-        providerId = payload.requiredString("providerId") ?: return null,
         title = payload.requiredString("title") ?: return null,
         posterUrl = payload.requiredString("posterUrl") ?: return null,
         backdropUrl = payload.requiredString("backdropUrl") ?: return null,

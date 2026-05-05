@@ -230,7 +230,7 @@ class CalendarService internal constructor(
         val releaseDate = airDate?.trim().takeIf { !it.isNullOrBlank() } ?: media.airDate?.trim().takeIf { !it.isNullOrBlank() }
         val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate)
         val watchedKey = if (season != null && episode != null) {
-            "${media.provider.lowercase(Locale.US)}:${media.providerId.lowercase(Locale.US)}:$season:$episode"
+            "${media.mediaKey}:$season:$episode"
         } else {
             media.mediaKey
         }
@@ -239,7 +239,7 @@ class CalendarService internal constructor(
             !releaseDate.isNullOrBlank() -> ":${releaseDate.take(10)}"
             else -> ""
         }
-        val localKey = "${media.provider}:${media.providerId}$localKeySuffix"
+        val localKey = "${media.mediaKey}$localKeySuffix"
         return CalendarEpisodeItem(
             id = localKey,
             titleMediaKey = relatedShow.mediaKey,
@@ -266,7 +266,7 @@ class CalendarService internal constructor(
     }
 
     private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
-        val localKey = "${relatedShow.provider}:${relatedShow.providerId}"
+        val localKey = relatedShow.mediaKey
         return CalendarSeriesItem(
             id = localKey,
             mediaKey = relatedShow.mediaKey,

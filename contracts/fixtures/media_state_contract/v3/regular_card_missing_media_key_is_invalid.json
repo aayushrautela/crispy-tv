@@ -6,8 +6,6 @@
     "kind": "regular_card",
     "payload": {
       "mediaType": "movie",
-      "provider": "tmdb",
-      "providerId": "550",
       "title": "Fight Club",
       "posterUrl": "https://img/poster.jpg"
     }

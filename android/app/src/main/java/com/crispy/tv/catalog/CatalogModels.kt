@@ -38,8 +38,6 @@ data class CatalogItem(
     val year: String? = null,
     val genre: String? = null,
     val description: String? = null,
-    val provider: String,
-    val providerId: String,
 )
 
 @Immutable

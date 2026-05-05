@@ -1,7 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["contract_version", "suite", "case_id", "input", "expected"],
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
   "additionalProperties": false,
   "properties": {
     "contract_version": {
@@ -17,7 +23,13 @@
     },
     "input": {
       "type": "object",
-      "required": ["snapshot", "hero_limit", "section_limit", "discover", "page"],
+      "required": [
+        "snapshot",
+        "hero_limit",
+        "section_limit",
+        "discover",
+        "page"
+      ],
       "additionalProperties": false,
       "properties": {
         "snapshot": {
@@ -31,11 +43,17 @@
         },
         "discover": {
           "type": "object",
-          "required": ["media_type", "limit"],
+          "required": [
+            "media_type",
+            "limit"
+          ],
           "additionalProperties": false,
           "properties": {
             "media_type": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "limit": {
               "type": "integer"
@@ -44,7 +62,11 @@
         },
         "page": {
           "type": "object",
-          "required": ["catalog_id", "page", "page_size"],
+          "required": [
+            "catalog_id",
+            "page",
+            "page_size"
+          ],
           "additionalProperties": false,
           "properties": {
             "catalog_id": {
@@ -62,17 +84,28 @@
     },
     "expected": {
       "type": "object",
-      "required": ["personal_feed", "discover", "page"],
+      "required": [
+        "personal_feed",
+        "discover",
+        "page"
+      ],
       "additionalProperties": false,
       "properties": {
         "personal_feed": {
           "type": "object",
-          "required": ["hero_result", "sections", "sections_status_message"],
+          "required": [
+            "hero_result",
+            "sections",
+            "sections_status_message"
+          ],
           "additionalProperties": false,
           "properties": {
             "hero_result": {
               "type": "object",
-              "required": ["items", "status_message"],
+              "required": [
+                "items",
+                "status_message"
+              ],
               "additionalProperties": false,
               "properties": {
                 "items": {
@@ -99,7 +132,10 @@
         },
         "discover": {
           "type": "object",
-          "required": ["catalogs", "status_message"],
+          "required": [
+            "catalogs",
+            "status_message"
+          ],
           "additionalProperties": false,
           "properties": {
             "catalogs": {
@@ -115,7 +151,11 @@
         },
         "page": {
           "type": "object",
-          "required": ["items", "status_message", "attempted_urls"],
+          "required": [
+            "items",
+            "status_message",
+            "attempted_urls"
+          ],
           "additionalProperties": false,
           "properties": {
             "items": {
@@ -141,11 +181,18 @@
   "$defs": {
     "snapshot": {
       "type": "object",
-      "required": ["profile_id", "status_message", "lists"],
+      "required": [
+        "profile_id",
+        "status_message",
+        "lists"
+      ],
       "additionalProperties": false,
       "properties": {
         "profile_id": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "status_message": {
           "type": "string"
@@ -160,7 +207,18 @@
     },
     "list": {
       "type": "object",
-      "required": ["kind", "variant_key", "source", "presentation", "name", "heading", "title", "subtitle", "media_types", "items"],
+      "required": [
+        "kind",
+        "variant_key",
+        "source",
+        "presentation",
+        "name",
+        "heading",
+        "title",
+        "subtitle",
+        "media_types",
+        "items"
+      ],
       "additionalProperties": false,
       "properties": {
         "kind": {
@@ -171,11 +229,20 @@
         },
         "source": {
           "type": "string",
-          "enum": ["personal", "public", "personal_home_feed", "public_home_feed"]
+          "enum": [
+            "personal",
+            "public",
+            "personal_home_feed",
+            "public_home_feed"
+          ]
         },
         "presentation": {
           "type": "string",
-          "enum": ["hero", "pill", "rail"]
+          "enum": [
+            "hero",
+            "pill",
+            "rail"
+          ]
         },
         "name": {
           "type": "string"
@@ -205,7 +272,17 @@
     },
     "item": {
       "type": "object",
-      "required": ["media_key", "title", "poster_url", "backdrop_url", "addon_id", "type", "rating", "year", "description"],
+      "required": [
+        "media_key",
+        "title",
+        "poster_url",
+        "backdrop_url",
+        "addon_id",
+        "type",
+        "rating",
+        "year",
+        "description"
+      ],
       "additionalProperties": false,
       "properties": {
         "media_key": {
@@ -215,10 +292,16 @@
           "type": "string"
         },
         "poster_url": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "backdrop_url": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "addon_id": {
           "type": "string"
@@ -227,27 +310,38 @@
           "type": "string"
         },
         "rating": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "year": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "description": {
-          "type": ["string", "null"]
-        },
-        "provider": {
-          "type": "string",
-          "minLength": 1
-        },
-        "provider_id": {
-          "type": "string",
-          "minLength": 1
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "hero_item": {
       "type": "object",
-      "required": ["media_key", "title", "description", "rating", "year", "genres", "backdrop_url", "addon_id", "type"],
+      "required": [
+        "media_key",
+        "title",
+        "description",
+        "rating",
+        "year",
+        "genres",
+        "backdrop_url",
+        "addon_id",
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
         "media_key": {
@@ -260,10 +354,16 @@
           "type": "string"
         },
         "rating": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "year": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "genres": {
           "type": "array",
@@ -279,20 +379,21 @@
         },
         "type": {
           "type": "string"
-        },
-        "provider": {
-          "type": "string",
-          "minLength": 1
-        },
-        "provider_id": {
-          "type": "string",
-          "minLength": 1
         }
       }
     },
     "section": {
       "type": "object",
-      "required": ["catalog_id", "source", "presentation", "variant_key", "name", "heading", "title", "subtitle"],
+      "required": [
+        "catalog_id",
+        "source",
+        "presentation",
+        "variant_key",
+        "name",
+        "heading",
+        "title",
+        "subtitle"
+      ],
       "additionalProperties": false,
       "properties": {
         "catalog_id": {
@@ -300,11 +401,20 @@
         },
         "source": {
           "type": "string",
-          "enum": ["personal", "public", "personal_home_feed", "public_home_feed"]
+          "enum": [
+            "personal",
+            "public",
+            "personal_home_feed",
+            "public_home_feed"
+          ]
         },
         "presentation": {
           "type": "string",
-          "enum": ["hero", "pill", "rail"]
+          "enum": [
+            "hero",
+            "pill",
+            "rail"
+          ]
         },
         "variant_key": {
           "type": "string"
@@ -325,7 +435,11 @@
     },
     "discover_ref": {
       "type": "object",
-      "required": ["section", "addon_name", "genres"],
+      "required": [
+        "section",
+        "addon_name",
+        "genres"
+      ],
       "additionalProperties": false,
       "properties": {
         "section": {

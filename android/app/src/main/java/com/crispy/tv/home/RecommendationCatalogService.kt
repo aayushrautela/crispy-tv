@@ -77,11 +77,7 @@ data class MediaDetails(
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
     val addonId: String?,
-    val provider: String? = null,
-    val providerId: String? = null,
     val parentMediaType: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
 )
 
@@ -97,10 +93,6 @@ data class MediaVideo(
     val lookupId: String? = null,
     val tmdbId: Int? = null,
     val showTmdbId: Int? = null,
-    val provider: String? = null,
-    val providerId: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
 )
 
@@ -346,10 +338,10 @@ class RecommendationCatalogService internal constructor(
     }
 
     private fun HomeCatalogItem.toCatalogItem(): CatalogItem? {
-        val runtimeLookup = mediaKey.toRuntimeLookup() ?: return null
+        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
         return CatalogItem(
-            id = mediaKey,
-            mediaKey = mediaKey,
+            id = normalizedMediaKey,
+            mediaKey = normalizedMediaKey,
             title = title,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
@@ -358,8 +350,6 @@ class RecommendationCatalogService internal constructor(
             rating = rating,
             year = year,
             description = description,
-            provider = runtimeLookup.provider,
-            providerId = runtimeLookup.providerId,
         )
     }
 
@@ -540,15 +530,6 @@ class RecommendationCatalogService internal constructor(
         )
     }
 
-    private fun String.toRuntimeLookup(): RuntimeLookup? {
-        val parts = trim().split(':').map { it.trim() }.filter { it.isNotEmpty() }
-        if (parts.size < 2) return null
-        val provider = parts.first()
-        val providerId = parts.last()
-        if (provider.isBlank() || providerId.isBlank()) return null
-        return RuntimeLookup(provider = provider, providerId = providerId)
-    }
-
     private fun recommendationsAttemptedUrl(profileId: String?, catalogId: String? = null, page: Int? = null): String {
         val base = "backend:/v1/profiles/${profileId.orEmpty()}/recommendations"
         val suffix = buildList {
@@ -557,9 +538,4 @@ class RecommendationCatalogService internal constructor(
         }.joinToString("&")
         return if (suffix.isBlank()) base else "$base?$suffix"
     }
-
-    private data class RuntimeLookup(
-        val provider: String,
-        val providerId: String,
-    )
 }

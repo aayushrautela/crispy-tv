@@ -807,10 +807,6 @@ private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): St
   return entry.titleMediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
 }
 
-private fun continueWatchingContentKey(type: String, provider: String, providerId: String): String {
-    return "${type.trim().lowercase(Locale.US)}:${provider.trim().lowercase(Locale.US)}:${providerId.trim().lowercase(Locale.US)}"
-}
-
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
     val seasonEpisode =
         if ((type.equals("series", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {

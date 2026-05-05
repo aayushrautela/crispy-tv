@@ -67,8 +67,6 @@ class CalendarContractTest {
         return ContractRegularCard(
             mediaType = json.requireString("media_type", path),
             mediaKey = json.requireString("media_key", path),
-            provider = json.requireString("provider", path),
-            providerId = json.requireString("provider_id", path),
             title = json.requireString("title", path),
             posterUrl = json.requireString("poster_url", path),
             releaseYear = json.optionalInt("release_year", path),
@@ -82,8 +80,6 @@ class CalendarContractTest {
         return ContractLandscapeCard(
             mediaType = json.requireString("media_type", path),
             mediaKey = json.requireString("media_key", path),
-            provider = json.requireString("provider", path),
-            providerId = json.requireString("provider_id", path),
             title = json.requireString("title", path),
             posterUrl = json.requireString("poster_url", path),
             backdropUrl = json.requireString("backdrop_url", path),

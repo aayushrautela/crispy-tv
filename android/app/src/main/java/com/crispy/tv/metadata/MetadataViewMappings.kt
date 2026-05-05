@@ -56,11 +56,7 @@ internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
         seasonNumber = seasonNumber,
         episodeNumber = episodeNumber,
         addonId = "backend",
-        provider = provider,
-        providerId = providerId,
         parentMediaType = parentMediaType,
-        parentProvider = parentProvider,
-        parentProviderId = parentProviderId,
         absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
@@ -92,10 +88,6 @@ val lookupId =
         lookupId = lookupId,
         tmdbId = tmdbId,
         showTmdbId = showTmdbId,
-        provider = provider,
-        providerId = providerId,
-        parentProvider = parentProvider,
-        parentProviderId = parentProviderId,
         absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
@@ -127,10 +119,6 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
     lookupId = lookupId,
     tmdbId = tmdbId,
     showTmdbId = showTmdbId,
-    provider = provider,
-    providerId = providerId,
-    parentProvider = parentProvider,
-    parentProviderId = parentProviderId,
     absoluteEpisodeNumber = absoluteEpisodeNumber,
   )
 }
@@ -171,8 +159,6 @@ internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): 
 internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
     val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedMediaKey = mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val lookupProvider = parentProvider?.trim()?.takeIf { it.isNotBlank() } ?: provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val lookupProviderId = parentProviderId?.trim()?.takeIf { it.isNotBlank() } ?: providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedType = normalizedCatalogMediaType()
     val normalizedPosterUrl = images.posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return CatalogItem(
@@ -188,8 +174,6 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
         year = releaseYear?.toString() ?: releaseDate?.take(4),
         genre = null,
         description = summary ?: overview,
-        provider = lookupProvider,
-        providerId = lookupProviderId,
     )
 }
 

@@ -52,7 +52,6 @@ class BackendWatchHistoryService(
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update watchlist.")
         val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
-            ?: resolveMediaKey(backendContext.accessToken, request)
             ?: return WatchHistoryResult(statusMessage = "Watchlist update failed.")
         val action = try {
             if (inWatchlist) {
@@ -127,7 +126,6 @@ class BackendWatchHistoryService(
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
         val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
-            ?: resolveMediaKey(backendContext.accessToken, request)
             ?: return WatchHistoryResult(statusMessage = "Rating update failed.")
         val action = try {
             if (rating == null) {
@@ -372,20 +370,9 @@ val next =
         )
     }
 
-    private suspend fun resolveMediaKey(accessToken: String, request: WatchHistoryRequest): String? {
-        return try {
-            backend.resolvePlayback(
-                accessToken = accessToken,
-                input = request.toProviderLookupInput(),
-            ).item.mediaKey.trim().takeIf { it.isNotBlank() }
-        } catch (_: Throwable) {
-            null
-        }
-    }
-
     private suspend fun syncWatchedMutation(request: WatchHistoryRequest, shouldMark: Boolean): WatchHistoryResult {
         val backendContext = getBackendContext() ?: return WatchHistoryResult(statusMessage = "Select a profile to update watched state.")
-        val mutationInput = buildWatchMutationInput(request, backendContext)
+        val mutationInput = buildWatchMutationInput(request)
             ?: return WatchHistoryResult(statusMessage = "Watched update failed.")
 
         val response = try {
@@ -609,35 +596,16 @@ private fun WatchHistoryRequest.toProviderLookupInput(): MediaLookupInput {
 
     private suspend fun buildWatchMutationInput(
         request: WatchHistoryRequest,
-        backendContext: BackendContext,
     ): WatchMutationInput? {
-        val directMediaKey = request.mediaKey?.trim()?.ifBlank { null }
-        if (directMediaKey != null && request.season == null && request.episode == null) {
-            return WatchMutationInput(
-                mediaKey = directMediaKey,
-                mediaType = request.contentType.toBackendMediaType(request),
-                occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
-            )
-        }
-
-        val resolved = try {
-            backend.resolvePlayback(
-                accessToken = backendContext.accessToken,
-                input = request.toProviderLookupInput(),
-            )
-        } catch (_: Throwable) {
-            null
-        } ?: return null
-
-val item = resolved.item
-    return WatchMutationInput(
-        mediaKey = item.mediaKey,
-        mediaType = item.mediaType,
-        seasonNumber = item.seasonNumber,
-        episodeNumber = item.episodeNumber,
-        absoluteEpisodeNumber = item.absoluteEpisodeNumber ?: request.absoluteEpisodeNumber,
-        occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
-    )
+        val directMediaKey = request.mediaKey?.trim()?.ifBlank { null } ?: return null
+        return WatchMutationInput(
+            mediaKey = directMediaKey,
+            mediaType = request.contentType.toBackendMediaType(request),
+            seasonNumber = request.season,
+            episodeNumber = request.episode,
+            absoluteEpisodeNumber = request.absoluteEpisodeNumber,
+            occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
+        )
     }
 
 private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
@@ -729,17 +697,7 @@ private fun titleStateIdentity(
     }
 
     private fun CrispyBackendClient.RuntimeMediaCard.toTitleMediaKey(): String {
-        val normalizedProvider = provider.trim()
-        val normalizedProviderId = providerId.trim()
-        if (normalizedProvider.isBlank() || normalizedProviderId.isBlank()) {
-            return mediaKey
-        }
-        val titleMediaType =
-            when (mediaType.trim().lowercase(Locale.US)) {
-                "movie" -> "movie"
-                else -> "show"
-            }
-        return "$titleMediaType:$normalizedProvider:$normalizedProviderId"
+        return mediaKey
     }
 
     private companion object {

@@ -14,17 +14,17 @@
           "media": {
             "mediaType": "movie",
             "mediaKey": "tmdb:movie:603",
-            "provider": "tmdb",
-            "providerId": "603",
             "title": "The Matrix",
             "posterUrl": "https://img/matrix.jpg",
             "releaseYear": 1999,
             "rating": 8.7,
             "genre": "Action",
-            "subtitle": "1999 · 136 min"
+            "subtitle": "1999 \u00b7 136 min"
           },
           "addedAt": "2026-04-08T12:00:00Z",
-          "origins": ["watchlist"]
+          "origins": [
+            "watchlist"
+          ]
         }
       ],
       "pageInfo": {
@@ -46,17 +46,17 @@
           "media": {
             "media_type": "movie",
             "media_key": "tmdb:movie:603",
-            "provider": "tmdb",
-            "provider_id": "603",
             "title": "The Matrix",
             "poster_url": "https://img/matrix.jpg",
             "release_year": 1999,
             "rating": 8.7,
             "genre": "Action",
-            "subtitle": "1999 · 136 min"
+            "subtitle": "1999 \u00b7 136 min"
           },
           "added_at": "2026-04-08T12:00:00Z",
-          "origins": ["watchlist"]
+          "origins": [
+            "watchlist"
+          ]
         }
       ],
       "page_info": {

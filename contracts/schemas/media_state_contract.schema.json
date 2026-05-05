@@ -94,18 +94,6 @@
                 "null"
               ]
             },
-            "provider": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "provider_id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "title": {
               "type": [
                 "string",

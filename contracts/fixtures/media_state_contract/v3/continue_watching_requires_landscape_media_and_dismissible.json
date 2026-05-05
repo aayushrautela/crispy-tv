@@ -9,8 +9,6 @@
       "media": {
         "mediaKey": "tmdb:series:1399",
         "mediaType": "series",
-        "provider": "tmdb",
-        "providerId": "1399",
         "title": "Game of Thrones",
         "posterUrl": "https://img/poster.jpg",
         "backdropUrl": "https://img/backdrop.jpg",
@@ -25,7 +23,9 @@
         "progressPercent": 47.5
       },
       "lastActivityAt": "2026-04-01T10:15:00Z",
-      "origins": ["trakt"],
+      "origins": [
+        "trakt"
+      ],
       "dismissible": false
     }
   },
@@ -36,8 +36,6 @@
       "media_key": "tmdb:series:1399",
       "media_type": "series",
       "item_id": "cw-123",
-      "provider": "tmdb",
-      "provider_id": "1399",
       "title": "Game of Thrones",
       "poster_url": "https://img/poster.jpg",
       "backdrop_url": "https://img/backdrop.jpg",
@@ -45,7 +43,9 @@
       "progress_percent": 47.5,
       "watched_at": null,
       "last_activity_at": "2026-04-01T10:15:00Z",
-      "origins": ["trakt"],
+      "origins": [
+        "trakt"
+      ],
       "dismissible": false,
       "layout": null,
       "route_kind": null

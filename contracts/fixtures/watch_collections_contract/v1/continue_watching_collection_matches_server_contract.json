@@ -14,8 +14,6 @@
           "media": {
             "mediaType": "series",
             "mediaKey": "tmdb:series:1399",
-            "provider": "tmdb",
-            "providerId": "1399",
             "title": "Game of Thrones",
             "posterUrl": "https://img/poster.jpg",
             "backdropUrl": "https://img/backdrop.jpg",
@@ -35,7 +33,10 @@
             "lastPlayedAt": "2026-04-11T23:58:00Z"
           },
           "lastActivityAt": "2026-04-11T23:58:10Z",
-          "origins": ["trakt", "watch_activity"],
+          "origins": [
+            "trakt",
+            "watch_activity"
+          ],
           "dismissible": false
         }
       ],
@@ -58,8 +59,6 @@
           "media": {
             "media_type": "series",
             "media_key": "tmdb:series:1399",
-            "provider": "tmdb",
-            "provider_id": "1399",
             "title": "Game of Thrones",
             "poster_url": "https://img/poster.jpg",
             "backdrop_url": "https://img/backdrop.jpg",
@@ -79,7 +78,10 @@
             "last_played_at": "2026-04-11T23:58:00Z"
           },
           "last_activity_at": "2026-04-11T23:58:10Z",
-          "origins": ["trakt", "watch_activity"],
+          "origins": [
+            "trakt",
+            "watch_activity"
+          ],
           "dismissible": false
         }
       ],

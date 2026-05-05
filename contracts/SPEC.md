@@ -48,7 +48,7 @@ The spec version documents the contract surface. Each suite owns its own
 - `home_catalogs`
   - Plan home-screen hero shelves, header sections, discover catalog refs, and paged catalog results from deterministic snapshot input.
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
-  - `contract_version` 5 requires `media_key` on client-facing title items. `provider` and `provider_id` are supporting metadata only when present and do not define client routing.
+  - `contract_version` 5 requires `media_key` on client-facing title items; provider identity is not part of client routing.
   - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
@@ -82,8 +82,8 @@ The spec version documents the contract surface. Each suite owns its own
   - Logical storage namespace/versioning and schema mismatch behavior.
 - `media_state_contract`
   - Validate exact backend payload-shape rules from `CLIENT_SERVER_MEDIA_STATE_CONTRACT.md` for client-facing runtime and card-like metadata surfaces.
-  - `contract_version` 3 requires `media.mediaKey` for every media-bearing title surface that can open title details. `mediaType`, `provider`, and `providerId` remain supporting metadata only.
-  - Regular-card surfaces require `mediaKey`, `mediaType`, `provider`, `providerId`, `title`, and `posterUrl`.
+  - `contract_version` 3 requires `media.mediaKey` for every media-bearing title surface that can open title details. `mediaType` remains supporting metadata only.
+  - Regular-card surfaces require `mediaKey`, `mediaType`, `title`, and `posterUrl`.
   - Landscape-card surfaces require the same fields plus `backdropUrl`.
   - Continue-watching items require `id`, `media`, `progress`, `lastActivityAt`, `origins`, and `dismissible`; they do not require `watchedAt`, and dismissal UI must honor backend `dismissible`.
   - Watched/watchlist/ratings items require `media` and `origins`, plus their relevant state fields.

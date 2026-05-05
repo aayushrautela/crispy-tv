@@ -14,8 +14,6 @@
         {
           "mediaKey": "tmdb:movie:550",
           "mediaType": "movie",
-          "provider": "tmdb",
-          "providerId": "550",
           "title": "Fight Club",
           "posterUrl": "https://img/poster.jpg"
         }
@@ -29,8 +27,6 @@
       "media_key": null,
       "media_type": null,
       "item_id": null,
-      "provider": null,
-      "provider_id": null,
       "title": null,
       "poster_url": null,
       "backdrop_url": null,

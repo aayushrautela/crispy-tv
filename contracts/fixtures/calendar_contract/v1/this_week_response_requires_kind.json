@@ -15,8 +15,6 @@
           "media": {
             "mediaType": "episode",
             "mediaKey": "tmdb:episode:2002",
-            "provider": "tmdb",
-            "providerId": "2002",
             "title": "The Return",
             "posterUrl": "https://img/return.jpg",
             "backdropUrl": "https://img/return-backdrop.jpg",
@@ -32,8 +30,6 @@
           "relatedShow": {
             "mediaType": "series",
             "mediaKey": "tmdb:series:900",
-            "provider": "tmdb",
-            "providerId": "900",
             "title": "Orbit Station",
             "posterUrl": "https://img/orbit.jpg",
             "releaseYear": 2024,
@@ -60,8 +56,6 @@
           "media": {
             "media_type": "episode",
             "media_key": "tmdb:episode:2002",
-            "provider": "tmdb",
-            "provider_id": "2002",
             "title": "The Return",
             "poster_url": "https://img/return.jpg",
             "backdrop_url": "https://img/return-backdrop.jpg",
@@ -77,8 +71,6 @@
           "related_show": {
             "media_type": "series",
             "media_key": "tmdb:series:900",
-            "provider": "tmdb",
-            "provider_id": "900",
             "title": "Orbit Station",
             "poster_url": "https://img/orbit.jpg",
             "release_year": 2024,

@@ -5,8 +5,6 @@ data class MediaStateNormalized(
     val mediaKey: String? = null,
     val mediaType: String? = null,
     val itemId: String? = null,
-    val provider: String? = null,
-    val providerId: String? = null,
     val title: String? = null,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
@@ -39,8 +37,6 @@ fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStat
 private fun normalizeCard(payload: Map<String, Any?>, requireBackdrop: Boolean): MediaStateNormalized? {
     val mediaKey = payload.stringValue("mediaKey") ?: return null
     val mediaType = payload.stringValue("mediaType") ?: return null
-    val provider = payload.stringValue("provider") ?: return null
-    val providerId = payload.stringValue("providerId") ?: return null
     val title = payload.stringValue("title") ?: return null
     val posterUrl = payload.stringValue("posterUrl") ?: payload.objectValue("images")?.stringValue("posterUrl") ?: return null
     val backdropUrl = payload.stringValue("backdropUrl") ?: payload.objectValue("images")?.stringValue("backdropUrl")
@@ -50,8 +46,6 @@ private fun normalizeCard(payload: Map<String, Any?>, requireBackdrop: Boolean):
         mediaKey = mediaKey,
         mediaType = mediaType,
         itemId = null,
-        provider = provider,
-        providerId = providerId,
         title = title,
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,
@@ -62,8 +56,6 @@ private fun normalizeCard(payload: Map<String, Any?>, requireBackdrop: Boolean):
 private fun normalizeMetadataCard(payload: Map<String, Any?>): MediaStateNormalized? {
     val mediaKey = payload.stringValue("mediaKey") ?: return null
     val mediaType = payload.stringValue("mediaType") ?: return null
-    val provider = payload.stringValue("provider") ?: return null
-    val providerId = payload.stringValue("providerId") ?: return null
     val title = payload.stringValue("title") ?: payload.stringValue("subtitle") ?: return null
     val images = payload.objectValue("images")
     val posterUrl = payload.stringValue("posterUrl") ?: images?.stringValue("posterUrl") ?: return null
@@ -73,8 +65,6 @@ private fun normalizeMetadataCard(payload: Map<String, Any?>): MediaStateNormali
         mediaKey = mediaKey,
         mediaType = mediaType,
         itemId = null,
-        provider = provider,
-        providerId = providerId,
         title = title,
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,

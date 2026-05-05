@@ -64,8 +64,6 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
             mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
             else -> "movie"
         }
-    val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
     val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return SearchCatalogItem(
@@ -81,7 +79,5 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
         year = year,
         genre = genre ?: defaultGenre,
         description = summary,
-        provider = normalizedProvider,
-        providerId = normalizedProviderId,
     )
 }
