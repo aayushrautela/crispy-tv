@@ -862,8 +862,6 @@ internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?)
             val item = safeArray.optJSONObject(index) ?: continue
             val mediaKey = item.optNullableString("mediaKey") ?: continue
             val mediaType = item.optString("mediaType").trim().ifBlank { continue }
-            val provider = item.optString("provider").trim().ifBlank { continue }
-            val providerId = item.optString("providerId").trim().ifBlank { continue }
             val title = item.optString("title").trim().ifBlank { continue }
             val description = item.optString("description").trim().ifBlank { continue }
             val backdropUrl = item.optString("backdropUrl").trim().ifBlank { continue }
@@ -871,8 +869,6 @@ internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?)
                 RecommendationHeroItem(
                     mediaKey = mediaKey,
                     mediaType = mediaType,
-                    provider = provider,
-                    providerId = providerId,
                     title = title,
                     description = description,
                     backdropUrl = backdropUrl,
@@ -899,15 +895,11 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
                 for (partIndex in 0 until parts.length()) {
                     val part = parts.optJSONObject(partIndex) ?: continue
                     val mediaType = part.optString("mediaType").trim().ifBlank { continue }
-                    val provider = part.optString("provider").trim().ifBlank { continue }
-                    val providerId = part.optString("providerId").trim().ifBlank { continue }
                     val partTitle = part.optString("title").trim().ifBlank { continue }
                     val posterUrl = part.optString("posterUrl").trim().ifBlank { continue }
                     add(
                         RecommendationCollectionItem(
                             mediaType = mediaType,
-                            provider = provider,
-                            providerId = providerId,
                             title = partTitle,
                             posterUrl = posterUrl,
                             releaseYear = part.optIntOrNull("releaseYear"),

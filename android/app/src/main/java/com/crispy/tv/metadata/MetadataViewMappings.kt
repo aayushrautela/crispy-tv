@@ -56,7 +56,6 @@ internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
         seasonNumber = seasonNumber,
         episodeNumber = episodeNumber,
         addonId = "backend",
-        parentMediaType = parentMediaType,
         absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
