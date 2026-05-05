@@ -591,10 +591,9 @@ class PlayerSessionViewModel(
                 runCatching {
                     withContext(Dispatchers.IO) {
                         val mediaKey = details.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
-                        backendClient.listMetadataEpisodes(
+                        backendClient.getMetadataTitleDetail(
                             accessToken = session.accessToken,
                             mediaKey = mediaKey,
-                            seasonNumber = season,
                         )
                     }
                 }.getOrElse {
@@ -624,7 +623,7 @@ class PlayerSessionViewModel(
                 }
 
             val videos =
-                response.episodes.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+                response.episodesForSeason(season).mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
 
             seasonEpisodesCache[season] = videos
             _uiState.update { current ->
@@ -632,12 +631,7 @@ class PlayerSessionViewModel(
                     current
                 } else {
                     current.copy(
-                        seasons =
-                            if (response.includedSeasonNumbers.isNotEmpty()) {
-                                response.includedSeasonNumbers.sorted()
-                            } else {
-                                current.seasons
-                            },
+                        seasons = response.seasonNumbers().ifEmpty { current.seasons },
                         seasonEpisodes = videos,
                         episodesIsLoading = false,
                         episodesStatusMessage = if (videos.isEmpty()) "No episodes found." else "",

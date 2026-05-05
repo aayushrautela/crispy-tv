@@ -180,7 +180,8 @@ internal fun HomeWideRailCard(
     onRemoveClick: (() -> Unit)? = null,
 ) {
     var actionSheetVisible by remember { mutableStateOf(false) }
-    val hasItemActions = showActions && onRemoveClick != null
+    val removeAction = onRemoveClick
+    val hasItemActions = showActions && removeAction != null
     val artworkModel = rememberLandscapeImageModel(item.imageUrl, 280.dp)
 
     val cardInteractionModifier =
@@ -270,16 +271,14 @@ internal fun HomeWideRailCard(
                         onDetailsClick()
                     },
                 )
-                onRemoveClick.let { removeAction ->
-                    if (removeAction != null) {
-                        ListItem(
-                            headlineContent = { Text("Remove") },
-                            modifier = Modifier.clickable {
-                                actionSheetVisible = false
-                                removeAction()
-                            },
-                        )
-                    }
+                if (removeAction != null) {
+                    ListItem(
+                        headlineContent = { Text("Remove") },
+                        modifier = Modifier.clickable {
+                            actionSheetVisible = false
+                            removeAction()
+                        },
+                    )
                 }
             }
         }

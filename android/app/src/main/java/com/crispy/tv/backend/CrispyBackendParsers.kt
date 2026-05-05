@@ -19,9 +19,6 @@ import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCollectionView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCardView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCompanyView
-import com.crispy.tv.backend.CrispyBackendClient.MetadataContentIds
-import com.crispy.tv.backend.CrispyBackendClient.MetadataContentRatings
-import com.crispy.tv.backend.CrispyBackendClient.MetadataContentView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodePreview
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodeView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataExternalIds
@@ -573,28 +570,6 @@ internal fun CrispyBackendClient.parseMetadataProductionInfoView(json: JSONObjec
     )
 }
 
-internal fun CrispyBackendClient.parseMetadataContentIds(json: JSONObject?): MetadataContentIds {
-    val safe = json ?: JSONObject()
-    return MetadataContentIds(
-        imdb = safe.optNullableString("imdb"),
-        tmdb = safe.optIntOrNull("tmdb"),
-        trakt = safe.optIntOrNull("trakt"),
-    )
-}
-
-internal fun CrispyBackendClient.parseMetadataContentRatings(json: JSONObject?): MetadataContentRatings {
-    val safe = json ?: JSONObject()
-    return MetadataContentRatings(
-        imdbRating = safe.optDoubleOrNull("imdbRating"),
-        imdbVotes = safe.optIntOrNull("imdbVotes"),
-        tmdbRating = safe.optDoubleOrNull("tmdbRating"),
-        metacritic = safe.optIntOrNull("metacritic"),
-        rottenTomatoes = safe.optIntOrNull("rottenTomatoes"),
-        letterboxdRating = safe.optDoubleOrNull("letterboxdRating"),
-        mdblistRating = safe.optDoubleOrNull("mdblistRating"),
-    )
-}
-
 internal fun CrispyBackendClient.parseMetadataTitleRatings(json: JSONObject?): MetadataTitleRatings {
     val safe = json ?: JSONObject()
     return MetadataTitleRatings(
@@ -607,38 +582,6 @@ internal fun CrispyBackendClient.parseMetadataTitleRatings(json: JSONObject?): M
         letterboxd = safe.optDoubleOrNull("letterboxd"),
         rogerEbert = safe.optDoubleOrNull("rogerEbert"),
         myAnimeList = safe.optDoubleOrNull("myAnimeList"),
-    )
-}
-
-internal fun CrispyBackendClient.parseMetadataContentView(json: JSONObject): MetadataContentView {
-    return MetadataContentView(
-        ids = parseMetadataContentIds(json.optJSONObject("ids")),
-        title = json.optNullableString("title"),
-        originalTitle = json.optNullableString("originalTitle"),
-        type = json.optNullableString("type"),
-        year = json.optIntOrNull("year"),
-        description = json.optNullableString("description"),
-        score = json.optDoubleOrNull("score"),
-        ratings = parseMetadataContentRatings(json.optJSONObject("ratings")),
-        posterUrl = json.optNullableString("posterUrl"),
-        backdropUrl = json.optNullableString("backdropUrl"),
-        genres = json.optStringList("genres"),
-        keywords = json.optStringList("keywords"),
-        runtime = json.optIntOrNull("runtime"),
-        certification = json.optNullableString("certification"),
-        released = json.optNullableString("released"),
-        language = json.optNullableString("language"),
-        country = json.optNullableString("country"),
-        seasonCount = json.optIntOrNull("seasonCount"),
-        episodeCount = json.optIntOrNull("episodeCount"),
-        directors = json.optStringList("directors"),
-        writers = json.optStringList("writers"),
-        network = json.optNullableString("network"),
-        studio = json.optNullableString("studio"),
-        status = json.optNullableString("status"),
-        budget = json.optLongOrNull("budget"),
-        revenue = json.optLongOrNull("revenue"),
-        updatedAt = json.optNullableString("updatedAt"),
     )
 }
 

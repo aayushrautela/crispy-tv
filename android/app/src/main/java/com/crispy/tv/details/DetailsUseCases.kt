@@ -35,7 +35,6 @@ internal data class DetailsScreenLoadResult(
 
 internal data class DetailsSecondaryLoadResult(
     val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse?,
-    val titleContent: CrispyBackendClient.MetadataTitleContentResponse?,
     val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse?,
 )
 
@@ -210,12 +209,6 @@ internal class DetailsUseCases(
                     )
                 }.getOrNull()
             }
-        val titleContent =
-            accessToken?.let {
-                runCatching {
-                    catalogRepository.getTitleContent(accessToken = it, mediaKey = mediaKey)
-                }.getOrNull()
-            }
         val titleRatings =
             accessToken?.takeIf { !profileId.isNullOrBlank() }?.let {
                 runCatching {
@@ -229,7 +222,6 @@ internal class DetailsUseCases(
 
         return DetailsSecondaryLoadResult(
             titleReviews = titleReviews,
-            titleContent = titleContent,
             titleRatings = titleRatings,
         )
     }
@@ -252,50 +244,25 @@ internal class DetailsUseCases(
     }
 
     suspend fun loadSeasonEpisodes(
-        mediaKey: String,
         season: Int,
         details: MediaDetails,
         titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
     ): DetailsSeasonEpisodesResult {
-        titleDetail
+        val episodesForSeason = titleDetail
             ?.episodesForSeason(season)
             ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
             ?.takeIf { it.isNotEmpty() }
-            ?.let { videos ->
-                return DetailsSeasonEpisodesResult(
-                    videos = videos,
-                    episodeWatchStates = resolveEpisodeWatchStates(details, videos),
-                    effectiveSeasonNumber = season,
-                    includedSeasonNumbers = titleDetail.seasonNumbers(),
-                )
-            }
 
-        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
-            ?: return DetailsSeasonEpisodesResult(errorMessage = "Sign in to load episodes.")
+        if (episodesForSeason != null) {
+            return DetailsSeasonEpisodesResult(
+                videos = episodesForSeason,
+                episodeWatchStates = resolveEpisodeWatchStates(details, episodesForSeason),
+                effectiveSeasonNumber = season,
+                includedSeasonNumbers = titleDetail.seasonNumbers(),
+            )
+        }
 
-        val episodeResponse =
-            runCatching {
-                catalogRepository.listEpisodes(
-                    accessToken = session.accessToken,
-                    mediaKey = mediaKey,
-                    seasonNumber = season,
-                )
-            }.getOrElse {
-                return DetailsSeasonEpisodesResult(errorMessage = "Failed to load episodes.")
-            }
-
-        val videos =
-            episodeResponse.episodes
-                .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
-                .sortedWith(compareBy<MediaVideo>({ it.episode ?: Int.MAX_VALUE }, { it.title.lowercase(Locale.US) }, { it.id }))
-        val episodeWatchStates = resolveEpisodeWatchStates(details, videos)
-
-        return DetailsSeasonEpisodesResult(
-            videos = videos,
-            episodeWatchStates = episodeWatchStates,
-            effectiveSeasonNumber = episodeResponse.effectiveSeasonNumber,
-            includedSeasonNumbers = episodeResponse.includedSeasonNumbers.sorted(),
-        )
+        return DetailsSeasonEpisodesResult(errorMessage = "No episodes found for this season.")
     }
 
     suspend fun resolveEpisodeWatchStates(
@@ -465,11 +432,4 @@ private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRe
         return result.accepted
     }
 
-    private fun parentMediaTypeFor(contentType: MetadataLabMediaType): String? {
-        return when (contentType) {
-            MetadataLabMediaType.MOVIE -> null
-            MetadataLabMediaType.SERIES -> "show"
-            MetadataLabMediaType.ANIME -> "anime"
-        }
-    }
 }

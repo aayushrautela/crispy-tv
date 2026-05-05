@@ -388,57 +388,6 @@ data class PlaybackEventInput(
         val networks: List<MetadataCompanyView>,
     )
 
-    data class MetadataContentIds(
-        val imdb: String?,
-        val tmdb: Int?,
-        val trakt: Int?,
-    )
-
-    data class MetadataContentRatings(
-        val imdbRating: Double?,
-        val imdbVotes: Int?,
-        val tmdbRating: Double?,
-        val metacritic: Int?,
-        val rottenTomatoes: Int?,
-        val letterboxdRating: Double?,
-        val mdblistRating: Double?,
-    )
-
-    data class MetadataContentView(
-        val ids: MetadataContentIds,
-        val title: String?,
-        val originalTitle: String?,
-        val type: String?,
-        val year: Int?,
-        val description: String?,
-        val score: Double?,
-        val ratings: MetadataContentRatings,
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val genres: List<String>,
-        val keywords: List<String>,
-        val runtime: Int?,
-        val certification: String?,
-        val released: String?,
-        val language: String?,
-        val country: String?,
-        val seasonCount: Int?,
-        val episodeCount: Int?,
-        val directors: List<String>,
-        val writers: List<String>,
-        val network: String?,
-        val studio: String?,
-        val status: String?,
-        val budget: Long?,
-        val revenue: Long?,
-        val updatedAt: String?,
-    )
-
-    data class MetadataTitleContentResponse(
-        val item: MetadataView,
-        val content: MetadataContentView,
-    )
-
     data class MetadataTitleRatings(
         val imdb: Double?,
         val tmdb: Double?,
@@ -453,27 +402,6 @@ data class PlaybackEventInput(
 
     data class MetadataTitleRatingsResponse(
         val ratings: MetadataTitleRatings,
-    )
-
-    data class MetadataSeasonDetailResponse(
-        val show: MetadataView,
-        val season: MetadataSeasonView,
-        val episodes: List<MetadataEpisodeView>,
-    )
-
-    data class MetadataEpisodeListResponse(
-        val show: MetadataView,
-        val requestedSeasonNumber: Int?,
-        val effectiveSeasonNumber: Int,
-        val includedSeasonNumbers: List<Int>,
-        val episodes: List<MetadataEpisodeView>,
-    )
-
-    data class MetadataNextEpisodeResponse(
-        val show: MetadataView,
-        val currentSeasonNumber: Int,
-        val currentEpisodeNumber: Int,
-        val item: MetadataEpisodeView?,
     )
 
     data class PlaybackResolveResponse(
@@ -764,13 +692,11 @@ data class PlaybackEventInput(
     suspend fun searchTitles(
         accessToken: String,
         query: String,
-        locale: String? = null,
         limit: Int = 20,
     ): SearchResultsResponse {
         return searchTitlesApi(
             accessToken = accessToken,
             query = query,
-            locale = locale,
             limit = limit,
         )
     }
@@ -778,13 +704,11 @@ data class PlaybackEventInput(
     suspend fun searchTitlesByGenre(
         accessToken: String,
         genre: String,
-        locale: String? = null,
         limit: Int = 20,
     ): SearchResultsResponse {
         return searchTitlesByGenreApi(
             accessToken = accessToken,
             genre = genre,
-            locale = locale,
             limit = limit,
         )
     }
@@ -841,10 +765,6 @@ data class PlaybackEventInput(
         )
     }
 
-    suspend fun getMetadataTitleContent(accessToken: String, mediaKey: String): MetadataTitleContentResponse {
-        return getMetadataTitleContentApi(accessToken, mediaKey)
-    }
-
     suspend fun getMetadataTitleRatings(
         accessToken: String,
         profileId: String,
@@ -857,37 +777,10 @@ data class PlaybackEventInput(
         )
     }
 
-    suspend fun getMetadataSeasonDetail(accessToken: String, mediaKey: String, seasonNumber: Int): MetadataSeasonDetailResponse {
-        return getMetadataSeasonDetailApi(accessToken, mediaKey, seasonNumber)
-    }
-
     suspend fun getMetadataPersonDetail(accessToken: String, id: String, language: String? = null): MetadataPersonDetail {
         return getMetadataPersonDetailApi(accessToken, id, language)
     }
 
-    suspend fun listMetadataEpisodes(accessToken: String, mediaKey: String, seasonNumber: Int? = null): MetadataEpisodeListResponse {
-        return listMetadataEpisodesApi(accessToken, mediaKey, seasonNumber)
-    }
-
-    suspend fun getNextEpisode(
-        accessToken: String,
-        mediaKey: String,
-        currentSeasonNumber: Int,
-        currentEpisodeNumber: Int,
-        watchedKeys: List<String> = emptyList(),
-        showMediaKey: String? = null,
-        nowMs: Long? = null,
-    ): MetadataNextEpisodeResponse {
-        return getNextEpisodeApi(
-            accessToken = accessToken,
-            mediaKey = mediaKey,
-            currentSeasonNumber = currentSeasonNumber,
-            currentEpisodeNumber = currentEpisodeNumber,
-            watchedKeys = watchedKeys,
-            showMediaKey = showMediaKey,
-            nowMs = nowMs,
-        )
-    }
 
     suspend fun resolvePlayback(accessToken: String, input: MediaLookupInput): PlaybackResolveResponse {
         return resolvePlaybackApi(accessToken, input)

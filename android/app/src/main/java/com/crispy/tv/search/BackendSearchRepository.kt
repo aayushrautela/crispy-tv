@@ -13,7 +13,7 @@ class BackendSearchRepository(
 ) {
     suspend fun search(
         query: String,
-        locale: Locale = Locale.getDefault(),
+        @Suppress("UNUSED_PARAMETER") locale: Locale = Locale.getDefault(),
     ): SearchResultsPayload {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
@@ -26,14 +26,13 @@ class BackendSearchRepository(
         val payload = backend.searchTitles(
             accessToken = session.accessToken,
             query = normalizedQuery,
-            locale = locale.toLanguageTag(),
         )
         return payload.toSearchResultsPayload()
     }
 
     suspend fun discoverByGenre(
         genreSuggestion: SearchGenreSuggestion,
-        locale: Locale = Locale.getDefault(),
+        @Suppress("UNUSED_PARAMETER") locale: Locale = Locale.getDefault(),
     ): SearchResultsPayload {
         val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             ?: return SearchResultsPayload(message = "Sign in to browse genres.")
@@ -41,7 +40,6 @@ class BackendSearchRepository(
         val payload = backend.searchTitlesByGenre(
             accessToken = session.accessToken,
             genre = genreSuggestion.label,
-            locale = locale.toLanguageTag(),
         )
         return payload.toSearchResultsPayload(defaultGenre = genreSuggestion.label)
     }

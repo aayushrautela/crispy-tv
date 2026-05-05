@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.crispy.tv.home.MediaDetails
-import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -27,7 +26,6 @@ import java.util.Locale
 internal fun buildDetailsRows(
     details: MediaDetails,
     titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
-    content: CrispyBackendClient.MetadataContentView?,
 ): List<Pair<String, String>> {
     val rows = mutableListOf<Pair<String, String>>()
     val item = titleDetail?.item
@@ -59,33 +57,24 @@ internal fun buildDetailsRows(
             rows += "CREATED BY" to details.creators.joinToString(", ")
         }
     } else {
-        content?.description?.takeIf { it.isNotBlank() && !it.equals(details.description, ignoreCase = true) }?.let {
+        item?.overview?.takeIf { it.isNotBlank() && !it.equals(details.description, ignoreCase = true) }?.let {
             rows += "PLOT" to it
         }
         item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
 
-        formatLongDate(item?.releaseDate ?: content?.released)?.let { rows += "RELEASE DATE" to it }
+        formatLongDate(item?.releaseDate)?.let { rows += "RELEASE DATE" to it }
 
-        (details.runtime?.takeIf { it.isNotBlank() } ?: formatRuntimeMinutes(content?.runtime))?.let {
+        (details.runtime?.takeIf { it.isNotBlank() } ?: formatRuntimeMinutes(item?.runtimeMinutes))?.let {
             rows += "RUNTIME" to it
         }
 
-        formatCurrency(content?.revenue)?.let {
-            rows += "REVENUE" to it
-        }
-
-        formatCurrency(content?.budget)?.let {
-            rows += "BUDGET" to it
-        }
-
-        val originCountry = content?.country?.takeIf { it.isNotBlank() }
-            ?: production?.originCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
+        val originCountry = production?.originCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
             ?: production?.productionCountries?.takeIf { it.isNotEmpty() }?.joinToString(", ")
         originCountry?.let { rows += "ORIGIN COUNTRY" to it }
 
-        val language = content?.language?.takeIf { it.isNotBlank() }
-            ?: production?.originalLanguage?.takeIf { it.isNotBlank() }?.uppercase()
-        language?.let { rows += "LANGUAGE" to it }
+        production?.originalLanguage?.takeIf { it.isNotBlank() }?.uppercase()?.let {
+            rows += "LANGUAGE" to it
+        }
     }
 
     return rows
@@ -116,7 +105,3 @@ internal fun formatRuntimeMinutes(minutes: Int?): String? {
     }
 }
 
-private fun formatCurrency(amount: Long?): String? {
-    val value = amount?.takeIf { it > 0L } ?: return null
-    return NumberFormat.getCurrencyInstance(Locale.US).format(value)
-}

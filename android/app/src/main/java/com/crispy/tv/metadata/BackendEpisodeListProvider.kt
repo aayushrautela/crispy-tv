@@ -28,23 +28,25 @@ internal class BackendEpisodeListProvider(
         val session = supabaseAccountClient.ensureValidSession() ?: return null
 
         val response = runCatching {
-            backendClient.listMetadataEpisodes(
+            backendClient.getMetadataTitleDetail(
                 accessToken = session.accessToken,
                 mediaKey = mediaKey,
-                seasonNumber = seasonHint,
             )
         }.getOrNull() ?: return null
 
-        return response.episodes.mapNotNull { episode ->
-            val season = episode.seasonNumber ?: return@mapNotNull null
-            val number = episode.episodeNumber ?: return@mapNotNull null
-            if (season <= 0 || number <= 0) return@mapNotNull null
-            EpisodeInfo(
-                season = season,
-                episode = number,
-                title = episode.title,
-                released = episode.airDate,
-            )
-        }.takeIf { it.isNotEmpty() }
+        return response.episodes
+            .asSequence()
+            .filter { episode -> seasonHint == null || episode.seasonNumber == seasonHint }
+            .mapNotNull { episode ->
+                val season = episode.seasonNumber ?: return@mapNotNull null
+                val number = episode.episodeNumber ?: return@mapNotNull null
+                if (season <= 0 || number <= 0) return@mapNotNull null
+                EpisodeInfo(
+                    season = season,
+                    episode = number,
+                    title = episode.title,
+                    released = episode.airDate,
+                )
+            }.toList().takeIf { it.isNotEmpty() }
     }
 }

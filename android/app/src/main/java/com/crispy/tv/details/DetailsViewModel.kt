@@ -88,7 +88,6 @@ class DetailsViewModel internal constructor(
                     isLoading = true,
                     titleDetail = null,
                     titleReviews = null,
-                    titleContent = null,
                     titleRatings = null,
                     secondaryContentIsLoading = false,
                     statusMessage = "",
@@ -238,7 +237,6 @@ class DetailsViewModel internal constructor(
                     it.copy(
                         secondaryContentIsLoading = false,
                         titleReviews = result.titleReviews,
-                        titleContent = result.titleContent,
                         titleRatings = result.titleRatings,
                     )
                 }
@@ -440,7 +438,6 @@ class DetailsViewModel internal constructor(
                 val result =
                     withContext(Dispatchers.IO) {
                         detailsUseCases.loadSeasonEpisodes(
-                            mediaKey = mediaKey,
                             season = season,
                             details = details,
                             titleDetail = _uiState.value.titleDetail,

@@ -25,13 +25,6 @@ class DefaultCatalogRepository(
         )
     }
 
-    override suspend fun getTitleContent(
-        accessToken: String,
-        mediaKey: String,
-    ): CrispyBackendClient.MetadataTitleContentResponse {
-        return backendClient.getMetadataTitleContent(accessToken = accessToken, mediaKey = mediaKey)
-    }
-
     override suspend fun getTitleRatings(
         accessToken: String,
         profileId: String,
@@ -41,18 +34,6 @@ class DefaultCatalogRepository(
             accessToken = accessToken,
             profileId = profileId,
             mediaKey = mediaKey,
-        )
-    }
-
-    override suspend fun listEpisodes(
-        accessToken: String,
-        mediaKey: String,
-        seasonNumber: Int,
-    ): CrispyBackendClient.MetadataEpisodeListResponse {
-        return backendClient.listMetadataEpisodes(
-            accessToken = accessToken,
-            mediaKey = mediaKey,
-            seasonNumber = seasonNumber,
         )
     }
 }

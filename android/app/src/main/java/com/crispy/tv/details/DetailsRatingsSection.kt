@@ -42,16 +42,14 @@ import com.crispy.tv.ui.components.skeletonElement
 @Composable
 internal fun RatingsSection(
     tmdbRating: String?,
-    content: CrispyBackendClient.MetadataContentView?,
     titleRatings: CrispyBackendClient.MetadataTitleRatings?,
     isLoading: Boolean,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
 ) {
-    val ratings = remember(tmdbRating, content, titleRatings) {
+    val ratings = remember(tmdbRating, titleRatings) {
         buildRatings(
             tmdbRating = tmdbRating,
-            content = content,
             titleRatings = titleRatings,
         )
     }
@@ -173,10 +171,8 @@ private data class DetailsRatingPill(
 
 private fun buildRatings(
     tmdbRating: String?,
-    content: CrispyBackendClient.MetadataContentView?,
     titleRatings: CrispyBackendClient.MetadataTitleRatings?,
 ): List<DetailsRatingPill> {
-    val contentRatings = content?.ratings
     val resolvedTitleRatings = titleRatings
 
     return listOfNotNull(
@@ -194,7 +190,7 @@ private fun buildRatings(
         buildRatingPill(
             key = "imdb",
             source = "IMDb",
-            score = resolvedTitleRatings?.imdb?.asOutOfTen() ?: contentRatings?.imdbRating?.asOutOfTen(),
+            score = resolvedTitleRatings?.imdb?.asOutOfTen(),
             badge = RatingBadgeSpec(
                 logoRes = R.raw.imdb,
                 text = "IMDb",
@@ -216,7 +212,7 @@ private fun buildRatings(
         buildRatingPill(
             key = "rotten_tomatoes",
             source = "Rotten Tomatoes",
-            score = resolvedTitleRatings?.rottenTomatoes?.asPercent() ?: contentRatings?.rottenTomatoes?.toDouble()?.asPercent(),
+            score = resolvedTitleRatings?.rottenTomatoes?.asPercent(),
             badge = RatingBadgeSpec(
                 logoRes = R.raw.rotten_tomatoes,
                 text = "RT",
@@ -237,7 +233,7 @@ private fun buildRatings(
         buildRatingPill(
             key = "metacritic",
             source = "Metacritic",
-            score = resolvedTitleRatings?.metacritic?.asOutOfHundred() ?: contentRatings?.metacritic?.toDouble()?.asOutOfHundred(),
+            score = resolvedTitleRatings?.metacritic?.asOutOfHundred(),
             badge = RatingBadgeSpec(
                 logoRes = R.raw.metacritic,
                 text = "MC",
@@ -248,7 +244,7 @@ private fun buildRatings(
         buildRatingPill(
             key = "letterboxd",
             source = "Letterboxd",
-            score = resolvedTitleRatings?.letterboxd?.asOutOfFive() ?: contentRatings?.letterboxdRating?.asOutOfFive(),
+            score = resolvedTitleRatings?.letterboxd?.asOutOfFive(),
             badge = RatingBadgeSpec(
                 logoRes = R.raw.letterboxd,
                 text = "LB",
@@ -274,16 +270,6 @@ private fun buildRatings(
                 logoRes = R.raw.myanimelist,
                 text = "MAL",
                 backgroundColor = Color(0xFF2E51A2),
-                contentColor = Color.White,
-            ),
-        ),
-        buildRatingPill(
-            key = "mdblist",
-            source = "MDBList",
-            score = contentRatings?.mdblistRating?.asOutOfTen(),
-            badge = RatingBadgeSpec(
-                text = "MDB",
-                backgroundColor = Color(0xFF4338CA),
                 contentColor = Color.White,
             ),
         ),
