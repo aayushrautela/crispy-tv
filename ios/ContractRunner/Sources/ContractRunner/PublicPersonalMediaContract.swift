@@ -3,8 +3,8 @@ import Foundation
 public struct ContractRegularCard: Equatable {
     public let mediaType: String
     public let mediaKey: String
-    public let provider: String
-    public let providerId: String
+    public let provider: String?
+    public let providerId: String?
     public let title: String
     public let posterUrl: String
     public let releaseYear: Int?
@@ -15,8 +15,8 @@ public struct ContractRegularCard: Equatable {
     public init(
         mediaType: String,
         mediaKey: String,
-        provider: String,
-        providerId: String,
+        provider: String?,
+        providerId: String?,
         title: String,
         posterUrl: String,
         releaseYear: Int?,
@@ -40,8 +40,8 @@ public struct ContractRegularCard: Equatable {
 public struct ContractLandscapeCard: Equatable {
     public let mediaType: String
     public let mediaKey: String
-    public let provider: String
-    public let providerId: String
+    public let provider: String?
+    public let providerId: String?
     public let title: String
     public let posterUrl: String
     public let backdropUrl: String
@@ -57,8 +57,8 @@ public struct ContractLandscapeCard: Equatable {
     public init(
         mediaType: String,
         mediaKey: String,
-        provider: String,
-        providerId: String,
+        provider: String?,
+        providerId: String?,
         title: String,
         posterUrl: String,
         backdropUrl: String,

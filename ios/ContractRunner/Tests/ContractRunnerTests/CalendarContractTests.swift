@@ -52,8 +52,8 @@ final class CalendarContractTests: XCTestCase {
         return ContractRegularCard(
             mediaType: try requireString(object, "media_type", fixture: fixture),
             mediaKey: try requireString(object, "media_key", fixture: fixture),
-            provider: try requireString(object, "provider", fixture: fixture),
-            providerId: try requireString(object, "provider_id", fixture: fixture),
+            provider: optionalString(object, "provider"),
+            providerId: optionalString(object, "provider_id"),
             title: try requireString(object, "title", fixture: fixture),
             posterUrl: try requireString(object, "poster_url", fixture: fixture),
             releaseYear: optionalInt(object, "release_year"),
@@ -67,8 +67,8 @@ final class CalendarContractTests: XCTestCase {
         return ContractLandscapeCard(
             mediaType: try requireString(object, "media_type", fixture: fixture),
             mediaKey: try requireString(object, "media_key", fixture: fixture),
-            provider: try requireString(object, "provider", fixture: fixture),
-            providerId: try requireString(object, "provider_id", fixture: fixture),
+            provider: optionalString(object, "provider"),
+            providerId: optionalString(object, "provider_id"),
             title: try requireString(object, "title", fixture: fixture),
             posterUrl: try requireString(object, "poster_url", fixture: fixture),
             backdropUrl: try requireString(object, "backdrop_url", fixture: fixture),

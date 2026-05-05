@@ -271,15 +271,13 @@ internal fun HomeWideRailCard(
                         onDetailsClick()
                     },
                 )
-                if (removeAction != null) {
-                    ListItem(
-                        headlineContent = { Text("Remove") },
-                        modifier = Modifier.clickable {
-                            actionSheetVisible = false
-                            removeAction()
-                        },
-                    )
-                }
+                ListItem(
+                    headlineContent = { Text("Remove") },
+                    modifier = Modifier.clickable {
+                        actionSheetVisible = false
+                        removeAction()
+                    },
+                )
             }
         }
     }
