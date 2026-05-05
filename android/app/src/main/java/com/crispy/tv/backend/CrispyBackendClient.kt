@@ -86,8 +86,6 @@ class CrispyBackendClient(
         val rating: String?,
         val year: String?,
         val genre: String?,
-        val provider: String?,
-        val providerId: String?,
     )
 
     data class SearchResultsResponse(
@@ -172,11 +170,6 @@ data class PlaybackEventInput(
         val mediaType: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
-        val provider: String?,
-        val providerId: String?,
-        val parentMediaType: String?,
-        val parentProvider: String?,
-        val parentProviderId: String?,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -197,11 +190,6 @@ data class PlaybackEventInput(
         val kind: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
-        val provider: String?,
-        val providerId: String?,
-        val parentMediaType: String?,
-        val parentProvider: String?,
-        val parentProviderId: String?,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -229,11 +217,6 @@ data class PlaybackEventInput(
     data class MetadataSeasonView(
         val mediaKey: String,
         val showTmdbId: Int?,
-        val provider: String?,
-        val providerId: String?,
-        val parentMediaType: String?,
-        val parentProvider: String?,
-        val parentProviderId: String?,
         val seasonNumber: Int,
         val title: String?,
         val summary: String?,
@@ -250,11 +233,6 @@ data class PlaybackEventInput(
         val mediaType: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
-        val provider: String?,
-        val providerId: String?,
-        val parentMediaType: String?,
-        val parentProvider: String?,
-        val parentProviderId: String?,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -304,11 +282,6 @@ data class PlaybackEventInput(
         val kind: String,
         val tmdbId: Int?,
         val showTmdbId: Int?,
-        val provider: String?,
-        val providerId: String?,
-        val parentMediaType: String?,
-        val parentProvider: String?,
-        val parentProviderId: String?,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -338,8 +311,6 @@ data class PlaybackEventInput(
 
     data class MetadataPersonRefView(
         val id: String,
-        val provider: String,
-        val providerId: String,
         val tmdbPersonId: Int?,
         val name: String,
         val role: String?,
@@ -362,8 +333,6 @@ data class PlaybackEventInput(
 
     data class MetadataCompanyView(
         val id: String,
-        val provider: String,
-        val providerId: String,
         val name: String,
         val logoUrl: String?,
         val originCountry: String?,
@@ -371,8 +340,6 @@ data class PlaybackEventInput(
 
     data class MetadataCollectionView(
         val id: String,
-        val provider: String,
-        val providerId: String,
         val name: String,
         val posterUrl: String?,
         val backdropUrl: String?,
@@ -418,8 +385,6 @@ data class PlaybackEventInput(
         val posterUrl: String?,
         val rating: Double?,
         val releaseYear: Int?,
-        val provider: String?,
-        val providerId: String?,
     ) {
         val id: String
             get() = mediaKey
@@ -427,8 +392,6 @@ data class PlaybackEventInput(
 
     data class MetadataPersonDetail(
         val id: String,
-        val provider: String,
-        val providerId: String,
         val tmdbPersonId: Int,
         val name: String,
         val knownForDepartment: String?,
@@ -474,8 +437,6 @@ data class PlaybackEventInput(
     data class RuntimeMediaCard(
         val mediaKey: String,
         val mediaType: String,
-        val provider: String,
-        val providerId: String,
         val title: String,
         val posterUrl: String,
         val backdropUrl: String?,
@@ -586,8 +547,6 @@ data class PlaybackEventInput(
     data class RecommendationHeroItem(
         val mediaKey: String,
         val mediaType: String,
-        val provider: String,
-        val providerId: String,
         val title: String,
         val description: String,
         val backdropUrl: String,
@@ -600,8 +559,6 @@ data class PlaybackEventInput(
 
     data class RecommendationCollectionItem(
         val mediaType: String,
-        val provider: String,
-        val providerId: String,
         val title: String,
         val posterUrl: String,
         val releaseYear: Int?,

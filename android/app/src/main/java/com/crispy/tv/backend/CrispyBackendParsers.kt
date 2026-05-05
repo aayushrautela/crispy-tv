@@ -162,8 +162,6 @@ internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): S
 internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMetadataItem {
     val title = json.optString("title").trim()
     val mediaType = json.optString("mediaType").trim()
-    val provider = json.optNullableString("provider")
-    val providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null }
     val images = parseMetadataImages(json)
     val posterUrl = json.optNullableString("posterUrl") ?: images.posterUrl
     if (title.isBlank()) {
@@ -188,8 +186,6 @@ if (mediaType.isBlank() || posterUrl.isNullOrBlank()) {
         rating = json.opt("rating")?.toString()?.trim()?.ifBlank { null },
         year = json.opt("releaseYear")?.toString()?.trim()?.ifBlank { null },
         genre = genre,
-        provider = provider,
-        providerId = providerId,
     )
 }
 
@@ -204,11 +200,6 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
         kind = json.optNullableString("kind") ?: "title",
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
         seasonNumber = json.optIntOrNull("seasonNumber"),
         episodeNumber = json.optIntOrNull("episodeNumber"),
@@ -249,11 +240,6 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
         kind = json.optNullableString("kind") ?: "title",
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
         seasonNumber = json.optIntOrNull("seasonNumber"),
         episodeNumber = json.optIntOrNull("episodeNumber"),
@@ -300,11 +286,6 @@ internal fun CrispyBackendClient.parseMetadataEpisodePreview(json: JSONObject): 
         mediaType = json.optNullableString("mediaType") ?: "episode",
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
         seasonNumber = json.optIntOrNull("seasonNumber"),
         episodeNumber = json.optIntOrNull("episodeNumber"),
@@ -336,11 +317,6 @@ internal fun CrispyBackendClient.parseMetadataSeasonView(json: JSONObject): Meta
     return MetadataSeasonView(
         mediaKey = mediaKey,
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         seasonNumber = seasonNumber,
         title = json.optNullableString("title"),
         summary = json.optNullableString("summary"),
@@ -367,11 +343,6 @@ internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): Met
         mediaType = preview.mediaType,
         tmdbId = preview.tmdbId,
         showTmdbId = preview.showTmdbId,
-        provider = preview.provider,
-        providerId = preview.providerId,
-        parentMediaType = preview.parentMediaType,
-        parentProvider = preview.parentProvider,
-        parentProviderId = preview.parentProviderId,
         absoluteEpisodeNumber = preview.absoluteEpisodeNumber,
         seasonNumber = preview.seasonNumber,
         episodeNumber = preview.episodeNumber,
@@ -396,8 +367,6 @@ internal fun CrispyBackendClient.parseMetadataPersonDetail(json: JSONObject): Me
     }
     return MetadataPersonDetail(
         id = id,
-        provider = json.optString("provider").trim(),
-        providerId = json.optString("providerId").trim(),
         tmdbPersonId = tmdbPersonId,
         name = name,
         knownForDepartment = json.optNullableString("knownForDepartment"),
@@ -430,8 +399,6 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
                     posterUrl = item.optNullableString("posterUrl"),
                     rating = item.optDoubleOrNull("rating"),
                     releaseYear = item.optIntOrNull("releaseYear"),
-                    provider = item.optNullableString("provider"),
-                    providerId = item.opt("providerId")?.toString()?.trim()?.ifBlank { null },
                 )
             )
         }
@@ -471,14 +438,10 @@ internal fun CrispyBackendClient.parseMetadataPersonRefViews(array: JSONArray?):
             val id = item.optString("id").trim()
             val tmdbPersonId = item.optIntOrNull("tmdbPersonId")
             val name = item.optString("name").trim()
-            val provider = item.optString("provider").trim()
-            val providerId = item.optString("providerId").trim()
-            if (id.isBlank() || provider.isBlank() || providerId.isBlank() || name.isBlank()) continue
+            if (id.isBlank() || name.isBlank()) continue
             add(
                 MetadataPersonRefView(
                     id = id,
-                    provider = provider,
-                    providerId = providerId,
                     tmdbPersonId = tmdbPersonId,
                     name = name,
                     role = item.optNullableString("role"),
@@ -522,15 +485,11 @@ internal fun CrispyBackendClient.parseMetadataCompanyViews(array: JSONArray?): L
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
             val id = item.opt("id")?.toString()?.trim().orEmpty()
-            val provider = item.optString("provider").trim()
-            val providerId = item.optString("providerId").trim()
             val name = item.optString("name").trim()
-            if (id.isBlank() || provider.isBlank() || providerId.isBlank() || name.isBlank()) continue
+            if (id.isBlank() || name.isBlank()) continue
             add(
                 MetadataCompanyView(
                     id = id,
-                    provider = provider,
-                    providerId = providerId,
                     name = name,
                     logoUrl = item.optNullableString("logoUrl"),
                     originCountry = item.optNullableString("originCountry"),
@@ -543,14 +502,10 @@ internal fun CrispyBackendClient.parseMetadataCompanyViews(array: JSONArray?): L
 internal fun CrispyBackendClient.parseMetadataCollectionView(json: JSONObject?): MetadataCollectionView? {
     val safe = json ?: return null
     val id = safe.opt("id")?.toString()?.trim().orEmpty()
-    val provider = safe.optString("provider").trim()
-    val providerId = safe.optString("providerId").trim()
     val name = safe.optString("name").trim()
-    if (id.isBlank() || provider.isBlank() || providerId.isBlank() || name.isBlank()) return null
+    if (id.isBlank() || name.isBlank()) return null
     return MetadataCollectionView(
         id = id,
-        provider = provider,
-        providerId = providerId,
         name = name,
         posterUrl = safe.optNullableString("posterUrl"),
         backdropUrl = safe.optNullableString("backdropUrl"),
@@ -654,8 +609,6 @@ internal fun CrispyBackendClient.parseRuntimeMediaCard(
 ): RuntimeMediaCard {
     val mediaKey = json.optNullableString("mediaKey")
     val mediaType = json.optString("mediaType").trim()
-    val provider = json.optNullableString("provider")?.trim()?.ifBlank { null }
-    val providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null }
     val title = json.optNullableString("title")
     val posterUrl = json.optNullableString("posterUrl")
         ?: json.optJSONObject("images").optNullableString("posterUrl")
@@ -664,12 +617,10 @@ internal fun CrispyBackendClient.parseRuntimeMediaCard(
     if (
         mediaKey.isNullOrBlank() ||
         mediaType.isBlank() ||
-        provider.isNullOrBlank() ||
-        providerId.isNullOrBlank() ||
         title.isNullOrBlank() ||
         posterUrl.isNullOrBlank()
     ) {
-        throw IllegalStateException("Runtime media card is missing required fields.")
+        throw IllegalStateException("Runtime media card is missing required identity/display fields.")
     }
     if (requireBackdrop && backdropUrl.isNullOrBlank()) {
         throw IllegalStateException("Landscape runtime media card is missing backdropUrl.")
@@ -677,8 +628,6 @@ internal fun CrispyBackendClient.parseRuntimeMediaCard(
     return RuntimeMediaCard(
         mediaKey = mediaKey,
         mediaType = mediaType,
-        provider = provider,
-        providerId = providerId,
         title = title,
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,
