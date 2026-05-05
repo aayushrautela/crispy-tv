@@ -282,8 +282,6 @@ private fun reviewProviderLogoRes(provider: String): Int? =
     when (provider.trim().lowercase()) {
         "tmdb" -> R.raw.tmdb
         "trakt" -> R.raw.trakt
-        "tvdb" -> R.raw.tvdb
-        "kitsu" -> R.raw.kitsu
         else -> null
     }
 
@@ -291,7 +289,5 @@ private fun String.providerLabel(): String =
     when (trim().lowercase()) {
         "tmdb" -> "TMDB review"
         "trakt" -> "Trakt review"
-        "tvdb" -> "TVDB review"
-        "kitsu" -> "Kitsu review"
         else -> "Review source"
     }

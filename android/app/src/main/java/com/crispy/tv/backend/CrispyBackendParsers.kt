@@ -289,8 +289,7 @@ internal fun CrispyBackendClient.parseMetadataExternalIds(json: JSONObject?): Me
     return MetadataExternalIds(
         tmdb = safe.optIntOrNull("tmdb"),
         imdb = safe.optNullableString("imdb"),
-        tvdb = safe.optIntOrNull("tvdb"),
-        kitsu = safe.optIntOrNull("kitsu"),
+
     )
 }
 
@@ -580,7 +579,6 @@ internal fun CrispyBackendClient.parseMetadataContentIds(json: JSONObject?): Met
         imdb = safe.optNullableString("imdb"),
         tmdb = safe.optIntOrNull("tmdb"),
         trakt = safe.optIntOrNull("trakt"),
-        tvdb = safe.optIntOrNull("tvdb"),
     )
 }
 

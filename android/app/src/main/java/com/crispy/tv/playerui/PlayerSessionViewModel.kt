@@ -1106,11 +1106,7 @@ private fun buildFallbackDetails(
         seasonNumber = identity?.season,
         episodeNumber = identity?.episode,
         addonId = null,
-        provider = null,
-        providerId = null,
         parentMediaType = identity?.parentMediaType,
-        parentProvider = null,
-        parentProviderId = null,
         absoluteEpisodeNumber = identity?.absoluteEpisodeNumber,
     )
 }

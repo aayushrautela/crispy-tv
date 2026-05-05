@@ -248,8 +248,6 @@ private func inferNumericProvider(_ idPrefixes: [String]) -> String? {
             provider = "tmdb"
         } else if lower.hasPrefix("trakt:") {
             provider = "trakt"
-        } else if lower.hasPrefix("tvdb:") {
-            provider = "tvdb"
         } else if lower.hasPrefix("simkl:") {
             provider = "simkl"
         } else {

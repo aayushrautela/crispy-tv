@@ -165,8 +165,6 @@ data class PlaybackEventInput(
     data class MetadataExternalIds(
         val tmdb: Int?,
         val imdb: String?,
-        val tvdb: Int?,
-        val kitsu: Int?,
     )
 
     data class MetadataEpisodePreview(
@@ -394,7 +392,6 @@ data class PlaybackEventInput(
         val imdb: String?,
         val tmdb: Int?,
         val trakt: Int?,
-        val tvdb: Int?,
     )
 
     data class MetadataContentRatings(

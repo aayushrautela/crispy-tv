@@ -237,7 +237,6 @@ private fun inferNumericProvider(idPrefixes: List<String>): String? {
                 when {
                     prefix.startsWith("tmdb:", ignoreCase = true) -> "tmdb"
                     prefix.startsWith("trakt:", ignoreCase = true) -> "trakt"
-                    prefix.startsWith("tvdb:", ignoreCase = true) -> "tvdb"
                     prefix.startsWith("simkl:", ignoreCase = true) -> "simkl"
                     else -> null
                 }

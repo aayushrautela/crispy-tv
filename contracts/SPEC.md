@@ -35,6 +35,7 @@ The spec version documents the contract surface. Each suite owns its own
   - Nuvio-style ID normalization for `content_id` and episode `video_id`.
   - Canonical episode form is `${content_id}:${season}:${episode}`.
   - Internal `series:` wrappers are accepted but stripped during normalization.
+  - Explicit TMDB and IMDb ids remain supported; Kitsu/TVDB provider ids are not part of the TMDB-only metadata contract.
 - `metadata_tmdb_enhancer`
   - Derive season rows from valid episode metadata only when series metadata has no seasons.
   - Derived seasons sort ascending, count valid episode rows, and keep the first non-blank release per season as `air_date`.
