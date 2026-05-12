@@ -84,6 +84,7 @@ data class LibrarySectionItemUi(
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
+    val logoUrl: String?,
     val addedAt: String?,
     val watchedAt: String?,
     val ratedAt: String?,
