@@ -467,6 +467,8 @@ private fun DiscoverScreen(
                             rating = item.rating,
                             year = item.year,
                             genre = item.genre,
+                            logoUrl = item.logoUrl,
+                            gradientColorHex = null,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { onItemClick(item) }
                         )
@@ -626,28 +628,12 @@ private fun DiscoverScreen(
 
 @Composable
 private fun DiscoverPosterSkeleton(modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .skeletonElement(pulse = false),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(14.dp)
-                .skeletonElement(pulse = false),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .width(84.dp)
-                .height(12.dp)
-                .skeletonElement(pulse = false),
-        )
-    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(2f / 3f)
+            .skeletonElement(pulse = false),
+    )
 }
 
 private const val DISCOVER_SKELETON_COUNT = 9

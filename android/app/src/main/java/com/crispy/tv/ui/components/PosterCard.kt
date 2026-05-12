@@ -8,12 +8,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -21,16 +22,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.crispy.tv.ratings.formatRating
 import coil.compose.AsyncImage
+import com.crispy.tv.ratings.formatRating
+
+private val PosterGradientFallback = Color(0xFF151515)
 
 @Composable
 fun PosterCard(
@@ -40,8 +46,9 @@ fun PosterCard(
     rating: String?,
     year: String? = null,
     genre: String? = null,
+    logoUrl: String? = null,
+    gradientColorHex: String? = null,
     modifier: Modifier = Modifier,
-    showTitle: Boolean = true,
     onClick: () -> Unit
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -51,95 +58,139 @@ fun PosterCard(
         height = 186.dp,
         tmdbSize = "w342",
     )
-    Column(modifier = modifier) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .clickable(onClick = onClick),
-            shape = MaterialTheme.shapes.large
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (imageModel != null) {
+    val logoModel = rememberCrispyImageModel(
+        logoUrl,
+        width = 96.dp,
+        height = 48.dp,
+        tmdbSize = "w185",
+    )
+    val gradientColor = remember(gradientColorHex) {
+        gradientColorHex?.toComposeColorOrNull() ?: PosterGradientFallback
+    }
+    val formattedRating = formatRating(rating?.toDoubleOrNull())
+    val metadataText = listOfNotNull(
+        year?.trim()?.ifBlank { null },
+        genre?.trim()?.ifBlank { null },
+    ).joinToString(" • ")
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(2f / 3f)
+            .clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.large
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (imageModel != null) {
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(fallbackColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = title.take(1).uppercase(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.58f)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                gradientColor.copy(alpha = 0.92f),
+                                gradientColor,
+                            )
+                        )
+                    )
+            )
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                if (logoModel != null) {
                     AsyncImage(
-                        model = imageModel,
+                        model = logoModel,
                         contentDescription = title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        modifier = Modifier
+                            .fillMaxWidth(0.82f)
+                            .height(46.dp),
+                        contentScale = ContentScale.Fit
                     )
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(fallbackColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = title.take(1).uppercase(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(max = 104.dp),
+                    )
                 }
 
-                formatRating(rating?.toDoubleOrNull())?.let { formattedRating ->
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .background(
-                                color = Color.Black.copy(alpha = 0.7f),
-                                shape = MaterialTheme.shapes.small
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                if (metadataText.isNotBlank() || formattedRating != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
+                        if (metadataText.isNotBlank()) {
+                            Text(
+                                text = metadataText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.86f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        formattedRating?.let { value ->
                             Icon(
                                 imageVector = Icons.Filled.Star,
                                 contentDescription = null,
-                                modifier = Modifier.size(12.dp),
+                                modifier = Modifier.size(11.dp),
                                 tint = Color(0xFFFFC107)
                             )
                             Text(
-                                text = formattedRating,
+                                text = value,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White,
-                                fontSize = 11.sp
+                                fontSize = 11.sp,
                             )
                         }
                     }
                 }
             }
         }
+    }
+}
 
-        if (showTitle) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 40.dp),
-                )
-                if (year != null || genre != null) {
-                    Text(
-                        text = listOfNotNull(year, genre).joinToString(" • "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        }
+private fun String.toComposeColorOrNull(): Color? {
+    val normalized = trim().removePrefix("#")
+    val value = normalized.toLongOrNull(16) ?: return null
+    return when (normalized.length) {
+        6 -> Color(0xFF000000 or value)
+        8 -> Color(value)
+        else -> null
     }
 }

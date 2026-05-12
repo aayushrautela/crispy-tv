@@ -118,6 +118,8 @@ fun CatalogRoute(
                             rating = item.rating,
                             year = item.year,
                             genre = item.genre,
+                            logoUrl = item.logoUrl,
+                            gradientColorHex = null,
                             onClick = { onItemClick(item) }
                         )
                     }
@@ -166,28 +168,12 @@ private fun CatalogLoadingSkeleton(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CatalogPosterSkeleton(modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .skeletonElement(pulse = false),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(14.dp)
-                .skeletonElement(pulse = false),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .width(80.dp)
-                .height(12.dp)
-                .skeletonElement(pulse = false),
-        )
-    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(2f / 3f)
+            .skeletonElement(pulse = false),
+    )
 }
 
 private const val CATALOG_SKELETON_COUNT = 12

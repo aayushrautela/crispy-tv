@@ -301,6 +301,10 @@ private fun SearchResultsContent(
                         posterUrl = item.posterUrl,
                         backdropUrl = item.backdropUrl,
                         rating = item.rating,
+                        year = item.year,
+                        genre = item.genre,
+                        logoUrl = item.logoUrl,
+                        gradientColorHex = null,
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onItemClick(item) },
                     )
@@ -421,28 +425,12 @@ private fun SearchLoadingIndicator(compact: Boolean = false) {
 
 @Composable
 private fun SearchPosterSkeleton(modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .skeletonElement(pulse = false),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(14.dp)
-                .skeletonElement(pulse = false),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .width(76.dp)
-                .height(12.dp)
-                .skeletonElement(pulse = false),
-        )
-    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(2f / 3f)
+            .skeletonElement(pulse = false),
+    )
 }
 
 private const val SEARCH_SKELETON_COUNT = 9
