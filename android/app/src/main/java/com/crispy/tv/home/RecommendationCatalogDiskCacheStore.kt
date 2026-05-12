@@ -1,6 +1,8 @@
 package com.crispy.tv.home
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -22,24 +24,24 @@ internal class RecommendationCatalogDiskCacheStore(appContext: Context) {
         }
     }
 
-    fun read(cacheKey: String, maxAgeMs: Long? = null): CachedPayload? {
+    suspend fun read(cacheKey: String, maxAgeMs: Long? = null): CachedPayload? = withContext(Dispatchers.IO) {
         val file = cacheFile(cacheKey)
-        val raw = runCatching { file.readText(StandardCharsets.UTF_8) }.getOrNull() ?: return null
-        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        val raw = runCatching { file.readText(StandardCharsets.UTF_8) }.getOrNull() ?: return@withContext null
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return@withContext null
         val payload = json.optString("payload").trim()
         val timestampMs = json.optLong("timestamp_ms", 0L)
         if (payload.isBlank() || timestampMs <= 0L) {
-            return null
+            return@withContext null
         }
         val entry = CachedPayload(payload = payload, timestampMs = timestampMs)
         val limit = maxAgeMs?.takeIf { it > 0L }
-        return if (limit != null && entry.ageMs() > limit) null else entry
+        return@withContext if (limit != null && entry.ageMs() > limit) null else entry
     }
 
-    fun write(cacheKey: String, payload: String, timestampMs: Long = System.currentTimeMillis()) {
+    suspend fun write(cacheKey: String, payload: String, timestampMs: Long = System.currentTimeMillis()) = withContext(Dispatchers.IO) {
         val normalizedPayload = payload.trim()
         if (normalizedPayload.isEmpty()) {
-            return
+            return@withContext
         }
         val file = cacheFile(cacheKey)
         val json =

@@ -86,6 +86,10 @@ internal fun HomeRoute(
     val catalogSections by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
     val scrollBehavior = appBarScrollBehavior()
 
+    LaunchedEffect(viewModel) {
+        viewModel.ensureLoaded()
+    }
+
     androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
         val observer =
             LifecycleEventObserver { _, event ->

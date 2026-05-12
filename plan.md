@@ -1,503 +1,611 @@
-# TMDB-Only Android Migration Plan
-
-Prepared from static code analysis of:
-- app repo: `/home/aayush/Downloads/crispy-rewrite`
-- server repo: `/home/aayush/Downloads/crispy server`
-
-## Environment Note
-
-- [x] Verified `gradle` is not installed in this environment via `which gradle`.
-- [x] Did not run `gradle`.
-- [x] Did not run `./gradlew`.
-- [ ] Run Android and contract verification later on a machine or CI image that has Gradle installed.
-
-## Goal
-
-Make the Android app use the same canonical identity model the server already uses:
-- server canonical identity: TMDB-backed `mediaKey`
-- server transitional lookup compatibility: `tmdbId`, and currently `imdbId`
-- app canonical runtime identity after migration: `mediaKey` first, TMDB-only fallback where strictly necessary
-
-## Non-Goals
-
-- Do not delete shared multi-ID normalization in `android/core-domain/src/main/kotlin/com/crispy/tv/domain/metadata/MediaIds.kt` yet.
-- Do not delete `contracts/fixtures/media_ids`, `contracts/fixtures/id_prefixes`, Android contract tests, or Swift ContractRunner until runtime app code no longer depends on broader ID normalization.
-- Do not remove provider-sync fields such as `remoteImdbId` from local progress storage unless Trakt/Simkl sync paths are also being retired.
-
-## Confirmed Baseline
-
-### Server state today
-
-- `src/http/routes/metadata.ts` `registerMetadataRoutes()` accepts `mediaKey`, `tmdbId`, `imdbId`, `mediaType`, `seasonNumber`, and `episodeNumber` for `/v1/metadata/resolve` and `/v1/playback/resolve`.
-- `src/modules/metadata/metadata-detail.service.ts` `resolveIdentity()`, `resolveShowTmdbId()`, and `resolveTitleTmdbId()` already canonicalize to TMDB identity.
-- `src/modules/metadata/playback-resolve.service.ts` `resolveIdentity()`, `resolveShowTmdbId()`, and `resolveTitleTmdbId()` do the same for playback.
-- `src/http/contracts/watch.ts` still exposes `provider`, `providerId`, `parentProvider`, and `parentProviderId` on watch write contracts.
-- `src/http/routes/watch.ts` `mapMutationBody()` still maps provider tuple fields, and `parseOptionalProvider()` still parses them.
-- Effective provider validation is already TMDB-only because `parseOptionalProvider()` ultimately goes through `ensureSupportedProvider()` in the server identity layer.
+# Plan: Remove `provider` / `providerId` From Runtime Media Identity
 
-### App state today
+## 1. Objective and root cause
 
-- `android/app/src/main/java/com/crispy/tv/backend/CrispyBackendClient.kt` still exposes generic lookup and write models through `MediaLookupInput`, `WatchMutationInput`, and `PlaybackEventInput`.
-- `android/app/src/main/java/com/crispy/tv/watchhistory/BackendWatchHistoryService.kt` still uses IMDb and provider tuple fallbacks in:
-  - `resolveMediaKey()`
-  - `sendPlaybackEvent()`
-  - `buildClientEventId()`
-  - `progressKeyParts()`
-  - `WatchHistoryRequest.toProviderLookupInput()`
-  - `buildWatchMutationInput()`
-  - `PlaybackIdentity.toPlaybackLookupInput()`
-  - `canonicalWatchedEpisodeRecords()`
-- `android/player/src/main/java/com/crispy/tv/player/WatchHistoryService.kt` still models legacy identity in `WatchHistoryRequest`, `PlaybackIdentity`, and `CanonicalContinueWatchingItem`.
-- `android/app/src/main/java/com/crispy/tv/details/DetailsUseCases.kt` still constructs watch mutations with IMDb and provider tuple fields in `updateEpisodeWatched()` and `buildTitleWatchHistoryRequest()`.
-- `android/app/src/main/java/com/crispy/tv/home/HomeViewModel.kt` still carries provider tuple identity in `CanonicalContinueWatchingItem.toPlaybackIdentity()` and suppression keys in `continueWatchingContentKey(...)`.
-- `android/app/src/main/java/com/crispy/tv/details/WatchCtaResolver.kt` still matches continue-watching entries by `mediaKey`, then provider tuple, then raw `id`.
-- `android/app/src/main/java/com/crispy/tv/details/EpisodeWatchStateResolver.kt` and `android/app/src/main/java/com/crispy/tv/watchhistory/WatchSupport.kt` still derive episode watch keys from `details.id` and provider-history fallbacks.
-- `android/app/src/main/java/com/crispy/tv/metadata/MetadataViewMappings.kt` and `android/app/src/main/java/com/crispy/tv/playback/StreamLookupSupport.kt` still derive stream lookup IDs from `provider:providerId`.
-- `android/app/src/main/java/com/crispy/tv/search/BackendSearchRepository.kt` and `android/app/src/main/java/com/crispy/tv/backend/CrispyBackendParsers.kt` still treat `provider` and `providerId` as required for some backend cards/items.
-- `android/watchhistory/src/main/java/com/crispy/tv/watchhistory/progress/WatchProgressStore.kt` still keys local data as `type:id[:episodeId]` and stores `remoteImdbId` in progress JSON.
-
-## Migration Rules
+### Objective
 
-- `mediaKey` becomes the primary identity for app-server traffic, local watch state, continue-watching suppression, episode watched keys, and UI matching.
-- `tmdbId` is allowed only as a transitional resolver input when `mediaKey` is not available yet at a call site.
-- `contentId`, `imdbId`, `provider`, `providerId`, `parentProvider`, and `parentProviderId` stop being canonical runtime identifiers.
-- Any temporary fallback reads for old local state must be migration-only and must not become the new steady-state contract.
-- Server cleanup that removes `imdbId` compatibility or provider tuple fields must happen only after the Android app no longer sends or requires them.
-
-## Implementation Order
+Remove the obsolete media identity concept of `provider` and `providerId` from the Crispy rewrite stack now that TMDB is the only supported metadata provider. Runtime media identity should be expressed through the canonical backend identifiers already used by the product:
 
-- [ ] Phase 1: narrow shared app identity models
-- [ ] Phase 2: canonicalize backend lookup and write payloads
-- [ ] Phase 3: migrate watch-history mutation and playback event flows
-- [ ] Phase 4: migrate local storage keys and suppression keys
-- [ ] Phase 5: migrate continue-watching, watched CTA, and episode watched-state matching
-- [ ] Phase 6: migrate stream lookup IDs away from provider tuples
-- [ ] Phase 7: relax parser and UI assumptions about provider/providerId
-- [ ] Phase 8: remove server compatibility surface after Android rollout
-- [ ] Phase 9: optional cleanup of broader multi-ID code only if product scope truly requires it
+- `mediaKey` as the primary stable media identity.
+- `mediaType` / `type` / normalized catalog type as the media kind.
+- `tmdbId` when available as the TMDB-specific numeric identifier.
 
-## Phase 1: Narrow Shared App Identity Models
+The implementation should make Android Library, Home, Calendar, watch-history-related runtime card surfaces, contracts, and any relevant server payloads agree on this identity model without requiring redundant provider fields.
 
-### `android/player/src/main/java/com/crispy/tv/player/WatchHistoryService.kt`
+### Exact root cause
 
-- [ ] `data class WatchHistoryRequest`
-  End state should represent canonical title or episode identity.
-  Keep: `mediaKey`, `contentType`, `season`, `episode`, `title`, `absoluteEpisodeNumber` if still needed.
-  Transitional only: TMDB-derived fallback fields if some callers still resolve before they have a `mediaKey`.
-  Remove after all call sites migrate: `contentId`, `remoteImdbId`, `provider`, `providerId`, `parentProvider`, `parentProviderId`.
+Android runtime-card parsing currently treats `provider` and `providerId` as required fields on `RuntimeMediaCard`.
 
-- [ ] `data class PlaybackIdentity`
-  Make `mediaKey` the primary identifier for local progress and playback event identity.
-  Keep `tmdbId` only if some lookup path still needs a TMDB fallback before `mediaKey` is available.
-  Remove after migration: `contentId`, `imdbId`, `provider`, `providerId`, `parentProvider`, `parentProviderId`.
+Known failing path:
 
-- [ ] `data class CanonicalContinueWatchingItem`
-  Verify the backend always supplies `media.mediaKey` for continue-watching rows.
-  If confirmed, make the app treat `mediaKey` as required and stop treating provider tuple fields as identity.
-  Replace `localKey` semantics so they are derived from canonical identity, not provider tuple fallback.
+- Android surfaces such as Library, Home, and Calendar call backend runtime-card endpoints.
+- The server response represents each media item using `mediaKey` and `mediaType` / type-oriented fields, and may include `tmdbId`.
+- The response does **not** include `provider` or `providerId` because these fields are no longer meaningful in a TMDB-only system.
+- Android `CrispyBackendClient.RuntimeMediaCard` still declares `provider` and `providerId` as required non-null strings.
+- `parseRuntimeMediaCard` rejects payloads where those fields are missing and throws/fails with:
 
-### Exit criteria
+```text
+Runtime media card is missing required fields
+```
 
-- [ ] All downstream call sites can build watch-history and playback identities without IMDb or provider tuples.
-- [ ] No new code depends on `contentId` or provider tuple identity for canonical Android flows.
+Search does not fail because it uses `BackendMetadataItem`, where `provider` and `providerId` are already optional. Runtime cards are therefore stricter than search results even though they represent the same backend identity direction.
 
-## Phase 2: Canonicalize Backend Lookup and Write Payloads
+## 2. Scope
 
-### `android/app/src/main/java/com/crispy/tv/backend/CrispyBackendClient.kt`
+### In scope
 
-- [ ] `data class MediaLookupInput`
-  Reduce to the fields the server actually needs for canonical resolution.
-  Keep: `mediaKey`, `mediaType`, `tmdbId`, `showTmdbId` only if an episode call site still needs it, `seasonNumber`, and `episodeNumber`.
-  Remove after call-site migration: `id`, `imdbId`, `tvdbId`, `provider`, `providerId`, `parentProvider`, `parentProviderId`, `absoluteEpisodeNumber` unless a verified server path still consumes it.
+#### Android client repository: `/home/aayush/Downloads/crispy-rewrite`
 
-- [ ] `data class WatchMutationInput`
-  Keep: `mediaKey`, `mediaType`, `seasonNumber`, `episodeNumber`, `absoluteEpisodeNumber` only if backend still requires it, `occurredAt`, `rating`, `payload`.
-  Remove: `provider`, `providerId`, `parentProvider`, `parentProviderId` once all callers stop sending them.
+Primary scope is Android app/backend parsing and all Android consumers of runtime media identity:
 
-- [ ] `data class PlaybackEventInput`
-  Keep only canonical identity plus playback timing fields.
-  Remove provider tuple fields after `BackendWatchHistoryService.sendPlaybackEvent()` is updated.
+- Remove required `provider` / `providerId` from `RuntimeMediaCard` and parser requirements.
+- Remove or deprecate provider fields from other app-level DTOs where they are merely identity duplication and not import-provider connection state.
+- Keep `mediaKey` as the canonical identifier throughout Home, Library, Calendar, Watch History, metadata title detail, and runtime action flows.
+- Keep `tmdbId` as optional TMDB-specific metadata.
+- Update tests and contract fixtures/schemas if runtime card schemas currently require provider fields.
 
-- [ ] `internal fun metadataLookupUrl(...)`
-  Stop adding query parameters for `id`, `imdbId`, `provider`, `providerId`, `parentProvider`, and `parentProviderId` once all callers are canonicalized.
-  End state query shape should match server TMDB-only intent: `mediaKey`, optional `tmdbId`, `mediaType`, `seasonNumber`, `episodeNumber`.
+Important distinction: do **not** remove unrelated import-provider/auth connection concepts without a separate product decision. Types such as Trakt/Simkl import provider connection state may still be valid because they are external account sync providers, not metadata identity providers.
 
-### Exit criteria
+#### Contracts: `/home/aayush/Downloads/crispy-rewrite/contracts`
 
-- [ ] App lookup and write transport models no longer normalize or synthesize provider tuple query/body fields.
-- [ ] No Android caller depends on `metadataLookupUrl(...)` to convert TMDB IDs into fake `provider=tmdb` query parameters.
+Relevant if contracts or schemas model runtime/media identity fields with `provider` / `providerId`:
 
-## Phase 3: Migrate Watch-History Mutation and Playback Event Flows
+- Update `contracts/SPEC.md` to state that metadata identity is canonicalized by `mediaKey`, not by provider/providerId.
+- Update schemas and fixtures to remove required provider identity fields where applicable.
+- Version/bump contract version only if existing contract behavior or fixture shape changes.
 
-### `android/app/src/main/java/com/crispy/tv/watchhistory/BackendWatchHistoryService.kt`
+#### Swift ContractRunner: `/home/aayush/Downloads/crispy-rewrite/ios/ContractRunner`
 
-- [ ] `resolveMediaKey(accessToken, request)`
-  Replace `request.toProviderLookupInput()` with a canonical lookup builder.
-  Lookup priority should be `mediaKey` first, then verified TMDB fallback only if the request genuinely does not have a `mediaKey` yet.
+Relevant if Swift contract code parses or asserts provider/providerId for shared contract suites:
 
-- [ ] `private fun WatchHistoryRequest.toProviderLookupInput()`
-  Rename to something canonical such as `toCanonicalLookupInput()`.
-  Stop populating `id`, `imdbId`, and provider tuple fields.
+- Mirror contract identity changes in Swift parsing and expected-output generation.
+- Keep Kotlin and Swift deterministic behavior aligned.
 
-- [ ] `buildWatchMutationInput(request, backendContext)`
-  Keep the direct `mediaKey` fast path for title mutations.
-  For episode mutations, resolve canonical playback identity using `mediaKey` or TMDB-only fallback and stop copying provider tuple fields from the resolved item into the mutation body.
+#### Server repository: `/home/aayush/Downloads/crispy server`
 
-- [ ] `sendPlaybackEvent(identity, positionMs, durationMs, eventType)`
-  Send canonical event identity only.
-  Remove `provider`, `providerId`, `parentProvider`, and `parentProviderId` from `PlaybackEventInput` creation.
+Relevant because Android should align to the actual backend API shape. The prior diagnosis indicates the server already omits `provider` / `providerId` from runtime-card responses and uses `mediaKey` / `mediaType`.
 
-- [ ] `buildClientEventId(identity, eventType)`
-  Build the suffix from canonical fields.
-  Preferred inputs: `mediaKey`, `season`, `episode`, and only TMDB-derived fallback if `mediaKey` is still missing during the migration window.
-  Stop using `contentId`, `imdbId`, and provider tuple values in the event key.
+Server work should be limited to documentation/schema cleanup unless code still emits or stores provider/providerId as canonical media identity:
 
-- [ ] `progressKeyParts(identity)`
-  Re-key local progress from `contentId` or IMDb to canonical `mediaKey`.
-  If a dual-read migration window is required, keep legacy-key reads temporarily but write only canonical keys.
+- Verify runtime-card response DTOs/OpenAPI/docs use `mediaKey`, `mediaType`, and optional `tmdbId`.
+- Remove provider/providerId from server response contracts if they are still documented as required.
+- Preserve backward-compatible reads for existing stored data if any old rows/documents contain provider/providerId.
 
-- [ ] `canonicalWatchedEpisodeRecords()`
-  Remove the fallback `item.media.providerId` path.
-  Episode records should come from canonical media identity only.
+### Out of scope
 
-- [ ] `PlaybackIdentity.toPlaybackLookupInput()`
-  Stop considering provider tuple or IMDb identity sufficient.
-  End state should require canonical `mediaKey`, with TMDB fallback only where a caller is still migrating.
+- Reintroducing multi-provider metadata support.
+- Replacing `mediaKey` with raw `tmdbId` everywhere.
+- Removing external import/sync provider concepts such as Trakt/Simkl account state unless they are specifically metadata identity fields.
+- Large UI redesigns unrelated to identity parsing.
+- Production code changes in this planning step.
 
-### `android/app/src/main/java/com/crispy/tv/details/DetailsUseCases.kt`
+## 3. Detailed file-by-file implementation plan
 
-- [ ] Title watched mutation path at lines around `330-347`
-  Stop calling `ensureImdbId(...)` as a prerequisite for watched mutations once canonical request builders are in place.
+> Paths are based on the current repo and prior diagnosis. Validate exact call sites before implementation with targeted search for `RuntimeMediaCard`, `parseRuntimeMediaCard`, `providerId`, `provider`, `mediaKey`, and `tmdbId`.
 
-- [ ] `updateEpisodeWatched(details, video, desired)`
-  Build the request from canonical title and episode identity.
-  Stop copying `remoteImdbId`, `provider`, `providerId`, `parentProvider`, and `parentProviderId` into the request.
+### 3.1 Android app backend DTOs
 
-- [ ] `buildTitleWatchHistoryRequest(details)`
-  Stop filling IMDb and provider tuple fields.
-  Keep canonical title identity only.
+#### `android/app/src/main/java/com/crispy/tv/backend/CrispyBackendClient.kt`
 
-- [ ] `updateRating(details, rating)`
-  This path already uses `mediaKey`; remove any unnecessary IMDb enrichment once watched mutations no longer require it.
+Likely symbols:
 
-### `android/app/src/main/java/com/crispy/tv/home/HomeViewModel.kt`
+- `data class BackendMetadataItem`
+- `data class RuntimeMediaCard`
+- Other metadata/runtime DTOs around detail, library, calendar, watch state, and action responses.
 
-- [ ] `CanonicalContinueWatchingItem.toPlaybackIdentity()`
-  Stop deriving IMDb from `provider == "imdb"`.
-  Build playback identity from canonical fields.
+Planned changes:
 
-### Exit criteria
+1. Update `RuntimeMediaCard`:
 
-- [ ] Title watched, episode watched, rating, and playback event writes no longer require IMDb or provider tuple fields.
-- [ ] Backend playback resolve is called with canonical inputs only.
+   Current problematic model likely includes required fields similar to:
 
-## Phase 4: Migrate Local Storage Keys and Suppression Keys
+   ```kotlin
+   data class RuntimeMediaCard(
+       val mediaKey: String,
+       val mediaType: String,
+       val provider: String,
+       val providerId: String,
+       ...
+   )
+   ```
 
-### `android/watchhistory/src/main/java/com/crispy/tv/watchhistory/progress/WatchProgressStore.kt`
+   Target shape:
 
-- [ ] `getWatchProgressPrefKey(id, type, episodeId)`
-  Change the persisted key strategy so `id` represents canonical identity, not provider/IMDb identity.
+   ```kotlin
+   data class RuntimeMediaCard(
+       val mediaKey: String,
+       val mediaType: String,
+       val tmdbId: Int?,
+       ...
+   )
+   ```
 
-- [ ] `getContentDurationPrefKey(id, type, episodeId)`
-  Apply the same canonical key strategy as watch progress.
+   Remove `provider` and `providerId` from constructor and all required property usage.
 
-- [ ] `buildWpKeyString(id, type, episodeId)`
-  Standardize the canonical storage key format used for progress, tombstones, and continue-watching removal markers.
+2. Keep or add optional `tmdbId: Int?` if runtime-card responses include it and consumers need direct TMDB identity.
 
-- [ ] `maybeRestoreContinueWatchingVisibility(id, type, episodeId, timestampEpochMs)`
-  Update restore/removal matching to use canonical title and episode keys.
+3. Review nearby DTOs that are metadata identity models and currently include optional/required `provider` and `providerId`, for example:
 
-- [ ] `mergeWithProviderProgress(...)`
-  Decouple provider sync metadata from local storage identity.
-  Keep `remoteImdbId` only if Trakt/Simkl sync still needs it.
-  Do not let provider sync reintroduce IMDb-based keying.
+   - `BackendMetadataItem` has optional provider fields today. Recommended short-term change: remove Android usage of these fields first, then remove the fields entirely if backend search payload/schema no longer includes them.
+   - Detail/review/watch-state response DTOs that expose `provider` / `providerId` should be classified:
+     - Metadata identity duplication: remove or make ignored/optional.
+     - External import provider state: keep.
 
-- [ ] `WatchProgressJson.fromJson(...)` and `WatchProgress.toJson()`
-  Preserve backward compatibility for old stored JSON during the migration window.
-  If `remoteImdbId` is kept for external sync, it should remain a payload attribute, not the persisted key source.
+4. Do **not** remove `ProviderState`, `ImportProvider`, connection provider fields, or Trakt/Simkl provider concepts unless a later audit confirms they are only metadata identity. Those are different domain concepts.
 
-### `android/app/src/main/java/com/crispy/tv/watchhistory/BackendWatchHistoryService.kt`
+Expected result:
 
-- [ ] `progressKeyParts(identity)`
-  Implement dual-read logic if needed.
-  Recommendation: read old keys and new keys during one migration window, but write only new canonical keys.
+- `RuntimeMediaCard` no longer encodes obsolete provider identity.
+- Runtime endpoint parsing can succeed with server responses containing only `mediaKey`, `mediaType`, and related display fields.
 
-### `android/app/src/main/java/com/crispy/tv/home/HomeViewModel.kt`
+### 3.2 Android app backend parsers
 
-- [ ] `continueWatchingContentKey(entry)`
-  Make `mediaKey` the canonical suppression key.
+#### `android/app/src/main/java/com/crispy/tv/backend/CrispyBackendParsers.kt`
 
-- [ ] `continueWatchingContentKey(type, provider, providerId)`
-  Keep only during the migration window for reading old suppressions.
-  Delete after old suppression entries have been migrated or expired.
+Likely symbols:
 
-### Migration strategy decision
+- `parseMetadataItems`
+- `parseMetadataItem`
+- `parseRuntimeMediaCard`
+- runtime response parsers that call `parseRuntimeMediaCard`, including home/library/calendar/watch-history card response parsers.
 
-- [ ] Implement either a one-time migration job or a dual-read migration window.
-- [ ] Recommended: dual-read old keys, write new keys, remove legacy reads after one release cycle.
+Planned changes:
 
-### Exit criteria
+1. Update `parseRuntimeMediaCard` required-field validation.
 
-- [ ] Existing users do not lose resume progress during the upgrade.
-- [ ] Existing continue-watching suppression entries still work or are safely migrated.
+   Remove `provider` and `providerId` from the required-field gate. Required fields should be limited to the actual runtime-card minimum, likely:
 
-## Phase 5: Continue-Watching, Watch CTA, and Episode Watched-State
+   - `mediaKey`
+   - `mediaType` or canonical type field used by server
+   - `title` / display title if currently required by UI
+   - artwork fields only when the existing `requireBackdrop` flag demands them
 
-### `android/app/src/main/java/com/crispy/tv/details/WatchCtaResolver.kt`
+2. Parse optional `tmdbId` robustly:
 
-- [ ] `resolveProviderState(details, itemId)`
-  Consider renaming to reflect canonical server watch state once provider tuple identity is gone.
+   - Accept integer JSON values.
+   - If current backend sometimes serializes IDs as strings, consider a helper that handles numeric strings safely.
+   - Treat missing/blank/unparseable `tmdbId` as `null`, not fatal.
 
-- [ ] `resolveContinueWatchingEntry(details, expectedType, nowMs)`
-  End state matching should be `mediaKey`-based.
-  Provider tuple and raw `id` fallback should exist only during the migration window if needed for old local entries.
+3. Normalize identity fields early:
 
-- [ ] `ensureImdbId(details)`
-  Remove from watched/rating flows once no canonical path requires IMDb enrichment.
+   - `mediaKey = json.optString("mediaKey").trim()` and fail only if blank.
+   - `mediaType = json.optString("mediaType", json.optString("type")).trim()` or use the repo’s existing helper if present.
+   - Avoid constructing fallback provider/providerId from `tmdbId`; that preserves the obsolete concept under another name.
 
-### `android/app/src/main/java/com/crispy/tv/details/EpisodeWatchStateResolver.kt`
+4. Update `parseMetadataItem` only if the product decision is to remove provider/providerId from search DTOs too:
 
-- [ ] `resolve(details, videos)`
-  Build `PlaybackIdentity` for local progress using canonical identity.
-  Stop filling provider tuple fields into local progress lookups.
+   - Because search currently works, this is not the urgent crash fix.
+   - Recommended implementation order is to first stop requiring provider fields in runtime cards, then remove optional search DTO fields once all search call sites are confirmed not to need them.
 
-- [ ] `resolveWatchKeys(details)`
-  Keep server `watchedEpisodeKeys` as the primary source of truth.
-  Remove `listWatchedEpisodeRecords()` fallback once canonical watch-state coverage is verified for all details paths.
+5. Update parser error messages to reflect the new identity contract. Example:
 
-### `android/app/src/main/java/com/crispy/tv/watchhistory/WatchSupport.kt`
+   ```text
+   Runtime media card is missing required identity/display fields
+   ```
 
-- [ ] `episodeWatchKeyCandidates(details, season, episode)`
-  Rebuild around canonical `mediaKey` or canonical episode key rules.
+   Avoid mentioning provider/providerId.
 
-- [ ] `addEpisodeKey(contentId, season, episode)`
-  Replace `contentId` semantics with canonical title identity semantics.
+Expected result:
 
-### Exit criteria
+- Runtime-card parsing accepts current server payloads.
+- Missing provider/providerId no longer causes Library/Home/Calendar failure.
 
-- [ ] Details page continue CTA still works after migration.
-- [ ] Episode watched badges still work for upgraded users with old local data.
-- [ ] Watch CTA logic no longer relies on provider tuple identity.
+### 3.3 Android search mapping
 
-## Phase 6: Stream Lookup Identity
+#### `android/app/src/main/java/com/crispy/tv/search/BackendSearchRepository.kt`
 
-### Confirm this before implementation
+Likely symbol:
 
-- [ ] Verify what the addon or stream lookup stack expects as its canonical lookup ID.
-- [ ] Decide whether the stream stack can consume TMDB-backed `mediaKey` or another TMDB-only canonical form directly.
-- [ ] If the stream stack still expects legacy `provider:providerId[:season:episode]`, plan a compatibility bridge instead of a straight deletion.
+- `internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem?`
 
-### `android/app/src/main/java/com/crispy/tv/metadata/MetadataViewMappings.kt`
+Planned changes:
 
-- [ ] `MetadataEpisodeView.toMediaVideo()`
-  Stop building `lookupId` from `canonicalProviderLookupId(parentProvider, parentProviderId)`.
-  Replace with a canonical TMDB/mediaKey-based episode lookup ID.
+1. Confirm `toCatalogItem` uses `mediaKey` as the identity and does not require provider/providerId.
+2. If `SearchCatalogItem` still has provider/providerId fields, decide whether they are UI/API leftovers:
 
-- [ ] `MetadataEpisodePreview.toMediaVideo()`
-  Apply the same canonical lookup ID logic.
+   - If unused: remove from `SearchCatalogItem` and mapping.
+   - If used only for analytics/debug labels: replace with `tmdbId` or omit.
 
-- [ ] `MetadataCardView.toCatalogItem()`
-  Stop requiring provider tuple identity if `mediaKey` is already present.
+3. Keep search behavior unchanged otherwise. Search already works because provider/providerId are optional in `BackendMetadataItem`; avoid introducing regressions.
 
-- [ ] `MediaDetails.providerBaseLookupId()`
-  Delete or replace after stream lookup migration is complete.
+Expected result:
 
-- [ ] `MetadataView.providerBaseLookupId()`
-  Delete or replace after stream lookup migration is complete.
+- Search remains functional and becomes consistent with runtime-card identity.
 
-- [ ] `canonicalProviderLookupId(provider, providerId)`
-  Delete when no caller remains.
+### 3.4 Android Home recommendations/runtime card consumers
 
-### `android/app/src/main/java/com/crispy/tv/playback/StreamLookupSupport.kt`
+#### `android/app/src/main/java/com/crispy/tv/home/RecommendationCatalogService.kt`
 
-- [ ] `resolveStreamLookupTarget(details, selectedSeason, seasonEpisodes, fallbackMediaType)`
-  Stop using `details.providerBaseLookupId()`.
-  Use canonical title or episode lookup identity instead.
+Likely symbols:
 
-- [ ] `buildEpisodeLookupId(details, season, episode)`
-  Rebuild from canonical identity.
+- `private fun CrispyBackendClient.RuntimeMediaCard.toCatalogItem(): HomeCatalogItem?`
+- `private fun CrispyBackendClient.RuntimeMediaCard.normalizedCatalogType(): String`
 
-- [ ] `findEpisodeForLookupId(...)`
-  Verify it still matches against the new canonical episode lookup format.
+Planned changes:
 
-### Exit criteria
+1. Remove any references to `RuntimeMediaCard.provider` or `RuntimeMediaCard.providerId`.
+2. Ensure `toCatalogItem()` uses:
 
-- [ ] Playback stream lookup works without provider/providerId-derived lookup IDs.
-- [ ] Details and player episode selection use the same canonical episode lookup identity.
+   - `mediaKey` for `contentId` / stable ID.
+   - normalized `mediaType` for catalog type.
+   - `tmdbId` only as optional metadata.
 
-## Phase 7: Relax Parser and UI Requirements Around Provider Tuples
+3. Ensure `normalizedCatalogType()` does not infer type from provider/providerId. It should use `mediaType`, `type`, or an existing canonical type helper.
 
-### `android/app/src/main/java/com/crispy/tv/backend/CrispyBackendParsers.kt`
+4. Confirm fallback behavior for missing artwork remains controlled by `requireBackdrop` in parser and does not depend on provider identity.
 
-- [ ] `parseMetadataItem(json)`
-  Stop throwing when `provider` or `providerId` is missing if `mediaKey` and other UI-required fields are present.
+Expected result:
 
-- [ ] `parseMetadataView(json)`
-  Keep provider tuple fields optional/passive during migration.
-  Do not let them remain required for app logic.
+- Home recommendation rows render from runtime-card responses without provider/providerId.
 
-- [ ] `parseMetadataEpisodePreview(json)`
-  Keep provider tuple fields optional/passive during migration.
+### 3.5 Android watch history / library runtime consumers
 
-- [ ] `parseMetadataSeasonView(json)`
-  Same treatment as above.
+#### `android/app/src/main/java/com/crispy/tv/watchhistory/BackendWatchHistoryService.kt`
 
-- [ ] `parseMetadataEpisodeView(json)`
-  Same treatment as above.
+Likely symbol:
 
-- [ ] `parseMetadataExternalIds(json)`
-  Keep parsing only as long as server responses still include them or some UI still explicitly needs them.
-  Remove `tvdb` and `kitsu` only after no UI/runtime code reads them.
+- `private fun CrispyBackendClient.RuntimeMediaCard.toTitleMediaKey(): String`
 
-### `android/app/src/main/java/com/crispy/tv/search/BackendSearchRepository.kt`
+Planned changes:
 
-- [ ] `BackendMetadataItem.toCatalogItem(defaultGenre)`
-  Stop returning `null` solely because `provider` or `providerId` is missing.
-  Search cards should survive the backend contract cleanup as long as canonical identity and required artwork are present.
+1. Confirm `toTitleMediaKey()` returns or derives from `mediaKey`, not provider/providerId.
+2. Remove provider/providerId references if present.
+3. Preserve existing handling for episode-level media keys if the backend distinguishes:
 
-### `android/app/src/main/java/com/crispy/tv/home/CalendarService.kt`
+   - title/show/movie `mediaKey`
+   - season/episode media keys
+   - related show media key on episode cards
 
-- [ ] `toCalendarEpisodeItem(nowMs)`
-  Replace provider-based `watchedKey` and `localKey` generation with canonical media or canonical episode keys.
+4. Ensure watch-state, continue-watching, and library action calls continue to pass `mediaKey` to backend endpoints.
 
-- [ ] `toCalendarSeriesItem()`
-  Replace provider-based `localKey` with canonical identity.
+Expected result:
 
-- [ ] `projectHomeThisWeekItems(...)`
-  Verify grouping still behaves correctly once `localKey` and watched-key semantics become canonical.
+- Library and watch-history surfaces identify titles by `mediaKey` and no longer require provider fields.
 
-### Exit criteria
+### 3.6 Android metadata/detail surfaces
 
-- [ ] Search and home/calendar UI do not silently drop TMDB-only backend rows.
-- [ ] Provider tuple fields can be removed from backend responses without breaking Android rendering.
+Potential files to audit:
 
-## Phase 8: Server Cleanup After Android Rollout
+- `android/app/src/main/java/com/crispy/tv/metadata/BackendEpisodeListProvider.kt`
+- `android/app/src/main/java/com/crispy/tv/backend/CrispyBackendMetadataApi.kt`
+- Any detail screen/view model that accepts `contentId`, `mediaKey`, `provider`, `providerId`, or `tmdbId`.
 
-Do not start this phase until Android no longer sends or requires the compatibility fields below.
+Planned changes:
 
-### `~/Downloads/crispy server/src/http/contracts/metadata.ts`
+1. Keep detail and episode APIs keyed by `mediaKey`.
+2. Remove any navigation arguments that carry provider/providerId solely for metadata identity.
+3. If old deep links or saved state contain provider/providerId, ignore those fields and resolve through `mediaKey` when available.
+4. If a legacy path only has `providerId` and no `mediaKey`, provide a transitional fallback only if necessary:
 
-- [ ] `MetadataResolveQuery`
-  Remove `imdbId` once Android no longer sends it.
+   - For TMDB movie: `tmdb:movie:<id>` or the repo’s canonical mediaKey format if defined in contracts.
+   - For TMDB show: `tmdb:tv:<id>` or canonical equivalent.
 
-- [ ] `metadataResolveQuerystringSchema`
-  Remove `imdbId` from the allowed query shape.
+   This fallback should be explicitly temporary and covered by tests if implemented.
 
-- [ ] `metadataExternalIdsSchema`
-  Reduce only after Android parser and UI no longer depend on `imdb` or `tvdb` values.
+Expected result:
 
-- [ ] `metadataEpisodePreviewSchema`
-  Stop requiring `provider`, `providerId`, `parentProvider`, and `parentProviderId` after Android parser and stream lookup no longer require them.
+- Detail and episode loading use the same canonical identity as runtime cards.
 
-- [ ] `metadataViewSchema`, `metadataSeasonViewSchema`, and `metadataEpisodeViewSchema`
-  Apply the same removal of provider tuple requirements.
+### 3.7 Android model/domain classes outside backend package
 
-### `~/Downloads/crispy server/src/http/routes/metadata.ts`
+Potential search targets:
 
-- [ ] `registerMetadataRoutes()`
-  Stop reading and forwarding `imdbId` after app rollout is complete.
+- `providerId` in app UI/model classes.
+- `provider` in catalog/search/watchlist/rating classes.
+- `tmdbId` and `mediaKey` mapping helpers.
 
-### `~/Downloads/crispy server/src/modules/metadata/metadata-detail.service.ts`
+Planned changes:
 
-- [ ] `resolveIdentity()`
-  Keep `mediaKey` as the canonical fast path.
+1. Classify every occurrence of provider/providerId into one of three buckets:
 
-- [ ] `resolveShowTmdbId(client, input)`
-  Remove IMDb fallback when no caller relies on it.
+   - **Metadata identity**: remove/replace with `mediaKey` and optional `tmdbId`.
+   - **External account/sync provider**: keep. Examples may include Trakt, Simkl, import connection provider state, scrobble policy provider.
+   - **Contract compatibility/legacy parsing**: make optional and ignored, then remove in a later contract version if public.
 
-- [ ] `resolveTitleTmdbId(client, input, mediaType)`
-  Remove IMDb fallback when no caller relies on it.
+2. Remove only metadata identity fields in this workstream.
+3. Avoid renaming external-provider concepts to prevent accidental churn.
 
-### `~/Downloads/crispy server/src/modules/metadata/playback-resolve.service.ts`
+Expected result:
 
-- [ ] `resolveIdentity()`
-  Keep `mediaKey` fast path and remove IMDb-only compatibility branches after Android rollout.
+- The codebase no longer requires provider/providerId to identify TMDB media, while still preserving unrelated provider concepts.
 
-- [ ] `resolveShowTmdbId(client, input)`
-  Remove IMDb fallback.
+## 4. Contract, schema, fixture, and versioning implications
 
-- [ ] `resolveTitleTmdbId(client, input, mediaType)`
-  Remove IMDb fallback.
+### Contract direction
 
-### `~/Downloads/crispy server/src/http/contracts/watch.ts`
+Update the source of truth to state:
 
-- [ ] `WatchEventBody`
-  Remove `provider`, `providerId`, `parentProvider`, and `parentProviderId` from the public contract.
+- Canonical media identity is `mediaKey`.
+- `tmdbId` is optional provider-specific metadata, not the primary identifier.
+- `provider` / `providerId` are not required for metadata title identity and should not appear in new runtime-card fixtures unless explicitly marked as legacy ignored fields.
+- Since only TMDB is supported, clients must not require a provider discriminator to parse runtime media cards.
 
-- [ ] `WatchMutationBody`
-  Remove the same provider tuple fields.
+### Files to inspect/update
 
-### `~/Downloads/crispy server/src/http/routes/watch.ts`
+#### `contracts/SPEC.md`
 
-- [ ] `mapMutationBody(body)`
-  Stop mapping provider tuple fields.
+Planned edits if provider/providerId are mentioned as metadata identity:
 
-- [ ] `parseOptionalProvider(value)`
-  Delete when unused.
+1. Replace language requiring provider/providerId with mediaKey-based identity.
+2. Clarify canonical mediaKey format if already defined by suites such as `media_ids` or `id_prefixes`.
+3. Add a note that legacy provider/providerId fields, if seen in payloads, are ignored by clients.
 
-### Exit criteria
+#### `contracts/schemas/**/*.json`
 
-- [ ] Server metadata and playback resolve endpoints no longer accept `imdbId`.
-- [ ] Server watch write contracts no longer expose provider tuple compatibility fields.
-- [ ] Android app still functions against the simplified server contract.
+Planned edits:
 
-## Phase 9: Optional Wider Cleanup
+1. Locate schemas for runtime cards, metadata titles, search results, library, calendar, home/recommendations, continue watching, storage, and media IDs.
+2. Remove `provider` / `providerId` from `required` arrays where they represent metadata identity.
+3. Optionally remove the properties entirely if no longer part of the public payload.
+4. Keep schemas for import/sync provider state intact.
 
-Only do this after Phases 1 through 8 are complete and verified.
+#### `contracts/fixtures/**/*.json`
 
-### App candidates
+Planned edits:
 
-- [ ] Remove unused `MetadataExternalIds.tvdb` and `MetadataExternalIds.kitsu` in `CrispyBackendClient.kt` if no UI or provider sync path still reads them.
-- [ ] Remove leftover multi-provider helpers in `CrispyBackendClient.kt` and `CrispyBackendParsers.kt` once no server response carries them.
-- [ ] Remove old provider tuple helpers from `HomeViewModel`, `WatchSupport`, `MetadataViewMappings`, and `StreamLookupSupport` once migration fallbacks are gone.
+1. Remove provider/providerId from runtime-card fixtures where they are present only to satisfy Android’s old parser.
+2. Add at least one fixture that intentionally omits provider/providerId to prevent regression.
+3. Ensure fixtures include `mediaKey`, media type, title/display fields, and optional `tmdbId`.
+4. Preserve canonical ordering and deterministic expected output.
 
-### Shared contracts and cross-platform candidates
+### Contract versioning
 
-- [ ] Re-evaluate `android/core-domain/src/main/kotlin/com/crispy/tv/domain/metadata/MediaIds.kt`.
-- [ ] Re-evaluate `contracts/fixtures/media_ids` and `contracts/fixtures/id_prefixes`.
-- [ ] Re-evaluate `android/contract-tests` media-id suites.
-- [ ] Re-evaluate `ios/ContractRunner` parity only if product scope truly wants TMDB-only normalization everywhere, not just at the app-server boundary.
+Versioning depends on what the current contracts say:
 
-## Risks To Actively Guard Against
+- If `provider` / `providerId` are currently required in contract schemas or expected outputs, removing them is a contract shape change. Bump `contract_version` according to `contracts/SPEC.md` rules and update Kotlin and Swift contract runners together.
+- If contracts already use `mediaKey` as canonical identity and only Android app runtime parsing is stale, no contract version bump may be needed. Add regression fixtures/tests without bumping only if allowed by existing versioning policy.
+- If backward-compatible optional legacy parsing is retained while required output stays the same, document it as compatibility behavior without changing semantic contract version unless fixture/schema shape changes.
 
-- [ ] Resume-progress loss caused by changing `WatchProgressStore` keys without a migration path.
-- [ ] Continue-watching suppression regressions caused by old provider-based suppression keys no longer matching.
-- [ ] Episode watched badge regressions caused by `details.id` and provider-history fallbacks disappearing before canonical watched keys are trusted everywhere.
-- [ ] Search result loss caused by `BackendSearchRepository.toCatalogItem()` continuing to reject rows missing provider tuple fields.
-- [ ] Stream lookup regressions caused by changing `lookupId` format without confirming addon expectations first.
+## 5. Test updates and exact commands
 
-## Final Acceptance Checklist
+### Android unit/contract tests to add or update
 
-- [ ] Title watched mutations work with canonical identity only.
-- [ ] Episode watched mutations work with canonical identity only.
-- [ ] Rating updates still work and do not require IMDb enrichment.
-- [ ] Playback events are emitted without IMDb or provider tuple fields.
-- [ ] Local progress survives upgrade for existing users.
-- [ ] Continue watching survives upgrade for existing users.
-- [ ] Episode watched badges remain correct after migration.
-- [ ] Search results still render when backend stops sending provider/providerId.
-- [ ] Calendar/home item keys are canonical and stable.
-- [ ] Stream lookup works with the new canonical lookup ID format.
-- [ ] Android no longer sends `imdbId` to `/v1/metadata/resolve` or `/v1/playback/resolve`.
-- [ ] Android no longer sends provider tuple fields to watch write endpoints.
-- [ ] Server can remove `imdbId` and provider tuple compatibility fields without breaking the Android app.
+1. Add parser-level regression coverage for runtime cards without provider/providerId.
 
-## Verification To Run Later When Gradle Exists
+   Suggested test intent:
 
-Do not run these in the current environment. `gradle` is not installed here.
+   - Given a runtime-card JSON object with `mediaKey`, `mediaType`, title, artwork as required by the parser mode, and `tmdbId`, but no `provider` or `providerId`.
+   - When `parseRuntimeMediaCard` is called.
+   - Then parsing succeeds and the resulting `RuntimeMediaCard.mediaKey` and `mediaType` are populated.
 
-- [ ] `python3 scripts/validate_contracts.py`
-- [ ] `gradle :android:contract-tests:test`
-- [ ] `gradle :android:core-domain:test`
-- [ ] `gradle :android:app:testDebugUnitTest`
-- [ ] `gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest :android:tv:assembleDebug`
-- [ ] `gradle :android:app:lintDebug`
-- [ ] `gradle :android:tv:lintDebug`
-- [ ] `swift test --package-path ios/ContractRunner` if any shared contract behavior changes
+2. Add surface-level tests if existing test harnesses are available:
 
-## Static Verification Already Completed
+   - Home recommendation payload without provider/providerId maps to `HomeCatalogItem`.
+   - Library/watch-history payload without provider/providerId maps to title media key.
+   - Calendar payload without provider/providerId maps to expected event/card model.
 
-- [x] Compared Android identity and watch-history code paths against server metadata and watch contracts.
-- [x] Confirmed server canonical identity is TMDB-only while API compatibility still exists at the edge.
-- [x] Confirmed the app still has active runtime dependencies on IMDb and provider tuple identity.
-- [x] Confirmed `gradle` is not installed, so no Gradle build or test task was run while preparing this plan.
+3. Update any snapshot/golden tests expecting provider/providerId fields.
+
+4. Update contract tests if schemas/fixtures change.
+
+### Swift ContractRunner tests
+
+If contracts change, update matching Swift tests and parsing logic, then run SwiftPM tests.
+
+### Server tests
+
+In `/home/aayush/Downloads/crispy server`, if server schema/docs/DTOs are changed:
+
+- Add or update API response tests to assert runtime-card responses are valid without provider/providerId.
+- Confirm no server endpoint still documents these fields as required metadata identity.
+
+Use the server repo’s own agent guide/package scripts if present.
+
+### Exact commands from `AGENTS.md`
+
+Run from `/home/aayush/Downloads/crispy-rewrite` after implementation:
+
+```sh
+python3 scripts/validate_contracts.py
+gradle :android:contract-tests:test
+```
+
+If Swift contract logic or fixtures are touched:
+
+```sh
+swift test --package-path ios/ContractRunner
+```
+
+For Android app parser/UI related changes:
+
+```sh
+gradle :android:app:testDebugUnitTest
+```
+
+For core domain changes, if any:
+
+```sh
+gradle :android:core-domain:test
+```
+
+For compile/lint confidence after app DTO changes:
+
+```sh
+gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest :android:tv:assembleDebug
+gradle :android:app:lintDebug
+gradle :android:tv:lintDebug
+```
+
+If contract behavior changes and a targeted contract test is enough during iteration:
+
+```sh
+gradle :android:contract-tests:test --tests com.crispy.tv.contracts.PlayerMachineContractTest
+```
+
+Replace the class filter with the specific contract test class for the changed suite if not `PlayerMachineContractTest`.
+
+## 6. Migration and backward-compatibility notes
+
+### Existing persisted data
+
+The product should treat `mediaKey` as the durable identifier. Migration behavior should be:
+
+1. Existing rows/documents with `mediaKey` continue to work unchanged.
+2. Existing rows/documents with `tmdbId` continue to expose it as optional metadata.
+3. Existing rows/documents with `provider` / `providerId` should not break reads, but those fields should no longer be required or used as primary identity.
+4. New writes should not include provider/providerId for metadata identity.
+
+### Media key compatibility
+
+Confirm the canonical `mediaKey` format before implementing fallbacks. If contracts define formats in `media_ids` or `id_prefixes`, use those exactly.
+
+Potential compatibility strategy:
+
+- Preferred: require stored/runtime records to have `mediaKey`.
+- Transitional fallback only if old local data lacks `mediaKey`:
+  - If `provider == "tmdb"`, `providerId` is present, and type is known, derive the canonical TMDB mediaKey.
+  - Do not derive if type is ambiguous.
+  - Log or surface a non-fatal migration warning if the app has an internal diagnostics path.
+
+### `tmdbId`
+
+`tmdbId` should remain optional because:
+
+- Some payloads may use `mediaKey` without raw TMDB ID.
+- Some item types may not have a direct title-level TMDB ID in a specific response context.
+- `mediaKey` is still the stable app/backend identity.
+
+Use `tmdbId` for display/debug/API calls only where explicitly needed. Do not use it as a replacement primary key unless the endpoint specifically requires raw TMDB ID.
+
+### API backward compatibility
+
+For a transition period, parsers may tolerate provider/providerId in responses but should ignore them. Server may continue to accept provider/providerId in request bodies only if older clients send them, but new clients should send `mediaKey`.
+
+## 7. Risks and acceptance criteria
+
+### Risks
+
+1. **Conflating metadata provider with import provider**
+
+   Removing every `provider` occurrence blindly could break Trakt/Simkl import connection state or scrobble policy logic. Mitigation: classify occurrences before editing.
+
+2. **Implicit provider/providerId usage in navigation or saved state**
+
+   Detail screens or deep links may still pass provider/providerId. Mitigation: keep backward-compatible optional read paths and prefer `mediaKey`.
+
+3. **Contract drift between Android and Swift**
+
+   If schemas/fixtures change but Swift ContractRunner is not updated, CI parity fails. Mitigation: update Kotlin and Swift contract implementations together and run both contract test suites.
+
+4. **Server/client schema mismatch**
+
+   Android may be fixed while server docs/schemas still claim provider/providerId are required, or vice versa. Mitigation: verify server response DTOs/docs and contract schemas.
+
+5. **Legacy data without mediaKey**
+
+   Very old local data may only have provider/providerId. Mitigation: add a constrained TMDB-only fallback if such data exists; otherwise document that `mediaKey` is required.
+
+6. **Overusing `tmdbId` as primary identity**
+
+   Replacing provider/providerId with `tmdbId` everywhere could lose type information and collide between movie/show IDs. Mitigation: primary identity remains `mediaKey`; `tmdbId` is optional metadata.
+
+### Acceptance criteria
+
+1. Android runtime-card parser accepts payloads that include `mediaKey` and media type but omit `provider` and `providerId`.
+2. Library, Home, and Calendar no longer fail with `Runtime media card is missing required fields` for current server responses.
+3. Search behavior remains unchanged or improves, with no new requirement for provider/providerId.
+4. New Android code paths use `mediaKey` as canonical identity and optional `tmdbId` only where appropriate.
+5. Metadata identity DTOs no longer require provider/providerId.
+6. External account provider concepts such as Trakt/Simkl import state remain intact.
+7. Contracts/schemas/fixtures, Kotlin contract tests, and Swift ContractRunner are updated together if contract shape changes.
+8. Required validation/test commands pass:
+
+   ```sh
+   python3 scripts/validate_contracts.py
+   gradle :android:contract-tests:test
+   gradle :android:app:testDebugUnitTest
+   ```
+
+   Plus, if Swift contracts are touched:
+
+   ```sh
+   swift test --package-path ios/ContractRunner
+   ```
+
+9. Compile/lint confidence commands pass before release:
+
+   ```sh
+   gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest :android:tv:assembleDebug
+   gradle :android:app:lintDebug
+   gradle :android:tv:lintDebug
+   ```
+
+## 8. Recommended order of implementation
+
+### Phase 1: Confirm current API and classify provider usages
+
+1. Inspect Android `CrispyBackendClient.kt` and `CrispyBackendParsers.kt` around runtime-card DTOs and parsers.
+2. Inspect Android consumers of `RuntimeMediaCard`:
+   - `RecommendationCatalogService.kt`
+   - `BackendWatchHistoryService.kt`
+   - library/calendar services or repositories discovered by search
+3. Classify `provider` / `providerId` occurrences into:
+   - metadata identity to remove
+   - external provider/import/sync to keep
+   - legacy compatibility to tolerate but ignore
+4. Inspect server runtime-card DTOs/docs in `/home/aayush/Downloads/crispy server` to confirm current payload shape.
+
+### Phase 2: Fix Android runtime-card parsing and DTOs
+
+1. Remove `provider` / `providerId` from `RuntimeMediaCard`.
+2. Update `parseRuntimeMediaCard` to require only `mediaKey`, media type, and existing display/artwork requirements.
+3. Parse `tmdbId` optionally.
+4. Update all compile errors from removed properties by replacing identity usage with `mediaKey` and type usage with normalized media type.
+5. Add parser regression tests for cards without provider/providerId.
+
+This phase should resolve the observed Library/Home/Calendar crash.
+
+### Phase 3: Clean Android metadata identity leftovers
+
+1. Remove or ignore provider/providerId in `BackendMetadataItem` and search mapping if no longer needed.
+2. Update navigation/detail/watchlist/rating models to pass `mediaKey` only.
+3. Keep compatibility for old saved state where necessary.
+4. Add tests for search/detail/watch-state identity behavior if existing harnesses make this practical.
+
+### Phase 4: Update contracts and Swift if required
+
+1. Update `contracts/SPEC.md` to document mediaKey-first identity.
+2. Update schemas to stop requiring provider/providerId for metadata identity.
+3. Update fixtures to omit provider/providerId in at least one runtime-card case.
+4. Bump `contract_version` if fixture/schema semantics require it.
+5. Update Kotlin contract tests and Swift ContractRunner to match.
+6. Run contract validation and both contract test suites.
+
+### Phase 5: Server cleanup if required
+
+1. In `/home/aayush/Downloads/crispy server`, remove provider/providerId from runtime-card API docs/schema if still present.
+2. Ensure backend response serializers do not emit provider/providerId for new runtime-card payloads.
+3. Keep server request/read compatibility for old clients/data where cheap and safe.
+4. Run the server repo’s tests and schema validation commands.
+
+### Phase 6: Full validation
+
+Run from `/home/aayush/Downloads/crispy-rewrite`:
+
+```sh
+python3 scripts/validate_contracts.py
+gradle :android:contract-tests:test
+gradle :android:app:testDebugUnitTest
+```
+
+If Swift was touched:
+
+```sh
+swift test --package-path ios/ContractRunner
+```
+
+Before merging/release:
+
+```sh
+gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest :android:tv:assembleDebug
+gradle :android:app:lintDebug
+gradle :android:tv:lintDebug
+```
+
+## 9. Implementation notes
+
+- Prefer removing the obsolete fields from strongly typed DTOs over keeping nullable placeholders indefinitely. Strong types should reflect the new product model.
+- During the migration window, parsers may tolerate extra provider/providerId JSON fields but should not require or propagate them.
+- Do not construct fake values such as `provider = "tmdb"` and `providerId = tmdbId.toString()` just to satisfy old models. That hides the migration and keeps obsolete identity alive.
+- Keep the language precise in code review: `provider` can still mean external sync/import provider, but it should no longer mean metadata identity provider.
+- Use compile errors after removing `RuntimeMediaCard.provider` / `providerId` as a guide to find remaining stale runtime-card call sites.

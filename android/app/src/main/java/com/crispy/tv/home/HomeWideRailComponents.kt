@@ -235,7 +235,8 @@ internal fun HomeWideRailCard(
         }
     }
 
-    if (hasItemActions && actionSheetVisible) {
+    val visibleRemoveAction = if (actionSheetVisible) removeAction else null
+    if (visibleRemoveAction != null) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { actionSheetVisible = false },
@@ -275,7 +276,7 @@ internal fun HomeWideRailCard(
                     headlineContent = { Text("Remove") },
                     modifier = Modifier.clickable {
                         actionSheetVisible = false
-                        removeAction()
+                        visibleRemoveAction()
                     },
                 )
             }

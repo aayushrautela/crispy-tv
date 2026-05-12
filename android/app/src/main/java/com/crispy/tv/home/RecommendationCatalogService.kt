@@ -17,6 +17,14 @@ import com.crispy.tv.domain.home.buildCatalogPage
 import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
 import com.crispy.tv.ratings.formatRatingOutOfTen
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -101,55 +109,25 @@ class RecommendationCatalogService internal constructor(
     private val backendContextResolver: BackendContextResolver,
     private val diskCacheStore: RecommendationCatalogDiskCacheStore,
 ) {
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val inFlightMutex = Mutex()
+    private val inFlightSnapshots = mutableMapOf<String, Deferred<HomeCatalogSnapshot>>()
     suspend fun loadPrimaryHomeFeed(
         heroLimit: Int = 10,
         sectionLimit: Int = Int.MAX_VALUE,
     ): HomePrimaryFeedLoadResult {
         val snapshot = loadSnapshot()
-        val feedPlan = planPersonalHomeFeed(snapshot, heroLimit = heroLimit, sectionLimit = sectionLimit)
-        return HomePrimaryFeedLoadResult(
-            heroResult =
-                HomeHeroLoadResult(
-                    items =
-                        feedPlan.heroResult.items.mapNotNull { hero ->
-                            HomeHeroItem(
-                                id = hero.mediaKey,
-                                title = hero.title,
-                                description = hero.description,
-                                rating = hero.rating,
-                                year = hero.year,
-                                genres = hero.genres,
-                                backdropUrl = hero.backdropUrl,
-                                addonId = hero.addonId,
-                                type = hero.type,
-                            )
-                        },
-                    statusMessage = feedPlan.heroResult.statusMessage,
-                ),
-            sections =
-                feedPlan.sections.map { section ->
-                    val previewItems =
-                        snapshot.lists
-                            .firstOrNull { it.catalogId == section.catalogId }
-                            ?.items
-                            ?.take(PREVIEW_ITEM_LIMIT)
-                            .orEmpty()
-                            .mapNotNull { item -> item.toCatalogItem() }
-                    CatalogSectionRef(
-                        catalogId = section.catalogId,
-                        source = section.source,
-                        presentation = section.presentation,
-                        layout = section.layout.orEmpty(),
-                        variantKey = section.variantKey,
-                        name = section.name,
-                        heading = section.heading,
-                        title = section.title,
-                        subtitle = section.subtitle,
-                        previewItems = previewItems,
-                    )
-                },
-            sectionsStatusMessage = feedPlan.sectionsStatusMessage,
-        )
+        return snapshot.toPrimaryHomeFeedLoadResult(heroLimit = heroLimit, sectionLimit = sectionLimit)
+    }
+
+    suspend fun loadCachedPrimaryHomeFeed(
+        heroLimit: Int = 10,
+        sectionLimit: Int = Int.MAX_VALUE,
+    ): HomePrimaryFeedLoadResult? {
+        val backendContext = getBackendContext()
+        val snapshot = readCachedSnapshot(profileId = backendContext?.profileId, maxAgeMs = RECOMMENDATION_CACHE_MAX_AGE_MS)
+            ?: return null
+        return snapshot.toPrimaryHomeFeedLoadResult(heroLimit = heroLimit, sectionLimit = sectionLimit)
     }
 
     suspend fun listDiscoverCatalogs(
@@ -199,7 +177,28 @@ class RecommendationCatalogService internal constructor(
                 ?: emptySnapshot("Sign in and select a profile to load recommendations.")
         }
 
-        return runCatching {
+        val requestKey = cacheKey(backendContext.profileId)
+        val deferred = inFlightMutex.withLock {
+            inFlightSnapshots[requestKey] ?: serviceScope.async {
+                loadSnapshotUncached(backendContext)
+            }.also { created ->
+                inFlightSnapshots[requestKey] = created
+            }
+        }
+
+        return try {
+            deferred.await()
+        } finally {
+            inFlightMutex.withLock {
+                if (inFlightSnapshots[requestKey] === deferred) {
+                    inFlightSnapshots.remove(requestKey)
+                }
+            }
+        }
+    }
+
+    private suspend fun loadSnapshotUncached(backendContext: BackendContext): HomeCatalogSnapshot {
+        return try {
             val response = backendClient.getRecommendations(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
@@ -207,7 +206,8 @@ class RecommendationCatalogService internal constructor(
             val snapshot = response?.toSnapshot() ?: emptySnapshot("No recommendations available right now.")
             writeCachedSnapshot(backendContext.profileId, snapshot)
             snapshot
-        }.getOrElse { error ->
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
             readCachedSnapshot(profileId = backendContext.profileId, maxAgeMs = RECOMMENDATION_CACHE_MAX_AGE_MS)
                 ?: emptySnapshot(error.message ?: "Failed to load recommendations.")
         }
@@ -217,7 +217,7 @@ class RecommendationCatalogService internal constructor(
         return backendContextResolver.resolve()
     }
 
-    private fun writeCachedSnapshot(profileId: String, snapshot: HomeCatalogSnapshot) {
+    private suspend fun writeCachedSnapshot(profileId: String, snapshot: HomeCatalogSnapshot) {
         diskCacheStore.write(
             cacheKey = cacheKey(profileId),
             payload = snapshot.toCachePayload(),
@@ -228,7 +228,7 @@ class RecommendationCatalogService internal constructor(
         )
     }
 
-    private fun readCachedSnapshot(profileId: String?, maxAgeMs: Long?): HomeCatalogSnapshot? {
+    private suspend fun readCachedSnapshot(profileId: String?, maxAgeMs: Long?): HomeCatalogSnapshot? {
         val cacheKeys = buildList {
             profileId?.trim()?.takeIf { it.isNotBlank() }?.let { add(cacheKey(it)) }
             add(GLOBAL_CACHE_KEY)
@@ -537,5 +537,55 @@ class RecommendationCatalogService internal constructor(
             page?.let { add("page=$it") }
         }.joinToString("&")
         return if (suffix.isBlank()) base else "$base?$suffix"
+    }
+
+    private fun HomeCatalogSnapshot.toPrimaryHomeFeedLoadResult(
+        heroLimit: Int,
+        sectionLimit: Int,
+    ): HomePrimaryFeedLoadResult {
+        val feedPlan = planPersonalHomeFeed(this, heroLimit = heroLimit, sectionLimit = sectionLimit)
+        return HomePrimaryFeedLoadResult(
+            heroResult =
+                HomeHeroLoadResult(
+                    items =
+                        feedPlan.heroResult.items.mapNotNull { hero ->
+                            HomeHeroItem(
+                                id = hero.mediaKey,
+                                title = hero.title,
+                                description = hero.description,
+                                rating = hero.rating,
+                                year = hero.year,
+                                genres = hero.genres,
+                                backdropUrl = hero.backdropUrl,
+                                addonId = hero.addonId,
+                                type = hero.type,
+                            )
+                        },
+                    statusMessage = feedPlan.heroResult.statusMessage,
+                ),
+            sections =
+                feedPlan.sections.map { section ->
+                    val previewItems =
+                        this.lists
+                            .firstOrNull { it.catalogId == section.catalogId }
+                            ?.items
+                            ?.take(PREVIEW_ITEM_LIMIT)
+                            .orEmpty()
+                            .mapNotNull { item -> item.toCatalogItem() }
+                    CatalogSectionRef(
+                        catalogId = section.catalogId,
+                        source = section.source,
+                        presentation = section.presentation,
+                        layout = section.layout.orEmpty(),
+                        variantKey = section.variantKey,
+                        name = section.name,
+                        heading = section.heading,
+                        title = section.title,
+                        subtitle = section.subtitle,
+                        previewItems = previewItems,
+                    )
+                },
+            sectionsStatusMessage = feedPlan.sectionsStatusMessage,
+        )
     }
 }
