@@ -74,6 +74,7 @@ private fun normalizeWatchItem(payload: Map<String, Any?>, stateKey: String): Me
     val media = payload.objectValue("mediaItem") ?: return null
     val normalizedMedia = normalizeMediaItem(media) ?: return null
     val origins = payload.stringList("origins") ?: return null
+    if (!payload.hasRequiredState(stateKey)) return null
     return normalizedMedia.copy(
         itemId = payload.stringValue("id"),
         watchedAt = payload.stringValue(stateKey).takeIf { stateKey == "watchedAt" },
@@ -81,13 +82,19 @@ private fun normalizeWatchItem(payload: Map<String, Any?>, stateKey: String): Me
     )
 }
 
+private fun Map<String, Any?>.hasRequiredState(stateKey: String): Boolean {
+    return when (stateKey) {
+        "ratedAt" -> objectValue("rating")?.stringValue(stateKey) != null
+        else -> stringValue(stateKey) != null
+    }
+}
+
 private fun normalizeLibraryItem(payload: Map<String, Any?>): MediaStateNormalized? {
     val itemId = payload.stringValue("id") ?: return null
     val media = payload.objectValue("mediaItem") ?: return null
     val normalizedMedia = normalizeMediaItem(media) ?: return null
-    val state = payload.objectValue("state") ?: return null
     val origins = payload.stringList("origins") ?: return null
-    if (state.isEmpty()) return null
+    if (!payload.containsKey("state")) return null
     return normalizedMedia.copy(itemId = itemId, origins = origins)
 }
 
