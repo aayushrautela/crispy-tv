@@ -459,7 +459,7 @@ internal fun defaultWideRailSection(
     )
 }
 
-private fun HomeWideRailSectionUi.isVisible(): Boolean {
+internal fun HomeWideRailSectionUi.isVisible(): Boolean {
     return isLoading || items.isNotEmpty() || statusMessage.isNotBlank()
 }
 
@@ -563,8 +563,8 @@ class ContinueWatchingSuppressionStore(context: Context) {
     }
 }
 
-private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-  return entry.titleMediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
+internal fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
+    return entry.titleMediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
 }
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {

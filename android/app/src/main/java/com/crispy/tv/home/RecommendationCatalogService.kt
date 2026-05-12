@@ -233,11 +233,11 @@ class RecommendationCatalogService internal constructor(
             profileId?.trim()?.takeIf { it.isNotBlank() }?.let { add(cacheKey(it)) }
             add(GLOBAL_CACHE_KEY)
         }
-        return cacheKeys
-            .asSequence()
-            .mapNotNull { cacheKey -> diskCacheStore.read(cacheKey, maxAgeMs = maxAgeMs)?.payload }
-            .mapNotNull { payload -> runCatching { payload.toSnapshot() }.getOrNull() }
-            .firstOrNull()
+        for (cacheKey in cacheKeys) {
+            val payload = diskCacheStore.read(cacheKey, maxAgeMs = maxAgeMs)?.payload ?: continue
+            return runCatching { payload.toSnapshot() }.getOrNull() ?: continue
+        }
+        return null
     }
 
     private fun cacheKey(profileId: String): String {
