@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.content
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -43,6 +42,6 @@ private fun kotlinx.serialization.json.JsonElement.toKotlinValue(): Any? {
         is kotlinx.serialization.json.JsonNull -> null
         is kotlinx.serialization.json.JsonObject -> toKotlinMap()
         is kotlinx.serialization.json.JsonArray -> map { element -> element.toKotlinValue() }
-        is kotlinx.serialization.json.JsonPrimitive -> jsonPrimitive.booleanOrNull ?: jsonPrimitive.intOrNull ?: jsonPrimitive.doubleOrNull ?: content
+        is kotlinx.serialization.json.JsonPrimitive -> jsonPrimitive.booleanOrNull ?: jsonPrimitive.intOrNull ?: jsonPrimitive.doubleOrNull ?: jsonPrimitive.content
     }
 }

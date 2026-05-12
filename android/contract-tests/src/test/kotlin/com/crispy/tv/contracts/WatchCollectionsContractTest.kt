@@ -40,6 +40,6 @@ private fun kotlinx.serialization.json.JsonElement.toKotlinValue(): Any? {
         is kotlinx.serialization.json.JsonNull -> null
         is kotlinx.serialization.json.JsonObject -> toKotlinMap()
         is kotlinx.serialization.json.JsonArray -> map { element -> element.toKotlinValue() }
-        is kotlinx.serialization.json.JsonPrimitive -> jsonPrimitive.booleanOrNull ?: jsonPrimitive.intOrNull ?: jsonPrimitive.doubleOrNull ?: content
+        is kotlinx.serialization.json.JsonPrimitive -> jsonPrimitive.booleanOrNull ?: jsonPrimitive.intOrNull ?: jsonPrimitive.doubleOrNull ?: jsonPrimitive.content
     }
 }
