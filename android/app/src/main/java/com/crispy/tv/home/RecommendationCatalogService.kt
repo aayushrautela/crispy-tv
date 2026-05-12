@@ -268,7 +268,7 @@ class RecommendationCatalogService internal constructor(
         val catalogItems = when (layout.trim().lowercase(Locale.US)) {
             "hero" -> heroItems.mapNotNull { item -> item.toCatalogItem() }
             "collection" -> collectionItems.mapNotNull { item -> item.toCatalogItem() }
-            else -> recommendationItems.mapNotNull { item -> item.media.toCatalogItem() }
+            else -> recommendationItems.mapNotNull { item -> item.mediaItem.toCatalogItem() }
         }
         if (catalogItems.isEmpty()) return null
         val meta = recommendationItems.firstOrNull()?.payload.orEmpty()
@@ -287,10 +287,10 @@ class RecommendationCatalogService internal constructor(
         )
     }
 
-    private fun CrispyBackendClient.RuntimeMediaCard.toCatalogItem(): HomeCatalogItem? {
+    private fun CrispyBackendClient.MediaItem.toCatalogItem(): HomeCatalogItem? {
         val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
         val normalizedTitle = title.trim().ifBlank { return null }
-        val normalizedType = normalizedCatalogType()
+        val normalizedType = mediaType.toCatalogType()
         return HomeCatalogItem(
             mediaKey = normalizedMediaKey,
             title = normalizedTitle,
@@ -300,7 +300,7 @@ class RecommendationCatalogService internal constructor(
             type = normalizedType,
             rating = formatRatingOutOfTen(rating?.toString()),
             year = releaseYear?.toString(),
-            description = subtitle,
+            description = subtitle ?: episodeTitle ?: overview,
         )
     }
 
@@ -351,15 +351,6 @@ class RecommendationCatalogService internal constructor(
             year = year,
             description = description,
         )
-    }
-
-    private fun CrispyBackendClient.RuntimeMediaCard.normalizedCatalogType(): String {
-        val normalizedMediaType = mediaType.trim().lowercase(Locale.US)
-        return when (normalizedMediaType) {
-            "anime" -> "anime"
-            "episode", "show", "tv", "series" -> "series"
-            else -> "movie"
-        }
     }
 
     private fun String.toCatalogType(): String {

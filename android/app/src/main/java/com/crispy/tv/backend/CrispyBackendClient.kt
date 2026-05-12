@@ -75,25 +75,69 @@ class CrispyBackendClient(
         val providerStates: List<ProviderState>,
     )
 
-    data class BackendMetadataItem(
+    data class MediaExternalIds(
+        val tmdb: Int?,
+        val imdb: String?,
+        val tvdb: Int?,
+    )
+
+    data class MediaItemParent(
         val mediaKey: String,
+        val mediaType: String,
         val title: String,
-        val summary: String?,
+    )
+
+    data class MediaItem(
+        val mediaKey: String,
+        val mediaType: String,
+        val title: String,
+        val originalTitle: String?,
+        val subtitle: String?,
+        val overview: String?,
         val posterUrl: String?,
         val backdropUrl: String?,
         val logoUrl: String?,
-        val mediaType: String,
-        val rating: String?,
-        val year: String?,
-        val genre: String?,
+        val stillUrl: String?,
+        val releaseDate: String?,
+        val releaseYear: Int?,
+        val rating: Double?,
+        val genres: List<String>,
+        val runtimeMinutes: Int?,
+        val status: String?,
+        val certification: String?,
+        val externalIds: MediaExternalIds,
+        val parent: MediaItemParent?,
+        val showTmdbId: Int?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+        val absoluteEpisodeNumber: Int?,
+        val episodeTitle: String?,
+        val airDate: String?,
+    )
+
+    data class MediaPresentationHint(
+        val preferredSize: String?,
+        val sectionId: String?,
+        val sectionTitle: String?,
+    )
+
+    data class SurfaceContext(
+        val values: Map<String, Any?>,
+    )
+
+    data class SearchResultItem(
+        val kind: String,
+        val mediaItem: MediaItem,
+        val context: SurfaceContext,
+        val presentation: MediaPresentationHint?,
     )
 
     data class SearchResultsResponse(
         val query: String,
-        val all: List<BackendMetadataItem>,
-        val movies: List<BackendMetadataItem>,
-        val series: List<BackendMetadataItem>,
-        val anime: List<BackendMetadataItem>,
+        val all: List<SearchResultItem>,
+        val movies: List<SearchResultItem>,
+        val series: List<SearchResultItem>,
+        val anime: List<SearchResultItem>,
     )
 
     data class AiInsightsCard(
@@ -163,6 +207,7 @@ data class PlaybackEventInput(
     data class MetadataExternalIds(
         val tmdb: Int?,
         val imdb: String?,
+        val tvdb: Int?,
     )
 
     data class MetadataEpisodePreview(
@@ -434,26 +479,11 @@ data class PlaybackEventInput(
         val ratedAt: String,
     )
 
-    data class RuntimeMediaCard(
-        val mediaKey: String,
-        val mediaType: String,
-        val title: String,
-        val posterUrl: String,
-        val backdropUrl: String?,
-        val subtitle: String?,
-        val releaseYear: Int?,
-        val rating: Double?,
-        val genre: String?,
-        val seasonNumber: Int?,
-        val episodeNumber: Int?,
-        val episodeTitle: String?,
-        val airDate: String?,
-        val runtimeMinutes: Int?,
-    )
-
     data class ContinueWatchingItem(
         val id: String,
-        val media: RuntimeMediaCard,
+        val mediaItem: MediaItem,
+        val context: SurfaceContext,
+        val presentation: MediaPresentationHint?,
         val progress: WatchProgressView?,
         val lastActivityAt: String,
         val origins: List<String>,
@@ -462,7 +492,9 @@ data class PlaybackEventInput(
 
     data class WatchedItem(
         val id: String?,
-        val media: RuntimeMediaCard,
+        val mediaItem: MediaItem,
+        val context: SurfaceContext,
+        val presentation: MediaPresentationHint?,
         val watchedAt: String?,
         val lastActivityAt: String?,
         val origins: List<String>,
@@ -470,14 +502,18 @@ data class PlaybackEventInput(
 
     data class WatchlistItem(
         val id: String?,
-        val media: RuntimeMediaCard,
+        val mediaItem: MediaItem,
+        val context: SurfaceContext,
+        val presentation: MediaPresentationHint?,
         val addedAt: String?,
         val origins: List<String>,
     )
 
     data class RatingItem(
         val id: String?,
-        val media: RuntimeMediaCard,
+        val mediaItem: MediaItem,
+        val context: SurfaceContext,
+        val presentation: MediaPresentationHint?,
         val rating: RatingStateView,
         val origins: List<String>,
     )
@@ -497,7 +533,10 @@ data class PlaybackEventInput(
     )
 
     data class WatchStateResponse(
-        val media: MetadataView,
+        val kind: String,
+        val mediaItem: MediaItem,
+        val context: SurfaceContext,
+        val presentation: MediaPresentationHint?,
         val progress: WatchProgressView?,
         val continueWatching: ContinueWatchingStateView?,
         val watched: WatchedStateView?,
@@ -520,10 +559,19 @@ data class PlaybackEventInput(
         val items: List<WatchStateResponse>,
     )
 
+    data class CalendarContext(
+        val bucket: String,
+        val airDate: String?,
+        val watched: Boolean,
+        val relatedShow: MediaItem,
+    )
+
     data class CalendarItem(
         val bucket: String,
-        val media: RuntimeMediaCard,
-        val relatedShow: RuntimeMediaCard,
+        val kind: String,
+        val mediaItem: MediaItem,
+        val context: CalendarContext,
+        val presentation: MediaPresentationHint?,
         val airDate: String?,
         val watched: Boolean,
     )
@@ -536,8 +584,19 @@ data class PlaybackEventInput(
         val items: List<CalendarItem>,
     )
 
+    data class RecommendationItemContext(
+        val reason: String?,
+        val reasonCodes: List<String>,
+        val score: Double?,
+        val rank: Double?,
+        val payload: Map<String, Any?>,
+    )
+
     data class RecommendationItem(
-        val media: RuntimeMediaCard,
+        val kind: String,
+        val mediaItem: MediaItem,
+        val context: RecommendationItemContext,
+        val presentation: MediaPresentationHint?,
         val reason: String?,
         val score: Double?,
         val rank: Double,

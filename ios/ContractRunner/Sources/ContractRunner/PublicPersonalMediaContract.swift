@@ -1,91 +1,120 @@
 import Foundation
 
-public struct ContractRegularCard: Equatable {
-    public let mediaType: String
-    public let mediaKey: String
-    public let provider: String?
-    public let providerId: String?
-    public let title: String
-    public let posterUrl: String
-    public let releaseYear: Int?
-    public let rating: Double?
-    public let genre: String?
-    public let subtitle: String?
+public struct ContractMediaExternalIds: Equatable {
+    public let tmdb: Int?
+    public let imdb: String?
+    public let tvdb: Int?
 
-    public init(
-        mediaType: String,
-        mediaKey: String,
-        provider: String?,
-        providerId: String?,
-        title: String,
-        posterUrl: String,
-        releaseYear: Int?,
-        rating: Double?,
-        genre: String?,
-        subtitle: String?
-    ) {
-        self.mediaType = mediaType
-        self.mediaKey = mediaKey
-        self.provider = provider
-        self.providerId = providerId
-        self.title = title
-        self.posterUrl = posterUrl
-        self.releaseYear = releaseYear
-        self.rating = rating
-        self.genre = genre
-        self.subtitle = subtitle
+    public init(tmdb: Int?, imdb: String?, tvdb: Int?) {
+        self.tmdb = tmdb
+        self.imdb = imdb
+        self.tvdb = tvdb
     }
 }
 
-public struct ContractLandscapeCard: Equatable {
-    public let mediaType: String
+public struct ContractMediaItemParent: Equatable {
     public let mediaKey: String
-    public let provider: String?
-    public let providerId: String?
+    public let mediaType: String
     public let title: String
-    public let posterUrl: String
-    public let backdropUrl: String
+
+    public init(mediaKey: String, mediaType: String, title: String) {
+        self.mediaKey = mediaKey
+        self.mediaType = mediaType
+        self.title = title
+    }
+}
+
+public struct ContractMediaItem: Equatable {
+    public let mediaKey: String
+    public let mediaType: String
+    public let title: String
+    public let originalTitle: String?
+    public let subtitle: String?
+    public let overview: String?
+    public let posterUrl: String?
+    public let backdropUrl: String?
+    public let logoUrl: String?
+    public let stillUrl: String?
+    public let releaseDate: String?
     public let releaseYear: Int?
     public let rating: Double?
-    public let genre: String?
+    public let genres: [String]
+    public let runtimeMinutes: Int?
+    public let status: String?
+    public let certification: String?
+    public let externalIds: ContractMediaExternalIds
+    public let parent: ContractMediaItemParent?
+    public let showTmdbId: Int?
     public let seasonNumber: Int?
     public let episodeNumber: Int?
+    public let absoluteEpisodeNumber: Int?
     public let episodeTitle: String?
     public let airDate: String?
-    public let runtimeMinutes: Int?
 
     public init(
-        mediaType: String,
         mediaKey: String,
-        provider: String?,
-        providerId: String?,
+        mediaType: String,
         title: String,
-        posterUrl: String,
-        backdropUrl: String,
-        releaseYear: Int?,
-        rating: Double?,
-        genre: String?,
-        seasonNumber: Int?,
-        episodeNumber: Int?,
-        episodeTitle: String?,
-        airDate: String?,
-        runtimeMinutes: Int?
+        originalTitle: String? = nil,
+        subtitle: String? = nil,
+        overview: String? = nil,
+        posterUrl: String? = nil,
+        backdropUrl: String? = nil,
+        logoUrl: String? = nil,
+        stillUrl: String? = nil,
+        releaseDate: String? = nil,
+        releaseYear: Int? = nil,
+        rating: Double? = nil,
+        genres: [String] = [],
+        runtimeMinutes: Int? = nil,
+        status: String? = nil,
+        certification: String? = nil,
+        externalIds: ContractMediaExternalIds,
+        parent: ContractMediaItemParent? = nil,
+        showTmdbId: Int? = nil,
+        seasonNumber: Int? = nil,
+        episodeNumber: Int? = nil,
+        absoluteEpisodeNumber: Int? = nil,
+        episodeTitle: String? = nil,
+        airDate: String? = nil
     ) {
-        self.mediaType = mediaType
         self.mediaKey = mediaKey
-        self.provider = provider
-        self.providerId = providerId
+        self.mediaType = mediaType
         self.title = title
+        self.originalTitle = originalTitle
+        self.subtitle = subtitle
+        self.overview = overview
         self.posterUrl = posterUrl
         self.backdropUrl = backdropUrl
+        self.logoUrl = logoUrl
+        self.stillUrl = stillUrl
+        self.releaseDate = releaseDate
         self.releaseYear = releaseYear
         self.rating = rating
-        self.genre = genre
+        self.genres = genres
+        self.runtimeMinutes = runtimeMinutes
+        self.status = status
+        self.certification = certification
+        self.externalIds = externalIds
+        self.parent = parent
+        self.showTmdbId = showTmdbId
         self.seasonNumber = seasonNumber
         self.episodeNumber = episodeNumber
+        self.absoluteEpisodeNumber = absoluteEpisodeNumber
         self.episodeTitle = episodeTitle
         self.airDate = airDate
-        self.runtimeMinutes = runtimeMinutes
+    }
+}
+
+public struct ContractMediaPresentationHint: Equatable {
+    public let preferredSize: String?
+    public let sectionId: String?
+    public let sectionTitle: String?
+
+    public init(preferredSize: String?, sectionId: String?, sectionTitle: String?) {
+        self.preferredSize = preferredSize
+        self.sectionId = sectionId
+        self.sectionTitle = sectionTitle
     }
 }
 
@@ -115,7 +144,9 @@ public struct ContractPageInfo: Equatable {
 
 public struct ContractContinueWatchingItem: Equatable {
     public let id: String
-    public let media: ContractLandscapeCard
+    public let mediaItem: ContractMediaItem
+    public let context: [String: String]
+    public let presentation: ContractMediaPresentationHint?
     public let progress: ContractWatchProgress?
     public let lastActivityAt: String
     public let origins: [String]
@@ -124,14 +155,19 @@ public struct ContractContinueWatchingItem: Equatable {
 
 public struct ContractHistoryItem: Equatable {
     public let id: String
-    public let media: ContractRegularCard
+    public let mediaItem: ContractMediaItem
+    public let context: [String: String]
+    public let presentation: ContractMediaPresentationHint?
     public let watchedAt: String
+    public let lastActivityAt: String?
     public let origins: [String]
 }
 
 public struct ContractWatchlistItem: Equatable {
     public let id: String
-    public let media: ContractRegularCard
+    public let mediaItem: ContractMediaItem
+    public let context: [String: String]
+    public let presentation: ContractMediaPresentationHint?
     public let addedAt: String
     public let origins: [String]
 }
@@ -143,7 +179,9 @@ public struct ContractRatingState: Equatable {
 
 public struct ContractRatingItem: Equatable {
     public let id: String
-    public let media: ContractRegularCard
+    public let mediaItem: ContractMediaItem
+    public let context: [String: String]
+    public let presentation: ContractMediaPresentationHint?
     public let rating: ContractRatingState
     public let origins: [String]
 }
@@ -180,10 +218,26 @@ public struct WatchCollectionContractEnvelope: Equatable {
     }
 }
 
+public struct CalendarContractContext: Equatable {
+    public let bucket: String?
+    public let airDate: String?
+    public let watched: Bool?
+    public let relatedShow: ContractMediaItem?
+
+    public init(bucket: String?, airDate: String?, watched: Bool?, relatedShow: ContractMediaItem?) {
+        self.bucket = bucket
+        self.airDate = airDate
+        self.watched = watched
+        self.relatedShow = relatedShow
+    }
+}
+
 public struct CalendarContractItem: Equatable {
     public let bucket: String
-    public let media: ContractLandscapeCard
-    public let relatedShow: ContractRegularCard
+    public let kind: String
+    public let mediaItem: ContractMediaItem
+    public let context: CalendarContractContext
+    public let presentation: ContractMediaPresentationHint?
     public let airDate: String?
     public let watched: Bool
 }
@@ -306,10 +360,12 @@ public func normalizeCalendarEnvelope(payload: [String: Any], route: String) -> 
 }
 
 private func parseContinueWatchingItem(_ payload: [String: Any]) -> ContractContinueWatchingItem? {
-    guard hasExactKeys(payload, expected: ["id", "media", "progress", "lastActivityAt", "origins", "dismissible"]),
+    guard hasExactKeys(payload, expected: ["id", "kind", "mediaItem", "context", "presentation", "progress", "lastActivityAt", "origins", "dismissible"]),
           let id = requiredString(payload, "id"),
-          let mediaObject = payload["media"] as? [String: Any],
-          let media = parseLandscapeCard(mediaObject),
+          let mediaItemObject = payload["mediaItem"] as? [String: Any],
+          let mediaItem = parseMediaItem(mediaItemObject),
+          let contextObject = payload["context"] as? [String: Any],
+          let context = stringifyContext(contextObject),
           let lastActivityAt = requiredString(payload, "lastActivityAt"),
           let originsRaw = payload["origins"] as? [Any],
           let origins = stringArray(originsRaw, key: "origins"),
@@ -320,9 +376,12 @@ private func parseContinueWatchingItem(_ payload: [String: Any]) -> ContractCont
     if payload.keys.contains("progress") && payload["progress"] is NSNull == false && progress == nil {
         return nil
     }
+    let presentation = optionalObject(payload, "presentation").flatMap(parseMediaPresentationHint)
     return ContractContinueWatchingItem(
         id: id,
-        media: media,
+        mediaItem: mediaItem,
+        context: context,
+        presentation: presentation,
         progress: progress,
         lastActivityAt: lastActivityAt,
         origins: origins,
@@ -331,43 +390,74 @@ private func parseContinueWatchingItem(_ payload: [String: Any]) -> ContractCont
 }
 
 private func parseHistoryItem(_ payload: [String: Any]) -> ContractHistoryItem? {
-    guard hasExactKeys(payload, expected: ["id", "media", "watchedAt", "origins"]),
+    guard hasExactKeys(payload, expected: ["id", "kind", "mediaItem", "context", "presentation", "watchedAt", "origins"]),
           let id = requiredString(payload, "id"),
-          let mediaObject = payload["media"] as? [String: Any],
-          let media = parseRegularCard(mediaObject),
+          let mediaItemObject = payload["mediaItem"] as? [String: Any],
+          let mediaItem = parseMediaItem(mediaItemObject),
+          let contextObject = payload["context"] as? [String: Any],
+          let context = stringifyContext(contextObject),
           let watchedAt = requiredString(payload, "watchedAt"),
           let originsRaw = payload["origins"] as? [Any],
           let origins = stringArray(originsRaw, key: "origins") else {
         return nil
     }
-    return ContractHistoryItem(id: id, media: media, watchedAt: watchedAt, origins: origins)
+    let presentation = optionalObject(payload, "presentation").flatMap(parseMediaPresentationHint)
+    return ContractHistoryItem(
+        id: id,
+        mediaItem: mediaItem,
+        context: context,
+        presentation: presentation,
+        watchedAt: watchedAt,
+        lastActivityAt: nil,
+        origins: origins
+    )
 }
 
 private func parseWatchlistItem(_ payload: [String: Any]) -> ContractWatchlistItem? {
-    guard hasExactKeys(payload, expected: ["id", "media", "addedAt", "origins"]),
+    guard hasExactKeys(payload, expected: ["id", "kind", "mediaItem", "context", "presentation", "addedAt", "origins"]),
           let id = requiredString(payload, "id"),
-          let mediaObject = payload["media"] as? [String: Any],
-          let media = parseRegularCard(mediaObject),
+          let mediaItemObject = payload["mediaItem"] as? [String: Any],
+          let mediaItem = parseMediaItem(mediaItemObject),
+          let contextObject = payload["context"] as? [String: Any],
+          let context = stringifyContext(contextObject),
           let addedAt = requiredString(payload, "addedAt"),
           let originsRaw = payload["origins"] as? [Any],
           let origins = stringArray(originsRaw, key: "origins") else {
         return nil
     }
-    return ContractWatchlistItem(id: id, media: media, addedAt: addedAt, origins: origins)
+    let presentation = optionalObject(payload, "presentation").flatMap(parseMediaPresentationHint)
+    return ContractWatchlistItem(
+        id: id,
+        mediaItem: mediaItem,
+        context: context,
+        presentation: presentation,
+        addedAt: addedAt,
+        origins: origins
+    )
 }
 
 private func parseRatingItem(_ payload: [String: Any]) -> ContractRatingItem? {
-    guard hasExactKeys(payload, expected: ["id", "media", "rating", "origins"]),
+    guard hasExactKeys(payload, expected: ["id", "kind", "mediaItem", "context", "presentation", "rating", "origins"]),
           let id = requiredString(payload, "id"),
-          let mediaObject = payload["media"] as? [String: Any],
-          let media = parseRegularCard(mediaObject),
+          let mediaItemObject = payload["mediaItem"] as? [String: Any],
+          let mediaItem = parseMediaItem(mediaItemObject),
+          let contextObject = payload["context"] as? [String: Any],
+          let context = stringifyContext(contextObject),
           let ratingObject = payload["rating"] as? [String: Any],
           let rating = parseRatingState(ratingObject),
           let originsRaw = payload["origins"] as? [Any],
           let origins = stringArray(originsRaw, key: "origins") else {
         return nil
     }
-    return ContractRatingItem(id: id, media: media, rating: rating, origins: origins)
+    let presentation = optionalObject(payload, "presentation").flatMap(parseMediaPresentationHint)
+    return ContractRatingItem(
+        id: id,
+        mediaItem: mediaItem,
+        context: context,
+        presentation: presentation,
+        rating: rating,
+        origins: origins
+    )
 }
 
 private func parseRatingState(_ payload: [String: Any]) -> ContractRatingState? {
@@ -401,71 +491,109 @@ private func parsePageInfo(_ payload: [String: Any]) -> ContractPageInfo? {
 }
 
 private func parseCalendarItem(_ payload: [String: Any]) -> CalendarContractItem? {
-    guard hasExactKeys(payload, expected: ["bucket", "media", "relatedShow", "airDate", "watched"]),
+    guard hasExactKeys(payload, expected: ["bucket", "kind", "mediaItem", "context", "presentation", "airDate", "watched"]),
           let bucket = requiredString(payload, "bucket"),
           ["up_next", "this_week", "upcoming", "recently_released", "no_scheduled"].contains(bucket),
-          let mediaObject = payload["media"] as? [String: Any],
-          let media = parseLandscapeCard(mediaObject),
-          let relatedShowObject = payload["relatedShow"] as? [String: Any],
-          let relatedShow = parseRegularCard(relatedShowObject),
+          let kind = requiredString(payload, "kind"),
+          let mediaItemObject = payload["mediaItem"] as? [String: Any],
+          let mediaItem = parseMediaItem(mediaItemObject),
+          let contextObject = payload["context"] as? [String: Any],
+          let context = stringifyContext(contextObject),
           let watched = payload["watched"] as? Bool else {
         return nil
     }
-    return CalendarContractItem(bucket: bucket, media: media, relatedShow: relatedShow, airDate: optionalString(payload, "airDate"), watched: watched)
-}
-
-private func parseRegularCard(_ payload: [String: Any]) -> ContractRegularCard? {
-    guard hasExactKeys(payload, expected: ["mediaType", "mediaKey", "provider", "providerId", "title", "posterUrl", "releaseYear", "rating", "genre", "subtitle"]),
-          let mediaType = requiredString(payload, "mediaType"),
-          let mediaKey = requiredString(payload, "mediaKey"),
-          let provider = requiredString(payload, "provider"),
-          let providerId = requiredString(payload, "providerId"),
-          let title = requiredString(payload, "title"),
-          let posterUrl = requiredString(payload, "posterUrl") else {
-        return nil
-    }
-    return ContractRegularCard(
-        mediaType: mediaType,
-        mediaKey: mediaKey,
-        provider: provider,
-        providerId: providerId,
-        title: title,
-        posterUrl: posterUrl,
-        releaseYear: nullableInt(payload, "releaseYear"),
-        rating: nullableDouble(payload, "rating"),
-        genre: optionalString(payload, "genre"),
-        subtitle: optionalString(payload, "subtitle")
+    let presentation = optionalObject(payload, "presentation").flatMap(parseMediaPresentationHint)
+    let context = CalendarContractContext(
+        bucket: bucket,
+        airDate: optionalString(payload, "airDate"),
+        watched: watched,
+        relatedShow: optionalObject(contextObject, "relatedShow").flatMap(parseMediaItem)
+    )
+    return CalendarContractItem(
+        bucket: bucket,
+        kind: kind,
+        mediaItem: mediaItem,
+        context: context,
+        presentation: presentation,
+        airDate: optionalString(payload, "airDate"),
+        watched: watched
     )
 }
 
-private func parseLandscapeCard(_ payload: [String: Any]) -> ContractLandscapeCard? {
-    guard hasExactKeys(payload, expected: ["mediaType", "mediaKey", "provider", "providerId", "title", "posterUrl", "backdropUrl", "releaseYear", "rating", "genre", "seasonNumber", "episodeNumber", "episodeTitle", "airDate", "runtimeMinutes"]),
+private func parseMediaItem(_ payload: [String: Any]) -> ContractMediaItem? {
+    guard let mediaKey = requiredString(payload, "mediaKey"),
           let mediaType = requiredString(payload, "mediaType"),
-          let mediaKey = requiredString(payload, "mediaKey"),
-          let provider = requiredString(payload, "provider"),
-          let providerId = requiredString(payload, "providerId"),
-          let title = requiredString(payload, "title"),
-          let posterUrl = requiredString(payload, "posterUrl"),
-          let backdropUrl = requiredString(payload, "backdropUrl") else {
+          let title = requiredString(payload, "title") else {
         return nil
     }
-    return ContractLandscapeCard(
-        mediaType: mediaType,
+
+    let externalIds = ContractMediaExternalIds(
+        tmdb: nullableInt(payload, "tmdb") ?? nullableInt(payload, "externalIds", "tmdb"),
+        imdb: optionalString(payload, "imdb") ?? optionalString(payload, "externalIds", "imdb"),
+        tvdb: nullableInt(payload, "tvdb") ?? nullableInt(payload, "externalIds", "tvdb")
+    )
+
+    let parent: ContractMediaItemParent?
+    if let parentObject = payload["parent"] as? [String: Any],
+       let parentMediaKey = requiredString(parentObject, "mediaKey"),
+       let parentMediaType = requiredString(parentObject, "mediaType"),
+       let parentTitle = requiredString(parentObject, "title") {
+        parent = ContractMediaItemParent(
+            mediaKey: parentMediaKey,
+            mediaType: parentMediaType,
+            title: parentTitle
+        )
+    } else {
+        parent = nil
+    }
+
+    return ContractMediaItem(
         mediaKey: mediaKey,
-        provider: provider,
-        providerId: providerId,
+        mediaType: mediaType,
         title: title,
-        posterUrl: posterUrl,
-        backdropUrl: backdropUrl,
+        originalTitle: optionalString(payload, "originalTitle"),
+        subtitle: optionalString(payload, "subtitle"),
+        overview: optionalString(payload, "overview"),
+        posterUrl: optionalString(payload, "posterUrl"),
+        backdropUrl: optionalString(payload, "backdropUrl"),
+        logoUrl: optionalString(payload, "logoUrl"),
+        stillUrl: optionalString(payload, "stillUrl"),
+        releaseDate: optionalString(payload, "releaseDate"),
         releaseYear: nullableInt(payload, "releaseYear"),
         rating: nullableDouble(payload, "rating"),
-        genre: optionalString(payload, "genre"),
+        genres: stringArray(payload["genres"] as? [Any] ?? [], key: "genres") ?? [],
+        runtimeMinutes: nullableInt(payload, "runtimeMinutes"),
+        status: optionalString(payload, "status"),
+        certification: optionalString(payload, "certification"),
+        externalIds: externalIds,
+        parent: parent,
+        showTmdbId: nullableInt(payload, "showTmdbId"),
         seasonNumber: nullableInt(payload, "seasonNumber"),
         episodeNumber: nullableInt(payload, "episodeNumber"),
+        absoluteEpisodeNumber: nullableInt(payload, "absoluteEpisodeNumber"),
         episodeTitle: optionalString(payload, "episodeTitle"),
-        airDate: optionalString(payload, "airDate"),
-        runtimeMinutes: nullableInt(payload, "runtimeMinutes")
+        airDate: optionalString(payload, "airDate")
     )
+}
+
+private func parseMediaPresentationHint(_ payload: [String: Any]) -> ContractMediaPresentationHint? {
+    return ContractMediaPresentationHint(
+        preferredSize: optionalString(payload, "preferredSize"),
+        sectionId: optionalString(payload, "sectionId"),
+        sectionTitle: optionalString(payload, "sectionTitle")
+    )
+}
+
+private func stringifyContext(_ object: [String: Any]) -> [String: String]? {
+    var output: [String: String] = [:]
+    for (key, value) in object {
+        if value is NSNull {
+            output[key] = ""
+        } else {
+            output[key] = String(describing: value)
+        }
+    }
+    return output
 }
 
 private func hasExactKeys(_ object: [String: Any], expected: Set<String>) -> Bool {
@@ -484,6 +612,13 @@ private func optionalString(_ object: [String: Any], _ key: String) -> String? {
         return nil
     }
     return value as? String
+}
+
+private func optionalString(_ object: [String: Any], _ key1: String, _ key2: String) -> String? {
+    guard let nested = object[key1] as? [String: Any] else {
+        return nil
+    }
+    return optionalString(nested, key2)
 }
 
 private func optionalObject(_ object: [String: Any], _ key: String) -> [String: Any]? {
@@ -513,30 +648,52 @@ private func nullableInt(_ object: [String: Any], _ key: String) -> Int? {
     return intValue(value)
 }
 
+private func nullableInt(_ object: [String: Any], _ key1: String, _ key2: String) -> Int? {
+    guard let nested = object[key1] as? [String: Any] else {
+        return nil
+    }
+    return nullableInt(nested, key2)
+}
+
 private func nullableDouble(_ object: [String: Any], _ key: String) -> Double? {
     guard let value = object[key] else { return nil }
     if value is NSNull { return nil }
     return doubleValue(value)
 }
 
-private func doubleValue(_ value: Any?) -> Double? {
-    if let double = value as? Double { return double }
-    if let int = value as? Int { return Double(int) }
-    if let number = value as? NSNumber { return number.doubleValue }
+private func intValue(_ value: Any) -> Int? {
+    if let int = value as? Int {
+        return int
+    }
+    if let number = value as? NSNumber {
+        return number.intValue
+    }
+    if let string = value as? String {
+        return Int(string.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
     return nil
 }
 
-private func intValue(_ value: Any?) -> Int? {
-    if let int = value as? Int { return int }
-    if let number = value as? NSNumber { return number.intValue }
+private func doubleValue(_ value: Any) -> Double? {
+    if let double = value as? Double {
+        return double
+    }
+    if let number = value as? NSNumber {
+        return number.doubleValue
+    }
+    if let string = value as? String {
+        return Double(string.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
     return nil
 }
 
 private func mapStrict<T>(_ values: [Any], transform: (Any) -> T?) -> [T]? {
-    var results: [T] = []
+    var output: [T] = []
     for value in values {
-        guard let result = transform(value) else { return nil }
-        results.append(result)
+        guard let transformed = transform(value) else {
+            return nil
+        }
+        output.append(transformed)
     }
-    return results
+    return output
 }

@@ -225,30 +225,31 @@ class CalendarService internal constructor(
     }
 
     private fun CrispyBackendClient.CalendarItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem {
-        val season = media.seasonNumber
-        val episode = media.episodeNumber
-        val releaseDate = airDate?.trim().takeIf { !it.isNullOrBlank() } ?: media.airDate?.trim().takeIf { !it.isNullOrBlank() }
+        val season = mediaItem.seasonNumber
+        val episode = mediaItem.episodeNumber
+        val relatedShow = context.relatedShow
+        val releaseDate = airDate?.trim().takeIf { !it.isNullOrBlank() } ?: mediaItem.airDate?.trim().takeIf { !it.isNullOrBlank() }
         val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate)
         val watchedKey = if (season != null && episode != null) {
-            "${media.mediaKey}:$season:$episode"
+            "${mediaItem.mediaKey}:$season:$episode"
         } else {
-            media.mediaKey
+            mediaItem.mediaKey
         }
         val localKeySuffix = when {
             season != null && episode != null -> ":$season:$episode"
             !releaseDate.isNullOrBlank() -> ":${releaseDate.take(10)}"
             else -> ""
         }
-        val localKey = "${media.mediaKey}$localKeySuffix"
+        val localKey = "${mediaItem.mediaKey}$localKeySuffix"
         return CalendarEpisodeItem(
             id = localKey,
             titleMediaKey = relatedShow.mediaKey,
-            playbackMediaKey = media.mediaKey,
+            playbackMediaKey = mediaItem.mediaKey,
             localKey = localKey,
             highlightEpisodeId = null,
             seriesName = relatedShow.title,
-            episodeTitle = media.episodeTitle,
-            overview = media.subtitle,
+            episodeTitle = mediaItem.episodeTitle,
+            overview = mediaItem.overview ?: mediaItem.subtitle,
             season = season,
             episode = episode,
             episodeRange = null,
@@ -257,15 +258,16 @@ class CalendarService internal constructor(
             releasedAtMs = releasedAtMs,
             isReleased = releasedAtMs?.let { it <= nowMs } ?: false,
             isGroup = false,
-            posterUrl = media.posterUrl,
-            backdropUrl = media.backdropUrl,
-            thumbnailUrl = media.backdropUrl,
+            posterUrl = mediaItem.posterUrl,
+            backdropUrl = mediaItem.backdropUrl,
+            thumbnailUrl = mediaItem.stillUrl ?: mediaItem.backdropUrl,
             watchedKeys = setOf(watchedKey),
-            absoluteEpisodeNumber = media.episodeNumber,
+            absoluteEpisodeNumber = mediaItem.absoluteEpisodeNumber,
         )
     }
 
     private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
+        val relatedShow = context.relatedShow
         val localKey = relatedShow.mediaKey
         return CalendarSeriesItem(
             id = localKey,
@@ -273,7 +275,7 @@ class CalendarService internal constructor(
             localKey = localKey,
             title = relatedShow.title,
             posterUrl = relatedShow.posterUrl,
-            backdropUrl = media.backdropUrl,
+            backdropUrl = mediaItem.backdropUrl ?: relatedShow.backdropUrl,
             sourceLabel = null,
         )
     }

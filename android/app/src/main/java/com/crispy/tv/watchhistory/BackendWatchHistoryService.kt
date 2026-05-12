@@ -428,12 +428,12 @@ val next =
         return listCanonicalWatchHistory(limit = 1000)
             .asSequence()
             .filter { item ->
-                item.media.mediaType.equals("episode", ignoreCase = true) &&
-                    item.media.seasonNumber != null &&
-                    item.media.episodeNumber != null
+                item.mediaItem.mediaType.equals("episode", ignoreCase = true) &&
+                    item.mediaItem.seasonNumber != null &&
+                    item.mediaItem.episodeNumber != null
             }
             .mapNotNull { item ->
-                val canonicalMediaKey = item.media.mediaKey.trim().ifBlank { return@mapNotNull null }
+                val canonicalMediaKey = item.mediaItem.mediaKey.trim().ifBlank { return@mapNotNull null }
                 val watchedAtEpochMs =
                     parseIsoToEpochMs(item.watchedAt)
                         ?: parseIsoToEpochMs(item.lastActivityAt)
@@ -443,8 +443,8 @@ val next =
                 }
                 WatchedEpisodeRecord(
                     contentId = canonicalMediaKey,
-                    season = item.media.seasonNumber ?: 1,
-                    episode = item.media.episodeNumber ?: 1,
+                    season = item.mediaItem.seasonNumber ?: 1,
+                    episode = item.mediaItem.episodeNumber ?: 1,
                     watchedAtEpochMs = watchedAtEpochMs,
                 )
             }
@@ -637,20 +637,20 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
                 add(
                     CanonicalContinueWatchingItem(
                         id = item.id,
-                        titleMediaKey = item.media.toTitleMediaKey(),
-                        playbackMediaKey = item.media.mediaKey,
-                        mediaType = item.media.mediaType,
-                        title = item.media.episodeTitle ?: item.media.title,
-                        season = item.media.seasonNumber,
-                        episode = item.media.episodeNumber,
+                        titleMediaKey = item.mediaItem.toTitleMediaKey(),
+                        playbackMediaKey = item.mediaItem.mediaKey,
+                        mediaType = item.mediaItem.mediaType,
+                        title = item.mediaItem.episodeTitle ?: item.mediaItem.title,
+                        season = item.mediaItem.seasonNumber,
+                        episode = item.mediaItem.episodeNumber,
                         progressPercent = item.progress?.progressPercent ?: 0.0,
                         lastUpdatedEpochMs = updatedAt,
-                        posterUrl = item.media.posterUrl,
-                        backdropUrl = item.media.backdropUrl,
-                        logoUrl = null,
+                        posterUrl = item.mediaItem.posterUrl,
+                        backdropUrl = item.mediaItem.backdropUrl,
+                        logoUrl = item.mediaItem.logoUrl,
                         addonId = "backend",
-                        subtitle = item.media.subtitle,
-                        absoluteEpisodeNumber = null,
+                        subtitle = item.mediaItem.subtitle,
+                        absoluteEpisodeNumber = item.mediaItem.absoluteEpisodeNumber,
                     )
                 )
             }
@@ -696,8 +696,8 @@ private fun titleStateIdentity(
         }
     }
 
-    private fun CrispyBackendClient.RuntimeMediaCard.toTitleMediaKey(): String {
-        return mediaKey
+    private fun CrispyBackendClient.MediaItem.toTitleMediaKey(): String {
+        return parent?.mediaKey ?: mediaKey
     }
 
     private companion object {

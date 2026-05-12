@@ -92,12 +92,12 @@ private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.to
     return LibrarySectionPageUi(
         items = items.map { item ->
             LibrarySectionItemUi(
-                id = item.id ?: item.media.mediaKey,
-                mediaKey = item.media.mediaKey,
-                mediaType = item.media.mediaType,
-                title = item.media.title,
-                posterUrl = item.media.posterUrl,
-                backdropUrl = item.media.backdropUrl,
+                id = item.id ?: item.mediaItem.mediaKey,
+                mediaKey = item.mediaItem.mediaKey,
+                mediaType = item.mediaItem.mediaType,
+                title = item.mediaItem.title,
+                posterUrl = item.mediaItem.posterUrl,
+                backdropUrl = item.mediaItem.backdropUrl,
                 addedAt = null,
                 watchedAt = item.watchedAt,
                 ratedAt = null,
@@ -115,12 +115,12 @@ private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.
     return LibrarySectionPageUi(
         items = items.map { item ->
             LibrarySectionItemUi(
-                id = item.id ?: item.media.mediaKey,
-                mediaKey = item.media.mediaKey,
-                mediaType = item.media.mediaType,
-                title = item.media.title,
-                posterUrl = item.media.posterUrl,
-                backdropUrl = item.media.backdropUrl,
+                id = item.id ?: item.mediaItem.mediaKey,
+                mediaKey = item.mediaItem.mediaKey,
+                mediaType = item.mediaItem.mediaType,
+                title = item.mediaItem.title,
+                posterUrl = item.mediaItem.posterUrl,
+                backdropUrl = item.mediaItem.backdropUrl,
                 addedAt = item.addedAt,
                 watchedAt = null,
                 ratedAt = null,
@@ -138,12 +138,12 @@ private fun CanonicalWatchCollectionResponse<CrispyBackendClient.RatingItem>.toR
     return LibrarySectionPageUi(
         items = items.map { item ->
             LibrarySectionItemUi(
-                id = item.id ?: item.media.mediaKey,
-                mediaKey = item.media.mediaKey,
-                mediaType = item.media.mediaType,
-                title = item.media.title,
-                posterUrl = item.media.posterUrl,
-                backdropUrl = item.media.backdropUrl,
+                id = item.id ?: item.mediaItem.mediaKey,
+                mediaKey = item.mediaItem.mediaKey,
+                mediaType = item.mediaItem.mediaType,
+                title = item.mediaItem.title,
+                posterUrl = item.mediaItem.posterUrl,
+                backdropUrl = item.mediaItem.backdropUrl,
                 addedAt = null,
                 watchedAt = null,
                 ratedAt = item.rating.ratedAt,

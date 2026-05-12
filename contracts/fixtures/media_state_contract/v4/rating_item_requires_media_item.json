@@ -1,0 +1,47 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "rating_item_requires_media_item",
+  "input": {
+    "kind": "rating_item",
+    "payload": {
+      "id": "rating-333",
+      "kind": "rating",
+      "mediaItem": {
+        "mediaKey": "tmdb:movie:444",
+        "mediaType": "movie",
+        "title": "Rated Movie",
+        "posterUrl": "https://example.com/poster.jpg",
+        "backdropUrl": null,
+        "subtitle": null
+      },
+      "context": {},
+      "presentation": null,
+      "rating": {
+        "value": 9.5,
+        "ratedAt": "2024-01-02T15:00:00Z"
+      },
+      "origins": ["manual"]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "media_key": "tmdb:movie:444",
+      "media_type": "movie",
+      "item_id": "rating-333",
+      "title": "Rated Movie",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": ["manual"],
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

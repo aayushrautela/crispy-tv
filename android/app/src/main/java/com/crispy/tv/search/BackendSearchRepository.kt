@@ -55,7 +55,7 @@ class BackendSearchRepository(
     }
 }
 
-internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
+internal fun CrispyBackendClient.MediaItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val normalizedType =
         when {
             mediaType.equals("anime", ignoreCase = true) -> "anime"
@@ -63,19 +63,18 @@ internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre:
             else -> "movie"
         }
     val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
-    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return SearchCatalogItem(
         id = normalizedMediaKey,
         mediaKey = normalizedMediaKey,
         title = title,
-        posterUrl = normalizedPosterUrl,
+        posterUrl = posterUrl,
         backdropUrl = backdropUrl,
         logoUrl = logoUrl,
         addonId = "backend",
         type = normalizedType,
-        rating = rating,
-        year = year,
-        genre = genre ?: defaultGenre,
-        description = summary,
+        rating = rating?.toString(),
+        year = releaseYear?.toString(),
+        genre = genres.firstOrNull() ?: defaultGenre,
+        description = overview ?: subtitle,
     )
 }

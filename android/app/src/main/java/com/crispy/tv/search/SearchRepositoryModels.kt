@@ -34,10 +34,10 @@ internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(de
     return SearchResultsPayload(
         query = query,
         buckets = SearchResultBuckets(
-            all = all.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
-            movies = movies.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
-            series = series.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
-            anime = anime.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
+            all = all.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
+            movies = movies.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
+            series = series.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
+            anime = emptyList(),
         ),
     )
 }

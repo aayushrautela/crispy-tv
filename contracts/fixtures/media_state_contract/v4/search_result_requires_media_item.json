@@ -1,0 +1,41 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "search_result_requires_media_item",
+  "input": {
+    "kind": "search_result",
+    "payload": {
+      "kind": "search_result",
+      "mediaItem": {
+        "mediaKey": "tmdb:movie:456",
+        "mediaType": "movie",
+        "title": "Search Result Movie",
+        "posterUrl": null,
+        "backdropUrl": null,
+        "subtitle": null
+      },
+      "context": {},
+      "presentation": null
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "media_key": "tmdb:movie:456",
+      "media_type": "movie",
+      "item_id": null,
+      "title": "Search Result Movie",
+      "poster_url": null,
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": null,
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

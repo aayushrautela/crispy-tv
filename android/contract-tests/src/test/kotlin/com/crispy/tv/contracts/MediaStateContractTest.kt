@@ -16,7 +16,8 @@ class MediaStateContractTest {
     @Test
     fun fixturesMatchMediaStateContract() {
         val fixturePaths = ContractTestSupport.fixtureFiles("media_state_contract")
-        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one media_state_contract fixture")
+            .filter { it.toString().contains("/v4/") }
+        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one media_state_contract v4 fixture")
 
         fixturePaths.forEach { path ->
             val fixture = ContractTestSupport.parseFixture(path)

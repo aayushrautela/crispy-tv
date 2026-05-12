@@ -1,0 +1,59 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "media_item_requires_media_key_and_supporting_metadata",
+  "input": {
+    "kind": "media_item",
+    "payload": {
+      "mediaKey": "tmdb:movie:123",
+      "mediaType": "movie",
+      "title": "Test Movie",
+      "originalTitle": "Test Movie Original",
+      "subtitle": "2024",
+      "overview": "A test movie",
+      "posterUrl": "https://example.com/poster.jpg",
+      "backdropUrl": "https://example.com/backdrop.jpg",
+      "logoUrl": "https://example.com/logo.jpg",
+      "stillUrl": "https://example.com/still.jpg",
+      "releaseDate": "2024-01-01",
+      "releaseYear": 2024,
+      "rating": 8.5,
+      "genres": ["Action", "Drama"],
+      "runtimeMinutes": 120,
+      "status": "Released",
+      "certification": "PG-13",
+      "externalIds": {
+        "tmdb": 123,
+        "imdb": "tt1234567",
+        "tvdb": null
+      },
+      "parent": null,
+      "showTmdbId": null,
+      "seasonNumber": null,
+      "episodeNumber": null,
+      "absoluteEpisodeNumber": null,
+      "episodeTitle": null,
+      "airDate": null
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "media_key": "tmdb:movie:123",
+      "media_type": "movie",
+      "item_id": null,
+      "title": "Test Movie",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": "https://example.com/backdrop.jpg",
+      "subtitle": "2024",
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": null,
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}
