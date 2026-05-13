@@ -7,19 +7,19 @@ data class SearchResultBuckets(
     val all: List<SearchCatalogItem> = emptyList(),
     val movies: List<SearchCatalogItem> = emptyList(),
     val series: List<SearchCatalogItem> = emptyList(),
-    val anime: List<SearchCatalogItem> = emptyList(),
+    val people: List<SearchCatalogItem> = emptyList(),
 ) {
     fun itemsFor(category: SearchCategory): List<SearchCatalogItem> {
         return when (category) {
             SearchCategory.ALL -> all
             SearchCategory.MOVIES -> movies
             SearchCategory.SERIES -> series
-            SearchCategory.ANIME -> anime
+            SearchCategory.PEOPLE -> people
         }
     }
 
     val isEmpty: Boolean
-        get() = all.isEmpty() && movies.isEmpty() && series.isEmpty() && anime.isEmpty()
+        get() = all.isEmpty() && movies.isEmpty() && series.isEmpty() && people.isEmpty()
 }
 
 data class SearchResultsPayload(
@@ -30,6 +30,22 @@ data class SearchResultsPayload(
 
 typealias SearchCatalogItem = CatalogItem
 
+internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
+    val normalizedName = name.trim().ifBlank { return null }
+    return SearchCatalogItem(
+        id = tmdbPersonId.toString(),
+        mediaKey = "tmdb:person:$tmdbPersonId",
+        title = normalizedName,
+        posterUrl = profileUrl?.trim()?.takeIf { it.isNotBlank() },
+        addonId = "backend",
+        type = "person",
+        rating = null,
+        year = null,
+        genre = knownForDepartment?.trim()?.takeIf { it.isNotBlank() } ?: defaultGenre,
+        description = knownForTitles.takeIf { it.isNotEmpty() }?.joinToString(" • "),
+    )
+}
+
 internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(defaultGenre: String? = null): SearchResultsPayload {
     return SearchResultsPayload(
         query = query,
@@ -37,7 +53,7 @@ internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(de
             all = all.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
             movies = movies.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
             series = series.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
-            anime = emptyList(),
+            people = people.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
         ),
     )
 }

@@ -15,6 +15,7 @@ import com.crispy.tv.backend.CrispyBackendClient.RecommendationHeroItem
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationItem
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationItemContext
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationSection
+import com.crispy.tv.backend.CrispyBackendClient.PersonSearchResultItem
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultItem
 import com.crispy.tv.backend.CrispyBackendClient.SurfaceContext
 import com.crispy.tv.backend.CrispyBackendClient.ImportJob
@@ -166,13 +167,40 @@ internal fun CrispyBackendClient.parseSearchResultItem(json: JSONObject): Search
     )
 }
 
+internal fun CrispyBackendClient.parsePersonSearchResultItems(array: JSONArray?): List<PersonSearchResultItem> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val item = safeArray.optJSONObject(index) ?: continue
+            add(parsePersonSearchResultItem(item))
+        }
+    }
+}
+
+internal fun CrispyBackendClient.parsePersonSearchResultItem(json: JSONObject): PersonSearchResultItem {
+    val tmdbPersonId = json.optIntOrNull("tmdbPersonId")
+        ?: throw IllegalStateException("Person search result is missing tmdbPersonId.")
+    val name = json.optString("name").trim()
+    if (name.isBlank()) {
+        throw IllegalStateException("Person search result is missing name.")
+    }
+    return PersonSearchResultItem(
+        kind = json.optNullableString("kind") ?: "person_search_result",
+        tmdbPersonId = tmdbPersonId,
+        name = name,
+        knownForDepartment = json.optNullableString("knownForDepartment"),
+        profileUrl = json.optNullableString("profileUrl"),
+        knownForTitles = json.optStringList("knownForTitles"),
+    )
+}
+
 internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): SearchResultsResponse {
     return SearchResultsResponse(
         query = json.optString("query").trim(),
         all = parseSearchResultItems(json.optJSONArray("all")),
         movies = parseSearchResultItems(json.optJSONArray("movies")),
         series = parseSearchResultItems(json.optJSONArray("series")),
-        anime = parseSearchResultItems(json.optJSONArray("anime")),
+        people = parsePersonSearchResultItems(json.optJSONArray("people")),
     )
 }
 

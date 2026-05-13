@@ -20,7 +20,7 @@ enum class SearchCategory {
     ALL,
     MOVIES,
     SERIES,
-    ANIME;
+    PEOPLE;
 
     val label: String
         get() =
@@ -28,7 +28,7 @@ enum class SearchCategory {
                 ALL -> "All"
                 MOVIES -> "Movies"
                 SERIES -> "Series"
-                ANIME -> "Anime"
+                PEOPLE -> "People"
             }
 }
 

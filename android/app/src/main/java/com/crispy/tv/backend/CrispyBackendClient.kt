@@ -145,12 +145,21 @@ class CrispyBackendClient(
         val presentation: MediaPresentationHint?,
     )
 
+    data class PersonSearchResultItem(
+        val kind: String,
+        val tmdbPersonId: Int,
+        val name: String,
+        val knownForDepartment: String?,
+        val profileUrl: String?,
+        val knownForTitles: List<String>,
+    )
+
     data class SearchResultsResponse(
         val query: String,
         val all: List<SearchResultItem>,
         val movies: List<SearchResultItem>,
         val series: List<SearchResultItem>,
-        val anime: List<SearchResultItem>,
+        val people: List<PersonSearchResultItem>,
     )
 
     data class AiInsightsCard(
