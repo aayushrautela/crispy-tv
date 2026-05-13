@@ -172,7 +172,7 @@ internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): S
         all = parseSearchResultItems(json.optJSONArray("all")),
         movies = parseSearchResultItems(json.optJSONArray("movies")),
         series = parseSearchResultItems(json.optJSONArray("series")),
-        anime = emptyList(),
+        anime = parseSearchResultItems(json.optJSONArray("anime")),
     )
 }
 
@@ -183,8 +183,8 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
     }
     return MetadataView(
         mediaKey = mediaKey,
-        mediaType = json.optNullableString("mediaType") ?: "movie",
-        kind = json.optNullableString("kind") ?: "title",
+        mediaType = json.optNullableString("mediaType") ?: error("Backend metadata view is missing mediaType."),
+        kind = json.optNullableString("kind") ?: error("Backend metadata view is missing kind."),
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
@@ -223,8 +223,8 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
     return MetadataCardView(
         id = json.optNullableString("id"),
         mediaKey = json.optNullableString("mediaKey"),
-        mediaType = json.optNullableString("mediaType") ?: "movie",
-        kind = json.optNullableString("kind") ?: "title",
+        mediaType = json.optNullableString("mediaType") ?: error("Metadata card view is missing mediaType."),
+        kind = json.optNullableString("kind") ?: error("Metadata card view is missing kind."),
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
@@ -244,25 +244,12 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
 }
 
 internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject): CrispyBackendClient.MetadataImages {
-    val images = json.optJSONObject("images")
-    val artwork = json.optJSONObject("artwork")
+    val images = json.optJSONObject("images") ?: JSONObject()
     return CrispyBackendClient.MetadataImages(
-        poster = parseResponsiveImageSet(
-            images?.optJSONObject("poster") ?: artwork?.optJSONObject("poster"),
-            json.optNullableString("posterUrl") ?: images?.optNullableString("posterUrl") ?: artwork?.optNullableString("posterUrl")
-        ),
-        backdrop = parseResponsiveImageSet(
-            images?.optJSONObject("backdrop") ?: artwork?.optJSONObject("backdrop"),
-            json.optNullableString("backdropUrl") ?: images?.optNullableString("backdropUrl") ?: artwork?.optNullableString("backdropUrl")
-        ),
-        still = parseResponsiveImageSet(
-            images?.optJSONObject("still") ?: artwork?.optJSONObject("still"),
-            json.optNullableString("stillUrl") ?: images?.optNullableString("stillUrl") ?: artwork?.optNullableString("stillUrl")
-        ),
-        logo = parseResponsiveImageSet(
-            images?.optJSONObject("logo"),
-            json.optNullableString("logoUrl") ?: images?.optNullableString("logoUrl")
-        ),
+        poster = parseResponsiveImageSet(images.optJSONObject("poster"), null),
+        backdrop = parseResponsiveImageSet(images.optJSONObject("backdrop"), null),
+        still = parseResponsiveImageSet(images.optJSONObject("still"), null),
+        logo = parseResponsiveImageSet(images.optJSONObject("logo"), null),
     )
 }
 
@@ -328,17 +315,17 @@ internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
         originalTitle = json.optNullableString("originalTitle"),
         subtitle = json.optNullableString("subtitle"),
         overview = json.optNullableString("overview"),
-        poster = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("poster"), json.optNullableString("posterUrl")),
-        backdrop = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("backdrop"), json.optNullableString("backdropUrl")),
-        logo = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("logo"), json.optNullableString("logoUrl")),
-        still = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("still"), json.optNullableString("stillUrl")),
+        poster = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("poster"), null),
+        backdrop = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("backdrop"), null),
+        logo = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("logo"), null),
+        still = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("still"), null),
         releaseDate = json.optNullableString("releaseDate"),
         releaseYear = json.optIntOrNull("releaseYear"),
         rating = json.optDoubleOrNull("rating"),
         genres = json.optStringList("genres"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
         status = json.optNullableString("status"),
-        maturityRating = json.optNullableString("maturityRating") ?: json.optNullableString("certification"),
+        maturityRating = json.optNullableString("maturityRating"),
         certification = json.optNullableString("certification"),
         externalIds = parseMediaExternalIds(json.optJSONObject("externalIds")),
         parent = parseMediaItemParent(json.optJSONObject("parent")),
@@ -358,7 +345,7 @@ internal fun CrispyBackendClient.parseMetadataEpisodePreview(json: JSONObject): 
     }
     return MetadataEpisodePreview(
         mediaKey = mediaKey,
-        mediaType = json.optNullableString("mediaType") ?: "episode",
+        mediaType = json.optNullableString("mediaType") ?: error("Metadata episode preview is missing mediaType."),
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
@@ -427,7 +414,7 @@ internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): Met
         runtimeMinutes = preview.runtimeMinutes,
         rating = preview.rating,
         images = preview.images,
-        showMediaKey = json.optNullableString("showMediaKey") ?: json.optNullableString("showId"),
+        showMediaKey = json.optNullableString("showMediaKey"),
         showTitle = json.optNullableString("showTitle"),
         showExternalIds = parseMetadataExternalIds(json.optJSONObject("showExternalIds")),
     )
@@ -468,7 +455,7 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
             add(
                 MetadataPersonKnownForItem(
                     mediaKey = item.optString("mediaKey").trim(),
-                    mediaType = item.optNullableString("mediaType") ?: "movie",
+                    mediaType = item.optNullableString("mediaType") ?: error("Person known-for item is missing mediaType."),
                     tmdbId = item.optIntOrNull("tmdbId"),
                     title = title,
                     posterUrl = item.optNullableString("posterUrl"),
@@ -785,7 +772,7 @@ internal fun CrispyBackendClient.parsePageInfo(json: JSONObject?): PageInfo {
 
 internal fun CrispyBackendClient.parseWatchStateResponse(json: JSONObject): WatchStateResponse {
     return WatchStateResponse(
-        kind = json.optNullableString("kind") ?: "watch_state",
+        kind = json.optNullableString("kind") ?: error("Backend watch state is missing kind."),
         mediaItem = parseMediaItem(json.optJSONObject("mediaItem") ?: throw IllegalStateException("Backend watch state is missing mediaItem.")),
         context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
         presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
@@ -873,7 +860,7 @@ internal fun CrispyBackendClient.parseCalendarItems(array: JSONArray?): List<Cal
             add(
                 CalendarItem(
                     bucket = item.optString("bucket").trim(),
-                    kind = item.optNullableString("kind") ?: "calendar_item",
+                    kind = item.optNullableString("kind") ?: error("Calendar item is missing kind."),
                     mediaItem = parseMediaItem(mediaJson),
                     context = CalendarContext(
                         bucket = contextJson.optString("bucket").trim(),
@@ -902,7 +889,7 @@ internal fun CrispyBackendClient.parseRecommendationItems(array: JSONArray?): Li
             val rank = item.optDoubleOrNull("rank") ?: contextJson.optDoubleOrNull("rank") ?: (index + 1).toDouble()
             add(
                 RecommendationItem(
-                    kind = item.optNullableString("kind") ?: "recommendation",
+                    kind = item.optNullableString("kind") ?: error("Recommendation item is missing kind."),
                     mediaItem = parseMediaItem(mediaJson),
                     context = RecommendationItemContext(
                         reason = contextJson.optNullableString("reason"),
@@ -1024,7 +1011,7 @@ internal fun CrispyBackendClient.parseRecommendationSections(array: JSONArray?):
 internal fun CrispyBackendClient.parseWatchActionResponse(json: JSONObject): WatchActionResponse {
     return WatchActionResponse(
         accepted = json.optBoolean("accepted", false),
-        mode = json.optString("mode").trim().ifBlank { "synchronous" },
+        mode = json.optString("mode").trim().ifBlank { error("Watch action response is missing mode.") },
     )
 }
 

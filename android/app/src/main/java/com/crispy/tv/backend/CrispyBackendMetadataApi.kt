@@ -27,7 +27,7 @@ internal suspend fun CrispyBackendClient.searchTitlesApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseSearchResultsResponse(json)
 }
 
@@ -46,7 +46,7 @@ internal suspend fun CrispyBackendClient.searchTitlesByGenreApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseSearchResultsResponse(json)
 }
 
@@ -67,7 +67,7 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseSearchResultsResponse(json)
 }
 
@@ -88,7 +88,7 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return AiInsightsResponse(
         insights = parseAiInsightsCards(json.optJSONArray("insights")),
         trivia = json.optString("trivia").trim(),
@@ -105,7 +105,7 @@ internal suspend fun CrispyBackendClient.resolveMetadataApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     val itemJson = json.optJSONObject("item") ?: throw IllegalStateException("Backend metadata resolve did not return an item.")
     return MetadataResolveResponse(item = parseMetadataView(itemJson))
 }
@@ -120,7 +120,7 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return MetadataTitleDetailResponse(
         item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend title detail is missing item.")),
         seasons = parseMetadataSeasonViews(json.optJSONArray("seasons")),
@@ -147,7 +147,7 @@ internal suspend fun CrispyBackendClient.getMetadataTitleReviewsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return MetadataTitleReviewsResponse(
         reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
     )
@@ -164,7 +164,7 @@ internal suspend fun CrispyBackendClient.getMetadataTitleRatingsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return MetadataTitleRatingsResponse(
         ratings = parseMetadataTitleRatings(json.optJSONObject("ratings")),
     )
@@ -188,7 +188,7 @@ internal suspend fun CrispyBackendClient.getMetadataPersonDetailApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseMetadataPersonDetail(json)
 }
 
@@ -203,7 +203,7 @@ internal suspend fun CrispyBackendClient.resolvePlaybackApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return PlaybackResolveResponse(
         item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend playback resolve is missing item.")),
         show = json.optJSONObject("show")?.let(::parseMetadataView),

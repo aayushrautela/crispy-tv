@@ -29,7 +29,7 @@ internal suspend fun CrispyBackendClient.getRecommendationsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     val recommendations = json.optJSONObject("recommendations") ?: return null
     return RecommendationsResponse(
         profileId = recommendations.optString("profileId").trim(),
@@ -50,11 +50,11 @@ internal suspend fun CrispyBackendClient.getCalendarApi(accessToken: String, pro
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return CalendarResponse(
         profileId = json.optString("profileId").trim(),
         source = json.optString("source").trim(),
-        kind = null,
+        kind = json.optNullableString("kind"),
         generatedAt = json.optNullableString("generatedAt"),
         items = parseCalendarItems(json.optJSONArray("items")),
     )
@@ -67,7 +67,7 @@ internal suspend fun CrispyBackendClient.getCalendarThisWeekApi(accessToken: Str
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return CalendarResponse(
         profileId = json.optString("profileId").trim(),
         source = json.optString("source").trim(),
@@ -102,7 +102,7 @@ internal suspend fun CrispyBackendClient.sendWatchEventApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    return parseWatchActionResponse(JSONObject(requireSuccess(response)))
+    return parseWatchActionResponse(requireSuccess(response))
 }
 
 internal suspend fun CrispyBackendClient.listContinueWatchingApi(
@@ -125,7 +125,7 @@ internal suspend fun CrispyBackendClient.dismissContinueWatchingApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    return parseWatchActionResponse(JSONObject(requireSuccess(response)))
+    return parseWatchActionResponse(requireSuccess(response))
 }
 
 internal suspend fun CrispyBackendClient.listWatchHistoryApi(
@@ -148,7 +148,7 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return CanonicalWatchCollectionResponse(
         profileId = json.optString("profileId").trim(),
         kind = json.optString("kind").trim(),
@@ -179,7 +179,7 @@ internal suspend fun CrispyBackendClient.listWatchlistApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseWatchlistCollectionResponse(json)
 }
 
@@ -203,7 +203,7 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseRatingCollectionResponse(json)
 }
 
@@ -221,7 +221,7 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseWatchStateEnvelope(json)
 }
 
@@ -249,7 +249,7 @@ internal suspend fun CrispyBackendClient.getWatchStatesApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseWatchStatesEnvelope(json)
 }
 
@@ -289,7 +289,7 @@ internal suspend fun CrispyBackendClient.putNativeWatchlistApi(
             .build(),
         callTimeoutMs = callTimeoutMs,
     )
-    return parseWatchActionResponse(JSONObject(requireSuccess(response)))
+    return parseWatchActionResponse(requireSuccess(response))
 }
 
 internal suspend fun CrispyBackendClient.deleteNativeWatchlistApi(
@@ -303,7 +303,7 @@ internal suspend fun CrispyBackendClient.deleteNativeWatchlistApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    return parseWatchActionResponse(JSONObject(requireSuccess(response)))
+    return parseWatchActionResponse(requireSuccess(response))
 }
 
 internal suspend fun CrispyBackendClient.putNativeRatingApi(
@@ -328,7 +328,7 @@ internal suspend fun CrispyBackendClient.putNativeRatingApi(
             .build(),
         callTimeoutMs = callTimeoutMs,
     )
-    return parseWatchActionResponse(JSONObject(requireSuccess(response)))
+    return parseWatchActionResponse(requireSuccess(response))
 }
 
 internal suspend fun CrispyBackendClient.deleteNativeRatingApi(
@@ -342,7 +342,7 @@ internal suspend fun CrispyBackendClient.deleteNativeRatingApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    return parseWatchActionResponse(JSONObject(requireSuccess(response)))
+    return parseWatchActionResponse(requireSuccess(response))
 }
 
 private suspend fun CrispyBackendClient.listContinueWatchingItemsApi(
@@ -366,7 +366,7 @@ private suspend fun CrispyBackendClient.listContinueWatchingItemsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseWatchCollectionResponse(json)
 }
 
@@ -393,5 +393,5 @@ private suspend fun CrispyBackendClient.postWatchMutationApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    return parseWatchActionResponse(JSONObject(requireSuccess(response)))
+    return parseWatchActionResponse(requireSuccess(response))
 }

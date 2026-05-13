@@ -692,6 +692,16 @@ data class PlaybackEventInput(
         val mode: String,
     )
 
+    class CrispyBackendException(
+        val httpCode: Int,
+        val code: String?,
+        override val message: String?,
+        val category: String?,
+        val retryable: Boolean,
+        val requestId: String?,
+        val details: String?,
+    ) : IllegalStateException(message)
+
     fun isConfigured(): Boolean {
         return baseUrl.isNotBlank()
     }
@@ -970,23 +980,45 @@ data class PlaybackEventInput(
             .build()
     }
 
-    internal fun requireSuccess(response: CrispyHttpResponse): String {
-        if (response.code in 200..299) {
-            return response.body
+    internal fun requireSuccess(response: CrispyHttpResponse): JSONObject {
+        return if (response.code in 200..299) {
+            extractDataEnvelope(response.body)
+        } else {
+            throw parseErrorEnvelope(response.code, response.body)
         }
-        throw IllegalStateException(extractErrorMessage(response.body) ?: "HTTP ${response.code}")
     }
 
-    internal fun extractErrorMessage(rawBody: String): String? {
-        val trimmed = rawBody.trim()
+    private fun extractDataEnvelope(body: String): JSONObject {
+        if (body.isBlank()) {
+            throw IllegalStateException("Empty response body")
+        }
+        val json = JSONObject(body)
+        return json.optJSONObject("data")
+            ?: throw IllegalStateException("Response missing 'data' envelope")
+    }
+
+    private fun parseErrorEnvelope(code: Int, body: String): CrispyBackendException {
+        val trimmed = body.trim()
         if (trimmed.isBlank()) {
-            return null
+            return CrispyBackendException(
+                httpCode = code, code = null, message = "HTTP $code",
+                category = null, retryable = false, requestId = null, details = null,
+            )
         }
         val json = runCatching { JSONObject(trimmed) }.getOrNull()
-        return json?.let {
-            listOf("message", "error", "error_description")
-                .firstNotNullOfOrNull { key -> it.optString(key).trim().takeIf(String::isNotBlank) }
-        } ?: trimmed
+        val error = json?.optJSONObject("error")
+        return CrispyBackendException(
+            httpCode = code,
+            code = error?.optString("code")?.trim()?.ifBlank { null },
+            message = error?.optString("message")?.trim()
+                ?: json?.optString("message")?.trim()
+                ?: "HTTP $code",
+            category = error?.optString("category")?.trim()?.ifBlank { null },
+            retryable = error?.optBoolean("retryable", false) ?: false,
+            requestId = error?.optString("requestId")?.trim()?.ifBlank { null }
+                ?: json?.optString("requestId")?.trim()?.ifBlank { null },
+            details = error?.optJSONObject("details")?.toString()?.ifBlank { null },
+        )
     }
 
     internal val callTimeoutMs: Long
