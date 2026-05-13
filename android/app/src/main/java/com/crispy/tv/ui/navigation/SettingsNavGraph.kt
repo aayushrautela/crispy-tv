@@ -11,6 +11,9 @@ import androidx.navigation.compose.composable
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.settings.AccountsProfilesRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
+import com.crispy.tv.settings.ImageQuality
+import com.crispy.tv.settings.ImageSettingsRepositoryProvider
+import com.crispy.tv.settings.ImageSettingsScreen
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.settings.PlaybackSettingsScreen
 import com.crispy.tv.settings.ProviderAuthPortalRoute
@@ -25,6 +28,9 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             },
             onNavigateToPlaybackSettings = {
                 navController.navigate(AppRoutes.PlaybackSettingsRoute)
+            },
+            onNavigateToImageSettings = {
+                navController.navigate(AppRoutes.ImageSettingsRoute)
             },
             onNavigateToProviderPortal = {
                 navController.navigate(AppRoutes.ProviderPortalRoute)
@@ -49,6 +55,23 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
 
     composable(AppRoutes.AccountsProfilesRoute) {
         AccountsProfilesRoute(onBack = { navController.popBackStack() })
+    }
+
+    composable(AppRoutes.ImageSettingsRoute) {
+        val context = LocalContext.current
+        val appContext = remember(context) { context.applicationContext }
+        val imageSettingsRepository = remember(appContext) {
+            ImageSettingsRepositoryProvider.get(appContext)
+        }
+        val imageSettings by imageSettingsRepository.settings.collectAsStateWithLifecycle()
+
+        ImageSettingsScreen(
+            settings = imageSettings,
+            onQualityChanged = { quality: ImageQuality ->
+                imageSettingsRepository.setQuality(quality)
+            },
+            onBack = { navController.popBackStack() }
+        )
     }
 
     composable(AppRoutes.PlaybackSettingsRoute) {

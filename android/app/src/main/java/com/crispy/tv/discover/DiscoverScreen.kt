@@ -468,6 +468,9 @@ private fun DiscoverScreen(
                             year = item.year,
                             genre = item.genre,
                             logoUrl = item.logoUrl,
+                            poster = item.poster,
+                            backdrop = item.backdrop,
+                            logo = item.logo,
                             gradientColorHex = null,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { onItemClick(item) }

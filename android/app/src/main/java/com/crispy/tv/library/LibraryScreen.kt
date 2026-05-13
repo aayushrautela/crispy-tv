@@ -52,6 +52,7 @@ import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -85,6 +86,9 @@ data class LibrarySectionItemUi(
     val posterUrl: String?,
     val backdropUrl: String?,
     val logoUrl: String?,
+    val poster: ResponsiveImageSet = ResponsiveImageSet.fromSingle(posterUrl),
+    val backdrop: ResponsiveImageSet = ResponsiveImageSet.fromSingle(backdropUrl),
+    val logo: ResponsiveImageSet = ResponsiveImageSet.fromSingle(logoUrl),
     val rating: Double?,
     val year: Int?,
     val genre: String?,
@@ -309,6 +313,9 @@ internal fun LibraryRouteContent(
                         maturityRating = item.maturityRating,
                         genre = item.genre,
                         logoUrl = item.logoUrl,
+                        poster = item.poster,
+                        backdrop = item.backdrop,
+                        logo = item.logo,
                         gradientColorHex = null,
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onItemClick(item) },

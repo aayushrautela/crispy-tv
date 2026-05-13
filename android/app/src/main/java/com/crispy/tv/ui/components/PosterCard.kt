@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ratings.formatRating
 
 private val PosterGradientFallback = Color(0xFF151515)
@@ -50,19 +51,23 @@ fun PosterCard(
     maturityRating: String? = null,
     genre: String? = null,
     logoUrl: String? = null,
+    poster: ResponsiveImageSet? = ResponsiveImageSet.fromSingle(posterUrl),
+    backdrop: ResponsiveImageSet? = ResponsiveImageSet.fromSingle(backdropUrl),
+    logo: ResponsiveImageSet? = ResponsiveImageSet.fromSingle(logoUrl),
     gradientColorHex: String? = null,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
+    val image = poster?.takeUnless { it.isEmpty } ?: backdrop
     val imageModel = rememberCrispyImageModel(
-        posterUrl ?: backdropUrl,
+        image = image,
         width = 124.dp,
         height = 186.dp,
         tmdbSize = "w342",
     )
     val logoModel = rememberCrispyImageModel(
-        logoUrl,
+        image = logo,
         width = 96.dp,
         height = 48.dp,
         tmdbSize = "w185",

@@ -68,7 +68,7 @@ internal fun HomeHeroCarousel(
     ) { index ->
         val item = items[index]
         val heroImageModel = rememberCrispyImageModel(
-            item.backdropUrl,
+            image = item.backdrop,
             width = 320.dp,
             height = 320.dp,
             tmdbSize = "w780",

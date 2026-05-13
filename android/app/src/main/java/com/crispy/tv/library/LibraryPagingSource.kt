@@ -5,6 +5,7 @@ import androidx.paging.PagingState
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
+import com.crispy.tv.images.toUiResponsiveImageSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -105,6 +106,9 @@ private fun CrispyBackendClient.MediaItem.toLibrarySectionItemUi(
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,
         logoUrl = logoUrl,
+        poster = poster.toUiResponsiveImageSet(),
+        backdrop = backdrop.toUiResponsiveImageSet(),
+        logo = logo.toUiResponsiveImageSet(),
         rating = rating,
         year = releaseYear,
         genre = genres.firstOrNull(),

@@ -5,6 +5,7 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.images.toUiResponsiveImageSet
 import java.util.Locale
 
 class BackendSearchRepository(
@@ -70,6 +71,9 @@ internal fun CrispyBackendClient.MediaItem.toCatalogItem(defaultGenre: String? =
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,
         logoUrl = logoUrl,
+        poster = poster.toUiResponsiveImageSet(),
+        backdrop = backdrop.toUiResponsiveImageSet(),
+        logo = logo.toUiResponsiveImageSet(),
         addonId = "backend",
         type = normalizedType,
         rating = rating?.toString(),

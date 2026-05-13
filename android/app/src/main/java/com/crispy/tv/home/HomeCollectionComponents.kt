@@ -108,9 +108,9 @@ private fun HomeCollectionCard(
 ) {
     val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
     val featuredMovie = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
-    val logoUrl = remember(featuredMovie?.logoUrl) { featuredMovie?.logoUrl?.trim()?.ifBlank { null } }
+    val logo = featuredMovie?.logo
     val logoModel = rememberCrispyImageModel(
-        url = logoUrl,
+        image = logo,
         width = 256.dp,
         height = 80.dp,
         enableCrossfade = true,
@@ -246,8 +246,8 @@ private fun HomeCollectionMovieRow(
     item: CatalogItem,
     onClick: () -> Unit,
 ) {
-    val posterUrl = item.posterUrl?.takeIf { it.isNotBlank() } ?: item.backdropUrl?.takeIf { it.isNotBlank() }
-    val imageModel = rememberCrispyImageModel(posterUrl, width = 56.dp, height = 56.dp, tmdbSize = "w185")
+    val image = item.poster?.takeUnless { it.isEmpty } ?: item.backdrop
+    val imageModel = rememberCrispyImageModel(image, width = 56.dp, height = 56.dp, tmdbSize = "w185")
     val detailText = collectionMovieMetaText(item)
     val ratingText = normalizeRatingText(item.rating)
 

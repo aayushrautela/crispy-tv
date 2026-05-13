@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @Composable
@@ -131,13 +132,23 @@ internal fun BoxScope.HomeArtworkBottomScrim(
 
 @Composable
 internal fun rememberPosterImageModel(url: String?): Any? {
-    return rememberCrispyImageModel(url = url, width = 124.dp, height = 186.dp, tmdbSize = "w342")
+    return rememberPosterImageModel(ResponsiveImageSet.fromSingle(url))
+}
+
+@Composable
+internal fun rememberPosterImageModel(image: ResponsiveImageSet?): Any? {
+    return rememberCrispyImageModel(image = image, width = 124.dp, height = 186.dp, tmdbSize = "w342")
 }
 
 @Composable
 internal fun rememberLandscapeImageModel(url: String?, width: Dp): Any? {
+    return rememberLandscapeImageModel(ResponsiveImageSet.fromSingle(url), width)
+}
+
+@Composable
+internal fun rememberLandscapeImageModel(image: ResponsiveImageSet?, width: Dp): Any? {
     return rememberCrispyImageModel(
-        url = url,
+        image = image,
         width = width,
         height = width * (9f / 16f),
         tmdbSize = "w500",

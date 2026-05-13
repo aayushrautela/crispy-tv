@@ -1,13 +1,17 @@
 package com.crispy.tv.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.metadata.tmdb.TmdbApi
+import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import java.util.Locale
 
 @Composable
@@ -19,18 +23,44 @@ internal fun rememberCrispyImageModel(
     enableCrossfade: Boolean = false,
     cacheKey: String? = null,
 ): Any? {
+    return rememberCrispyImageModel(
+        image = ResponsiveImageSet.fromSingle(url),
+        width = width,
+        height = height,
+        tmdbSize = tmdbSize,
+        enableCrossfade = enableCrossfade,
+        cacheKey = cacheKey,
+    )
+}
+
+@Composable
+internal fun rememberCrispyImageModel(
+    image: ResponsiveImageSet?,
+    width: Dp,
+    height: Dp,
+    tmdbSize: String? = null,
+    enableCrossfade: Boolean = false,
+    cacheKey: String? = null,
+): Any? {
     val context = LocalContext.current
+    val imageSettingsRepository = remember(context) {
+        ImageSettingsRepositoryProvider.get(context.applicationContext)
+    }
+    val imageSettings by imageSettingsRepository.settings.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    val resolvedUrl = remember(url, tmdbSize) {
+    val selectedUrl = image?.urlFor(imageSettings.quality)
+    val resolvedUrl = remember(selectedUrl, tmdbSize) {
         when {
-            url.isNullOrBlank() -> null
-            tmdbSize.isNullOrBlank() -> url
-            else -> TmdbApi.resizedImageUrl(url, tmdbSize)
+            selectedUrl.isNullOrBlank() -> null
+            tmdbSize.isNullOrBlank() -> selectedUrl
+            else -> TmdbApi.resizedImageUrl(selectedUrl, tmdbSize)
         }
     }
-    val resolvedCacheKey = cacheKey?.trim()?.ifBlank { null }
+    val resolvedCacheKey = remember(cacheKey, imageSettings.quality) {
+        cacheKey?.trim()?.ifBlank { null }?.let { "$it:${imageSettings.quality.key}" }
+    }
 
     return remember(context, resolvedUrl, widthPx, heightPx, enableCrossfade, resolvedCacheKey) {
         resolvedUrl?.let {

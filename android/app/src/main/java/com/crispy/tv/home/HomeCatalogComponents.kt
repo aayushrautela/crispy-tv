@@ -132,6 +132,9 @@ internal fun HomeCatalogPosterCard(
         year = item.year,
         genre = item.genre,
         logoUrl = item.logoUrl,
+        poster = item.poster,
+        backdrop = item.backdrop,
+        logo = item.logo,
         gradientColorHex = null,
         modifier = Modifier.width(124.dp),
         onClick = onClick

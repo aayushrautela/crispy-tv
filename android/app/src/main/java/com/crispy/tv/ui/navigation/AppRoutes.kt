@@ -26,6 +26,7 @@ object AppRoutes {
     const val PersonDetailsPersonIdArg = "personId"
 
     const val PlaybackSettingsRoute = "settings/playback"
+    const val ImageSettingsRoute = "settings/image"
     const val AddonsSettingsRoute = "settings/addons"
     const val ProviderPortalRoute = "settings/providers"
     const val AccountsProfilesRoute = "settings/accounts"

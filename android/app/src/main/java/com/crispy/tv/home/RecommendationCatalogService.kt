@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.backend.toStringMap
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -17,6 +18,10 @@ import com.crispy.tv.domain.home.buildCatalogPage
 import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
 import com.crispy.tv.ratings.formatRatingOutOfTen
+import com.crispy.tv.images.ResponsiveImageSet
+import com.crispy.tv.images.responsiveImageSetFromDomainMap
+import com.crispy.tv.images.toDomainMap
+import com.crispy.tv.images.toUiResponsiveImageSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -43,6 +48,7 @@ data class HomeHeroItem(
     val year: String? = null,
     val genres: List<String> = emptyList(),
     val backdropUrl: String,
+    val backdrop: ResponsiveImageSet = ResponsiveImageSet.fromSingle(backdropUrl),
     val addonId: String,
     val type: String,
 )
@@ -297,6 +303,9 @@ class RecommendationCatalogService internal constructor(
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
             logoUrl = logoUrl,
+            poster = poster.toDomainMap(),
+            backdrop = backdrop.toDomainMap(),
+            logo = logo.toDomainMap(),
             addonId = "backend",
             type = normalizedType,
             rating = formatRatingOutOfTen(rating?.toString()),
@@ -315,6 +324,9 @@ class RecommendationCatalogService internal constructor(
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
             logoUrl = logoUrl,
+            poster = poster.toDomainMap(),
+            backdrop = backdrop.toDomainMap(),
+            logo = logo.toDomainMap(),
             addonId = "backend",
             type = normalizedType,
             rating = formatRatingOutOfTen(rating?.toString()),
@@ -332,6 +344,9 @@ class RecommendationCatalogService internal constructor(
             posterUrl = firstItem.posterUrl,
             backdropUrl = null,
             logoUrl = logoUrl,
+            poster = firstItem.poster.toDomainMap(),
+            backdrop = emptyMap(),
+            logo = logo.toDomainMap(),
             addonId = "backend",
             type = firstItem.mediaType.toCatalogType(),
             rating = formatRatingOutOfTen(firstItem.rating?.toString()),
@@ -349,6 +364,9 @@ class RecommendationCatalogService internal constructor(
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
             logoUrl = logoUrl,
+            poster = responsiveImageSetFromDomainMap(poster),
+            backdrop = responsiveImageSetFromDomainMap(backdrop),
+            logo = responsiveImageSetFromDomainMap(logo),
             addonId = addonId,
             type = type,
             rating = rating,
@@ -442,6 +460,9 @@ class RecommendationCatalogService internal constructor(
                                                             .put("poster_url", item.posterUrl)
                                                             .put("backdrop_url", item.backdropUrl)
                                                             .put("logo_url", item.logoUrl)
+                                                            .put("poster", JSONObject(item.poster))
+                                                            .put("backdrop", JSONObject(item.backdrop))
+                                                            .put("logo", JSONObject(item.logo))
                                                             .put("addon_id", item.addonId)
                                                             .put("type", item.type)
                                                             .put("rating", item.rating)
@@ -519,6 +540,9 @@ class RecommendationCatalogService internal constructor(
             posterUrl = json.optString("poster_url").trim().ifBlank { null },
             backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
             logoUrl = json.optString("logo_url").trim().ifBlank { null },
+            poster = json.optJSONObject("poster")?.toStringMap() ?: emptyMap(),
+            backdrop = json.optJSONObject("backdrop")?.toStringMap() ?: emptyMap(),
+            logo = json.optJSONObject("logo")?.toStringMap() ?: emptyMap(),
             addonId = addonId,
             type = type,
             rating = json.optString("rating").trim().ifBlank { null },
@@ -554,6 +578,7 @@ class RecommendationCatalogService internal constructor(
                                 year = hero.year,
                                 genres = hero.genres,
                                 backdropUrl = hero.backdropUrl,
+                                backdrop = hero.backdrop.toUiResponsiveImageSet(),
                                 addonId = hero.addonId,
                                 type = hero.type,
                             )

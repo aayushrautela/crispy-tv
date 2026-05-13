@@ -28,7 +28,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataCompanyView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodePreview
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodeView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataExternalIds
-import com.crispy.tv.backend.CrispyBackendClient.MetadataImages
+import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonKnownForItem
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonRefView
@@ -243,14 +243,35 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
     )
 }
 
-internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject): MetadataImages {
+internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject): CrispyBackendClient.MetadataImages {
     val images = json.optJSONObject("images")
     val artwork = json.optJSONObject("artwork")
-    return MetadataImages(
-        posterUrl = json.optNullableString("posterUrl") ?: images.optNullableString("posterUrl") ?: artwork.optNullableString("posterUrl"),
-        backdropUrl = json.optNullableString("backdropUrl") ?: images.optNullableString("backdropUrl") ?: artwork.optNullableString("backdropUrl"),
-        stillUrl = json.optNullableString("stillUrl") ?: images.optNullableString("stillUrl") ?: artwork.optNullableString("stillUrl"),
-        logoUrl = json.optNullableString("logoUrl") ?: images.optNullableString("logoUrl"),
+    return CrispyBackendClient.MetadataImages(
+        poster = parseResponsiveImageSet(
+            images.optJSONObject("poster") ?: artwork.optJSONObject("poster"),
+            json.optNullableString("posterUrl") ?: images.optNullableString("posterUrl") ?: artwork.optNullableString("posterUrl")
+        ),
+        backdrop = parseResponsiveImageSet(
+            images.optJSONObject("backdrop") ?: artwork.optJSONObject("backdrop"),
+            json.optNullableString("backdropUrl") ?: images.optNullableString("backdropUrl") ?: artwork.optNullableString("backdropUrl")
+        ),
+        still = parseResponsiveImageSet(
+            images.optJSONObject("still") ?: artwork.optJSONObject("still"),
+            json.optNullableString("stillUrl") ?: images.optNullableString("stillUrl") ?: artwork.optNullableString("stillUrl")
+        ),
+        logo = parseResponsiveImageSet(
+            images.optJSONObject("logo"),
+            json.optNullableString("logoUrl") ?: images.optNullableString("logoUrl")
+        ),
+    )
+}
+
+private fun parseResponsiveImageSet(json: JSONObject?, fallbackUrl: String?): ResponsiveImageSet {
+    val fallback = fallbackUrl?.trim()?.ifBlank { null }
+    return ResponsiveImageSet(
+        small = json.optNullableString("small") ?: fallback,
+        medium = json.optNullableString("medium") ?: fallback,
+        large = json.optNullableString("large") ?: fallback,
     )
 }
 
@@ -307,10 +328,10 @@ internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
         originalTitle = json.optNullableString("originalTitle"),
         subtitle = json.optNullableString("subtitle"),
         overview = json.optNullableString("overview"),
-        posterUrl = json.optNullableString("posterUrl"),
-        backdropUrl = json.optNullableString("backdropUrl"),
-        logoUrl = json.optNullableString("logoUrl"),
-        stillUrl = json.optNullableString("stillUrl"),
+        poster = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("poster"), json.optNullableString("posterUrl")),
+        backdrop = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("backdrop"), json.optNullableString("backdropUrl")),
+        logo = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("logo"), json.optNullableString("logoUrl")),
+        still = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("still"), json.optNullableString("stillUrl")),
         releaseDate = json.optNullableString("releaseDate"),
         releaseYear = json.optIntOrNull("releaseYear"),
         rating = json.optDoubleOrNull("rating"),
@@ -911,6 +932,11 @@ internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?)
             val title = item.optString("title").trim().ifBlank { continue }
             val description = item.optString("description").trim().ifBlank { continue }
             val backdropUrl = item.optString("backdropUrl").trim().ifBlank { continue }
+            val backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop"), backdropUrl)
+            val posterUrl = item.optNullableString("posterUrl")
+            val poster = parseResponsiveImageSet(item.optJSONObject("poster"), posterUrl)
+            val logoUrl = item.optNullableString("logoUrl")
+            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), logoUrl)
             add(
                 RecommendationHeroItem(
                     mediaKey = mediaKey,
@@ -918,8 +944,11 @@ internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?)
                     title = title,
                     description = description,
                     backdropUrl = backdropUrl,
-                    posterUrl = item.optNullableString("posterUrl"),
-                    logoUrl = item.optNullableString("logoUrl"),
+                    backdrop = backdrop,
+                    posterUrl = posterUrl,
+                    poster = poster,
+                    logoUrl = logoUrl,
+                    logo = logo,
                     releaseYear = item.optIntOrNull("releaseYear"),
                     rating = item.optDoubleOrNull("rating"),
                     genre = item.optNullableString("genre"),
@@ -936,6 +965,7 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
             val item = safeArray.optJSONObject(index) ?: continue
             val title = item.optString("title").trim().ifBlank { continue }
             val logoUrl = item.optString("logoUrl").trim().ifBlank { continue }
+            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), logoUrl)
             val items = buildList {
                 val parts = item.optJSONArray("items") ?: JSONArray()
                 for (partIndex in 0 until parts.length()) {
@@ -943,11 +973,13 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
                     val mediaType = part.optString("mediaType").trim().ifBlank { continue }
                     val partTitle = part.optString("title").trim().ifBlank { continue }
                     val posterUrl = part.optString("posterUrl").trim().ifBlank { continue }
+                    val poster = parseResponsiveImageSet(part.optJSONObject("poster"), posterUrl)
                     add(
                         RecommendationCollectionItem(
                             mediaType = mediaType,
                             title = partTitle,
                             posterUrl = posterUrl,
+                            poster = poster,
                             releaseYear = part.optIntOrNull("releaseYear"),
                             rating = part.optDoubleOrNull("rating"),
                         )
@@ -955,7 +987,7 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
                 }
             }
             if (items.isNotEmpty()) {
-                add(RecommendationCollectionCard(title = title, logoUrl = logoUrl, items = items))
+                add(RecommendationCollectionCard(title = title, logoUrl = logoUrl, logo = logo, items = items))
             }
         }
     }

@@ -94,10 +94,10 @@ class CrispyBackendClient(
         val originalTitle: String?,
         val subtitle: String?,
         val overview: String?,
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val logoUrl: String?,
-        val stillUrl: String?,
+        val poster: ResponsiveImageSet,
+        val backdrop: ResponsiveImageSet,
+        val logo: ResponsiveImageSet,
+        val still: ResponsiveImageSet,
         val releaseDate: String?,
         val releaseYear: Int?,
         val rating: Double?,
@@ -114,13 +114,19 @@ class CrispyBackendClient(
         val absoluteEpisodeNumber: Int?,
         val episodeTitle: String?,
         val airDate: String?,
-    )
+    ) {
+        val posterUrl: String?
+            get() = poster.medium
 
-    data class MediaPresentationHint(
-        val preferredSize: String?,
-        val sectionId: String?,
-        val sectionTitle: String?,
-    )
+        val backdropUrl: String?
+            get() = backdrop.medium
+
+        val logoUrl: String?
+            get() = logo.medium
+
+        val stillUrl: String?
+            get() = still.medium
+    }
 
     data class SurfaceContext(
         val values: Map<String, Any?>,
@@ -198,12 +204,30 @@ data class PlaybackEventInput(
     val payload: Map<String, Any?> = emptyMap(),
 )
 
-    data class MetadataImages(
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val stillUrl: String?,
-        val logoUrl: String?,
+    data class ResponsiveImageSet(
+        val small: String?,
+        val medium: String?,
+        val large: String?,
     )
+
+    data class MetadataImages(
+        val poster: ResponsiveImageSet,
+        val backdrop: ResponsiveImageSet,
+        val still: ResponsiveImageSet,
+        val logo: ResponsiveImageSet,
+    ) {
+        val posterUrl: String?
+            get() = poster.medium
+
+        val backdropUrl: String?
+            get() = backdrop.medium
+
+        val stillUrl: String?
+            get() = still.medium
+
+        val logoUrl: String?
+            get() = logo.medium
+    }
 
     data class MetadataExternalIds(
         val tmdb: Int?,
@@ -610,8 +634,11 @@ data class PlaybackEventInput(
         val title: String,
         val description: String,
         val backdropUrl: String,
+        val backdrop: ResponsiveImageSet,
         val posterUrl: String?,
+        val poster: ResponsiveImageSet,
         val logoUrl: String?,
+        val logo: ResponsiveImageSet,
         val releaseYear: Int?,
         val rating: Double?,
         val genre: String?,
@@ -621,6 +648,7 @@ data class PlaybackEventInput(
         val mediaType: String,
         val title: String,
         val posterUrl: String,
+        val poster: ResponsiveImageSet,
         val releaseYear: Int?,
         val rating: Double?,
     )
@@ -628,6 +656,7 @@ data class PlaybackEventInput(
     data class RecommendationCollectionCard(
         val title: String,
         val logoUrl: String,
+        val logo: ResponsiveImageSet,
         val items: List<RecommendationCollectionItem>,
     )
 

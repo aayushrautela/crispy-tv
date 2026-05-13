@@ -6,6 +6,7 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.ratings.formatRating
+import com.crispy.tv.images.toUiResponsiveImageSet
 import java.util.Locale
 
 internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
@@ -167,6 +168,9 @@ internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? 
         posterUrl = normalizedPosterUrl,
         backdropUrl = images.backdropUrl,
         logoUrl = images.logoUrl,
+        poster = images.poster.toUiResponsiveImageSet(),
+        backdrop = images.backdrop.toUiResponsiveImageSet(),
+        logo = images.logo.toUiResponsiveImageSet(),
         addonId = "backend",
         type = normalizedType,
         rating = formatRating(rating),
