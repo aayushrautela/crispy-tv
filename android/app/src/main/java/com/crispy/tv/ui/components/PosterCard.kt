@@ -1,5 +1,6 @@
 package com.crispy.tv.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -45,6 +47,7 @@ fun PosterCard(
     backdropUrl: String?,
     rating: String?,
     year: String? = null,
+    maturityRating: String? = null,
     genre: String? = null,
     logoUrl: String? = null,
     gradientColorHex: String? = null,
@@ -68,10 +71,10 @@ fun PosterCard(
         gradientColorHex?.toComposeColorOrNull() ?: PosterGradientFallback
     }
     val formattedRating = formatRating(rating?.toDoubleOrNull())
-    val metadataText = listOfNotNull(
-        year?.trim()?.ifBlank { null },
-        genre?.trim()?.ifBlank { null },
-    ).joinToString(" • ")
+    val yearText = year?.trim()?.ifBlank { null }
+    val maturityText = maturityRating?.trim()?.ifBlank { null }
+    val genreText = genre?.trim()?.ifBlank { null }
+    val metadataColor = Color.White.copy(alpha = 0.86f)
 
     Card(
         modifier = modifier
@@ -127,6 +130,40 @@ fun PosterCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom
             ) {
+                if (yearText != null || maturityText != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        yearText?.let { value ->
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = metadataColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        maturityText?.let { value ->
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = Color.White.copy(alpha = 0.10f),
+                                contentColor = metadataColor,
+                                border = BorderStroke(1.dp, metadataColor.copy(alpha = 0.3f)),
+                            ) {
+                                Text(
+                                    text = value,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Light,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+
                 if (logoModel != null) {
                     AsyncImage(
                         model = logoModel,
@@ -149,17 +186,17 @@ fun PosterCard(
                     )
                 }
 
-                if (metadataText.isNotBlank() || formattedRating != null) {
+                if (genreText != null || formattedRating != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        if (metadataText.isNotBlank()) {
+                        genreText?.let { value ->
                             Text(
-                                text = metadataText,
+                                text = value,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.86f),
+                                color = metadataColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -169,12 +206,12 @@ fun PosterCard(
                                 imageVector = Icons.Filled.Star,
                                 contentDescription = null,
                                 modifier = Modifier.size(11.dp),
-                                tint = Color(0xFFFFC107)
+                                tint = metadataColor
                             )
                             Text(
                                 text = value,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
+                                color = metadataColor,
                                 fontSize = 11.sp,
                             )
                         }
