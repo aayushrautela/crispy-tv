@@ -93,8 +93,6 @@ private fun choosePreferred(
         current.contentType == "movie" ||
             (current.episodeKey != null && current.episodeKey == incoming.episodeKey)
 
-    // Mirror Nuvio's behavior: for the same episode/movie, only let progress win when it is
-    // meaningfully ahead; otherwise, fall back to recency to avoid flip-flopping on tiny deltas.
     if (sameEpisode) {
         val preferProgressDelta = 0.5
         if (incoming.progressPercent > current.progressPercent + preferProgressDelta) {

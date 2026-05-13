@@ -26,20 +26,6 @@ data class NextEpisodeResult(
     val title: String? = null,
 )
 
-/**
- * 1:1 port of Nuvio's `findNextEpisode`.
- *
- * Given the current season/episode and a full episode list,
- * returns the next *released* episode that isn't in [watchedSet].
- *
- * Sorting: ascending by season, then by episode (matching Nuvio).
- *
- * [watchedSet] keys must be in the format `{imdbId}:{season}:{episode}`
- * (the imdbId should include the `tt` prefix).
- *
- * [showId] is the IMDb ID of the show (e.g. `tt1234567`), used to
- * build lookup keys into [watchedSet].
- */
 fun findNextEpisode(
     currentSeason: Int,
     currentEpisode: Int,
@@ -53,11 +39,9 @@ fun findNextEpisode(
     val sorted = episodes.sortedWith(compareBy({ it.season }, { it.episode }))
 
     for (ep in sorted) {
-        // Skip episodes at or before the current position
         if (ep.season < currentSeason) continue
         if (ep.season == currentSeason && ep.episode <= currentEpisode) continue
 
-        // Skip already-watched episodes
         if (watchedSet != null && showId != null) {
             val cleanShowId = if (showId.startsWith("tt")) showId else "tt$showId"
             val key1 = "$cleanShowId:${ep.season}:${ep.episode}"
@@ -65,7 +49,6 @@ fun findNextEpisode(
             if (watchedSet.contains(key1) || watchedSet.contains(key2)) continue
         }
 
-        // Only return released episodes
         if (!isEpisodeReleased(ep.released, nowMs)) continue
 
         return NextEpisodeResult(
@@ -78,12 +61,6 @@ fun findNextEpisode(
     return null
 }
 
-/**
- * 1:1 port of Nuvio's `isEpisodeReleased`.
- *
- * Returns `true` if [released] is a valid date string that is <= now.
- * Returns `false` if null, blank, or unparseable.
- */
 private fun isEpisodeReleased(released: String?, nowMs: Long?): Boolean {
     if (released.isNullOrBlank()) return false
     val trimmed = released.trim()

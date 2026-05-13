@@ -1,11 +1,10 @@
 package com.crispy.tv.home
 
 import android.content.Context
-import com.crispy.tv.domain.metadata.formatIdForIdPrefixes
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.metadata.AddonManifestSeed
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.network.CrispyHttpClient
+import com.crispy.tv.playback.parseLookupId
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -55,7 +54,7 @@ internal class CalendarMetaEpisodeService(
         id: String,
         preferredAddonId: String?,
     ): MetaDetails? {
-        val normalizedId = normalizeNuvioMediaId(id).addonLookupId.ifBlank { normalizeNuvioMediaId(id).contentId }
+        val normalizedId = parseLookupId(id).let { parsed -> buildLookupId(parsed.baseId, parsed.season, parsed.episode) }
         if (normalizedId.isBlank()) return null
 
         val endpoints = resolveEndpoints()
@@ -93,14 +92,9 @@ internal class CalendarMetaEpisodeService(
                 ?: return null
 
         val addonId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
-        val addonIdPrefixes =
-            parseStringArray(manifest.optJSONArray("idPrefixes")).ifEmpty {
-                nonBlank(manifest.optString("idPrefix"))?.let(::listOf).orEmpty()
-            }
 
         val resources = manifest.optJSONArray("resources") ?: JSONArray()
         var declaredTypes = emptyList<String>()
-        var resourceIdPrefixes = emptyList<String>()
 
         for (index in 0 until resources.length()) {
             when (val resource = resources.opt(index)) {
@@ -112,10 +106,6 @@ internal class CalendarMetaEpisodeService(
                 is JSONObject -> {
                     if (!resource.optString("name").equals("meta", ignoreCase = true)) continue
                     declaredTypes = parseStringArray(resource.optJSONArray("types"))
-                    resourceIdPrefixes =
-                        parseStringArray(resource.optJSONArray("idPrefixes")).ifEmpty {
-                            nonBlank(resource.optString("idPrefix"))?.let(::listOf).orEmpty()
-                        }
                     break
                 }
             }
@@ -130,8 +120,6 @@ internal class CalendarMetaEpisodeService(
             baseUrl = seed.baseUrl,
             encodedQuery = seed.encodedQuery,
             declaredTypes = declaredTypes,
-            addonIdPrefixes = addonIdPrefixes,
-            resourceIdPrefixes = resourceIdPrefixes,
         )
     }
 
@@ -140,7 +128,7 @@ internal class CalendarMetaEpisodeService(
         type: String,
         id: String,
     ): MetaDetails? {
-        val lookupId = endpoint.formatLookupId(type, id) ?: return null
+        val lookupId = endpoint.formatLookupId(id) ?: return null
         val resolvedType = endpoint.resolveType(type)
         val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
         val url = buildString {
@@ -230,7 +218,6 @@ internal class CalendarMetaEpisodeService(
                         JSONObject()
                             .put("name", "meta")
                             .put("types", JSONArray().put("movie").put("series"))
-                            .put("idPrefixes", JSONArray().put("tt"))
                     )
                 )
         }
@@ -254,42 +241,13 @@ internal class CalendarMetaEpisodeService(
 
     private fun firstNonBlank(vararg values: String?): String? = values.firstNotNullOfOrNull { nonBlank(it) }
 
-    private data class AddonMetaEndpoint(
-        val addonId: String,
-        val baseUrl: String,
-        val encodedQuery: String?,
-        val declaredTypes: List<String>,
-        val addonIdPrefixes: List<String>,
-        val resourceIdPrefixes: List<String>,
-    ) {
-        fun resolveType(requestedType: String): String {
-            return declaredTypes.firstOrNull { it.equals(requestedType, ignoreCase = true) }
-                ?: declaredTypes.firstOrNull()
-                ?: requestedType.lowercase()
-        }
-
-        fun formatLookupId(requestedType: String, rawId: String): String? {
-            val normalized = normalizeNuvioMediaId(rawId).addonLookupId.ifBlank { normalizeNuvioMediaId(rawId).contentId }
-            val prefixes = resourceIdPrefixes.ifEmpty { addonIdPrefixes }
-            return if (prefixes.isNotEmpty()) {
-                formatIdForIdPrefixes(
-                    input = normalized,
-                    mediaType = if (requestedType.equals("movie", ignoreCase = true)) "movie" else "series",
-                    idPrefixes = prefixes,
-                )
-            } else {
-                normalized.takeIf { it.isNotBlank() }
-            }
+    private fun buildLookupId(contentId: String, season: Int?, episode: Int?): String {
+        return if (season != null && season > 0 && episode != null && episode > 0) {
+            "$contentId:$season:$episode"
+        } else {
+            contentId
         }
     }
-
-    private data class MetaDetails(
-        val seriesName: String,
-        val posterUrl: String?,
-        val backdropUrl: String?,
-        val addonId: String,
-        val videos: List<MetaVideo>,
-    )
 
     private companion object {
         private const val DAY_MS = 24L * 60L * 60L * 1000L
@@ -298,6 +256,26 @@ internal class CalendarMetaEpisodeService(
             "https://v3-cinemeta.strem.io",
             "http://v3-cinemeta.strem.io",
         )
+    }
+}
+
+internal data class AddonMetaEndpoint(
+    val addonId: String,
+    val baseUrl: String,
+    val encodedQuery: String?,
+    val declaredTypes: List<String>,
+) {
+    fun formatLookupId(id: String): String? {
+        val trimmed = id.trim()
+        return trimmed.takeIf { it.isNotBlank() }
+    }
+
+    fun resolveType(type: String): String {
+        val normalizedType = type.lowercase().trim()
+        if (declaredTypes.contains(normalizedType)) {
+            return normalizedType
+        }
+        return declaredTypes.firstOrNull { it.equals("series", ignoreCase = true) }?.lowercase() ?: "movie"
     }
 }
 

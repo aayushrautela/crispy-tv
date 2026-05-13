@@ -2,7 +2,6 @@ package com.crispy.tv.streams
 
 import android.content.Context
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.domain.metadata.formatIdForIdPrefixes
 import com.crispy.tv.metadata.AddonManifestSeed
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.network.CrispyHttpClient
@@ -184,7 +183,6 @@ class AddonStreamsService(
         val manifest = resolveManifest(seed)
         val providerId = nonBlank(manifest?.optString("id")) ?: seed.addonIdHint
         val providerName = nonBlank(manifest?.optString("name")) ?: providerId
-        val addonIdPrefixes = parseManifestStringArray(manifest?.optJSONArray("idPrefixes"))
 
         val streamSupport = parseStreamSupport(manifest)
         if (!streamSupport.supported) return null
@@ -195,8 +193,6 @@ class AddonStreamsService(
             baseUrl = seed.baseUrl,
             encodedQuery = seed.encodedQuery.orEmpty(),
             supportedTypes = streamSupport.types,
-            addonIdPrefixes = addonIdPrefixes,
-            streamIdPrefixes = streamSupport.idPrefixes,
         )
     }
 
@@ -218,17 +214,16 @@ class AddonStreamsService(
     private fun parseStreamSupport(manifest: JSONObject?): StreamSupport {
         val defaultTypes = setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME)
         if (manifest == null) {
-            return StreamSupport(supported = true, types = defaultTypes, idPrefixes = emptyMap())
+            return StreamSupport(supported = true, types = defaultTypes)
         }
 
         val resources = manifest.optJSONArray("resources")
         if (resources == null || resources.length() == 0) {
-            return StreamSupport(supported = true, types = defaultTypes, idPrefixes = emptyMap())
+            return StreamSupport(supported = true, types = defaultTypes)
         }
 
         var streamDeclared = false
         val supportedTypes = linkedSetOf<MetadataLabMediaType>()
-        val idPrefixes = mutableMapOf<MetadataLabMediaType, List<String>>()
 
         for (index in 0 until resources.length()) {
             when (val resource = resources.opt(index)) {
@@ -248,27 +243,19 @@ class AddonStreamsService(
                         parseMediaTypes(resource.optJSONArray("types")).ifEmpty {
                             defaultTypes
                         }
-                    val resourcePrefixes =
-                        parseManifestStringArray(resource.optJSONArray("idPrefixes")).ifEmpty {
-                            nonBlank(resource.optString("idPrefix"))?.let(::listOf).orEmpty()
-                        }
-
                     for (type in types) {
                         supportedTypes += type
-                        if (resourcePrefixes.isNotEmpty()) {
-                            idPrefixes[type] = resourcePrefixes
-                        }
                     }
                 }
             }
         }
 
         if (!streamDeclared) {
-            return StreamSupport(supported = false, types = emptySet(), idPrefixes = emptyMap())
+            return StreamSupport(supported = false, types = emptySet())
         }
 
         val finalTypes = if (supportedTypes.isEmpty()) defaultTypes else supportedTypes
-        return StreamSupport(supported = true, types = finalTypes, idPrefixes = idPrefixes)
+        return StreamSupport(supported = true, types = finalTypes)
     }
 
     private suspend fun fetchProviderStreams(
@@ -276,7 +263,7 @@ class AddonStreamsService(
         mediaType: MetadataLabMediaType,
         lookupId: String,
     ): ProviderStreamsResult {
-        val formattedLookupId = endpoint.formatLookupId(mediaType, lookupId)
+        val formattedLookupId = endpoint.formatLookupId(lookupId)
         if (formattedLookupId == null) {
             return ProviderStreamsResult(
                 providerId = endpoint.providerId,
@@ -514,7 +501,6 @@ class AddonStreamsService(
     private data class StreamSupport(
         val supported: Boolean,
         val types: Set<MetadataLabMediaType>,
-        val idPrefixes: Map<MetadataLabMediaType, List<String>>,
     )
 
     private data class JsonRequestPolicy(
@@ -549,24 +535,12 @@ class AddonStreamsService(
         val baseUrl: String,
         val encodedQuery: String,
         val supportedTypes: Set<MetadataLabMediaType>,
-        val addonIdPrefixes: List<String>,
-        val streamIdPrefixes: Map<MetadataLabMediaType, List<String>>,
     ) {
         fun supports(mediaType: MetadataLabMediaType): Boolean = supportedTypes.contains(mediaType)
 
-        fun formatLookupId(mediaType: MetadataLabMediaType, lookupId: String): String? {
-            val acceptedPrefixes = streamIdPrefixes[mediaType].orEmpty().ifEmpty { addonIdPrefixes }
-            val mediaTypePath =
-                when (mediaType) {
-                    MetadataLabMediaType.MOVIE -> "movie"
-                    MetadataLabMediaType.SERIES -> "series"
-                    MetadataLabMediaType.ANIME -> "series"
-                }
-            return formatIdForIdPrefixes(
-                input = lookupId,
-                mediaType = mediaTypePath,
-                idPrefixes = acceptedPrefixes,
-            )
+        fun formatLookupId(lookupId: String): String? {
+            val trimmedLookupId = lookupId.trim()
+            return trimmedLookupId.takeIf { it.isNotBlank() }
         }
     }
 

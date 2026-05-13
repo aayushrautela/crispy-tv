@@ -117,6 +117,31 @@ fun extractTmdbIdOrNull(rawId: String?): Int? {
     return match.groupValues.getOrNull(1)?.toIntOrNull()
 }
 
+data class ParsedLookupId(
+    val baseId: String,
+    val season: Int?,
+    val episode: Int?
+)
+
+fun parseLookupId(rawId: String): ParsedLookupId {
+    val trimmed = rawId.trim()
+    if (trimmed.isEmpty()) {
+        return ParsedLookupId(baseId = "", season = null, episode = null)
+    }
+
+    val parts = trimmed.split(":")
+    if (parts.size >= 3) {
+        val season = parts[parts.lastIndex - 1].toIntOrNull()
+        val episode = parts.last().toIntOrNull()
+        if (season != null && season > 0 && episode != null && episode > 0) {
+            val baseId = parts.dropLast(2).joinToString(":").trim()
+            return ParsedLookupId(baseId = baseId, season = season, episode = episode)
+        }
+    }
+
+    return ParsedLookupId(baseId = trimmed, season = null, episode = null)
+}
+
 fun ProviderStreamsResult.toUiState(): StreamProviderUiState {
     return StreamProviderUiState(
         providerId = providerId,

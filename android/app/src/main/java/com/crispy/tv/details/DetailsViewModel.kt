@@ -4,7 +4,6 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.episodesForSeason
@@ -22,7 +21,7 @@ import com.crispy.tv.playback.buildPlayerSubtitle
 import com.crispy.tv.playback.buildStreamStatusMessage
 import com.crispy.tv.playback.findEpisodeForLookupId
 import com.crispy.tv.playback.resolveStreamLookupTarget
-import com.crispy.tv.playback.matchesTarget
+import com.crispy.tv.playback.parseLookupId
 import com.crispy.tv.playback.toUiState
 import com.crispy.tv.playback.toLoadingUiState
 import com.crispy.tv.playback.applyProviderResult
@@ -813,10 +812,7 @@ class DetailsViewModel internal constructor(
                         seasonEpisodes = currentState.seasonEpisodes,
                         fallbackMediaType = requestedMediaType,
                     ).lookupId
-            val normalizedLookupId =
-                normalizeNuvioMediaId(
-                    resolvedLookupId,
-                )
+            val parsedLookupId = parseLookupId(resolvedLookupId)
 
             val isEpisodic = resolvedMediaType != MetadataLabMediaType.MOVIE
             val parentMediaType =
@@ -825,8 +821,8 @@ class DetailsViewModel internal constructor(
                     MetadataLabMediaType.SERIES -> "show"
                     MetadataLabMediaType.ANIME -> "anime"
                 }
-            val season = if (isEpisodic) targetEpisode?.season ?: normalizedLookupId.season else null
-            val episode = if (isEpisodic) targetEpisode?.episode ?: normalizedLookupId.episode else null
+            val season = if (isEpisodic) targetEpisode?.season ?: parsedLookupId.season else null
+            val episode = if (isEpisodic) targetEpisode?.episode ?: parsedLookupId.episode else null
 
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
             val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"

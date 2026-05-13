@@ -386,7 +386,7 @@ class PlayerSessionViewModel(
                     seasonEpisodes = uiState.value.seasonEpisodes,
                     fallbackMediaType = activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE,
                 ).lookupId
-        val normalizedLookupId = com.crispy.tv.domain.metadata.normalizeNuvioMediaId(lookupId)
+        val parsedLookupId = com.crispy.tv.playback.parseLookupId(lookupId)
         val nextMediaType = state.streamSelector.mediaType ?: activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE
         val nextEpisode =
             selectedEpisode
@@ -398,8 +398,8 @@ class PlayerSessionViewModel(
                 MetadataLabMediaType.ANIME -> "anime"
             }
 
-        val nextSeason = if (isEpisodic) nextEpisode?.season ?: normalizedLookupId.season else null
-        val nextEpisodeNumber = if (isEpisodic) nextEpisode?.episode ?: normalizedLookupId.episode else null
+        val nextSeason = if (isEpisodic) nextEpisode?.season ?: parsedLookupId.season else null
+        val nextEpisodeNumber = if (isEpisodic) nextEpisode?.episode ?: parsedLookupId.episode else null
         val nextTitle = nextEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: details.title.trim().ifBlank { "Player" }
         val nextSubtitle = buildPlayerSubtitle(nextMediaType, details, nextTitle, nextSeason, nextEpisodeNumber)
         val nextIdentity =
