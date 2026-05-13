@@ -462,7 +462,7 @@ private func parseRatingItem(_ payload: [String: Any]) -> ContractRatingItem? {
 
 private func parseRatingState(_ payload: [String: Any]) -> ContractRatingState? {
     guard hasExactKeys(payload, expected: ["value", "ratedAt"]),
-          let value = doubleValue(payload["value"]),
+          let value = doubleValue(payload["value"] as Any),
           let ratedAt = requiredString(payload, "ratedAt") else {
         return nil
     }
@@ -471,7 +471,7 @@ private func parseRatingState(_ payload: [String: Any]) -> ContractRatingState? 
 
 private func parseWatchProgress(_ payload: [String: Any]) -> ContractWatchProgress? {
     guard hasExactKeys(payload, expected: ["positionSeconds", "durationSeconds", "progressPercent", "lastPlayedAt"]),
-          let progressPercent = doubleValue(payload["progressPercent"]) else {
+          let progressPercent = doubleValue(payload["progressPercent"] as Any) else {
         return nil
     }
     return ContractWatchProgress(
@@ -498,7 +498,7 @@ private func parseCalendarItem(_ payload: [String: Any]) -> CalendarContractItem
           let mediaItemObject = payload["mediaItem"] as? [String: Any],
           let mediaItem = parseMediaItem(mediaItemObject),
           let contextObject = payload["context"] as? [String: Any],
-          let context = stringifyContext(contextObject),
+          let _ = stringifyContext(contextObject),
           let watched = payload["watched"] as? Bool else {
         return nil
     }
