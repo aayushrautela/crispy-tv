@@ -88,21 +88,45 @@ private suspend fun loadLibrarySectionPage(
     }
 }
 
+private fun CrispyBackendClient.MediaItem.toLibrarySectionItemUi(
+    id: String?,
+    addedAt: String?,
+    watchedAt: String?,
+    ratedAt: String?,
+    ratingValue: Int?,
+    lastActivityAt: String?,
+    origins: List<String>,
+): LibrarySectionItemUi {
+    return LibrarySectionItemUi(
+        id = id ?: mediaKey,
+        mediaKey = mediaKey,
+        mediaType = mediaType,
+        title = title,
+        posterUrl = posterUrl,
+        backdropUrl = backdropUrl,
+        logoUrl = logoUrl,
+        rating = rating,
+        year = releaseYear,
+        genre = genres.firstOrNull(),
+        maturityRating = maturityRating,
+        addedAt = addedAt,
+        watchedAt = watchedAt,
+        ratedAt = ratedAt,
+        ratingValue = ratingValue,
+        lastActivityAt = lastActivityAt,
+        origins = origins,
+    )
+}
+
 private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.toWatchedSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
         items = items.map { item ->
-            LibrarySectionItemUi(
-                id = item.id ?: item.mediaItem.mediaKey,
-                mediaKey = item.mediaItem.mediaKey,
-                mediaType = item.mediaItem.mediaType,
-                title = item.mediaItem.title,
-                posterUrl = item.mediaItem.posterUrl,
-                backdropUrl = item.mediaItem.backdropUrl,
-                logoUrl = item.mediaItem.logoUrl,
+            item.mediaItem.toLibrarySectionItemUi(
+                id = item.id,
                 addedAt = null,
                 watchedAt = item.watchedAt,
                 ratedAt = null,
-                rating = null,
+                ratingValue = null,
                 lastActivityAt = item.lastActivityAt,
                 origins = item.origins,
             )
@@ -115,18 +139,12 @@ private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.to
 private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.toWatchlistSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
         items = items.map { item ->
-            LibrarySectionItemUi(
-                id = item.id ?: item.mediaItem.mediaKey,
-                mediaKey = item.mediaItem.mediaKey,
-                mediaType = item.mediaItem.mediaType,
-                title = item.mediaItem.title,
-                posterUrl = item.mediaItem.posterUrl,
-                backdropUrl = item.mediaItem.backdropUrl,
-                logoUrl = item.mediaItem.logoUrl,
+            item.mediaItem.toLibrarySectionItemUi(
+                id = item.id,
                 addedAt = item.addedAt,
                 watchedAt = null,
                 ratedAt = null,
-                rating = null,
+                ratingValue = null,
                 lastActivityAt = item.addedAt,
                 origins = item.origins,
             )
@@ -139,18 +157,12 @@ private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.
 private fun CanonicalWatchCollectionResponse<CrispyBackendClient.RatingItem>.toRatingsSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
         items = items.map { item ->
-            LibrarySectionItemUi(
-                id = item.id ?: item.mediaItem.mediaKey,
-                mediaKey = item.mediaItem.mediaKey,
-                mediaType = item.mediaItem.mediaType,
-                title = item.mediaItem.title,
-                posterUrl = item.mediaItem.posterUrl,
-                backdropUrl = item.mediaItem.backdropUrl,
-                logoUrl = item.mediaItem.logoUrl,
+            item.mediaItem.toLibrarySectionItemUi(
+                id = item.id,
                 addedAt = null,
                 watchedAt = null,
                 ratedAt = item.rating.ratedAt,
-                rating = item.rating.value,
+                ratingValue = item.rating.value,
                 lastActivityAt = item.rating.ratedAt,
                 origins = item.origins,
             )

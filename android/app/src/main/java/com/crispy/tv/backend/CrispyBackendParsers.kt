@@ -317,6 +317,7 @@ internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
         genres = json.optStringList("genres"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
         status = json.optNullableString("status"),
+        maturityRating = json.optNullableString("maturityRating") ?: json.optNullableString("certification"),
         certification = json.optNullableString("certification"),
         externalIds = parseMediaExternalIds(json.optJSONObject("externalIds")),
         parent = parseMediaItemParent(json.optJSONObject("parent")),

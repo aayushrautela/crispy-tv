@@ -296,6 +296,7 @@ class RecommendationCatalogService internal constructor(
             title = normalizedTitle,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
+            logoUrl = logoUrl,
             addonId = "backend",
             type = normalizedType,
             rating = formatRatingOutOfTen(rating?.toString()),
@@ -313,6 +314,7 @@ class RecommendationCatalogService internal constructor(
             title = normalizedTitle,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
+            logoUrl = logoUrl,
             addonId = "backend",
             type = normalizedType,
             rating = formatRatingOutOfTen(rating?.toString()),
@@ -329,6 +331,7 @@ class RecommendationCatalogService internal constructor(
             title = title.trim(),
             posterUrl = firstItem.posterUrl,
             backdropUrl = null,
+            logoUrl = logoUrl,
             addonId = "backend",
             type = firstItem.mediaType.toCatalogType(),
             rating = formatRatingOutOfTen(firstItem.rating?.toString()),
@@ -345,6 +348,7 @@ class RecommendationCatalogService internal constructor(
             title = title,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
+            logoUrl = logoUrl,
             addonId = addonId,
             type = type,
             rating = rating,
@@ -437,6 +441,7 @@ class RecommendationCatalogService internal constructor(
                                                             .put("title", item.title)
                                                             .put("poster_url", item.posterUrl)
                                                             .put("backdrop_url", item.backdropUrl)
+                                                            .put("logo_url", item.logoUrl)
                                                             .put("addon_id", item.addonId)
                                                             .put("type", item.type)
                                                             .put("rating", item.rating)
@@ -513,6 +518,7 @@ class RecommendationCatalogService internal constructor(
             title = title,
             posterUrl = json.optString("poster_url").trim().ifBlank { null },
             backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
+            logoUrl = json.optString("logo_url").trim().ifBlank { null },
             addonId = addonId,
             type = type,
             rating = json.optString("rating").trim().ifBlank { null },

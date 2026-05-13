@@ -7,6 +7,7 @@ data class HomeCatalogItem(
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
+    val logoUrl: String? = null,
     val addonId: String,
     val type: String,
     val rating: String? = null,

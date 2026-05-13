@@ -104,6 +104,7 @@ class CrispyBackendClient(
         val genres: List<String>,
         val runtimeMinutes: Int?,
         val status: String?,
+        val maturityRating: String?,
         val certification: String?,
         val externalIds: MediaExternalIds,
         val parent: MediaItemParent?,
