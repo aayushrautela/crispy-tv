@@ -222,7 +222,7 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
         subtitle = json.optNullableString("subtitle"),
         summary = json.optNullableString("summary"),
         overview = json.optNullableString("overview"),
-        images = parseMetadataImages(json),
+        images = parseMetadataImages(json.optJSONObject("images")),
         releaseDate = json.optNullableString("releaseDate"),
         releaseYear = json.optIntOrNull("releaseYear"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
@@ -262,7 +262,7 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
         subtitle = json.optNullableString("subtitle"),
         summary = json.optNullableString("summary"),
         overview = json.optNullableString("overview"),
-        images = parseMetadataImages(json),
+        images = parseMetadataImages(json.optJSONObject("images")),
         releaseDate = json.optNullableString("releaseDate"),
         releaseYear = json.optIntOrNull("releaseYear"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
@@ -308,8 +308,8 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject):
     )
 }
 
-internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject): CrispyBackendClient.MetadataImages {
-    val images = json.optJSONObject("images") ?: JSONObject()
+internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject?): CrispyBackendClient.MetadataImages {
+    val images = json ?: JSONObject()
     return CrispyBackendClient.MetadataImages(
         poster = parseResponsiveImageSet(images.optJSONObject("poster"), null),
         backdrop = parseResponsiveImageSet(images.optJSONObject("backdrop"), null),
@@ -421,7 +421,7 @@ internal fun CrispyBackendClient.parseMetadataEpisodePreview(json: JSONObject): 
         airDate = json.optNullableString("airDate"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
         rating = json.optDoubleOrNull("rating"),
-        images = parseMetadataImages(json),
+        images = parseMetadataImages(json.optJSONObject("images")),
     )
 }
 
@@ -449,7 +449,7 @@ internal fun CrispyBackendClient.parseMetadataSeasonView(json: JSONObject): Meta
         summary = json.optNullableString("summary"),
         airDate = json.optNullableString("airDate"),
         episodeCount = json.optIntOrNull("episodeCount"),
-        posterUrl = parseMetadataImages(json).posterUrl,
+        posterUrl = parseMetadataImages(json.optJSONObject("images")).posterUrl,
     )
 }
 
@@ -618,7 +618,7 @@ internal fun CrispyBackendClient.parseMetadataCompanyViews(array: JSONArray?): L
                 MetadataCompanyView(
                     id = id,
                     name = name,
-                    logoUrl = item.optNullableString("logoUrl"),
+                    logo = parseResponsiveImageSet(item.optJSONObject("logo"), null),
                     originCountry = item.optNullableString("originCountry"),
                 )
             )
@@ -634,8 +634,8 @@ internal fun CrispyBackendClient.parseMetadataCollectionView(json: JSONObject?):
     return MetadataCollectionView(
         id = id,
         name = name,
-        posterUrl = safe.optNullableString("posterUrl"),
-        backdropUrl = safe.optNullableString("backdropUrl"),
+        poster = parseResponsiveImageSet(safe.optJSONObject("poster"), null),
+        backdrop = parseResponsiveImageSet(safe.optJSONObject("backdrop"), null),
         parts = parseMetadataRelatedItemViews(safe.optJSONArray("parts")),
     )
 }

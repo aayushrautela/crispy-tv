@@ -419,17 +419,26 @@ data class PlaybackEventInput(
     data class MetadataCompanyView(
         val id: String,
         val name: String,
-        val logoUrl: String?,
+        val logo: ResponsiveImageSet,
         val originCountry: String?,
-    )
+    ) {
+        val logoUrl: String?
+            get() = logo.medium
+    }
 
     data class MetadataCollectionView(
         val id: String,
         val name: String,
-        val posterUrl: String?,
-        val backdropUrl: String?,
+        val poster: ResponsiveImageSet,
+        val backdrop: ResponsiveImageSet,
         val parts: List<MetadataCardView>,
-    )
+    ) {
+        val posterUrl: String?
+            get() = poster.medium
+
+        val backdropUrl: String?
+            get() = backdrop.medium
+    }
 
     data class MetadataProductionInfoView(
         val originalLanguage: String?,
