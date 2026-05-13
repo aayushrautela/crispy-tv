@@ -3,7 +3,7 @@ package com.crispy.tv.images
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.settings.ImageQuality
 
-internal data class ResponsiveImageSet(
+data class ResponsiveImageSet(
     val low: String?,
     val medium: String?,
     val high: String?,
@@ -35,6 +35,14 @@ internal fun CrispyBackendClient.ResponsiveImageSet.toUiResponsiveImageSet(): Re
         low = small,
         medium = medium,
         high = large,
+    )
+}
+
+internal fun CrispyBackendClient.ResponsiveImageSet.toDomainMap(): Map<String, String?> {
+    return mapOf(
+        "small" to small,
+        "medium" to medium,
+        "large" to large,
     )
 }
 

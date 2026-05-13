@@ -132,6 +132,12 @@ class CrispyBackendClient(
         val values: Map<String, Any?>,
     )
 
+    data class MediaPresentationHint(
+        val preferredSize: String?,
+        val sectionId: String?,
+        val sectionTitle: String?,
+    )
+
     data class SearchResultItem(
         val kind: String,
         val mediaItem: MediaItem,

@@ -21,7 +21,6 @@ import com.crispy.tv.ratings.formatRatingOutOfTen
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.images.responsiveImageSetFromDomainMap
 import com.crispy.tv.images.toDomainMap
-import com.crispy.tv.images.toUiResponsiveImageSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -578,7 +577,7 @@ class RecommendationCatalogService internal constructor(
                                 year = hero.year,
                                 genres = hero.genres,
                                 backdropUrl = hero.backdropUrl,
-                                backdrop = hero.backdrop.toUiResponsiveImageSet(),
+                                backdrop = ResponsiveImageSet.fromSingle(hero.backdropUrl),
                                 addonId = hero.addonId,
                                 type = hero.type,
                             )
