@@ -279,6 +279,14 @@ internal data class AddonMetaEndpoint(
     }
 }
 
+internal data class MetaDetails(
+    val seriesName: String,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+    val addonId: String?,
+    val videos: List<MetaVideo>,
+)
+
 internal data class SeriesMetaEpisodes(
     val seriesName: String,
     val posterUrl: String?,
