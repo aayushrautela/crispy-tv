@@ -162,7 +162,7 @@ internal fun HeaderInfoSection(
     }
 
 
-    val genre = details.genres.take(2).joinToString(" / ") { it.trim() }
+    val genre = details.genres.take(2).joinToString(" · ") { it.trim() }
 
     var showRatingDialog by rememberSaveable { mutableStateOf(false) }
     var pendingRating by rememberSaveable { mutableStateOf(0f) }
