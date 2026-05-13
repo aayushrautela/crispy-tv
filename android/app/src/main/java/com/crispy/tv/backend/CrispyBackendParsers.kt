@@ -248,20 +248,20 @@ internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject): CrispyBa
     val artwork = json.optJSONObject("artwork")
     return CrispyBackendClient.MetadataImages(
         poster = parseResponsiveImageSet(
-            images.optJSONObject("poster") ?: artwork.optJSONObject("poster"),
-            json.optNullableString("posterUrl") ?: images.optNullableString("posterUrl") ?: artwork.optNullableString("posterUrl")
+            images?.optJSONObject("poster") ?: artwork?.optJSONObject("poster"),
+            json.optNullableString("posterUrl") ?: images?.optNullableString("posterUrl") ?: artwork?.optNullableString("posterUrl")
         ),
         backdrop = parseResponsiveImageSet(
-            images.optJSONObject("backdrop") ?: artwork.optJSONObject("backdrop"),
-            json.optNullableString("backdropUrl") ?: images.optNullableString("backdropUrl") ?: artwork.optNullableString("backdropUrl")
+            images?.optJSONObject("backdrop") ?: artwork?.optJSONObject("backdrop"),
+            json.optNullableString("backdropUrl") ?: images?.optNullableString("backdropUrl") ?: artwork?.optNullableString("backdropUrl")
         ),
         still = parseResponsiveImageSet(
-            images.optJSONObject("still") ?: artwork.optJSONObject("still"),
-            json.optNullableString("stillUrl") ?: images.optNullableString("stillUrl") ?: artwork.optNullableString("stillUrl")
+            images?.optJSONObject("still") ?: artwork?.optJSONObject("still"),
+            json.optNullableString("stillUrl") ?: images?.optNullableString("stillUrl") ?: artwork?.optNullableString("stillUrl")
         ),
         logo = parseResponsiveImageSet(
-            images.optJSONObject("logo"),
-            json.optNullableString("logoUrl") ?: images.optNullableString("logoUrl")
+            images?.optJSONObject("logo"),
+            json.optNullableString("logoUrl") ?: images?.optNullableString("logoUrl")
         ),
     )
 }
