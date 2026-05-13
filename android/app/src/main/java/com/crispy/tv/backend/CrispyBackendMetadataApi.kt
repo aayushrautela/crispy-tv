@@ -132,7 +132,7 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
         creators = parseMetadataPersonRefViews(json.optJSONArray("creators")),
         production = parseMetadataProductionInfoView(json.optJSONObject("production")),
         collection = parseMetadataCollectionView(json.optJSONObject("collection")),
-        similar = parseMetadataCardViews(json.optJSONArray("similar")),
+        similar = parseMetadataRelatedItemViews(json.optJSONArray("similar")),
     )
 }
 

@@ -271,6 +271,43 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
     )
 }
 
+internal fun CrispyBackendClient.parseMetadataRelatedItemViews(array: JSONArray?): List<MetadataCardView> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val item = safeArray.optJSONObject(index) ?: continue
+            add(parseMetadataRelatedItemView(item))
+        }
+    }
+}
+
+internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject): MetadataCardView {
+    val mediaItem = json.optJSONObject("mediaItem")
+        ?: error("Metadata related item is missing mediaItem.")
+    return MetadataCardView(
+        id = mediaItem.optNullableString("mediaKey"),
+        mediaKey = mediaItem.optNullableString("mediaKey"),
+        mediaType = mediaItem.optNullableString("mediaType")
+            ?: error("Metadata related item mediaItem is missing mediaType."),
+        kind = json.optNullableString("kind") ?: "metadata_detail",
+        tmdbId = mediaItem.optJSONObject("externalIds")?.optIntOrNull("tmdb"),
+        showTmdbId = mediaItem.optIntOrNull("showTmdbId"),
+        absoluteEpisodeNumber = mediaItem.optIntOrNull("absoluteEpisodeNumber"),
+        seasonNumber = mediaItem.optIntOrNull("seasonNumber"),
+        episodeNumber = mediaItem.optIntOrNull("episodeNumber"),
+        title = mediaItem.optNullableString("title"),
+        subtitle = mediaItem.optNullableString("subtitle"),
+        summary = mediaItem.optNullableString("overview"),
+        overview = mediaItem.optNullableString("overview"),
+        images = parseMetadataImages(mediaItem.optJSONObject("images")),
+        releaseDate = mediaItem.optNullableString("releaseDate"),
+        releaseYear = mediaItem.optIntOrNull("releaseYear"),
+        runtimeMinutes = mediaItem.optIntOrNull("runtimeMinutes"),
+        rating = mediaItem.optDoubleOrNull("rating"),
+        status = mediaItem.optNullableString("status"),
+    )
+}
+
 internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject): CrispyBackendClient.MetadataImages {
     val images = json.optJSONObject("images") ?: JSONObject()
     return CrispyBackendClient.MetadataImages(
@@ -599,7 +636,7 @@ internal fun CrispyBackendClient.parseMetadataCollectionView(json: JSONObject?):
         name = name,
         posterUrl = safe.optNullableString("posterUrl"),
         backdropUrl = safe.optNullableString("backdropUrl"),
-        parts = parseMetadataCardViews(safe.optJSONArray("parts")),
+        parts = parseMetadataRelatedItemViews(safe.optJSONArray("parts")),
     )
 }
 
