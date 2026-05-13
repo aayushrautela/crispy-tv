@@ -37,6 +37,7 @@ internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGen
         mediaKey = "tmdb:person:$tmdbPersonId",
         title = normalizedName,
         posterUrl = profileUrl?.trim()?.takeIf { it.isNotBlank() },
+        backdropUrl = null,
         addonId = "backend",
         type = "person",
         rating = null,
