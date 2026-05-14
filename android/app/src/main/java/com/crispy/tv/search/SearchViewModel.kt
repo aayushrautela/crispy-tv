@@ -37,7 +37,7 @@ data class SearchUiState(
         get() = isLoading || executedQuery.isNotBlank() || selectedGenre != null
 
     val shouldShowSuggestions: Boolean
-        get() = query.trim().length >= 2 && executedQuery.isBlank() && selectedGenre == null && suggestions.isNotEmpty()
+        get() = query.trim().length >= 2 && executedQuery.isBlank() && selectedGenre == null
 }
 
 class SearchViewModel(
@@ -57,7 +57,6 @@ class SearchViewModel(
     private var suggestionToken: Long = 0L
 
     fun updateQuery(query: String) {
-        clearSuggestions()
         val snapshot = _uiState.value
 
         _uiState.value = snapshot.copy(
@@ -71,11 +70,8 @@ class SearchViewModel(
         )
 
         val trimmedQuery = query.trim()
-        if (trimmedQuery.isBlank()) {
-            return
-        }
-
-        if (trimmedQuery.length < 2) {
+        if (trimmedQuery.isBlank() || trimmedQuery.length < 2) {
+            clearSuggestions()
             return
         }
 

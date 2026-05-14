@@ -36,8 +36,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Search
+
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -163,12 +164,14 @@ private fun SearchBrowseContent(
         pageHorizontalPadding = pageHorizontalPadding,
         modifier = modifier,
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            SearchBrowseHeader(
-                recentSearches = uiState.recentSearches,
-                onRecentSearchClick = onRecentSearchClick,
-                onRemoveRecentSearch = onRemoveRecentSearch,
-            )
+        if (uiState.recentSearches.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                RecentSearchStrip(
+                    recentSearches = uiState.recentSearches,
+                    onRecentSearchClick = onRecentSearchClick,
+                    onRemoveRecentSearch = onRemoveRecentSearch,
+                )
+            }
         }
         gridItems(
             items = SearchGenreSuggestion.entries,
@@ -179,21 +182,6 @@ private fun SearchBrowseContent(
                 onClick = { onGenreClick(genre) },
             )
         }
-    }
-}
-
-@Composable
-private fun SearchBrowseHeader(
-    recentSearches: List<String>,
-    onRecentSearchClick: (String) -> Unit,
-    onRemoveRecentSearch: (String) -> Unit,
-) {
-    if (recentSearches.isNotEmpty()) {
-        RecentSearchStrip(
-            recentSearches = recentSearches,
-            onRecentSearchClick = onRecentSearchClick,
-            onRemoveRecentSearch = onRemoveRecentSearch,
-        )
     }
 }
 
@@ -301,7 +289,7 @@ private fun SearchResultsContent(
 
             else -> {
                 if (isLoading) {
-                    SearchLoadingIndicator(compact = true)
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 if (buckets.movies.isNotEmpty()) {
                     SearchSectionRow(title = "Movies", items = buckets.movies, onItemClick = onItemClick)
@@ -421,7 +409,12 @@ private fun SearchSuggestionsContent(
         modifier = modifier.padding(horizontal = 16.dp),
     ) {
         if (isLoading && suggestions.isEmpty()) {
-            SearchLoadingIndicator(compact = true)
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
         } else if (suggestions.isEmpty()) {
             Text(
                 text = "Keep typing to search",
@@ -454,13 +447,7 @@ private fun SearchSuggestionRow(
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Search,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = suggestion.title,
@@ -508,17 +495,6 @@ private fun SearchGrid(
     )
 }
 
-@Composable
-private fun SearchLoadingIndicator(compact: Boolean = false) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = if (compact) 8.dp else 24.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator()
-    }
-}
+
 
 
