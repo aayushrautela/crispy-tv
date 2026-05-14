@@ -17,8 +17,8 @@ import com.crispy.tv.ui.brand.CrispyMark
 @Composable
 fun topLevelAppBarColors(): TopAppBarColors {
     return TopAppBarDefaults.topAppBarColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = MaterialTheme.colorScheme.background,
+        scrolledContainerColor = MaterialTheme.colorScheme.background,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,

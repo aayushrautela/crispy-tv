@@ -8,17 +8,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import com.crispy.tv.ui.utils.AppBarScrollBehavior
 
 @Composable
 fun standardTopAppBarColors(): TopAppBarColors {
     return TopAppBarDefaults.topAppBarColors(
-        containerColor = Color.Transparent,
-        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = MaterialTheme.colorScheme.background,
+        scrolledContainerColor = MaterialTheme.colorScheme.background,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -32,17 +31,16 @@ fun StandardTopAppBar(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
-    scrollBehavior: TopAppBarScrollBehavior? = null,
+    scrollBehavior: AppBarScrollBehavior? = null,
     colors: TopAppBarColors? = null,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
     val resolvedColors = colors ?: standardTopAppBarColors()
     TopAppBar(
         title = title,
-        modifier = modifier,
+        modifier = if (scrollBehavior == null) modifier else modifier.then(scrollBehavior.modifier()),
         navigationIcon = navigationIcon,
         actions = actions,
-        scrollBehavior = scrollBehavior,
         colors = resolvedColors,
         windowInsets = windowInsets,
     )
@@ -55,7 +53,7 @@ fun StandardTopAppBar(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
-    scrollBehavior: TopAppBarScrollBehavior? = null,
+    scrollBehavior: AppBarScrollBehavior? = null,
     colors: TopAppBarColors? = null,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
