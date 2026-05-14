@@ -1,7 +1,11 @@
 package com.crispy.tv.details
 
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,11 +26,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -44,23 +51,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
-import androidx.compose.ui.unit.sp
 import com.crispy.tv.home.HomeCatalogPosterCard
+import com.crispy.tv.home.LandscapeArtworkFrame
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.home.rememberLandscapeImageModel
 import com.crispy.tv.metadata.toCatalogItem
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.home.LandscapeArtworkFrame
-import com.crispy.tv.home.rememberLandscapeImageModel
+
 
 private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers")
 
@@ -74,6 +77,7 @@ internal fun DetailsBody(
     onPersonClick: (String) -> Unit = {},
     onEpisodeClick: (videoId: String) -> Unit = {},
     onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
+    onMakingOfVideoClick: (CrispyBackendClient.MetadataVideoView) -> Unit = {},
 ) {
     val details = uiState.details
     val titleDetail = uiState.titleDetail
@@ -190,12 +194,6 @@ internal fun DetailsBody(
             }
         }
     }
-
-    var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
-    MakingOfVideoPlayerDialog(
-        video = selectedMakingOfVideo,
-        onDismiss = { selectedMakingOfVideo = null },
-    )
 
     Column(
         modifier = Modifier
@@ -442,7 +440,7 @@ internal fun DetailsBody(
                 items(items = makingOfVideos, key = { it.id }) { video ->
                     MakingOfCard(
                         video = video,
-                        onClick = { selectedMakingOfVideo = video },
+                        onClick = { onMakingOfVideoClick(video) },
                     )
                 }
             }
@@ -587,56 +585,112 @@ private fun MakingOfCard(
     }
 }
 
-@Suppress("DEPRECATION")
+private fun youtubeEmbedHtml(videoKey: String): String =
+    """
+    <!doctype html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          html, body, #player { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
+        </style>
+      </head>
+      <body>
+        <iframe
+          id="player"
+          width="100%"
+          height="100%"
+          src="https://www.youtube.com/embed/$videoKey?autoplay=1&rel=0&playsinline=1&enablejsapi=1&origin=https%3A%2F%2Fwww.youtube.com"
+          title="YouTube video player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen>
+        </iframe>
+      </body>
+    </html>
+    """.trimIndent()
+
 @Composable
-private fun MakingOfVideoPlayerDialog(
+internal fun MakingOfVideoPlayerDialog(
     video: CrispyBackendClient.MetadataVideoView?,
     onDismiss: () -> Unit,
 ) {
     val videoKey = video?.key?.trim().orEmpty()
     if (video == null || videoKey.isBlank()) return
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    BackHandler(onBack = onDismiss)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.85f)),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
+            Text(
+                text = video.name.orEmpty(),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            AndroidView(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = video.name.orEmpty(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f),
-                    factory = { context ->
-                        WebView(context).apply {
-                            webViewClient = WebViewClient()
-                            settings.javaScriptEnabled = true
-                            settings.loadWithOverviewMode = true
-                            settings.useWideViewPort = true
-                            loadUrl("https://www.youtube.com/embed/$videoKey?autoplay=1&rel=0")
-                        }
-                    },
-                )
-                TextButton(onClick = onDismiss) {
-                    Text("Close", color = Color.White)
-                }
+                    .aspectRatio(16f / 9f),
+                factory = { context ->
+                    FrameLayout(context).apply {
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        clipToOutline = true
+                        layoutParams =
+                            ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                            )
+                        addView(
+                            WebView(context).apply {
+                                setBackgroundColor(android.graphics.Color.BLACK)
+                                clipToOutline = true
+                                webViewClient = WebViewClient()
+                                webChromeClient = WebChromeClient()
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.mediaPlaybackRequiresUserGesture = false
+                                settings.loadWithOverviewMode = true
+                                settings.useWideViewPort = true
+                                loadDataWithBaseURL(
+                                    "https://www.youtube.com",
+                                    youtubeEmbedHtml(videoKey),
+                                    "text/html",
+                                    "UTF-8",
+                                    null,
+                                )
+                            },
+                            FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                            ),
+                        )
+                    }
+                },
+                onRelease = { container ->
+                    (container.getChildAt(0) as? WebView)?.run {
+                        stopLoading()
+                        loadUrl("about:blank")
+                        removeAllViews()
+                        destroy()
+                    }
+                    container.removeAllViews()
+                },
+            )
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = Color.White)
             }
         }
     }

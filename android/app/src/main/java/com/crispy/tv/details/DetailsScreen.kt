@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
@@ -237,6 +238,8 @@ internal fun DetailsScreen(
         snackbarHostState.showSnackbar(message)
     }
 
+    var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
+
     MaterialTheme(colorScheme = detailsScheme) {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -307,6 +310,7 @@ internal fun DetailsScreen(
                         onPersonClick = onPersonClick,
                         onEpisodeClick = onEpisodeClick,
                         onToggleEpisodeWatched = onToggleEpisodeWatched,
+                        onMakingOfVideoClick = { selectedMakingOfVideo = it },
                     )
                 }
             }
@@ -356,6 +360,11 @@ internal fun DetailsScreen(
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+
+            MakingOfVideoPlayerDialog(
+                video = selectedMakingOfVideo,
+                onDismiss = { selectedMakingOfVideo = null },
             )
 
             StreamSelectorBottomSheet(
