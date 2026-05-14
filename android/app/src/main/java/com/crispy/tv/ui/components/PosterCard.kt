@@ -77,7 +77,7 @@ fun PosterCard(
     val yearText = year?.trim()?.ifBlank { null }
     val maturityText = maturityRating?.trim()?.ifBlank { null }
     val genreText = genre?.trim()?.ifBlank { null }?.let { shortenGenre(it) }
-    val metadataColor = Color.White.copy(alpha = 0.86f)
+    val metadataColor = Color.White.copy(alpha = 0.72f)
 
     Card(
         modifier = modifier
@@ -118,8 +118,8 @@ fun PosterCard(
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                gradientColor.copy(alpha = 0.92f),
-                                gradientColor,
+                                gradientColor.copy(alpha = 0.52f),
+                                gradientColor.copy(alpha = 0.88f),
                             )
                         )
                     )
@@ -182,7 +182,7 @@ fun PosterCard(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = Color.White.copy(alpha = 0.92f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
