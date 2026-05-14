@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -50,6 +52,14 @@ import androidx.compose.material3.FilterChipDefaults
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import com.crispy.tv.home.LandscapeArtworkFrame
+import com.crispy.tv.home.rememberLandscapeImageModel
+
+private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers", "Featurette", "Clip")
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -177,6 +187,12 @@ internal fun DetailsBody(
             }
         }
     }
+
+    var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
+    MakingOfVideoPlayerDialog(
+        video = selectedMakingOfVideo,
+        onDismiss = { selectedMakingOfVideo = null },
+    )
 
     Column(
         modifier = Modifier
@@ -402,6 +418,32 @@ internal fun DetailsBody(
             }
         }
 
+        val makingOfVideos = uiState.titleDetail?.videos.orEmpty()
+            .filter { video -> video.key.isNotBlank() && video.type in MAKING_OF_VIDEO_TYPES }
+        if (makingOfVideos.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(18.dp))
+            val baseTitle = details.title.substringBefore(':').trim().ifBlank { details.title }
+            Text(
+                text = "Making of $baseTitle",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = horizontalPadding),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(items = makingOfVideos, key = { it.id }) { video ->
+                    MakingOfCard(
+                        video = video,
+                        onClick = { selectedMakingOfVideo = video },
+                    )
+                }
+            }
+        }
+
         val collection = uiState.titleExtras?.collection ?: titleDetail?.collection
         collection?.let { col ->
             val collectionParts = col.parts.mapNotNull { it.toCatalogItem() }
@@ -510,5 +552,88 @@ private fun DetailsReviewPlaceholder(modifier: Modifier = Modifier) {
                 .height(92.dp)
                 .skeletonElement(color = DetailsSkeletonColors.Base),
         )
+    }
+}
+
+@Composable
+private fun MakingOfCard(
+    video: CrispyBackendClient.MetadataVideoView,
+    onClick: () -> Unit,
+) {
+    val imageModel = rememberLandscapeImageModel(video.thumbnailUrl, 280.dp)
+    Column(
+        modifier = Modifier
+            .width(280.dp)
+            .clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LandscapeArtworkFrame(
+            title = video.name.orEmpty(),
+            imageModel = imageModel,
+            onClick = null,
+            modifier = Modifier.aspectRatio(16f / 9f),
+        )
+        Text(
+            text = video.name.orEmpty(),
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Suppress("DEPRECATION")
+@Composable
+private fun MakingOfVideoPlayerDialog(
+    video: CrispyBackendClient.MetadataVideoView?,
+    onDismiss: () -> Unit,
+) {
+    val videoKey = video?.key?.trim().orEmpty()
+    if (video == null || videoKey.isBlank()) return
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.85f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = video.name.orEmpty(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f),
+                    factory = { context ->
+                        WebView(context).apply {
+                            webViewClient = WebViewClient()
+                            settings.javaScriptEnabled = true
+                            settings.loadWithOverviewMode = true
+                            settings.useWideViewPort = true
+                            loadUrl("https://www.youtube.com/embed/$videoKey?autoplay=1&rel=0")
+                        }
+                    },
+                )
+                TextButton(onClick = onDismiss) {
+                    Text("Close", color = Color.White)
+                }
+            }
+        }
     }
 }
