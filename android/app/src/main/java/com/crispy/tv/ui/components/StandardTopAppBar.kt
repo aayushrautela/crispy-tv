@@ -1,7 +1,7 @@
 package com.crispy.tv.ui.components
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -10,6 +10,7 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.crispy.tv.ui.utils.AppBarScrollBehavior
 
@@ -35,13 +36,12 @@ fun StandardTopAppBar(
     colors: TopAppBarColors? = null,
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
 ) {
-    val resolvedColors = colors ?: standardTopAppBarColors()
     TopAppBar(
         title = title,
         modifier = if (scrollBehavior == null) modifier else modifier.then(scrollBehavior.modifier()),
         navigationIcon = navigationIcon,
         actions = actions,
-        colors = resolvedColors,
+        colors = colors ?: standardTopAppBarColors(),
         windowInsets = windowInsets,
     )
 }
@@ -61,7 +61,8 @@ fun StandardTopAppBar(
         title = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

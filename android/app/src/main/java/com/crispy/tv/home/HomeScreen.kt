@@ -113,8 +113,8 @@ internal fun HomeRoute(
                 title = {
                     CrispyWordmark(
                         modifier = Modifier
-                            .width(118.dp)
-                            .height(26.dp),
+                            .width(164.dp)
+                            .height(36.dp),
                     )
                 },
                 actions = {
