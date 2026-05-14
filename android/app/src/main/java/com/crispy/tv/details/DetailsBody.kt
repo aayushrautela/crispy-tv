@@ -223,7 +223,7 @@ internal fun DetailsBody(
         RatingsSection(
             tmdbRating = details.rating,
             titleRatings = titleRatings,
-            isLoading = uiState.secondaryContentIsLoading,
+            isLoading = uiState.ratingsIsLoading,
             horizontalPadding = horizontalPadding,
             contentPadding = contentPadding,
         )
@@ -269,8 +269,8 @@ internal fun DetailsBody(
             }
         }
 
-        val reviews = uiState.titleReviews?.reviews.orEmpty()
-        if (reviews.isNotEmpty() || uiState.secondaryContentIsLoading) {
+        val reviews = uiState.titleExtras?.reviews.orEmpty()
+        if (reviews.isNotEmpty() || uiState.extrasIsLoading) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
                 text = "Reviews",
@@ -392,12 +392,13 @@ internal fun DetailsBody(
             }
         }
 
-        titleDetail?.collection?.let { collection ->
-            val collectionParts = collection.parts.mapNotNull { it.toCatalogItem() }
+        val collection = uiState.titleExtras?.collection ?: titleDetail?.collection
+        collection?.let { col ->
+            val collectionParts = col.parts.mapNotNull { it.toCatalogItem() }
             if (collectionParts.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(18.dp))
                 Text(
-                    text = collection.name,
+                    text = col.name,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = horizontalPadding),
                     maxLines = 1,
@@ -415,7 +416,7 @@ internal fun DetailsBody(
             }
         }
 
-        val similar = titleDetail?.similar.orEmpty().mapNotNull { it.toCatalogItem() }
+        val similar = (uiState.titleExtras?.similar ?: titleDetail?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
         if (similar.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
@@ -435,7 +436,7 @@ internal fun DetailsBody(
             }
 
         val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail)
-        if (detailRows.isNotEmpty() || uiState.secondaryContentIsLoading) {
+        if (detailRows.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
 
             val header = when (details.mediaType) {
@@ -452,34 +453,28 @@ internal fun DetailsBody(
             Spacer(modifier = Modifier.height(12.dp))
 
             Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                if (detailRows.isNotEmpty()) {
-                    detailRows.forEach { (label, value) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier.widthIn(min = 100.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                } else {
-                    repeat(4) {
-                        DetailsRowPlaceholder()
+                detailRows.forEach { (label, value) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.widthIn(min = 100.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = value,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
@@ -503,31 +498,6 @@ private fun DetailsReviewPlaceholder(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(92.dp)
-                .skeletonElement(color = DetailsSkeletonColors.Base),
-        )
-    }
-}
-
-@Composable
-private fun DetailsRowPlaceholder() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
-    ) {
-        Box(
-            modifier = Modifier
-                .width(110.dp)
-                .height(12.dp)
-                .skeletonElement(color = DetailsSkeletonColors.Base),
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(12.dp)
                 .skeletonElement(color = DetailsSkeletonColors.Base),
         )
     }

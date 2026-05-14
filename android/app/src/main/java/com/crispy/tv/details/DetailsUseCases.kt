@@ -33,8 +33,11 @@ internal data class DetailsScreenLoadResult(
     val seasons: List<Int>,
 )
 
-internal data class DetailsSecondaryLoadResult(
-    val titleReviews: CrispyBackendClient.MetadataTitleReviewsResponse?,
+internal data class DetailsExtrasLoadResult(
+    val titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse?,
+)
+
+internal data class DetailsRatingsLoadResult(
     val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse?,
 )
 
@@ -191,24 +194,34 @@ internal class DetailsUseCases(
         }
     }
 
-    suspend fun loadSecondaryContent(
+    suspend fun loadExtras(
         mediaKey: String,
-    ): DetailsSecondaryLoadResult {
+    ): DetailsExtrasLoadResult {
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
+        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+
+        val titleExtras =
+            accessToken?.let {
+                runCatching {
+                    catalogRepository.getTitleExtras(
+                        accessToken = it,
+                        mediaKey = mediaKey,
+                    )
+                }.getOrNull()
+            }
+
+        return DetailsExtrasLoadResult(titleExtras = titleExtras)
+    }
+
+    suspend fun loadRatings(
+        mediaKey: String,
+    ): DetailsRatingsLoadResult {
         val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
         val accessToken = backendContext?.accessToken ?: session?.accessToken
         val profileId = backendContext?.profileId
 
-        val titleReviews =
-            accessToken?.takeIf { !profileId.isNullOrBlank() }?.let {
-                runCatching {
-                    catalogRepository.getTitleReviews(
-                        accessToken = it,
-                        profileId = checkNotNull(profileId),
-                        mediaKey = mediaKey,
-                    )
-                }.getOrNull()
-            }
         val titleRatings =
             accessToken?.takeIf { !profileId.isNullOrBlank() }?.let {
                 runCatching {
@@ -220,10 +233,7 @@ internal class DetailsUseCases(
                 }.getOrNull()
             }
 
-        return DetailsSecondaryLoadResult(
-            titleReviews = titleReviews,
-            titleRatings = titleRatings,
-        )
+        return DetailsRatingsLoadResult(titleRatings = titleRatings)
     }
 
     suspend fun resolveWatchCta(
@@ -247,18 +257,24 @@ internal class DetailsUseCases(
         season: Int,
         details: MediaDetails,
         titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
+        titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse? = null,
     ): DetailsSeasonEpisodesResult {
         val episodesForSeason = titleDetail
             ?.episodesForSeason(season)
             ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
             ?.takeIf { it.isNotEmpty() }
+            ?: titleExtras
+                ?.episodes
+                ?.filter { it.seasonNumber == season }
+                ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+                ?.takeIf { it.isNotEmpty() }
 
         if (episodesForSeason != null) {
             return DetailsSeasonEpisodesResult(
                 videos = episodesForSeason,
                 episodeWatchStates = resolveEpisodeWatchStates(details, episodesForSeason),
                 effectiveSeasonNumber = season,
-                includedSeasonNumbers = titleDetail.seasonNumbers(),
+                includedSeasonNumbers = titleDetail?.seasonNumbers().orEmpty(),
             )
         }
 

@@ -60,7 +60,8 @@ class DetailsViewModel internal constructor(
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
     private var reloadJob: Job? = null
-    private var secondaryContentJob: Job? = null
+    private var extrasJob: Job? = null
+    private var ratingsJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
     @Volatile
@@ -79,7 +80,8 @@ class DetailsViewModel internal constructor(
             aiJob?.cancel()
             streamLoadJob?.cancel()
             episodesJob?.cancel()
-            secondaryContentJob?.cancel()
+            extrasJob?.cancel()
+            ratingsJob?.cancel()
             seasonEpisodesCache.clear()
             detailsUseCases.clearEpisodeWatchStateCache()
 
@@ -87,10 +89,13 @@ class DetailsViewModel internal constructor(
                 it.copy(
                     isLoading = true,
                     titleDetail = null,
-                    titleReviews = null,
+                    titleExtras = null,
                     titleRatings = null,
-                    secondaryContentIsLoading = false,
+                    extrasIsLoading = false,
+                    ratingsIsLoading = false,
                     statusMessage = "",
+                    extrasStatusMessage = "",
+                    ratingsStatusMessage = "",
                     aiIsLoading = false,
                     aiInsights = null,
                     aiStoryVisible = false,
@@ -187,7 +192,8 @@ class DetailsViewModel internal constructor(
             }
 
             if (enrichedDetails != null) {
-                loadSecondaryContent(generation)
+                loadExtras(generation)
+                loadRatings(generation)
             }
 
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
@@ -201,7 +207,7 @@ class DetailsViewModel internal constructor(
                 if (cachedEpisodes != null) {
                     loadEpisodeWatchStatesForSeason(seasonToLoad, cachedEpisodes)
                 } else {
-                    loadEpisodesForSeason(seasonToLoad, force = true)
+                    _uiState.update { it.copy(episodesIsLoading = true, episodesStatusMessage = "") }
                 }
             }
 
@@ -221,23 +227,91 @@ class DetailsViewModel internal constructor(
         }
     }
 
-    private fun loadSecondaryContent(generation: Long) {
-        secondaryContentJob?.cancel()
-        _uiState.update { it.copy(secondaryContentIsLoading = true) }
+    private fun loadExtras(generation: Long) {
+        extrasJob?.cancel()
+        _uiState.update { it.copy(extrasIsLoading = true, extrasStatusMessage = "") }
 
-        secondaryContentJob =
+        extrasJob =
             viewModelScope.launch {
                 val result =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.loadSecondaryContent(mediaKey = mediaKey)
+                        detailsUseCases.loadExtras(mediaKey = mediaKey)
+                    }
+                if (!isCurrentGeneration(generation)) return@launch
+
+                val titleExtras = result.titleExtras
+                if (titleExtras != null) {
+                    titleExtras.episodes
+                        .mapNotNull { it.toMediaVideo() }
+                        .groupBy { it.season }
+                        .forEach { (season, videos) ->
+                            if (season != null && videos.isNotEmpty()) {
+                                seasonEpisodesCache[season] = videos
+                            }
+                        }
+                }
+
+                _uiState.update { state ->
+                    val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
+                        videos = titleExtras?.episodes.orEmpty().mapNotNull { it.toMediaVideo() },
+                        runtimeEntry = runtimeEntry,
+                    )
+                    val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: runtimeEpisodeTarget?.episodeId
+                    val pendingSeason =
+                        runtimeEpisodeTarget?.seasonNumber ?: pendingHighlightEpisodeId?.let { highlightEpisodeId ->
+                            seasonEpisodesCache.values.asSequence().flatten().firstOrNull { episode ->
+                                episode.id.equals(highlightEpisodeId, ignoreCase = true)
+                            }?.season
+                        }
+                    val selectedSeason =
+                        when {
+                            pendingSeason != null && pendingSeason in state.seasons -> pendingSeason
+                            state.selectedSeason != null && state.selectedSeason in state.seasons -> state.selectedSeason
+                            else -> state.selectedSeasonOrFirst
+                        }
+                    val selectedSeasonEpisodes = selectedSeason?.let { seasonEpisodesCache[it] }.orEmpty()
+                    state.copy(
+                        extrasIsLoading = false,
+                        titleExtras = titleExtras,
+                        selectedSeason = selectedSeason,
+                        highlightedEpisodeId = pendingHighlightEpisodeId ?: state.highlightedEpisodeId,
+                        seasonEpisodes = selectedSeasonEpisodes.takeIf { it.isNotEmpty() } ?: state.seasonEpisodes,
+                        episodesIsLoading = false,
+                        episodesStatusMessage = when {
+                            selectedSeason == null -> ""
+                            titleExtras == null -> "Episodes are unavailable right now."
+                            selectedSeasonEpisodes.isEmpty() -> "No episodes found for this season."
+                            else -> ""
+                        },
+                        extrasStatusMessage = if (titleExtras == null) "Some details are unavailable right now." else "",
+                    )
+                }
+
+                val selectedSeason = _uiState.value.selectedSeasonOrFirst
+                val selectedSeasonEpisodes = selectedSeason?.let { seasonEpisodesCache[it] }
+                if (selectedSeason != null && !selectedSeasonEpisodes.isNullOrEmpty()) {
+                    loadEpisodeWatchStatesForSeason(selectedSeason, selectedSeasonEpisodes)
+                }
+            }
+    }
+
+    private fun loadRatings(generation: Long) {
+        ratingsJob?.cancel()
+        _uiState.update { it.copy(ratingsIsLoading = true, ratingsStatusMessage = "") }
+
+        ratingsJob =
+            viewModelScope.launch {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.loadRatings(mediaKey = mediaKey)
                     }
                 if (!isCurrentGeneration(generation)) return@launch
 
                 _uiState.update {
                     it.copy(
-                        secondaryContentIsLoading = false,
-                        titleReviews = result.titleReviews,
+                        ratingsIsLoading = false,
                         titleRatings = result.titleRatings,
+                        ratingsStatusMessage = if (result.titleRatings == null) "Ratings are unavailable right now." else "",
                     )
                 }
             }
@@ -328,6 +402,9 @@ class DetailsViewModel internal constructor(
                 episodesIsLoading = cached == null,
                 episodesStatusMessage = "",
             )
+        }
+        if (cached == null && _uiState.value.extrasIsLoading) {
+            return
         }
         if (cached == null) {
             loadEpisodesForSeason(season)
@@ -441,6 +518,7 @@ class DetailsViewModel internal constructor(
                             season = season,
                             details = details,
                             titleDetail = _uiState.value.titleDetail,
+                            titleExtras = _uiState.value.titleExtras,
                         )
                     }
 

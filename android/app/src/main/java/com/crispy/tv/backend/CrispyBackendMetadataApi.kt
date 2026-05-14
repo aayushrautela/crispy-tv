@@ -7,7 +7,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataResolveResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleReviewsResponse
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
@@ -136,20 +136,22 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
     )
 }
 
-internal suspend fun CrispyBackendClient.getMetadataTitleReviewsApi(
+internal suspend fun CrispyBackendClient.getMetadataTitleExtrasApi(
     accessToken: String,
-    profileId: String,
     mediaKey: String,
-): MetadataTitleReviewsResponse {
+): MetadataTitleExtrasResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/metadata/titles/${mediaKey.trim()}/reviews".toHttpUrl(),
+        url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/extras".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return MetadataTitleReviewsResponse(
+    return MetadataTitleExtrasResponse(
+        episodes = parseMetadataEpisodeViews(json.optJSONArray("episodes")),
         reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
+        similar = parseMetadataRelatedItemViews(json.optJSONArray("similar")),
+        collection = parseMetadataCollectionView(json.optJSONObject("collection")),
     )
 }
 

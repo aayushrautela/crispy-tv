@@ -356,8 +356,11 @@ data class PlaybackEventInput(
         val similar: List<MetadataCardView>,
     )
 
-    data class MetadataTitleReviewsResponse(
+    data class MetadataTitleExtrasResponse(
+        val episodes: List<MetadataEpisodeView>,
         val reviews: List<MetadataReviewView>,
+        val similar: List<MetadataCardView>,
+        val collection: MetadataCollectionView?,
     )
 
     data class MetadataCardView(
@@ -833,16 +836,8 @@ data class PlaybackEventInput(
         return getMetadataTitleDetailApi(accessToken, mediaKey)
     }
 
-    suspend fun getMetadataTitleReviews(
-        accessToken: String,
-        profileId: String,
-        mediaKey: String,
-    ): MetadataTitleReviewsResponse {
-        return getMetadataTitleReviewsApi(
-            accessToken = accessToken,
-            profileId = profileId,
-            mediaKey = mediaKey,
-        )
+    suspend fun getMetadataTitleExtras(accessToken: String, mediaKey: String): MetadataTitleExtrasResponse {
+        return getMetadataTitleExtrasApi(accessToken, mediaKey)
     }
 
     suspend fun getMetadataTitleRatings(

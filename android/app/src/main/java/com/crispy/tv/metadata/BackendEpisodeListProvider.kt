@@ -28,7 +28,7 @@ internal class BackendEpisodeListProvider(
         val session = supabaseAccountClient.ensureValidSession() ?: return null
 
         val response = runCatching {
-            backendClient.getMetadataTitleDetail(
+            backendClient.getMetadataTitleExtras(
                 accessToken = session.accessToken,
                 mediaKey = mediaKey,
             )

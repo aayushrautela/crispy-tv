@@ -8,11 +8,10 @@ interface CatalogRepository {
         mediaKey: String,
     ): CrispyBackendClient.MetadataTitleDetailResponse
 
-    suspend fun getTitleReviews(
+    suspend fun getTitleExtras(
         accessToken: String,
-        profileId: String,
         mediaKey: String,
-    ): CrispyBackendClient.MetadataTitleReviewsResponse
+    ): CrispyBackendClient.MetadataTitleExtrasResponse
 
     suspend fun getTitleRatings(
         accessToken: String,
