@@ -1,6 +1,6 @@
 package com.crispy.tv.ui.utils
 
-import androidx.compose.foundation.layout.clipToBounds
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
