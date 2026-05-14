@@ -3,7 +3,6 @@ package com.crispy.tv.search
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,14 +28,16 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -47,7 +48,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -75,15 +75,18 @@ fun SearchRoute(
     val viewModel = rememberSearchViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val browseGridState = rememberLazyGridState()
-    val resultsGridState = rememberLazyGridState()
+    val resultsScrollState = rememberScrollState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
     val isAiMode = uiState.searchMode == SearchMode.AI
 
     LaunchedEffect(scrollToTopRequest, uiState.hasActiveResults) {
         if (scrollToTopRequest > 0) {
-            val targetGridState = if (uiState.hasActiveResults) resultsGridState else browseGridState
-            targetGridState.animateScrollToItem(0)
+            if (uiState.hasActiveResults) {
+                resultsScrollState.animateScrollTo(0)
+            } else {
+                browseGridState.animateScrollToItem(0)
+            }
             onScrollToTopConsumed()
         }
     }
@@ -116,9 +119,8 @@ fun SearchRoute(
         if (uiState.hasActiveResults) {
             SearchResultsContent(
                 uiState = uiState,
-                gridState = resultsGridState,
+                scrollState = resultsScrollState,
                 pageHorizontalPadding = pageHorizontalPadding,
-                onCategoryChange = viewModel::setCategory,
                 onItemClick = onItemClick,
                 emptyMessage = uiState.statusMessage,
                 modifier = contentModifier,
@@ -258,67 +260,56 @@ private fun RecentSearchChip(
 @Composable
 private fun SearchResultsContent(
     uiState: SearchUiState,
-    gridState: LazyGridState,
+    scrollState: ScrollState,
     pageHorizontalPadding: Dp,
-    onCategoryChange: (SearchCategory) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
-    SearchGrid(
-        state = gridState,
-        columns = GridCells.Adaptive(minSize = 124.dp),
-        pageHorizontalPadding = pageHorizontalPadding,
-        modifier = modifier,
-    ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            SearchCategoryRow(
-                availableCategories = uiState.availableCategories,
-                selectedCategory = uiState.category,
-                onCategoryChange = onCategoryChange,
-            )
-        }
+    val buckets = uiState.resultBuckets
+    val isLoading = uiState.isLoading
 
+    Column(
+        modifier = modifier
+            .verticalScroll(scrollState)
+            .padding(horizontal = pageHorizontalPadding),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
         when {
-            uiState.isLoading && uiState.visibleResults.isEmpty() -> {
-                items(SEARCH_SKELETON_COUNT, span = { GridItemSpan(1) }, key = { index -> "search-skeleton-$index" }) {
-                    SearchPosterSkeleton(modifier = Modifier.fillMaxWidth())
-                }
+            isLoading && buckets.isEmpty -> {
+                SearchSectionSkeleton()
+                SearchSectionSkeleton()
+                SearchSectionSkeleton()
             }
 
-            uiState.visibleResults.isEmpty() -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SearchEmptyState(
-                        text = emptyMessage ?: if (uiState.searchMode == SearchMode.AI) "No AI matches found." else "No results",
+            buckets.isEmpty -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = emptyMessage
+                            ?: if (uiState.searchMode == SearchMode.AI) "No AI matches found." else "No results",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             else -> {
-                if (uiState.isLoading) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        SearchLoadingIndicator(compact = true)
-                    }
+                if (isLoading) {
+                    SearchLoadingIndicator(compact = true)
                 }
-                gridItems(
-                    items = uiState.visibleResults,
-                    key = { "${it.type}:${it.id}" },
-                ) { item ->
-                    PosterCard(
-                        title = item.title,
-                        posterUrl = item.posterUrl,
-                        backdropUrl = item.backdropUrl,
-                        rating = item.rating,
-                        year = item.year,
-                        genre = item.genre,
-                        logoUrl = item.logoUrl,
-                        poster = item.poster,
-                        backdrop = item.backdrop,
-                        logo = item.logo,
-                        gradientColorHex = null,
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onItemClick(item) },
-                    )
+                if (buckets.movies.isNotEmpty()) {
+                    SearchSectionRow(title = "Movies", items = buckets.movies, onItemClick = onItemClick)
+                }
+                if (buckets.series.isNotEmpty()) {
+                    SearchSectionRow(title = "Series", items = buckets.series, onItemClick = onItemClick)
+                }
+                if (buckets.people.isNotEmpty()) {
+                    SearchSectionRow(title = "People", items = buckets.people, onItemClick = onItemClick)
                 }
             }
         }
@@ -326,21 +317,58 @@ private fun SearchResultsContent(
 }
 
 @Composable
-private fun SearchCategoryRow(
-    availableCategories: List<SearchCategory>,
-    selectedCategory: SearchCategory,
-    onCategoryChange: (SearchCategory) -> Unit,
+private fun SearchSectionRow(
+    title: String,
+    items: List<CatalogItem>,
+    onItemClick: (CatalogItem) -> Unit,
 ) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(availableCategories, key = { it.name }) { category ->
-            FilterChip(
-                selected = selectedCategory == category,
-                onClick = { onCategoryChange(category) },
-                label = { Text(category.label) },
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(items, key = { "${it.type}:${it.id}" }) { item ->
+                PosterCard(
+                    title = item.title,
+                    posterUrl = item.posterUrl,
+                    backdropUrl = item.backdropUrl,
+                    rating = item.rating,
+                    year = item.year,
+                    genre = item.genre,
+                    logoUrl = item.logoUrl,
+                    poster = item.poster,
+                    backdrop = item.backdrop,
+                    logo = item.logo,
+                    gradientColorHex = null,
+                    modifier = Modifier.width(124.dp),
+                    onClick = { onItemClick(item) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchSectionSkeleton() {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            modifier = Modifier
+                .width(120.dp)
+                .height(24.dp)
+                .skeletonElement(pulse = false),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(6) {
+                Box(
+                    modifier = Modifier
+                        .width(124.dp)
+                        .aspectRatio(2f / 3f)
+                        .skeletonElement(pulse = false),
+                )
+            }
         }
     }
 }
@@ -480,22 +508,6 @@ private fun SearchGrid(
 }
 
 @Composable
-private fun SearchEmptyState(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
 private fun SearchLoadingIndicator(compact: Boolean = false) {
     Row(
         modifier = Modifier
@@ -508,14 +520,4 @@ private fun SearchLoadingIndicator(compact: Boolean = false) {
     }
 }
 
-@Composable
-private fun SearchPosterSkeleton(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(2f / 3f)
-            .skeletonElement(pulse = false),
-    )
-}
 
-private const val SEARCH_SKELETON_COUNT = 9

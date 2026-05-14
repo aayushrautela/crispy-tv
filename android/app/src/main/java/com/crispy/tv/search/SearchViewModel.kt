@@ -5,7 +5,6 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.network.AppHttp
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -15,22 +14,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-enum class SearchCategory {
-    ALL,
-    MOVIES,
-    SERIES,
-    PEOPLE;
-
-    val label: String
-        get() =
-            when (this) {
-                ALL -> "All"
-                MOVIES -> "Movies"
-                SERIES -> "Series"
-                PEOPLE -> "People"
-            }
-}
 
 enum class SearchMode {
     STANDARD,
@@ -42,7 +25,6 @@ data class SearchUiState(
     val query: String = "",
     val executedQuery: String = "",
     val selectedGenre: SearchGenreSuggestion? = null,
-    val category: SearchCategory = SearchCategory.ALL,
     val searchMode: SearchMode = SearchMode.STANDARD,
     val isLoading: Boolean = false,
     val recentSearches: List<String> = emptyList(),
@@ -56,12 +38,6 @@ data class SearchUiState(
 
     val shouldShowSuggestions: Boolean
         get() = query.trim().length >= 2 && executedQuery.isBlank() && selectedGenre == null && suggestions.isNotEmpty()
-
-    val availableCategories: List<SearchCategory>
-        get() = SearchCategory.entries
-
-    val visibleResults: List<CatalogItem>
-        get() = resultBuckets.itemsFor(category)
 }
 
 class SearchViewModel(
@@ -88,7 +64,6 @@ class SearchViewModel(
             query = query,
             executedQuery = "",
             selectedGenre = null,
-            category = SearchCategory.ALL,
             searchMode = SearchMode.STANDARD,
             isLoading = false,
             resultBuckets = SearchResultBuckets(),
@@ -158,7 +133,6 @@ class SearchViewModel(
                     query = genreSuggestion.label,
                     executedQuery = "",
                     selectedGenre = genreSuggestion,
-                    category = SearchCategory.ALL,
                     searchMode = SearchMode.STANDARD,
                     isLoading = true,
                     statusMessage = null,
@@ -178,14 +152,6 @@ class SearchViewModel(
 
     fun clearRecentSearches() {
         _uiState.value = _uiState.value.copy(recentSearches = searchHistoryStore.clear())
-    }
-
-    fun setCategory(category: SearchCategory) {
-        if (_uiState.value.category == category) {
-            return
-        }
-
-        _uiState.value = _uiState.value.copy(category = category)
     }
 
     private fun scheduleSuggestions(query: String) {
@@ -277,7 +243,6 @@ class SearchViewModel(
                     query = normalizedQuery,
                     executedQuery = normalizedQuery,
                     selectedGenre = null,
-                    category = SearchCategory.ALL,
                     recentSearches = updatedRecentSearches,
                     searchMode = mode,
                     isLoading = true,

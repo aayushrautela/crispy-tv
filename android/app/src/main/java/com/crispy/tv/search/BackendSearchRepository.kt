@@ -47,7 +47,6 @@ class BackendSearchRepository(
 
     suspend fun suggest(
         query: String,
-        filter: SearchCategory = SearchCategory.ALL,
         locale: Locale = Locale.getDefault(),
     ): List<SearchSuggestion> {
         val normalizedQuery = query.trim()
@@ -58,11 +57,10 @@ class BackendSearchRepository(
         val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             ?: return emptyList()
 
-        val backendFilter = filter.toBackendFilter()
         val payload = backend.searchSuggestions(
             accessToken = session.accessToken,
             query = normalizedQuery,
-            filter = backendFilter,
+            filter = "all",
             limit = 8,
             locale = locale.toLanguageTag(),
         )
@@ -77,15 +75,6 @@ class BackendSearchRepository(
                 backend = BackendServicesProvider.backendClient(appContext),
             )
         }
-    }
-}
-
-private fun SearchCategory.toBackendFilter(): String {
-    return when (this) {
-        SearchCategory.ALL -> "all"
-        SearchCategory.MOVIES -> "movies"
-        SearchCategory.SERIES -> "series"
-        SearchCategory.PEOPLE -> "people"
     }
 }
 

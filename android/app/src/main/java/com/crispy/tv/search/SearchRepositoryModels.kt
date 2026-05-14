@@ -4,22 +4,12 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 
 data class SearchResultBuckets(
-    val all: List<SearchCatalogItem> = emptyList(),
     val movies: List<SearchCatalogItem> = emptyList(),
     val series: List<SearchCatalogItem> = emptyList(),
     val people: List<SearchCatalogItem> = emptyList(),
 ) {
-    fun itemsFor(category: SearchCategory): List<SearchCatalogItem> {
-        return when (category) {
-            SearchCategory.ALL -> all
-            SearchCategory.MOVIES -> movies
-            SearchCategory.SERIES -> series
-            SearchCategory.PEOPLE -> people
-        }
-    }
-
     val isEmpty: Boolean
-        get() = all.isEmpty() && movies.isEmpty() && series.isEmpty() && people.isEmpty()
+        get() = movies.isEmpty() && series.isEmpty() && people.isEmpty()
 }
 
 data class SearchResultsPayload(
@@ -74,7 +64,6 @@ internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(de
     return SearchResultsPayload(
         query = query,
         buckets = SearchResultBuckets(
-            all = all.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
             movies = movies.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
             series = series.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
             people = people.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
