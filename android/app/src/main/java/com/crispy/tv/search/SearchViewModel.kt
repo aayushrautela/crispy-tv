@@ -48,9 +48,14 @@ data class SearchUiState(
     val recentSearches: List<String> = emptyList(),
     val resultBuckets: SearchResultBuckets = SearchResultBuckets(),
     val statusMessage: String? = null,
+    val suggestions: List<SearchSuggestion> = emptyList(),
+    val isLoadingSuggestions: Boolean = false,
 ) {
     val hasActiveResults: Boolean
         get() = isLoading || executedQuery.isNotBlank() || selectedGenre != null
+
+    val shouldShowSuggestions: Boolean
+        get() = query.trim().length >= 2 && executedQuery.isBlank() && selectedGenre == null && suggestions.isNotEmpty()
 
     val availableCategories: List<SearchCategory>
         get() = SearchCategory.entries
@@ -64,40 +69,56 @@ class SearchViewModel(
     private val aiSearchRepository: AiSearchRepository,
     private val searchHistoryStore: SearchHistoryStore,
     private val localeProvider: () -> Locale = { Locale.getDefault() },
-    private val searchDebounceMs: Long = SEARCH_DEBOUNCE_MS,
+    private val suggestionDebounceMs: Long = SUGGESTION_DEBOUNCE_MS,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState(recentSearches = searchHistoryStore.load()))
     val uiState: StateFlow<SearchUiState> = _uiState
 
     private var searchJob: Job? = null
-    private var debouncedSearchJob: Job? = null
+    private var suggestionJob: Job? = null
     private var searchToken: Long = 0L
+    private var suggestionToken: Long = 0L
 
     fun updateQuery(query: String) {
+        clearSuggestions()
         val snapshot = _uiState.value
+
+        _uiState.value = snapshot.copy(
+            query = query,
+            executedQuery = "",
+            selectedGenre = null,
+            category = SearchCategory.ALL,
+            searchMode = SearchMode.STANDARD,
+            isLoading = false,
+            resultBuckets = SearchResultBuckets(),
+            statusMessage = null,
+        )
+
         val trimmedQuery = query.trim()
-        val clearsGenreSelection = snapshot.selectedGenre != null && query != snapshot.selectedGenre.label
-
-        _uiState.value =
-            snapshot.copy(
-                query = query,
-                selectedGenre = if (clearsGenreSelection) null else snapshot.selectedGenre,
-                executedQuery = if (clearsGenreSelection) "" else snapshot.executedQuery,
-                resultBuckets = if (clearsGenreSelection) SearchResultBuckets() else snapshot.resultBuckets,
-                statusMessage = if (clearsGenreSelection) null else snapshot.statusMessage,
-                isLoading = if (clearsGenreSelection) false else snapshot.isLoading,
-            )
-
         if (trimmedQuery.isBlank()) {
-            resetToBrowse(query = query)
             return
         }
 
-        scheduleDebouncedQuerySearch(mode = _uiState.value.searchMode)
+        if (trimmedQuery.length < 2) {
+            return
+        }
+
+        scheduleSuggestions(trimmedQuery)
+    }
+
+    fun selectSuggestion(suggestion: SearchSuggestion) {
+        executeQuerySearch(
+            rawQuery = suggestion.title,
+            mode = SearchMode.STANDARD,
+            recordInHistory = true,
+            immediate = true,
+        )
     }
 
     fun submitSearch(query: String = _uiState.value.query) {
+        cancelPendingSuggestions()
+        clearSuggestions()
         executeQuerySearch(
             rawQuery = query,
             mode = SearchMode.STANDARD,
@@ -107,6 +128,8 @@ class SearchViewModel(
     }
 
     fun submitAiSearch(query: String = _uiState.value.query) {
+        cancelPendingSuggestions()
+        clearSuggestions()
         executeQuerySearch(
             rawQuery = query,
             mode = SearchMode.AI,
@@ -116,14 +139,19 @@ class SearchViewModel(
     }
 
     fun clearSearch() {
-        resetToBrowse(query = "")
+        cancelPendingSuggestions()
+        clearSuggestions()
+        searchToken += 1
+        cancelActiveSearch()
+        _uiState.value = SearchUiState(recentSearches = searchHistoryStore.load())
     }
 
     fun selectGenre(genreSuggestion: SearchGenreSuggestion) {
         if (_uiState.value.selectedGenre == genreSuggestion) {
             return
         }
-        cancelPendingQuerySearch()
+        cancelPendingSuggestions()
+        clearSuggestions()
         launchSearch(
             updateState = {
                 copy(
@@ -160,35 +188,53 @@ class SearchViewModel(
         _uiState.value = _uiState.value.copy(category = category)
     }
 
-    private fun resetToBrowse(query: String) {
-        searchToken += 1
-        cancelActiveSearch()
-        cancelPendingQuerySearch()
-        _uiState.value =
-            _uiState.value.copy(
-                query = query,
-                executedQuery = "",
-                selectedGenre = null,
-                category = SearchCategory.ALL,
-                searchMode = SearchMode.STANDARD,
-                isLoading = false,
-                resultBuckets = SearchResultBuckets(),
-                statusMessage = null,
-            )
+    private fun scheduleSuggestions(query: String) {
+        cancelPendingSuggestions()
+        suggestionJob =
+            viewModelScope.launch {
+                delay(suggestionDebounceMs)
+                loadSuggestions(query)
+            }
     }
 
-    private fun scheduleDebouncedQuerySearch(mode: SearchMode) {
-        cancelPendingQuerySearch()
-        debouncedSearchJob =
-            viewModelScope.launch {
-                delay(searchDebounceMs)
-                executeQuerySearch(
-                    rawQuery = _uiState.value.query,
-                    mode = mode,
-                    recordInHistory = false,
-                    immediate = false,
-                )
+    private suspend fun loadSuggestions(rawQuery: String) {
+        val normalizedQuery = rawQuery.trim()
+        if (normalizedQuery.length < 2) {
+            clearSuggestions()
+            return
+        }
+
+        suggestionToken += 1
+        val token = suggestionToken
+        _uiState.value = _uiState.value.copy(isLoadingSuggestions = true)
+
+        val locale = localeProvider()
+        val results =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    searchRepository.suggest(
+                        query = normalizedQuery,
+                        locale = locale,
+                    )
+                }.getOrDefault(emptyList())
             }
+
+        if (token != suggestionToken) {
+            return
+        }
+
+        if (_uiState.value.executedQuery.isNotBlank()) {
+            return
+        }
+
+        if (_uiState.value.query.trim() != normalizedQuery) {
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            suggestions = results,
+            isLoadingSuggestions = false,
+        )
     }
 
     private fun executeQuerySearch(
@@ -197,16 +243,15 @@ class SearchViewModel(
         recordInHistory: Boolean,
         immediate: Boolean,
     ) {
+        cancelPendingSuggestions()
+        clearSuggestions()
+
         val normalizedQuery = rawQuery.trim()
         if (normalizedQuery.isBlank()) {
             if (immediate) {
-                resetToBrowse(query = rawQuery)
+                clearSearch()
             }
             return
-        }
-
-        if (immediate) {
-            cancelPendingQuerySearch()
         }
 
         val snapshot = _uiState.value
@@ -287,9 +332,16 @@ class SearchViewModel(
             }
     }
 
-    private fun cancelPendingQuerySearch() {
-        debouncedSearchJob?.cancel()
-        debouncedSearchJob = null
+    private fun cancelPendingSuggestions() {
+        suggestionJob?.cancel()
+        suggestionJob = null
+    }
+
+    private fun clearSuggestions() {
+        _uiState.value = _uiState.value.copy(
+            suggestions = emptyList(),
+            isLoadingSuggestions = false,
+        )
     }
 
     private fun cancelActiveSearch() {
@@ -298,7 +350,7 @@ class SearchViewModel(
     }
 
     companion object {
-        private const val SEARCH_DEBOUNCE_MS = 350L
+        private const val SUGGESTION_DEBOUNCE_MS = 300L
 
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext

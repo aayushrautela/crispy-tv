@@ -47,6 +47,29 @@ internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGen
     )
 }
 
+data class SearchSuggestion(
+    val title: String,
+    val mediaType: String,
+    val year: Int?,
+    val mediaKey: String,
+)
+
+internal fun CrispyBackendClient.SearchSuggestionItem.toSearchSuggestion(): SearchSuggestion? {
+    val normalizedTitle = title.trim()
+    if (normalizedTitle.isBlank()) return null
+    val normalizedType = when (mediaType) {
+        "tv" -> "series"
+        else -> "movie"
+    }
+    val mediaKey = "tmdb:$normalizedType:$tmdbId"
+    return SearchSuggestion(
+        title = normalizedTitle,
+        mediaType = normalizedType,
+        year = year,
+        mediaKey = mediaKey,
+    )
+}
+
 internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(defaultGenre: String? = null): SearchResultsPayload {
     return SearchResultsPayload(
         query = query,

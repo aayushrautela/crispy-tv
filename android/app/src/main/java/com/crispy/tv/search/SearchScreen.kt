@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -120,6 +121,13 @@ fun SearchRoute(
                 onCategoryChange = viewModel::setCategory,
                 onItemClick = onItemClick,
                 emptyMessage = uiState.statusMessage,
+                modifier = contentModifier,
+            )
+        } else if (uiState.shouldShowSuggestions) {
+            SearchSuggestionsContent(
+                suggestions = uiState.suggestions,
+                isLoading = uiState.isLoadingSuggestions,
+                onSuggestionClick = viewModel::selectSuggestion,
                 modifier = contentModifier,
             )
         } else {
@@ -370,6 +378,80 @@ private fun GenreTab(
             color = Color.White,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun SearchSuggestionsContent(
+    suggestions: List<SearchSuggestion>,
+    isLoading: Boolean,
+    onSuggestionClick: (SearchSuggestion) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp),
+    ) {
+        if (isLoading && suggestions.isEmpty()) {
+            SearchLoadingIndicator(compact = true)
+        } else if (suggestions.isEmpty()) {
+            Text(
+                text = "Keep typing to search",
+                modifier = Modifier.padding(vertical = 24.dp).fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        } else {
+            Spacer(Modifier.height(8.dp))
+            suggestions.forEach { suggestion ->
+                SearchSuggestionRow(
+                    suggestion = suggestion,
+                    onClick = { onSuggestionClick(suggestion) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchSuggestionRow(
+    suggestion: SearchSuggestion,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = suggestion.title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val subtitle = buildString {
+                append(if (suggestion.mediaType == "series") "Series" else "Movie")
+                if (suggestion.year != null) {
+                    append(" · ${suggestion.year}")
+                }
+            }
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
     }
 }
 

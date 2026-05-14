@@ -5,6 +5,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.MetadataResolveResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
@@ -69,6 +70,30 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
     )
     val json = requireSuccess(response)
     return parseSearchResultsResponse(json)
+}
+
+internal suspend fun CrispyBackendClient.searchSuggestionsApi(
+    accessToken: String,
+    query: String,
+    filter: String = "all",
+    limit: Int = 8,
+    locale: String? = null,
+): SearchSuggestionsResponse {
+    checkConfigured()
+    val urlBuilder = "$baseUrl/v1/search/suggestions".toHttpUrl().newBuilder()
+    urlBuilder.addQueryParameter("query", query.trim())
+    urlBuilder.addQueryParameter("filter", filter.trim())
+    urlBuilder.addQueryParameter("limit", limit.toString())
+    if (!locale.isNullOrBlank()) {
+        urlBuilder.addQueryParameter("locale", locale.trim())
+    }
+    val response = httpClient.get(
+        url = urlBuilder.build(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseSearchSuggestionsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.getAiInsightsApi(

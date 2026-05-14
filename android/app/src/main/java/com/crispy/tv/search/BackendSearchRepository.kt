@@ -45,6 +45,30 @@ class BackendSearchRepository(
         return payload.toSearchResultsPayload(defaultGenre = genreSuggestion.label)
     }
 
+    suspend fun suggest(
+        query: String,
+        filter: SearchCategory = SearchCategory.ALL,
+        locale: Locale = Locale.getDefault(),
+    ): List<SearchSuggestion> {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.length < 2) {
+            return emptyList()
+        }
+
+        val session = runCatching { supabase.ensureValidSession() }.getOrNull()
+            ?: return emptyList()
+
+        val backendFilter = filter.toBackendFilter()
+        val payload = backend.searchSuggestions(
+            accessToken = session.accessToken,
+            query = normalizedQuery,
+            filter = backendFilter,
+            limit = 8,
+            locale = locale.toLanguageTag(),
+        )
+        return payload.suggestions.mapNotNull { it.toSearchSuggestion() }
+    }
+
     companion object {
         fun create(context: Context): BackendSearchRepository {
             val appContext = context.applicationContext
@@ -53,6 +77,15 @@ class BackendSearchRepository(
                 backend = BackendServicesProvider.backendClient(appContext),
             )
         }
+    }
+}
+
+private fun SearchCategory.toBackendFilter(): String {
+    return when (this) {
+        SearchCategory.ALL -> "all"
+        SearchCategory.MOVIES -> "movies"
+        SearchCategory.SERIES -> "series"
+        SearchCategory.PEOPLE -> "people"
     }
 }
 

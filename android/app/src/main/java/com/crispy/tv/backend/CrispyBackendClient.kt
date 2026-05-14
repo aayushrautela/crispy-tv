@@ -162,6 +162,20 @@ class CrispyBackendClient(
         val people: List<PersonSearchResultItem>,
     )
 
+    data class SearchSuggestionItem(
+        val tmdbId: Int,
+        val mediaType: String,
+        val title: String,
+        val year: Int?,
+        val posterPath: String?,
+        val popularity: Double,
+        val overview: String?,
+    )
+
+    data class SearchSuggestionsResponse(
+        val suggestions: List<SearchSuggestionItem>,
+    )
+
     data class AiInsightsCard(
         val type: String,
         val title: String,
@@ -806,6 +820,22 @@ data class PlaybackEventInput(
             accessToken = accessToken,
             profileId = profileId,
             query = query,
+            locale = locale,
+        )
+    }
+
+    suspend fun searchSuggestions(
+        accessToken: String,
+        query: String,
+        filter: String = "all",
+        limit: Int = 8,
+        locale: String? = null,
+    ): SearchSuggestionsResponse {
+        return searchSuggestionsApi(
+            accessToken = accessToken,
+            query = query,
+            filter = filter,
+            limit = limit,
             locale = locale,
         )
     }

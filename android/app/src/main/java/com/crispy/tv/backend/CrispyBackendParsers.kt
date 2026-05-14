@@ -44,6 +44,8 @@ import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProviderState
 import com.crispy.tv.backend.CrispyBackendClient.RatingStateView
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionItem
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.User
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchProgressView
@@ -201,6 +203,44 @@ internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): S
         movies = parseSearchResultItems(json.optJSONArray("movies")),
         series = parseSearchResultItems(json.optJSONArray("series")),
         people = parsePersonSearchResultItems(json.optJSONArray("people")),
+    )
+}
+
+internal fun CrispyBackendClient.parseSearchSuggestionsResponse(json: JSONObject): SearchSuggestionsResponse {
+    return SearchSuggestionsResponse(
+        suggestions = parseSearchSuggestionItems(json.optJSONArray("suggestions")),
+    )
+}
+
+internal fun CrispyBackendClient.parseSearchSuggestionItems(array: JSONArray?): List<SearchSuggestionItem> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val item = safeArray.optJSONObject(index) ?: continue
+            add(parseSearchSuggestionItem(item))
+        }
+    }
+}
+
+internal fun CrispyBackendClient.parseSearchSuggestionItem(json: JSONObject): SearchSuggestionItem {
+    val tmdbId = json.optIntOrNull("tmdbId")
+        ?: throw IllegalStateException("Search suggestion is missing tmdbId.")
+    val mediaType = json.optString("mediaType").trim().lowercase()
+    if (mediaType != "movie" && mediaType != "tv") {
+        throw IllegalStateException("Search suggestion has invalid mediaType: $mediaType")
+    }
+    val title = json.optString("title").trim()
+    if (title.isBlank()) {
+        throw IllegalStateException("Search suggestion is missing title.")
+    }
+    return SearchSuggestionItem(
+        tmdbId = tmdbId,
+        mediaType = mediaType,
+        title = title,
+        year = json.optIntOrNull("year"),
+        posterPath = json.optNullableString("posterPath"),
+        popularity = json.optDouble("popularity", 0.0),
+        overview = json.optNullableString("overview"),
     )
 }
 
