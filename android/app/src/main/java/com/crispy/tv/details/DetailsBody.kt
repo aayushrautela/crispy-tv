@@ -1,10 +1,8 @@
 package com.crispy.tv.details
 
-import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,7 +61,6 @@ import com.crispy.tv.metadata.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-
 
 private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers")
 
@@ -585,31 +582,6 @@ private fun MakingOfCard(
     }
 }
 
-private fun youtubeEmbedHtml(videoKey: String): String =
-    """
-    <!doctype html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          html, body, #player { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
-        </style>
-      </head>
-      <body>
-        <iframe
-          id="player"
-          width="100%"
-          height="100%"
-          src="https://www.youtube.com/embed/$videoKey?autoplay=1&rel=0&playsinline=1&enablejsapi=1&origin=https%3A%2F%2Fwww.youtube.com"
-          title="YouTube video player"
-          frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen>
-        </iframe>
-      </body>
-    </html>
-    """.trimIndent()
-
 @Composable
 internal fun MakingOfVideoPlayerDialog(
     video: CrispyBackendClient.MetadataVideoView?,
@@ -645,48 +617,26 @@ internal fun MakingOfVideoPlayerDialog(
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f),
                 factory = { context ->
-                    FrameLayout(context).apply {
+                    WebView(context).apply {
                         setBackgroundColor(android.graphics.Color.BLACK)
-                        clipToOutline = true
-                        layoutParams =
-                            ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                            )
-                        addView(
-                            WebView(context).apply {
-                                setBackgroundColor(android.graphics.Color.BLACK)
-                                clipToOutline = true
-                                webViewClient = WebViewClient()
-                                webChromeClient = WebChromeClient()
-                                settings.javaScriptEnabled = true
-                                settings.domStorageEnabled = true
-                                settings.mediaPlaybackRequiresUserGesture = false
-                                settings.loadWithOverviewMode = true
-                                settings.useWideViewPort = true
-                                loadDataWithBaseURL(
-                                    "https://www.youtube.com",
-                                    youtubeEmbedHtml(videoKey),
-                                    "text/html",
-                                    "UTF-8",
-                                    null,
-                                )
-                            },
-                            FrameLayout.LayoutParams(
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                            ),
+                        webViewClient = WebViewClient()
+                        webChromeClient = WebChromeClient()
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        loadUrl(
+                            "https://www.youtube.com/embed/$videoKey?autoplay=1&rel=0&playsinline=1",
+                            mapOf("Referer" to "https://${context.packageName}"),
                         )
                     }
                 },
-                onRelease = { container ->
-                    (container.getChildAt(0) as? WebView)?.run {
-                        stopLoading()
-                        loadUrl("about:blank")
-                        removeAllViews()
-                        destroy()
-                    }
-                    container.removeAllViews()
+                onRelease = { webView ->
+                    webView.stopLoading()
+                    webView.loadUrl("about:blank")
+                    webView.removeAllViews()
+                    webView.destroy()
                 },
             )
             TextButton(onClick = onDismiss) {
