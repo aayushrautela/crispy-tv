@@ -77,7 +77,7 @@ fun PosterCard(
     val yearText = year?.trim()?.ifBlank { null }
     val maturityText = maturityRating?.trim()?.ifBlank { null }
     val genreText = genre?.trim()?.ifBlank { null }?.let { shortenGenre(it) }
-    val metadataColor = Color.White.copy(alpha = 0.72f)
+    val metadataColor = Color.White.copy(alpha = 0.78f)
 
     Card(
         modifier = modifier
@@ -142,7 +142,7 @@ fun PosterCard(
                             Text(
                                 text = value,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 color = metadataColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -159,7 +159,7 @@ fun PosterCard(
                                     text = value,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                 )
                             }
@@ -182,7 +182,7 @@ fun PosterCard(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.92f),
+                        color = Color.White.copy(alpha = 0.96f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -200,7 +200,7 @@ fun PosterCard(
                             Text(
                                 text = value,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 color = metadataColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -216,7 +216,7 @@ fun PosterCard(
                             Text(
                                 text = value,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 color = metadataColor,
                                 fontSize = 11.sp,
                             )
