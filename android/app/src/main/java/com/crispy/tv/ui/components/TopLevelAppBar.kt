@@ -37,12 +37,12 @@ fun CrispySectionAppBarTitle(
     ) {
         CrispyMark(
             modifier = Modifier
-                .width(30.dp)
-                .height(36.dp),
+                .width(26.dp)
+                .height(32.dp),
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 12.dp),
         )

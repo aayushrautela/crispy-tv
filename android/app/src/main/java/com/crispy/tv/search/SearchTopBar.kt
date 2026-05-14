@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
@@ -61,7 +62,7 @@ fun SearchTopBar(
     modifier: Modifier = Modifier,
 ) {
     StandardTopAppBar(
-        title = "Search",
+        title = { CrispySectionAppBarTitle(label = "Search") },
         modifier = modifier,
         actions = {
             ProfileIconButton(onClick = onOpenAccountsProfiles)
