@@ -62,7 +62,7 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.home.LandscapeArtworkFrame
 import com.crispy.tv.home.rememberLandscapeImageModel
 
-private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers", "Featurette", "Clip")
+private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers")
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -423,6 +423,7 @@ internal fun DetailsBody(
 
         val makingOfVideos = uiState.titleDetail?.videos.orEmpty()
             .filter { video -> video.key.isNotBlank() && video.type in MAKING_OF_VIDEO_TYPES }
+            .sortedByDescending { it.type.equals("Bloopers", ignoreCase = true) }
         if (makingOfVideos.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             val baseTitle = details.title.substringBefore(':').trim().ifBlank { details.title }
