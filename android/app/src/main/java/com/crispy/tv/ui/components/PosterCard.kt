@@ -64,13 +64,11 @@ fun PosterCard(
         image = image,
         width = 124.dp,
         height = 186.dp,
-        tmdbSize = "w342",
     )
     val logoModel = rememberCrispyImageModel(
         image = logo,
         width = 96.dp,
-        height = 48.dp,
-        tmdbSize = "w185",
+        height = 36.dp,
     )
     val gradientColor = remember(gradientColorHex) {
         gradientColorHex?.toComposeColorOrNull() ?: PosterGradientFallback
