@@ -1,6 +1,9 @@
 package com.crispy.tv.details
 
-import com.crispy.tv.backend.CrispyBackendClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.ui.unit.sp
 import com.crispy.tv.home.HomeCatalogPosterCard
@@ -52,10 +59,6 @@ import androidx.compose.material3.FilterChipDefaults
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import com.crispy.tv.home.LandscapeArtworkFrame
 import com.crispy.tv.home.rememberLandscapeImageModel
 
