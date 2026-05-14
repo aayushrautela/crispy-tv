@@ -80,7 +80,6 @@ fun SearchRoute(
     val resultsScrollState = rememberScrollState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
-    val isAiMode = uiState.searchMode == SearchMode.AI
 
     LaunchedEffect(scrollToTopRequest, uiState.hasActiveResults) {
         if (scrollToTopRequest > 0) {
@@ -99,16 +98,7 @@ fun SearchRoute(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            SearchTopBar(
-                query = uiState.query,
-                onQueryChange = viewModel::updateQuery,
-                onSearch = viewModel::submitSearch,
-                onAiSearch = viewModel::submitAiSearch,
-                onClear = viewModel::clearSearch,
-                onOpenAccountsProfiles = onOpenAccountsProfiles,
-                isAiActive = isAiMode && uiState.hasActiveResults,
-                isAiLoading = isAiMode && uiState.isLoading,
-            )
+            SearchTopBar(onOpenAccountsProfiles = onOpenAccountsProfiles)
         },
     ) { paddingValues ->
         val contentModifier =
@@ -118,31 +108,84 @@ fun SearchRoute(
                 .consumeWindowInsets(paddingValues)
                 .imePadding()
 
-        if (uiState.hasActiveResults) {
-            SearchResultsContent(
+        SearchContent(
+            uiState = uiState,
+            browseGridState = browseGridState,
+            resultsScrollState = resultsScrollState,
+            pageHorizontalPadding = pageHorizontalPadding,
+            onQueryChange = viewModel::updateQuery,
+            onSearch = viewModel::submitSearch,
+            onAiSearch = viewModel::submitAiSearch,
+            onClear = viewModel::clearSearch,
+            onSuggestionClick = viewModel::selectSuggestion,
+            onGenreClick = viewModel::selectGenre,
+            onRecentSearchClick = viewModel::submitSearch,
+            onRemoveRecentSearch = viewModel::removeRecentSearch,
+            onItemClick = onItemClick,
+            modifier = contentModifier,
+        )
+    }
+}
+
+@Composable
+private fun SearchContent(
+    uiState: SearchUiState,
+    browseGridState: LazyGridState,
+    resultsScrollState: ScrollState,
+    pageHorizontalPadding: Dp,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onAiSearch: () -> Unit,
+    onClear: () -> Unit,
+    onSuggestionClick: (SearchSuggestion) -> Unit,
+    onGenreClick: (SearchGenreSuggestion) -> Unit,
+    onRecentSearchClick: (String) -> Unit,
+    onRemoveRecentSearch: (String) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isAiMode = uiState.searchMode == SearchMode.AI
+
+    Column(modifier = modifier) {
+        SearchBar(
+            query = uiState.query,
+            onQueryChange = onQueryChange,
+            onSearch = onSearch,
+            onAiSearch = onAiSearch,
+            onClear = onClear,
+            isAiActive = isAiMode && uiState.hasActiveResults,
+            isAiLoading = isAiMode && uiState.isLoading,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = pageHorizontalPadding, vertical = Dimensions.SmallSpacing),
+        )
+
+        when {
+            uiState.hasActiveResults -> SearchResultsContent(
                 uiState = uiState,
                 scrollState = resultsScrollState,
                 pageHorizontalPadding = pageHorizontalPadding,
                 onItemClick = onItemClick,
                 emptyMessage = uiState.statusMessage,
-                modifier = contentModifier,
+                modifier = Modifier.fillMaxSize(),
             )
-        } else if (uiState.shouldShowSuggestions) {
-            SearchSuggestionsContent(
+
+            uiState.shouldShowSuggestions -> SearchSuggestionsContent(
                 suggestions = uiState.suggestions,
                 isLoading = uiState.isLoadingSuggestions,
-                onSuggestionClick = viewModel::selectSuggestion,
-                modifier = contentModifier,
+                onSuggestionClick = onSuggestionClick,
+                pageHorizontalPadding = pageHorizontalPadding,
+                modifier = Modifier.fillMaxSize(),
             )
-        } else {
-            SearchBrowseContent(
+
+            else -> SearchBrowseContent(
                 uiState = uiState,
                 gridState = browseGridState,
                 pageHorizontalPadding = pageHorizontalPadding,
-                onGenreClick = viewModel::selectGenre,
-                onRecentSearchClick = viewModel::submitSearch,
-                onRemoveRecentSearch = viewModel::removeRecentSearch,
-                modifier = contentModifier,
+                onGenreClick = onGenreClick,
+                onRecentSearchClick = onRecentSearchClick,
+                onRemoveRecentSearch = onRemoveRecentSearch,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
@@ -403,10 +446,11 @@ private fun SearchSuggestionsContent(
     suggestions: List<SearchSuggestion>,
     isLoading: Boolean,
     onSuggestionClick: (SearchSuggestion) -> Unit,
+    pageHorizontalPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 16.dp),
+        modifier = modifier.padding(horizontal = pageHorizontalPadding),
     ) {
         if (isLoading && suggestions.isEmpty()) {
             Box(
