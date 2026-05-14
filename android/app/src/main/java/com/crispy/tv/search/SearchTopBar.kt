@@ -7,11 +7,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -76,9 +75,7 @@ fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    onAiSearch: () -> Unit,
     onClear: () -> Unit,
-    isAiActive: Boolean,
     isAiLoading: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -99,18 +96,31 @@ fun SearchBar(
             )
         },
         leadingIcon = {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-            )
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                )
+            }
         },
         trailingIcon = {
-            SearchBarActions(
-                query = query,
-                onAiSearch = onAiSearch,
-                onClear = onClear,
-                isAiHighlighted = isAiActive || isAiLoading,
-            )
+            if (query.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onClear),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Clear,
+                        contentDescription = "Clear search",
+                    )
+                }
+            }
         },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
@@ -122,55 +132,26 @@ fun SearchBar(
 }
 
 @Composable
-private fun SearchBarActions(
-    query: String,
-    onAiSearch: () -> Unit,
-    onClear: () -> Unit,
-    isAiHighlighted: Boolean,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        SearchIconAction(
-            icon = Icons.Outlined.AutoAwesome,
-            contentDescription = "AI search",
-            onClick = onAiSearch,
-            tint = if (isAiHighlighted) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-
-        if (query.isNotBlank()) {
-            SearchIconAction(
-                icon = Icons.Outlined.Clear,
-                contentDescription = "Clear search",
-                onClick = onClear,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SearchIconAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
+fun AiSearchButton(
     onClick: () -> Unit,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    isHighlighted: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(48.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
+            imageVector = Icons.Outlined.AutoAwesome,
+            contentDescription = "AI search",
+            tint = if (isHighlighted) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         )
     }
 }
@@ -204,7 +185,7 @@ private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
 
         val strokeWidth = 2.5.dp.toPx()
         val inset = strokeWidth / 2f
-        val maxGlowWidth = 14.dp.toPx()
+        val maxGlowWidth = 6.dp.toPx()
         val cornerRadius = CornerRadius(28.dp.toPx(), 28.dp.toPx())
         val brush = Brush.linearGradient(
             colors = SearchAiLoadingColors,

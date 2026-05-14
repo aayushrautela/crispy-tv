@@ -145,20 +145,29 @@ private fun SearchContent(
     modifier: Modifier = Modifier,
 ) {
     val isAiMode = uiState.searchMode == SearchMode.AI
+    val isAiLoading = isAiMode && uiState.isLoading
 
     Column(modifier = modifier) {
-        SearchBar(
-            query = uiState.query,
-            onQueryChange = onQueryChange,
-            onSearch = onSearch,
-            onAiSearch = onAiSearch,
-            onClear = onClear,
-            isAiActive = isAiMode && uiState.hasActiveResults,
-            isAiLoading = isAiMode && uiState.isLoading,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = pageHorizontalPadding, vertical = Dimensions.SmallSpacing),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SearchBar(
+                query = uiState.query,
+                onQueryChange = onQueryChange,
+                onSearch = onSearch,
+                onClear = onClear,
+                isAiLoading = isAiLoading,
+                modifier = Modifier.weight(1f),
+            )
+            AiSearchButton(
+                onClick = onAiSearch,
+                isHighlighted = isAiMode && uiState.hasActiveResults || isAiLoading,
+            )
+        }
 
         when {
             uiState.hasActiveResults -> SearchResultsContent(
