@@ -28,7 +28,6 @@ import androidx.paging.compose.itemKey
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +50,9 @@ import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.skeletonElement
@@ -245,6 +247,14 @@ internal fun LibraryRouteContent(
                                 selected = section.id == selectedSectionId,
                                 onClick = { onSelectSection(section.id) },
                                 label = { Text(section.label) },
+                                shape = RoundedCornerShape(16.dp),
+                                border = null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                    labelColor = MaterialTheme.colorScheme.onSurface,
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
                             )
                         }
                     }

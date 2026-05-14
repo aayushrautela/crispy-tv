@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -156,6 +157,14 @@ internal fun PlayerInfoSheet(
                                                 selected = season == selectedSeason,
                                                 onClick = { onSeasonSelected(season) },
                                                 label = { Text("Season $season") },
+                                                shape = RoundedCornerShape(16.dp),
+                                                border = null,
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                                    labelColor = MaterialTheme.colorScheme.onSurface,
+                                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                ),
                                             )
                                         }
                                     }
