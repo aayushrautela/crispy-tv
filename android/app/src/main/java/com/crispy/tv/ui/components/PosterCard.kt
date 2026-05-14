@@ -78,7 +78,7 @@ fun PosterCard(
     val formattedRating = formatRating(rating?.toDoubleOrNull())
     val yearText = year?.trim()?.ifBlank { null }
     val maturityText = maturityRating?.trim()?.ifBlank { null }
-    val genreText = genre?.trim()?.ifBlank { null }
+    val genreText = genre?.trim()?.ifBlank { null }?.let { shortenGenre(it) }
     val metadataColor = Color.White.copy(alpha = 0.86f)
 
     Card(
@@ -229,6 +229,19 @@ fun PosterCard(
         }
     }
 }
+
+private val genreShortLabels =
+    mapOf(
+        "Action & Adventure" to "Action",
+        "Sci-Fi & Fantasy" to "Sci-Fi",
+        "Science Fiction" to "Sci-Fi",
+        "War & Politics" to "War",
+        "Documentary" to "Doc",
+        "Adventure" to "Adv",
+    )
+
+private fun shortenGenre(genre: String): String =
+    genreShortLabels[genre] ?: genre
 
 private fun String.toComposeColorOrNull(): Color? {
     val normalized = trim().removePrefix("#")
