@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,15 +58,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import coil3.compose.AsyncImagePainter
 import coil3.compose.AsyncImage
-import coil3.compose.rememberAsyncImagePainter
 import coil3.toBitmap
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.metadata.tmdb.TmdbApi
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
@@ -142,23 +140,16 @@ internal fun HeroSection(
             return@BoxWithConstraints
         }
 
-        val imagePainter = rememberAsyncImagePainter(model = imageUrl)
-        val imagePainterState by imagePainter.state.collectAsState()
-        LaunchedEffect(imageUrl, imagePainterState) {
-            when (val state = imagePainterState) {
-                is AsyncImagePainter.State.Success -> {
-                    onHeroImageLoaded(state.result.image.toBitmap(width = 128, height = 128))
-                }
-                is AsyncImagePainter.State.Error -> onHeroImageLoadFailed()
-                else -> Unit
-            }
-        }
         if (!imageUrl.isNullOrBlank()) {
-            Image(
-                painter = imagePainter,
+            AsyncImage(
+                model = imageUrl,
                 contentDescription = details?.title,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                onSuccess = { result ->
+                    onHeroImageLoaded(result.image.toBitmap(width = 128, height = 128))
+                },
+                onError = { onHeroImageLoadFailed() },
             )
         } else {
             Surface(
@@ -275,8 +266,9 @@ internal fun HeroSection(
         ) {
             val logoUrl = details.logoUrl?.trim().orEmpty()
             if (logoUrl.isNotBlank()) {
+                val logoModel = rememberCrispyImageModel(url = logoUrl, width = 320.dp, height = 104.dp)
                 AsyncImage(
-                    model = logoUrl,
+                    model = logoModel ?: logoUrl,
                     contentDescription = details.title,
                     modifier = Modifier
                         .fillMaxWidth(0.81f)

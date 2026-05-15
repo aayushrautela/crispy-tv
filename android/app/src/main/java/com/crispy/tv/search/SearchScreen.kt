@@ -19,8 +19,11 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -77,14 +80,14 @@ fun SearchRoute(
     val viewModel = rememberSearchViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val browseGridState = rememberLazyGridState()
-    val resultsScrollState = rememberScrollState()
+    val resultsListState = rememberLazyListState()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTopRequest, uiState.hasActiveResults) {
         if (scrollToTopRequest > 0) {
             if (uiState.hasActiveResults) {
-                resultsScrollState.animateScrollTo(0)
+                resultsListState.animateScrollToItem(0)
             } else {
                 browseGridState.animateScrollToItem(0)
             }
@@ -111,7 +114,7 @@ fun SearchRoute(
         SearchContent(
             uiState = uiState,
             browseGridState = browseGridState,
-            resultsScrollState = resultsScrollState,
+            resultsListState = resultsListState,
             pageHorizontalPadding = pageHorizontalPadding,
             onQueryChange = viewModel::updateQuery,
             onSearch = viewModel::submitSearch,
@@ -131,7 +134,7 @@ fun SearchRoute(
 private fun SearchContent(
     uiState: SearchUiState,
     browseGridState: LazyGridState,
-    resultsScrollState: ScrollState,
+    resultsListState: LazyListState,
     pageHorizontalPadding: Dp,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
@@ -172,7 +175,7 @@ private fun SearchContent(
         when {
             uiState.hasActiveResults -> SearchResultsContent(
                 uiState = uiState,
-                scrollState = resultsScrollState,
+                listState = resultsListState,
                 pageHorizontalPadding = pageHorizontalPadding,
                 onItemClick = onItemClick,
                 emptyMessage = uiState.statusMessage,
@@ -301,7 +304,7 @@ private fun RecentSearchChip(
 @Composable
 private fun SearchResultsContent(
     uiState: SearchUiState,
-    scrollState: ScrollState,
+    listState: LazyListState,
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem) -> Unit,
     emptyMessage: String?,
@@ -310,47 +313,55 @@ private fun SearchResultsContent(
     val buckets = uiState.resultBuckets
     val isLoading = uiState.isLoading
 
-    Column(
-        modifier = modifier
-            .verticalScroll(scrollState)
-            .padding(horizontal = pageHorizontalPadding),
+    LazyColumn(
+        modifier = modifier,
+        state = listState,
+        contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         when {
             isLoading && buckets.isEmpty -> {
-                SearchSectionSkeleton()
-                SearchSectionSkeleton()
-                SearchSectionSkeleton()
+                item { SearchSectionSkeleton() }
+                item { SearchSectionSkeleton() }
+                item { SearchSectionSkeleton() }
             }
 
             buckets.isEmpty -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = emptyMessage
-                            ?: if (uiState.searchMode == SearchMode.AI) "No AI matches found." else "No results",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = emptyMessage
+                                ?: if (uiState.searchMode == SearchMode.AI) "No AI matches found." else "No results",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
             else -> {
                 if (isLoading) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
                 }
                 if (buckets.movies.isNotEmpty()) {
-                    SearchSectionRow(title = "Movies", items = buckets.movies, onItemClick = onItemClick)
+                    item(key = "movies") {
+                        SearchSectionRow(title = "Movies", items = buckets.movies, onItemClick = onItemClick)
+                    }
                 }
                 if (buckets.series.isNotEmpty()) {
-                    SearchSectionRow(title = "Series", items = buckets.series, onItemClick = onItemClick)
+                    item(key = "series") {
+                        SearchSectionRow(title = "Series", items = buckets.series, onItemClick = onItemClick)
+                    }
                 }
                 if (buckets.people.isNotEmpty()) {
-                    SearchSectionRow(title = "People", items = buckets.people, onItemClick = onItemClick)
+                    item(key = "people") {
+                        SearchSectionRow(title = "People", items = buckets.people, onItemClick = onItemClick)
+                    }
                 }
             }
         }

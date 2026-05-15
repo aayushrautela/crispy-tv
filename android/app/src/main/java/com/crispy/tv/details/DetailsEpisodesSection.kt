@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import kotlin.math.roundToInt
 
@@ -73,12 +74,15 @@ internal fun EpisodeCard(
             ) {
                 val thumbnail = video.thumbnailUrl?.trim().orEmpty()
                 if (thumbnail.isNotBlank()) {
-                    AsyncImage(
-                        model = thumbnail,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
+                    val thumbnailModel = rememberCrispyImageModel(url = thumbnail, width = 400.dp, height = 225.dp)
+                    if (thumbnailModel != null) {
+                        AsyncImage(
+                            model = thumbnailModel,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
                 } else {
                     Box(
                         modifier = Modifier

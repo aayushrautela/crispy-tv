@@ -249,7 +249,7 @@ internal fun DetailsScreen(
                     .navigationBarsPadding(),
                 state = listState,
             ) {
-                item {
+                item(key = "hero") {
                     HeroSection(
                         details = visibleDetails,
                         imageUrl = imageUrl,
@@ -282,7 +282,7 @@ internal fun DetailsScreen(
                     )
                 }
 
-                item {
+                item(key = "header") {
                     HeaderInfoSection(
                         details = visibleDetails,
                         isInWatchlist = visibleUiState.isInWatchlist,
@@ -301,7 +301,7 @@ internal fun DetailsScreen(
                     )
                 }
 
-                item {
+                item(key = "body") {
                     DetailsBody(
                         uiState = visibleUiState,
                         onRetry = onRetry,

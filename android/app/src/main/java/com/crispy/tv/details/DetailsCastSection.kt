@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.R
 import com.crispy.tv.ratings.formatRatingOutOfTen
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @Composable
 internal fun SimpleCastItem(
@@ -106,12 +107,15 @@ internal fun MetadataCastCard(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             if (profileUrl.isNotBlank()) {
-                AsyncImage(
-                    model = profileUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
+                val profileModel = rememberCrispyImageModel(url = profileUrl, width = 80.dp, height = 80.dp, tmdbSize = "w185")
+                if (profileModel != null) {
+                    AsyncImage(
+                        model = profileModel,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
             } else {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
@@ -168,13 +172,16 @@ internal fun MetadataProductionCard(
             contentAlignment = Alignment.Center,
         ) {
             if (logo.isNotBlank()) {
-                AsyncImage(
-                    model = logo,
-                    contentDescription = entity.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.Center,
-                )
+                val logoModel = rememberCrispyImageModel(url = logo, width = 160.dp, height = 56.dp)
+                if (logoModel != null) {
+                    AsyncImage(
+                        model = logoModel,
+                        contentDescription = entity.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.Center,
+                    )
+                }
             } else {
                 Text(
                     text = entity.name,

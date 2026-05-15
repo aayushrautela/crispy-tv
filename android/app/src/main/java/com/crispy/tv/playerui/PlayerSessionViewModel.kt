@@ -181,7 +181,7 @@ class PlayerSessionViewModel(
         viewModelScope.launch {
             loadInitialMetadata()
         }
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             pollPlaybackState()
         }
     }
@@ -864,7 +864,7 @@ class PlayerSessionViewModel(
             val snapshot = playbackController.snapshot()
 
             if (maybeHandlePlaybackError(snapshot.error, snapshot.engine)) {
-                delay(250)
+                delay(500)
                 continue
             }
 
@@ -892,7 +892,7 @@ class PlayerSessionViewModel(
                 isPlaying = uiStateSnapshot.isPlaying,
             )
 
-            delay(250)
+            delay(500)
         }
     }
 

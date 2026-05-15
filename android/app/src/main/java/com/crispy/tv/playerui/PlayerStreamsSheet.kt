@@ -47,6 +47,7 @@ import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.StreamProviderUiState
 import com.crispy.tv.streams.StreamSelectorUiState
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,8 +173,9 @@ private fun StreamSheetHeader(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                 ) {
+                    val imageModel = rememberCrispyImageModel(url = imageUrl, width = 96.dp, height = 56.dp)
                     AsyncImage(
-                        model = imageUrl,
+                        model = imageModel ?: imageUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(width = 96.dp, height = 56.dp),
