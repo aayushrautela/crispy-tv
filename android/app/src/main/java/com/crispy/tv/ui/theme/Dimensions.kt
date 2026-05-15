@@ -24,7 +24,7 @@ object Dimensions {
     val PosterCardWidth: Dp = 146.dp
     val PosterCardHeight: Dp = 219.dp
     const val PosterCardAspectRatio: Float = 2f / 3f
-    val WideCardWidth: Dp = 330.dp
+    val WideCardWidth: Dp = 280.dp
     const val WideCardAspectRatio: Float = 16f / 9f
 
     val SearchBarPillHeight: Dp = 56.dp
