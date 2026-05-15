@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,7 +14,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -64,24 +66,32 @@ private fun MakingOfCard(
     onClick: () -> Unit,
 ) {
     val imageModel = rememberLandscapeImageModel(video.thumbnailUrl, 280.dp)
-    Column(
+    LandscapeArtworkFrame(
+        title = video.name.orEmpty(),
+        imageModel = imageModel,
+        onClick = onClick,
         modifier = Modifier
             .width(280.dp)
-            .clickable(onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LandscapeArtworkFrame(
-            title = video.name.orEmpty(),
-            imageModel = imageModel,
-            onClick = null,
-            modifier = Modifier.aspectRatio(16f / 9f),
-        )
-        Text(
-            text = video.name.orEmpty(),
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+            .aspectRatio(16f / 9f),
+        scrimHeightFraction = 0.55f,
+        scrimMaxAlpha = 0.88f,
+        bottomOverlayContent = {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = video.name.orEmpty(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+    )
 }

@@ -23,46 +23,43 @@ internal fun CalendarEpisodeCard(
     onClick: () -> Unit,
 ) {
     val imageModel = rememberLandscapeImageModel(item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl, 280.dp)
-    Column(
-        modifier = Modifier.width(280.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LandscapeArtworkFrame(
-            title = item.seriesName,
-            imageModel = imageModel,
-            onClick = onClick,
-            modifier = Modifier.aspectRatio(16f / 9f),
-            badgeLabel = calendarBadgeLabel(item),
-            badgeAlignment = Alignment.TopEnd,
-            scrimHeightFraction = 0.68f,
-            scrimMaxAlpha = 0.92f,
-            bottomOverlayContent = {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = item.seriesName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = calendarSecondaryText(item),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            },
-        )
-    }
+    LandscapeArtworkFrame(
+        title = item.seriesName,
+        imageModel = imageModel,
+        onClick = onClick,
+        modifier = Modifier
+            .width(280.dp)
+            .aspectRatio(16f / 9f),
+        badgeLabel = calendarBadgeLabel(item),
+        badgeAlignment = Alignment.TopEnd,
+        scrimHeightFraction = 0.68f,
+        scrimMaxAlpha = 0.92f,
+        bottomOverlayContent = {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = item.seriesName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = calendarSecondaryText(item),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -71,45 +68,42 @@ internal fun CalendarSeriesCard(
     onClick: () -> Unit,
 ) {
     val imageModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, 280.dp)
-    Column(
-        modifier = Modifier.width(280.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LandscapeArtworkFrame(
-            title = item.title,
-            imageModel = imageModel,
-            onClick = onClick,
-            modifier = Modifier.aspectRatio(16f / 9f),
-            badgeLabel = "No schedule",
-            bottomOverlayContent = {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
+    LandscapeArtworkFrame(
+        title = item.title,
+        imageModel = imageModel,
+        onClick = onClick,
+        modifier = Modifier
+            .width(280.dp)
+            .aspectRatio(16f / 9f),
+        badgeLabel = "No schedule",
+        bottomOverlayContent = {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                item.sourceLabel?.takeIf { it.isNotBlank() }?.let { sourceLabel ->
                     Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 2,
+                        text = sourceLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.72f),
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    item.sourceLabel?.takeIf { it.isNotBlank() }?.let { sourceLabel ->
-                        Text(
-                            text = sourceLabel,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.72f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
                 }
-            },
-        )
-    }
+            }
+        },
+    )
 }
 
 private fun calendarBadgeLabel(item: CalendarEpisodeItem): String? {

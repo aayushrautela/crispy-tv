@@ -8,11 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -36,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.components.skeletonElement
 
@@ -112,29 +110,12 @@ internal fun HomeWideRailSection(
 
 @Composable
 private fun HomeWideRailSkeletonCard() {
-    Column(
-        modifier = Modifier.width(280.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.7f)
-                .height(16.dp)
-                .skeletonElement(pulse = false)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.45f)
-                .height(12.dp)
-                .skeletonElement(pulse = false)
-        )
-    }
+    Box(
+        modifier = Modifier
+            .width(280.dp)
+            .aspectRatio(16f / 9f)
+            .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false)
+    )
 }
 
 @Composable
@@ -199,7 +180,6 @@ internal fun HomeWideRailCard(
         modifier = Modifier
             .width(280.dp)
             .then(cardInteractionModifier),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LandscapeArtworkFrame(
             title = item.title,
@@ -209,30 +189,36 @@ internal fun HomeWideRailCard(
             badgeLabel = item.badgeLabel,
             badgeAlignment = Alignment.TopEnd,
             progressFraction = item.progressFraction,
-            scrimHeightFraction = if (item.progressFraction != null) 0.42f else 0f,
-            scrimMaxAlpha = if (item.progressFraction != null) 0.36f else 0f,
+            scrimHeightFraction = 0.55f,
+            scrimMaxAlpha = 0.88f,
+            bottomOverlayContent = {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (item.subtitle.isNotBlank()) {
+                        Text(
+                            text = item.subtitle,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White.copy(alpha = 0.78f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            },
         )
-
-        Text(
-            text = item.title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        if (item.subtitle.isNotBlank()) {
-            Text(
-                text = item.subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
     }
 
     val visibleRemoveAction = if (actionSheetVisible) removeAction else null
