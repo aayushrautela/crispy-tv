@@ -7,10 +7,12 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.allowHardware
 import coil3.request.crossfade
 import com.crispy.tv.app.AppGraph
+import com.crispy.tv.network.AppHttp
 import okio.Path.Companion.toOkioPath
 
 class CrispyApplication : Application(), SingletonImageLoader.Factory {
@@ -19,17 +21,26 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory {
     }
 
     override fun newImageLoader(context: Context): ImageLoader {
-        return ImageLoader.Builder(context)
+        val appContext = context.applicationContext
+
+        return ImageLoader.Builder(appContext)
+            .components {
+                add(
+                    OkHttpNetworkFetcherFactory(
+                        callFactory = { AppHttp.okHttp(appContext) },
+                    ),
+                )
+            }
             .crossfade(200)
             .allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(context, 0.25)
+                    .maxSizePercent(appContext, 0.25)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
-                    .directory(cacheDir.resolve("image_cache").toOkioPath())
+                    .directory(appContext.cacheDir.resolve("image_cache").toOkioPath())
                     .maxSizeBytes(256L * 1024L * 1024L)
                     .build()
             }

@@ -194,6 +194,7 @@ dependencies {
     implementation("com.woowla.compose.icon.collections:simpleicons:16.6.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
     implementation("io.coil-kt.coil3:coil-svg:3.4.0")
     implementation("com.materialkolor:material-kolor:4.1.1")
 
