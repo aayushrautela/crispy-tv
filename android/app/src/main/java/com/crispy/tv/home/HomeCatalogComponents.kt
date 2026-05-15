@@ -99,7 +99,7 @@ internal fun HomeCatalogSectionRow(
             contentPadding = PaddingValues(0.dp)
         ) {
             if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
-                items(HOME_POSTER_SKELETON_COUNT) {
+                items(HOME_POSTER_SKELETON_COUNT, contentType = { "posterSkeleton" }) {
                     Box(
                         modifier = Modifier
                             .width(Dimensions.PosterCardWidth)
@@ -108,7 +108,7 @@ internal fun HomeCatalogSectionRow(
                     )
                 }
             } else {
-                items(sectionUi.items, key = { "${it.type}:${it.id}" }) { item ->
+                items(sectionUi.items, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
                     HomeCatalogPosterCard(
                         item = item,
                         onClick = { onItemClick(item) }

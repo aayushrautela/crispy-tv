@@ -444,7 +444,7 @@ private fun DiscoverScreen(
                 }
 
                 if ((uiState.isRefreshing && uiState.catalogs.isEmpty()) || (refreshState is LoadState.Loading && pagingItems.itemCount == 0 && selectedCatalog != null)) {
-                    items(DISCOVER_SKELETON_COUNT, span = { GridItemSpan(1) }, key = { index -> "discover-skeleton-$index" }) {
+                    items(DISCOVER_SKELETON_COUNT, span = { GridItemSpan(1) }, key = { index -> "discover-skeleton-$index" }, contentType = { "posterSkeleton" }) {
                         DiscoverPosterSkeleton(modifier = Modifier.fillMaxWidth())
                     }
                 } else if (pagingItems.itemCount == 0) {
@@ -475,7 +475,8 @@ private fun DiscoverScreen(
                 } else {
                     items(
                         count = pagingItems.itemCount,
-                        key = pagingItems.itemKey { "${it.type}:${it.id}" }
+                        key = pagingItems.itemKey { "${it.type}:${it.id}" },
+                        contentType = { "poster" }
                     ) { index ->
                         val item = pagingItems[index] ?: return@items
                         PosterCard(

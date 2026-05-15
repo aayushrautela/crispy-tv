@@ -72,11 +72,11 @@ internal fun HomeWideRailSection(
                 contentPadding = PaddingValues(0.dp)
             ) {
                 if (section.isLoading && section.items.isEmpty()) {
-                    items(HOME_WIDE_SKELETON_COUNT) {
+                    items(HOME_WIDE_SKELETON_COUNT, contentType = { "wideSkeleton" }) {
                         HomeWideRailSkeletonCard()
                     }
                 } else {
-                    items(section.items, key = { it.key }) { item ->
+                    items(section.items, key = { it.key }, contentType = { "wideRailCard" }) { item ->
                         HomeWideRailCard(
                             item = item,
                             showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,

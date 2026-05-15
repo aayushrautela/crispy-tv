@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.crispy.tv.startup.AppStartup
 import com.crispy.tv.ui.AppRoot
+import com.crispy.tv.ui.components.ProvideCrispyImageSettings
 import com.crispy.tv.ui.theme.CrispyRewriteTheme
 
 class MainActivity : ComponentActivity() {
@@ -26,12 +27,14 @@ class MainActivity : ComponentActivity() {
         AppStartup.run(applicationContext)
 
         setContent {
-            CrispyRewriteTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    AppRoot()
+            ProvideCrispyImageSettings {
+                CrispyRewriteTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        AppRoot()
+                    }
                 }
             }
         }

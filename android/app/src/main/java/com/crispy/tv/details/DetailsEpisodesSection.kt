@@ -65,7 +65,7 @@ internal fun EpisodeCard(
             CardDefaults.elevatedCardColors(
                 containerColor = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
             ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isHighlighted) 8.dp else 2.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isHighlighted) 6.dp else 0.dp),
     ) {
         Column {
             Box(
@@ -99,15 +99,11 @@ internal fun EpisodeCard(
                     )
                 }
 
+                val overlayScrim = remember { Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.55f)) }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                1f to Color.Black.copy(alpha = 0.55f)
-                            )
-                        )
+                        .background(overlayScrim)
                 )
 
                 val prefix = episodePrefix(video)

@@ -382,7 +382,7 @@ private fun SearchSectionRow(
             color = MaterialTheme.colorScheme.primary,
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(items, key = { "${it.type}:${it.id}" }) { item ->
+            items(items, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
                 PosterCard(
                     title = item.title,
                     posterUrl = item.posterUrl,
@@ -413,7 +413,7 @@ private fun SearchSectionSkeleton() {
                 .skeletonElement(pulse = false),
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(6) {
+            items(6, contentType = { "posterSkeleton" }) {
                 Box(
                     modifier = Modifier
                         .width(Dimensions.PosterCardWidth)

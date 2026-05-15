@@ -115,19 +115,20 @@ internal fun BoxScope.HomeArtworkBottomScrim(
     heightFraction: Float,
     maxAlpha: Float,
 ) {
+    val scrimBrush = remember(maxAlpha) {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                Color.Black.copy(alpha = maxAlpha),
+            ),
+        )
+    }
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .fillMaxHeight(heightFraction.coerceIn(0f, 1f))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = maxAlpha),
-                    ),
-                ),
-            ),
+            .background(scrimBrush),
     )
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,9 +37,11 @@ internal fun MakingOfVideosSection(
     contentPadding: PaddingValues,
     onVideoClick: (CrispyBackendClient.MetadataVideoView) -> Unit,
 ) {
-    val filtered = videos
-        .filter { it.key.isNotBlank() && it.type in MAKING_OF_VIDEO_TYPES }
-        .sortedByDescending { it.type.equals("Bloopers", ignoreCase = true) }
+    val filtered = remember(videos) {
+        videos
+            .filter { it.key.isNotBlank() && it.type in MAKING_OF_VIDEO_TYPES }
+            .sortedByDescending { it.type.equals("Bloopers", ignoreCase = true) }
+    }
 
     if (filtered.isEmpty()) return
 
@@ -55,7 +58,7 @@ internal fun MakingOfVideosSection(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(items = filtered, key = { it.id }) { video ->
+        items(items = filtered, key = { it.id }, contentType = { "makingOf" }) { video ->
             MakingOfCard(video = video, onClick = { onVideoClick(video) })
         }
     }

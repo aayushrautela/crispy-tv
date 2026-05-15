@@ -87,7 +87,7 @@ internal fun HomeCollectionSectionRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
         ) {
-            items(visibleSections, key = { it.section.key }) { sectionUi ->
+            items(visibleSections, key = { it.section.key }, contentType = { "collectionCard" }) { sectionUi ->
                 HomeCollectionCard(
                     sectionUi = sectionUi,
                     onCollectionClick = { onCollectionClick(sectionUi.section) },

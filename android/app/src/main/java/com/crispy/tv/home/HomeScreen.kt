@@ -78,12 +78,13 @@ internal fun HomeRoute(
             HomeViewModel.factory(appContext)
         },
     )
-    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-    val headerPills by viewModel.headerPillsState.collectAsStateWithLifecycle()
-    val heroState by viewModel.heroState.collectAsStateWithLifecycle()
-    val layoutState by viewModel.layoutState.collectAsStateWithLifecycle()
-    val wideRailSections by viewModel.wideRailSectionsState.collectAsStateWithLifecycle()
-    val catalogSections by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing = uiState.isRefreshing
+    val headerPills = uiState.headerPills
+    val heroState = uiState.heroState
+    val layoutState = uiState.layoutState
+    val wideRailSections = uiState.wideRailSections
+    val catalogSections = uiState.catalogSections
     val scrollBehavior = appBarScrollBehavior()
 
     LaunchedEffect(viewModel) {
@@ -250,7 +251,9 @@ private fun HomeScreen(
                         }
 
                         is HomeCollectionShelfSectionUi -> {
-                            val sectionUis = block.sectionKeys.mapNotNull(catalogSections::get)
+                            val sectionUis = remember(block.sectionKeys, catalogSections) {
+                                block.sectionKeys.mapNotNull(catalogSections::get)
+                            }
                             if (sectionUis.isNotEmpty()) {
                                 HomeCollectionSectionRow(
                                     sectionUis = sectionUis,

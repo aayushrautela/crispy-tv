@@ -325,7 +325,7 @@ private fun PersonBody(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = responsivePageHorizontalPadding())
         ) {
-            items(items = person.knownFor, key = { "${it.type}:${it.id}" }) { item ->
+            items(items = person.knownFor, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
                 HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
             }
         }

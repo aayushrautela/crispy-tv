@@ -108,7 +108,8 @@ fun CatalogRoute(
                 ) {
                     items(
                         count = pagingItems.itemCount,
-                        key = pagingItems.itemKey { "${it.type}:${it.id}" }
+                        key = pagingItems.itemKey { "${it.type}:${it.id}" },
+                        contentType = { "poster" }
                     ) { index ->
                         val item = pagingItems[index] ?: return@items
                         PosterCard(
@@ -163,7 +164,7 @@ private fun CatalogLoadingSkeleton(modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(CATALOG_SKELETON_COUNT) {
+        items(CATALOG_SKELETON_COUNT, contentType = { "posterSkeleton" }) {
             CatalogPosterSkeleton(modifier = Modifier.fillMaxWidth())
         }
     }

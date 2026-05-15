@@ -265,7 +265,7 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(items = cast, key = { it.id }) { member ->
+                items(items = cast, key = { it.id }, contentType = { "cast" }) { member ->
                     MetadataCastCard(
                         member = member,
                         onClick = { onPersonClick(member.id) }
@@ -288,7 +288,7 @@ internal fun DetailsBody(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (reviews.isNotEmpty()) {
-                    items(items = reviews, key = { it.id }) { review ->
+                    items(items = reviews, key = { it.id }, contentType = { "review" }) { review ->
                         MetadataReviewCard(
                             review = review,
                             modifier = Modifier.width(Dimensions.WideCardWidth),
@@ -296,15 +296,17 @@ internal fun DetailsBody(
                         )
                     }
                 } else {
-                    items(2) {
+                    items(2, contentType = { "reviewSkeleton" }) {
                         DetailsReviewPlaceholder(modifier = Modifier.width(Dimensions.WideCardWidth))
                     }
                 }
             }
         }
 
-        val production = (titleDetail?.production?.companies.orEmpty() + titleDetail?.production?.networks.orEmpty())
-            .distinctBy { it.id }
+        val production = remember(titleDetail?.production) {
+            (titleDetail?.production?.companies.orEmpty() + titleDetail?.production?.networks.orEmpty())
+                .distinctBy { it.id }
+        }
         if (production.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
@@ -317,7 +319,7 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(items = production, key = { it.id }) { entity ->
+                items(items = production, key = { it.id }, contentType = { "production" }) { entity ->
                     MetadataProductionCard(entity = entity)
                 }
             }
@@ -339,7 +341,7 @@ internal fun DetailsBody(
                     contentPadding = contentPadding,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(seasons) { season ->
+                    items(seasons, key = { it }, contentType = { "seasonChip" }) { season ->
                         FilterChip(
                             selected = season == selectedSeason,
                             onClick = { onSeasonSelected(season) },
@@ -358,10 +360,11 @@ internal fun DetailsBody(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                val episodes =
+                val episodes = remember(uiState.seasonEpisodes) {
                     uiState.seasonEpisodes
                         .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
                         .take(50)
+                }
 
                 when {
                     uiState.episodesIsLoading && episodes.isEmpty() -> {
@@ -369,7 +372,7 @@ internal fun DetailsBody(
                             contentPadding = contentPadding,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(4) {
+                            items(4, contentType = { "episodeSkeleton" }) {
                                 EpisodeCardSkeleton(modifier = Modifier.width(Dimensions.WideCardWidth))
                             }
                         }
@@ -389,7 +392,7 @@ internal fun DetailsBody(
                             contentPadding = contentPadding,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(items = episodes, key = { it.id }) { video ->
+                            items(items = episodes, key = { it.id }, contentType = { "episode" }) { video ->
                                 EpisodeCard(
                                     video = video,
                                     watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
@@ -415,7 +418,7 @@ internal fun DetailsBody(
 
         val collection = uiState.titleExtras?.collection ?: titleDetail?.collection
         collection?.let { col ->
-            val collectionParts = col.parts.mapNotNull { it.toCatalogItem() }
+            val collectionParts = remember(col) { col.parts.mapNotNull { it.toCatalogItem() } }
             if (collectionParts.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(18.dp))
                 Text(
@@ -430,14 +433,16 @@ internal fun DetailsBody(
                     contentPadding = contentPadding,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(items = collectionParts, key = { "${it.type}:${it.id}" }) { item ->
+                    items(items = collectionParts, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
                         HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
                     }
                 }
             }
         }
 
-        val similar = (uiState.titleExtras?.similar ?: titleDetail?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
+        val similar = remember(uiState.titleExtras?.similar, titleDetail?.similar) {
+            (uiState.titleExtras?.similar ?: titleDetail?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
+        }
         if (similar.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
@@ -450,13 +455,13 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(items = similar, key = { "${it.type}:${it.id}" }) { item ->
-                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
-                    }
+                items(items = similar, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
+                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
                 }
             }
+        }
 
-        val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail)
+        val detailRows = remember(details, titleDetail) { buildDetailsRows(details = details, titleDetail = titleDetail) }
         if (detailRows.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
 

@@ -23,8 +23,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,6 +74,16 @@ internal const val CONTINUE_WATCHING_SECTION_KEY = "continueWatching"
 internal const val UP_NEXT_SECTION_KEY = "upNext"
 internal const val THIS_WEEK_SECTION_KEY = "thisWeek"
 
+@Immutable
+data class HomeUiState(
+    val isRefreshing: Boolean = false,
+    val headerPills: List<CatalogSectionRef> = emptyList(),
+    val heroState: HeroState = HeroState(),
+    val layoutState: HomeLayoutState = HomeLayoutState(),
+    val wideRailSections: Map<String, HomeWideRailSectionUi> = defaultWideRailSections(),
+    val catalogSections: Map<String, HomeCatalogSectionUi> = emptyMap(),
+)
+
 class HomeViewModel internal constructor(
     private val refreshCoordinator: HomeRefreshCoordinator,
     private val watchHistoryService: WatchHistoryService,
@@ -112,22 +124,31 @@ class HomeViewModel internal constructor(
     }
 
     private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
     private val _headerPillsState = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
-    val headerPillsState: StateFlow<List<CatalogSectionRef>> = _headerPillsState.asStateFlow()
-
     private val _heroState = MutableStateFlow(HeroState())
-    val heroState: StateFlow<HeroState> = _heroState.asStateFlow()
-
     private val _layoutState = MutableStateFlow(HomeLayoutState())
-    val layoutState: StateFlow<HomeLayoutState> = _layoutState.asStateFlow()
-
     private val _wideRailSectionsState = MutableStateFlow(defaultWideRailSections())
-    val wideRailSectionsState: StateFlow<Map<String, HomeWideRailSectionUi>> = _wideRailSectionsState.asStateFlow()
-
     private val _catalogSectionsState = MutableStateFlow<Map<String, HomeCatalogSectionUi>>(emptyMap())
-    val catalogSectionsState: StateFlow<Map<String, HomeCatalogSectionUi>> = _catalogSectionsState.asStateFlow()
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        listOf(
+            _isRefreshing,
+            _headerPillsState,
+            _heroState,
+            _layoutState,
+            _wideRailSectionsState,
+            _catalogSectionsState,
+        ),
+    ) { arr ->
+        HomeUiState(
+            isRefreshing = arr[0] as Boolean,
+            headerPills = arr[1] as List<CatalogSectionRef>,
+            heroState = arr[2] as HeroState,
+            layoutState = arr[3] as HomeLayoutState,
+            wideRailSections = arr[4] as Map<String, HomeWideRailSectionUi>,
+            catalogSections = arr[5] as Map<String, HomeCatalogSectionUi>,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     private var catalogSectionLayoutMeta: List<CatalogSectionLayoutMeta> = emptyList()
     private var catalogStatusMessage: String = ""

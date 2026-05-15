@@ -66,18 +66,32 @@ fun PosterCard(
         width = Dimensions.PosterCardWidth,
         height = Dimensions.PosterCardHeight,
     )
-    val logoModel = rememberCrispyImageModel(
-        image = logo,
-        width = 96.dp,
-        height = 36.dp,
-    )
+    val logoModel =
+        if (logo != null && !logo.isEmpty) {
+            rememberCrispyImageModel(
+                image = logo,
+                width = 96.dp,
+                height = 36.dp,
+            )
+        } else {
+            null
+        }
     val gradientColor = remember(gradientColorHex) {
         gradientColorHex?.toComposeColorOrNull() ?: PosterGradientFallback
     }
-    val formattedRating = formatRating(rating?.toDoubleOrNull())
-    val yearText = year?.trim()?.ifBlank { null }
-    val maturityText = maturityRating?.trim()?.ifBlank { null }
-    val genreText = genre?.trim()?.ifBlank { null }?.let { shortenGenre(it) }
+    val gradientBrush = remember(gradientColor) {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                gradientColor.copy(alpha = 0.52f),
+                gradientColor.copy(alpha = 0.88f),
+            )
+        )
+    }
+    val formattedRating = remember(rating) { formatRating(rating?.toDoubleOrNull()) }
+    val yearText = remember(year) { year?.trim()?.ifBlank { null } }
+    val maturityText = remember(maturityRating) { maturityRating?.trim()?.ifBlank { null } }
+    val genreText = remember(genre) { genre?.trim()?.ifBlank { null }?.let { shortenGenre(it) } }
     val metadataColor = Color.White.copy(alpha = 0.78f)
 
     Card(
@@ -115,15 +129,7 @@ fun PosterCard(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .fillMaxHeight(0.58f)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                gradientColor.copy(alpha = 0.52f),
-                                gradientColor.copy(alpha = 0.88f),
-                            )
-                        )
-                    )
+                    .background(gradientBrush)
             )
 
             Column(

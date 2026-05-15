@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.paging.LoadState
 import androidx.paging.Pager
@@ -247,11 +248,14 @@ private fun historyMonthLabel(monthKey: String): String {
 
 private sealed interface HistoryDisplayRow {
     val stableKey: String
+    val contentType: String
     data class Header(val monthKey: String, val label: String) : HistoryDisplayRow {
         override val stableKey get() = "history-month-$monthKey"
+        override val contentType get() = "sectionHeader"
     }
     data class Post(val monthKey: String, val items: List<LibrarySectionItemUi>) : HistoryDisplayRow {
         override val stableKey get() = "history-row-$monthKey"
+        override val contentType get() = "posterRow"
     }
 }
 
@@ -289,11 +293,14 @@ private fun buildRatingBandSections(items: List<LibrarySectionItemUi>): List<Rat
 
 private sealed interface RatingDisplayRow {
     val stableKey: String
+    val contentType: String
     data class Header(val bandKey: String, val label: String) : RatingDisplayRow {
         override val stableKey get() = "rating-band-$bandKey"
+        override val contentType get() = "sectionHeader"
     }
     data class Post(val bandKey: String, val items: List<LibrarySectionItemUi>) : RatingDisplayRow {
         override val stableKey get() = "rating-row-$bandKey"
+        override val contentType get() = "posterRow"
     }
 }
 
@@ -362,11 +369,14 @@ private fun buildWatchlistDateSections(items: List<LibrarySectionItemUi>): List<
 
 private sealed interface WatchlistDisplayRow {
     val stableKey: String
+    val contentType: String
     data class Header(val groupKey: String, val label: String) : WatchlistDisplayRow {
         override val stableKey get() = "watchlist-group-$groupKey"
+        override val contentType get() = "sectionHeader"
     }
     data class Post(val groupKey: String, val items: List<LibrarySectionItemUi>) : WatchlistDisplayRow {
         override val stableKey get() = "watchlist-row-$groupKey"
+        override val contentType get() = "posterRow"
     }
 }
 
@@ -592,18 +602,18 @@ private fun HistoryLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems =
-        (0 until pagingItems.itemCount)
-            .map { index -> pagingItems[index] }
-            .filterNotNull()
-    val monthSections = buildHistoryMonthSections(loadedItems)
-    val displayRows =
+    val loadedItems = remember(pagingItems.itemSnapshotList) {
+        pagingItems.itemSnapshotList.filterNotNull()
+    }
+    val monthSections = remember(loadedItems) { buildHistoryMonthSections(loadedItems) }
+    val displayRows = remember(monthSections) {
         monthSections.flatMap { section ->
             listOf(
                 HistoryDisplayRow.Header(section.monthKey, section.label),
                 HistoryDisplayRow.Post(section.monthKey, section.items),
             )
         }
+    }
 
     LazyColumn(
         state = listState,
@@ -648,7 +658,7 @@ private fun HistoryLibraryContent(
                 )
             }
         } else {
-            items(displayRows, key = { it.stableKey }) { row ->
+            items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
                 when (row) {
                     is HistoryDisplayRow.Header -> {
                         Text(
@@ -662,7 +672,7 @@ private fun HistoryLibraryContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                         ) {
-                            items(row.items, key = { it.stableKey }) { item ->
+                            items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
                                 PosterCard(
                                     title = item.title,
                                     posterUrl = item.posterUrl,
@@ -710,18 +720,18 @@ private fun RatingsLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems =
-        (0 until pagingItems.itemCount)
-            .map { index -> pagingItems[index] }
-            .filterNotNull()
-    val bandSections = buildRatingBandSections(loadedItems)
-    val displayRows =
+    val loadedItems = remember(pagingItems.itemSnapshotList) {
+        pagingItems.itemSnapshotList.filterNotNull()
+    }
+    val bandSections = remember(loadedItems) { buildRatingBandSections(loadedItems) }
+    val displayRows = remember(bandSections) {
         bandSections.flatMap { section ->
             listOf(
                 RatingDisplayRow.Header(section.bandKey, section.label),
                 RatingDisplayRow.Post(section.bandKey, section.items),
             )
         }
+    }
 
     LazyColumn(
         state = listState,
@@ -766,7 +776,7 @@ private fun RatingsLibraryContent(
                 )
             }
         } else {
-            items(displayRows, key = { it.stableKey }) { row ->
+            items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
                 when (row) {
                     is RatingDisplayRow.Header -> {
                         Text(
@@ -780,13 +790,13 @@ private fun RatingsLibraryContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                         ) {
-                            items(row.items, key = { it.stableKey }) { item ->
+                            items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
                                 PosterCard(
                                     title = item.title,
                                     posterUrl = item.posterUrl,
                                     backdropUrl = item.backdropUrl,
-                                    rating = item.rating?.toString(),
-                                    year = item.year?.toString(),
+                                    rating = item.rating,
+                                    year = item.year,
                                     maturityRating = item.maturityRating,
                                     genre = item.genre,
                                     logoUrl = item.logoUrl,
@@ -828,18 +838,18 @@ private fun WatchlistLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems =
-        (0 until pagingItems.itemCount)
-            .map { index -> pagingItems[index] }
-            .filterNotNull()
-    val dateSections = buildWatchlistDateSections(loadedItems)
-    val displayRows =
+    val loadedItems = remember(pagingItems.itemSnapshotList) {
+        pagingItems.itemSnapshotList.filterNotNull()
+    }
+    val dateSections = remember(loadedItems) { buildWatchlistDateSections(loadedItems) }
+    val displayRows = remember(dateSections) {
         dateSections.flatMap { section ->
             listOf(
                 WatchlistDisplayRow.Header(section.groupKey, section.label),
                 WatchlistDisplayRow.Post(section.groupKey, section.items),
             )
         }
+    }
 
     LazyColumn(
         state = listState,
@@ -884,7 +894,7 @@ private fun WatchlistLibraryContent(
                 )
             }
         } else {
-            items(displayRows, key = { it.stableKey }) { row ->
+            items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
                 when (row) {
                     is WatchlistDisplayRow.Header -> {
                         Text(
@@ -898,7 +908,7 @@ private fun WatchlistLibraryContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                         ) {
-                            items(row.items, key = { it.stableKey }) { item ->
+                            items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
                                 PosterCard(
                                     title = item.title,
                                     posterUrl = item.posterUrl,
