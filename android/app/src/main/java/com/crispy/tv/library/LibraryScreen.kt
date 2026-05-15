@@ -418,6 +418,7 @@ private fun LibraryEmptyState(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LibraryAppendState(
     appendState: LoadState,
@@ -534,6 +535,7 @@ private fun FlatLibraryGridContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HistoryLibraryContent(
     pagingItems: LazyPagingItems<LibrarySectionItemUi>,
