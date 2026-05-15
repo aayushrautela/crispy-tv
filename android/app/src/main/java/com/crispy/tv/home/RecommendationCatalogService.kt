@@ -577,7 +577,7 @@ class RecommendationCatalogService internal constructor(
                                 year = hero.year,
                                 genres = hero.genres,
                                 backdropUrl = hero.backdropUrl,
-                                backdrop = hero.backdrop,
+                                backdrop = responsiveImageSetFromDomainMap(hero.backdrop),
                                 addonId = hero.addonId,
                                 type = hero.type,
                             )
