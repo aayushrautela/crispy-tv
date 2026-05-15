@@ -21,6 +21,7 @@ data class CanonicalContinueWatchingItem(
     val localKey: String = titleMediaKey,
     val mediaType: String,
     val title: String,
+    val episodeTitle: String? = null,
     val season: Int?,
     val episode: Int?,
     val progressPercent: Double,

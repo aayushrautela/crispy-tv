@@ -574,6 +574,7 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
         } else {
             null
         }
+    val episodeName = episodeTitle?.takeIf { it.isNotBlank() }
     val relativeWatched =
         DateUtils.getRelativeTimeSpanString(
             watchedAtEpochMs,
@@ -581,5 +582,5 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
             DateUtils.MINUTE_IN_MILLIS,
         ).toString()
 
-    return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
+    return listOfNotNull(seasonEpisode, episodeName, relativeWatched).joinToString(separator = " • ")
 }

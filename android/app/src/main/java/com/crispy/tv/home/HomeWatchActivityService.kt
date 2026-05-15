@@ -51,6 +51,7 @@ private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): Can
     localKey = entry.localKey,
     mediaType = entry.mediaType,
     title = entry.title,
+    episodeTitle = entry.episodeTitle,
     season = entry.season,
     episode = entry.episode,
     lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
