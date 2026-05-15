@@ -31,7 +31,7 @@ class CrispyHttpClient(private val okHttpClient: OkHttpClient) {
                     url = response.request.url,
                     code = response.code,
                     headers = response.headers,
-                    body = response.body?.string().orEmpty(),
+                    body = response.body.string(),
                 )
             }
         }

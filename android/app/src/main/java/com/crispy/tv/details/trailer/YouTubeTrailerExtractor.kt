@@ -264,7 +264,7 @@ object YouTubeTrailerExtractor {
                     resp.code,
                     resp.message,
                     resp.headers.toMultimap(),
-                    resp.body?.string(),
+                    resp.body.string(),
                     latestUrl,
                 )
             }

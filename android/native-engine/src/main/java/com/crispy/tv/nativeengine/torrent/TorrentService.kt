@@ -244,8 +244,6 @@ class TorrentService : Service() {
         call.timeout().timeout(1000, TimeUnit.MILLISECONDS)
 
         call.execute().use { response ->
-            // Consume body to avoid leaking connections.
-            response.body?.close()
             if (!response.isSuccessful) {
                 throw IOException("Echo endpoint failed with status ${response.code}")
             }
@@ -348,7 +346,7 @@ class TorrentService : Service() {
         call.timeout().timeout(20, TimeUnit.SECONDS)
 
         call.execute().use { response ->
-            val responseText = response.body?.string().orEmpty()
+            val responseText = response.body.string()
             if (!response.isSuccessful) {
                 throw IOException("HTTP ${response.code} for $path: $responseText")
             }
