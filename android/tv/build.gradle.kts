@@ -14,7 +14,7 @@ val debugKeyPassword = providers.gradleProperty("DEBUG_KEY_PASSWORD").orNull
 
 android {
     namespace = "com.crispy.tv.tv"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.crispy.tv.tv"

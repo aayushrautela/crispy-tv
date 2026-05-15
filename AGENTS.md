@@ -8,7 +8,7 @@ Repo agent rules:
 
 ## Toolchain (match CI)
 
-- JDK 21; Android SDK `platforms;android-36` + `build-tools;36.0.0`
+- JDK 21; Android SDK `platforms;android-37` + `build-tools;37.0.0`
 - Gradle 9.3.1 via `gradle` (no wrapper checked in)
 - Python 3.12 + `jsonschema==4.23.0`
 - Xcode + `xcodegen`; Swift tools 5.9
