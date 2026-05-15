@@ -237,7 +237,10 @@ data class PlaybackEventInput(
         val small: String?,
         val medium: String?,
         val large: String?,
-    )
+    ) {
+        val isEmpty: Boolean
+            get() = small.isNullOrBlank() && medium.isNullOrBlank() && large.isNullOrBlank()
+    }
 
     data class MetadataImages(
         val poster: ResponsiveImageSet,

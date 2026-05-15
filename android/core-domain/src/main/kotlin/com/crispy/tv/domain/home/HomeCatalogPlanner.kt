@@ -91,6 +91,7 @@ data class HomeCatalogHeroItem(
     val year: String? = null,
     val genres: List<String> = emptyList(),
     val backdropUrl: String,
+    val backdrop: Map<String, String?> = emptyMap(),
     val addonId: String,
     val type: String,
 )
@@ -327,6 +328,7 @@ private fun buildHeroResult(
                     year = item.year,
                     genres = emptyList(),
                     backdropUrl = backdrop,
+                    backdrop = item.backdrop,
                     addonId = item.addonId,
                     type = item.type,
                 )
