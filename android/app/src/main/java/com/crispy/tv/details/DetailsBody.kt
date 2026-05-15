@@ -1,8 +1,5 @@
 package com.crispy.tv.details
 
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,6 +48,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LocalLifecycleOwner
+
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
+
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
@@ -589,6 +593,7 @@ internal fun MakingOfVideoPlayerDialog(
 ) {
     val videoKey = video?.key?.trim().orEmpty()
     if (video == null || videoKey.isBlank()) return
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     BackHandler(onBack = onDismiss)
 
@@ -617,26 +622,23 @@ internal fun MakingOfVideoPlayerDialog(
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f),
                 factory = { context ->
-                    WebView(context).apply {
-                        setBackgroundColor(android.graphics.Color.BLACK)
-                        webViewClient = WebViewClient()
-                        webChromeClient = WebChromeClient()
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        settings.loadWithOverviewMode = true
-                        settings.useWideViewPort = true
-                        loadUrl(
-                            "https://www.youtube.com/embed/$videoKey?autoplay=1&rel=0&playsinline=1",
-                            mapOf("Referer" to "https://${context.packageName}"),
+                    YouTubePlayerView(context).apply {
+                        lifecycleOwner.lifecycle.addObserver(this)
+                        enableAutomaticInitialization = false
+                        initialize(object : AbstractYouTubePlayerListener() {
+                            override fun onReady(youTubePlayer: YouTubePlayer) {
+                                youTubePlayer.loadVideo(videoKey, 0f)
+                            }
+                        }, IFramePlayerOptions.Builder()
+                            .controls(1)
+                            .fullscreen(0)
+                            .rel(0)
+                            .build()
                         )
                     }
                 },
-                onRelease = { webView ->
-                    webView.stopLoading()
-                    webView.loadUrl("about:blank")
-                    webView.removeAllViews()
-                    webView.destroy()
+                onRelease = { playerView ->
+                    playerView.release()
                 },
             )
             TextButton(onClick = onDismiss) {
