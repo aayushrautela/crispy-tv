@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 2
+      "minimum": 3
     },
     "suite": {
       "const": "media_state_contract"
@@ -31,16 +31,19 @@
         "kind": {
           "type": "string",
           "enum": [
-            "regular_card",
-            "landscape_card",
+            "media_item",
+            "search_result",
+            "recommendation_item",
             "continue_watching_item",
-            "metadata_card",
             "watched_item",
             "watchlist_item",
             "rating_item",
             "library_item",
             "home_snapshot_section",
-            "title_route"
+            "title_route",
+            "regular_card",
+            "landscape_card",
+            "metadata_card"
           ]
         },
         "payload": {
@@ -71,6 +74,7 @@
                 "null"
               ],
               "enum": [
+                "media_item",
                 "regular",
                 "landscape",
                 null
@@ -89,18 +93,6 @@
               ]
             },
             "item_id": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "provider": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "provider_id": {
               "type": [
                 "string",
                 "null"

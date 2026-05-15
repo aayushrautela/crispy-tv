@@ -8,14 +8,14 @@ interface CatalogRepository {
         mediaKey: String,
     ): CrispyBackendClient.MetadataTitleDetailResponse
 
-    suspend fun getTitleContent(
+    suspend fun getTitleExtras(
         accessToken: String,
         mediaKey: String,
-    ): CrispyBackendClient.MetadataTitleContentResponse
+    ): CrispyBackendClient.MetadataTitleExtrasResponse
 
-    suspend fun listEpisodes(
+    suspend fun getTitleRatings(
         accessToken: String,
+        profileId: String,
         mediaKey: String,
-        seasonNumber: Int,
-    ): CrispyBackendClient.MetadataEpisodeListResponse
+    ): CrispyBackendClient.MetadataTitleRatingsResponse
 }

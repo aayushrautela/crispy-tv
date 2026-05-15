@@ -8,28 +8,20 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.domain.home.HomeCatalogPresentation
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import com.crispy.tv.player.CanonicalContinueWatchingResult
-import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.player.WatchProvider
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,14 +48,14 @@ data class HomeCatalogSectionUi(
     val statusMessage: String = "",
 )
 
-private data class HomePrimarySnapshot(
+data class HomePrimarySnapshot(
     val hero: HeroState = HeroState(),
     val headerPills: List<CatalogSectionRef> = emptyList(),
     val catalogSections: List<HomeCatalogSectionUi> = emptyList(),
     val catalogStatusMessage: String = "",
 )
 
-private data class HomeWatchActivitySnapshot(
+data class HomeWatchActivitySnapshot(
     val continueWatching: HomeWideRailSectionUi = defaultWideRailSection(
         key = CONTINUE_WATCHING_SECTION_KEY,
         title = "Continue Watching",
@@ -76,28 +68,18 @@ private data class HomeWatchActivitySnapshot(
     ),
 )
 
-private data class CatalogSectionLayoutMeta(
-    val key: String,
-    val layout: String,
-)
-
-private const val CONTINUE_WATCHING_SECTION_KEY = "continueWatching"
-private const val UP_NEXT_SECTION_KEY = "upNext"
-private const val THIS_WEEK_SECTION_KEY = "thisWeek"
-private const val CATALOG_STATUS_SECTION_KEY = "catalogStatus"
+internal const val CONTINUE_WATCHING_SECTION_KEY = "continueWatching"
+internal const val UP_NEXT_SECTION_KEY = "upNext"
+internal const val THIS_WEEK_SECTION_KEY = "thisWeek"
 
 class HomeViewModel internal constructor(
-    private val homeCatalogService: HomeCatalogService,
-    private val homeWatchActivityService: HomeWatchActivityService,
+    private val refreshCoordinator: HomeRefreshCoordinator,
     private val watchHistoryService: WatchHistoryService,
-    private val calendarService: CalendarService,
     private val suppressionStore: ContinueWatchingSuppressionStore,
 ) : ViewModel() {
     companion object {
         private const val TAG = "HomeViewModel"
-        private const val SECTION_SKELETON_MIN_DURATION_MS = 150L
         private const val BACKGROUND_REFRESH_DEBOUNCE_MS = 60_000L
-        private const val HOME_PROVIDER_CONTINUE_WATCHING_LIMIT = 30
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -105,18 +87,22 @@ class HomeViewModel internal constructor(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                         val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(appContext)
+                        val suppressionStore = ContinueWatchingSuppressionStore(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
-                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
-                            homeWatchActivityService = HomeWatchActivityService(),
+                            refreshCoordinator = HomeRefreshCoordinator(
+                                recommendationCatalogService = SupabaseServicesProvider.recommendationCatalogService(appContext),
+                                homeWatchActivityService = HomeWatchActivityService(),
+                                watchHistoryService = watchHistoryService,
+                                calendarService =
+                                    CalendarService(
+                                        backendClient = BackendServicesProvider.backendClient(appContext),
+                                        backendContextResolver = BackendContextResolverProvider.get(appContext),
+                                    ),
+                                suppressionStore = suppressionStore,
+                            ),
                             watchHistoryService = watchHistoryService,
-                            calendarService =
-                                CalendarService(
-                                    supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
-                                    activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
-                                    backendClient = BackendServicesProvider.backendClient(appContext),
-                                ),
-                            suppressionStore = ContinueWatchingSuppressionStore(appContext),
+                            suppressionStore = suppressionStore,
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -145,7 +131,6 @@ class HomeViewModel internal constructor(
 
     private var catalogSectionLayoutMeta: List<CatalogSectionLayoutMeta> = emptyList()
     private var catalogStatusMessage: String = ""
-    private var primarySnapshot = HomePrimarySnapshot()
     private var watchActivitySnapshot = HomeWatchActivitySnapshot()
     private var thisWeekSection = defaultWideRailSection(
         key = THIS_WEEK_SECTION_KEY,
@@ -161,7 +146,8 @@ class HomeViewModel internal constructor(
     private var refreshPending: Boolean = false
     private var lastRefreshCompletedAtMs: Long = 0L
 
-    init {
+    fun ensureLoaded() {
+        if (hasLoadedHomeContent() || refreshJob?.isActive == true) return
         refresh(forceForegroundLoading = true)
     }
 
@@ -179,25 +165,81 @@ class HomeViewModel internal constructor(
 
         refreshJob =
             viewModelScope.launch {
-                var nextPrimarySnapshot: HomePrimarySnapshot? = null
-                var nextWatchActivitySnapshot: HomeWatchActivitySnapshot? = null
+                val refreshCompletion = CompletableDeferred<Unit>()
                 try {
+                    if (showForegroundLoading) {
+                        val cachedPrimarySnapshot = runCatching { refreshCoordinator.loadCachedPrimarySnapshot() }.getOrNull()
+                        if (cachedPrimarySnapshot != null && isCurrentRefresh(currentRefreshGeneration)) {
+                            applyPrimarySnapshot(cachedPrimarySnapshot)
+                        }
+                    }
+
                     coroutineScope {
-                        val primaryDeferred = async { loadPrimarySnapshot() }
-                        val watchActivityDeferred =
-                            async {
-                                loadWatchActivitySnapshot()
+                        async {
+                            val snapshot = runCatching { refreshCoordinator.loadPrimarySnapshot() }.getOrElse { error ->
+                                if (error is CancellationException) throw error
+                                Log.w(TAG, "Primary home feed refresh failed", error)
+                                HomePrimarySnapshot(
+                                    hero = HeroState(
+                                        items = emptyList(),
+                                        isLoading = false,
+                                        statusMessage = error.message ?: "Failed to load home feed.",
+                                    ),
+                                    catalogStatusMessage = error.message ?: "Failed to load home feed.",
+                                )
                             }
-                        nextPrimarySnapshot = primaryDeferred.await()
-                        nextWatchActivitySnapshot = watchActivityDeferred.await()
+                            if (isCurrentRefresh(currentRefreshGeneration)) {
+                                applyPrimarySnapshot(snapshot)
+                            }
+                        }
+                        async {
+                            val snapshot = runCatching { refreshCoordinator.loadWatchActivitySnapshot() }.getOrElse { error ->
+                                if (error is CancellationException) throw error
+                                Log.w(TAG, "Watch activity refresh failed", error)
+                                HomeWatchActivitySnapshot(
+                                    continueWatching = defaultWideRailSection(
+                                        key = CONTINUE_WATCHING_SECTION_KEY,
+                                        title = "Continue Watching",
+                                        kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+                                    ).copy(
+                                        isLoading = false,
+                                        statusMessage = error.message ?: "Failed to load continue watching.",
+                                    ),
+                                    upNext = defaultWideRailSection(
+                                        key = UP_NEXT_SECTION_KEY,
+                                        title = "Up Next",
+                                        kind = HomeWideRailSectionKind.UP_NEXT,
+                                    ).copy(isLoading = false),
+                                )
+                            }
+                            if (isCurrentRefresh(currentRefreshGeneration)) {
+                                applyWatchActivitySnapshot(snapshot)
+                            }
+                        }
+                        async {
+                            val section = runCatching { refreshCoordinator.loadThisWeekSection() }.getOrElse { error ->
+                                if (error is CancellationException) throw error
+                                Log.w(TAG, "This week refresh failed", error)
+                                defaultWideRailSection(
+                                    key = THIS_WEEK_SECTION_KEY,
+                                    title = "This Week",
+                                    kind = HomeWideRailSectionKind.THIS_WEEK,
+                                ).copy(
+                                    isLoading = false,
+                                    statusMessage = error.message ?: "Failed to load this week.",
+                                )
+                            }
+                            if (isCurrentRefresh(currentRefreshGeneration)) {
+                                applyThisWeekSection(section)
+                            }
+                        }
                     }
                 } finally {
                     if (isCurrentRefresh(currentRefreshGeneration)) {
-                        nextPrimarySnapshot?.let(::applyPrimarySnapshot)
-                        nextWatchActivitySnapshot?.let(::applyWatchActivitySnapshot)
                         _isRefreshing.value = false
                         lastRefreshCompletedAtMs = System.currentTimeMillis()
                     }
+                    refreshCompletion.complete(Unit)
 
                     refreshJob = null
                     if (refreshPending) {
@@ -206,23 +248,13 @@ class HomeViewModel internal constructor(
                     } else if (isCurrentRefresh(currentRefreshGeneration)) {
                         backgroundRefreshJob =
                             viewModelScope.launch {
-                                val refreshedWatchActivitySnapshot =
-                                    if (showForegroundLoading) {
-                                        loadWatchActivitySnapshot()
-                                    } else {
-                                        watchActivitySnapshot
-                                    }
-                                val refreshedThisWeekSection = loadThisWeekSection()
-                                if (!isCurrentRefresh(currentRefreshGeneration)) {
-                                    return@launch
-                                }
+                                refreshCompletion.await()
+                                val refreshedSnapshot = runCatching { refreshCoordinator.loadAll() }.getOrNull() ?: return@launch
+                                if (!isCurrentRefresh(currentRefreshGeneration)) return@launch
 
-                                if (refreshedWatchActivitySnapshot != watchActivitySnapshot) {
-                                    applyWatchActivitySnapshot(refreshedWatchActivitySnapshot)
-                                }
-                                if (refreshedThisWeekSection != thisWeekSection) {
-                                    applyThisWeekSection(refreshedThisWeekSection)
-                                }
+                                applyPrimarySnapshot(refreshedSnapshot.primary)
+                                applyWatchActivitySnapshot(refreshedSnapshot.watchActivity)
+                                applyThisWeekSection(refreshedSnapshot.thisWeek)
                             }
                     }
                 }
@@ -238,7 +270,6 @@ class HomeViewModel internal constructor(
     }
 
     fun removeContinueWatchingItem(item: CanonicalContinueWatchingItem) {
-        if (!item.dismissible) return
         suppressKeys(
             item.id,
             continueWatchingContentKey(item),
@@ -254,26 +285,13 @@ class HomeViewModel internal constructor(
         viewModelScope.launch {
             val removalResult =
                 withContext(Dispatchers.IO) {
-                    when {
-                        item.isUpNextPlaceholder -> {
-                            com.crispy.tv.player.WatchHistoryResult(
-                                statusMessage = "Removed ${item.title} from Continue Watching.",
-                            )
-                        }
-
-                        item.id.isNotBlank() -> {
-                            val dismissId = item.id.trim()
-                            watchHistoryService.removeFromPlayback(
-                                playbackId = dismissId,
-                                source = item.source.takeUnless { it == WatchProvider.LOCAL },
-                            )
-                        }
-
-                        else -> {
-                            com.crispy.tv.player.WatchHistoryResult(
-                                statusMessage = "Removed ${item.title} from Continue Watching.",
-                            )
-                        }
+                    if (item.id.isNotBlank()) {
+                        val dismissId = item.id.trim()
+                        watchHistoryService.removeFromPlayback(playbackId = dismissId)
+                    } else {
+                        com.crispy.tv.player.WatchHistoryResult(
+                            statusMessage = "Removed ${item.title} from Continue Watching.",
+                        )
                     }
                 }
 
@@ -328,193 +346,7 @@ class HomeViewModel internal constructor(
         return refreshGeneration == generation
     }
 
-    private suspend fun loadPrimarySnapshot(): HomePrimarySnapshot {
-        val feedLoadStartedAt = System.currentTimeMillis()
-        val primaryFeedResult =
-            try {
-                withContext(Dispatchers.IO) {
-                    homeCatalogService.loadPrimaryHomeFeed(heroLimit = 10)
-                }
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                Log.w(TAG, "Primary home feed refresh failed", error)
-                delayForMinimumSkeletonVisibility(feedLoadStartedAt)
-                val message = error.message ?: "Failed to load home feed."
-                return HomePrimarySnapshot(
-                    hero = HeroState(items = emptyList(), isLoading = false, statusMessage = message),
-                    catalogStatusMessage = message,
-                )
-            }
-
-        delayForMinimumSkeletonVisibility(feedLoadStartedAt)
-        val heroItems = primaryFeedResult.heroResult.items
-        val allSections = primaryFeedResult.sections
-        val headerPills =
-            allSections
-                .asSequence()
-                .filter { it.presentation == HomeCatalogPresentation.PILL }
-                .filter { it.displayTitle.trim().isNotEmpty() }
-                .distinctBy { it.key }
-                .toList()
-        val catalogSections =
-            allSections
-                .asSequence()
-                .filter { it.presentation != HomeCatalogPresentation.PILL }
-                .map { section ->
-                    HomeCatalogSectionUi(
-                        section = section,
-                        items = section.previewItems,
-                        isLoading = false,
-                    )
-                }
-                .toList()
-        val selectedId =
-            _heroState.value.selectedId?.takeIf { id -> heroItems.any { it.id == id } }
-                ?: heroItems.firstOrNull()?.id
-
-        return HomePrimarySnapshot(
-            hero = HeroState(
-                items = heroItems,
-                selectedId = selectedId,
-                isLoading = false,
-                statusMessage = primaryFeedResult.heroResult.statusMessage,
-            ),
-            headerPills = headerPills,
-            catalogSections = catalogSections,
-            catalogStatusMessage = primaryFeedResult.sectionsStatusMessage,
-        )
-    }
-
-    private suspend fun loadWatchActivitySnapshot(): HomeWatchActivitySnapshot {
-        val sectionLoadStartedAt = System.currentTimeMillis()
-        val continueWatchingResult =
-            try {
-                withContext(Dispatchers.IO) {
-                    val suppressionMap = suppressionStore.read()
-                    suppressedItemsByKey = suppressionMap
-
-                    val providerResult = loadProviderContinueWatching()
-                    val filteredProviderResult =
-                        providerResult.copy(
-                            entries = applyProviderSuppressionFilter(providerResult.entries, suppressionMap),
-                        )
-
-                    homeWatchActivityService.loadWatchActivity(
-                        providerResult = filteredProviderResult,
-                        limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-                    )
-                }
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                Log.w(TAG, "Watch activity refresh failed", error)
-                delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-                val message = error.message ?: "Failed to load continue watching."
-                return HomeWatchActivitySnapshot(
-                    continueWatching =
-                        defaultWideRailSection(
-                            key = CONTINUE_WATCHING_SECTION_KEY,
-                            title = "Continue Watching",
-                            kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
-                        ).copy(
-                            isLoading = false,
-                            statusMessage = message,
-                        ),
-                    upNext =
-                        defaultWideRailSection(
-                            key = UP_NEXT_SECTION_KEY,
-                            title = "Up Next",
-                            kind = HomeWideRailSectionKind.UP_NEXT,
-                        ).copy(isLoading = false),
-                )
-            }
-
-        delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-
-        val nowMs = System.currentTimeMillis()
-        val railItems = continueWatchingResult.entries
-        val continueWatchingItems = railItems.filterNot { it.isUpNextPlaceholder }
-        val upNextItems = railItems.filter { it.isUpNextPlaceholder }
-
-        return HomeWatchActivitySnapshot(
-            continueWatching =
-                defaultWideRailSection(
-                    key = CONTINUE_WATCHING_SECTION_KEY,
-                    title = "Continue Watching",
-                    kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
-                ).copy(
-                    items = continueWatchingItems.map { item -> item.toWideRailItem(nowMs) },
-                    isLoading = false,
-                    statusMessage =
-                        continueWatchingResult.statusMessage.takeIf {
-                            continueWatchingItems.isNotEmpty() || continueWatchingResult.isError
-                        }.orEmpty(),
-                ),
-            upNext =
-                defaultWideRailSection(
-                    key = UP_NEXT_SECTION_KEY,
-                    title = "Up Next",
-                    kind = HomeWideRailSectionKind.UP_NEXT,
-                ).copy(
-                    items = upNextItems.map { item -> item.toWideRailItem(nowMs) },
-                    isLoading = false,
-                ),
-        )
-    }
-
-    private suspend fun loadThisWeekSection(): HomeWideRailSectionUi {
-        val sectionLoadStartedAt = System.currentTimeMillis()
-        val thisWeekResult =
-            try {
-                withContext(Dispatchers.IO) {
-                    calendarService.loadThisWeek(System.currentTimeMillis())
-                }
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                Log.w(TAG, "This week refresh failed", error)
-                delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-                return defaultWideRailSection(
-                    key = THIS_WEEK_SECTION_KEY,
-                    title = "This Week",
-                    kind = HomeWideRailSectionKind.THIS_WEEK,
-                ).copy(
-                    isLoading = false,
-                    statusMessage = error.message ?: "Failed to load this week.",
-                )
-            }
-
-        delayForMinimumSkeletonVisibility(sectionLoadStartedAt)
-
-        return defaultWideRailSection(
-            key = THIS_WEEK_SECTION_KEY,
-            title = "This Week",
-            kind = HomeWideRailSectionKind.THIS_WEEK,
-        ).copy(
-            items = thisWeekResult.items.map { item -> item.toWideRailItem() },
-            isLoading = false,
-            statusMessage =
-                thisWeekResult.statusMessage.takeIf {
-                    thisWeekResult.items.isNotEmpty() || thisWeekResult.isError
-                }.orEmpty(),
-        )
-    }
-
-    private suspend fun loadProviderContinueWatching(): CanonicalContinueWatchingResult {
-        return watchHistoryService.getCanonicalContinueWatching(
-            limit = HOME_PROVIDER_CONTINUE_WATCHING_LIMIT,
-            source = null,
-        )
-    }
-
-    private suspend fun delayForMinimumSkeletonVisibility(visibleAtMs: Long) {
-        val elapsedMs = System.currentTimeMillis() - visibleAtMs
-        val remainingMs = SECTION_SKELETON_MIN_DURATION_MS - elapsedMs
-        if (remainingMs > 0L) {
-            delay(remainingMs)
-        }
-    }
-
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {
-        primarySnapshot = snapshot
         _heroState.value = snapshot.hero
         _headerPillsState.value = snapshot.headerPills
         catalogStatusMessage = snapshot.catalogStatusMessage
@@ -573,116 +405,10 @@ class HomeViewModel internal constructor(
     }
 
     private fun updateLayout() {
-        val wideRails = _wideRailSectionsState.value
-        val blocks = mutableListOf<HomeContentSectionUi>()
-
-        listOf(
-            CONTINUE_WATCHING_SECTION_KEY,
-            UP_NEXT_SECTION_KEY,
-            THIS_WEEK_SECTION_KEY,
-        ).forEach { key ->
-            val section = wideRails[key] ?: return@forEach
-            if (section.isVisible()) {
-                blocks += HomeWideRailLayoutUi(key = section.key, kind = section.kind)
-            }
-        }
-
-        if (catalogSectionLayoutMeta.isEmpty() && catalogStatusMessage.isNotBlank()) {
-            blocks += HomeStatusSectionUi(
-                key = CATALOG_STATUS_SECTION_KEY,
-                statusMessage = catalogStatusMessage,
-            )
-        }
-
-        var index = 0
-        while (index < catalogSectionLayoutMeta.size) {
-            val sectionMeta = catalogSectionLayoutMeta[index]
-            if (sectionMeta.layout.equals("collection", ignoreCase = true)) {
-                val groupedKeys = mutableListOf<String>()
-                while (
-                    index < catalogSectionLayoutMeta.size &&
-                        catalogSectionLayoutMeta[index].layout.equals("collection", ignoreCase = true)
-                ) {
-                    groupedKeys += catalogSectionLayoutMeta[index].key
-                    index += 1
-                }
-                blocks += HomeCollectionShelfSectionUi(
-                    key = groupedKeys.joinToString(separator = ":", prefix = "collections:"),
-                    sectionKeys = groupedKeys,
-                )
-            } else {
-                blocks += HomeCatalogRowSectionUi(
-                    key = sectionMeta.key,
-                    sectionKey = sectionMeta.key,
-                )
-                index += 1
-            }
-        }
-
-        _layoutState.value = HomeLayoutState(blocks = blocks)
-    }
-
-    private fun applyProviderSuppressionFilter(
-        entries: List<CanonicalContinueWatchingItem>,
-        suppressionMap: MutableMap<String, Long>? = suppressedItemsByKey,
-    ): List<CanonicalContinueWatchingItem> {
-        if (entries.isEmpty()) return emptyList()
-        val activeSuppressionMap = suppressionMap ?: return entries
-
-        var updated = false
-        val filtered = mutableListOf<CanonicalContinueWatchingItem>()
-        entries.forEach { entry ->
-            val key = continueWatchingContentKey(entry)
-            val suppressedAt = activeSuppressionMap[key]
-            if (suppressedAt == null) {
-                filtered += entry
-                return@forEach
-            }
-
-            if (entry.lastUpdatedEpochMs > suppressedAt) {
-                activeSuppressionMap.remove(key)
-                updated = true
-                filtered += entry
-            }
-        }
-
-        if (updated) {
-            suppressionStore.write(activeSuppressionMap)
-        }
-
-        return filtered
-    }
-
-private fun CanonicalContinueWatchingItem.toPlaybackIdentity(): PlaybackIdentity {
-        val contentType =
-            when (type.lowercase(Locale.US)) {
-                "series" -> MetadataLabMediaType.SERIES
-                "anime" -> MetadataLabMediaType.ANIME
-                else -> MetadataLabMediaType.MOVIE
-            }
-        val normalizedImdb = providerId.lowercase(Locale.US).takeIf { provider.equals("imdb", ignoreCase = true) && it.startsWith("tt") }
-
-        return PlaybackIdentity(
-            contentId = null,
-            mediaKey = mediaKey,
-            imdbId = normalizedImdb,
-            tmdbId = null,
-            contentType = contentType,
-            season = season,
-            episode = episode,
-            title = title,
-            year = null,
-            showTitle = if (contentType != MetadataLabMediaType.MOVIE) title else null,
-            showYear = null,
-            provider = provider,
-            providerId = providerId,
-            parentMediaType = if (contentType == MetadataLabMediaType.MOVIE) null else when (type.lowercase(Locale.US)) {
-                "anime" -> "anime"
-                else -> "show"
-            },
-            parentProvider = provider,
-            parentProviderId = providerId,
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
+        _layoutState.value = buildHomeLayoutState(
+            wideRails = _wideRailSectionsState.value,
+            catalogSectionLayoutMeta = catalogSectionLayoutMeta,
+            catalogStatusMessage = catalogStatusMessage,
         )
     }
 
@@ -720,7 +446,7 @@ private fun defaultWideRailSections(): Map<String, HomeWideRailSectionUi> {
     )
 }
 
-private fun defaultWideRailSection(
+internal fun defaultWideRailSection(
     key: String,
     title: String,
     kind: HomeWideRailSectionKind,
@@ -733,15 +459,15 @@ private fun defaultWideRailSection(
     )
 }
 
-private fun HomeWideRailSectionUi.isVisible(): Boolean {
+internal fun HomeWideRailSectionUi.isVisible(): Boolean {
     return isLoading || items.isNotEmpty() || statusMessage.isNotBlank()
 }
 
 private fun CanonicalContinueWatchingItem.sectionKey(): String {
-    return if (isUpNextPlaceholder) UP_NEXT_SECTION_KEY else CONTINUE_WATCHING_SECTION_KEY
+    return CONTINUE_WATCHING_SECTION_KEY
 }
 
-private fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
+internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
     return HomeWideRailItemUi(
         key = "${type}:${localKey}",
         title = title,
@@ -753,7 +479,7 @@ private fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideR
     )
 }
 
-private fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
+internal fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
     return HomeWideRailItemUi(
         key = "${type}:${localKey}",
         title = seriesName,
@@ -767,8 +493,9 @@ private fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
 
 private fun CalendarEpisodeItem.buildCalendarBadgeLabel(): String? {
     if (isReleased) return "Released"
+    val normalizedReleaseDate = releaseDate ?: return null
     return try {
-        val date = LocalDate.parse(releaseDate.take(10))
+        val date = LocalDate.parse(normalizedReleaseDate.take(10))
         "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
     } catch (_: Exception) {
         null
@@ -785,10 +512,13 @@ private fun CalendarEpisodeItem.buildCalendarSecondaryText(): String {
         }?.trim()
 
     val episodeLabel =
-        if (episodeRange != null) {
-            "S${season} ${episodeRange}"
-        } else {
-            "S${season} E${episode}"
+        when {
+            episodeRange != null && season != null -> "S${season} ${episodeRange}"
+            season != null && episode != null -> "S${season} E${episode}"
+            episodeRange != null -> episodeRange
+            episode != null -> "Episode ${episode}"
+            releaseDate != null -> releaseDate.take(10)
+            else -> "Upcoming episode"
         }
     return if (supportingText.isNullOrBlank()) {
         episodeLabel
@@ -833,16 +563,8 @@ class ContinueWatchingSuppressionStore(context: Context) {
     }
 }
 
-private fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-    val normalizedMediaKey = entry.mediaKey?.trim().orEmpty()
-    if (normalizedMediaKey.isNotEmpty()) {
-        return normalizedMediaKey
-    }
-    return continueWatchingContentKey(entry.type, entry.provider, entry.providerId)
-}
-
-private fun continueWatchingContentKey(type: String, provider: String, providerId: String): String {
-    return "${type.trim().lowercase(Locale.US)}:${provider.trim().lowercase(Locale.US)}:${providerId.trim().lowercase(Locale.US)}"
+internal fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
+    return entry.titleMediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
 }
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
@@ -860,12 +582,4 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
         ).toString()
 
     return listOfNotNull(seasonEpisode, relativeWatched).joinToString(separator = " • ")
-}
-
-private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
-    return when {
-        equals("series", ignoreCase = true) -> MetadataLabMediaType.SERIES
-        equals("anime", ignoreCase = true) -> MetadataLabMediaType.ANIME
-        else -> MetadataLabMediaType.MOVIE
-    }
 }

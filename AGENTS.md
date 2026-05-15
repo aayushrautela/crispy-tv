@@ -8,7 +8,7 @@ Repo agent rules:
 
 ## Toolchain (match CI)
 
-- JDK 21; Android SDK `platforms;android-35` + `build-tools;35.0.0`
+- JDK 21; Android SDK `platforms;android-37` + `build-tools;37.0.0`
 - Gradle 9.3.1 via `gradle` (no wrapper checked in)
 - Python 3.12 + `jsonschema==4.23.0`
 - Xcode + `xcodegen`; Swift tools 5.9
@@ -105,7 +105,7 @@ General:
 
 Contracts:
 - Fixtures include `contract_version`, `suite`, `case_id` (and `now_ms` when specified).
-- Suites currently covered include: `player_machine`, `continue_watching`, `trakt_scrobble_policy`, `media_ids`, `id_prefixes`, `search_ranking_and_dedup`, `sync_planner`, `storage_v1`.
+- Suites currently covered include: `player_machine`, `continue_watching`, `trakt_scrobble_policy`, `search_ranking_and_dedup`, `sync_planner`, `storage_v1`.
 - If you change behavior: bump `contract_version` (per SPEC), update fixtures/schemas, and keep Kotlin + Swift implementations in lockstep.
 
 Kotlin (Android + JVM):

@@ -4,14 +4,16 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.metadata.episodesForSeason
+import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.playerui.PlayerEpisodeSnapshot
 import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.StreamSelectorUiState
 import com.crispy.tv.streams.StreamProviderDescriptor
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.StreamLookupTarget
@@ -19,6 +21,7 @@ import com.crispy.tv.playback.buildPlayerSubtitle
 import com.crispy.tv.playback.buildStreamStatusMessage
 import com.crispy.tv.playback.findEpisodeForLookupId
 import com.crispy.tv.playback.resolveStreamLookupTarget
+import com.crispy.tv.playback.parseLookupId
 import com.crispy.tv.playback.matchesTarget
 import com.crispy.tv.playback.toUiState
 import com.crispy.tv.playback.toLoadingUiState
@@ -56,18 +59,29 @@ class DetailsViewModel internal constructor(
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
     private var episodesJob: Job? = null
+    private var reloadJob: Job? = null
+    private var extrasJob: Job? = null
+    private var ratingsJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
+    @Volatile
+    private var reloadGeneration: Long = 0L
 
     init {
         reload()
     }
 
     fun reload() {
-        viewModelScope.launch {
+        reloadJob?.cancel()
+        val generation = ++reloadGeneration
+        reloadJob = viewModelScope.launch {
             val nowMs = System.currentTimeMillis()
 
+            aiJob?.cancel()
+            streamLoadJob?.cancel()
             episodesJob?.cancel()
+            extrasJob?.cancel()
+            ratingsJob?.cancel()
             seasonEpisodesCache.clear()
             detailsUseCases.clearEpisodeWatchStateCache()
 
@@ -75,14 +89,20 @@ class DetailsViewModel internal constructor(
                 it.copy(
                     isLoading = true,
                     titleDetail = null,
-                    titleContent = null,
-                    statusMessage = "Loading...",
+                    titleExtras = null,
+                    titleRatings = null,
+                    extrasIsLoading = false,
+                    ratingsIsLoading = false,
+                    statusMessage = "",
+                    extrasStatusMessage = "",
+                    ratingsStatusMessage = "",
                     aiIsLoading = false,
                     aiInsights = null,
                     aiStoryVisible = false,
                     watchCta = WatchCta(),
                     continueVideoId = null,
                     seasons = emptyList(),
+                    highlightedEpisodeId = null,
                     seasonEpisodes = emptyList(),
                     episodeWatchStates = emptyMap(),
                     episodesIsLoading = false,
@@ -100,34 +120,60 @@ class DetailsViewModel internal constructor(
                         nowMs = nowMs,
                     )
                 }
+            if (!isCurrentGeneration(generation)) return@launch
 
             val enrichedDetails = result.details
+            val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
+                videos = result.titleDetail?.episodes.orEmpty().mapNotNull { it.toMediaVideo() },
+                runtimeEntry = runtimeEntry,
+            )
 
             _uiState.update { state ->
-                val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId
+                val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: runtimeEpisodeTarget?.episodeId
                 val pendingSeason =
-                    pendingHighlightEpisodeId?.let { highlightEpisodeId ->
-                result.details?.videos?.firstOrNull { video ->
-                    video.id.equals(highlightEpisodeId, ignoreCase = true)
-                }?.season
+                    runtimeEpisodeTarget?.seasonNumber ?: pendingHighlightEpisodeId?.let { highlightEpisodeId ->
+                        result.titleDetail
+                            ?.episodes
+                            ?.firstOrNull { episode ->
+                                episode.id.equals(highlightEpisodeId, ignoreCase = true)
+                            }
+                            ?.seasonNumber
                     }
                 val selectedSeason =
                     when {
                         pendingSeason != null && pendingSeason in result.seasons -> pendingSeason
                         state.selectedSeason != null && state.selectedSeason in result.seasons -> state.selectedSeason
                         result.seasons.isNotEmpty() -> result.seasons.first()
-                    else -> null
+                        else -> null
+                    }
+
+                result.titleDetail?.let { titleDetail ->
+                    result.seasons.forEach { season ->
+                        val seasonEpisodes = titleDetail.episodesForSeason(season).mapNotNull { it.toMediaVideo() }
+                        if (seasonEpisodes.isNotEmpty()) {
+                            seasonEpisodesCache[season] = seasonEpisodes
+                        }
+                    }
+                }
+
+                val titleDetailEpisodes =
+                    selectedSeason
+                        ?.let { season -> result.titleDetail?.episodesForSeason(season) }
+                        .orEmpty()
+                        .mapNotNull { it.toMediaVideo() }
+                if (selectedSeason != null && titleDetailEpisodes.isNotEmpty()) {
+                    seasonEpisodesCache[selectedSeason] = titleDetailEpisodes
                 }
 
                 val selectedSeasonEpisodes =
                     selectedSeason?.let { seasonEpisodesCache[it] }
+                        ?: titleDetailEpisodes.takeIf { it.isNotEmpty() }
                         ?: state.seasonEpisodes.takeIf { selectedSeason == state.selectedSeasonOrFirst }
 
                 state.copy(
                     isLoading = false,
                     details = result.details,
                     titleDetail = result.titleDetail,
-                    titleContent = result.titleContent,
                     statusMessage = result.statusMessage,
                     isWatched = result.providerState.isWatched,
                     isInWatchlist = result.providerState.isInWatchlist,
@@ -137,11 +183,17 @@ class DetailsViewModel internal constructor(
                     continueVideoId = result.continueVideoId,
                     seasons = result.seasons,
                     selectedSeason = selectedSeason,
+                    highlightedEpisodeId = pendingHighlightEpisodeId,
                     seasonEpisodes = selectedSeasonEpisodes.orEmpty(),
                     episodeWatchStates = emptyMap(),
-                    episodesIsLoading = selectedSeason != null && selectedSeasonEpisodes == null,
+                    episodesIsLoading = false,
                     episodesStatusMessage = "",
                 )
+            }
+
+            if (enrichedDetails != null) {
+                loadExtras(generation)
+                loadRatings(generation)
             }
 
             val seasonToLoad = _uiState.value.selectedSeasonOrFirst
@@ -149,9 +201,14 @@ class DetailsViewModel internal constructor(
                 enrichedDetails?.mediaType
                     ?.toMetadataLabMediaTypeOrNull()
                     ?.let { it != MetadataLabMediaType.MOVIE }
-                    == true && seasonToLoad != null
+                == true && seasonToLoad != null
             ) {
-                loadEpisodesForSeason(seasonToLoad, force = true)
+                val cachedEpisodes = seasonEpisodesCache[seasonToLoad]
+                if (cachedEpisodes != null) {
+                    loadEpisodeWatchStatesForSeason(seasonToLoad, cachedEpisodes)
+                } else {
+                    _uiState.update { it.copy(episodesIsLoading = true, episodesStatusMessage = "") }
+                }
             }
 
             val detailsForAi = enrichedDetails
@@ -163,11 +220,105 @@ class DetailsViewModel internal constructor(
                     withContext(Dispatchers.IO) {
                         detailsUseCases.loadCachedAiInsights(aiMediaKey, aiLocale)
                     }
-                if (cached != null) {
+                if (cached != null && isCurrentGeneration(generation)) {
                     _uiState.update { it.copy(aiInsights = cached) }
                 }
             }
         }
+    }
+
+    private fun loadExtras(generation: Long) {
+        extrasJob?.cancel()
+        _uiState.update { it.copy(extrasIsLoading = true, extrasStatusMessage = "") }
+
+        extrasJob =
+            viewModelScope.launch {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.loadExtras(mediaKey = mediaKey)
+                    }
+                if (!isCurrentGeneration(generation)) return@launch
+
+                val titleExtras = result.titleExtras
+                if (titleExtras != null) {
+                    titleExtras.episodes
+                        .mapNotNull { it.toMediaVideo() }
+                        .groupBy { it.season }
+                        .forEach { (season, videos) ->
+                            if (season != null && videos.isNotEmpty()) {
+                                seasonEpisodesCache[season] = videos
+                            }
+                        }
+                }
+
+                _uiState.update { state ->
+                    val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
+                        videos = titleExtras?.episodes.orEmpty().mapNotNull { it.toMediaVideo() },
+                        runtimeEntry = runtimeEntry,
+                    )
+                    val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: runtimeEpisodeTarget?.episodeId
+                    val pendingSeason =
+                        runtimeEpisodeTarget?.seasonNumber ?: pendingHighlightEpisodeId?.let { highlightEpisodeId ->
+                            seasonEpisodesCache.values.asSequence().flatten().firstOrNull { episode ->
+                                episode.id.equals(highlightEpisodeId, ignoreCase = true)
+                            }?.season
+                        }
+                    val selectedSeason =
+                        when {
+                            pendingSeason != null && pendingSeason in state.seasons -> pendingSeason
+                            state.selectedSeason != null && state.selectedSeason in state.seasons -> state.selectedSeason
+                            else -> state.selectedSeasonOrFirst
+                        }
+                    val selectedSeasonEpisodes = selectedSeason?.let { seasonEpisodesCache[it] }.orEmpty()
+                    state.copy(
+                        extrasIsLoading = false,
+                        titleExtras = titleExtras,
+                        selectedSeason = selectedSeason,
+                        highlightedEpisodeId = pendingHighlightEpisodeId ?: state.highlightedEpisodeId,
+                        seasonEpisodes = selectedSeasonEpisodes.takeIf { it.isNotEmpty() } ?: state.seasonEpisodes,
+                        episodesIsLoading = false,
+                        episodesStatusMessage = when {
+                            selectedSeason == null -> ""
+                            titleExtras == null -> "Episodes are unavailable right now."
+                            selectedSeasonEpisodes.isEmpty() -> "No episodes found for this season."
+                            else -> ""
+                        },
+                        extrasStatusMessage = if (titleExtras == null) "Some details are unavailable right now." else "",
+                    )
+                }
+
+                val selectedSeason = _uiState.value.selectedSeasonOrFirst
+                val selectedSeasonEpisodes = selectedSeason?.let { seasonEpisodesCache[it] }
+                if (selectedSeason != null && !selectedSeasonEpisodes.isNullOrEmpty()) {
+                    loadEpisodeWatchStatesForSeason(selectedSeason, selectedSeasonEpisodes)
+                }
+            }
+    }
+
+    private fun loadRatings(generation: Long) {
+        ratingsJob?.cancel()
+        _uiState.update { it.copy(ratingsIsLoading = true, ratingsStatusMessage = "") }
+
+        ratingsJob =
+            viewModelScope.launch {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.loadRatings(mediaKey = mediaKey)
+                    }
+                if (!isCurrentGeneration(generation)) return@launch
+
+                _uiState.update {
+                    it.copy(
+                        ratingsIsLoading = false,
+                        titleRatings = result.titleRatings,
+                        ratingsStatusMessage = if (result.titleRatings == null) "Ratings are unavailable right now." else "",
+                    )
+                }
+            }
+    }
+
+    private fun isCurrentGeneration(generation: Long): Boolean {
+        return generation == reloadGeneration
     }
 
     fun onAiInsightsClick() {
@@ -252,6 +403,9 @@ class DetailsViewModel internal constructor(
                 episodesStatusMessage = "",
             )
         }
+        if (cached == null && _uiState.value.extrasIsLoading) {
+            return
+        }
         if (cached == null) {
             loadEpisodesForSeason(season)
         } else {
@@ -269,6 +423,7 @@ class DetailsViewModel internal constructor(
                 highlightEpisodeId = normalizedHighlightEpisodeId,
                 autoOpenEpisode = autoOpenEpisode,
             )
+        _uiState.update { it.copy(highlightedEpisodeId = normalizedHighlightEpisodeId) }
 
         val currentState = _uiState.value
         val targetSeason =
@@ -360,9 +515,10 @@ class DetailsViewModel internal constructor(
                 val result =
                     withContext(Dispatchers.IO) {
                         detailsUseCases.loadSeasonEpisodes(
-                            mediaKey = mediaKey,
                             season = season,
                             details = details,
+                            titleDetail = _uiState.value.titleDetail,
+                            titleExtras = _uiState.value.titleExtras,
                         )
                     }
 
@@ -389,6 +545,7 @@ class DetailsViewModel internal constructor(
                     if (current.selectedSeasonOrFirst != season && current.selectedSeasonOrFirst != resolvedSeason) current
                     else current.copy(
                         selectedSeason = resolvedSeason,
+                        highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
                         seasonEpisodes = result.videos,
                         episodeWatchStates = result.episodeWatchStates,
                         episodesIsLoading = false,
@@ -413,7 +570,10 @@ class DetailsViewModel internal constructor(
                     }
                 _uiState.update { current ->
                     if (current.selectedSeasonOrFirst != season) current
-                    else current.copy(episodeWatchStates = episodeWatchStates)
+                    else current.copy(
+                        highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
+                        episodeWatchStates = episodeWatchStates,
+                    )
                 }
                 maybeConsumePendingEpisodeNavigation(videos)
             }
@@ -731,10 +891,7 @@ class DetailsViewModel internal constructor(
                         seasonEpisodes = currentState.seasonEpisodes,
                         fallbackMediaType = requestedMediaType,
                     ).lookupId
-            val normalizedLookupId =
-                normalizeNuvioMediaId(
-                    resolvedLookupId,
-                )
+            val parsedLookupId = parseLookupId(resolvedLookupId)
 
             val isEpisodic = resolvedMediaType != MetadataLabMediaType.MOVIE
             val parentMediaType =
@@ -743,31 +900,26 @@ class DetailsViewModel internal constructor(
                     MetadataLabMediaType.SERIES -> "show"
                     MetadataLabMediaType.ANIME -> "anime"
                 }
-            val season = if (isEpisodic) targetEpisode?.season ?: normalizedLookupId.season else null
-            val episode = if (isEpisodic) targetEpisode?.episode ?: normalizedLookupId.episode else null
+            val season = if (isEpisodic) targetEpisode?.season ?: parsedLookupId.season else null
+            val episode = if (isEpisodic) targetEpisode?.episode ?: parsedLookupId.episode else null
 
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
             val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
-            val identity =
-                PlaybackIdentity(
-                    contentId = enriched.id,
-                    imdbId = enriched.imdbId,
-                    tmdbId = if (resolvedMediaType == MetadataLabMediaType.MOVIE) enriched.tmdbId ?: targetEpisode?.tmdbId else null,
-                    contentType = resolvedMediaType,
-                    season = season,
-                    episode = episode,
-                    title = title,
-                    year = yearInt,
-                    showTitle = if (isEpisodic) enriched.title else null,
-                    showYear = if (isEpisodic) yearInt else null,
-                    provider = targetEpisode?.provider ?: enriched.provider,
-                    providerId = targetEpisode?.providerId ?: enriched.providerId,
-                    parentMediaType = enriched.parentMediaType ?: parentMediaType,
-                    parentProvider = targetEpisode?.parentProvider ?: enriched.parentProvider ?: enriched.provider,
-                    parentProviderId = targetEpisode?.parentProviderId ?: enriched.parentProviderId ?: enriched.providerId,
-                    absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
-                )
+val identity =
+            PlaybackIdentity(
+                mediaKey = enriched.mediaKey,
+                tmdbId = if (resolvedMediaType == MetadataLabMediaType.MOVIE) enriched.tmdbId ?: targetEpisode?.tmdbId else null,
+                contentType = resolvedMediaType,
+                season = season,
+                episode = episode,
+                title = title,
+                year = yearInt,
+                showTitle = if (isEpisodic) enriched.title else null,
+                showYear = if (isEpisodic) yearInt else null,
+                parentMediaType = enriched.parentMediaType ?: parentMediaType,
+                absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
+            )
             val artworkUrl = enriched.backdropUrl?.trim()?.ifBlank { null } ?: enriched.posterUrl?.trim()?.ifBlank { null }
             val subtitle = buildPlayerSubtitle(
                 mediaType = resolvedMediaType,
@@ -793,11 +945,7 @@ class DetailsViewModel internal constructor(
                             seasonNumber = season,
                             episodeNumber = episode,
                             mediaType = enriched.mediaType,
-                            provider = enriched.provider,
-                            providerId = enriched.providerId,
                             parentMediaType = enriched.parentMediaType ?: parentMediaType,
-                            parentProvider = enriched.parentProvider ?: enriched.provider,
-                            parentProviderId = enriched.parentProviderId ?: enriched.providerId,
                             absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
                             title = enriched.title,
                             posterUrl = enriched.posterUrl,
@@ -822,10 +970,6 @@ class DetailsViewModel internal constructor(
                                         overview = episodeItem.overview,
                                         thumbnailUrl = episodeItem.thumbnailUrl,
                                         lookupId = episodeItem.lookupId,
-                                        provider = episodeItem.provider,
-                                        providerId = episodeItem.providerId,
-                                        parentProvider = episodeItem.parentProvider,
-                                        parentProviderId = episodeItem.parentProviderId,
                                         absoluteEpisodeNumber = episodeItem.absoluteEpisodeNumber,
                                     )
                                 },
@@ -995,11 +1139,12 @@ class DetailsViewModel internal constructor(
         val target = videos.firstOrNull { video ->
             video.id.equals(pending.highlightEpisodeId, ignoreCase = true)
         } ?: return
+        _uiState.update { it.copy(highlightedEpisodeId = target.id) }
         pendingEpisodeNavigation = null
 
         if (!pending.autoOpenEpisode) return
 
-        target?.let { video -> onOpenStreamSelectorForEpisode(video.id) }
+        onOpenStreamSelectorForEpisode(target.id)
     }
 
     companion object {

@@ -11,14 +11,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.ui.brand.CrispyMark
 
 @Composable
 fun topLevelAppBarColors(): TopAppBarColors {
     return TopAppBarDefaults.topAppBarColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = MaterialTheme.colorScheme.background,
+        scrolledContainerColor = MaterialTheme.colorScheme.background,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -36,13 +37,14 @@ fun CrispySectionAppBarTitle(
     ) {
         CrispyMark(
             modifier = Modifier
-                .width(21.dp)
-                .height(25.dp),
+                .width(26.dp)
+                .height(32.dp),
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = 10.dp),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 12.dp),
         )
     }
 }

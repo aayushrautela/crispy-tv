@@ -9,8 +9,6 @@ from jsonschema import Draft202012Validator
 
 SUITE_TO_SCHEMA = {
     "player_machine": "player_machine.schema.json",
-    "media_ids": "media_ids.schema.json",
-    "id_prefixes": "id_prefixes.schema.json",
     "search_ranking_and_dedup": "search_ranking_and_dedup.schema.json",
     "sync_planner": "sync_planner.schema.json",
     "storage_v1": "storage_v1.schema.json",
@@ -22,6 +20,8 @@ SUITE_TO_SCHEMA = {
     "catalog_url_building": "catalog_url_building.schema.json",
     "trakt_scrobble_policy": "trakt_scrobble_policy.schema.json",
     "media_state_contract": "media_state_contract.schema.json",
+    "watch_collections_contract": "watch_collections_contract.schema.json",
+    "calendar_contract": "calendar_contract.schema.json",
 }
 
 

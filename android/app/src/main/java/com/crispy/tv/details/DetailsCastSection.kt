@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CardDefaults
@@ -34,7 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
+import com.crispy.tv.R
 import com.crispy.tv.ratings.formatRatingOutOfTen
 
 @Composable
@@ -248,14 +249,45 @@ internal fun MetadataReviewCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                review.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
-                    Text(
-                        text = createdAt.take(10),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    review.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
+                        Text(
+                            text = createdAt.take(10),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    ReviewProviderBadge(provider = review.provider)
                 }
             }
         }
     }
 }
+
+@Composable
+internal fun ReviewProviderBadge(provider: String) {
+    val logoRes = reviewProviderLogoRes(provider) ?: return
+    AsyncImage(
+        model = logoRes,
+        contentDescription = provider.providerLabel(),
+        modifier = Modifier.size(width = 24.dp, height = 24.dp),
+    )
+}
+
+private fun reviewProviderLogoRes(provider: String): Int? =
+    when (provider.trim().lowercase()) {
+        "tmdb" -> R.raw.tmdb
+        "trakt" -> R.raw.trakt
+        else -> null
+    }
+
+private fun String.providerLabel(): String =
+    when (trim().lowercase()) {
+        "tmdb" -> "TMDB review"
+        "trakt" -> "Trakt review"
+        else -> "Review source"
+    }

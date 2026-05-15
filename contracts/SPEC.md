@@ -31,10 +31,6 @@ The spec version documents the contract surface. Each suite owns its own
   - Time-sensitive comparisons use fixture-provided `now_ms`.
 - `trakt_scrobble_policy`
   - Deterministic Trakt scrobble decisions (endpoint + watched/progress flags) based on stage and progress.
-- `media_ids`
-  - Nuvio-style ID normalization for `content_id` and episode `video_id`.
-  - Canonical episode form is `${content_id}:${season}:${episode}`.
-  - Internal `series:` wrappers are accepted but stripped during normalization.
 - `metadata_tmdb_enhancer`
   - Derive season rows from valid episode metadata only when series metadata has no seasons.
   - Derived seasons sort ascending, count valid episode rows, and keep the first non-blank release per season as `air_date`.
@@ -48,7 +44,7 @@ The spec version documents the contract surface. Each suite owns its own
 - `home_catalogs`
   - Plan home-screen hero shelves, header sections, discover catalog refs, and paged catalog results from deterministic snapshot input.
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
-  - `contract_version` 5 requires `media_key` on client-facing title items. `provider` and `provider_id` are supporting metadata only when present and do not define client routing.
+  - `contract_version` 5 requires `media_key` on client-facing title items; provider identity is not part of client routing.
   - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
@@ -59,10 +55,6 @@ The spec version documents the contract surface. Each suite owns its own
   - For first-page requests with no filters, try simple path first, then path-style extras, then legacy query style.
   - Path/query forms always include canonical `skip` and `limit`; filters trim blanks, drop empty entries, sort deterministically by key then value, and preserve duplicates.
   - Generated URLs keep addon query parameters and percent-encode path/query components consistently.
-- `id_prefixes`
-  - Nuvio-style addon ID-prefix compatibility formatting.
-  - Resource-level `idPrefixes` are preferred; addon-level prefixes are fallback.
-  - Prefix matching uses `startsWith`; when no prefixes are declared, return best-effort normalized ID.
 - `search_ranking_and_dedup`
   - Normalize TMDB search results and preserve the upstream (TMDB) ordering.
   - Include `person` results (no filtering).
@@ -82,14 +74,25 @@ The spec version documents the contract surface. Each suite owns its own
   - Logical storage namespace/versioning and schema mismatch behavior.
 - `media_state_contract`
   - Validate exact backend payload-shape rules from `CLIENT_SERVER_MEDIA_STATE_CONTRACT.md` for client-facing runtime and card-like metadata surfaces.
-  - `contract_version` 2 requires `media.mediaKey` for every media-bearing title surface that can open title details. `mediaType`, `provider`, and `providerId` remain supporting metadata only.
-  - Regular-card surfaces require `mediaKey`, `mediaType`, `provider`, `providerId`, `title`, and `posterUrl`.
+  - `contract_version` 3 requires `media.mediaKey` for every media-bearing title surface that can open title details. `mediaType` remains supporting metadata only.
+  - Regular-card surfaces require `mediaKey`, `mediaType`, `title`, and `posterUrl`.
   - Landscape-card surfaces require the same fields plus `backdropUrl`.
-  - Continue-watching items require `id`, `media`, `progress`, `watchedAt`, `lastActivityAt`, `origins`, and `dismissible`; dismissal UI must honor backend `dismissible`.
+  - Continue-watching items require `id`, `media`, `progress`, `lastActivityAt`, `origins`, and `dismissible`; they do not require `watchedAt`, and dismissal UI must honor backend `dismissible`.
   - Watched/watchlist/ratings items require `media` and `origins`, plus their relevant state fields.
   - Search results, `similar`, `collection.parts`, and other card-like title metadata items are `mediaKey`-based and must not require internal canonical ids.
   - Title metadata routes use `/v1/metadata/titles/:mediaKey` and nested title-content routes hang off that same public key rather than internal ids.
   - Home snapshot sections preserve exact backend `layout` values: `regular`, `landscape`, `collection`, `hero`.
+- `watch_collections_contract`
+  - Validate public `/v1/profiles/:profileId/watch/*` collection envelopes against the server contract.
+  - Collection envelopes preserve exact server fields: `profileId`, `kind`, `source`, `generatedAt`, `items`, and `pageInfo`.
+  - Collection `source` is `canonical_watch`; `kind` values are `continue-watching`, `history`, `watchlist`, and `ratings`.
+  - Continue-watching items require landscape media plus `progress`, `lastActivityAt`, `origins`, and `dismissible`.
+  - History/watchlist/ratings items require regular media plus their respective server state objects/fields.
+- `calendar_contract`
+  - Validate public `/v1/profiles/:profileId/calendar` and `/calendar/this-week` responses against the server contract.
+  - Calendar envelopes preserve exact server fields: `profileId`, `source`, `generatedAt`, and `items`; `this-week` additionally requires `kind: this-week`.
+  - Calendar items require `bucket`, landscape `media`, regular `relatedShow`, `airDate`, and `watched`.
+  - Calendar `source` is `canonical_calendar`; valid buckets are `up_next`, `this_week`, `upcoming`, `recently_released`, and `no_scheduled`.
 
 ## Breaking Changes
 

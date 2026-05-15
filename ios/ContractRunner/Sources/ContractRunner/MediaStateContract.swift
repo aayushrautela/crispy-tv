@@ -5,8 +5,6 @@ public struct MediaStateNormalized: Equatable {
     public let mediaKey: String?
     public let mediaType: String?
     public let itemId: String?
-    public let provider: String?
-    public let providerId: String?
     public let title: String?
     public let posterUrl: String?
     public let backdropUrl: String?
@@ -24,8 +22,6 @@ public struct MediaStateNormalized: Equatable {
         mediaKey: String? = nil,
         mediaType: String? = nil,
         itemId: String? = nil,
-        provider: String? = nil,
-        providerId: String? = nil,
         title: String? = nil,
         posterUrl: String? = nil,
         backdropUrl: String? = nil,
@@ -42,8 +38,6 @@ public struct MediaStateNormalized: Equatable {
         self.mediaKey = mediaKey
         self.mediaType = mediaType
         self.itemId = itemId
-        self.provider = provider
-        self.providerId = providerId
         self.title = title
         self.posterUrl = posterUrl
         self.backdropUrl = backdropUrl
@@ -60,12 +54,8 @@ public struct MediaStateNormalized: Equatable {
 
 public func normalizeMediaStateCard(payload: [String: Any], kind: String) -> MediaStateNormalized? {
     switch kind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-    case "regular_card":
-        return normalizeCard(payload: payload, requireBackdrop: false)
-    case "landscape_card":
-        return normalizeCard(payload: payload, requireBackdrop: true)
-    case "metadata_card":
-        return normalizeMetadataCard(payload)
+    case "media_item", "search_result", "recommendation_item":
+        return normalizeMediaItemWrapper(payload)
     case "continue_watching_item":
         return normalizeContinueWatching(payload)
     case "watched_item":
@@ -85,79 +75,41 @@ public func normalizeMediaStateCard(payload: [String: Any], kind: String) -> Med
     }
 }
 
-private func normalizeCard(payload: [String: Any], requireBackdrop: Bool) -> MediaStateNormalized? {
+private func normalizeMediaItemWrapper(_ payload: [String: Any]) -> MediaStateNormalized? {
+    let media = objectValue(payload, "mediaItem") ?? (payload.keys.contains("mediaKey") ? payload : nil)
+    guard let media else {
+        return nil
+    }
+    return normalizeMediaItem(media)
+}
+
+private func normalizeMediaItem(_ payload: [String: Any]) -> MediaStateNormalized? {
     guard let mediaKey = stringValue(payload, "mediaKey"),
           let mediaType = stringValue(payload, "mediaType"),
-          let provider = stringValue(payload, "provider"),
-          let providerId = stringValue(payload, "providerId"),
           let title = stringValue(payload, "title") else {
         return nil
     }
-    let images = objectValue(payload, "images")
-    guard let posterUrl = stringValue(payload, "posterUrl") ?? images.flatMap({ stringValue($0, "posterUrl") }) else {
-        return nil
-    }
-    let backdropUrl = stringValue(payload, "backdropUrl") ?? images.flatMap({ stringValue($0, "backdropUrl") })
-    if requireBackdrop && backdropUrl == nil {
-        return nil
-    }
     return MediaStateNormalized(
-        cardFamily: requireBackdrop ? "landscape" : "regular",
+        cardFamily: "media_item",
         mediaKey: mediaKey,
         mediaType: mediaType,
-        itemId: nil,
-        provider: provider,
-        providerId: providerId,
         title: title,
-        posterUrl: posterUrl,
-        backdropUrl: backdropUrl,
-        subtitle: stringValue(payload, "subtitle")
-    )
-}
-
-private func normalizeMetadataCard(_ payload: [String: Any]) -> MediaStateNormalized? {
-    guard let mediaKey = stringValue(payload, "mediaKey"),
-          let mediaType = stringValue(payload, "mediaType"),
-          let provider = stringValue(payload, "provider"),
-          let providerId = stringValue(payload, "providerId") else {
-        return nil
-    }
-    let images = objectValue(payload, "images")
-    guard let title = stringValue(payload, "title") ?? stringValue(payload, "subtitle") else {
-        return nil
-    }
-    guard let posterUrl = stringValue(payload, "posterUrl") ?? images.flatMap({ stringValue($0, "posterUrl") }) else {
-        return nil
-    }
-    let backdropUrl = stringValue(payload, "backdropUrl") ?? images.flatMap({ stringValue($0, "backdropUrl") })
-    return MediaStateNormalized(
-        cardFamily: "regular",
-        mediaKey: mediaKey,
-        mediaType: mediaType,
-        itemId: nil,
-        provider: provider,
-        providerId: providerId,
-        title: title,
-        posterUrl: posterUrl,
-        backdropUrl: backdropUrl,
-        subtitle: stringValue(payload, "subtitle") ?? stringValue(payload, "summary") ?? stringValue(payload, "overview")
+        posterUrl: nullableStringValue(payload, "posterUrl"),
+        backdropUrl: nullableStringValue(payload, "backdropUrl"),
+        subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "episodeTitle") ?? nullableStringValue(payload, "overview")
     )
 }
 
 private func normalizeContinueWatching(_ payload: [String: Any]) -> MediaStateNormalized? {
     guard let id = stringValue(payload, "id"),
-          let media = objectValue(payload, "media"),
-          let normalizedMedia = normalizeCard(payload: media, requireBackdrop: true),
-          let watchedAt = stringValue(payload, "watchedAt"),
+          let media = objectValue(payload, "mediaItem"),
+          let normalizedMedia = normalizeMediaItem(media),
+          payload.keys.contains("progress"),
           let lastActivityAt = stringValue(payload, "lastActivityAt"),
           let originsValue = payload["origins"] as? [Any],
+          let origins = stringArray(originsValue),
           let dismissible = payload["dismissible"] as? Bool else {
         return nil
-    }
-    let origins = originsValue.compactMap { value -> String? in
-        guard let string = value as? String else { return nil }
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
     let progress = objectValue(payload, "progress")
     let progressPercent = doubleValue(progress, "progressPercent") ?? 0
@@ -166,14 +118,11 @@ private func normalizeContinueWatching(_ payload: [String: Any]) -> MediaStateNo
         mediaKey: normalizedMedia.mediaKey,
         mediaType: normalizedMedia.mediaType,
         itemId: id,
-        provider: normalizedMedia.provider,
-        providerId: normalizedMedia.providerId,
         title: normalizedMedia.title,
         posterUrl: normalizedMedia.posterUrl,
         backdropUrl: normalizedMedia.backdropUrl,
         subtitle: normalizedMedia.subtitle,
         progressPercent: progressPercent,
-        watchedAt: watchedAt,
         lastActivityAt: lastActivityAt,
         origins: origins,
         dismissible: dismissible
@@ -181,55 +130,41 @@ private func normalizeContinueWatching(_ payload: [String: Any]) -> MediaStateNo
 }
 
 private func normalizeWatchItem(_ payload: [String: Any], stateKey: String) -> MediaStateNormalized? {
-    guard let media = objectValue(payload, "media"),
-          let normalizedMedia = normalizeCard(payload: media, requireBackdrop: false),
-          let originsValue = payload["origins"] as? [Any] else {
+    guard let id = stringValue(payload, "id"),
+          let media = objectValue(payload, "mediaItem"),
+          let normalizedMedia = normalizeMediaItem(media),
+          let originsValue = payload["origins"] as? [Any],
+          let origins = stringArray(originsValue) else {
         return nil
-    }
-    let origins = originsValue.compactMap { value -> String? in
-        guard let string = value as? String else { return nil }
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
     return MediaStateNormalized(
         cardFamily: normalizedMedia.cardFamily,
         mediaKey: normalizedMedia.mediaKey,
         mediaType: normalizedMedia.mediaType,
-        itemId: nil,
-        provider: normalizedMedia.provider,
-        providerId: normalizedMedia.providerId,
+        itemId: id,
         title: normalizedMedia.title,
         posterUrl: normalizedMedia.posterUrl,
         backdropUrl: normalizedMedia.backdropUrl,
         subtitle: normalizedMedia.subtitle,
-        progressPercent: nil,
         watchedAt: stateKey == "watchedAt" ? stringValue(payload, stateKey) : nil,
-        lastActivityAt: nil,
-        origins: origins,
-        dismissible: nil
+        origins: origins
     )
 }
 
 private func normalizeLibraryItem(_ payload: [String: Any]) -> MediaStateNormalized? {
     guard let itemId = stringValue(payload, "id"),
-          let media = objectValue(payload, "media"),
+          let media = objectValue(payload, "mediaItem"),
           let _ = objectValue(payload, "state"),
-          let normalizedMedia = normalizeCard(payload: media, requireBackdrop: false),
-          let originsValue = payload["origins"] as? [Any] else {
+          let normalizedMedia = normalizeMediaItem(media),
+          let originsValue = payload["origins"] as? [Any],
+          let origins = stringArray(originsValue) else {
         return nil
-    }
-    let origins = originsValue.compactMap { value -> String? in
-        guard let string = value as? String else { return nil }
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
     return MediaStateNormalized(
         cardFamily: normalizedMedia.cardFamily,
         mediaKey: normalizedMedia.mediaKey,
         mediaType: normalizedMedia.mediaType,
         itemId: itemId,
-        provider: normalizedMedia.provider,
-        providerId: normalizedMedia.providerId,
         title: normalizedMedia.title,
         posterUrl: normalizedMedia.posterUrl,
         backdropUrl: normalizedMedia.backdropUrl,
@@ -264,6 +199,20 @@ private func stringValue(_ object: [String: Any]?, _ key: String) -> String? {
     return trimmed.isEmpty ? nil : trimmed
 }
 
+private func nullableStringValue(_ object: [String: Any], _ key: String) -> String? {
+    guard let value = object[key] else {
+        return nil
+    }
+    if value is NSNull {
+        return nil
+    }
+    guard let text = value as? String else {
+        return nil
+    }
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+}
+
 private func doubleValue(_ object: [String: Any]?, _ key: String) -> Double? {
     guard let value = object?[key] else {
         return nil
@@ -282,4 +231,19 @@ private func doubleValue(_ object: [String: Any]?, _ key: String) -> Double? {
 
 private func objectValue(_ object: [String: Any], _ key: String) -> [String: Any]? {
     return object[key] as? [String: Any]
+}
+
+private func stringArray(_ values: [Any]) -> [String]? {
+    var output: [String] = []
+    for value in values {
+        guard let string = value as? String else {
+            return nil
+        }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return nil
+        }
+        output.append(trimmed)
+    }
+    return output
 }

@@ -25,7 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 
@@ -68,7 +68,7 @@ internal fun HomeHeroCarousel(
     ) { index ->
         val item = items[index]
         val heroImageModel = rememberCrispyImageModel(
-            item.backdropUrl,
+            image = item.backdrop,
             width = 320.dp,
             height = 320.dp,
             tmdbSize = "w780",

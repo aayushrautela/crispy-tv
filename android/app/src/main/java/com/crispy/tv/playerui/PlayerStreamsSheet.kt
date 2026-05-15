@@ -23,6 +23,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -40,12 +41,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import com.crispy.tv.details.StreamProviderUiState
-import com.crispy.tv.details.StreamSelectorUiState
+import coil3.compose.AsyncImage
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.StreamProviderUiState
+import com.crispy.tv.streams.StreamSelectorUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -254,6 +255,14 @@ private fun ProviderChipsRow(
             selected = state.selectedProviderId == null,
             onClick = { onProviderSelected(null) },
             label = { Text("All ${state.totalStreamCount}") },
+            shape = RoundedCornerShape(16.dp),
+            border = null,
+            colors = FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                labelColor = MaterialTheme.colorScheme.onSurface,
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
         )
 
         state.providers.forEach { provider ->
@@ -261,6 +270,14 @@ private fun ProviderChipsRow(
                 selected = provider.providerId.equals(state.selectedProviderId, ignoreCase = true),
                 onClick = { onProviderSelected(provider.providerId) },
                 label = { Text("${provider.providerName} ${provider.streams.size}") },
+                shape = RoundedCornerShape(16.dp),
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    labelColor = MaterialTheme.colorScheme.onSurface,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
             )
         }
     }

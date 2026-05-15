@@ -6,17 +6,17 @@ import com.crispy.tv.player.CanonicalContinueWatchingResult
 class HomeWatchActivityService {
 
     suspend fun loadWatchActivity(
-        providerResult: CanonicalContinueWatchingResult,
+        canonicalResult: CanonicalContinueWatchingResult,
         limit: Int = 20,
     ): CanonicalContinueWatchingResult {
-        return if (providerResult.entries.isNotEmpty()) {
-            loadContinueWatchingItems(providerResult.entries, limit).copy(
-                statusMessage = providerResult.statusMessage,
-                isError = providerResult.isError,
+        return if (canonicalResult.entries.isNotEmpty()) {
+            loadContinueWatchingItems(canonicalResult.entries, limit).copy(
+                statusMessage = canonicalResult.statusMessage,
+                isError = canonicalResult.isError,
             )
-        } else if (providerResult.isError) {
+        } else if (canonicalResult.isError) {
             CanonicalContinueWatchingResult(
-                statusMessage = providerResult.statusMessage,
+                statusMessage = canonicalResult.statusMessage,
                 isError = true,
             )
         } else {
@@ -43,28 +43,24 @@ class HomeWatchActivityService {
         )
     }
 
-    private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
-        return CanonicalContinueWatchingItem(
-            id = entry.id.trim(),
-            mediaKey = entry.mediaKey,
-            localKey = entry.localKey,
-            provider = entry.provider,
-            providerId = entry.providerId,
-            mediaType = entry.mediaType,
-            title = entry.title,
-            season = entry.season,
-            episode = entry.episode,
-            lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
-            progressPercent = entry.progressPercent,
-            source = entry.source,
-            isUpNextPlaceholder = entry.isUpNextPlaceholder,
-            backdropUrl = entry.backdropUrl,
-            posterUrl = entry.posterUrl,
-            logoUrl = entry.logoUrl,
-            addonId = entry.addonId,
-            subtitle = entry.subtitle,
-            dismissible = entry.dismissible,
-            absoluteEpisodeNumber = entry.absoluteEpisodeNumber,
-        )
-    }
+private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
+  return CanonicalContinueWatchingItem(
+    id = entry.id.trim(),
+    titleMediaKey = entry.titleMediaKey,
+    playbackMediaKey = entry.playbackMediaKey,
+    localKey = entry.localKey,
+    mediaType = entry.mediaType,
+    title = entry.title,
+    season = entry.season,
+    episode = entry.episode,
+    lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
+    progressPercent = entry.progressPercent,
+    backdropUrl = entry.backdropUrl,
+    posterUrl = entry.posterUrl,
+    logoUrl = entry.logoUrl,
+    addonId = entry.addonId,
+    subtitle = entry.subtitle,
+    absoluteEpisodeNumber = entry.absoluteEpisodeNumber,
+  )
+}
 }

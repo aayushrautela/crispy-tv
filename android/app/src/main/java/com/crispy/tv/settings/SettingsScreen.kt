@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Person
@@ -70,6 +71,7 @@ data class SettingsGroup(
 fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
+    onNavigateToImageSettings: () -> Unit = {},
     onNavigateToProviderPortal: () -> Unit = {},
     onNavigateToAccountsProfiles: () -> Unit = {},
     scrollToTopRequests: StateFlow<Int>,
@@ -98,6 +100,13 @@ fun SettingsScreen(
                             icon = Icons.Outlined.VideoSettings,
                             iconTint = MaterialTheme.colorScheme.secondary,
                             onClick = onNavigateToPlaybackSettings
+                        ),
+                        SettingsItem(
+                            label = "Image Quality",
+                            description = "Choose artwork detail and cache size",
+                            icon = Icons.Outlined.Image,
+                            iconTint = MaterialTheme.colorScheme.secondary,
+                            onClick = onNavigateToImageSettings
                         ),
                         SettingsItem(
                             label = "Subtitles",

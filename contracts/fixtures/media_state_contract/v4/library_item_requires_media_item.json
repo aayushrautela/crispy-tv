@@ -1,0 +1,44 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "library_item_requires_media_item",
+  "input": {
+    "kind": "library_item",
+    "payload": {
+      "id": "library-555",
+      "kind": "watch_state",
+      "mediaItem": {
+        "mediaKey": "tmdb:show:666",
+        "mediaType": "show",
+        "title": "Library Show",
+        "posterUrl": "https://example.com/poster.jpg",
+        "backdropUrl": null,
+        "subtitle": null
+      },
+      "context": {},
+      "presentation": null,
+      "state": {},
+      "origins": ["manual"]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "media_key": "tmdb:show:666",
+      "media_type": "show",
+      "item_id": "library-555",
+      "title": "Library Show",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": ["manual"],
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

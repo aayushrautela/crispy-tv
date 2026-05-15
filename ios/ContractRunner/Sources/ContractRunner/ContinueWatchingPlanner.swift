@@ -125,8 +125,6 @@ private func normalizeCandidate(_ candidate: ContinueWatchingCandidate) -> Conti
 private func choosePreferred(current: ContinueWatchingCandidate, incoming: ContinueWatchingCandidate) -> ContinueWatchingCandidate {
     let sameEpisode = current.contentType == "movie" || (current.episodeKey != nil && current.episodeKey == incoming.episodeKey)
 
-    // Mirror Nuvio's behavior: for the same episode/movie, only let progress win when it is
-    // meaningfully ahead; otherwise, fall back to recency to avoid flip-flopping on tiny deltas.
     if sameEpisode {
         let preferProgressDelta = 0.5
         if incoming.progressPercent > current.progressPercent + preferProgressDelta {

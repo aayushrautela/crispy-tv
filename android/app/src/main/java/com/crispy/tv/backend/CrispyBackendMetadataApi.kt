@@ -1,16 +1,14 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.AiInsightsResponse
-import com.crispy.tv.backend.CrispyBackendClient.AiSearchResponse
 import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
-import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodeListResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataNextEpisodeResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.MetadataResolveResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataSearchResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataSeasonDetailResponse
-import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleContentResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
@@ -18,21 +16,11 @@ import org.json.JSONObject
 internal suspend fun CrispyBackendClient.searchTitlesApi(
     accessToken: String,
     query: String,
-    filter: String? = null,
-    locale: String? = null,
     limit: Int = 20,
-): MetadataSearchResponse {
+): SearchResultsResponse {
     checkConfigured()
     val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
         .addQueryParameter("query", query.trim())
-        .apply {
-            if (!filter.isNullOrBlank()) {
-                addQueryParameter("filter", filter)
-            }
-            if (!locale.isNullOrBlank()) {
-                addQueryParameter("locale", locale)
-            }
-        }
         .addQueryParameter("limit", limit.toString())
         .build()
     val response = httpClient.get(
@@ -40,28 +28,18 @@ internal suspend fun CrispyBackendClient.searchTitlesApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
-    return MetadataSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    val json = requireSuccess(response)
+    return parseSearchResultsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.searchTitlesByGenreApi(
     accessToken: String,
     genre: String,
-    filter: String? = null,
-    locale: String? = null,
     limit: Int = 20,
-): MetadataSearchResponse {
+): SearchResultsResponse {
     checkConfigured()
     val url = "$baseUrl/v1/search/titles".toHttpUrl().newBuilder()
         .addQueryParameter("genre", genre.trim())
-        .apply {
-            if (!filter.isNullOrBlank()) {
-                addQueryParameter("filter", filter)
-            }
-            if (!locale.isNullOrBlank()) {
-                addQueryParameter("locale", locale)
-            }
-        }
         .addQueryParameter("limit", limit.toString())
         .build()
     val response = httpClient.get(
@@ -69,21 +47,19 @@ internal suspend fun CrispyBackendClient.searchTitlesByGenreApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
-    return MetadataSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    val json = requireSuccess(response)
+    return parseSearchResultsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.searchAiTitlesApi(
     accessToken: String,
     profileId: String,
     query: String,
-    filter: String? = null,
     locale: String? = null,
-): AiSearchResponse {
+): SearchResultsResponse {
     checkConfigured()
     val payload = JSONObject().apply {
         put("query", query.trim())
-        if (!filter.isNullOrBlank()) put("filter", filter)
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
     val response = httpClient.postJson(
@@ -92,8 +68,32 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
-    return AiSearchResponse(items = parseMetadataItems(json.optJSONArray("items")))
+    val json = requireSuccess(response)
+    return parseSearchResultsResponse(json)
+}
+
+internal suspend fun CrispyBackendClient.searchSuggestionsApi(
+    accessToken: String,
+    query: String,
+    filter: String = "all",
+    limit: Int = 8,
+    locale: String? = null,
+): SearchSuggestionsResponse {
+    checkConfigured()
+    val urlBuilder = "$baseUrl/v1/search/suggestions".toHttpUrl().newBuilder()
+    urlBuilder.addQueryParameter("query", query.trim())
+    urlBuilder.addQueryParameter("filter", filter.trim())
+    urlBuilder.addQueryParameter("limit", limit.toString())
+    if (!locale.isNullOrBlank()) {
+        urlBuilder.addQueryParameter("locale", locale.trim())
+    }
+    val response = httpClient.get(
+        url = urlBuilder.build(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseSearchSuggestionsResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.getAiInsightsApi(
@@ -113,7 +113,7 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return AiInsightsResponse(
         insights = parseAiInsightsCards(json.optJSONArray("insights")),
         trivia = json.optString("trivia").trim(),
@@ -126,11 +126,11 @@ internal suspend fun CrispyBackendClient.resolveMetadataApi(
 ): MetadataResolveResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = metadataLookupUrl("$baseUrl/v1/metadata/resolve", input, includeMediaKey = true),
+        url = metadataLookupUrl("$baseUrl/v1/metadata/resolve", input),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     val itemJson = json.optJSONObject("item") ?: throw IllegalStateException("Backend metadata resolve did not return an item.")
     return MetadataResolveResponse(item = parseMetadataView(itemJson))
 }
@@ -145,54 +145,55 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return MetadataTitleDetailResponse(
         item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend title detail is missing item.")),
         seasons = parseMetadataSeasonViews(json.optJSONArray("seasons")),
+        episodes = parseMetadataEpisodeViews(json.optJSONArray("episodes")),
+        nextEpisode = json.optJSONObject("nextEpisode")?.let(::parseMetadataEpisodeView),
         videos = parseMetadataVideoViews(json.optJSONArray("videos")),
         cast = parseMetadataPersonRefViews(json.optJSONArray("cast")),
         directors = parseMetadataPersonRefViews(json.optJSONArray("directors")),
         creators = parseMetadataPersonRefViews(json.optJSONArray("creators")),
-        reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
         production = parseMetadataProductionInfoView(json.optJSONObject("production")),
         collection = parseMetadataCollectionView(json.optJSONObject("collection")),
-        similar = parseMetadataCardViews(json.optJSONArray("similar")),
+        similar = parseMetadataRelatedItemViews(json.optJSONArray("similar")),
     )
 }
 
-internal suspend fun CrispyBackendClient.getMetadataTitleContentApi(
+internal suspend fun CrispyBackendClient.getMetadataTitleExtrasApi(
     accessToken: String,
     mediaKey: String,
-): MetadataTitleContentResponse {
+): MetadataTitleExtrasResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/content".toHttpUrl(),
+        url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/extras".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
-    return MetadataTitleContentResponse(
-        item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend title content is missing item.")),
-        content = parseMetadataContentView(json.optJSONObject("content") ?: throw IllegalStateException("Backend title content is missing content.")),
-    )
-}
-
-internal suspend fun CrispyBackendClient.getMetadataSeasonDetailApi(
-    accessToken: String,
-    mediaKey: String,
-    seasonNumber: Int,
-): MetadataSeasonDetailResponse {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/seasons/$seasonNumber".toHttpUrl(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return MetadataSeasonDetailResponse(
-        show = parseMetadataView(json.optJSONObject("show") ?: throw IllegalStateException("Backend season detail is missing show.")),
-        season = parseMetadataSeasonView(json.optJSONObject("season") ?: throw IllegalStateException("Backend season detail is missing season.")),
+    val json = requireSuccess(response)
+    return MetadataTitleExtrasResponse(
         episodes = parseMetadataEpisodeViews(json.optJSONArray("episodes")),
+        reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
+        similar = parseMetadataRelatedItemViews(json.optJSONArray("similar")),
+        collection = parseMetadataCollectionView(json.optJSONObject("collection")),
+    )
+}
+
+internal suspend fun CrispyBackendClient.getMetadataTitleRatingsApi(
+    accessToken: String,
+    profileId: String,
+    mediaKey: String,
+): MetadataTitleRatingsResponse {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/metadata/titles/${mediaKey.trim()}/ratings".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return MetadataTitleRatingsResponse(
+        ratings = parseMetadataTitleRatings(json.optJSONObject("ratings")),
     )
 }
 
@@ -214,77 +215,10 @@ internal suspend fun CrispyBackendClient.getMetadataPersonDetailApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return parseMetadataPersonDetail(json)
 }
 
-internal suspend fun CrispyBackendClient.listMetadataEpisodesApi(
-    accessToken: String,
-    mediaKey: String,
-    seasonNumber: Int? = null,
-): MetadataEpisodeListResponse {
-    checkConfigured()
-    val url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/episodes".toHttpUrl().newBuilder()
-        .apply {
-            if (seasonNumber != null) {
-                addQueryParameter("seasonNumber", seasonNumber.toString())
-            }
-        }
-        .build()
-    val response = httpClient.get(
-        url = url,
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return MetadataEpisodeListResponse(
-        show = parseMetadataView(json.optJSONObject("show") ?: throw IllegalStateException("Backend episode list is missing show.")),
-        requestedSeasonNumber = json.optIntOrNull("requestedSeasonNumber"),
-        effectiveSeasonNumber = json.optIntOrNull("effectiveSeasonNumber")
-            ?: throw IllegalStateException("Backend episode list is missing effective season number."),
-        includedSeasonNumbers = json.optIntList("includedSeasonNumbers"),
-        episodes = parseMetadataEpisodeViews(json.optJSONArray("episodes")),
-    )
-}
-
-internal suspend fun CrispyBackendClient.getNextEpisodeApi(
-    accessToken: String,
-    mediaKey: String,
-    currentSeasonNumber: Int,
-    currentEpisodeNumber: Int,
-    watchedKeys: List<String> = emptyList(),
-    showMediaKey: String? = null,
-    nowMs: Long? = null,
-): MetadataNextEpisodeResponse {
-    checkConfigured()
-    val url = "$baseUrl/v1/metadata/titles/${mediaKey.trim()}/next-episode".toHttpUrl().newBuilder()
-        .addQueryParameter("currentSeasonNumber", currentSeasonNumber.toString())
-        .addQueryParameter("currentEpisodeNumber", currentEpisodeNumber.toString())
-        .apply {
-            if (watchedKeys.isNotEmpty()) {
-                addQueryParameter("watchedKeys", watchedKeys.joinToString(","))
-            }
-            if (!showMediaKey.isNullOrBlank()) {
-                addQueryParameter("showMediaKey", showMediaKey.trim())
-            }
-            if (nowMs != null) {
-                addQueryParameter("nowMs", nowMs.toString())
-            }
-        }
-        .build()
-    val response = httpClient.get(
-        url = url,
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = JSONObject(requireSuccess(response))
-    return MetadataNextEpisodeResponse(
-        show = parseMetadataView(json.optJSONObject("show") ?: throw IllegalStateException("Backend next episode response is missing show.")),
-        currentSeasonNumber = json.optIntOrNull("currentSeasonNumber") ?: currentSeasonNumber,
-        currentEpisodeNumber = json.optIntOrNull("currentEpisodeNumber") ?: currentEpisodeNumber,
-        item = json.optJSONObject("item")?.let(::parseMetadataEpisodeView),
-    )
-}
 
 internal suspend fun CrispyBackendClient.resolvePlaybackApi(
     accessToken: String,
@@ -292,11 +226,11 @@ internal suspend fun CrispyBackendClient.resolvePlaybackApi(
 ): PlaybackResolveResponse {
     checkConfigured()
     val response = httpClient.get(
-        url = metadataLookupUrl("$baseUrl/v1/playback/resolve", input, includeMediaKey = true),
+        url = metadataLookupUrl("$baseUrl/v1/playback/resolve", input),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return PlaybackResolveResponse(
         item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend playback resolve is missing item.")),
         show = json.optJSONObject("show")?.let(::parseMetadataView),

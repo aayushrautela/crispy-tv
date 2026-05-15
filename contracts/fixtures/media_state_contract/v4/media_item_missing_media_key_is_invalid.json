@@ -1,0 +1,16 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "media_item_missing_media_key_is_invalid",
+  "input": {
+    "kind": "media_item",
+    "payload": {
+      "mediaType": "movie",
+      "title": "Test Movie"
+    }
+  },
+  "expected": {
+    "valid": false,
+    "normalized": null
+  }
+}

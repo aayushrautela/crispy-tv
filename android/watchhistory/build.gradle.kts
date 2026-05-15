@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace = "com.crispy.tv.watchhistory"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
@@ -20,5 +20,5 @@ dependencies {
     implementation(project(":android:core-domain"))
     implementation(project(":android:player"))
     implementation(project(":android:network"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }

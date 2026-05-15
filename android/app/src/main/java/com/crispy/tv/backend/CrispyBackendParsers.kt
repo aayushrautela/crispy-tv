@@ -1,51 +1,51 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.AiInsightsCard
-import com.crispy.tv.backend.CrispyBackendClient.BackendMetadataItem
+import com.crispy.tv.backend.CrispyBackendClient.CalendarContext
 import com.crispy.tv.backend.CrispyBackendClient.CalendarItem
 import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
 import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingStateView
-import com.crispy.tv.backend.CrispyBackendClient.HomeCollectionCard
-import com.crispy.tv.backend.CrispyBackendClient.HomeCollectionItem
-import com.crispy.tv.backend.CrispyBackendClient.HomeHeroItem
-import com.crispy.tv.backend.CrispyBackendClient.HomeRecommendationItem
-import com.crispy.tv.backend.CrispyBackendClient.HomeSnapshotSection
+import com.crispy.tv.backend.CrispyBackendClient.MediaExternalIds
+import com.crispy.tv.backend.CrispyBackendClient.MediaItem
+import com.crispy.tv.backend.CrispyBackendClient.MediaItemParent
+import com.crispy.tv.backend.CrispyBackendClient.MediaPresentationHint
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationCollectionCard
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationCollectionItem
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationHeroItem
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationItem
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationItemContext
+import com.crispy.tv.backend.CrispyBackendClient.RecommendationSection
+import com.crispy.tv.backend.CrispyBackendClient.PersonSearchResultItem
+import com.crispy.tv.backend.CrispyBackendClient.SearchResultItem
+import com.crispy.tv.backend.CrispyBackendClient.SurfaceContext
 import com.crispy.tv.backend.CrispyBackendClient.ImportJob
-import com.crispy.tv.backend.CrispyBackendClient.LibraryItemState
-import com.crispy.tv.backend.CrispyBackendClient.LibrarySection
-import com.crispy.tv.backend.CrispyBackendClient.LibrarySectionItem
 import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingItem
-import com.crispy.tv.backend.CrispyBackendClient.RuntimeMediaCard
 import com.crispy.tv.backend.CrispyBackendClient.RatingItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
-import com.crispy.tv.backend.CrispyBackendClient.LibraryAuth
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCollectionView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCardView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCompanyView
-import com.crispy.tv.backend.CrispyBackendClient.MetadataContentIds
-import com.crispy.tv.backend.CrispyBackendClient.MetadataContentRatings
-import com.crispy.tv.backend.CrispyBackendClient.MetadataContentView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodePreview
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodeView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataExternalIds
-import com.crispy.tv.backend.CrispyBackendClient.MetadataImages
+import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonKnownForItem
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonRefView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataProductionInfoView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataReviewView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataSeasonView
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatings
 import com.crispy.tv.backend.CrispyBackendClient.MetadataVideoView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataView
 import com.crispy.tv.backend.CrispyBackendClient.PageInfo
 import com.crispy.tv.backend.CrispyBackendClient.Profile
-import com.crispy.tv.backend.CrispyBackendClient.ProviderAccount
-import com.crispy.tv.backend.CrispyBackendClient.ProviderAuthState
-import com.crispy.tv.backend.CrispyBackendClient.ProviderLibraryFolder
-import com.crispy.tv.backend.CrispyBackendClient.ProviderLibraryItem
-import com.crispy.tv.backend.CrispyBackendClient.ProviderLibrarySnapshot
+import com.crispy.tv.backend.CrispyBackendClient.ProviderState
 import com.crispy.tv.backend.CrispyBackendClient.RatingStateView
+import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionItem
+import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.User
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchProgressView
@@ -96,27 +96,28 @@ internal fun CrispyBackendClient.parseProfile(json: JSONObject): Profile {
     )
 }
 
-internal fun CrispyBackendClient.parseProviderAccounts(array: JSONArray?): List<ProviderAccount> {
+internal fun CrispyBackendClient.parseProviderStates(array: JSONArray?): List<ProviderState> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
-            val providerAccount = safeArray.optJSONObject(index) ?: continue
-            add(parseProviderAccount(providerAccount))
+            val providerState = safeArray.optJSONObject(index) ?: continue
+            add(parseProviderState(providerState))
         }
     }
 }
 
-internal fun CrispyBackendClient.parseProviderAccount(json: JSONObject): ProviderAccount {
-    return ProviderAccount(
-        id = json.optString("id").trim(),
+internal fun CrispyBackendClient.parseProviderState(json: JSONObject): ProviderState {
+    return ProviderState(
         provider = json.optString("provider").trim(),
-        status = json.optString("status").trim(),
-        providerUserId = json.optString("providerUserId").trim().ifBlank { null },
+        connectionState = json.optString("connectionState").trim(),
+        accountStatus = json.optString("accountStatus").trim().ifBlank { null },
+        primaryAction = json.optString("primaryAction").trim(),
+        canImport = json.optBoolean("canImport", false),
+        canReconnect = json.optBoolean("canReconnect", false),
+        canDisconnect = json.optBoolean("canDisconnect", false),
         externalUsername = json.optString("externalUsername").trim().ifBlank { null },
-        createdAt = json.optString("createdAt").trim().ifBlank { null },
-        updatedAt = json.optString("updatedAt").trim().ifBlank { null },
-        lastUsedAt = json.optString("lastUsedAt").trim().ifBlank { null },
-        lastImportJobId = json.optString("lastImportJobId").trim().ifBlank { null },
+        statusLabel = json.optString("statusLabel").trim(),
+        statusMessage = json.optString("statusMessage").trim().ifBlank { null },
         lastImportCompletedAt = json.optString("lastImportCompletedAt").trim().ifBlank { null },
     )
 }
@@ -139,7 +140,6 @@ internal fun CrispyBackendClient.parseImportJob(json: JSONObject): ImportJob {
         mode = json.optString("mode").trim(),
         status = json.optString("status").trim(),
         requestedByUserId = json.optString("requestedByUserId").trim(),
-        providerAccountId = json.optString("providerAccountId").trim().ifBlank { null },
         errorMessage = json.optJSONObject("errorJson")?.optString("message")?.trim().orEmpty().ifBlank { null },
         createdAt = json.optString("createdAt").trim().ifBlank { null },
         startedAt = json.optString("startedAt").trim().ifBlank { null },
@@ -148,47 +148,99 @@ internal fun CrispyBackendClient.parseImportJob(json: JSONObject): ImportJob {
     )
 }
 
-internal fun CrispyBackendClient.parseMetadataItems(array: JSONArray?): List<BackendMetadataItem> {
+internal fun CrispyBackendClient.parseSearchResultItems(array: JSONArray?): List<SearchResultItem> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
-            add(parseMetadataItem(item))
+            add(parseSearchResultItem(item))
         }
     }
 }
 
-internal fun CrispyBackendClient.parseMetadataItem(json: JSONObject): BackendMetadataItem {
+internal fun CrispyBackendClient.parseSearchResultItem(json: JSONObject): SearchResultItem {
+    val mediaJson = json.optJSONObject("mediaItem")
+        ?: throw IllegalStateException("Search result is missing mediaItem.")
+    return SearchResultItem(
+        kind = json.optNullableString("kind") ?: "search_result",
+        mediaItem = parseMediaItem(mediaJson),
+        context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
+        presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
+    )
+}
+
+internal fun CrispyBackendClient.parsePersonSearchResultItems(array: JSONArray?): List<PersonSearchResultItem> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val item = safeArray.optJSONObject(index) ?: continue
+            add(parsePersonSearchResultItem(item))
+        }
+    }
+}
+
+internal fun CrispyBackendClient.parsePersonSearchResultItem(json: JSONObject): PersonSearchResultItem {
+    val tmdbPersonId = json.optIntOrNull("tmdbPersonId")
+        ?: throw IllegalStateException("Person search result is missing tmdbPersonId.")
+    val name = json.optString("name").trim()
+    if (name.isBlank()) {
+        throw IllegalStateException("Person search result is missing name.")
+    }
+    return PersonSearchResultItem(
+        kind = json.optNullableString("kind") ?: "person_search_result",
+        tmdbPersonId = tmdbPersonId,
+        name = name,
+        knownForDepartment = json.optNullableString("knownForDepartment"),
+        profileUrl = json.optNullableString("profileUrl"),
+        knownForTitles = json.optStringList("knownForTitles"),
+    )
+}
+
+internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): SearchResultsResponse {
+    return SearchResultsResponse(
+        query = json.optString("query").trim(),
+        all = parseSearchResultItems(json.optJSONArray("all")),
+        movies = parseSearchResultItems(json.optJSONArray("movies")),
+        series = parseSearchResultItems(json.optJSONArray("series")),
+        people = parsePersonSearchResultItems(json.optJSONArray("people")),
+    )
+}
+
+internal fun CrispyBackendClient.parseSearchSuggestionsResponse(json: JSONObject): SearchSuggestionsResponse {
+    return SearchSuggestionsResponse(
+        suggestions = parseSearchSuggestionItems(json.optJSONArray("suggestions")),
+    )
+}
+
+internal fun CrispyBackendClient.parseSearchSuggestionItems(array: JSONArray?): List<SearchSuggestionItem> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val item = safeArray.optJSONObject(index) ?: continue
+            add(parseSearchSuggestionItem(item))
+        }
+    }
+}
+
+internal fun CrispyBackendClient.parseSearchSuggestionItem(json: JSONObject): SearchSuggestionItem {
+    val tmdbId = json.optIntOrNull("tmdbId")
+        ?: throw IllegalStateException("Search suggestion is missing tmdbId.")
+    val mediaType = json.optString("mediaType").trim().lowercase()
+    if (mediaType != "movie" && mediaType != "tv") {
+        throw IllegalStateException("Search suggestion has invalid mediaType: $mediaType")
+    }
     val title = json.optString("title").trim()
-    val mediaType = json.optString("mediaType").trim()
-    val provider = json.optNullableString("provider")
-    val providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null }
-    val images = parseMetadataImages(json)
-    val posterUrl = json.optNullableString("posterUrl") ?: images.posterUrl
     if (title.isBlank()) {
-        throw IllegalStateException("Backend metadata item is missing required fields.")
+        throw IllegalStateException("Search suggestion is missing title.")
     }
-    if (mediaType.isBlank() || provider.isNullOrBlank() || providerId.isNullOrBlank() || posterUrl.isNullOrBlank()) {
-        throw IllegalStateException("Backend metadata item is missing regular-card fields.")
-    }
-    val genre = json.optNullableString("genre") ?: json.optJSONArray("genres")?.optString(0)?.trim().takeUnless { it.isNullOrBlank() }
-    val mediaKey = json.optNullableString("mediaKey")
-    if (mediaKey.isNullOrBlank()) {
-        throw IllegalStateException("Backend metadata item is missing a mediaKey.")
-    }
-    return BackendMetadataItem(
-        mediaKey = mediaKey,
-        title = title,
-        summary = json.optString("summary").trim().ifBlank { null },
-        posterUrl = posterUrl,
-        backdropUrl = json.optNullableString("backdropUrl") ?: images.backdropUrl,
-        logoUrl = json.optNullableString("logoUrl") ?: images.logoUrl,
+    return SearchSuggestionItem(
+        tmdbId = tmdbId,
         mediaType = mediaType,
-        rating = json.opt("rating")?.toString()?.trim()?.ifBlank { null },
-        year = json.opt("releaseYear")?.toString()?.trim()?.ifBlank { null },
-        genre = genre,
-        provider = provider,
-        providerId = providerId,
+        title = title,
+        year = json.optIntOrNull("year"),
+        posterPath = json.optNullableString("posterPath"),
+        popularity = json.optDouble("popularity", 0.0),
+        overview = json.optNullableString("overview"),
     )
 }
 
@@ -199,15 +251,10 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
     }
     return MetadataView(
         mediaKey = mediaKey,
-        mediaType = json.optNullableString("mediaType") ?: "movie",
-        kind = json.optNullableString("kind") ?: "title",
+        mediaType = json.optNullableString("mediaType") ?: error("Backend metadata view is missing mediaType."),
+        kind = json.optNullableString("kind") ?: error("Backend metadata view is missing kind."),
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
         seasonNumber = json.optIntOrNull("seasonNumber"),
         episodeNumber = json.optIntOrNull("episodeNumber"),
@@ -215,7 +262,7 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
         subtitle = json.optNullableString("subtitle"),
         summary = json.optNullableString("summary"),
         overview = json.optNullableString("overview"),
-        images = parseMetadataImages(json),
+        images = parseMetadataImages(json.optJSONObject("images")),
         releaseDate = json.optNullableString("releaseDate"),
         releaseYear = json.optIntOrNull("releaseYear"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
@@ -244,15 +291,10 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
     return MetadataCardView(
         id = json.optNullableString("id"),
         mediaKey = json.optNullableString("mediaKey"),
-        mediaType = json.optNullableString("mediaType") ?: "movie",
-        kind = json.optNullableString("kind") ?: "title",
+        mediaType = json.optNullableString("mediaType") ?: error("Metadata card view is missing mediaType."),
+        kind = json.optNullableString("kind") ?: error("Metadata card view is missing kind."),
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
         seasonNumber = json.optIntOrNull("seasonNumber"),
         episodeNumber = json.optIntOrNull("episodeNumber"),
@@ -260,7 +302,7 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
         subtitle = json.optNullableString("subtitle"),
         summary = json.optNullableString("summary"),
         overview = json.optNullableString("overview"),
-        images = parseMetadataImages(json),
+        images = parseMetadataImages(json.optJSONObject("images")),
         releaseDate = json.optNullableString("releaseDate"),
         releaseYear = json.optIntOrNull("releaseYear"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
@@ -269,14 +311,59 @@ internal fun CrispyBackendClient.parseMetadataCardView(json: JSONObject): Metada
     )
 }
 
-internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject): MetadataImages {
-    val images = json.optJSONObject("images")
-    val artwork = json.optJSONObject("artwork")
-    return MetadataImages(
-        posterUrl = json.optNullableString("posterUrl") ?: images.optNullableString("posterUrl") ?: artwork.optNullableString("posterUrl"),
-        backdropUrl = json.optNullableString("backdropUrl") ?: images.optNullableString("backdropUrl") ?: artwork.optNullableString("backdropUrl"),
-        stillUrl = json.optNullableString("stillUrl") ?: images.optNullableString("stillUrl") ?: artwork.optNullableString("stillUrl"),
-        logoUrl = json.optNullableString("logoUrl") ?: images.optNullableString("logoUrl"),
+internal fun CrispyBackendClient.parseMetadataRelatedItemViews(array: JSONArray?): List<MetadataCardView> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val item = safeArray.optJSONObject(index) ?: continue
+            add(parseMetadataRelatedItemView(item))
+        }
+    }
+}
+
+internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject): MetadataCardView {
+    val mediaItem = json.optJSONObject("mediaItem")
+        ?: error("Metadata related item is missing mediaItem.")
+    return MetadataCardView(
+        id = mediaItem.optNullableString("mediaKey"),
+        mediaKey = mediaItem.optNullableString("mediaKey"),
+        mediaType = mediaItem.optNullableString("mediaType")
+            ?: error("Metadata related item mediaItem is missing mediaType."),
+        kind = json.optNullableString("kind") ?: "metadata_detail",
+        tmdbId = mediaItem.optJSONObject("externalIds")?.optIntOrNull("tmdb"),
+        showTmdbId = mediaItem.optIntOrNull("showTmdbId"),
+        absoluteEpisodeNumber = mediaItem.optIntOrNull("absoluteEpisodeNumber"),
+        seasonNumber = mediaItem.optIntOrNull("seasonNumber"),
+        episodeNumber = mediaItem.optIntOrNull("episodeNumber"),
+        title = mediaItem.optNullableString("title"),
+        subtitle = mediaItem.optNullableString("subtitle"),
+        summary = mediaItem.optNullableString("overview"),
+        overview = mediaItem.optNullableString("overview"),
+        images = parseMetadataImages(mediaItem.optJSONObject("images")),
+        releaseDate = mediaItem.optNullableString("releaseDate"),
+        releaseYear = mediaItem.optIntOrNull("releaseYear"),
+        runtimeMinutes = mediaItem.optIntOrNull("runtimeMinutes"),
+        rating = mediaItem.optDoubleOrNull("rating"),
+        status = mediaItem.optNullableString("status"),
+    )
+}
+
+internal fun CrispyBackendClient.parseMetadataImages(json: JSONObject?): CrispyBackendClient.MetadataImages {
+    val images = json ?: JSONObject()
+    return CrispyBackendClient.MetadataImages(
+        poster = parseResponsiveImageSet(images.optJSONObject("poster"), null),
+        backdrop = parseResponsiveImageSet(images.optJSONObject("backdrop"), null),
+        still = parseResponsiveImageSet(images.optJSONObject("still"), null),
+        logo = parseResponsiveImageSet(images.optJSONObject("logo"), null),
+    )
+}
+
+private fun parseResponsiveImageSet(json: JSONObject?, fallbackUrl: String?): ResponsiveImageSet {
+    val fallback = fallbackUrl?.trim()?.ifBlank { null }
+    return ResponsiveImageSet(
+        small = json.optNullableString("small") ?: fallback,
+        medium = json.optNullableString("medium") ?: fallback,
+        large = json.optNullableString("large") ?: fallback,
     )
 }
 
@@ -286,7 +373,73 @@ internal fun CrispyBackendClient.parseMetadataExternalIds(json: JSONObject?): Me
         tmdb = safe.optIntOrNull("tmdb"),
         imdb = safe.optNullableString("imdb"),
         tvdb = safe.optIntOrNull("tvdb"),
-        kitsu = safe.optIntOrNull("kitsu"),
+    )
+}
+
+internal fun CrispyBackendClient.parseMediaExternalIds(json: JSONObject?): MediaExternalIds {
+    val safe = json ?: JSONObject()
+    return MediaExternalIds(
+        tmdb = safe.optIntOrNull("tmdb"),
+        imdb = safe.optNullableString("imdb"),
+        tvdb = safe.optIntOrNull("tvdb"),
+    )
+}
+
+internal fun CrispyBackendClient.parseMediaItemParent(json: JSONObject?): MediaItemParent? {
+    val safe = json ?: return null
+    val mediaKey = safe.optNullableString("mediaKey") ?: return null
+    val mediaType = safe.optNullableString("mediaType") ?: return null
+    val title = safe.optNullableString("title") ?: return null
+    return MediaItemParent(
+        mediaKey = mediaKey,
+        mediaType = mediaType,
+        title = title,
+    )
+}
+
+internal fun CrispyBackendClient.parseMediaPresentationHint(json: JSONObject?): MediaPresentationHint? {
+    val safe = json ?: return null
+    return MediaPresentationHint(
+        preferredSize = safe.optNullableString("preferredSize"),
+        sectionId = safe.optNullableString("sectionId"),
+        sectionTitle = safe.optNullableString("sectionTitle"),
+    )
+}
+
+internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
+    val mediaKey = json.optNullableString("mediaKey")
+    val mediaType = json.optNullableString("mediaType")
+    val title = json.optNullableString("title")
+    if (mediaKey.isNullOrBlank() || mediaType.isNullOrBlank() || title.isNullOrBlank()) {
+        throw IllegalStateException("MediaItem is missing required identity fields.")
+    }
+    return MediaItem(
+        mediaKey = mediaKey,
+        mediaType = mediaType,
+        title = title,
+        originalTitle = json.optNullableString("originalTitle"),
+        subtitle = json.optNullableString("subtitle"),
+        overview = json.optNullableString("overview"),
+        poster = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("poster"), null),
+        backdrop = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("backdrop"), null),
+        logo = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("logo"), null),
+        still = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("still"), null),
+        releaseDate = json.optNullableString("releaseDate"),
+        releaseYear = json.optIntOrNull("releaseYear"),
+        rating = json.optDoubleOrNull("rating"),
+        genres = json.optStringList("genres"),
+        runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
+        status = json.optNullableString("status"),
+        maturityRating = json.optNullableString("maturityRating"),
+        certification = json.optNullableString("certification"),
+        externalIds = parseMediaExternalIds(json.optJSONObject("externalIds")),
+        parent = parseMediaItemParent(json.optJSONObject("parent")),
+        showTmdbId = json.optIntOrNull("showTmdbId"),
+        seasonNumber = json.optIntOrNull("seasonNumber"),
+        episodeNumber = json.optIntOrNull("episodeNumber"),
+        absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
+        episodeTitle = json.optNullableString("episodeTitle"),
+        airDate = json.optNullableString("airDate"),
     )
 }
 
@@ -297,14 +450,9 @@ internal fun CrispyBackendClient.parseMetadataEpisodePreview(json: JSONObject): 
     }
     return MetadataEpisodePreview(
         mediaKey = mediaKey,
-        mediaType = json.optNullableString("mediaType") ?: "episode",
+        mediaType = json.optNullableString("mediaType") ?: error("Metadata episode preview is missing mediaType."),
         tmdbId = json.optIntOrNull("tmdbId"),
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
         seasonNumber = json.optIntOrNull("seasonNumber"),
         episodeNumber = json.optIntOrNull("episodeNumber"),
@@ -313,7 +461,7 @@ internal fun CrispyBackendClient.parseMetadataEpisodePreview(json: JSONObject): 
         airDate = json.optNullableString("airDate"),
         runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
         rating = json.optDoubleOrNull("rating"),
-        images = parseMetadataImages(json),
+        images = parseMetadataImages(json.optJSONObject("images")),
     )
 }
 
@@ -336,17 +484,12 @@ internal fun CrispyBackendClient.parseMetadataSeasonView(json: JSONObject): Meta
     return MetadataSeasonView(
         mediaKey = mediaKey,
         showTmdbId = json.optIntOrNull("showTmdbId"),
-        provider = json.optNullableString("provider"),
-        providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null },
-        parentMediaType = json.optNullableString("parentMediaType"),
-        parentProvider = json.optNullableString("parentProvider"),
-        parentProviderId = json.opt("parentProviderId")?.toString()?.trim()?.ifBlank { null },
         seasonNumber = seasonNumber,
         title = json.optNullableString("title"),
         summary = json.optNullableString("summary"),
         airDate = json.optNullableString("airDate"),
         episodeCount = json.optIntOrNull("episodeCount"),
-        posterUrl = parseMetadataImages(json).posterUrl,
+        posterUrl = parseMetadataImages(json.optJSONObject("images")).posterUrl,
     )
 }
 
@@ -367,11 +510,6 @@ internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): Met
         mediaType = preview.mediaType,
         tmdbId = preview.tmdbId,
         showTmdbId = preview.showTmdbId,
-        provider = preview.provider,
-        providerId = preview.providerId,
-        parentMediaType = preview.parentMediaType,
-        parentProvider = preview.parentProvider,
-        parentProviderId = preview.parentProviderId,
         absoluteEpisodeNumber = preview.absoluteEpisodeNumber,
         seasonNumber = preview.seasonNumber,
         episodeNumber = preview.episodeNumber,
@@ -381,7 +519,7 @@ internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): Met
         runtimeMinutes = preview.runtimeMinutes,
         rating = preview.rating,
         images = preview.images,
-        showMediaKey = json.optNullableString("showMediaKey") ?: json.optNullableString("showId"),
+        showMediaKey = json.optNullableString("showMediaKey"),
         showTitle = json.optNullableString("showTitle"),
         showExternalIds = parseMetadataExternalIds(json.optJSONObject("showExternalIds")),
     )
@@ -396,8 +534,6 @@ internal fun CrispyBackendClient.parseMetadataPersonDetail(json: JSONObject): Me
     }
     return MetadataPersonDetail(
         id = id,
-        provider = json.optString("provider").trim(),
-        providerId = json.optString("providerId").trim(),
         tmdbPersonId = tmdbPersonId,
         name = name,
         knownForDepartment = json.optNullableString("knownForDepartment"),
@@ -424,14 +560,12 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
             add(
                 MetadataPersonKnownForItem(
                     mediaKey = item.optString("mediaKey").trim(),
-                    mediaType = item.optNullableString("mediaType") ?: "movie",
+                    mediaType = item.optNullableString("mediaType") ?: error("Person known-for item is missing mediaType."),
                     tmdbId = item.optIntOrNull("tmdbId"),
                     title = title,
                     posterUrl = item.optNullableString("posterUrl"),
                     rating = item.optDoubleOrNull("rating"),
                     releaseYear = item.optIntOrNull("releaseYear"),
-                    provider = item.optNullableString("provider"),
-                    providerId = item.opt("providerId")?.toString()?.trim()?.ifBlank { null },
                 )
             )
         }
@@ -471,14 +605,10 @@ internal fun CrispyBackendClient.parseMetadataPersonRefViews(array: JSONArray?):
             val id = item.optString("id").trim()
             val tmdbPersonId = item.optIntOrNull("tmdbPersonId")
             val name = item.optString("name").trim()
-            val provider = item.optString("provider").trim()
-            val providerId = item.optString("providerId").trim()
-            if (id.isBlank() || provider.isBlank() || providerId.isBlank() || name.isBlank()) continue
+            if (id.isBlank() || name.isBlank()) continue
             add(
                 MetadataPersonRefView(
                     id = id,
-                    provider = provider,
-                    providerId = providerId,
                     tmdbPersonId = tmdbPersonId,
                     name = name,
                     role = item.optNullableString("role"),
@@ -501,6 +631,7 @@ internal fun CrispyBackendClient.parseMetadataReviewViews(array: JSONArray?): Li
             add(
                 MetadataReviewView(
                     id = id,
+                    provider = item.optString("provider").trim(),
                     author = item.optNullableString("author"),
                     username = item.optNullableString("username"),
                     content = content,
@@ -521,17 +652,13 @@ internal fun CrispyBackendClient.parseMetadataCompanyViews(array: JSONArray?): L
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
             val id = item.opt("id")?.toString()?.trim().orEmpty()
-            val provider = item.optString("provider").trim()
-            val providerId = item.optString("providerId").trim()
             val name = item.optString("name").trim()
-            if (id.isBlank() || provider.isBlank() || providerId.isBlank() || name.isBlank()) continue
+            if (id.isBlank() || name.isBlank()) continue
             add(
                 MetadataCompanyView(
                     id = id,
-                    provider = provider,
-                    providerId = providerId,
                     name = name,
-                    logoUrl = item.optNullableString("logoUrl"),
+                    logo = parseResponsiveImageSet(item.optJSONObject("logo"), null),
                     originCountry = item.optNullableString("originCountry"),
                 )
             )
@@ -542,18 +669,14 @@ internal fun CrispyBackendClient.parseMetadataCompanyViews(array: JSONArray?): L
 internal fun CrispyBackendClient.parseMetadataCollectionView(json: JSONObject?): MetadataCollectionView? {
     val safe = json ?: return null
     val id = safe.opt("id")?.toString()?.trim().orEmpty()
-    val provider = safe.optString("provider").trim()
-    val providerId = safe.optString("providerId").trim()
     val name = safe.optString("name").trim()
-    if (id.isBlank() || provider.isBlank() || providerId.isBlank() || name.isBlank()) return null
+    if (id.isBlank() || name.isBlank()) return null
     return MetadataCollectionView(
         id = id,
-        provider = provider,
-        providerId = providerId,
         name = name,
-        posterUrl = safe.optNullableString("posterUrl"),
-        backdropUrl = safe.optNullableString("backdropUrl"),
-        parts = parseMetadataCardViews(safe.optJSONArray("parts")),
+        poster = parseResponsiveImageSet(safe.optJSONObject("poster"), null),
+        backdrop = parseResponsiveImageSet(safe.optJSONObject("backdrop"), null),
+        parts = parseMetadataRelatedItemViews(safe.optJSONArray("parts")),
     )
 }
 
@@ -569,77 +692,19 @@ internal fun CrispyBackendClient.parseMetadataProductionInfoView(json: JSONObjec
     )
 }
 
-internal fun CrispyBackendClient.parseMetadataContentIds(json: JSONObject?): MetadataContentIds {
+internal fun CrispyBackendClient.parseMetadataTitleRatings(json: JSONObject?): MetadataTitleRatings {
     val safe = json ?: JSONObject()
-    return MetadataContentIds(
-        imdb = safe.optNullableString("imdb"),
-        tmdb = safe.optIntOrNull("tmdb"),
-        trakt = safe.optIntOrNull("trakt"),
-        tvdb = safe.optIntOrNull("tvdb"),
+    return MetadataTitleRatings(
+        imdb = safe.optDoubleOrNull("imdb"),
+        tmdb = safe.optDoubleOrNull("tmdb"),
+        trakt = safe.optDoubleOrNull("trakt"),
+        metacritic = safe.optDoubleOrNull("metacritic"),
+        rottenTomatoes = safe.optDoubleOrNull("rottenTomatoes"),
+        audience = safe.optDoubleOrNull("audience"),
+        letterboxd = safe.optDoubleOrNull("letterboxd"),
+        rogerEbert = safe.optDoubleOrNull("rogerEbert"),
+        myAnimeList = safe.optDoubleOrNull("myAnimeList"),
     )
-}
-
-internal fun CrispyBackendClient.parseMetadataContentRatings(json: JSONObject?): MetadataContentRatings {
-    val safe = json ?: JSONObject()
-    return MetadataContentRatings(
-        imdbRating = safe.optDoubleOrNull("imdbRating"),
-        imdbVotes = safe.optIntOrNull("imdbVotes"),
-        tmdbRating = safe.optDoubleOrNull("tmdbRating"),
-        metacritic = safe.optIntOrNull("metacritic"),
-        rottenTomatoes = safe.optIntOrNull("rottenTomatoes"),
-        letterboxdRating = safe.optDoubleOrNull("letterboxdRating"),
-        mdblistRating = safe.optDoubleOrNull("mdblistRating"),
-    )
-}
-
-internal fun CrispyBackendClient.parseMetadataContentView(json: JSONObject): MetadataContentView {
-    return MetadataContentView(
-        ids = parseMetadataContentIds(json.optJSONObject("ids")),
-        title = json.optNullableString("title"),
-        originalTitle = json.optNullableString("originalTitle"),
-        type = json.optNullableString("type"),
-        year = json.optIntOrNull("year"),
-        description = json.optNullableString("description"),
-        score = json.optDoubleOrNull("score"),
-        ratings = parseMetadataContentRatings(json.optJSONObject("ratings")),
-        posterUrl = json.optNullableString("posterUrl"),
-        backdropUrl = json.optNullableString("backdropUrl"),
-        genres = json.optStringList("genres"),
-        keywords = json.optStringList("keywords"),
-        runtime = json.optIntOrNull("runtime"),
-        certification = json.optNullableString("certification"),
-        released = json.optNullableString("released"),
-        language = json.optNullableString("language"),
-        country = json.optNullableString("country"),
-        seasonCount = json.optIntOrNull("seasonCount"),
-        episodeCount = json.optIntOrNull("episodeCount"),
-        directors = json.optStringList("directors"),
-        writers = json.optStringList("writers"),
-        network = json.optNullableString("network"),
-        studio = json.optNullableString("studio"),
-        status = json.optNullableString("status"),
-        budget = json.optLongOrNull("budget"),
-        revenue = json.optLongOrNull("revenue"),
-        updatedAt = json.optNullableString("updatedAt"),
-    )
-}
-
-internal fun CrispyBackendClient.parseProviderAuthStates(array: JSONArray?): List<ProviderAuthState> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val item = safeArray.optJSONObject(index) ?: continue
-            add(
-                ProviderAuthState(
-                    provider = item.optString("provider").trim(),
-                    connected = item.optBoolean("connected", false),
-                    status = item.optString("status").trim().ifBlank { "disconnected" },
-                    externalUsername = item.optNullableString("externalUsername"),
-                    statusMessage = item.optNullableString("statusMessage"),
-                )
-            )
-        }
-    }
 }
 
 internal fun CrispyBackendClient.parseWatchProgressView(json: JSONObject?): WatchProgressView? {
@@ -705,55 +770,18 @@ internal fun CrispyBackendClient.parseContinueWatchingItems(array: JSONArray?): 
     }
 }
 
-internal fun CrispyBackendClient.parseRuntimeMediaCard(
-    json: JSONObject,
-    requireBackdrop: Boolean,
-): RuntimeMediaCard {
-    val mediaKey = json.optNullableString("mediaKey")
-    val mediaType = json.optString("mediaType").trim()
-    val provider = json.optNullableString("provider")
-    val providerId = json.opt("providerId")?.toString()?.trim()?.ifBlank { null }
-    val title = json.optNullableString("title")
-    val posterUrl = json.optNullableString("posterUrl")
-        ?: json.optJSONObject("images").optNullableString("posterUrl")
-    val backdropUrl = json.optNullableString("backdropUrl")
-        ?: json.optJSONObject("images").optNullableString("backdropUrl")
-    if (mediaKey.isNullOrBlank() || mediaType.isBlank() || provider.isNullOrBlank() || providerId.isNullOrBlank() || title.isNullOrBlank() || posterUrl.isNullOrBlank()) {
-        throw IllegalStateException("Runtime media card is missing required fields.")
-    }
-    if (requireBackdrop && backdropUrl.isNullOrBlank()) {
-        throw IllegalStateException("Landscape runtime media card is missing backdropUrl.")
-    }
-    return RuntimeMediaCard(
-        mediaKey = mediaKey,
-        mediaType = mediaType,
-        provider = provider,
-        providerId = providerId,
-        title = title,
-        posterUrl = posterUrl,
-        backdropUrl = backdropUrl,
-        subtitle = json.optNullableString("subtitle"),
-        releaseYear = json.optIntOrNull("releaseYear"),
-        rating = json.optDoubleOrNull("rating"),
-        genre = json.optNullableString("genre"),
-        seasonNumber = json.optIntOrNull("seasonNumber"),
-        episodeNumber = json.optIntOrNull("episodeNumber"),
-        episodeTitle = json.optNullableString("episodeTitle"),
-        airDate = json.optNullableString("airDate"),
-        runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
-    )
-}
-
 internal fun CrispyBackendClient.parseContinueWatchingItem(json: JSONObject): ContinueWatchingItem {
     val id = json.optString("id").trim()
     if (id.isBlank()) {
         throw IllegalStateException("Continue watching item is missing id.")
     }
-    val mediaJson = json.optJSONObject("media")
-        ?: throw IllegalStateException("Continue watching item is missing media.")
+    val mediaJson = json.optJSONObject("mediaItem")
+        ?: throw IllegalStateException("Continue watching item is missing mediaItem.")
     return ContinueWatchingItem(
         id = id,
-        media = parseRuntimeMediaCard(mediaJson, requireBackdrop = true),
+        mediaItem = parseMediaItem(mediaJson),
+        context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
+        presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
         progress = parseWatchProgressView(json.optJSONObject("progress")),
         lastActivityAt = json.optString("lastActivityAt").trim(),
         origins = parseOrigins(json.optJSONArray("origins")),
@@ -772,13 +800,15 @@ internal fun CrispyBackendClient.parseWatchedItems(array: JSONArray?): List<Watc
 }
 
 internal fun CrispyBackendClient.parseWatchedItem(json: JSONObject): WatchedItem {
-    val mediaJson = json.optJSONObject("media")
+    val mediaJson = json.optJSONObject("mediaItem")
     if (mediaJson == null) {
-        throw IllegalStateException("Watched item is missing media.")
+        throw IllegalStateException("Watched item is missing mediaItem.")
     }
     return WatchedItem(
         id = json.optNullableString("id"),
-        media = parseRuntimeMediaCard(mediaJson, requireBackdrop = false),
+        mediaItem = parseMediaItem(mediaJson),
+        context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
+        presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
         watchedAt = json.optNullableString("watchedAt"),
         lastActivityAt = json.optNullableString("lastActivityAt"),
         origins = parseOrigins(json.optJSONArray("origins")),
@@ -796,13 +826,15 @@ internal fun CrispyBackendClient.parseWatchlistItems(array: JSONArray?): List<Wa
 }
 
 internal fun CrispyBackendClient.parseWatchlistItem(json: JSONObject): WatchlistItem {
-    val mediaJson = json.optJSONObject("media")
+    val mediaJson = json.optJSONObject("mediaItem")
     if (mediaJson == null) {
-        throw IllegalStateException("Watchlist item is missing media.")
+        throw IllegalStateException("Watchlist item is missing mediaItem.")
     }
     return WatchlistItem(
         id = json.optNullableString("id"),
-        media = parseRuntimeMediaCard(mediaJson, requireBackdrop = false),
+        mediaItem = parseMediaItem(mediaJson),
+        context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
+        presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
         addedAt = json.optNullableString("addedAt"),
         origins = parseOrigins(json.optJSONArray("origins")),
     )
@@ -819,7 +851,7 @@ internal fun CrispyBackendClient.parseRatingItems(array: JSONArray?): List<Ratin
 }
 
 internal fun CrispyBackendClient.parseRatingItem(json: JSONObject): RatingItem {
-    val mediaJson = json.optJSONObject("media")
+    val mediaJson = json.optJSONObject("mediaItem")
     val ratingJson = json.optJSONObject("rating")
     val rating = parseRatingStateView(ratingJson)
     if (mediaJson == null || rating == null) {
@@ -827,7 +859,9 @@ internal fun CrispyBackendClient.parseRatingItem(json: JSONObject): RatingItem {
     }
     return RatingItem(
         id = json.optNullableString("id"),
-        media = parseRuntimeMediaCard(mediaJson, requireBackdrop = false),
+        mediaItem = parseMediaItem(mediaJson),
+        context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
+        presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
         rating = rating,
         origins = parseOrigins(json.optJSONArray("origins")),
     )
@@ -843,7 +877,10 @@ internal fun CrispyBackendClient.parsePageInfo(json: JSONObject?): PageInfo {
 
 internal fun CrispyBackendClient.parseWatchStateResponse(json: JSONObject): WatchStateResponse {
     return WatchStateResponse(
-        media = parseMetadataView(json.optJSONObject("media") ?: throw IllegalStateException("Backend watch state is missing media.")),
+        kind = json.optNullableString("kind") ?: error("Backend watch state is missing kind."),
+        mediaItem = parseMediaItem(json.optJSONObject("mediaItem") ?: throw IllegalStateException("Backend watch state is missing mediaItem.")),
+        context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
+        presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
         progress = parseWatchProgressView(json.optJSONObject("progress")),
         continueWatching = parseContinueWatchingStateView(json.optJSONObject("continueWatching")),
         watched = parseWatchedStateView(json.optJSONObject("watched")),
@@ -922,11 +959,22 @@ internal fun CrispyBackendClient.parseCalendarItems(array: JSONArray?): List<Cal
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
-            val mediaJson = item.optJSONObject("media") ?: continue
+            val mediaJson = item.optJSONObject("mediaItem") ?: continue
+            val contextJson = item.optJSONObject("context") ?: continue
+            val relatedShowJson = contextJson.optJSONObject("relatedShow") ?: continue
             add(
                 CalendarItem(
                     bucket = item.optString("bucket").trim(),
-                    media = parseRuntimeMediaCard(mediaJson, requireBackdrop = true),
+                    kind = item.optNullableString("kind") ?: error("Calendar item is missing kind."),
+                    mediaItem = parseMediaItem(mediaJson),
+                    context = CalendarContext(
+                        bucket = contextJson.optString("bucket").trim(),
+                        airDate = contextJson.optNullableString("airDate"),
+                        watched = contextJson.optBoolean("watched", false),
+                        relatedShow = parseMediaItem(relatedShowJson),
+                    ),
+                    presentation = parseMediaPresentationHint(item.optJSONObject("presentation")),
+                    airDate = item.optNullableString("airDate"),
                     watched = item.optBoolean("watched", false),
                 )
             )
@@ -934,48 +982,65 @@ internal fun CrispyBackendClient.parseCalendarItems(array: JSONArray?): List<Cal
     }
 }
 
-internal fun CrispyBackendClient.parseHomeRecommendationItems(array: JSONArray?, requireBackdrop: Boolean): List<HomeRecommendationItem> {
+internal fun CrispyBackendClient.parseRecommendationItems(array: JSONArray?): List<RecommendationItem> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
-            val mediaJson = item.optJSONObject("media") ?: continue
+            val mediaJson = item.optJSONObject("mediaItem") ?: continue
+            val contextJson = item.optJSONObject("context") ?: JSONObject()
+            val payload = item.optJSONObject("payload")?.toAnyMap()
+                ?: contextJson.optJSONObject("payload").toAnyMap()
+            val rank = item.optDoubleOrNull("rank") ?: contextJson.optDoubleOrNull("rank") ?: (index + 1).toDouble()
             add(
-                HomeRecommendationItem(
-                    media = parseRuntimeMediaCard(mediaJson, requireBackdrop = requireBackdrop),
-                    reason = item.optNullableString("reason"),
-                    score = item.optDoubleOrNull("score"),
-                    rank = item.optDoubleOrNull("rank") ?: index.toDouble(),
-                    payload = item.optJSONObject("payload").toStringMap(),
+                RecommendationItem(
+                    kind = item.optNullableString("kind") ?: error("Recommendation item is missing kind."),
+                    mediaItem = parseMediaItem(mediaJson),
+                    context = RecommendationItemContext(
+                        reason = contextJson.optNullableString("reason"),
+                        reasonCodes = contextJson.optStringList("reasonCodes"),
+                        score = contextJson.optDoubleOrNull("score"),
+                        rank = contextJson.optDoubleOrNull("rank"),
+                        payload = contextJson.optJSONObject("payload").toAnyMap(),
+                    ),
+                    presentation = parseMediaPresentationHint(item.optJSONObject("presentation")),
+                    reason = item.optNullableString("reason") ?: contextJson.optNullableString("reason"),
+                    score = item.optDoubleOrNull("score") ?: contextJson.optDoubleOrNull("score"),
+                    rank = rank,
+                    payload = payload,
                 )
             )
         }
     }
 }
 
-internal fun CrispyBackendClient.parseHomeHeroItems(array: JSONArray?): List<HomeHeroItem> {
+internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?): List<RecommendationHeroItem> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
             val mediaKey = item.optNullableString("mediaKey") ?: continue
             val mediaType = item.optString("mediaType").trim().ifBlank { continue }
-            val provider = item.optString("provider").trim().ifBlank { continue }
-            val providerId = item.optString("providerId").trim().ifBlank { continue }
             val title = item.optString("title").trim().ifBlank { continue }
             val description = item.optString("description").trim().ifBlank { continue }
             val backdropUrl = item.optString("backdropUrl").trim().ifBlank { continue }
+            val backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop"), backdropUrl)
+            val posterUrl = item.optNullableString("posterUrl")
+            val poster = parseResponsiveImageSet(item.optJSONObject("poster"), posterUrl)
+            val logoUrl = item.optNullableString("logoUrl")
+            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), logoUrl)
             add(
-                HomeHeroItem(
+                RecommendationHeroItem(
                     mediaKey = mediaKey,
                     mediaType = mediaType,
-                    provider = provider,
-                    providerId = providerId,
                     title = title,
                     description = description,
                     backdropUrl = backdropUrl,
-                    posterUrl = item.optNullableString("posterUrl"),
-                    logoUrl = item.optNullableString("logoUrl"),
+                    backdrop = backdrop,
+                    posterUrl = posterUrl,
+                    poster = poster,
+                    logoUrl = logoUrl,
+                    logo = logo,
                     releaseYear = item.optIntOrNull("releaseYear"),
                     rating = item.optDoubleOrNull("rating"),
                     genre = item.optNullableString("genre"),
@@ -985,29 +1050,28 @@ internal fun CrispyBackendClient.parseHomeHeroItems(array: JSONArray?): List<Hom
     }
 }
 
-internal fun CrispyBackendClient.parseHomeCollectionCards(array: JSONArray?): List<HomeCollectionCard> {
+internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONArray?): List<RecommendationCollectionCard> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
             val title = item.optString("title").trim().ifBlank { continue }
             val logoUrl = item.optString("logoUrl").trim().ifBlank { continue }
+            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), logoUrl)
             val items = buildList {
                 val parts = item.optJSONArray("items") ?: JSONArray()
                 for (partIndex in 0 until parts.length()) {
                     val part = parts.optJSONObject(partIndex) ?: continue
                     val mediaType = part.optString("mediaType").trim().ifBlank { continue }
-                    val provider = part.optString("provider").trim().ifBlank { continue }
-                    val providerId = part.optString("providerId").trim().ifBlank { continue }
                     val partTitle = part.optString("title").trim().ifBlank { continue }
                     val posterUrl = part.optString("posterUrl").trim().ifBlank { continue }
+                    val poster = parseResponsiveImageSet(part.optJSONObject("poster"), posterUrl)
                     add(
-                        HomeCollectionItem(
+                        RecommendationCollectionItem(
                             mediaType = mediaType,
-                            provider = provider,
-                            providerId = providerId,
                             title = partTitle,
                             posterUrl = posterUrl,
+                            poster = poster,
                             releaseYear = part.optIntOrNull("releaseYear"),
                             rating = part.optDoubleOrNull("rating"),
                         )
@@ -1015,13 +1079,13 @@ internal fun CrispyBackendClient.parseHomeCollectionCards(array: JSONArray?): Li
                 }
             }
             if (items.isNotEmpty()) {
-                add(HomeCollectionCard(title = title, logoUrl = logoUrl, items = items))
+                add(RecommendationCollectionCard(title = title, logoUrl = logoUrl, logo = logo, items = items))
             }
         }
     }
 }
 
-internal fun CrispyBackendClient.parseHomeSections(array: JSONArray?): List<HomeSnapshotSection> {
+internal fun CrispyBackendClient.parseRecommendationSections(array: JSONArray?): List<RecommendationSection> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
@@ -1032,151 +1096,17 @@ internal fun CrispyBackendClient.parseHomeSections(array: JSONArray?): List<Home
             val layout = section.optString("layout").trim().ifBlank { "regular" }
             val sourceKey = section.optString("sourceKey").trim().ifBlank { section.optString("source").trim() }
             add(
-                HomeSnapshotSection(
+                RecommendationSection(
                     id = id,
                     title = title,
                     layout = layout,
                     sourceKey = sourceKey,
                     recommendationItems = when (layout) {
-                        "regular" -> parseHomeRecommendationItems(items, requireBackdrop = false)
-                        "landscape" -> parseHomeRecommendationItems(items, requireBackdrop = true)
+                        "regular", "landscape" -> parseRecommendationItems(items)
                         else -> emptyList()
                     },
-                    heroItems = if (layout == "hero") parseHomeHeroItems(items) else emptyList(),
-                    collectionItems = if (layout == "collection") parseHomeCollectionCards(items) else emptyList(),
-                )
-            )
-        }
-    }
-}
-
-internal fun CrispyBackendClient.parseLibrarySections(array: JSONArray?): List<LibrarySection> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val section = safeArray.optJSONObject(index) ?: continue
-            val parsed = parseLibrarySection(section, index) ?: continue
-            add(parsed)
-        }
-    }
-}
-
-internal fun CrispyBackendClient.parseLibrarySection(json: JSONObject?, fallbackOrder: Int): LibrarySection? {
-    val section = json ?: return null
-    val sectionId = section.optString("id").trim()
-    val label = section.optString("label").trim()
-    if (sectionId.isBlank()) return null
-    return LibrarySection(
-        id = sectionId,
-        label = label.ifBlank { sectionId },
-        order = section.optIntOrNull("order") ?: fallbackOrder,
-        itemCount = section.optIntOrNull("itemCount") ?: 0,
-    )
-}
-
-internal fun CrispyBackendClient.parseLibraryItemState(json: JSONObject?): LibraryItemState {
-    val safe = json ?: JSONObject()
-    return LibraryItemState(
-        addedAt = safe.optNullableString("addedAt"),
-        watchedAt = safe.optNullableString("watchedAt"),
-        ratedAt = safe.optNullableString("ratedAt"),
-        rating = safe.optIntOrNull("rating"),
-        lastActivityAt = safe.optNullableString("lastActivityAt"),
-    )
-}
-
-internal fun CrispyBackendClient.parseLibrarySectionItems(array: JSONArray?): List<LibrarySectionItem> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val item = safeArray.optJSONObject(index) ?: continue
-            val id = item.optString("id").trim()
-            val mediaJson = item.optJSONObject("media")
-            if (id.isBlank() || mediaJson == null) continue
-            add(
-                LibrarySectionItem(
-                    id = id,
-                    media = parseRuntimeMediaCard(mediaJson, requireBackdrop = false),
-                    state = parseLibraryItemState(item.optJSONObject("state")),
-                    origins = parseOrigins(item.optJSONArray("origins")),
-                )
-            )
-        }
-    }
-}
-
-internal fun CrispyBackendClient.parseLibraryAuth(json: JSONObject?): LibraryAuth {
-    val safe = json ?: JSONObject()
-    return LibraryAuth(providers = parseProviderAuthStates(safe.optJSONArray("providers")))
-}
-
-internal fun CrispyBackendClient.parseProviderLibrarySnapshots(array: JSONArray?): List<ProviderLibrarySnapshot> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val snapshot = safeArray.optJSONObject(index) ?: continue
-            add(
-                ProviderLibrarySnapshot(
-                    provider = snapshot.optString("provider").trim(),
-                    status = snapshot.optString("status").trim(),
-                    statusMessage = snapshot.optString("statusMessage").trim(),
-                    folders = parseProviderLibraryFolders(snapshot.optJSONArray("folders")),
-                    items = parseProviderLibraryItems(snapshot.optJSONArray("items")),
-                )
-            )
-        }
-    }
-}
-
-internal fun CrispyBackendClient.parseProviderLibraryFolders(array: JSONArray?): List<ProviderLibraryFolder> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val item = safeArray.optJSONObject(index) ?: continue
-            val id = item.optString("id").trim()
-            val label = item.optString("label").trim()
-            if (id.isBlank() || label.isBlank()) {
-                continue
-            }
-            add(
-                ProviderLibraryFolder(
-                    id = id,
-                    label = label,
-                    provider = item.optString("provider").trim(),
-                    itemCount = item.optIntOrNull("itemCount") ?: 0,
-                )
-            )
-        }
-    }
-}
-
-internal fun CrispyBackendClient.parseProviderLibraryItems(array: JSONArray?): List<ProviderLibraryItem> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val item = safeArray.optJSONObject(index) ?: continue
-            val provider = item.optString("provider").trim()
-            val folderId = item.optString("folderId").trim()
-            val contentId = item.optString("contentId").trim()
-            val contentType = item.optString("contentType").trim()
-            val title = item.optString("title").trim()
-            if (provider.isBlank() || folderId.isBlank() || contentId.isBlank() || contentType.isBlank() || title.isBlank()) {
-                continue
-            }
-            add(
-                ProviderLibraryItem(
-                    provider = provider,
-                    folderId = folderId,
-                    contentId = contentId,
-                    contentType = contentType,
-                    title = title,
-                    posterUrl = item.optNullableString("posterUrl"),
-                    backdropUrl = item.optNullableString("backdropUrl"),
-                    externalIds = item.optJSONObject("externalIds")?.let(::parseMetadataExternalIds),
-                    seasonNumber = item.optIntOrNull("seasonNumber"),
-                    episodeNumber = item.optIntOrNull("episodeNumber"),
-                    addedAt = item.optNullableString("addedAt"),
-                    media = item.optJSONObject("media")?.let(::parseMetadataView),
+                    heroItems = if (layout == "hero") parseRecommendationHeroItems(items) else emptyList(),
+                    collectionItems = if (layout == "collection") parseRecommendationCollectionCards(items) else emptyList(),
                 )
             )
         }
@@ -1186,7 +1116,7 @@ internal fun CrispyBackendClient.parseProviderLibraryItems(array: JSONArray?): L
 internal fun CrispyBackendClient.parseWatchActionResponse(json: JSONObject): WatchActionResponse {
     return WatchActionResponse(
         accepted = json.optBoolean("accepted", false),
-        mode = json.optString("mode").trim().ifBlank { "synchronous" },
+        mode = json.optString("mode").trim().ifBlank { error("Watch action response is missing mode.") },
     )
 }
 

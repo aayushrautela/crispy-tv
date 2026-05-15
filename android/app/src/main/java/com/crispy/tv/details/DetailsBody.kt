@@ -1,6 +1,6 @@
 package com.crispy.tv.details
 
-import com.crispy.tv.backend.CrispyBackendClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +17,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -40,8 +42,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.ui.unit.sp
+
+import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toCatalogItem
@@ -59,10 +63,11 @@ internal fun DetailsBody(
     onPersonClick: (String) -> Unit = {},
     onEpisodeClick: (videoId: String) -> Unit = {},
     onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
+    onMakingOfVideoClick: (CrispyBackendClient.MetadataVideoView) -> Unit = {},
 ) {
     val details = uiState.details
     val titleDetail = uiState.titleDetail
-    val titleContent = uiState.titleContent?.content
+    val titleRatings = uiState.titleRatings?.ratings
     val horizontalPadding = responsivePageHorizontalPadding()
     val contentPadding = PaddingValues(horizontal = horizontalPadding)
 
@@ -85,23 +90,35 @@ internal fun DetailsBody(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    review.author?.takeIf { it.isNotBlank() } ?: review.username?.takeIf { it.isNotBlank() } ?: "Review",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-
-                review.rating?.let {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = null,
-                            tint = Color(0xFFFFD54F)
+                        Text(
+                            review.author?.takeIf { it.isNotBlank() } ?: review.username?.takeIf { it.isNotBlank() } ?: "Review",
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                        Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
+
+                        review.rating?.let {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFD54F)
+                                )
+                                Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
                     }
+                    ReviewProviderBadge(provider = review.provider)
                 }
 
                 Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
@@ -210,8 +227,8 @@ internal fun DetailsBody(
 
         RatingsSection(
             tmdbRating = details.rating,
-            content = titleContent,
-            isLoading = false,
+            titleRatings = titleRatings,
+            isLoading = uiState.ratingsIsLoading,
             horizontalPadding = horizontalPadding,
             contentPadding = contentPadding,
         )
@@ -257,8 +274,8 @@ internal fun DetailsBody(
             }
         }
 
-        val reviews = titleDetail?.reviews.orEmpty()
-        if (reviews.isNotEmpty()) {
+        val reviews = uiState.titleExtras?.reviews.orEmpty()
+        if (reviews.isNotEmpty() || uiState.extrasIsLoading) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
                 text = "Reviews",
@@ -270,12 +287,18 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(items = reviews, key = { it.id }) { review ->
-                    MetadataReviewCard(
-                        review = review,
-                        modifier = Modifier.width(280.dp),
-                        onClick = { expandedReview = review }
-                    )
+                if (reviews.isNotEmpty()) {
+                    items(items = reviews, key = { it.id }) { review ->
+                        MetadataReviewCard(
+                            review = review,
+                            modifier = Modifier.width(280.dp),
+                            onClick = { expandedReview = review }
+                        )
+                    }
+                } else {
+                    items(2) {
+                        DetailsReviewPlaceholder(modifier = Modifier.width(280.dp))
+                    }
                 }
             }
         }
@@ -320,7 +343,15 @@ internal fun DetailsBody(
                         FilterChip(
                             selected = season == selectedSeason,
                             onClick = { onSeasonSelected(season) },
-                            label = { Text("Season $season") }
+                            label = { Text("Season $season") },
+                            shape = RoundedCornerShape(16.dp),
+                            border = null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                labelColor = MaterialTheme.colorScheme.onSurface,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
                         )
                     }
                 }
@@ -362,6 +393,7 @@ internal fun DetailsBody(
                                 EpisodeCard(
                                     video = video,
                                     watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
+                                    isHighlighted = video.id == uiState.highlightedEpisodeId,
                                     modifier = Modifier.width(280.dp),
                                     onClick = { onEpisodeClick(video.id) },
                                     onLongPress = { selectedEpisodeAction = video },
@@ -373,12 +405,21 @@ internal fun DetailsBody(
             }
         }
 
-        titleDetail?.collection?.let { collection ->
-            val collectionParts = collection.parts.mapNotNull { it.toCatalogItem() }
+        MakingOfVideosSection(
+            videos = uiState.titleDetail?.videos.orEmpty(),
+            baseTitle = details.title.substringBefore(':').trim().ifBlank { details.title },
+            horizontalPadding = horizontalPadding,
+            contentPadding = contentPadding,
+            onVideoClick = onMakingOfVideoClick,
+        )
+
+        val collection = uiState.titleExtras?.collection ?: titleDetail?.collection
+        collection?.let { col ->
+            val collectionParts = col.parts.mapNotNull { it.toCatalogItem() }
             if (collectionParts.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(18.dp))
                 Text(
-                    text = collection.name,
+                    text = col.name,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = horizontalPadding),
                     maxLines = 1,
@@ -396,7 +437,7 @@ internal fun DetailsBody(
             }
         }
 
-        val similar = titleDetail?.similar.orEmpty().mapNotNull { it.toCatalogItem() }
+        val similar = (uiState.titleExtras?.similar ?: titleDetail?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
         if (similar.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
@@ -415,7 +456,7 @@ internal fun DetailsBody(
                 }
             }
 
-        val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail, content = titleContent)
+        val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail)
         if (detailRows.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
 
@@ -461,3 +502,26 @@ internal fun DetailsBody(
         }
     }
 }
+
+@Composable
+private fun DetailsReviewPlaceholder(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.55f)
+                .height(18.dp)
+                .skeletonElement(color = DetailsSkeletonColors.Base),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(92.dp)
+                .skeletonElement(color = DetailsSkeletonColors.Base),
+        )
+    }
+}
+
+

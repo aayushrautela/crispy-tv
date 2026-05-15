@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -43,9 +44,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.ui.components.StandardTopAppBar
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -60,7 +62,8 @@ import kotlinx.coroutines.withContext
 
 @Immutable
 private data class CalendarUiState(
-    val isLoading: Boolean = true,
+    val isInitialLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val statusMessage: String = "",
     val sections: List<CalendarSection> = emptyList(),
 )
@@ -80,13 +83,20 @@ private class CalendarViewModel(
         if (refreshJob?.isActive == true) {
             return
         }
-        _uiState.update { current -> current.copy(isLoading = true, statusMessage = if (current.sections.isEmpty()) "" else current.statusMessage) }
+        _uiState.update { current ->
+            current.copy(
+                isInitialLoading = current.sections.isEmpty(),
+                isRefreshing = current.sections.isNotEmpty(),
+                statusMessage = if (current.sections.isEmpty()) "" else current.statusMessage,
+            )
+        }
         refreshJob =
             viewModelScope.launch {
                 val snapshot = withContext(Dispatchers.IO) { calendarService.loadCalendar(System.currentTimeMillis()) }
                 _uiState.value =
                     CalendarUiState(
-                        isLoading = false,
+                        isInitialLoading = false,
+                        isRefreshing = false,
                         statusMessage = snapshot.statusMessage.orEmpty(),
                         sections = snapshot.sections,
                     )
@@ -101,9 +111,8 @@ private class CalendarViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     return CalendarViewModel(
                         calendarService = CalendarService(
-                            supabaseAccountClient = SupabaseServicesProvider.accountClient(appContext),
-                            activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                             backendClient = BackendServicesProvider.backendClient(appContext),
+                            backendContextResolver = BackendContextResolverProvider.get(appContext),
                         )
                     ) as T
                 }
@@ -149,26 +158,21 @@ internal fun CalendarRoute(
         )
 
         PullToRefreshBox(
-            isRefreshing = uiState.isLoading,
+            isRefreshing = uiState.isRefreshing,
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize(),
             state = pullToRefreshState,
             indicator = {
                 Indicator(
                     state = pullToRefreshState,
-                    isRefreshing = uiState.isLoading,
+                    isRefreshing = uiState.isRefreshing,
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = innerPadding.calculateTopPadding()),
                 )
             },
         ) {
             when {
-                uiState.isLoading && uiState.sections.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                uiState.isInitialLoading && uiState.sections.isEmpty() -> {
+                    CalendarLoadingSkeleton(contentPadding = contentPadding)
                 }
 
                 uiState.sections.isEmpty() -> {
@@ -235,6 +239,63 @@ internal fun CalendarRoute(
 }
 
 @Composable
+private fun CalendarLoadingSkeleton(contentPadding: PaddingValues) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(22.dp),
+    ) {
+        items(CALENDAR_SKELETON_SECTION_COUNT) { index ->
+            CalendarSkeletonSection(titleWidthFraction = if (index % 2 == 0) 0.34f else 0.46f)
+        }
+    }
+}
+
+@Composable
+private fun CalendarSkeletonSection(titleWidthFraction: Float) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(titleWidthFraction)
+                .height(20.dp)
+                .skeletonElement(pulse = false),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(CALENDAR_SKELETON_CARD_COUNT) {
+                CalendarSkeletonCard()
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarSkeletonCard() {
+    Column(
+        modifier = Modifier.width(280.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .skeletonElement(pulse = false),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .height(16.dp)
+                .skeletonElement(pulse = false),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.45f)
+                .height(12.dp)
+                .skeletonElement(pulse = false),
+        )
+    }
+}
+
+@Composable
 private fun CalendarEpisodeSection(
     title: String,
     items: List<CalendarEpisodeItem>,
@@ -269,3 +330,6 @@ private fun CalendarSeriesSection(
         }
     }
 }
+
+private const val CALENDAR_SKELETON_SECTION_COUNT = 3
+private const val CALENDAR_SKELETON_CARD_COUNT = 3

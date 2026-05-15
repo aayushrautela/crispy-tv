@@ -1,0 +1,44 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "watched_item_requires_media_item",
+  "input": {
+    "kind": "watched_item",
+    "payload": {
+      "id": "watched-456",
+      "kind": "watch_history",
+      "mediaItem": {
+        "mediaKey": "tmdb:movie:111",
+        "mediaType": "movie",
+        "title": "Watched Movie",
+        "posterUrl": "https://example.com/poster.jpg",
+        "backdropUrl": null,
+        "subtitle": null
+      },
+      "context": {},
+      "presentation": null,
+      "watchedAt": "2024-01-10T18:30:00Z",
+      "origins": ["manual"]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "media_key": "tmdb:movie:111",
+      "media_type": "movie",
+      "item_id": "watched-456",
+      "title": "Watched Movie",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": "2024-01-10T18:30:00Z",
+      "last_activity_at": null,
+      "origins": ["manual"],
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

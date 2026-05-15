@@ -158,7 +158,6 @@ class TorrentEngineClient(context: Context) : Closeable {
         call.timeout().timeout(2, TimeUnit.SECONDS)
 
         call.execute().use { response ->
-            response.body?.close()
             return response.code
         }
     }

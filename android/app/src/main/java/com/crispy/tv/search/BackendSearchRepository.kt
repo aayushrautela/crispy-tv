@@ -5,6 +5,7 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.images.toUiResponsiveImageSet
 import java.util.Locale
 
 class BackendSearchRepository(
@@ -13,8 +14,7 @@ class BackendSearchRepository(
 ) {
     suspend fun search(
         query: String,
-        filter: SearchTypeFilter,
-        locale: Locale = Locale.getDefault(),
+        @Suppress("UNUSED_PARAMETER") locale: Locale = Locale.getDefault(),
     ): SearchResultsPayload {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
@@ -27,16 +27,13 @@ class BackendSearchRepository(
         val payload = backend.searchTitles(
             accessToken = session.accessToken,
             query = normalizedQuery,
-            filter = filter.toBackendSearchFilter(),
-            locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem() })
+        return payload.toSearchResultsPayload()
     }
 
     suspend fun discoverByGenre(
         genreSuggestion: SearchGenreSuggestion,
-        filter: SearchTypeFilter,
-        locale: Locale = Locale.getDefault(),
+        @Suppress("UNUSED_PARAMETER") locale: Locale = Locale.getDefault(),
     ): SearchResultsPayload {
         val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             ?: return SearchResultsPayload(message = "Sign in to browse genres.")
@@ -44,10 +41,30 @@ class BackendSearchRepository(
         val payload = backend.searchTitlesByGenre(
             accessToken = session.accessToken,
             genre = genreSuggestion.label,
-            filter = filter.toBackendSearchFilter(),
+        )
+        return payload.toSearchResultsPayload(defaultGenre = genreSuggestion.label)
+    }
+
+    suspend fun suggest(
+        query: String,
+        locale: Locale = Locale.getDefault(),
+    ): List<SearchSuggestion> {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.length < 2) {
+            return emptyList()
+        }
+
+        val session = runCatching { supabase.ensureValidSession() }.getOrNull()
+            ?: return emptyList()
+
+        val payload = backend.searchSuggestions(
+            accessToken = session.accessToken,
+            query = normalizedQuery,
+            filter = "all",
+            limit = 8,
             locale = locale.toLanguageTag(),
         )
-        return SearchResultsPayload(items = payload.items.mapNotNull { it.toCatalogItem(defaultGenre = genreSuggestion.label) })
+        return payload.suggestions.mapNotNull { it.toSearchSuggestion() }
     }
 
     companion object {
@@ -61,40 +78,29 @@ class BackendSearchRepository(
     }
 }
 
-private fun SearchTypeFilter.toBackendSearchFilter(): String? {
-    return when (this) {
-        SearchTypeFilter.ALL -> null
-        SearchTypeFilter.MOVIES -> "movies"
-        SearchTypeFilter.SERIES -> "series"
-        SearchTypeFilter.ANIME -> "anime"
-    }
-}
-
-internal fun CrispyBackendClient.BackendMetadataItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
+internal fun CrispyBackendClient.MediaItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val normalizedType =
         when {
             mediaType.equals("anime", ignoreCase = true) -> "anime"
             mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
             else -> "movie"
-    }
-    val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        }
     val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
-    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return SearchCatalogItem(
         id = normalizedMediaKey,
         mediaKey = normalizedMediaKey,
         title = title,
-        posterUrl = normalizedPosterUrl,
+        posterUrl = posterUrl,
         backdropUrl = backdropUrl,
         logoUrl = logoUrl,
+        poster = poster.toUiResponsiveImageSet(),
+        backdrop = backdrop.toUiResponsiveImageSet(),
+        logo = logo.toUiResponsiveImageSet(),
         addonId = "backend",
         type = normalizedType,
-        rating = rating,
-        year = year,
-        genre = genre ?: defaultGenre,
-        description = summary,
-        provider = normalizedProvider,
-        providerId = normalizedProviderId,
+        rating = rating?.toString(),
+        year = releaseYear?.toString(),
+        genre = genres.firstOrNull() ?: defaultGenre,
+        description = overview ?: subtitle,
     )
 }

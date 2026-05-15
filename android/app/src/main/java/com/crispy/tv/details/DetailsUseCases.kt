@@ -2,12 +2,14 @@ package com.crispy.tv.details
 
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.metadata.episodesForSeason
 import com.crispy.tv.metadata.seasonNumbers
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
@@ -15,16 +17,15 @@ import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
-import com.crispy.tv.player.WatchProvider
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 internal data class DetailsScreenLoadResult(
     val details: MediaDetails?,
     val titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
-    val titleContent: CrispyBackendClient.MetadataTitleContentResponse?,
     val statusMessage: String,
     val providerState: ProviderState,
     val watchCta: WatchCta,
@@ -32,10 +33,23 @@ internal data class DetailsScreenLoadResult(
     val seasons: List<Int>,
 )
 
+internal data class DetailsExtrasLoadResult(
+    val titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse?,
+)
+
+internal data class DetailsRatingsLoadResult(
+    val titleRatings: CrispyBackendClient.MetadataTitleRatingsResponse?,
+)
+
 data class RuntimeDetailsEntry(
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
     val absoluteEpisodeNumber: Int? = null,
+)
+
+internal data class RuntimeEpisodeTarget(
+    val episodeId: String,
+    val seasonNumber: Int?,
 )
 
 internal data class DetailsSeasonEpisodesResult(
@@ -58,8 +72,10 @@ internal class DetailsUseCases(
     private val userMediaRepository: UserMediaRepository,
     private val aiRepository: AiInsightsRepository,
     private val addonStreamsService: AddonStreamsService,
+    private val backendContextResolver: BackendContextResolver,
 ) {
     private val episodeWatchStateResolver = EpisodeWatchStateResolver(userMediaRepository)
+    private val cachedBaseResults = ConcurrentHashMap<String, DetailsScreenLoadResult>()
 
     fun clearEpisodeWatchStateCache() {
         episodeWatchStateResolver.clearCache()
@@ -71,23 +87,29 @@ internal class DetailsUseCases(
         runtimeEntry: RuntimeDetailsEntry?,
         nowMs: Long,
     ): DetailsScreenLoadResult {
+        val cacheKey = detailsCacheKey(mediaKey, requestedMediaType)
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+        val profileId = backendContext?.profileId
+        cachedBaseResults[cacheKey]?.takeIf { cached -> cached.details != null && accessToken != null }?.let { cached ->
+            val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
+            val providerState = watchCtaResolver.resolveProviderState(cached.details, mediaKey)
+            val ctaResolution = watchCtaResolver.resolveWatchCta(cached.details, providerState, nowMs)
+            return cached.copy(
+                providerState = providerState,
+                watchCta = ctaResolution.watchCta,
+                continueVideoId = ctaResolution.continueVideoId,
+            )
+        }
         val titleDetailResult =
-            session?.let {
+            accessToken?.let {
                 runCatching {
-                    catalogRepository.getTitleDetail(accessToken = it.accessToken, mediaKey = mediaKey)
+                    catalogRepository.getTitleDetail(accessToken = it, mediaKey = mediaKey)
                 }
             }
         val titleDetail = titleDetailResult?.getOrNull()
         val titleDetailError = titleDetailResult?.exceptionOrNull()
-        val titleContentResult =
-            session?.let {
-                runCatching {
-                    catalogRepository.getTitleContent(accessToken = it.accessToken, mediaKey = mediaKey)
-                }
-            }
-        val titleContent = titleContentResult?.getOrNull()
-        val titleContentError = titleContentResult?.exceptionOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
         val providerState = watchCtaResolver.resolveProviderState(details, mediaKey)
@@ -97,34 +119,121 @@ internal class DetailsUseCases(
             if (details?.mediaType?.toMetadataLabMediaTypeOrNull() == MetadataLabMediaType.MOVIE) {
                 emptyList()
             } else {
-                val backendSeasons = titleDetail?.seasonNumbers().orEmpty()
-                val seasonCount = titleDetail?.item?.seasonCount ?: 0
-                when {
-                    backendSeasons.isNotEmpty() -> backendSeasons
-                    seasonCount > 0 -> (1..seasonCount).toList()
-                    else -> emptyList()
-                }
+                titleDetail?.seasonNumbers().orEmpty()
             }
 
         val statusMessage =
             when {
                 details != null -> ""
-                session == null -> "Sign in to load details."
+                accessToken == null -> "Sign in to load details."
                 titleDetailError != null -> titleDetailError.message ?: "Unable to load details."
-                titleContentError != null -> titleContentError.message ?: "Unable to load details."
                 else -> "Unable to load details."
             }
 
-        return DetailsScreenLoadResult(
+        val result = DetailsScreenLoadResult(
             details = details,
             titleDetail = titleDetail,
-            titleContent = titleContent,
             statusMessage = statusMessage,
             providerState = providerState,
             watchCta = ctaResolution.watchCta,
             continueVideoId = ctaResolution.continueVideoId,
             seasons = seasons,
         )
+        if (result.details != null) {
+            cachedBaseResults[cacheKey] = result
+        } else {
+            cachedBaseResults.remove(cacheKey)
+        }
+        return result
+    }
+
+    fun resolveRuntimeEpisodeTarget(
+        videos: List<MediaVideo>,
+        runtimeEntry: RuntimeDetailsEntry?,
+    ): RuntimeEpisodeTarget? {
+        if (runtimeEntry == null || videos.isEmpty()) return null
+
+        val seasonNumber = runtimeEntry.seasonNumber
+        val episodeNumber = runtimeEntry.episodeNumber
+        val absoluteEpisodeNumber = runtimeEntry.absoluteEpisodeNumber
+
+        val exactMatch =
+            videos.firstOrNull { video ->
+                val seasonMatches = seasonNumber == null || video.season == seasonNumber
+                val episodeMatches = episodeNumber == null || video.episode == episodeNumber
+                val absoluteMatches = absoluteEpisodeNumber == null || video.absoluteEpisodeNumber == absoluteEpisodeNumber
+                seasonMatches && episodeMatches && absoluteMatches
+            }
+        if (exactMatch != null) {
+            return RuntimeEpisodeTarget(
+                episodeId = exactMatch.id,
+                seasonNumber = exactMatch.season,
+            )
+        }
+
+        val absoluteMatch =
+            absoluteEpisodeNumber?.let { absolute ->
+                videos.firstOrNull { video -> video.absoluteEpisodeNumber == absolute }
+            }
+        if (absoluteMatch != null) {
+            return RuntimeEpisodeTarget(
+                episodeId = absoluteMatch.id,
+                seasonNumber = absoluteMatch.season,
+            )
+        }
+
+        val seasonEpisodeMatch =
+            videos.firstOrNull { video ->
+                video.season == seasonNumber && video.episode == episodeNumber
+            }
+        return seasonEpisodeMatch?.let { video ->
+            RuntimeEpisodeTarget(
+                episodeId = video.id,
+                seasonNumber = video.season,
+            )
+        }
+    }
+
+    suspend fun loadExtras(
+        mediaKey: String,
+    ): DetailsExtrasLoadResult {
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
+        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+
+        val titleExtras =
+            accessToken?.let {
+                runCatching {
+                    catalogRepository.getTitleExtras(
+                        accessToken = it,
+                        mediaKey = mediaKey,
+                    )
+                }.getOrNull()
+            }
+
+        return DetailsExtrasLoadResult(titleExtras = titleExtras)
+    }
+
+    suspend fun loadRatings(
+        mediaKey: String,
+    ): DetailsRatingsLoadResult {
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
+        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+        val profileId = backendContext?.profileId
+
+        val titleRatings =
+            accessToken?.takeIf { !profileId.isNullOrBlank() }?.let {
+                runCatching {
+                    catalogRepository.getTitleRatings(
+                        accessToken = it,
+                        profileId = checkNotNull(profileId),
+                        mediaKey = mediaKey,
+                    )
+                }.getOrNull()
+            }
+
+        return DetailsRatingsLoadResult(titleRatings = titleRatings)
     }
 
     suspend fun resolveWatchCta(
@@ -145,36 +254,31 @@ internal class DetailsUseCases(
     }
 
     suspend fun loadSeasonEpisodes(
-        mediaKey: String,
         season: Int,
         details: MediaDetails,
+        titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
+        titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse? = null,
     ): DetailsSeasonEpisodesResult {
-        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
-            ?: return DetailsSeasonEpisodesResult(errorMessage = "Sign in to load episodes.")
+        val episodesForSeason = titleDetail
+            ?.episodesForSeason(season)
+            ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+            ?.takeIf { it.isNotEmpty() }
+            ?: titleExtras
+                ?.episodes
+                ?.filter { it.seasonNumber == season }
+                ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+                ?.takeIf { it.isNotEmpty() }
 
-        val episodeResponse =
-            runCatching {
-                catalogRepository.listEpisodes(
-                    accessToken = session.accessToken,
-                    mediaKey = mediaKey,
-                    seasonNumber = season,
-                )
-            }.getOrElse {
-                return DetailsSeasonEpisodesResult(errorMessage = "Failed to load episodes.")
-            }
+        if (episodesForSeason != null) {
+            return DetailsSeasonEpisodesResult(
+                videos = episodesForSeason,
+                episodeWatchStates = resolveEpisodeWatchStates(details, episodesForSeason),
+                effectiveSeasonNumber = season,
+                includedSeasonNumbers = titleDetail?.seasonNumbers().orEmpty(),
+            )
+        }
 
-        val videos =
-            episodeResponse.episodes
-                .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
-                .sortedWith(compareBy<MediaVideo>({ it.episode ?: Int.MAX_VALUE }, { it.title.lowercase(Locale.US) }, { it.id }))
-        val episodeWatchStates = resolveEpisodeWatchStates(details, videos)
-
-        return DetailsSeasonEpisodesResult(
-            videos = videos,
-            episodeWatchStates = episodeWatchStates,
-            effectiveSeasonNumber = episodeResponse.effectiveSeasonNumber,
-            includedSeasonNumbers = episodeResponse.includedSeasonNumbers.sorted(),
-        )
+        return DetailsSeasonEpisodesResult(errorMessage = "No episodes found for this season.")
     }
 
     suspend fun resolveEpisodeWatchStates(
@@ -189,6 +293,13 @@ internal class DetailsUseCases(
         requestedMediaType: MetadataLabMediaType,
     ): MediaDetails {
         return WatchCtaResolver(userMediaRepository, requestedMediaType).ensureImdbId(details)
+    }
+
+    private fun detailsCacheKey(
+        mediaKey: String,
+        requestedMediaType: MetadataLabMediaType,
+    ): String {
+        return "${requestedMediaType.name.lowercase(Locale.US)}:${mediaKey.trim()}"
     }
 
     fun loadCachedAiInsights(
@@ -231,161 +342,110 @@ internal class DetailsUseCases(
         )
     }
 
-    suspend fun updateWatchlist(
-        details: MediaDetails,
-        desired: Boolean,
-    ): DetailsMutationResult {
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        val mediaKey = enriched.mediaKey?.trim()?.ifBlank { null }
-            ?: return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Title media key is unavailable.",
-            )
-        val result = userMediaRepository.setTitleInWatchlist(mediaKey, desired)
-        return DetailsMutationResult(
-            details = enriched,
-            success = mutationSucceeded(null, result),
-            statusMessage = result.statusMessage,
-        )
-    }
-
-    suspend fun updateWatched(
-        details: MediaDetails,
-        desired: Boolean,
-    ): DetailsMutationResult {
-        val source = userMediaRepository.preferredProvider()
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-            return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Couldn't resolve an IMDb id for this title (required for Simkl).",
-            )
-        }
-
-        val request = buildTitleWatchHistoryRequest(enriched)
-        val result =
-            if (desired) {
-                userMediaRepository.markWatched(request, source)
-            } else {
-                userMediaRepository.unmarkWatched(request, source)
-            }
-        return DetailsMutationResult(
-            details = enriched,
-            success = mutationSucceeded(source, result),
-            statusMessage = result.statusMessage,
-        )
-    }
-
-    suspend fun updateEpisodeWatched(
-        details: MediaDetails,
-        video: MediaVideo,
-        desired: Boolean,
-    ): DetailsMutationResult {
-        val source = userMediaRepository.preferredProvider()
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES)
-        if (source == WatchProvider.SIMKL && enriched.imdbId == null) {
-            return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Couldn't resolve an IMDb id for this show (required for Simkl).",
-            )
-        }
-
-        val season = video.season ?: return DetailsMutationResult(
-            details = enriched,
+suspend fun updateWatchlist(
+    details: MediaDetails,
+    desired: Boolean,
+): DetailsMutationResult {
+    val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+        ?: return DetailsMutationResult(
+            details = details,
             success = false,
-            statusMessage = "Episode metadata is incomplete.",
+            statusMessage = "Title media key is unavailable.",
         )
-        val episode = video.episode ?: return DetailsMutationResult(
-            details = enriched,
-            success = false,
-            statusMessage = "Episode metadata is incomplete.",
-        )
-        val contentType = enriched.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
-        val request =
-            WatchHistoryRequest(
-                contentId = enriched.id,
-                mediaKey = enriched.mediaKey,
-                contentType = contentType,
-                title = enriched.title,
-                season = season,
-                episode = episode,
-                remoteImdbId = enriched.imdbId,
-                provider = video.provider ?: enriched.provider,
-                providerId = video.providerId ?: enriched.providerId,
-                parentMediaType = parentMediaTypeFor(contentType),
-                parentProvider = video.parentProvider ?: enriched.parentProvider ?: enriched.provider,
-                parentProviderId = video.parentProviderId ?: enriched.parentProviderId ?: enriched.providerId,
-                absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
-            )
-        val result =
-            if (desired) {
-                userMediaRepository.markWatched(request, source)
-            } else {
-                userMediaRepository.unmarkWatched(request, source)
-            }
-        return DetailsMutationResult(
-            details = enriched,
-            success = mutationSucceeded(source, result),
-            statusMessage = result.statusMessage,
-        )
-    }
+    val result = userMediaRepository.setTitleInWatchlist(mediaKey, desired)
+    return DetailsMutationResult(
+        details = details,
+        success = mutationSucceeded(result),
+        statusMessage = result.statusMessage,
+    )
+}
 
-    suspend fun updateRating(
-        details: MediaDetails,
-        rating: Int?,
-    ): DetailsMutationResult {
-        val enriched = ensureImdbId(details, details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE)
-        val mediaKey = enriched.mediaKey?.trim()?.ifBlank { null }
-            ?: return DetailsMutationResult(
-                details = enriched,
-                success = false,
-                statusMessage = "Title media key is unavailable.",
-            )
-        val result = userMediaRepository.setTitleRating(mediaKey, rating)
-        return DetailsMutationResult(
-            details = enriched,
-            success = mutationSucceeded(null, result),
-            statusMessage = result.statusMessage,
-        )
-    }
+suspend fun updateWatched(
+    details: MediaDetails,
+    desired: Boolean,
+): DetailsMutationResult {
+    val request = buildTitleWatchHistoryRequest(details)
+    val result =
+        if (desired) {
+            userMediaRepository.markWatched(request)
+        } else {
+            userMediaRepository.unmarkWatched(request)
+        }
+    return DetailsMutationResult(
+        details = details,
+        success = mutationSucceeded(result),
+        statusMessage = result.statusMessage,
+    )
+}
 
-    private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRequest {
-        val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
-        return WatchHistoryRequest(
-            contentId = details.id,
+suspend fun updateEpisodeWatched(
+    details: MediaDetails,
+    video: MediaVideo,
+    desired: Boolean,
+): DetailsMutationResult {
+    val season = video.season ?: return DetailsMutationResult(
+        details = details,
+        success = false,
+        statusMessage = "Episode metadata is incomplete.",
+    )
+    val episode = video.episode ?: return DetailsMutationResult(
+        details = details,
+        success = false,
+        statusMessage = "Episode metadata is incomplete.",
+    )
+    val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
+    val request =
+        WatchHistoryRequest(
             mediaKey = details.mediaKey,
             contentType = contentType,
             title = details.title,
-            remoteImdbId = details.imdbId,
-            provider = details.provider,
-            providerId = details.providerId,
-            parentMediaType = details.parentMediaType,
-            parentProvider = details.parentProvider,
-            parentProviderId = details.parentProviderId,
-            absoluteEpisodeNumber = details.absoluteEpisodeNumber,
+            season = season,
+            episode = episode,
+            absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
         )
+    val result =
+        if (desired) {
+            userMediaRepository.markWatched(request)
+        } else {
+            userMediaRepository.unmarkWatched(request)
+        }
+    return DetailsMutationResult(
+        details = details,
+        success = mutationSucceeded(result),
+        statusMessage = result.statusMessage,
+    )
+}
+
+suspend fun updateRating(
+    details: MediaDetails,
+    rating: Int?,
+): DetailsMutationResult {
+    val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+        ?: return DetailsMutationResult(
+            details = details,
+            success = false,
+            statusMessage = "Title media key is unavailable.",
+        )
+    val result = userMediaRepository.setTitleRating(mediaKey, rating)
+    return DetailsMutationResult(
+        details = details,
+        success = mutationSucceeded(result),
+        statusMessage = result.statusMessage,
+    )
+}
+
+private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRequest {
+    val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+    return WatchHistoryRequest(
+        mediaKey = details.mediaKey,
+        contentType = contentType,
+        title = details.title,
+        absoluteEpisodeNumber = details.absoluteEpisodeNumber,
+    )
+}
+
+    private fun mutationSucceeded(result: WatchHistoryResult): Boolean {
+        return result.accepted
     }
 
-    private fun mutationSucceeded(
-        source: WatchProvider?,
-        result: WatchHistoryResult,
-    ): Boolean {
-        return when (source) {
-            WatchProvider.TRAKT -> result.syncedToTrakt
-            WatchProvider.SIMKL -> result.syncedToSimkl
-            WatchProvider.LOCAL -> true
-            null -> result.accepted
-        }
-    }
-
-    private fun parentMediaTypeFor(contentType: MetadataLabMediaType): String? {
-        return when (contentType) {
-            MetadataLabMediaType.MOVIE -> null
-            MetadataLabMediaType.SERIES -> "show"
-            MetadataLabMediaType.ANIME -> "anime"
-        }
-    }
 }

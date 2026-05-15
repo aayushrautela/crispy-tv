@@ -1,25 +1,5 @@
 package com.crispy.tv.player
 
-enum class WatchProvider {
-    LOCAL,
-    TRAKT,
-    SIMKL
-}
-
-data class WatchProviderSession(
-    val accessToken: String,
-    val expiresAtEpochMs: Long? = null,
-    val userHandle: String? = null,
-    val connectedAtEpochMs: Long = System.currentTimeMillis()
-)
-
-data class WatchProviderAuthState(
-    val traktAuthenticated: Boolean = false,
-    val simklAuthenticated: Boolean = false,
-    val traktSession: WatchProviderSession? = null,
-    val simklSession: WatchProviderSession? = null
-)
-
 data class WatchHistoryEntry(
     val contentId: String,
     val contentType: MetadataLabMediaType,
@@ -30,90 +10,49 @@ data class WatchHistoryEntry(
 )
 
 data class WatchHistoryRequest(
-    val contentId: String,
     val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String? = null,
     val season: Int? = null,
     val episode: Int? = null,
-    val remoteImdbId: String? = null,
-    val provider: String? = null,
-    val providerId: String? = null,
-    val parentMediaType: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
 )
 
 data class WatchHistoryResult(
     val statusMessage: String,
     val entries: List<WatchHistoryEntry> = emptyList(),
-    val authState: WatchProviderAuthState = WatchProviderAuthState(),
     val accepted: Boolean = false,
     val syncedToTrakt: Boolean = false,
     val syncedToSimkl: Boolean = false
 )
 
-data class ContinueWatchingEntry(
-    val id: String,
-    val mediaKey: String? = null,
-    val localKey: String = id,
-    val provider: String,
-    val providerId: String,
-    val mediaType: String,
-    val title: String,
-    val season: Int?,
-    val episode: Int?,
-    val progressPercent: Double,
-    val lastUpdatedEpochMs: Long,
-    val source: WatchProvider,
-    val isUpNextPlaceholder: Boolean = false,
-    val posterUrl: String? = null,
-    val backdropUrl: String? = null,
-    val logoUrl: String? = null,
-    val addonId: String? = null,
-    val subtitle: String? = null,
-    val dismissible: Boolean = false,
-    val absoluteEpisodeNumber: Int? = null,
-)
-
-data class ContinueWatchingResult(
-    val statusMessage: String,
-    val entries: List<ContinueWatchingEntry> = emptyList(),
-    val isError: Boolean = false,
-)
-
 data class CanonicalContinueWatchingItem(
     val id: String,
-    val mediaKey: String? = null,
-    val localKey: String = id,
-    val provider: String,
-    val providerId: String,
+    val titleMediaKey: String,
+    val playbackMediaKey: String,
+    val localKey: String = titleMediaKey,
     val mediaType: String,
     val title: String,
     val season: Int?,
     val episode: Int?,
     val progressPercent: Double,
     val lastUpdatedEpochMs: Long,
-    val source: WatchProvider,
-    val isUpNextPlaceholder: Boolean = false,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
     val logoUrl: String? = null,
     val addonId: String? = null,
     val subtitle: String? = null,
-    val dismissible: Boolean = false,
     val absoluteEpisodeNumber: Int? = null,
 ) {
     val type: String
-        get() = when (mediaType.lowercase()) {
-            "show", "tv", "series", "episode" -> MetadataLabMediaType.SERIES.label
-            "anime" -> MetadataLabMediaType.ANIME.label
-            else -> MetadataLabMediaType.MOVIE.label
-        }
+    get() = when (mediaType.lowercase()) {
+        "show", "tv", "series", "episode" -> MetadataLabMediaType.SERIES.label
+        "anime" -> MetadataLabMediaType.ANIME.label
+        else -> MetadataLabMediaType.MOVIE.label
+    }
 
     val watchedAtEpochMs: Long
-        get() = lastUpdatedEpochMs
+    get() = lastUpdatedEpochMs
 }
 
 data class CanonicalContinueWatchingResult(
@@ -131,57 +70,11 @@ data class CanonicalWatchStateSnapshot(
     val watchedEpisodeKeys: Set<String> = emptySet(),
 )
 
-data class CanonicalProviderLibraryItem(
-    val contentId: String,
-    val mediaKey: String? = null,
-    val contentType: MetadataLabMediaType,
-    val title: String,
-    val posterUrl: String? = null,
-    val backdropUrl: String? = null,
-    val folderIds: Set<String> = emptySet(),
-    val addedAtEpochMs: Long = 0L,
-)
-
 data class WatchedEpisodeRecord(
     val contentId: String,
     val season: Int,
     val episode: Int,
     val watchedAtEpochMs: Long,
-)
-
-data class ProviderLibraryFolder(
-    val id: String,
-    val label: String,
-    val provider: WatchProvider,
-    val itemCount: Int
-)
-
-data class ProviderExternalIds(
-    val tmdb: Int? = null,
-    val imdb: String? = null,
-    val tvdb: Int? = null,
-    val kitsu: Int? = null,
-)
-
-data class ProviderLibraryItem(
-    val provider: WatchProvider,
-    val folderId: String,
-    val contentId: String,
-    val mediaKey: String? = null,
-    val contentType: MetadataLabMediaType,
-    val title: String,
-    val posterUrl: String? = null,
-    val backdropUrl: String? = null,
-    val externalIds: ProviderExternalIds? = null,
-    val season: Int? = null,
-    val episode: Int? = null,
-    val addedAtEpochMs: Long = System.currentTimeMillis()
-)
-
-data class ProviderLibrarySnapshot(
-    val statusMessage: String,
-    val folders: List<ProviderLibraryFolder> = emptyList(),
-    val items: List<ProviderLibraryItem> = emptyList()
 )
 
 enum class ProviderCommentScope {
@@ -215,49 +108,9 @@ data class ProviderCommentResult(
     val comments: List<ProviderComment> = emptyList()
 )
 
-data class ProviderAuthStartResult(
-    val authorizationUrl: String,
-    val statusMessage: String
-)
-
-data class ProviderAuthActionResult(
-    val success: Boolean,
-    val statusMessage: String,
-    val authState: WatchProviderAuthState = WatchProviderAuthState()
-)
-
-data class ProviderSessionBackendResult(
-    val session: WatchProviderSession? = null,
-    val errorMessage: String? = null,
-)
-
-data class ProviderSessionDisconnectResult(
-    val success: Boolean,
-    val errorMessage: String? = null,
-)
-
-interface ProviderSessionBackend {
-    fun isConfigured(): Boolean
-
-    suspend fun exchangeProviderSession(
-        provider: WatchProvider,
-        code: String,
-        redirectUri: String,
-        codeVerifier: String,
-    ): ProviderSessionBackendResult
-
-    suspend fun resolveProviderSession(
-        provider: WatchProvider,
-        forceRefresh: Boolean = false,
-    ): ProviderSessionBackendResult
-
-    suspend fun disconnectProviderSession(provider: WatchProvider): ProviderSessionDisconnectResult
-}
 
 data class PlaybackIdentity(
-    val contentId: String? = null,
-    val mediaKey: String? = null,
-    val imdbId: String?,
+    val mediaKey: String?,
     val tmdbId: Int? = null,
     val contentType: MetadataLabMediaType,
     val season: Int? = null,
@@ -266,11 +119,7 @@ data class PlaybackIdentity(
     val year: Int? = null,
     val showTitle: String? = null,
     val showYear: Int? = null,
-    val provider: String? = null,
-    val providerId: String? = null,
     val parentMediaType: String? = null,
-    val parentProvider: String? = null,
-    val parentProviderId: String? = null,
     val absoluteEpisodeNumber: Int? = null,
 )
 
@@ -283,45 +132,14 @@ data class WatchProgressSnapshot(
         get() = if (durationSeconds <= 0.0) 0.0 else (currentTimeSeconds / durationSeconds) * 100.0
 }
 
-data class WatchProgressSyncResult(
-    val statusMessage: String,
-    val updatedCount: Int = 0
-)
-
 interface WatchHistoryService {
-    fun clearCachedProviderAuthState() {
-    }
+    suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryResult
 
-    suspend fun disconnectProvider(provider: WatchProvider): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = false, statusMessage = "Provider disconnect unavailable.")
-    }
-
-    fun authState(): WatchProviderAuthState
-
-    suspend fun refreshProviderAuthState(forceRefresh: Boolean = false): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = true, statusMessage = "", authState = authState())
-    }
-
-    suspend fun listLocalHistory(limit: Int = 100): WatchHistoryResult
-
-    suspend fun exportLocalHistory(): List<WatchHistoryEntry>
-
-    suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryResult
-
-    suspend fun markWatched(
-        request: WatchHistoryRequest,
-        source: WatchProvider? = null
-    ): WatchHistoryResult
-
-    suspend fun unmarkWatched(
-        request: WatchHistoryRequest,
-        source: WatchProvider? = null
-    ): WatchHistoryResult
+    suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryResult
 
     suspend fun setInWatchlist(
         request: WatchHistoryRequest,
         inWatchlist: Boolean,
-        source: WatchProvider? = null
     ): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Watchlist unavailable.")
     }
@@ -329,53 +147,23 @@ interface WatchHistoryService {
     suspend fun setRating(
         request: WatchHistoryRequest,
         rating: Int?,
-        source: WatchProvider? = null
     ): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Rating unavailable.")
     }
 
-    suspend fun removeFromPlayback(
-        playbackId: String,
-        source: WatchProvider? = null
-    ): WatchHistoryResult {
+    suspend fun removeFromPlayback(playbackId: String): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Playback removal unavailable.")
-    }
-
-    suspend fun listContinueWatching(
-        limit: Int = 20,
-        nowMs: Long = System.currentTimeMillis(),
-        source: WatchProvider? = null
-    ): ContinueWatchingResult {
-        return ContinueWatchingResult(statusMessage = "Continue watching unavailable.", isError = true)
-    }
-
-    suspend fun getCachedContinueWatching(
-        limit: Int = 20,
-        nowMs: Long = System.currentTimeMillis(),
-        source: WatchProvider? = null
-    ): ContinueWatchingResult {
-        return ContinueWatchingResult(statusMessage = "Cached continue watching unavailable.", isError = true)
     }
 
     suspend fun getCanonicalContinueWatching(
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
-        source: WatchProvider? = null,
     ): CanonicalContinueWatchingResult {
         return CanonicalContinueWatchingResult(statusMessage = "Canonical continue watching unavailable.", isError = true)
     }
 
-    suspend fun listWatchedEpisodeRecords(
-        source: WatchProvider? = null,
-    ): List<WatchedEpisodeRecord> {
+    suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
         return emptyList()
-    }
-
-    suspend fun listProviderLibrary(
-        limitPerFolder: Int = 200,
-        source: WatchProvider? = null
-    ): ProviderLibrarySnapshot {
-        return ProviderLibrarySnapshot(statusMessage = "Provider library unavailable.")
     }
 
     suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {
@@ -389,45 +177,8 @@ interface WatchHistoryService {
         return null
     }
 
-    suspend fun getCanonicalProviderLibraryItems(
-        limitPerFolder: Int = 200,
-        source: WatchProvider,
-    ): List<CanonicalProviderLibraryItem> {
-        return emptyList()
-    }
-
-    suspend fun getCachedCanonicalProviderLibraryItems(
-        limitPerFolder: Int = 200,
-        source: WatchProvider,
-    ): List<CanonicalProviderLibraryItem> {
-        return emptyList()
-    }
-
-    suspend fun getCachedProviderLibrary(
-        limitPerFolder: Int = 200,
-        source: WatchProvider? = null
-    ): ProviderLibrarySnapshot {
-        return ProviderLibrarySnapshot(statusMessage = "Cached provider library unavailable.")
-    }
-
     suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {
         return ProviderCommentResult(statusMessage = "Provider comments unavailable.")
-    }
-
-    suspend fun beginTraktOAuth(): ProviderAuthStartResult? {
-        return null
-    }
-
-    suspend fun completeTraktOAuth(callbackUri: String): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = false, statusMessage = "Trakt OAuth unavailable.")
-    }
-
-    suspend fun beginSimklOAuth(): ProviderAuthStartResult? {
-        return null
-    }
-
-    suspend fun completeSimklOAuth(callbackUri: String): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = false, statusMessage = "Simkl OAuth unavailable.")
     }
 
     suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
@@ -461,95 +212,23 @@ interface WatchHistoryService {
     suspend fun onPlaybackStopped(identity: PlaybackIdentity, positionMs: Long, durationMs: Long) {
     }
 
-    suspend fun fetchAndMergeTraktProgress(): WatchProgressSyncResult {
-        return WatchProgressSyncResult(statusMessage = "Trakt progress merge unavailable.")
-    }
-
-    suspend fun fetchAndMergeSimklProgress(): WatchProgressSyncResult {
-        return WatchProgressSyncResult(statusMessage = "Simkl progress merge unavailable.")
-    }
-
-    suspend fun syncAllTraktProgress(): WatchProgressSyncResult {
-        return WatchProgressSyncResult(statusMessage = "Trakt progress sync unavailable.")
-    }
-
-    suspend fun syncAllSimklProgress(): WatchProgressSyncResult {
-        return WatchProgressSyncResult(statusMessage = "Simkl progress sync unavailable.")
-    }
 }
 
 object UnavailableWatchHistoryService : WatchHistoryService {
-    override fun clearCachedProviderAuthState() {
-    }
-
-    override suspend fun disconnectProvider(provider: WatchProvider): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = false, statusMessage = "Watch history service unavailable.")
-    }
-
-    override fun authState(): WatchProviderAuthState {
-        return WatchProviderAuthState()
-    }
-
-    override suspend fun refreshProviderAuthState(forceRefresh: Boolean): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = false, statusMessage = "Watch history service unavailable.")
-    }
-
-    override suspend fun listLocalHistory(limit: Int): WatchHistoryResult {
+    override suspend fun markWatched(request: WatchHistoryRequest): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun exportLocalHistory(): List<WatchHistoryEntry> {
-        return emptyList()
-    }
-
-    override suspend fun replaceLocalHistory(entries: List<WatchHistoryEntry>): WatchHistoryResult {
+    override suspend fun unmarkWatched(request: WatchHistoryRequest): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun markWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryResult {
+    override suspend fun removeFromPlayback(playbackId: String): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
-    }
-
-    override suspend fun unmarkWatched(request: WatchHistoryRequest, source: WatchProvider?): WatchHistoryResult {
-        return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
-    }
-
-    override suspend fun removeFromPlayback(playbackId: String, source: WatchProvider?): WatchHistoryResult {
-        return WatchHistoryResult(statusMessage = "Watch history service unavailable.")
-    }
-
-    override suspend fun listContinueWatching(
-        limit: Int,
-        nowMs: Long,
-        source: WatchProvider?
-    ): ContinueWatchingResult {
-        return ContinueWatchingResult(statusMessage = "Watch history service unavailable.", isError = true)
-    }
-
-    override suspend fun listProviderLibrary(
-        limitPerFolder: Int,
-        source: WatchProvider?
-    ): ProviderLibrarySnapshot {
-        return ProviderLibrarySnapshot(statusMessage = "Watch history service unavailable.")
     }
 
     override suspend fun fetchProviderComments(query: ProviderCommentQuery): ProviderCommentResult {
         return ProviderCommentResult(statusMessage = "Watch history service unavailable.")
     }
 
-    override suspend fun beginTraktOAuth(): ProviderAuthStartResult? {
-        return null
-    }
-
-    override suspend fun completeTraktOAuth(callbackUri: String): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = false, statusMessage = "Watch history service unavailable.")
-    }
-
-    override suspend fun beginSimklOAuth(): ProviderAuthStartResult? {
-        return null
-    }
-
-    override suspend fun completeSimklOAuth(callbackUri: String): ProviderAuthActionResult {
-        return ProviderAuthActionResult(success = false, statusMessage = "Watch history service unavailable.")
-    }
 }

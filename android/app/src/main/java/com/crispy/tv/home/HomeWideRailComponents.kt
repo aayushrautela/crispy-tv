@@ -45,6 +45,7 @@ private const val HOME_WIDE_SKELETON_COUNT = 3
 internal fun HomeWideRailSection(
     section: HomeWideRailSectionUi,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
     onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
@@ -88,18 +89,14 @@ internal fun HomeWideRailSection(
                             },
                             onDetailsClick = {
                                 when (item.kind) {
-                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
+                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingOpenDetails)
                                     HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
                                 }
                             },
                             onRemoveClick =
                                 if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
                                     item.continueWatchingItem?.let { continueWatchingItem ->
-                                        if (continueWatchingItem.dismissible) {
-                                            { onRemoveContinueWatchingItem(continueWatchingItem) }
-                                        } else {
-                                            null
-                                        }
+                                        { onRemoveContinueWatchingItem(continueWatchingItem) }
                                     }
                                 } else {
                                     null
@@ -183,7 +180,8 @@ internal fun HomeWideRailCard(
     onRemoveClick: (() -> Unit)? = null,
 ) {
     var actionSheetVisible by remember { mutableStateOf(false) }
-    val hasItemActions = showActions && onRemoveClick != null
+    val removeAction = onRemoveClick
+    val hasItemActions = showActions && removeAction != null
     val artworkModel = rememberLandscapeImageModel(item.imageUrl, 280.dp)
 
     val cardInteractionModifier =
@@ -237,7 +235,8 @@ internal fun HomeWideRailCard(
         }
     }
 
-    if (hasItemActions && actionSheetVisible) {
+    val visibleRemoveAction = if (actionSheetVisible) removeAction else null
+    if (visibleRemoveAction != null) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { actionSheetVisible = false },
@@ -258,7 +257,7 @@ internal fun HomeWideRailCard(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
                 ListItem(
-                    headlineContent = { Text("Details") },
+                    headlineContent = { Text("Open details") },
                     supportingContent = {
                         if (item.subtitle.isNotBlank()) {
                             Text(
@@ -273,15 +272,13 @@ internal fun HomeWideRailCard(
                         onDetailsClick()
                     },
                 )
-                onRemoveClick?.let { removeAction ->
-                    ListItem(
-                        headlineContent = { Text("Remove") },
-                        modifier = Modifier.clickable {
-                            actionSheetVisible = false
-                            removeAction()
-                        },
-                    )
-                }
+                ListItem(
+                    headlineContent = { Text("Remove") },
+                    modifier = Modifier.clickable {
+                        actionSheetVisible = false
+                        visibleRemoveAction()
+                    },
+                )
             }
         }
     }

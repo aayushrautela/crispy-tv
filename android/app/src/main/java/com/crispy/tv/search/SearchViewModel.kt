@@ -5,31 +5,15 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.network.AppHttp
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-enum class SearchTypeFilter {
-    ALL,
-    MOVIES,
-    SERIES,
-    ANIME;
-
-    val label: String
-        get() =
-            when (this) {
-                ALL -> "All"
-                MOVIES -> "Movies"
-                SERIES -> "Series"
-                ANIME -> "Anime"
-            }
-}
 
 enum class SearchMode {
     STANDARD,
@@ -39,25 +23,21 @@ enum class SearchMode {
 @Immutable
 data class SearchUiState(
     val query: String = "",
-    val appliedQuery: String = "",
+    val executedQuery: String = "",
     val selectedGenre: SearchGenreSuggestion? = null,
-    val filter: SearchTypeFilter = SearchTypeFilter.ALL,
     val searchMode: SearchMode = SearchMode.STANDARD,
     val isLoading: Boolean = false,
     val recentSearches: List<String> = emptyList(),
-    val results: List<CatalogItem> = emptyList(),
+    val resultBuckets: SearchResultBuckets = SearchResultBuckets(),
     val statusMessage: String? = null,
+    val suggestions: List<SearchSuggestion> = emptyList(),
+    val isLoadingSuggestions: Boolean = false,
 ) {
     val hasActiveResults: Boolean
-        get() = appliedQuery.isNotBlank() || selectedGenre != null
+        get() = isLoading || executedQuery.isNotBlank() || selectedGenre != null
 
-    val availableFilters: List<SearchTypeFilter>
-        get() =
-            if (selectedGenre == null) {
-                SearchTypeFilter.entries
-            } else {
-                listOf(SearchTypeFilter.ALL, SearchTypeFilter.MOVIES, SearchTypeFilter.SERIES, SearchTypeFilter.ANIME)
-            }
+    val shouldShowSuggestions: Boolean
+        get() = query.trim().length >= 2 && executedQuery.isBlank() && selectedGenre == null
 }
 
 class SearchViewModel(
@@ -65,104 +45,101 @@ class SearchViewModel(
     private val aiSearchRepository: AiSearchRepository,
     private val searchHistoryStore: SearchHistoryStore,
     private val localeProvider: () -> Locale = { Locale.getDefault() },
+    private val suggestionDebounceMs: Long = SUGGESTION_DEBOUNCE_MS,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState(recentSearches = searchHistoryStore.load()))
     val uiState: StateFlow<SearchUiState> = _uiState
 
     private var searchJob: Job? = null
+    private var suggestionJob: Job? = null
     private var searchToken: Long = 0L
+    private var suggestionToken: Long = 0L
 
     fun updateQuery(query: String) {
-        _uiState.value = _uiState.value.copy(query = query)
+        val snapshot = _uiState.value
+
+        _uiState.value = snapshot.copy(
+            query = query,
+            executedQuery = "",
+            selectedGenre = null,
+            searchMode = SearchMode.STANDARD,
+            isLoading = false,
+            resultBuckets = SearchResultBuckets(),
+            statusMessage = null,
+        )
+
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isBlank() || trimmedQuery.length < 2) {
+            clearSuggestions()
+            return
+        }
+
+        scheduleSuggestions(trimmedQuery)
+    }
+
+    fun selectSuggestion(suggestion: SearchSuggestion) {
+        executeQuerySearch(
+            rawQuery = suggestion.title,
+            mode = SearchMode.STANDARD,
+            recordInHistory = true,
+            immediate = true,
+        )
     }
 
     fun submitSearch(query: String = _uiState.value.query) {
-        val normalizedQuery = query.trim()
-        if (normalizedQuery.isBlank()) {
-            return
-        }
-
-        val snapshot = _uiState.value
-        if (snapshot.selectedGenre != null && normalizedQuery == snapshot.selectedGenre.label) {
-            return
-        }
-
-        val resolvedFilter = normalizeFilterForMode(snapshot.filter, SearchMode.STANDARD)
-        val updatedRecentSearches = searchHistoryStore.record(normalizedQuery)
-        launchSearch(
-            updateState = {
-                copy(
-                    query = normalizedQuery,
-                    appliedQuery = normalizedQuery,
-                    selectedGenre = null,
-                    recentSearches = updatedRecentSearches,
-                    filter = resolvedFilter,
-                    searchMode = SearchMode.STANDARD,
-                    isLoading = true,
-                    results = emptyList(),
-                    statusMessage = null,
-                )
-            },
-        ) { locale ->
-            searchRepository.search(
-                query = normalizedQuery,
-                filter = resolvedFilter,
-                locale = locale,
-            )
-        }
+        cancelPendingSuggestions()
+        clearSuggestions()
+        executeQuerySearch(
+            rawQuery = query,
+            mode = SearchMode.STANDARD,
+            recordInHistory = true,
+            immediate = true,
+        )
     }
 
     fun submitAiSearch(query: String = _uiState.value.query) {
-        val normalizedQuery = query.trim()
-        if (normalizedQuery.isBlank()) {
+        cancelPendingSuggestions()
+        clearSuggestions()
+        executeQuerySearch(
+            rawQuery = query,
+            mode = SearchMode.AI,
+            recordInHistory = true,
+            immediate = true,
+        )
+    }
+
+    fun clearSearch() {
+        cancelPendingSuggestions()
+        clearSuggestions()
+        searchToken += 1
+        cancelActiveSearch()
+        _uiState.value = SearchUiState(recentSearches = searchHistoryStore.load())
+    }
+
+    fun selectGenre(genreSuggestion: SearchGenreSuggestion) {
+        if (_uiState.value.selectedGenre == genreSuggestion) {
             return
         }
-
-        val snapshot = _uiState.value
-        val resolvedFilter = normalizeFilterForMode(snapshot.filter, SearchMode.AI)
-        val updatedRecentSearches = searchHistoryStore.record(normalizedQuery)
+        cancelPendingSuggestions()
+        clearSuggestions()
         launchSearch(
             updateState = {
                 copy(
-                    query = normalizedQuery,
-                    appliedQuery = normalizedQuery,
-                    selectedGenre = null,
-                    recentSearches = updatedRecentSearches,
-                    filter = resolvedFilter,
-                    searchMode = SearchMode.AI,
+                    query = genreSuggestion.label,
+                    executedQuery = "",
+                    selectedGenre = genreSuggestion,
+                    searchMode = SearchMode.STANDARD,
                     isLoading = true,
-                    results = emptyList(),
                     statusMessage = null,
                 )
             },
         ) { locale ->
-            aiSearchRepository.search(
-                query = normalizedQuery,
-                filter = resolvedFilter,
+            searchRepository.discoverByGenre(
+                genreSuggestion = genreSuggestion,
                 locale = locale,
             )
         }
-    }
-
-    fun clearSearch() {
-        searchToken += 1
-        cancelActiveSearch()
-        _uiState.value =
-            _uiState.value.copy(
-                query = "",
-                appliedQuery = "",
-                selectedGenre = null,
-                searchMode = SearchMode.STANDARD,
-                isLoading = false,
-                results = emptyList(),
-                statusMessage = null,
-            )
-    }
-
-    fun selectGenre(genreSuggestion: SearchGenreSuggestion) {
-        val resolvedFilter = normalizeFilterForMode(_uiState.value.filter, SearchMode.STANDARD)
-        loadGenreResults(genreSuggestion = genreSuggestion, filter = resolvedFilter)
     }
 
     fun removeRecentSearch(query: String) {
@@ -173,124 +150,113 @@ class SearchViewModel(
         _uiState.value = _uiState.value.copy(recentSearches = searchHistoryStore.clear())
     }
 
-    fun setFilter(filter: SearchTypeFilter) {
-        val mode = _uiState.value.searchMode
-        val resolvedFilter =
-            if (_uiState.value.selectedGenre != null) {
-                normalizeFilterForMode(filter, SearchMode.STANDARD)
-            } else {
-                normalizeFilterForMode(filter, mode)
+    private fun scheduleSuggestions(query: String) {
+        cancelPendingSuggestions()
+        suggestionJob =
+            viewModelScope.launch {
+                delay(suggestionDebounceMs)
+                loadSuggestions(query)
             }
-        if (_uiState.value.filter == resolvedFilter) {
+    }
+
+    private suspend fun loadSuggestions(rawQuery: String) {
+        val normalizedQuery = rawQuery.trim()
+        if (normalizedQuery.length < 2) {
+            clearSuggestions()
             return
         }
 
-        _uiState.value = _uiState.value.copy(filter = resolvedFilter)
-        val snapshot = _uiState.value
-        when {
-            snapshot.selectedGenre != null -> {
-                loadGenreResults(
-                    genreSuggestion = snapshot.selectedGenre,
-                    filter = resolvedFilter,
-                )
+        suggestionToken += 1
+        val token = suggestionToken
+        _uiState.value = _uiState.value.copy(isLoadingSuggestions = true)
+
+        val locale = localeProvider()
+        val results =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    searchRepository.suggest(
+                        query = normalizedQuery,
+                        locale = locale,
+                    )
+                }.getOrDefault(emptyList())
             }
 
-            snapshot.appliedQuery.isNotBlank() -> {
-                if (snapshot.searchMode == SearchMode.AI) {
-                    loadAiResults(
-                        query = snapshot.appliedQuery,
-                        filter = resolvedFilter,
-                    )
-                } else {
-                    loadQueryResults(
-                        query = snapshot.appliedQuery,
-                        filter = resolvedFilter,
-                    )
-                }
-            }
-
-            else -> clearResultsOnly()
+        if (token != suggestionToken) {
+            return
         }
-    }
 
-    private fun clearResultsOnly() {
-        searchToken += 1
-        cancelActiveSearch()
-        _uiState.value = _uiState.value.copy(isLoading = false, results = emptyList(), statusMessage = null)
-    }
-
-    private fun loadQueryResults(query: String, filter: SearchTypeFilter) {
-        val resolvedFilter = normalizeFilterForMode(filter, SearchMode.STANDARD)
-        launchSearch(
-            updateState = {
-                copy(
-                    query = query,
-                    appliedQuery = query,
-                    selectedGenre = null,
-                    filter = resolvedFilter,
-                    searchMode = SearchMode.STANDARD,
-                    isLoading = true,
-                    results = emptyList(),
-                    statusMessage = null,
-                )
-            },
-        ) { locale ->
-            searchRepository.search(
-                query = query,
-                filter = resolvedFilter,
-                locale = locale,
-            )
+        if (_uiState.value.executedQuery.isNotBlank()) {
+            return
         }
-    }
 
-    private fun loadAiResults(query: String, filter: SearchTypeFilter) {
-        val resolvedFilter = normalizeFilterForMode(filter, SearchMode.AI)
-        launchSearch(
-            updateState = {
-                copy(
-                    query = query,
-                    appliedQuery = query,
-                    selectedGenre = null,
-                    filter = resolvedFilter,
-                    searchMode = SearchMode.AI,
-                    isLoading = true,
-                    results = emptyList(),
-                    statusMessage = null,
-                )
-            },
-        ) { locale ->
-            aiSearchRepository.search(
-                query = query,
-                filter = resolvedFilter,
-                locale = locale,
-            )
+        if (_uiState.value.query.trim() != normalizedQuery) {
+            return
         }
+
+        _uiState.value = _uiState.value.copy(
+            suggestions = results,
+            isLoadingSuggestions = false,
+        )
     }
 
-    private fun loadGenreResults(
-        genreSuggestion: SearchGenreSuggestion,
-        filter: SearchTypeFilter,
+    private fun executeQuerySearch(
+        rawQuery: String,
+        mode: SearchMode,
+        recordInHistory: Boolean,
+        immediate: Boolean,
     ) {
-        val resolvedFilter = normalizeFilterForMode(filter, SearchMode.STANDARD)
+        cancelPendingSuggestions()
+        clearSuggestions()
+
+        val normalizedQuery = rawQuery.trim()
+        if (normalizedQuery.isBlank()) {
+            if (immediate) {
+                clearSearch()
+            }
+            return
+        }
+
+        val snapshot = _uiState.value
+        val updatedRecentSearches =
+            if (recordInHistory) {
+                searchHistoryStore.record(normalizedQuery)
+            } else {
+                snapshot.recentSearches
+            }
+
+        if (
+            snapshot.selectedGenre == null &&
+            snapshot.searchMode == mode &&
+            snapshot.executedQuery.equals(normalizedQuery, ignoreCase = true)
+        ) {
+            _uiState.value = snapshot.copy(query = rawQuery, recentSearches = updatedRecentSearches)
+            return
+        }
+
         launchSearch(
             updateState = {
                 copy(
-                    query = genreSuggestion.label,
-                    selectedGenre = genreSuggestion,
-                    appliedQuery = "",
-                    filter = resolvedFilter,
-                    searchMode = SearchMode.STANDARD,
+                    query = normalizedQuery,
+                    executedQuery = normalizedQuery,
+                    selectedGenre = null,
+                    recentSearches = updatedRecentSearches,
+                    searchMode = mode,
                     isLoading = true,
-                    results = emptyList(),
                     statusMessage = null,
                 )
             },
         ) { locale ->
-            searchRepository.discoverByGenre(
-                genreSuggestion = genreSuggestion,
-                filter = resolvedFilter,
-                locale = locale,
-            )
+            if (mode == SearchMode.AI) {
+                aiSearchRepository.search(
+                    query = normalizedQuery,
+                    locale = locale,
+                )
+            } else {
+                searchRepository.search(
+                    query = normalizedQuery,
+                    locale = locale,
+                )
+            }
         }
     }
 
@@ -321,10 +287,22 @@ class SearchViewModel(
                 _uiState.value =
                     _uiState.value.copy(
                         isLoading = false,
-                        results = payload.items,
+                        resultBuckets = payload.buckets,
                         statusMessage = payload.message,
                     )
             }
+    }
+
+    private fun cancelPendingSuggestions() {
+        suggestionJob?.cancel()
+        suggestionJob = null
+    }
+
+    private fun clearSuggestions() {
+        _uiState.value = _uiState.value.copy(
+            suggestions = emptyList(),
+            isLoadingSuggestions = false,
+        )
     }
 
     private fun cancelActiveSearch() {
@@ -332,15 +310,9 @@ class SearchViewModel(
         searchJob = null
     }
 
-    private fun normalizeFilterForGenre(filter: SearchTypeFilter): SearchTypeFilter {
-        return filter
-    }
-
-    private fun normalizeFilterForMode(filter: SearchTypeFilter, mode: SearchMode): SearchTypeFilter {
-        return normalizeFilterForGenre(filter)
-    }
-
     companion object {
+        private const val SUGGESTION_DEBOUNCE_MS = 300L
+
         fun factory(appContext: Context): ViewModelProvider.Factory {
             val context = appContext.applicationContext
             return object : ViewModelProvider.Factory {

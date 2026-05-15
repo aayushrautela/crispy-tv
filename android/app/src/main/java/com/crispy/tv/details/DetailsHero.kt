@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.media3.common.C
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,7 +59,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.AsyncImage
+import coil3.compose.rememberAsyncImagePainter
+import coil3.toBitmap
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
@@ -67,33 +73,42 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+internal fun detailsHeroBackdropSize(screenWidthPx: Float): String {
+    return if (screenWidthPx > 1280f) "original" else "w1280"
+}
+
+internal fun detailsHeroImageUrl(details: MediaDetails?, backdropSize: String): String? {
+    return details?.backdropUrl?.let { TmdbApi.resizedImageUrl(it, size = backdropSize) }
+        ?: details?.posterUrl
+}
+
 @Composable
 internal fun HeroSection(
     details: MediaDetails?,
+    imageUrl: String?,
     palette: DetailsPaletteColors,
     trailerKey: String?,
     showTrailer: Boolean,
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
+    onHeroImageLoaded: (Bitmap) -> Unit,
+    onHeroImageLoadFailed: () -> Unit,
     onToggleTrailer: () -> Unit,
 ) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
-    val heroHeight = (configuration.screenHeightDp.dp * 0.52f).coerceIn(340.dp, 520.dp)
-    val screenWidthPx = remember(configuration.screenWidthDp, density) {
-        with(density) { configuration.screenWidthDp.dp.toPx() }
-    }
-    val backdropSize = if (screenWidthPx > 1280f) "original" else "w1280"
+    val heroHeight = (configuration.screenHeightDp.dp * 0.43f).coerceIn(300.dp, 440.dp)
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(heroHeight)
     ) {
+        val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
 
-        if (details == null) {
+        if (details == null && imageUrl.isNullOrBlank()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -103,21 +118,9 @@ internal fun HeroSection(
                     )
             ) {
                 // Bottom fade to merge hero into the page background.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colorStops =
-                                    arrayOf(
-                                        0f to Color.Transparent,
-                                        0.58f to Color.Transparent,
-                                        1f to palette.pageBackground
-                                    ),
-                                startY = 0f,
-                                endY = heightPx
-                            )
-                        )
+                HeroBottomFade(
+                    pageBackground = palette.pageBackground,
+                    heightPx = heightPx,
                 )
 
                 Column(
@@ -139,14 +142,21 @@ internal fun HeroSection(
             return@BoxWithConstraints
         }
 
-        val imageUrl = remember(details.backdropUrl, details.posterUrl, backdropSize) {
-            details.backdropUrl?.let { TmdbApi.resizedImageUrl(it, size = backdropSize) }
-                ?: details.posterUrl
+        val imagePainter = rememberAsyncImagePainter(model = imageUrl)
+        val imagePainterState by imagePainter.state.collectAsState()
+        LaunchedEffect(imageUrl, imagePainterState) {
+            when (val state = imagePainterState) {
+                is AsyncImagePainter.State.Success -> {
+                    onHeroImageLoaded(state.result.image.toBitmap(width = 128, height = 128))
+                }
+                is AsyncImagePainter.State.Error -> onHeroImageLoadFailed()
+                else -> Unit
+            }
         }
         if (!imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = details.title,
+            Image(
+                painter = imagePainter,
+                contentDescription = details?.title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
@@ -157,22 +167,34 @@ internal fun HeroSection(
             ) {}
         }
 
+        if (details == null) {
+            HeroBottomFade(
+                pageBackground = palette.pageBackground,
+                heightPx = heightPx,
+            )
+            return@BoxWithConstraints
+        }
+
         val hasTrailer = !trailerKey.isNullOrBlank()
         var trailerIsPlaying by remember(trailerKey) { mutableStateOf(false) }
+        var trailerHasRenderedFirstFrame by remember(trailerKey) { mutableStateOf(false) }
         val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying
 
         if (showTrailer && hasTrailer) {
             HeroYouTubeTrailerLayer(
                 modifier = Modifier.fillMaxSize(),
                 trailerKey = trailerKey,
+                viewportWidthPx = widthPx,
+                viewportHeightPx = heightPx.toInt(),
                 shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
-                onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 },
+                onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
+                onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
             )
         }
 
         val coverAlpha by animateFloatAsState(
-            targetValue = if (shouldAttemptPlayback && trailerIsPlaying) 0f else 1f,
+            targetValue = if (showTrailer && hasTrailer && trailerHasRenderedFirstFrame) 0f else 1f,
             animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
             label = "hero_trailer_cover_alpha",
         )
@@ -210,21 +232,9 @@ internal fun HeroSection(
         )
 
         // Bottom fade to merge hero into the page background.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops =
-                            arrayOf(
-                                0f to Color.Transparent,
-                                0.58f to Color.Transparent,
-                                1f to palette.pageBackground
-                            ),
-                        startY = 0f,
-                        endY = heightPx
-                    )
-                )
+        HeroBottomFade(
+            pageBackground = palette.pageBackground,
+            heightPx = heightPx,
         )
 
         if (hasTrailer) {
@@ -234,7 +244,7 @@ internal fun HeroSection(
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 160.dp)
+                    .padding(bottom = 136.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
                     .clickable { onToggleTrailer() },
                 color = Color.Black.copy(alpha = 0.34f),
@@ -259,8 +269,8 @@ internal fun HeroSection(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = horizontalPadding)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val logoUrl = details.logoUrl?.trim().orEmpty()
@@ -269,8 +279,8 @@ internal fun HeroSection(
                     model = logoUrl,
                     contentDescription = details.title,
                     modifier = Modifier
-                        .fillMaxWidth(0.84f)
-                        .height(110.dp),
+                        .fillMaxWidth(0.81f)
+                        .height(104.dp),
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.Center
                 )
@@ -289,15 +299,42 @@ internal fun HeroSection(
 }
 
 @Composable
+private fun HeroBottomFade(
+    pageBackground: Color,
+    heightPx: Float,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to Color.Transparent,
+                            0.66f to Color.Transparent,
+                            1f to pageBackground
+                        ),
+                    startY = 0f,
+                    endY = heightPx
+                )
+            )
+    )
+}
+
+@Composable
 private fun HeroYouTubeTrailerLayer(
     modifier: Modifier,
     trailerKey: String,
+    viewportWidthPx: Int,
+    viewportHeightPx: Int,
     shouldPlay: Boolean,
     isMuted: Boolean,
+    onFirstFrameRendered: () -> Unit,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
 ) {
     val context = LocalContext.current
 
+    val latestOnFirstFrameRendered = rememberUpdatedState(onFirstFrameRendered)
     val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
     val latestShouldPlay = rememberUpdatedState(shouldPlay)
 
@@ -311,7 +348,11 @@ private fun HeroYouTubeTrailerLayer(
         if (!shouldPlay) return@LaunchedEffect
         if (source != null) return@LaunchedEffect
         source = withContext(Dispatchers.IO) {
-            YouTubeTrailerExtractor.resolve(trailerKey)
+            YouTubeTrailerExtractor.resolve(
+                videoId = trailerKey,
+                viewportWidthPx = viewportWidthPx,
+                viewportHeightPx = viewportHeightPx,
+            )
         }
     }
 
@@ -348,6 +389,7 @@ private fun HeroYouTubeTrailerLayer(
             object : Player.Listener {
                 override fun onRenderedFirstFrame() {
                     hasRenderedFirstFrame = true
+                    latestOnFirstFrameRendered.value()
                     if (latestShouldPlay.value) {
                         sendState(1)
                     }

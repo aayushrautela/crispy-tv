@@ -2,32 +2,30 @@ package com.crispy.tv.home
 
 import android.util.Log
 import androidx.compose.runtime.Immutable
-import com.crispy.tv.accounts.ActiveProfileStore
-import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.backend.BackendContext
+import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.MetadataLabMediaType
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
 @Immutable
 data class CalendarEpisodeItem(
     val id: String,
-    val mediaKey: String,
+    val titleMediaKey: String,
+    val playbackMediaKey: String,
     val localKey: String,
     val highlightEpisodeId: String? = null,
     val seriesName: String,
     val episodeTitle: String?,
     val overview: String?,
-    val season: Int,
-    val episode: Int,
+    val season: Int?,
+    val episode: Int?,
     val episodeRange: String?,
     val episodeCount: Int,
-    val releaseDate: String,
-    val releasedAtMs: Long,
+    val releaseDate: String?,
+    val releasedAtMs: Long?,
     val isReleased: Boolean,
     val isGroup: Boolean,
     val posterUrl: String?,
@@ -68,6 +66,8 @@ data class CalendarSection(
 @Immutable
 data class CalendarSnapshot(
     val sections: List<CalendarSection>,
+    val source: String? = null,
+    val generatedAt: String? = null,
     val statusMessage: String? = null,
     val isError: Boolean = false,
 )
@@ -75,45 +75,62 @@ data class CalendarSnapshot(
 @Immutable
 data class ThisWeekResult(
     val items: List<CalendarEpisodeItem>,
+    val source: String? = null,
+    val kind: String? = null,
+    val generatedAt: String? = null,
     val statusMessage: String?,
     val isError: Boolean = false,
 )
 
 class CalendarService internal constructor(
-    private val supabaseAccountClient: SupabaseAccountClient,
-    private val activeProfileStore: ActiveProfileStore,
     private val backendClient: CrispyBackendClient,
+    private val backendContextResolver: BackendContextResolver,
 ) {
+    @Volatile
+    private var cachedCalendarSnapshot: CachedCalendarSnapshot? = null
+
     suspend fun loadCalendar(nowMs: Long): CalendarSnapshot {
+        val backendContext = getBackendContext()
+        val cachedSnapshot =
+            backendContext
+                ?.let { context -> cachedCalendarSnapshot?.takeIf { it.profileId == context.profileId }?.snapshot }
         return try {
-            fetchCalendarSnapshot(nowMs)
+            val freshSnapshot = fetchCalendarSnapshot(nowMs, backendContext)
+            if (!freshSnapshot.isError) {
+                backendContext?.let { context ->
+                    cachedCalendarSnapshot = CachedCalendarSnapshot(profileId = context.profileId, snapshot = freshSnapshot)
+                }
+            }
+            freshSnapshot
         } catch (error: Exception) {
             Log.w(TAG, "Failed to load calendar", error)
-            CalendarSnapshot(
-                sections = emptyList(),
-                statusMessage = "Unable to load your calendar right now.",
+            cachedSnapshot
+                ?: CalendarSnapshot(
+                    sections = emptyList(),
+                    statusMessage = "Unable to load your calendar right now.",
+                    isError = true,
+                )
+        }
+    }
+
+    suspend fun loadThisWeek(nowMs: Long): ThisWeekResult {
+        return try {
+            fetchThisWeekResult(nowMs)
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to load this week", error)
+            ThisWeekResult(
+                items = emptyList(),
+                statusMessage = "Unable to load this week right now.",
                 isError = true,
             )
         }
     }
 
-    suspend fun loadThisWeek(nowMs: Long): ThisWeekResult {
-        val snapshot = loadCalendar(nowMs)
-        val rawItems =
-            snapshot.sections
-                .firstOrNull { it.key == CalendarSectionKey.THIS_WEEK }
-                ?.episodeItems
-                .orEmpty()
-
-        return ThisWeekResult(
-            items = projectHomeThisWeekItems(rawItems, nowMs),
-            statusMessage = snapshot.statusMessage,
-            isError = snapshot.isError,
-        )
-    }
-
-    private suspend fun fetchCalendarSnapshot(nowMs: Long): CalendarSnapshot {
-        val backendContext = getBackendContext()
+    private suspend fun fetchCalendarSnapshot(
+        nowMs: Long,
+        backendContext: BackendContext? = null,
+    ): CalendarSnapshot {
+        val resolvedBackendContext = backendContext ?: getBackendContext()
             ?: return CalendarSnapshot(
                 sections = emptyList(),
                 statusMessage = "Sign in and select a profile to load your calendar.",
@@ -121,58 +138,70 @@ class CalendarService internal constructor(
             )
 
         val response = backendClient.getCalendar(
-            accessToken = backendContext.accessToken,
-            profileId = backendContext.profileId,
+            accessToken = resolvedBackendContext.accessToken,
+            profileId = resolvedBackendContext.profileId,
         )
 
         val sections = response.toCalendarSections(nowMs)
         return CalendarSnapshot(
             sections = sections,
+            source = response.source,
+            generatedAt = response.generatedAt,
             statusMessage = if (sections.isEmpty()) "No upcoming episodes found right now." else null,
             isError = false,
         )
     }
 
+    private suspend fun fetchThisWeekResult(nowMs: Long): ThisWeekResult {
+        val backendContext = getBackendContext()
+            ?: return ThisWeekResult(
+                items = emptyList(),
+                statusMessage = "Sign in and select a profile to load this week.",
+                isError = true,
+            )
+
+        val response = backendClient.getCalendarThisWeek(
+            accessToken = backendContext.accessToken,
+            profileId = backendContext.profileId,
+        )
+        val rawItems =
+            response.items
+                .map { it.toCalendarEpisodeItem(nowMs) }
+                .sortedWith(compareBy(nullsLast()) { it.releasedAtMs })
+
+        val projected = projectHomeThisWeekItems(rawItems, nowMs)
+        return ThisWeekResult(
+            items = projected,
+            source = response.source,
+            kind = response.kind,
+            generatedAt = response.generatedAt,
+            statusMessage = if (projected.isEmpty()) "No episodes airing this week right now." else null,
+            isError = false,
+        )
+    }
+
     private suspend fun getBackendContext(): BackendContext? {
-        if (!supabaseAccountClient.isConfigured() || !backendClient.isConfigured()) {
-            return null
-        }
-        val session = supabaseAccountClient.ensureValidSession() ?: return null
-        var profileId = activeProfileStore.getActiveProfileId(session.userId).orEmpty().trim()
-        if (profileId.isBlank()) {
-            profileId = runCatching {
-                backendClient.getMe(session.accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
-            }.getOrDefault("")
-            if (profileId.isNotBlank()) {
-                activeProfileStore.setActiveProfileId(session.userId, profileId)
-            }
-        }
-        if (profileId.isBlank()) {
-            return null
-        }
-        return BackendContext(accessToken = session.accessToken, profileId = profileId)
+        return backendContextResolver.resolve()
     }
 
     private fun CrispyBackendClient.CalendarResponse.toCalendarSections(nowMs: Long): List<CalendarSection> {
-        val zone = ZoneId.systemDefault()
-        val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
         val itemsByBucket = items.groupBy { it.bucket.trim().lowercase(Locale.US) }
 
         val thisWeekEpisodes =
             itemsByBucket["this_week"].orEmpty()
-                .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
-                .sortedBy { it.releasedAtMs }
+                .map { it.toCalendarEpisodeItem(nowMs) }
+                .sortedWith(compareBy(nullsLast()) { it.releasedAtMs })
 
         val upcomingEpisodes =
             itemsByBucket["upcoming"].orEmpty()
-                .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
-                .sortedBy { it.releasedAtMs }
+                .map { it.toCalendarEpisodeItem(nowMs) }
+                .sortedWith(compareBy(nullsLast()) { it.releasedAtMs })
 
         val recentEpisodes =
             (itemsByBucket["recently_released"].orEmpty() + itemsByBucket["up_next"].orEmpty())
-                .mapNotNull { it.toCalendarEpisodeItem(nowMs) }
+                .map { it.toCalendarEpisodeItem(nowMs) }
                 .distinctBy { it.localKey }
-                .sortedBy { it.releasedAtMs }
+                .sortedWith(compareBy(nullsLast()) { it.releasedAtMs })
 
         val noScheduledSeries =
             itemsByBucket["no_scheduled"].orEmpty()
@@ -187,13 +216,7 @@ class CalendarService internal constructor(
                 add(CalendarSection(CalendarSectionKey.UPCOMING, "Upcoming", episodeItems = upcomingEpisodes))
             }
             if (recentEpisodes.isNotEmpty()) {
-                val filtered = recentEpisodes.filter { episode ->
-                    val releaseDate = epochMsToLocalDate(episode.releasedAtMs, zone)
-                    !isThisWeek(releaseDate, today)
-                }
-                if (filtered.isNotEmpty()) {
-                    add(CalendarSection(CalendarSectionKey.RECENTLY_RELEASED, "Recently Released", episodeItems = filtered))
-                }
+                add(CalendarSection(CalendarSectionKey.RECENTLY_RELEASED, "Recently Released", episodeItems = recentEpisodes))
             }
             if (noScheduledSeries.isNotEmpty()) {
                 add(CalendarSection(CalendarSectionKey.NO_SCHEDULED, "Series with No Scheduled Episodes", seriesItems = noScheduledSeries))
@@ -201,48 +224,58 @@ class CalendarService internal constructor(
         }
     }
 
-    private fun CrispyBackendClient.CalendarItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem? {
-        val mediaType = media.mediaType.trim().lowercase(Locale.US)
-        if (mediaType != "episode") return null
-        val season = media.seasonNumber ?: return null
-        val episode = media.episodeNumber ?: return null
-        val releaseDate = media.airDate?.trim().takeIf { !it.isNullOrBlank() } ?: return null
-        val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate) ?: return null
-        val watchedKey = "${media.provider.lowercase(Locale.US)}:${media.providerId.lowercase(Locale.US)}:$season:$episode"
-        val localKey = "${media.provider}:${media.providerId}:$season:$episode"
+    private fun CrispyBackendClient.CalendarItem.toCalendarEpisodeItem(nowMs: Long): CalendarEpisodeItem {
+        val season = mediaItem.seasonNumber
+        val episode = mediaItem.episodeNumber
+        val relatedShow = context.relatedShow
+        val releaseDate = airDate?.trim().takeIf { !it.isNullOrBlank() } ?: mediaItem.airDate?.trim().takeIf { !it.isNullOrBlank() }
+        val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate)
+        val watchedKey = if (season != null && episode != null) {
+            "${mediaItem.mediaKey}:$season:$episode"
+        } else {
+            mediaItem.mediaKey
+        }
+        val localKeySuffix = when {
+            season != null && episode != null -> ":$season:$episode"
+            !releaseDate.isNullOrBlank() -> ":${releaseDate.take(10)}"
+            else -> ""
+        }
+        val localKey = "${mediaItem.mediaKey}$localKeySuffix"
         return CalendarEpisodeItem(
             id = localKey,
-            mediaKey = media.mediaKey,
+            titleMediaKey = relatedShow.mediaKey,
+            playbackMediaKey = mediaItem.mediaKey,
             localKey = localKey,
             highlightEpisodeId = null,
-            seriesName = media.title,
-            episodeTitle = media.episodeTitle,
-            overview = media.subtitle,
+            seriesName = relatedShow.title,
+            episodeTitle = mediaItem.episodeTitle,
+            overview = mediaItem.overview ?: mediaItem.subtitle,
             season = season,
             episode = episode,
             episodeRange = null,
             episodeCount = 1,
             releaseDate = releaseDate,
             releasedAtMs = releasedAtMs,
-            isReleased = releasedAtMs <= nowMs,
+            isReleased = releasedAtMs?.let { it <= nowMs } ?: false,
             isGroup = false,
-            posterUrl = media.posterUrl,
-            backdropUrl = media.backdropUrl,
-            thumbnailUrl = media.backdropUrl,
+            posterUrl = mediaItem.posterUrl,
+            backdropUrl = mediaItem.backdropUrl,
+            thumbnailUrl = mediaItem.stillUrl ?: mediaItem.backdropUrl,
             watchedKeys = setOf(watchedKey),
-            absoluteEpisodeNumber = null,
+            absoluteEpisodeNumber = mediaItem.absoluteEpisodeNumber,
         )
     }
 
     private fun CrispyBackendClient.CalendarItem.toCalendarSeriesItem(): CalendarSeriesItem {
-        val localKey = "${media.provider}:${media.providerId}"
+        val relatedShow = context.relatedShow
+        val localKey = relatedShow.mediaKey
         return CalendarSeriesItem(
             id = localKey,
-            mediaKey = media.mediaKey,
+            mediaKey = relatedShow.mediaKey,
             localKey = localKey,
-            title = media.title,
-            posterUrl = media.posterUrl,
-            backdropUrl = media.backdropUrl,
+            title = relatedShow.title,
+            posterUrl = relatedShow.posterUrl,
+            backdropUrl = mediaItem.backdropUrl ?: relatedShow.backdropUrl,
             sourceLabel = null,
         )
     }
@@ -251,45 +284,35 @@ class CalendarService internal constructor(
         items: List<CalendarEpisodeItem>,
         nowMs: Long,
     ): List<CalendarEpisodeItem> {
-        val rawItems = items.filter { it.season != 0 }.take(HOME_THIS_WEEK_RAW_LIMIT)
+        val rawItems = items.take(HOME_THIS_WEEK_RAW_LIMIT)
 
         return rawItems
-            .groupBy { item -> "${item.mediaKey}_${item.releaseDate.take(10)}" }
+            .groupBy { item -> "${item.titleMediaKey}_${item.releaseDate?.take(10).orEmpty()}" }
             .values
             .map { group ->
-                val sorted = group.sortedBy { it.episode }
+                val sorted = group.sortedWith(compareBy(nullsLast()) { it.episode })
                 val first = sorted.first()
                 val last = sorted.last()
                 if (sorted.size == 1) {
                     first
                 } else {
-                    val groupedLocalKey = "group_${first.mediaKey}_${first.releaseDate.take(10)}"
+                    val groupedLocalKey = "group_${first.titleMediaKey}_${first.releaseDate?.take(10).orEmpty()}"
                     first.copy(
                         id = groupedLocalKey,
                         localKey = groupedLocalKey,
                         highlightEpisodeId = null,
                         episodeTitle = null,
                         overview = null,
-                        episodeRange = "E${first.episode}-E${last.episode}",
+                        episodeRange = if (first.episode != null && last.episode != null) "E${first.episode}-E${last.episode}" else null,
                         episodeCount = sorted.size,
                         isGroup = true,
-                        isReleased = first.releasedAtMs <= nowMs,
+                        isReleased = first.releasedAtMs?.let { it <= nowMs } ?: false,
                         thumbnailUrl = sorted.firstNotNullOfOrNull { it.thumbnailUrl },
                     )
                 }
             }
-            .sortedBy { it.releasedAtMs }
+            .sortedWith(compareBy(nullsLast()) { it.releasedAtMs })
             .take(HOME_THIS_WEEK_RENDER_LIMIT)
-    }
-
-    private fun isThisWeek(date: LocalDate, today: LocalDate): Boolean {
-        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
-        val weekEnd = weekStart.plusDays(6)
-        return !date.isBefore(weekStart) && !date.isAfter(weekEnd)
-    }
-
-    private fun epochMsToLocalDate(epochMs: Long, zone: ZoneId): LocalDate {
-        return Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate()
     }
 
     private fun parseCalendarReleaseToEpochMs(raw: String?): Long? {
@@ -305,14 +328,14 @@ class CalendarService internal constructor(
             .getOrNull()
     }
 
-    private data class BackendContext(
-        val accessToken: String,
-        val profileId: String,
-    )
-
     companion object {
         private const val TAG = "CalendarService"
         private const val HOME_THIS_WEEK_RAW_LIMIT = 60
         private const val HOME_THIS_WEEK_RENDER_LIMIT = 20
     }
+
+    private data class CachedCalendarSnapshot(
+        val profileId: String,
+        val snapshot: CalendarSnapshot,
+    )
 }

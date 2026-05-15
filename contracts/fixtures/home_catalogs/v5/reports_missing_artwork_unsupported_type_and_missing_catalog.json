@@ -16,7 +16,9 @@
           "heading": "",
           "title": "Featured",
           "subtitle": "",
-          "media_types": ["movie"],
+          "media_types": [
+            "movie"
+          ],
           "items": [
             {
               "media_key": "tmdb:movie:991001",
@@ -40,7 +42,9 @@
           "heading": "",
           "title": "Drama",
           "subtitle": "Tense stories",
-          "media_types": ["series"],
+          "media_types": [
+            "series"
+          ],
           "items": [
             {
               "media_key": "tmdb:series:157239",

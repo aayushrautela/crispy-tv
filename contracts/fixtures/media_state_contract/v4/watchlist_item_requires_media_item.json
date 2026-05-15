@@ -1,0 +1,44 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "watchlist_item_requires_media_item",
+  "input": {
+    "kind": "watchlist_item",
+    "payload": {
+      "id": "watchlist-789",
+      "kind": "watchlist",
+      "mediaItem": {
+        "mediaKey": "tmdb:show:222",
+        "mediaType": "show",
+        "title": "Watchlist Show",
+        "posterUrl": "https://example.com/poster.jpg",
+        "backdropUrl": null,
+        "subtitle": null
+      },
+      "context": {},
+      "presentation": null,
+      "addedAt": "2024-01-05T10:00:00Z",
+      "origins": ["manual"]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "media_key": "tmdb:show:222",
+      "media_type": "show",
+      "item_id": "watchlist-789",
+      "title": "Watchlist Show",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": ["manual"],
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

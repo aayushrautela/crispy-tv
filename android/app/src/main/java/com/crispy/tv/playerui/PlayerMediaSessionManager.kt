@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
@@ -17,10 +16,12 @@ import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
-import coil.imageLoader
-import coil.request.ImageRequest
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import coil3.toBitmap
 import com.crispy.tv.R
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import kotlinx.coroutines.CoroutineScope
@@ -191,11 +192,8 @@ internal class PlayerMediaSessionManager(
                                 .size(960, 540)
                                 .build()
                         val result = appContext.imageLoader.execute(request)
-                        val drawable = result.drawable ?: return@runCatching null
-                        when (drawable) {
-                            is BitmapDrawable -> drawable.bitmap
-                            else -> drawable.toBitmap()
-                        }
+                        val image = (result as? SuccessResult)?.image ?: return@runCatching null
+                        image.toBitmap()
                     }.getOrNull()
 
                 withContext(Dispatchers.Main.immediate) {

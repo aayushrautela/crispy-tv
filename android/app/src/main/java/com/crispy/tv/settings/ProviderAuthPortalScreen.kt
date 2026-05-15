@@ -53,9 +53,11 @@ import java.util.Locale
 
 @Immutable
 data class ProviderImportUiState(
-    val connected: Boolean = false,
-    val connectionStatus: String = "Disconnected",
+    val primaryActionLabel: String = "Connect",
+    val connectionStatus: String = "Not connected",
+    val statusMessage: String? = null,
     val externalUsername: String? = null,
+    val canDisconnect: Boolean = false,
     val latestJobStatus: String? = null,
     val latestJobError: String? = null,
 )
@@ -94,11 +96,27 @@ internal class ProviderPortalViewModel(
     }
 
     fun connectTrakt() {
-        startImport(CrispyBackendClient.ImportProvider.TRAKT)
+        startImport(CrispyBackendClient.ImportProvider.TRAKT, action = "connect")
     }
 
     fun connectSimkl() {
-        startImport(CrispyBackendClient.ImportProvider.SIMKL)
+        startImport(CrispyBackendClient.ImportProvider.SIMKL, action = "connect")
+    }
+
+    fun reconnectTrakt() {
+        startImport(CrispyBackendClient.ImportProvider.TRAKT, action = "reconnect")
+    }
+
+    fun reconnectSimkl() {
+        startImport(CrispyBackendClient.ImportProvider.SIMKL, action = "reconnect")
+    }
+
+    fun importTraktNow() {
+        startImport(CrispyBackendClient.ImportProvider.TRAKT, action = "import")
+    }
+
+    fun importSimklNow() {
+        startImport(CrispyBackendClient.ImportProvider.SIMKL, action = "import")
     }
 
     fun disconnectTrakt() {
@@ -149,8 +167,8 @@ internal class ProviderPortalViewModel(
                     isBusy = false,
                     activeProfileId = context.profile.id,
                     activeProfileName = context.profile.name,
-                    trakt = buildProviderState("trakt", connections?.providerAccounts, jobs?.jobs),
-                    simkl = buildProviderState("simkl", connections?.providerAccounts, jobs?.jobs),
+                    trakt = buildProviderState("trakt", connections?.providerStates, jobs?.jobs),
+                    simkl = buildProviderState("simkl", connections?.providerStates, jobs?.jobs),
                     statusMessage =
                         forceMessage
                             ?: errorMessage
@@ -160,7 +178,7 @@ internal class ProviderPortalViewModel(
         }
     }
 
-    private fun startImport(provider: CrispyBackendClient.ImportProvider) {
+    private fun startImport(provider: CrispyBackendClient.ImportProvider, action: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             val context = resolveActiveProfileContext() ?: return@launch
@@ -170,6 +188,7 @@ internal class ProviderPortalViewModel(
                         accessToken = context.session.accessToken,
                         profileId = context.profile.id,
                         provider = provider,
+                        action = action,
                     )
                 }
 
@@ -189,6 +208,7 @@ internal class ProviderPortalViewModel(
                 when (result.nextAction) {
                     "authorize_provider" ->
                         "Continue in your browser to authorize $providerLabel. The backend will queue the import after approval."
+                    "queued" -> "$providerLabel import queued for ${context.profile.name}."
                     else -> "$providerLabel import queued for ${context.profile.name}."
                 }
 
@@ -298,15 +318,17 @@ internal class ProviderPortalViewModel(
 
     private fun buildProviderState(
         provider: String,
-        providerAccounts: List<CrispyBackendClient.ProviderAccount>?,
+        providerStates: List<CrispyBackendClient.ProviderState>?,
         jobs: List<CrispyBackendClient.ImportJob>?,
     ): ProviderImportUiState {
-        val providerAccount = providerAccounts.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
+        val providerState = providerStates.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         val latestJob = jobs.orEmpty().firstOrNull { it.provider.equals(provider, ignoreCase = true) }
         return ProviderImportUiState(
-            connected = providerAccount?.status.equals("connected", ignoreCase = true),
-            connectionStatus = providerAccount?.status?.toDisplayLabel() ?: "Disconnected",
-            externalUsername = providerAccount?.externalUsername,
+            primaryActionLabel = providerState?.primaryAction.toActionLabel(),
+            connectionStatus = providerState?.statusLabel ?: "Not connected",
+            statusMessage = providerState?.statusMessage,
+            externalUsername = providerState?.externalUsername,
+            canDisconnect = providerState?.canDisconnect == true,
             latestJobStatus = latestJob?.status?.toDisplayLabel(),
             latestJobError = latestJob?.errorMessage,
         )
@@ -360,6 +382,10 @@ fun ProviderAuthPortalRoute(onBack: () -> Unit) {
         uiState = uiState,
         onConnectTrakt = viewModel::connectTrakt,
         onConnectSimkl = viewModel::connectSimkl,
+        onReconnectTrakt = viewModel::reconnectTrakt,
+        onReconnectSimkl = viewModel::reconnectSimkl,
+        onImportTrakt = viewModel::importTraktNow,
+        onImportSimkl = viewModel::importSimklNow,
         onDisconnectTrakt = viewModel::disconnectTrakt,
         onDisconnectSimkl = viewModel::disconnectSimkl,
         onRefresh = { viewModel.refreshImportState() },
@@ -373,6 +399,10 @@ private fun ProviderAuthPortalScreen(
     uiState: ProviderPortalUiState,
     onConnectTrakt: () -> Unit,
     onConnectSimkl: () -> Unit,
+    onReconnectTrakt: () -> Unit,
+    onReconnectSimkl: () -> Unit,
+    onImportTrakt: () -> Unit,
+    onImportSimkl: () -> Unit,
     onDisconnectTrakt: () -> Unit,
     onDisconnectSimkl: () -> Unit,
     onRefresh: () -> Unit,
@@ -439,10 +469,14 @@ private fun ProviderAuthPortalScreen(
                 ProviderCard(
                     title = "Trakt",
                     state = uiState.trakt,
-                    actionLabel = if (uiState.trakt.connected) "Run import" else "Connect & import",
+                    actionLabel = uiState.trakt.primaryActionLabel,
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
-                    onAction = onConnectTrakt,
-                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.trakt.connected,
+                    onAction = when (uiState.trakt.primaryActionLabel) {
+                        "Reconnect" -> onReconnectTrakt
+                        "Import now" -> onImportTrakt
+                        else -> onConnectTrakt
+                    },
+                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.trakt.canDisconnect,
                     onDisconnect = onDisconnectTrakt,
                 )
             }
@@ -451,10 +485,14 @@ private fun ProviderAuthPortalScreen(
                 ProviderCard(
                     title = "Simkl",
                     state = uiState.simkl,
-                    actionLabel = if (uiState.simkl.connected) "Run import" else "Connect & import",
+                    actionLabel = uiState.simkl.primaryActionLabel,
                     actionEnabled = uiState.configured && !uiState.isBusy && !uiState.activeProfileId.isNullOrBlank(),
-                    onAction = onConnectSimkl,
-                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.simkl.connected,
+                    onAction = when (uiState.simkl.primaryActionLabel) {
+                        "Reconnect" -> onReconnectSimkl
+                        "Import now" -> onImportSimkl
+                        else -> onConnectSimkl
+                    },
+                    disconnectEnabled = uiState.configured && !uiState.isBusy && uiState.simkl.canDisconnect,
                     onDisconnect = onDisconnectSimkl,
                 )
             }
@@ -497,8 +535,15 @@ private fun ProviderCard(
             Text(
                 text = state.connectionStatus,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (state.connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurface,
             )
+            if (!state.statusMessage.isNullOrBlank()) {
+                Text(
+                    text = state.statusMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (!state.externalUsername.isNullOrBlank()) {
                 Text(
                     text = "Connected account: ${state.externalUsername}",
@@ -526,7 +571,7 @@ private fun ProviderCard(
             ) {
                 Text(actionLabel)
             }
-            if (state.connected) {
+            if (state.canDisconnect) {
                 OutlinedButton(
                     onClick = onDisconnect,
                     enabled = disconnectEnabled,
@@ -557,5 +602,13 @@ private fun providerLabel(provider: String): String {
         "trakt" -> "Trakt"
         "simkl" -> "Simkl"
         else -> provider.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+    }
+}
+
+private fun String?.toActionLabel(): String {
+    return when (this?.trim()?.lowercase(Locale.US)) {
+        "import" -> "Import now"
+        "reconnect" -> "Reconnect"
+        else -> "Connect"
     }
 }

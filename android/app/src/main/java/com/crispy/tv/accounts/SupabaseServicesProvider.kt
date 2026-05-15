@@ -2,9 +2,10 @@ package com.crispy.tv.accounts
 
 import android.content.Context
 import com.crispy.tv.BuildConfig
+import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
-import com.crispy.tv.home.HomeCatalogDiskCacheStore
-import com.crispy.tv.home.HomeCatalogService
+import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
+import com.crispy.tv.home.RecommendationCatalogService
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
@@ -18,7 +19,7 @@ object SupabaseServicesProvider {
     private var activeProfileStore: ActiveProfileStore? = null
 
     @Volatile
-    private var homeCatalogService: HomeCatalogService? = null
+    private var recommendationCatalogService: RecommendationCatalogService? = null
 
     fun accountClient(context: Context): SupabaseAccountClient {
         supabaseAccountClient?.let { return it }
@@ -47,19 +48,18 @@ object SupabaseServicesProvider {
         }
     }
 
-    fun homeCatalogService(context: Context): HomeCatalogService {
-        homeCatalogService?.let { return it }
+    fun recommendationCatalogService(context: Context): RecommendationCatalogService {
+        recommendationCatalogService?.let { return it }
         synchronized(this) {
-            homeCatalogService?.let { return it }
+            recommendationCatalogService?.let { return it }
             val appContext = context.applicationContext
             val created =
-                HomeCatalogService(
-                    supabaseAccountClient = accountClient(appContext),
-                    activeProfileStore = activeProfileStore(appContext),
+                RecommendationCatalogService(
                     backendClient = BackendServicesProvider.backendClient(appContext),
-                    diskCacheStore = HomeCatalogDiskCacheStore(appContext),
+                    backendContextResolver = BackendContextResolverProvider.get(appContext),
+                    diskCacheStore = RecommendationCatalogDiskCacheStore(appContext),
                 )
-            homeCatalogService = created
+            recommendationCatalogService = created
             return created
         }
     }

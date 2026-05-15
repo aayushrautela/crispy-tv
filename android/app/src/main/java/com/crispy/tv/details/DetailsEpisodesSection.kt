@@ -38,7 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.ui.components.skeletonElement
 import kotlin.math.roundToInt
@@ -48,6 +48,7 @@ import kotlin.math.roundToInt
 internal fun EpisodeCard(
     video: MediaVideo,
     watchState: EpisodeWatchState,
+    isHighlighted: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onLongPress: () -> Unit = {},
@@ -60,8 +61,9 @@ internal fun EpisodeCard(
         modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongPress),
         colors =
             CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-            )
+                containerColor = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isHighlighted) 8.dp else 2.dp),
     ) {
         Column {
             Box(

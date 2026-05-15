@@ -4,7 +4,6 @@ import com.crispy.tv.domain.metadata.AddonMetadataCandidate
 import com.crispy.tv.domain.metadata.MetadataMediaType
 import com.crispy.tv.domain.metadata.MetadataRecord
 import com.crispy.tv.domain.metadata.bridgeCandidateIds
-import com.crispy.tv.domain.metadata.normalizeNuvioMediaId
 import com.crispy.tv.domain.metadata.withDerivedSeasons
 
 enum class MetadataLabMediaType {
@@ -43,8 +42,7 @@ data class MetadataTransportStat(
 
 fun interface MetadataLabDataSource {
     suspend fun load(
-        request: MetadataLabRequest,
-        normalizedId: com.crispy.tv.domain.metadata.NuvioMediaId
+        request: MetadataLabRequest
     ): MetadataLabPayload
 }
 
@@ -70,10 +68,11 @@ class CoreDomainMetadataLabResolver(
     private val dataSource: MetadataLabDataSource
 ) : MetadataLabResolver {
     override suspend fun resolve(request: MetadataLabRequest): MetadataLabResolution {
-        val normalized = normalizeNuvioMediaId(request.rawId)
-        require(normalized.contentId.isNotBlank()) { "content id is required" }
+        val contentId = request.rawId.trim()
+        require(contentId.isNotBlank()) { "content id is required" }
+        val parsedLookupId = parseTmdbLookupId(contentId)
 
-        val payload = dataSource.load(request = request, normalizedId = normalized)
+        val payload = dataSource.load(request = request)
         require(payload.addonResults.isNotEmpty()) { "addon results must not be empty" }
 
         val domainMediaType = request.mediaType.toDomainMediaType()
@@ -81,17 +80,17 @@ class CoreDomainMetadataLabResolver(
         val merged = withDerivedSeasons(payload.tmdbMeta ?: payload.addonMeta, domainMediaType)
 
         return MetadataLabResolution(
-            contentId = normalized.contentId,
-            videoId = normalized.videoId,
-            addonLookupId = normalized.addonLookupId,
+            contentId = parsedLookupId.baseId,
+            videoId = parsedLookupId.videoId,
+            addonLookupId = parsedLookupId.videoId ?: parsedLookupId.baseId,
             primaryId = primary.mediaId,
             primaryTitle = primary.title,
             sources = listOf(primary.addonId),
             needsEnrichment = false,
             bridgeCandidateIds = bridgeCandidateIds(
-                contentId = normalized.contentId,
-                season = normalized.season,
-                episode = normalized.episode,
+                contentId = parsedLookupId.baseId,
+                season = parsedLookupId.season,
+                episode = parsedLookupId.episode,
                 tmdbMeta = payload.tmdbMeta
             ),
             mergedImdbId = merged.imdbId,
@@ -103,17 +102,18 @@ class CoreDomainMetadataLabResolver(
 
 object DefaultMetadataLabResolver : MetadataLabResolver {
     override suspend fun resolve(request: MetadataLabRequest): MetadataLabResolution {
-        val normalized = normalizeNuvioMediaId(request.rawId)
-        require(normalized.contentId.isNotBlank()) { "content id is required" }
+        val contentId = request.rawId.trim()
+        require(contentId.isNotBlank()) { "content id is required" }
+        val parsedLookupId = parseTmdbLookupId(contentId)
         return MetadataLabResolution(
-            contentId = normalized.contentId,
-            videoId = normalized.videoId,
-            addonLookupId = normalized.addonLookupId,
-            primaryId = normalized.contentId,
+            contentId = parsedLookupId.baseId,
+            videoId = parsedLookupId.videoId,
+            addonLookupId = parsedLookupId.videoId ?: parsedLookupId.baseId,
+            primaryId = parsedLookupId.baseId,
             primaryTitle = "Unavailable",
             sources = emptyList(),
             needsEnrichment = false,
-            bridgeCandidateIds = listOf(normalized.addonLookupId),
+            bridgeCandidateIds = listOf(parsedLookupId.videoId ?: parsedLookupId.baseId),
             mergedImdbId = null,
             mergedSeasonNumbers = emptyList(),
             transportStats = emptyList()
@@ -127,4 +127,30 @@ private fun MetadataLabMediaType.toDomainMediaType(): MetadataMediaType {
         MetadataLabMediaType.SERIES -> MetadataMediaType.SERIES
         MetadataLabMediaType.ANIME -> MetadataMediaType.ANIME
     }
+}
+
+private data class ParsedTmdbLookupId(
+    val baseId: String,
+    val videoId: String?,
+    val season: Int?,
+    val episode: Int?
+)
+
+private fun parseTmdbLookupId(rawId: String): ParsedTmdbLookupId {
+    val trimmed = rawId.trim()
+    val parts = trimmed.split(":")
+    if (parts.size >= 3) {
+        val season = parts[parts.lastIndex - 1].toIntOrNull()
+        val episode = parts.last().toIntOrNull()
+        if (season != null && season > 0 && episode != null && episode > 0) {
+            val baseId = parts.dropLast(2).joinToString(":").trim()
+            return ParsedTmdbLookupId(
+                baseId = baseId,
+                videoId = "$baseId:$season:$episode",
+                season = season,
+                episode = episode
+            )
+        }
+    }
+    return ParsedTmdbLookupId(baseId = trimmed, videoId = null, season = null, episode = null)
 }

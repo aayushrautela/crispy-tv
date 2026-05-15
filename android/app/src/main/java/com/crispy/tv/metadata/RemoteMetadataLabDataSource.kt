@@ -3,7 +3,6 @@ package com.crispy.tv.metadata
 import android.content.Context
 import com.crispy.tv.domain.metadata.AddonMetadataCandidate
 import com.crispy.tv.domain.metadata.MetadataRecord
-import com.crispy.tv.domain.metadata.formatIdForIdPrefixes
 import com.crispy.tv.metadata.tmdb.TmdbMetadataRecordRepository
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabDataSource
@@ -11,6 +10,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.MetadataLabPayload
 import com.crispy.tv.player.MetadataLabRequest
 import com.crispy.tv.player.MetadataTransportStat
+import com.crispy.tv.playback.parseLookupId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Headers
@@ -30,12 +30,12 @@ internal class RemoteMetadataLabDataSource(
     private val addonClient = AddonMetadataClient(addonRegistry, httpClient)
 
     override suspend fun load(
-        request: MetadataLabRequest,
-        normalizedId: com.crispy.tv.domain.metadata.NuvioMediaId
+        request: MetadataLabRequest
     ): MetadataLabPayload = withContext(Dispatchers.IO) {
-        val contentId = normalizedId.contentId
-        val streamLookupId = normalizedId.videoId ?: contentId
-        val subtitleLookupId = normalizedId.videoId ?: contentId
+        val parsedLookupId = parseLookupId(request.rawId)
+        val contentId = parsedLookupId.baseId
+        val streamLookupId = buildLookupId(contentId, parsedLookupId.season, parsedLookupId.episode)
+        val subtitleLookupId = streamLookupId
         val tmdbResult = tmdbRepository.fetchMeta(request.mediaType, contentId)
         val tmdbMeta = tmdbResult?.record
         var transportStats = addonClient.fetchTransportStats(
@@ -117,36 +117,14 @@ private data class AddonEndpoint(
     val baseUrl: String,
     val encodedQuery: String?,
     val supportedTypes: Map<AddonResourceKind, Set<MetadataLabMediaType>>,
-    val addonIdPrefixes: List<String>,
-    val resourceIdPrefixes: Map<AddonResourceKind, Map<MetadataLabMediaType, List<String>>>
 ) {
     fun supports(kind: AddonResourceKind, mediaType: MetadataLabMediaType): Boolean {
         return supportedTypes[kind]?.contains(mediaType) == true
     }
 
-    fun acceptedIdPrefixes(kind: AddonResourceKind, mediaType: MetadataLabMediaType): List<String> {
-        val resourcePrefixes = resourceIdPrefixes[kind]?.get(mediaType)
-        return if (!resourcePrefixes.isNullOrEmpty()) {
-            resourcePrefixes
-        } else {
-            addonIdPrefixes
-        }
-    }
-
-    fun formatLookupId(kind: AddonResourceKind, mediaType: MetadataLabMediaType, lookupId: String): String? {
-        if (lookupId.isBlank()) {
-            return null
-        }
-
-        return formatIdForIdPrefixes(
-            input = lookupId,
-            mediaType = mediaType.asIdKind(),
-            idPrefixes = acceptedIdPrefixes(kind, mediaType)
-        )
-    }
-
-    fun accepts(kind: AddonResourceKind, mediaType: MetadataLabMediaType, lookupId: String): Boolean {
-        return formatLookupId(kind, mediaType, lookupId) != null
+    fun formatLookupId(lookupId: String): String? {
+        val trimmed = lookupId.trim()
+        return trimmed.takeIf { it.isNotBlank() }
     }
 }
 
@@ -179,7 +157,7 @@ private class AddonMetadataClient(
             var streamRequestId: String? = null
             var subtitleRequestId: String? = null
 
-            val formattedStreamLookupId = endpoint.formatLookupId(AddonResourceKind.STREAM, mediaType, streamLookupId)
+            val formattedStreamLookupId = endpoint.formatLookupId(streamLookupId)
             if (
                 endpoint.supports(AddonResourceKind.STREAM, mediaType) &&
                     formattedStreamLookupId != null
@@ -194,7 +172,7 @@ private class AddonMetadataClient(
             }
 
             val formattedSubtitleLookupId =
-                endpoint.formatLookupId(AddonResourceKind.SUBTITLES, mediaType, subtitleLookupId)
+                endpoint.formatLookupId(subtitleLookupId)
             if (
                 endpoint.supports(AddonResourceKind.SUBTITLES, mediaType) &&
                     formattedSubtitleLookupId != null
@@ -277,21 +255,13 @@ private class AddonMetadataClient(
                         AddonResourceKind.STREAM to setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES),
                         AddonResourceKind.SUBTITLES to setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
                     ),
-                addonIdPrefixes = emptyList(),
-                resourceIdPrefixes = emptyMap()
             )
         }
 
         val addonId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
-        val addonIdPrefixes =
-            parseManifestStringArray(manifest.optJSONArray("idPrefixes")).ifEmpty {
-                nonBlank(manifest.optString("idPrefix"))?.let(::listOf).orEmpty()
-            }
         val resources = manifest.optJSONArray("resources")
 
         val supportedTypes = mutableMapOf<AddonResourceKind, MutableSet<MetadataLabMediaType>>()
-        val resourcePrefixes =
-            mutableMapOf<AddonResourceKind, MutableMap<MetadataLabMediaType, MutableList<String>>>()
 
         if (resources == null) {
             val defaults = setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
@@ -309,10 +279,6 @@ private class AddonMetadataClient(
                     is JSONObject -> {
                         val kind = toResourceKindOrNull(nonBlank(resource.optString("name"))) ?: continue
                         val types = parseManifestStringArray(resource.optJSONArray("types"))
-                        val prefixes =
-                            parseManifestStringArray(resource.optJSONArray("idPrefixes")).ifEmpty {
-                                nonBlank(resource.optString("idPrefix"))?.let(::listOf).orEmpty()
-                            }
                         val targets =
                             if (types.isEmpty()) {
                                 listOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES)
@@ -322,12 +288,6 @@ private class AddonMetadataClient(
 
                         for (target in targets) {
                             supportedTypes.getOrPut(kind) { mutableSetOf() }.add(target)
-                            if (prefixes.isNotEmpty()) {
-                                resourcePrefixes
-                                    .getOrPut(kind) { mutableMapOf() }
-                                    .getOrPut(target) { mutableListOf() }
-                                    .addAll(prefixes)
-                            }
                         }
                     }
                 }
@@ -335,18 +295,12 @@ private class AddonMetadataClient(
         }
 
         val frozenSupportedTypes = supportedTypes.mapValues { (_, values) -> values.toSet() }
-        val frozenPrefixes =
-            resourcePrefixes.mapValues { (_, byType) ->
-                byType.mapValues { (_, values) -> values.distinct() }
-            }
 
         return AddonEndpoint(
             addonId = addonId,
             baseUrl = seed.baseUrl,
             encodedQuery = seed.encodedQuery,
             supportedTypes = frozenSupportedTypes,
-            addonIdPrefixes = addonIdPrefixes,
-            resourceIdPrefixes = frozenPrefixes
         )
     }
 
@@ -365,16 +319,6 @@ private class AddonMetadataClient(
             return JSONObject()
                 .put("id", "com.linvo.cinemeta")
                 .put("types", JSONArray().put("movie").put("series"))
-                .put(
-                    "resources",
-                    JSONArray()
-                        .put(
-                            JSONObject()
-                                .put("name", "catalog")
-                                .put("types", JSONArray().put("movie").put("series"))
-                                .put("idPrefixes", JSONArray().put("tt"))
-                        )
-                )
         }
 
         val looksLikeOpenSubtitles =
@@ -384,15 +328,6 @@ private class AddonMetadataClient(
             return JSONObject()
                 .put("id", "org.stremio.opensubtitlesv3")
                 .put("types", JSONArray().put("movie").put("series"))
-                .put(
-                    "resources",
-                    JSONArray().put(
-                        JSONObject()
-                            .put("name", "subtitles")
-                            .put("types", JSONArray().put("movie").put("series"))
-                            .put("idPrefixes", JSONArray().put("tt"))
-                    )
-                )
         }
 
         return null
@@ -418,32 +353,6 @@ private class AddonMetadataClient(
             )
             )
             .map { it.value }
-    }
-
-    private fun isValidContentId(
-        endpoints: List<AddonEndpoint>,
-        resourceKind: AddonResourceKind,
-        mediaType: MetadataLabMediaType,
-        contentId: String
-    ): Boolean {
-        if (contentId.isBlank()) {
-            return false
-        }
-
-        if (endpoints.isEmpty()) {
-            return false
-        }
-
-        val allPrefixes = endpoints.flatMap { it.acceptedIdPrefixes(resourceKind, mediaType) }.distinct()
-        if (allPrefixes.isEmpty()) {
-            return true
-        }
-
-        return formatIdForIdPrefixes(
-            input = contentId,
-            mediaType = mediaType.asIdKind(),
-            idPrefixes = allPrefixes
-        ) != null
     }
 
     private suspend fun fetchResourceCount(
@@ -616,8 +525,12 @@ private fun nonBlank(value: String?): String? {
     return if (trimmed.isNullOrEmpty()) null else trimmed
 }
 
-private fun MetadataLabMediaType.asIdKind(): String {
-    return if (this == MetadataLabMediaType.SERIES) "series" else "movie"
+private fun buildLookupId(contentId: String, season: Int?, episode: Int?): String {
+    return if (season != null && season > 0 && episode != null && episode > 0) {
+        "$contentId:$season:$episode"
+    } else {
+        contentId
+    }
 }
 
 private suspend fun CrispyHttpClient.getJsonObject(url: String): JSONObject? {

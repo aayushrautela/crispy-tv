@@ -8,18 +8,10 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -30,7 +22,6 @@ import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -41,17 +32,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 
 private val SearchAiLoadingColors =
@@ -63,109 +58,107 @@ private val SearchAiLoadingColors =
         Color(0xFF4285F4),
     )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchTopBar(
+    onOpenAccountsProfiles: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    StandardTopAppBar(
+        title = { CrispySectionAppBarTitle(label = "Search") },
+        modifier = modifier,
+        actions = {
+            ProfileIconButton(onClick = onOpenAccountsProfiles)
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    onAiSearch: () -> Unit,
     onClear: () -> Unit,
-    onOpenAccountsProfiles: () -> Unit,
-    isAiActive: Boolean,
     isAiLoading: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val searchFieldShape = RoundedCornerShape(28.dp)
-
-    Row(
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
         modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .windowInsetsPadding(
-                WindowInsets.safeDrawing.only(
-                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
-                ),
+            .heightIn(min = Dimensions.SearchBarPillHeight)
+            .then(aiSearchBorderModifier(isAiLoading)),
+        singleLine = true,
+        shape = RoundedCornerShape(28.dp),
+        textStyle = MaterialTheme.typography.bodyLarge,
+        placeholder = {
+            Text(
+                text = "Find movies and shows",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            .padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = Dimensions.SearchBarPillHeight)
-                .then(rememberAiSearchBorderModifier(isAiLoading)),
-            singleLine = true,
-            shape = searchFieldShape,
-            textStyle = MaterialTheme.typography.bodyLarge,
-            placeholder = {
-                Text(
-                    text = "Find movies and shows",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = null,
-                )
-            },
-            trailingIcon = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onClear),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    AiSearchAction(
-                        onClick = onAiSearch,
-                        isHighlighted = isAiActive || isAiLoading,
+                    Icon(
+                        imageVector = Icons.Outlined.Clear,
+                        contentDescription = "Clear search",
                     )
-
-                    if (query.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(onClick = onClear),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Clear,
-                                contentDescription = "Clear search",
-                            )
-                        }
-                    }
                 }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
-                unfocusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
-            ),
-        )
-        ProfileIconButton(onClick = onOpenAccountsProfiles)
-    }
+            }
+        },
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
+            unfocusedBorderColor = if (isAiLoading) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+        ),
+    )
 }
 
 @Composable
-private fun AiSearchAction(
+fun AiSearchButton(
     onClick: () -> Unit,
     isHighlighted: Boolean,
+    modifier: Modifier = Modifier,
 ) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = -6f,
+        targetValue = 6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "ai_sparkle_rotation",
+    )
+
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(48.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = Icons.Outlined.AutoAwesome,
             contentDescription = "AI search",
+            modifier = Modifier.rotate(rotation),
             tint = if (isHighlighted) {
                 MaterialTheme.colorScheme.primary
             } else {
@@ -176,7 +169,7 @@ private fun AiSearchAction(
 }
 
 @Composable
-private fun rememberAiSearchBorderModifier(isAiLoading: Boolean): Modifier {
+private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
     if (!isAiLoading) return Modifier
 
     val borderSweepTransition = rememberInfiniteTransition(label = "ai_search_border")
@@ -204,33 +197,32 @@ private fun rememberAiSearchBorderModifier(isAiLoading: Boolean): Modifier {
 
         val strokeWidth = 2.5.dp.toPx()
         val inset = strokeWidth / 2f
-        val maxGlowWidth = 14.dp.toPx()
+        val maxGlowWidth = 6.dp.toPx()
         val cornerRadius = CornerRadius(28.dp.toPx(), 28.dp.toPx())
-        val brush =
-            Brush.linearGradient(
-                colors = SearchAiLoadingColors,
-                start = Offset(
-                    x = size.width * borderSweepProgress,
-                    y = size.height * borderSweepProgress
-                ),
-                end = Offset(
-                    x = size.width * (borderSweepProgress + 1f),
-                    y = size.height * (borderSweepProgress + 1f)
-                ),
-                tileMode = androidx.compose.ui.graphics.TileMode.Repeated
-            )
+        val brush = Brush.linearGradient(
+            colors = SearchAiLoadingColors,
+            start = Offset(
+                x = size.width * borderSweepProgress,
+                y = size.height * borderSweepProgress,
+            ),
+            end = Offset(
+                x = size.width * (borderSweepProgress + 1f),
+                y = size.height * (borderSweepProgress + 1f),
+            ),
+            tileMode = TileMode.Repeated,
+        )
 
         val glowLevels = 5
         for (i in 1..glowLevels) {
-            val currentW = maxGlowWidth * (glowLevels - i + 1) / glowLevels.toFloat()
-            val outlineOffset = -currentW / 2f
+            val currentWidth = maxGlowWidth * (glowLevels - i + 1) / glowLevels.toFloat()
+            val outlineOffset = -currentWidth / 2f
 
             drawRoundRect(
                 brush = brush,
                 topLeft = Offset(outlineOffset, outlineOffset),
                 size = Size(size.width - 2 * outlineOffset, size.height - 2 * outlineOffset),
                 cornerRadius = CornerRadius(28.dp.toPx() - outlineOffset, 28.dp.toPx() - outlineOffset),
-                style = Stroke(width = currentW),
+                style = Stroke(width = currentWidth),
                 alpha = (glowAlpha / glowLevels) * 1.5f,
             )
         }

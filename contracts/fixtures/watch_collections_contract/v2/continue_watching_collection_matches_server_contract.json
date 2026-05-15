@@ -1,0 +1,73 @@
+{
+  "contract_version": 2,
+  "suite": "watch_collections_contract",
+  "case_id": "continue_watching_collection_matches_server_contract",
+  "input": {
+    "payload": {
+      "profileId": "profile-123",
+      "kind": "continue-watching",
+      "source": "canonical_watch",
+      "generatedAt": "2026-04-12T00:00:00Z",
+      "items": [
+        {
+          "id": "cw-1",
+          "kind": "continue_watching",
+          "mediaItem": {
+            "mediaKey": "tmdb:series:1399",
+            "mediaType": "show",
+            "title": "Game of Thrones",
+            "originalTitle": null,
+            "subtitle": null,
+            "overview": null,
+            "posterUrl": null,
+            "backdropUrl": "https://img/backdrop.jpg",
+            "logoUrl": null,
+            "stillUrl": null,
+            "releaseDate": null,
+            "releaseYear": 2011,
+            "rating": 9.2,
+            "genres": ["Fantasy"],
+            "runtimeMinutes": 55,
+            "status": null,
+            "certification": null,
+            "externalIds": { "tmdb": 1399, "imdb": null, "tvdb": null },
+            "parent": null,
+            "showTmdbId": 1399,
+            "seasonNumber": 3,
+            "episodeNumber": 9,
+            "absoluteEpisodeNumber": null,
+            "episodeTitle": "The Rains of Castamere",
+            "airDate": "2013-06-02"
+          },
+          "context": {
+            "id": "cw-1",
+            "progress": {
+              "positionSeconds": 1500,
+              "durationSeconds": 3300,
+              "progressPercent": 45.45,
+              "lastPlayedAt": "2026-04-11T23:58:00Z"
+            },
+            "lastActivityAt": "2026-04-11T23:58:10Z",
+            "origins": ["trakt", "watch_activity"],
+            "dismissible": false
+          },
+          "presentation": null,
+          "progress": {
+            "positionSeconds": 1500,
+            "durationSeconds": 3300,
+            "progressPercent": 45.45,
+            "lastPlayedAt": "2026-04-11T23:58:00Z"
+          },
+          "lastActivityAt": "2026-04-11T23:58:10Z",
+          "origins": ["trakt", "watch_activity"],
+          "dismissible": false
+        }
+      ],
+      "pageInfo": { "nextCursor": null, "hasMore": false }
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": null
+  }
+}

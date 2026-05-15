@@ -306,23 +306,17 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_SUBTITLE, subtitle)
                 .putExtra(EXTRA_ARTWORK_URL, artworkUrl)
-                .putExtra(EXTRA_LAUNCH_SNAPSHOT, launchSnapshot?.toJsonString())
-                .putExtra(EXTRA_CONTENT_ID, identity.contentId)
-                .putExtra(EXTRA_MEDIA_KEY, identity.mediaKey)
-                .putExtra(EXTRA_IMDB_ID, identity.imdbId)
-                .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
-                .putExtra(EXTRA_SEASON, identity.season ?: -1)
-                .putExtra(EXTRA_EPISODE, identity.episode ?: -1)
-                .putExtra(EXTRA_YEAR, identity.year ?: -1)
-                .putExtra(EXTRA_SHOW_TITLE, identity.showTitle)
-                .putExtra(EXTRA_SHOW_YEAR, identity.showYear ?: -1)
-                .putExtra(EXTRA_PROVIDER, identity.provider)
-                .putExtra(EXTRA_PROVIDER_ID, identity.providerId)
-                .putExtra(EXTRA_PARENT_MEDIA_TYPE, identity.parentMediaType)
-                .putExtra(EXTRA_PARENT_PROVIDER, identity.parentProvider)
-                .putExtra(EXTRA_PARENT_PROVIDER_ID, identity.parentProviderId)
-                .putExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, identity.absoluteEpisodeNumber ?: -1)
-        }
+.putExtra(EXTRA_LAUNCH_SNAPSHOT, launchSnapshot?.toJsonString())
+        .putExtra(EXTRA_MEDIA_KEY, identity.mediaKey)
+        .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
+        .putExtra(EXTRA_SEASON, identity.season ?: -1)
+        .putExtra(EXTRA_EPISODE, identity.episode ?: -1)
+        .putExtra(EXTRA_YEAR, identity.year ?: -1)
+        .putExtra(EXTRA_SHOW_TITLE, identity.showTitle)
+        .putExtra(EXTRA_SHOW_YEAR, identity.showYear ?: -1)
+        .putExtra(EXTRA_PARENT_MEDIA_TYPE, identity.parentMediaType)
+        .putExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, identity.absoluteEpisodeNumber ?: -1)
+    }
 
         private fun parseIdentityFromIntent(intent: Intent, title: String): PlaybackIdentity? {
             val mediaTypeName = intent.getStringExtra(EXTRA_MEDIA_TYPE).orEmpty().trim()
@@ -344,25 +338,19 @@ class PlayerActivity : ComponentActivity() {
             val parentProviderId = intent.getStringExtra(EXTRA_PARENT_PROVIDER_ID)?.trim()?.ifBlank { null }
             val absoluteEpisodeNumber = intent.getIntExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, -1).takeIf { it > 0 }
 
-            return PlaybackIdentity(
-                contentId = contentId,
-                mediaKey = mediaKey,
-                imdbId = imdbId,
-                tmdbId = null,
-                contentType = contentType,
-                season = season,
-                episode = episode,
-                title = title,
-                year = year,
-                showTitle = showTitle,
-                showYear = showYear,
-                provider = provider,
-                providerId = providerId,
-                parentMediaType = parentMediaType,
-                parentProvider = parentProvider,
-                parentProviderId = parentProviderId,
-                absoluteEpisodeNumber = absoluteEpisodeNumber,
-            )
+return PlaybackIdentity(
+            mediaKey = mediaKey,
+            tmdbId = null,
+            contentType = contentType,
+            season = season,
+            episode = episode,
+            title = title,
+            year = year,
+            showTitle = showTitle,
+            showYear = showYear,
+            parentMediaType = parentMediaType,
+            absoluteEpisodeNumber = absoluteEpisodeNumber,
+        )
         }
 
         private fun parsePlaybackSourceFromIntent(intent: Intent): PlaybackSource {

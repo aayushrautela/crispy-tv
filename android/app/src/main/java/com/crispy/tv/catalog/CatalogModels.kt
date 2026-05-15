@@ -3,6 +3,7 @@ package com.crispy.tv.catalog
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.domain.home.HomeCatalogPresentation
 import com.crispy.tv.domain.home.HomeCatalogSource
+import com.crispy.tv.images.ResponsiveImageSet
 import java.util.Locale
 
 @Immutable
@@ -32,14 +33,15 @@ data class CatalogItem(
     val posterUrl: String?,
     val backdropUrl: String?,
     val logoUrl: String? = null,
+    val poster: ResponsiveImageSet? = ResponsiveImageSet.fromSingle(posterUrl),
+    val backdrop: ResponsiveImageSet? = ResponsiveImageSet.fromSingle(backdropUrl),
+    val logo: ResponsiveImageSet? = ResponsiveImageSet.fromSingle(logoUrl),
     val addonId: String,
     val type: String,
     val rating: String? = null,
     val year: String? = null,
     val genre: String? = null,
     val description: String? = null,
-    val provider: String,
-    val providerId: String,
 )
 
 @Immutable

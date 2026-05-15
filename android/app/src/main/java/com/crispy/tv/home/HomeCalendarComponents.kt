@@ -114,8 +114,9 @@ internal fun CalendarSeriesCard(
 
 private fun calendarBadgeLabel(item: CalendarEpisodeItem): String? {
     if (item.isReleased) return "Released"
+    val releaseDate = item.releaseDate ?: return null
     return try {
-        val date = java.time.LocalDate.parse(item.releaseDate.take(10))
+        val date = java.time.LocalDate.parse(releaseDate.take(10))
         "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
     } catch (_: Exception) {
         null
@@ -123,10 +124,15 @@ private fun calendarBadgeLabel(item: CalendarEpisodeItem): String? {
 }
 
 private fun calendarEpisodeLabel(item: CalendarEpisodeItem): String {
-    return if (item.episodeRange != null) {
-        "S${item.season} ${item.episodeRange}"
-    } else {
-        "S${item.season} E${item.episode}"
+    val season = item.season
+    val episode = item.episode
+    return when {
+        item.episodeRange != null && season != null -> "S$season ${item.episodeRange}"
+        season != null && episode != null -> "S$season E$episode"
+        item.episodeRange != null -> item.episodeRange
+        episode != null -> "Episode $episode"
+        item.releaseDate != null -> item.releaseDate.take(10)
+        else -> "Upcoming episode"
     }
 }
 

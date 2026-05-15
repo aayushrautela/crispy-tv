@@ -136,8 +136,6 @@ private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails 
 private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): CatalogItem? {
     val type = if (mediaType.equals("movie", ignoreCase = true)) "movie" else "series"
     val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
-    val normalizedProvider = provider?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val normalizedProviderId = providerId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return CatalogItem(
         id = normalizedMediaKey,
@@ -150,7 +148,5 @@ private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): Cata
         rating = formatRating(rating),
         year = releaseYear?.toString(),
         genre = null,
-        provider = normalizedProvider,
-        providerId = normalizedProviderId,
     )
 }

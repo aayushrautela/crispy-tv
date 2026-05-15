@@ -1,0 +1,85 @@
+{
+  "contract_version": 2,
+  "suite": "calendar_contract",
+  "case_id": "calendar_response_matches_server_contract",
+  "input": {
+    "route": "calendar",
+    "payload": {
+      "profileId": "profile-123",
+      "source": "canonical_calendar",
+      "generatedAt": "2026-04-12T00:00:00Z",
+      "items": [
+        {
+          "bucket": "no_scheduled",
+          "kind": "calendar_item",
+          "mediaItem": {
+            "mediaKey": "tmdb:episode:1001",
+            "mediaType": "episode",
+            "title": "Sunrise, Sunset",
+            "originalTitle": null,
+            "subtitle": null,
+            "overview": null,
+            "posterUrl": null,
+            "backdropUrl": "https://img/episode-backdrop.jpg",
+            "logoUrl": null,
+            "stillUrl": null,
+            "releaseDate": null,
+            "releaseYear": 2026,
+            "rating": 8.1,
+            "genres": ["Drama"],
+            "runtimeMinutes": 48,
+            "status": null,
+            "certification": null,
+            "externalIds": { "tmdb": 1001, "imdb": null, "tvdb": null },
+            "parent": null,
+            "showTmdbId": 500,
+            "seasonNumber": 1,
+            "episodeNumber": 3,
+            "absoluteEpisodeNumber": null,
+            "episodeTitle": "Sunrise, Sunset",
+            "airDate": null
+          },
+          "context": {
+            "bucket": "no_scheduled",
+            "airDate": null,
+            "watched": false,
+            "relatedShow": {
+              "mediaKey": "tmdb:series:500",
+              "mediaType": "show",
+              "title": "The Morning Bell",
+              "originalTitle": null,
+              "subtitle": null,
+              "overview": null,
+              "posterUrl": null,
+              "backdropUrl": null,
+              "logoUrl": null,
+              "stillUrl": null,
+              "releaseDate": null,
+              "releaseYear": 2026,
+              "rating": 8.3,
+              "genres": ["Drama"],
+              "runtimeMinutes": null,
+              "status": null,
+              "certification": null,
+              "externalIds": { "tmdb": 500, "imdb": null, "tvdb": null },
+              "parent": null,
+              "showTmdbId": 500,
+              "seasonNumber": null,
+              "episodeNumber": null,
+              "absoluteEpisodeNumber": null,
+              "episodeTitle": null,
+              "airDate": null
+            }
+          },
+          "presentation": null,
+          "airDate": null,
+          "watched": false
+        }
+      ]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": null
+  }
+}

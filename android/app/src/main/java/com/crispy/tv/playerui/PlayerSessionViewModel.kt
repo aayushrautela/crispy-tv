@@ -14,7 +14,7 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.details.StreamSelectorUiState
+import com.crispy.tv.metadata.episodesForSeason
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
@@ -45,6 +45,7 @@ import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
+import com.crispy.tv.streams.StreamSelectorUiState
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -385,7 +386,7 @@ class PlayerSessionViewModel(
                     seasonEpisodes = uiState.value.seasonEpisodes,
                     fallbackMediaType = activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE,
                 ).lookupId
-        val normalizedLookupId = com.crispy.tv.domain.metadata.normalizeNuvioMediaId(lookupId)
+        val parsedLookupId = com.crispy.tv.playback.parseLookupId(lookupId)
         val nextMediaType = state.streamSelector.mediaType ?: activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE
         val nextEpisode =
             selectedEpisode
@@ -397,15 +398,13 @@ class PlayerSessionViewModel(
                 MetadataLabMediaType.ANIME -> "anime"
             }
 
-        val nextSeason = if (isEpisodic) nextEpisode?.season ?: normalizedLookupId.season else null
-        val nextEpisodeNumber = if (isEpisodic) nextEpisode?.episode ?: normalizedLookupId.episode else null
+        val nextSeason = if (isEpisodic) nextEpisode?.season ?: parsedLookupId.season else null
+        val nextEpisodeNumber = if (isEpisodic) nextEpisode?.episode ?: parsedLookupId.episode else null
         val nextTitle = nextEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: details.title.trim().ifBlank { "Player" }
         val nextSubtitle = buildPlayerSubtitle(nextMediaType, details, nextTitle, nextSeason, nextEpisodeNumber)
         val nextIdentity =
             PlaybackIdentity(
-                contentId = details.id,
                 mediaKey = details.mediaKey,
-                imdbId = details.imdbId,
                 tmdbId = if (nextMediaType == MetadataLabMediaType.MOVIE) details.tmdbId ?: nextEpisode?.tmdbId else null,
                 contentType = nextMediaType,
                 season = nextSeason,
@@ -414,11 +413,7 @@ class PlayerSessionViewModel(
                 year = details.year?.trim()?.toIntOrNull(),
                 showTitle = if (isEpisodic) details.title else null,
                 showYear = if (isEpisodic) details.year?.trim()?.toIntOrNull() else null,
-                provider = nextEpisode?.provider ?: details.provider,
-                providerId = nextEpisode?.providerId ?: details.providerId,
                 parentMediaType = details.parentMediaType ?: parentMediaType,
-                parentProvider = nextEpisode?.parentProvider ?: details.parentProvider ?: details.provider,
-                parentProviderId = nextEpisode?.parentProviderId ?: details.parentProviderId ?: details.providerId,
                 absoluteEpisodeNumber = nextEpisode?.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
             )
 
@@ -476,25 +471,46 @@ class PlayerSessionViewModel(
 
         val backendDetails = backendDetail?.toMediaDetails()
         val fetchedDetails = backendDetails ?: return
+        val titleDetail = backendDetail
 
         val seasons =
-            if (backendDetail?.seasonNumbers()?.isNotEmpty() == true) {
-                backendDetail.seasonNumbers()
+            if (titleDetail.seasonNumbers().isNotEmpty()) {
+                titleDetail.seasonNumbers()
             } else {
                 emptyList()
             }
+
+        seasons.forEach { season ->
+            val seasonEpisodes =
+                titleDetail
+                    .episodesForSeason(season)
+                    .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+            if (seasonEpisodes.isNotEmpty()) {
+                seasonEpisodesCache[season] = seasonEpisodes
+            }
+        }
 
         _uiState.update { state ->
             val selectedSeason =
                 state.selectedSeason
                     ?: activeIdentity?.season
                     ?: seasons.firstOrNull()
+            val titleDetailEpisodes =
+                selectedSeason
+                    ?.let { season -> titleDetail.episodesForSeason(season) }
+                    .orEmpty()
+                    .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+            if (selectedSeason != null && titleDetailEpisodes.isNotEmpty()) {
+                seasonEpisodesCache[selectedSeason] = titleDetailEpisodes
+            }
             state.copy(
                 details = fetchedDetails,
                 backdropUrl = fetchedDetails.backdropUrl,
                 artworkUrl = state.artworkUrl ?: fetchedDetails.backdropUrl ?: fetchedDetails.posterUrl,
                 seasons = if (seasons.isNotEmpty()) seasons else state.seasons,
                 selectedSeason = selectedSeason,
+                seasonEpisodes = if (titleDetailEpisodes.isNotEmpty()) titleDetailEpisodes else state.seasonEpisodes,
+                episodesIsLoading = false,
             )
         }
 
@@ -503,9 +519,11 @@ class PlayerSessionViewModel(
             fetchedDetails.mediaType
                 .toMetadataLabMediaTypeOrNull()
                 ?.let { it != MetadataLabMediaType.MOVIE }
-                == true && seasonToLoad != null
+            == true && seasonToLoad != null
         ) {
-            loadEpisodesForSeason(seasonToLoad, force = _uiState.value.seasonEpisodes.isEmpty())
+            if (seasonEpisodesCache[seasonToLoad] == null) {
+                loadEpisodesForSeason(seasonToLoad, force = true)
+            }
         }
     }
 
@@ -573,10 +591,9 @@ class PlayerSessionViewModel(
                 runCatching {
                     withContext(Dispatchers.IO) {
                         val mediaKey = details.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
-                        backendClient.listMetadataEpisodes(
+                        backendClient.getMetadataTitleExtras(
                             accessToken = session.accessToken,
                             mediaKey = mediaKey,
-                            seasonNumber = season,
                         )
                     }
                 }.getOrElse {
@@ -606,7 +623,9 @@ class PlayerSessionViewModel(
                 }
 
             val videos =
-                response.episodes.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+                response.episodes
+                    .filter { it.seasonNumber == season }
+                    .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
 
             seasonEpisodesCache[season] = videos
             _uiState.update { current ->
@@ -614,12 +633,6 @@ class PlayerSessionViewModel(
                     current
                 } else {
                     current.copy(
-                        seasons =
-                            if (response.includedSeasonNumbers.isNotEmpty()) {
-                                response.includedSeasonNumbers.sorted()
-                            } else {
-                                current.seasons
-                            },
                         seasonEpisodes = videos,
                         episodesIsLoading = false,
                         episodesStatusMessage = if (videos.isEmpty()) "No episodes found." else "",
@@ -1055,7 +1068,7 @@ private fun buildFallbackDetails(
     artworkUrl: String?,
     identity: PlaybackIdentity?,
 ): MediaDetails? {
-    val contentId = identity?.contentId?.trim()?.takeIf { it.isNotBlank() } ?: rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val contentId = identity?.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedTitle = title.trim().ifBlank { return null }
     val mediaType =
         when (identity?.contentType) {
@@ -1067,7 +1080,7 @@ private fun buildFallbackDetails(
     return MediaDetails(
         id = contentId,
         mediaKey = identity?.mediaKey,
-        imdbId = identity?.imdbId,
+        imdbId = null,
         mediaType = mediaType,
         title = identity?.showTitle?.takeIf { mediaType == "series" } ?: normalizedTitle,
         posterUrl = normalizedArtworkUrl,
@@ -1088,11 +1101,7 @@ private fun buildFallbackDetails(
         seasonNumber = identity?.season,
         episodeNumber = identity?.episode,
         addonId = null,
-        provider = identity?.provider,
-        providerId = identity?.providerId,
         parentMediaType = identity?.parentMediaType,
-        parentProvider = identity?.parentProvider,
-        parentProviderId = identity?.parentProviderId,
         absoluteEpisodeNumber = identity?.absoluteEpisodeNumber,
     )
 }

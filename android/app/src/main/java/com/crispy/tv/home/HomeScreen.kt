@@ -15,12 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -28,6 +25,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -61,6 +61,7 @@ private val HomeTopSectionSpacing = 16.dp
 internal fun HomeRoute(
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
@@ -85,6 +86,10 @@ internal fun HomeRoute(
     val catalogSections by viewModel.catalogSectionsState.collectAsStateWithLifecycle()
     val scrollBehavior = appBarScrollBehavior()
 
+    LaunchedEffect(viewModel) {
+        viewModel.ensureLoaded()
+    }
+
     androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
         val observer =
             LifecycleEventObserver { _, event ->
@@ -108,8 +113,8 @@ internal fun HomeRoute(
                 title = {
                     CrispyWordmark(
                         modifier = Modifier
-                            .width(118.dp)
-                            .height(26.dp),
+                            .width(164.dp)
+                            .height(36.dp),
                     )
                 },
                 actions = {
@@ -137,6 +142,7 @@ internal fun HomeRoute(
                 onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
                 onHeroClick = onHeroClick,
                 onContinueWatchingClick = onContinueWatchingClick,
+                onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
                 onThisWeekClick = onThisWeekClick,
                 onThisWeekSeeAllClick = onThisWeekSeeAllClick,
                 onCatalogItemClick = onCatalogItemClick,
@@ -161,6 +167,7 @@ private fun HomeScreen(
     onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
     onHeroClick: (HomeHeroItem) -> Unit,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
     onCatalogItemClick: (CatalogItem) -> Unit,
@@ -264,6 +271,7 @@ private fun HomeScreen(
                                 HomeWideRailSection(
                                     section = section,
                                     onContinueWatchingClick = onContinueWatchingClick,
+                                    onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
                                     onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
                                     onThisWeekClick = onThisWeekClick,
                                     onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
@@ -350,6 +358,8 @@ private fun HomeHeaderSectionChips(
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     labelColor = MaterialTheme.colorScheme.onSurface,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
             )
         }

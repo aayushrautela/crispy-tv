@@ -19,7 +19,7 @@ internal suspend fun CrispyBackendClient.getMeApi(accessToken: String): MeRespon
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     val userJson = json.optJSONObject("user") ?: throw IllegalStateException("Backend /v1/me did not return a user.")
     return MeResponse(
         user = parseUser(userJson),
@@ -49,7 +49,7 @@ internal suspend fun CrispyBackendClient.createProfileApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     val profileJson = json.optJSONObject("profile") ?: throw IllegalStateException("Backend did not return a created profile.")
     return parseProfile(profileJson)
 }
@@ -64,9 +64,9 @@ internal suspend fun CrispyBackendClient.listImportConnectionsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return ProviderAccountsResponse(
-        providerAccounts = parseProviderAccounts(json.optJSONArray("providerAccounts")),
+        providerStates = parseProviderStates(json.optJSONArray("providerStates")),
     )
 }
 
@@ -77,7 +77,7 @@ internal suspend fun CrispyBackendClient.listImportJobsApi(accessToken: String, 
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return ImportJobsResponse(
         jobs = parseImportJobs(json.optJSONArray("jobs")),
     )
@@ -87,19 +87,24 @@ internal suspend fun CrispyBackendClient.startImportApi(
     accessToken: String,
     profileId: String,
     provider: ImportProvider,
+    action: String,
 ): StartImportResult {
     checkConfigured()
     val response = httpClient.postJson(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/imports/start".toHttpUrl(),
-        jsonBody = JSONObject().put("provider", provider.apiValue).toString(),
+        jsonBody = JSONObject()
+            .put("provider", provider.apiValue)
+            .put("action", action)
+            .toString(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     val jobJson = json.optJSONObject("job") ?: throw IllegalStateException("Backend did not return an import job.")
+    val providerStateJson = json.optJSONObject("providerState") ?: throw IllegalStateException("Backend did not return a provider state.")
     return StartImportResult(
         job = parseImportJob(jobJson),
-        providerAccount = json.optJSONObject("providerAccount")?.let(::parseProviderAccount),
+        providerState = parseProviderState(providerStateJson),
         authUrl = json.optString("authUrl").trim().ifBlank { null },
         nextAction = json.optString("nextAction").trim().ifBlank { "queued" },
     )
@@ -115,7 +120,7 @@ internal suspend fun CrispyBackendClient.getProfileSettingsApi(
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return ProfileSettings(
         settings = json.optJSONObject("settings").toStringMap(),
     )
@@ -138,7 +143,7 @@ internal suspend fun CrispyBackendClient.patchProfileSettingsApi(
             .build(),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
+    val json = requireSuccess(response)
     return ProfileSettings(
         settings = json.optJSONObject("settings").toStringMap(),
     )
@@ -148,14 +153,14 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
     accessToken: String,
     profileId: String,
     provider: ImportProvider,
-): CrispyBackendClient.ProviderAccount {
+): CrispyBackendClient.ProviderState {
     checkConfigured()
     val response = httpClient.delete(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/import-connections/${provider.apiValue}".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
-    val json = JSONObject(requireSuccess(response))
-    val providerAccountJson = json.optJSONObject("providerAccount") ?: throw IllegalStateException("Backend did not return a provider account.")
-    return parseProviderAccount(providerAccountJson)
+    val json = requireSuccess(response)
+    val providerStateJson = json.optJSONObject("providerState") ?: throw IllegalStateException("Backend did not return a provider state.")
+    return parseProviderState(providerStateJson)
 }
