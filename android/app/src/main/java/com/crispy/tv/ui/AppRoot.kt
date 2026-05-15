@@ -34,9 +34,7 @@ fun AppRoot() {
     val shouldShowNavigationBar = currentRoute == null || topLevelRoutes.contains(currentRoute)
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val showRail = shouldShowNavigationBar && isLandscape
-    val bottomSystemInset = remember(configuration) {
-        WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
-    }
+    val bottomSystemInset = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
 
     val onTopLevelDestinationClick: (TopLevelDestination, Boolean) -> Unit = remember(navController) {
         { destination: TopLevelDestination, isSelected: Boolean ->
