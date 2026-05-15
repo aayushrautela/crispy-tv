@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.metadata.tmdb.TmdbApi
 import com.crispy.tv.settings.ImageSettingsRepositoryProvider
@@ -70,7 +71,7 @@ internal fun rememberCrispyImageModel(
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .diskCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED)
-                .crossfade(enableCrossfade)
+                .crossfade(if (enableCrossfade) 200 else 0)
                 .diskCacheKey(it)
 
             if (resolvedCacheKey != null) {

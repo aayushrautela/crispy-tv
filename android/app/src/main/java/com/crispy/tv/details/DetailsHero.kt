@@ -59,10 +59,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.graphics.drawable.toBitmap
 import coil3.compose.AsyncImagePainter
 import coil3.compose.AsyncImage
 import coil3.compose.rememberAsyncImagePainter
+import coil3.toBitmap
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
@@ -147,7 +147,7 @@ internal fun HeroSection(
         LaunchedEffect(imageUrl, imagePainterState) {
             when (val state = imagePainterState) {
                 is AsyncImagePainter.State.Success -> {
-                    onHeroImageLoaded(state.result.drawable.toBitmap(width = 128, height = 128))
+                    onHeroImageLoaded(state.result.image.toBitmap(width = 128, height = 128))
                 }
                 is AsyncImagePainter.State.Error -> onHeroImageLoadFailed()
                 else -> Unit

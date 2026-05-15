@@ -7,10 +7,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.graphics.drawable.toBitmap
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import coil3.toBitmap
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.ktx.themeColor
@@ -105,9 +106,9 @@ internal suspend fun loadDetailsSeedColor(
                     .build()
 
             val result = imageLoader.execute(request)
-            val drawable = (result as? SuccessResult)?.drawable ?: return@runCatching null
+            val image = (result as? SuccessResult)?.image ?: return@runCatching null
             computeDetailsSeedColor(
-                bitmap = drawable.toBitmap(),
+                bitmap = image.toBitmap(),
                 fallbackSeed = fallbackSeed,
             )
         }.getOrNull()
