@@ -233,8 +233,13 @@ private fun historyMonthKey(timestamp: String?): String {
 private fun historyMonthLabel(monthKey: String): String {
     if (monthKey == "unknown") return "Unknown date"
     return try {
-        YearMonth.parse(monthKey)
-            .format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
+        val ym = YearMonth.parse(monthKey)
+        val now = YearMonth.now()
+        when (ym) {
+            now -> "This Month"
+            now.minusMonths(1) -> "Last Month"
+            else -> ym.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
+        }
     } catch (_: Exception) {
         "Unknown date"
     }
