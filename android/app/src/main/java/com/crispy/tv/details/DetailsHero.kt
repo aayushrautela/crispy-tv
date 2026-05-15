@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.media3.common.C
@@ -59,7 +58,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil3.compose.AsyncImage
-import coil3.toBitmap
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
@@ -89,7 +87,7 @@ internal fun HeroSection(
     showTrailer: Boolean,
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
-    onHeroImageLoaded: (Bitmap) -> Unit,
+    onHeroImageLoaded: () -> Unit,
     onHeroImageLoadFailed: () -> Unit,
     onToggleTrailer: () -> Unit,
 ) {
@@ -147,7 +145,7 @@ internal fun HeroSection(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
                 onSuccess = { result ->
-                    onHeroImageLoaded(result.image.toBitmap(width = 128, height = 128))
+                    onHeroImageLoaded()
                 },
                 onError = { onHeroImageLoadFailed() },
             )

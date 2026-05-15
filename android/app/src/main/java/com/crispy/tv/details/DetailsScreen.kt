@@ -5,7 +5,6 @@
 
 package com.crispy.tv.details
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -39,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,6 +88,7 @@ internal fun DetailsScreen(
         }
     val listState = rememberLazyListState()
     val configuration = LocalConfiguration.current
+    val context = LocalContext.current
     val density = LocalDensity.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val screenWidthPx = remember(configuration.screenWidthDp, density) {
@@ -103,7 +104,7 @@ internal fun DetailsScreen(
     var isSeedColorResolved by remember(imageUrl, fallbackSeed) {
         mutableStateOf(details == null || imageUrl.isNullOrBlank() || cachedSeed != null)
     }
-    var loadedHeroBitmap by remember(imageUrl) { mutableStateOf<Bitmap?>(null) }
+    var heroImageLoaded by remember(imageUrl) { mutableStateOf(false) }
     var heroImageLoadFailed by remember(imageUrl) { mutableStateOf(false) }
     var heroSeedGateTimedOut by remember(imageUrl) { mutableStateOf(false) }
 
@@ -116,20 +117,20 @@ internal fun DetailsScreen(
         }
     }
 
-    LaunchedEffect(details, imageUrl, cachedSeed, fallbackSeed, loadedHeroBitmap, heroImageLoadFailed, heroSeedGateTimedOut) {
+    LaunchedEffect(details, imageUrl, cachedSeed, fallbackSeed, heroImageLoaded, heroImageLoadFailed, heroSeedGateTimedOut) {
         seedColor = cachedSeed ?: fallbackSeed
         isSeedColorResolved = details == null || imageUrl.isNullOrBlank() || cachedSeed != null || heroSeedGateTimedOut
         if (details == null || imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
         if (heroSeedGateTimedOut) return@LaunchedEffect
-
-        val bitmap = loadedHeroBitmap
-        if (bitmap == null && !heroImageLoadFailed) return@LaunchedEffect
+        if (!heroImageLoaded && !heroImageLoadFailed) return@LaunchedEffect
 
         val resolvedSeed =
-            if (bitmap != null) {
-                computeDetailsSeedColor(bitmap = bitmap, fallbackSeed = fallbackSeed)?.also {
-                    cacheDetailsSeedColor(imageUrl, it)
-                }
+            if (heroImageLoaded) {
+                loadDetailsSeedColor(
+                    context = context,
+                    imageUrl = imageUrl,
+                    fallbackSeed = fallbackSeed,
+                )
             } else {
                 null
             }
@@ -258,14 +259,14 @@ internal fun DetailsScreen(
                         showTrailer = showTrailer,
                         isTrailerPlaying = isTrailerPlaying,
                         isTrailerMuted = userMutedTrailer,
-                        onHeroImageLoaded = { bitmap ->
-                            if (cachedSeed == null && loadedHeroBitmap == null && !heroSeedGateTimedOut) {
-                                loadedHeroBitmap = bitmap
+                        onHeroImageLoaded = {
+                            if (cachedSeed == null && !heroImageLoaded && !heroSeedGateTimedOut) {
+                                heroImageLoaded = true
                                 heroImageLoadFailed = false
                             }
                         },
                         onHeroImageLoadFailed = {
-                            if (cachedSeed == null && loadedHeroBitmap == null && !heroSeedGateTimedOut) {
+                            if (cachedSeed == null && !heroImageLoaded && !heroSeedGateTimedOut) {
                                 heroImageLoadFailed = true
                             }
                         },
