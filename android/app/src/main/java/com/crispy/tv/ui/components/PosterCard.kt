@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ratings.formatRating
+import com.crispy.tv.ui.theme.Dimensions
 
 private val PosterGradientFallback = Color(0xFF151515)
 
@@ -62,8 +63,8 @@ fun PosterCard(
     val image = poster?.takeUnless { it.isEmpty } ?: backdrop
     val imageModel = rememberCrispyImageModel(
         image = image,
-        width = 124.dp,
-        height = 186.dp,
+        width = Dimensions.PosterCardWidth,
+        height = Dimensions.PosterCardHeight,
     )
     val logoModel = rememberCrispyImageModel(
         image = logo,
@@ -82,7 +83,7 @@ fun PosterCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(2f / 3f)
+            .aspectRatio(Dimensions.PosterCardAspectRatio)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.large
     ) {

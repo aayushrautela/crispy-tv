@@ -271,13 +271,13 @@ private fun CalendarSkeletonSection(titleWidthFraction: Float) {
 @Composable
 private fun CalendarSkeletonCard() {
     Column(
-        modifier = Modifier.width(280.dp),
+        modifier = Modifier.width(Dimensions.WideCardWidth),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .aspectRatio(Dimensions.WideCardAspectRatio)
                 .skeletonElement(pulse = false),
         )
         Box(

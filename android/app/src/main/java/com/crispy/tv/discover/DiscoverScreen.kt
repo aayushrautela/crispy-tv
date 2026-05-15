@@ -345,7 +345,7 @@ private fun DiscoverScreen(
     ) {
         LazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Adaptive(minSize = 124.dp),
+            columns = GridCells.Adaptive(minSize = Dimensions.PosterCardWidth),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = pageHorizontalPadding,
@@ -652,7 +652,7 @@ private fun DiscoverPosterSkeleton(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(2f / 3f)
+            .aspectRatio(Dimensions.PosterCardAspectRatio)
             .skeletonElement(pulse = false),
     )
 }

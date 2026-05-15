@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.components.rememberCrispyImageModel
+import com.crispy.tv.ui.theme.Dimensions
 
 @Composable
 internal fun LandscapeArtworkFrame(
@@ -137,7 +138,12 @@ internal fun rememberPosterImageModel(url: String?): Any? {
 
 @Composable
 internal fun rememberPosterImageModel(image: ResponsiveImageSet?): Any? {
-    return rememberCrispyImageModel(image = image, width = 124.dp, height = 186.dp, tmdbSize = "w342")
+    return rememberCrispyImageModel(
+        image = image,
+        width = Dimensions.PosterCardWidth,
+        height = Dimensions.PosterCardHeight,
+        tmdbSize = "w342",
+    )
 }
 
 @Composable

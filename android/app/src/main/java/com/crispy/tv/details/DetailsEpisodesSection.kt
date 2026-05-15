@@ -42,6 +42,7 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.theme.Dimensions
 import kotlin.math.roundToInt
 
 @Composable
@@ -70,7 +71,7 @@ internal fun EpisodeCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+                        .aspectRatio(Dimensions.WideCardAspectRatio)
             ) {
                 val thumbnail = video.thumbnailUrl?.trim().orEmpty()
                 if (thumbnail.isNotBlank()) {
@@ -244,7 +245,7 @@ internal fun EpisodeCardSkeleton(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
+                    .aspectRatio(Dimensions.WideCardAspectRatio)
                         .skeletonElement(color = DetailsSkeletonColors.Base)
             )
 

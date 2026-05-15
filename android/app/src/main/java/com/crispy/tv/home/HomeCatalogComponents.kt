@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_POSTER_SKELETON_COUNT = 5
 
@@ -101,8 +102,8 @@ internal fun HomeCatalogSectionRow(
                 items(HOME_POSTER_SKELETON_COUNT) {
                     Box(
                         modifier = Modifier
-                            .width(124.dp)
-                            .aspectRatio(2f / 3f)
+                            .width(Dimensions.PosterCardWidth)
+                            .aspectRatio(Dimensions.PosterCardAspectRatio)
                             .skeletonElement(pulse = false)
                     )
                 }
@@ -136,7 +137,7 @@ internal fun HomeCatalogPosterCard(
         backdrop = item.backdrop,
         logo = item.logo,
         gradientColorHex = null,
-        modifier = Modifier.width(124.dp),
+        modifier = Modifier.width(Dimensions.PosterCardWidth),
         onClick = onClick
     )
 }

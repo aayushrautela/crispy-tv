@@ -95,7 +95,7 @@ fun CatalogRoute(
                 modifier = Modifier.fillMaxSize()
             ) {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 124.dp),
+                    columns = GridCells.Adaptive(minSize = Dimensions.PosterCardWidth),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding,
@@ -158,7 +158,7 @@ fun CatalogRoute(
 @Composable
 private fun CatalogLoadingSkeleton(modifier: Modifier = Modifier) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 124.dp),
+        columns = GridCells.Adaptive(minSize = Dimensions.PosterCardWidth),
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -174,7 +174,7 @@ private fun CatalogPosterSkeleton(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(2f / 3f)
+            .aspectRatio(Dimensions.PosterCardAspectRatio)
             .skeletonElement(pulse = false),
     )
 }

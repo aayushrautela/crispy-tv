@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.home.LandscapeArtworkFrame
 import com.crispy.tv.home.rememberLandscapeImageModel
+import com.crispy.tv.ui.theme.Dimensions
 
 private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers")
 
@@ -65,14 +66,14 @@ private fun MakingOfCard(
     video: CrispyBackendClient.MetadataVideoView,
     onClick: () -> Unit,
 ) {
-    val imageModel = rememberLandscapeImageModel(video.thumbnailUrl, 280.dp)
+    val imageModel = rememberLandscapeImageModel(video.thumbnailUrl, Dimensions.WideCardWidth)
     LandscapeArtworkFrame(
         title = video.name.orEmpty(),
         imageModel = imageModel,
         onClick = onClick,
         modifier = Modifier
-            .width(280.dp)
-            .aspectRatio(16f / 9f),
+            .width(Dimensions.WideCardWidth)
+            .aspectRatio(Dimensions.WideCardAspectRatio),
         scrimHeightFraction = 0.55f,
         scrimMaxAlpha = 0.88f,
         bottomOverlayContent = {

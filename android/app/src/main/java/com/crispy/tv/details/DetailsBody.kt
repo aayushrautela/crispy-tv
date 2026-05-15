@@ -291,13 +291,13 @@ internal fun DetailsBody(
                     items(items = reviews, key = { it.id }) { review ->
                         MetadataReviewCard(
                             review = review,
-                            modifier = Modifier.width(280.dp),
+                            modifier = Modifier.width(Dimensions.WideCardWidth),
                             onClick = { expandedReview = review }
                         )
                     }
                 } else {
                     items(2) {
-                        DetailsReviewPlaceholder(modifier = Modifier.width(280.dp))
+                        DetailsReviewPlaceholder(modifier = Modifier.width(Dimensions.WideCardWidth))
                     }
                 }
             }
@@ -370,7 +370,7 @@ internal fun DetailsBody(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(4) {
-                                EpisodeCardSkeleton(modifier = Modifier.width(280.dp))
+                                EpisodeCardSkeleton(modifier = Modifier.width(Dimensions.WideCardWidth))
                             }
                         }
                     }
@@ -394,7 +394,7 @@ internal fun DetailsBody(
                                     video = video,
                                     watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
                                     isHighlighted = video.id == uiState.highlightedEpisodeId,
-                                    modifier = Modifier.width(280.dp),
+                                    modifier = Modifier.width(Dimensions.WideCardWidth),
                                     onClick = { onEpisodeClick(video.id) },
                                     onLongPress = { selectedEpisodeAction = video },
                                 )

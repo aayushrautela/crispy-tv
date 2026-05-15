@@ -395,7 +395,7 @@ private fun SearchSectionRow(
                     backdrop = item.backdrop,
                     logo = item.logo,
                     gradientColorHex = null,
-                    modifier = Modifier.width(124.dp),
+                    modifier = Modifier.width(Dimensions.PosterCardWidth),
                     onClick = { onItemClick(item) },
                 )
             }
@@ -416,8 +416,8 @@ private fun SearchSectionSkeleton() {
             items(6) {
                 Box(
                     modifier = Modifier
-                        .width(124.dp)
-                        .aspectRatio(2f / 3f)
+                        .width(Dimensions.PosterCardWidth)
+                        .aspectRatio(Dimensions.PosterCardAspectRatio)
                         .skeletonElement(pulse = false),
                 )
             }

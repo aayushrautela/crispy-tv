@@ -15,21 +15,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.components.rememberCrispyImageModel
+import com.crispy.tv.ui.theme.Dimensions
 
 @Composable
 internal fun CalendarEpisodeCard(
     item: CalendarEpisodeItem,
     onClick: () -> Unit,
 ) {
-    val imageModel = rememberLandscapeImageModel(item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl, 280.dp)
+    val imageModel = rememberLandscapeImageModel(item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl, Dimensions.WideCardWidth)
     LandscapeArtworkFrame(
         title = item.seriesName,
         imageModel = imageModel,
         onClick = onClick,
         modifier = Modifier
-            .width(280.dp)
-            .aspectRatio(16f / 9f),
+            .width(Dimensions.WideCardWidth)
+            .aspectRatio(Dimensions.WideCardAspectRatio),
         badgeLabel = calendarBadgeLabel(item),
         badgeAlignment = Alignment.TopEnd,
         scrimHeightFraction = 0.68f,
@@ -67,14 +67,14 @@ internal fun CalendarSeriesCard(
     item: CalendarSeriesItem,
     onClick: () -> Unit,
 ) {
-    val imageModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, 280.dp)
+    val imageModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, Dimensions.WideCardWidth)
     LandscapeArtworkFrame(
         title = item.title,
         imageModel = imageModel,
         onClick = onClick,
         modifier = Modifier
-            .width(280.dp)
-            .aspectRatio(16f / 9f),
+            .width(Dimensions.WideCardWidth)
+            .aspectRatio(Dimensions.WideCardAspectRatio),
         badgeLabel = "No schedule",
         bottomOverlayContent = {
             Column(

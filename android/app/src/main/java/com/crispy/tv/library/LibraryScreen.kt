@@ -461,7 +461,7 @@ private fun FlatLibraryGridContent(
 ) {
     LazyVerticalGrid(
         state = gridState,
-        columns = GridCells.Adaptive(minSize = 124.dp),
+        columns = GridCells.Adaptive(minSize = Dimensions.PosterCardWidth),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = pageHorizontalPadding,
@@ -569,11 +569,13 @@ private fun HistoryLibraryContent(
         contentPadding = PaddingValues(bottom = 12.dp + Dimensions.PageBottomPadding),
     ) {
         item(key = "filters") {
-            LibraryFiltersRow(
-                sections = sections,
-                selectedSectionId = selectedSectionId,
-                onSelectSection = onSelectSection,
-            )
+            Box(modifier = Modifier.padding(horizontal = pageHorizontalPadding)) {
+                LibraryFiltersRow(
+                    sections = sections,
+                    selectedSectionId = selectedSectionId,
+                    onSelectSection = onSelectSection,
+                )
+            }
         }
 
         item(key = "status") {
@@ -632,7 +634,7 @@ private fun HistoryLibraryContent(
                                     backdrop = item.backdrop,
                                     logo = item.logo,
                                     gradientColorHex = null,
-                                    modifier = Modifier.width(124.dp),
+                                    modifier = Modifier.width(Dimensions.PosterCardWidth),
                                     onClick = { onItemClick(item) },
                                 )
                             }
@@ -656,7 +658,7 @@ private fun LibraryPosterSkeleton(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(2f / 3f)
+            .aspectRatio(Dimensions.PosterCardAspectRatio)
             .skeletonElement(pulse = false),
     )
 }

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
 
@@ -112,8 +113,8 @@ internal fun HomeWideRailSection(
 private fun HomeWideRailSkeletonCard() {
     Box(
         modifier = Modifier
-            .width(280.dp)
-            .aspectRatio(16f / 9f)
+            .width(Dimensions.WideCardWidth)
+            .aspectRatio(Dimensions.WideCardAspectRatio)
             .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false)
     )
 }
@@ -163,7 +164,7 @@ internal fun HomeWideRailCard(
     var actionSheetVisible by remember { mutableStateOf(false) }
     val removeAction = onRemoveClick
     val hasItemActions = showActions && removeAction != null
-    val artworkModel = rememberLandscapeImageModel(item.imageUrl, 280.dp)
+    val artworkModel = rememberLandscapeImageModel(item.imageUrl, Dimensions.WideCardWidth)
 
     val cardInteractionModifier =
         if (hasItemActions) {
@@ -178,14 +179,14 @@ internal fun HomeWideRailCard(
 
     Column(
         modifier = Modifier
-            .width(280.dp)
+            .width(Dimensions.WideCardWidth)
             .then(cardInteractionModifier),
     ) {
         LandscapeArtworkFrame(
             title = item.title,
             imageModel = artworkModel,
             onClick = null,
-            modifier = Modifier.aspectRatio(16f / 9f),
+            modifier = Modifier.aspectRatio(Dimensions.WideCardAspectRatio),
             badgeLabel = item.badgeLabel,
             badgeAlignment = Alignment.TopEnd,
             progressFraction = item.progressFraction,
