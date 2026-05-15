@@ -13,7 +13,6 @@ import com.crispy.tv.player.CanonicalWatchStateSnapshot
 import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.player.WatchedEpisodeRecord
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchHistoryService
@@ -220,10 +219,6 @@ class BackendWatchHistoryService(
         )
     }
 
-    override suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
-        return canonicalWatchedEpisodeRecords()
-    }
-
     override suspend fun getCanonicalContinueWatching(
         limit: Int,
         nowMs: Long,
@@ -421,46 +416,6 @@ val next =
                 entries = emptyList(),
                 isError = true,
             )
-        }
-    }
-
-    private suspend fun canonicalWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
-        return listCanonicalWatchHistory(limit = 1000)
-            .asSequence()
-            .filter { item ->
-                item.mediaItem.mediaType.equals("episode", ignoreCase = true) &&
-                    item.mediaItem.seasonNumber != null &&
-                    item.mediaItem.episodeNumber != null
-            }
-            .mapNotNull { item ->
-                val canonicalMediaKey = item.mediaItem.mediaKey.trim().ifBlank { return@mapNotNull null }
-                val watchedAtEpochMs =
-                    parseIsoToEpochMs(item.watchedAt)
-                        ?: parseIsoToEpochMs(item.lastActivityAt)
-                        ?: 0L
-                if (watchedAtEpochMs <= 0L) {
-                    return@mapNotNull null
-                }
-                WatchedEpisodeRecord(
-                    contentId = canonicalMediaKey,
-                    season = item.mediaItem.seasonNumber ?: 1,
-                    episode = item.mediaItem.episodeNumber ?: 1,
-                    watchedAtEpochMs = watchedAtEpochMs,
-                )
-            }
-            .toList()
-    }
-
-    private suspend fun listCanonicalWatchHistory(limit: Int): List<CrispyBackendClient.WatchedItem> {
-        val backendContext = getBackendContext() ?: return emptyList()
-        return try {
-            backend.listWatchHistory(
-                accessToken = backendContext.accessToken,
-                profileId = backendContext.profileId,
-                limit = limit.coerceAtLeast(1),
-            ).items
-        } catch (_: Throwable) {
-            emptyList()
         }
     }
 
@@ -676,17 +631,6 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
             watchedEpisodeKeys = watchedEpisodeKeys.map { it.trim().lowercase(Locale.US) }.filter { it.isNotBlank() }.toSet(),
         )
     }
-
-private fun titleStateIdentity(
-    mediaKey: String,
-    contentType: MetadataLabMediaType,
-): PlaybackIdentity {
-    return PlaybackIdentity(
-        mediaKey = mediaKey,
-        contentType = contentType,
-        title = mediaKey,
-    )
-}
 
     private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
         return when (trim().lowercase(Locale.US)) {

@@ -70,13 +70,6 @@ data class CanonicalWatchStateSnapshot(
     val watchedEpisodeKeys: Set<String> = emptySet(),
 )
 
-data class WatchedEpisodeRecord(
-    val contentId: String,
-    val season: Int,
-    val episode: Int,
-    val watchedAtEpochMs: Long,
-)
-
 enum class ProviderCommentScope {
     MOVIE,
     SHOW,
@@ -160,10 +153,6 @@ interface WatchHistoryService {
         nowMs: Long = System.currentTimeMillis(),
     ): CanonicalContinueWatchingResult {
         return CanonicalContinueWatchingResult(statusMessage = "Canonical continue watching unavailable.", isError = true)
-    }
-
-    suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
-        return emptyList()
     }
 
     suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot? {

@@ -6,7 +6,6 @@ import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.watchhistory.addEpisodeKey
 import com.crispy.tv.watchhistory.episodeWatchKeyCandidates
 import java.util.Locale
 
@@ -43,21 +42,21 @@ internal class EpisodeWatchStateResolver(
             } else {
                 val watchedByHistory =
                     episodeWatchKeyCandidates(details, season, episode).any { key -> watchedKeys.contains(key) }
-val localProgress =
-            userMediaRepository.getLocalWatchProgress(
-                PlaybackIdentity(
-                    mediaKey = details.mediaKey,
-                    contentType = contentType,
-                    season = season,
-                    episode = episode,
-                    title = video.title,
-                    year = yearInt,
-                    showTitle = if (contentType == MetadataLabMediaType.MOVIE) null else details.title,
-                    showYear = if (contentType == MetadataLabMediaType.MOVIE) null else yearInt,
-                    parentMediaType = parentMediaType,
-                    absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
-                )
-            )
+                val localProgress =
+                    userMediaRepository.getLocalWatchProgress(
+                        PlaybackIdentity(
+                            mediaKey = details.mediaKey,
+                            contentType = contentType,
+                            season = season,
+                            episode = episode,
+                            title = video.title,
+                            year = yearInt,
+                            showTitle = if (contentType == MetadataLabMediaType.MOVIE) null else details.title,
+                            showYear = if (contentType == MetadataLabMediaType.MOVIE) null else yearInt,
+                            parentMediaType = parentMediaType,
+                            absoluteEpisodeNumber = video.absoluteEpisodeNumber ?: details.absoluteEpisodeNumber,
+                        )
+                    )
                 val progressPercent = localProgress?.progressPercent ?: 0.0
                 val isWatched = watchedByHistory || progressPercent >= completionPercent
                 video.id to
@@ -86,16 +85,7 @@ val localProgress =
             canonical?.watchedEpisodeKeys.orEmpty()
                 .mapNotNull(::normalizeWatchKey)
                 .toSet()
-        if (canonicalKeys.isNotEmpty()) {
-            return canonicalKeys.also { cachedEpisodeWatchKeys = it }
-        }
-
-        val providerHistoryKeys =
-            userMediaRepository.listWatchedEpisodeRecords().mapNotNull { record ->
-                addEpisodeKey(record.contentId, record.season, record.episode)
-            }.mapNotNull(::normalizeWatchKey).toSet()
-
-        return providerHistoryKeys.also { cachedEpisodeWatchKeys = it }
+        return canonicalKeys.also { cachedEpisodeWatchKeys = it }
     }
 
     private fun normalizeWatchKey(value: String): String? {

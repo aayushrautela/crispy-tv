@@ -7,7 +7,6 @@ import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchProgressSnapshot
-import com.crispy.tv.player.WatchedEpisodeRecord
 
 interface UserMediaRepository {
     suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot?
@@ -21,8 +20,6 @@ interface UserMediaRepository {
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
     ): CanonicalContinueWatchingResult
-
-    suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord>
 
     suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot?
 

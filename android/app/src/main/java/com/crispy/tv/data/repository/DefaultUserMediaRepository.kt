@@ -9,7 +9,6 @@ import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProgressSnapshot
-import com.crispy.tv.player.WatchedEpisodeRecord
 
 class DefaultUserMediaRepository(
     private val watchHistoryService: WatchHistoryService,
@@ -33,10 +32,6 @@ class DefaultUserMediaRepository(
             limit = limit,
             nowMs = nowMs,
         )
-    }
-
-    override suspend fun listWatchedEpisodeRecords(): List<WatchedEpisodeRecord> {
-        return watchHistoryService.listWatchedEpisodeRecords()
     }
 
     override suspend fun getLocalWatchProgress(identity: PlaybackIdentity): WatchProgressSnapshot? {
