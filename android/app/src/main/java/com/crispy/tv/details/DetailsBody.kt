@@ -629,7 +629,7 @@ internal fun MakingOfVideoPlayerDialog(
                             override fun onReady(youTubePlayer: YouTubePlayer) {
                                 youTubePlayer.loadVideo(videoKey, 0f)
                             }
-                        }, IFramePlayerOptions.Builder()
+                        }, IFramePlayerOptions.Builder(context)
                             .controls(1)
                             .fullscreen(0)
                             .rel(0)
