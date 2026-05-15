@@ -1030,23 +1030,18 @@ internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?)
             val mediaType = item.optString("mediaType").trim().ifBlank { continue }
             val title = item.optString("title").trim().ifBlank { continue }
             val description = item.optString("description").trim().ifBlank { continue }
-            val backdropUrl = item.optString("backdropUrl").trim().ifBlank { continue }
-            val backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop"), backdropUrl)
-            val posterUrl = item.optNullableString("posterUrl")
-            val poster = parseResponsiveImageSet(item.optJSONObject("poster"), posterUrl)
-            val logoUrl = item.optNullableString("logoUrl")
-            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), logoUrl)
+            val backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop"), item.optNullableString("backdropUrl"))
+            val poster = parseResponsiveImageSet(item.optJSONObject("poster"), item.optNullableString("posterUrl"))
+            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), item.optNullableString("logoUrl"))
+            if (backdrop.isEmpty) continue
             add(
                 RecommendationHeroItem(
                     mediaKey = mediaKey,
                     mediaType = mediaType,
                     title = title,
                     description = description,
-                    backdropUrl = backdropUrl,
                     backdrop = backdrop,
-                    posterUrl = posterUrl,
                     poster = poster,
-                    logoUrl = logoUrl,
                     logo = logo,
                     releaseYear = item.optIntOrNull("releaseYear"),
                     rating = item.optDoubleOrNull("rating"),
@@ -1063,21 +1058,20 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
             val title = item.optString("title").trim().ifBlank { continue }
-            val logoUrl = item.optString("logoUrl").trim().ifBlank { continue }
-            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), logoUrl)
+            val logo = parseResponsiveImageSet(item.optJSONObject("logo"), item.optNullableString("logoUrl"))
+            if (logo.isEmpty) continue
             val items = buildList {
                 val parts = item.optJSONArray("items") ?: JSONArray()
                 for (partIndex in 0 until parts.length()) {
                     val part = parts.optJSONObject(partIndex) ?: continue
                     val mediaType = part.optString("mediaType").trim().ifBlank { continue }
                     val partTitle = part.optString("title").trim().ifBlank { continue }
-                    val posterUrl = part.optString("posterUrl").trim().ifBlank { continue }
-                    val poster = parseResponsiveImageSet(part.optJSONObject("poster"), posterUrl)
+                    val poster = parseResponsiveImageSet(part.optJSONObject("poster"), part.optNullableString("posterUrl"))
+                    if (poster.isEmpty) continue
                     add(
                         RecommendationCollectionItem(
                             mediaType = mediaType,
                             title = partTitle,
-                            posterUrl = posterUrl,
                             poster = poster,
                             releaseYear = part.optIntOrNull("releaseYear"),
                             rating = part.optDoubleOrNull("rating"),
@@ -1086,7 +1080,7 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
                 }
             }
             if (items.isNotEmpty()) {
-                add(RecommendationCollectionCard(title = title, logoUrl = logoUrl, logo = logo, items = items))
+                add(RecommendationCollectionCard(title = title, logo = logo, items = items))
             }
         }
     }

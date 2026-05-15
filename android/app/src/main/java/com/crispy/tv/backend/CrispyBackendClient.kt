@@ -675,11 +675,8 @@ data class PlaybackEventInput(
         val mediaType: String,
         val title: String,
         val description: String,
-        val backdropUrl: String,
         val backdrop: ResponsiveImageSet,
-        val posterUrl: String?,
         val poster: ResponsiveImageSet,
-        val logoUrl: String?,
         val logo: ResponsiveImageSet,
         val releaseYear: Int?,
         val rating: Double?,
@@ -689,7 +686,6 @@ data class PlaybackEventInput(
     data class RecommendationCollectionItem(
         val mediaType: String,
         val title: String,
-        val posterUrl: String,
         val poster: ResponsiveImageSet,
         val releaseYear: Int?,
         val rating: Double?,
@@ -697,7 +693,6 @@ data class PlaybackEventInput(
 
     data class RecommendationCollectionCard(
         val title: String,
-        val logoUrl: String,
         val logo: ResponsiveImageSet,
         val items: List<RecommendationCollectionItem>,
     )
