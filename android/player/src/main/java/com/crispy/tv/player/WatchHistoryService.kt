@@ -1,14 +1,5 @@
 package com.crispy.tv.player
 
-data class WatchHistoryEntry(
-    val contentId: String,
-    val contentType: MetadataLabMediaType,
-    val title: String,
-    val season: Int?,
-    val episode: Int?,
-    val watchedAtEpochMs: Long
-)
-
 data class WatchHistoryRequest(
     val mediaKey: String? = null,
     val contentType: MetadataLabMediaType,
@@ -20,10 +11,7 @@ data class WatchHistoryRequest(
 
 data class WatchHistoryResult(
     val statusMessage: String,
-    val entries: List<WatchHistoryEntry> = emptyList(),
     val accepted: Boolean = false,
-    val syncedToTrakt: Boolean = false,
-    val syncedToSimkl: Boolean = false
 )
 
 data class CanonicalContinueWatchingItem(
@@ -68,6 +56,7 @@ data class CanonicalWatchStateSnapshot(
     val isRated: Boolean,
     val userRating: Int?,
     val watchedEpisodeKeys: Set<String> = emptySet(),
+    val playCount: Int = 0,
 )
 
 enum class ProviderCommentScope {

@@ -5,7 +5,7 @@ import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionRespons
 import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingItem
 import com.crispy.tv.backend.CrispyBackendClient.RatingItem
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationsResponse
-import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
+import com.crispy.tv.backend.CrispyBackendClient.HistoryItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
@@ -133,7 +133,7 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
     profileId: String,
     limit: Int = 50,
     cursor: String? = null,
-): CanonicalWatchCollectionResponse<WatchedItem> {
+): CanonicalWatchCollectionResponse<HistoryItem> {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/history".toHttpUrl().newBuilder()
@@ -154,7 +154,7 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
         kind = json.optString("kind").trim(),
         source = json.optString("source").trim(),
         generatedAt = json.optNullableString("generatedAt"),
-        items = parseWatchedItems(json.optJSONArray("items")),
+        items = parseHistoryItems(json.optJSONArray("items")),
         pageInfo = parsePageInfo(json.optJSONObject("pageInfo")),
     )
 }

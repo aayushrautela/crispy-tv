@@ -520,7 +520,6 @@ data class PlaybackEventInput(
         val positionSeconds: Double?,
         val durationSeconds: Double?,
         val progressPercent: Double,
-        val status: String?,
         val lastPlayedAt: String?,
     )
 
@@ -556,13 +555,14 @@ data class PlaybackEventInput(
         val dismissible: Boolean,
     )
 
-    data class WatchedItem(
-        val id: String?,
+    data class HistoryItem(
+        val id: String,
         val mediaItem: MediaItem,
         val context: SurfaceContext,
         val presentation: MediaPresentationHint?,
+        val eventType: String,
+        val occurredAt: String?,
         val watchedAt: String?,
-        val lastActivityAt: String?,
         val origins: List<String>,
     )
 
@@ -609,6 +609,7 @@ data class PlaybackEventInput(
         val watchlist: WatchlistStateView?,
         val rating: RatingStateView?,
         val watchedEpisodeKeys: List<String>,
+        val playCount: Int = 0,
     )
 
     data class WatchStateEnvelope(
@@ -925,7 +926,7 @@ data class PlaybackEventInput(
         profileId: String,
         limit: Int = 50,
         cursor: String? = null,
-    ): CanonicalWatchCollectionResponse<WatchedItem> {
+    ): CanonicalWatchCollectionResponse<HistoryItem> {
         return listWatchHistoryApi(accessToken, profileId, limit, cursor)
     }
 

@@ -21,7 +21,7 @@ import com.crispy.tv.backend.CrispyBackendClient.SurfaceContext
 import com.crispy.tv.backend.CrispyBackendClient.ImportJob
 import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingItem
 import com.crispy.tv.backend.CrispyBackendClient.RatingItem
-import com.crispy.tv.backend.CrispyBackendClient.WatchedItem
+import com.crispy.tv.backend.CrispyBackendClient.HistoryItem
 import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCollectionView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataCardView
@@ -713,7 +713,6 @@ internal fun CrispyBackendClient.parseWatchProgressView(json: JSONObject?): Watc
         positionSeconds = safe.optDoubleOrNull("positionSeconds"),
         durationSeconds = safe.optDoubleOrNull("durationSeconds"),
         progressPercent = safe.optDoubleOrNull("progressPercent") ?: 0.0,
-        status = safe.optNullableString("status"),
         lastPlayedAt = safe.optNullableString("lastPlayedAt"),
     )
 }
@@ -789,28 +788,35 @@ internal fun CrispyBackendClient.parseContinueWatchingItem(json: JSONObject): Co
     )
 }
 
-internal fun CrispyBackendClient.parseWatchedItems(array: JSONArray?): List<WatchedItem> {
+internal fun CrispyBackendClient.parseHistoryItems(array: JSONArray?): List<HistoryItem> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
-            add(parseWatchedItem(item))
+            add(parseHistoryItem(item))
         }
     }
 }
 
-internal fun CrispyBackendClient.parseWatchedItem(json: JSONObject): WatchedItem {
-    val mediaJson = json.optJSONObject("mediaItem")
-    if (mediaJson == null) {
-        throw IllegalStateException("Watched item is missing mediaItem.")
+internal fun CrispyBackendClient.parseHistoryItem(json: JSONObject): HistoryItem {
+    val id = json.optString("id").trim()
+    if (id.isBlank()) {
+        throw IllegalStateException("History item is missing id.")
     }
-    return WatchedItem(
-        id = json.optNullableString("id"),
+    val mediaJson = json.optJSONObject("mediaItem")
+        ?: throw IllegalStateException("History item is missing mediaItem.")
+    val eventType = json.optString("eventType").trim()
+    if (eventType.isBlank()) {
+        throw IllegalStateException("History item is missing eventType.")
+    }
+    return HistoryItem(
+        id = id,
         mediaItem = parseMediaItem(mediaJson),
         context = SurfaceContext(json.optJSONObject("context").toAnyMap()),
         presentation = parseMediaPresentationHint(json.optJSONObject("presentation")),
+        eventType = eventType,
+        occurredAt = json.optNullableString("occurredAt"),
         watchedAt = json.optNullableString("watchedAt"),
-        lastActivityAt = json.optNullableString("lastActivityAt"),
         origins = parseOrigins(json.optJSONArray("origins")),
     )
 }
@@ -887,6 +893,7 @@ internal fun CrispyBackendClient.parseWatchStateResponse(json: JSONObject): Watc
         watchlist = parseWatchlistStateView(json.optJSONObject("watchlist")),
         rating = parseRatingStateView(json.optJSONObject("rating")),
         watchedEpisodeKeys = json.optStringList("watchedEpisodeKeys"),
+        playCount = json.optIntOrNull("playCount") ?: 0,
     )
 }
 

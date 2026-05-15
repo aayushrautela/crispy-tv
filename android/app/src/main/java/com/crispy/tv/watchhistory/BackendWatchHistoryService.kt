@@ -629,6 +629,7 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
             isRated = rating != null,
             userRating = rating?.value,
             watchedEpisodeKeys = watchedEpisodeKeys.map { it.trim().lowercase(Locale.US) }.filter { it.isNotBlank() }.toSet(),
+            playCount = playCount,
         )
     }
 

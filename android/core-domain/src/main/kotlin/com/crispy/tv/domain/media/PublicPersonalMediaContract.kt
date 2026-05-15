@@ -76,7 +76,9 @@ data class ContractHistoryItem(
     val mediaItem: ContractMediaItem,
     val context: Map<String, Any?>,
     val presentation: ContractMediaPresentationHint?,
-    val watchedAt: String,
+    val eventType: String,
+    val occurredAt: String?,
+    val watchedAt: String?,
     val origins: List<String>,
 ) : WatchCollectionContractItem
 
@@ -193,13 +195,15 @@ private fun parseContinueWatchingItem(payload: Map<String, Any?>): ContractConti
 }
 
 private fun parseHistoryItem(payload: Map<String, Any?>): ContractHistoryItem? {
-    if (!payload.hasExactKeys(setOf("id", "kind", "mediaItem", "context", "presentation", "watchedAt", "origins"))) return null
+    if (!payload.hasExactKeys(setOf("id", "kind", "mediaItem", "context", "presentation", "eventType", "occurredAt", "watchedAt", "origins"))) return null
     return ContractHistoryItem(
         id = payload.requiredString("id") ?: return null,
         mediaItem = payload.requiredObject("mediaItem")?.let(::parseMediaItem) ?: return null,
         context = payload.requiredObject("context") ?: return null,
         presentation = payload.nullableObject("presentation")?.let(::parsePresentation),
-        watchedAt = payload.requiredString("watchedAt") ?: return null,
+        eventType = payload.requiredString("eventType") ?: return null,
+        occurredAt = payload.nullableString("occurredAt"),
+        watchedAt = payload.nullableString("watchedAt"),
         origins = payload.requiredStringList("origins") ?: return null,
     )
 }

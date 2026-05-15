@@ -64,7 +64,7 @@ private suspend fun loadLibrarySectionPage(
                 profileId = profileId,
                 limit = limit,
                 cursor = cursor,
-            ).toWatchedSectionPageUi()
+            ).toHistorySectionPageUi()
         }
 
         LIBRARY_SECTION_WATCHLIST -> {
@@ -122,7 +122,7 @@ private fun CrispyBackendClient.MediaItem.toLibrarySectionItemUi(
     )
 }
 
-private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.toWatchedSectionPageUi(): LibrarySectionPageUi {
+private fun CanonicalWatchCollectionResponse<CrispyBackendClient.HistoryItem>.toHistorySectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
         items = items.map { item ->
             item.mediaItem.toLibrarySectionItemUi(
@@ -131,7 +131,7 @@ private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchedItem>.to
                 watchedAt = item.watchedAt,
                 ratedAt = null,
                 ratingValue = null,
-                lastActivityAt = item.lastActivityAt,
+                lastActivityAt = item.occurredAt ?: item.watchedAt,
                 origins = item.origins,
             )
         },
