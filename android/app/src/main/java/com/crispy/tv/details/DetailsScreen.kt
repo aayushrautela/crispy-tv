@@ -362,7 +362,7 @@ internal fun DetailsScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             )
 
-            MakingOfVideoPlayerDialog(
+            YouTubeExtraVideoDialog(
                 video = selectedMakingOfVideo,
                 onDismiss = { selectedMakingOfVideo = null },
             )

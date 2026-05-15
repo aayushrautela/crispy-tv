@@ -1,16 +1,12 @@
 package com.crispy.tv.details
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -47,26 +43,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.compose.LocalLifecycleOwner
-
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
-import com.crispy.tv.home.LandscapeArtworkFrame
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.home.rememberLandscapeImageModel
 import com.crispy.tv.metadata.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-
-private val MAKING_OF_VIDEO_TYPES = setOf("Behind the Scenes", "Bloopers")
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -420,32 +405,13 @@ internal fun DetailsBody(
             }
         }
 
-        val makingOfVideos = uiState.titleDetail?.videos.orEmpty()
-            .filter { video -> video.key.isNotBlank() && video.type in MAKING_OF_VIDEO_TYPES }
-            .sortedByDescending { it.type.equals("Bloopers", ignoreCase = true) }
-        if (makingOfVideos.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(18.dp))
-            val baseTitle = details.title.substringBefore(':').trim().ifBlank { details.title }
-            Text(
-                text = "Making of $baseTitle",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(items = makingOfVideos, key = { it.id }) { video ->
-                    MakingOfCard(
-                        video = video,
-                        onClick = { onMakingOfVideoClick(video) },
-                    )
-                }
-            }
-        }
+        MakingOfVideosSection(
+            videos = uiState.titleDetail?.videos.orEmpty(),
+            baseTitle = details.title.substringBefore(':').trim().ifBlank { details.title },
+            horizontalPadding = horizontalPadding,
+            contentPadding = contentPadding,
+            onVideoClick = onMakingOfVideoClick,
+        )
 
         val collection = uiState.titleExtras?.collection ?: titleDetail?.collection
         collection?.let { col ->
@@ -558,92 +524,4 @@ private fun DetailsReviewPlaceholder(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun MakingOfCard(
-    video: CrispyBackendClient.MetadataVideoView,
-    onClick: () -> Unit,
-) {
-    val imageModel = rememberLandscapeImageModel(video.thumbnailUrl, 280.dp)
-    Column(
-        modifier = Modifier
-            .width(280.dp)
-            .clickable(onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LandscapeArtworkFrame(
-            title = video.name.orEmpty(),
-            imageModel = imageModel,
-            onClick = null,
-            modifier = Modifier.aspectRatio(16f / 9f),
-        )
-        Text(
-            text = video.name.orEmpty(),
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
 
-@Composable
-internal fun MakingOfVideoPlayerDialog(
-    video: CrispyBackendClient.MetadataVideoView?,
-    onDismiss: () -> Unit,
-) {
-    val videoKey = video?.key?.trim().orEmpty()
-    if (video == null || videoKey.isBlank()) return
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    BackHandler(onBack = onDismiss)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = video.name.orEmpty(),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            AndroidView(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f),
-                factory = { context ->
-                    YouTubePlayerView(context).apply {
-                        lifecycleOwner.lifecycle.addObserver(this)
-                        enableAutomaticInitialization = false
-                        initialize(object : AbstractYouTubePlayerListener() {
-                            override fun onReady(youTubePlayer: YouTubePlayer) {
-                                youTubePlayer.loadVideo(videoKey, 0f)
-                            }
-                        }, IFramePlayerOptions.Builder(context)
-                            .controls(1)
-                            .fullscreen(0)
-                            .rel(0)
-                            .build()
-                        )
-                    }
-                },
-                onRelease = { playerView ->
-                    playerView.release()
-                },
-            )
-            TextButton(onClick = onDismiss) {
-                Text("Close", color = Color.White)
-            }
-        }
-    }
-}
