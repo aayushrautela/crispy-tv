@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,9 +60,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.drawable.toBitmap
-import coil.compose.AsyncImagePainter
-import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
+import coil3.compose.AsyncImagePainter
+import coil3.compose.AsyncImage
+import coil3.compose.rememberAsyncImagePainter
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
@@ -142,8 +143,9 @@ internal fun HeroSection(
         }
 
         val imagePainter = rememberAsyncImagePainter(model = imageUrl)
-        LaunchedEffect(imageUrl, imagePainter.state) {
-            when (val state = imagePainter.state) {
+        val imagePainterState by imagePainter.state.collectAsState()
+        LaunchedEffect(imageUrl, imagePainterState) {
+            when (val state = imagePainterState) {
                 is AsyncImagePainter.State.Success -> {
                     onHeroImageLoaded(state.result.drawable.toBitmap(width = 128, height = 128))
                 }

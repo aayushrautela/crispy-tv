@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 JNI_LIBS_DIR="$ROOT_DIR/android/native-engine/src/main/jniLibs"
 
-TAG="MatriX.137"
+TAG="MatriX.141"
 BASE_URL="https://github.com/YouROK/TorrServer/releases/download/${TAG}"
 
 ABIS=(arm64-v8a armeabi-v7a x86_64)
@@ -16,9 +16,9 @@ declare -A FILES=(
 )
 
 declare -A SHA256=(
-  [arm64-v8a]="5f7679d3dfb6d5e51781b85d4579cfa509fbd887f3f0c98f49d49a47459139b3"
-  [armeabi-v7a]="4382fd692467bfd33d723696932b0990fe5720cf2fcc52bb47db5fdb4462ecd8"
-  [x86_64]="6fa874d2b00ce7006b7f61cc775252e84feb2de0a41492f149eaca3c962a9725"
+  [arm64-v8a]="ff35f24ac57b0bc42137822118007ad9601cf14db616e4b33b11c0c3befd4e20"
+  [armeabi-v7a]="72bd32c086ffa6b538ae3ae78bfad1da4fee92a38a44230da5204ac3848990f0"
+  [x86_64]="c255d39e45e509a2e9458c69240b5e640140d68c40c9a35330e5ad3991a750d6"
 )
 
 mkdir -p "$JNI_LIBS_DIR"

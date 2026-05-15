@@ -7,8 +7,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.request.CachePolicy
-import coil.request.ImageRequest
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.metadata.tmdb.TmdbApi
 import com.crispy.tv.settings.ImageSettingsRepositoryProvider

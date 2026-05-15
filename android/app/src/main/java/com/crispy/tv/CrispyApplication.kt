@@ -3,12 +3,12 @@ package com.crispy.tv
 import android.app.Application
 import android.os.Build
 import com.crispy.tv.app.AppGraph
-import coil.ImageLoader
-import coil.ImageLoaderFactory
-import coil.decode.SvgDecoder
-import coil.disk.DiskCache
-import coil.memory.MemoryCache
-import coil.request.CachePolicy
+import coil3.ImageLoader
+import coil3.ImageLoaderFactory
+import coil3.decode.SvgDecoder
+import coil3.disk.DiskCache
+import coil3.memory.MemoryCache
+import coil3.request.CachePolicy
 
 class CrispyApplication : Application(), ImageLoaderFactory {
     val appGraph: AppGraph by lazy {

@@ -53,7 +53,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo

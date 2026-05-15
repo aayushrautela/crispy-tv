@@ -1,8 +1,8 @@
 package com.crispy.tv.images
 
 import android.content.Context
-import coil.annotation.ExperimentalCoilApi
-import coil.imageLoader
+import coil3.annotation.ExperimentalCoilApi
+import coil3.imageLoader
 
 @OptIn(ExperimentalCoilApi::class)
 internal fun clearImageCache(context: Context) {

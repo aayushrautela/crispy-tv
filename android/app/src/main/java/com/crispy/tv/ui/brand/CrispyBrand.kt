@@ -3,7 +3,7 @@ package com.crispy.tv.ui.brand
 import androidx.annotation.RawRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.crispy.tv.R
 
 @Composable

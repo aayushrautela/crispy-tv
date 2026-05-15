@@ -27,7 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.foundation.shape.RoundedCornerShape
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.streams.AddonStream

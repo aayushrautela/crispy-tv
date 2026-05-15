@@ -19,8 +19,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
-import coil.imageLoader
-import coil.request.ImageRequest
+import coil3.imageLoader
+import coil3.request.ImageRequest
 import com.crispy.tv.R
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import kotlinx.coroutines.CoroutineScope
