@@ -26,12 +26,6 @@ internal fun CrispyBackendClient.MetadataTitleDetailResponse.seasonNumbers(): Li
     return seasonNumbers
 }
 
-internal fun CrispyBackendClient.MetadataTitleDetailResponse.episodesForSeason(seasonNumber: Int): List<CrispyBackendClient.MetadataEpisodeView> {
-    return episodes
-        .filter { it.seasonNumber == seasonNumber }
-        .sortedWith(compareBy<CrispyBackendClient.MetadataEpisodeView>({ it.episodeNumber ?: Int.MAX_VALUE }, { it.title ?: "" }, { it.id }))
-}
-
 internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
     return MediaDetails(
         id = id,

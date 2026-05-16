@@ -9,7 +9,6 @@ import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.episodesForSeason
 import com.crispy.tv.metadata.seasonNumbers
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
@@ -256,25 +255,20 @@ internal class DetailsUseCases(
     suspend fun loadSeasonEpisodes(
         season: Int,
         details: MediaDetails,
-        titleDetail: CrispyBackendClient.MetadataTitleDetailResponse? = null,
-        titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse? = null,
+        titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse?,
     ): DetailsSeasonEpisodesResult {
-        val episodesForSeason = titleDetail
-            ?.episodesForSeason(season)
+        val episodesForSeason = titleExtras
+            ?.episodes
+            ?.filter { it.seasonNumber == season }
             ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
             ?.takeIf { it.isNotEmpty() }
-            ?: titleExtras
-                ?.episodes
-                ?.filter { it.seasonNumber == season }
-                ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
-                ?.takeIf { it.isNotEmpty() }
 
         if (episodesForSeason != null) {
             return DetailsSeasonEpisodesResult(
                 videos = episodesForSeason,
                 episodeWatchStates = resolveEpisodeWatchStates(details, episodesForSeason),
                 effectiveSeasonNumber = season,
-                includedSeasonNumbers = titleDetail?.seasonNumbers().orEmpty(),
+                includedSeasonNumbers = emptyList(),
             )
         }
 

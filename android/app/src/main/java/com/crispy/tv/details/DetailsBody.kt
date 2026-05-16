@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -416,7 +419,7 @@ internal fun DetailsBody(
             onVideoClick = onMakingOfVideoClick,
         )
 
-        val collection = uiState.titleExtras?.collection ?: titleDetail?.collection
+        val collection = uiState.titleExtras?.collection
         collection?.let { col ->
             val collectionParts = remember(col) { col.parts.mapNotNull { it.toCatalogItem() } }
             if (collectionParts.isNotEmpty()) {
@@ -440,8 +443,8 @@ internal fun DetailsBody(
             }
         }
 
-        val similar = remember(uiState.titleExtras?.similar, titleDetail?.similar) {
-            (uiState.titleExtras?.similar ?: titleDetail?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
+        val similar = remember(uiState.titleExtras?.similar) {
+            (uiState.titleExtras?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
         }
         if (similar.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
@@ -510,22 +513,35 @@ internal fun DetailsBody(
 
 @Composable
 private fun DetailsReviewPlaceholder(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ElevatedCard(
+        modifier = modifier.height(168.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.55f)
-                .height(18.dp)
-                .skeletonElement(color = DetailsSkeletonColors.Base),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(92.dp)
-                .skeletonElement(color = DetailsSkeletonColors.Base),
-        )
+        Column(
+            modifier = Modifier.fillMaxSize().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.55f)
+                    .height(18.dp)
+                    .skeletonElement(color = DetailsSkeletonColors.Base),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .skeletonElement(color = DetailsSkeletonColors.Base),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.3f)
+                    .height(14.dp)
+                    .skeletonElement(color = DetailsSkeletonColors.Base),
+            )
+        }
     }
 }
 

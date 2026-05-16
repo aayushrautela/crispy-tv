@@ -14,7 +14,6 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.metadata.episodesForSeason
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
@@ -480,37 +479,19 @@ class PlayerSessionViewModel(
                 emptyList()
             }
 
-        seasons.forEach { season ->
-            val seasonEpisodes =
-                titleDetail
-                    .episodesForSeason(season)
-                    .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
-            if (seasonEpisodes.isNotEmpty()) {
-                seasonEpisodesCache[season] = seasonEpisodes
-            }
-        }
-
         _uiState.update { state ->
             val selectedSeason =
                 state.selectedSeason
                     ?: activeIdentity?.season
                     ?: seasons.firstOrNull()
-            val titleDetailEpisodes =
-                selectedSeason
-                    ?.let { season -> titleDetail.episodesForSeason(season) }
-                    .orEmpty()
-                    .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
-            if (selectedSeason != null && titleDetailEpisodes.isNotEmpty()) {
-                seasonEpisodesCache[selectedSeason] = titleDetailEpisodes
-            }
             state.copy(
                 details = fetchedDetails,
                 backdropUrl = fetchedDetails.backdropUrl,
                 artworkUrl = state.artworkUrl ?: fetchedDetails.backdropUrl ?: fetchedDetails.posterUrl,
                 seasons = if (seasons.isNotEmpty()) seasons else state.seasons,
                 selectedSeason = selectedSeason,
-                seasonEpisodes = if (titleDetailEpisodes.isNotEmpty()) titleDetailEpisodes else state.seasonEpisodes,
-                episodesIsLoading = false,
+                seasonEpisodes = emptyList(),
+                episodesIsLoading = true,
             )
         }
 
@@ -521,9 +502,7 @@ class PlayerSessionViewModel(
                 ?.let { it != MetadataLabMediaType.MOVIE }
             == true && seasonToLoad != null
         ) {
-            if (seasonEpisodesCache[seasonToLoad] == null) {
-                loadEpisodesForSeason(seasonToLoad, force = true)
-            }
+            loadEpisodesForSeason(seasonToLoad, force = true)
         }
     }
 
