@@ -328,7 +328,7 @@ internal fun DetailsBody(
             }
         }
 
-        if (details.mediaType != "movie" && uiState.seasons.isNotEmpty()) {
+        if (details.mediaType != "movie" && (uiState.seasons.isNotEmpty() || uiState.episodesIsLoading)) {
             Spacer(modifier = Modifier.height(22.dp))
             Text(
                 text = "Episodes",
@@ -336,10 +336,21 @@ internal fun DetailsBody(
                 modifier = Modifier.padding(horizontal = horizontalPadding)
             )
 
-            val seasons = uiState.seasons
-            val selectedSeason = uiState.selectedSeasonOrFirst
-            if (seasons.isNotEmpty() && selectedSeason != null) {
+            if (uiState.episodesIsLoading && uiState.seasonEpisodes.isEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
+                LazyRow(
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(4, contentType = { "episodeSkeleton" }) {
+                        EpisodeCardSkeleton(modifier = Modifier.width(Dimensions.WideCardWidth))
+                    }
+                }
+            } else if (uiState.seasons.isNotEmpty()) {
+                val seasons = uiState.seasons
+                val selectedSeason = uiState.selectedSeasonOrFirst
+                if (seasons.isNotEmpty() && selectedSeason != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
                 LazyRow(
                     contentPadding = contentPadding,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -408,6 +419,7 @@ internal fun DetailsBody(
                         }
                     }
                 }
+            }
             }
         }
 

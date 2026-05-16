@@ -199,6 +199,12 @@ class DetailsViewModel internal constructor(
                 }
 
                 _uiState.update { state ->
+                    val extrasSeasons = titleExtras?.seasons
+                        ?.map { it.seasonNumber }
+                        ?.filter { it > 0 }
+                        ?.distinct()
+                        ?.sorted()
+                        .orEmpty()
                     val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
                         videos = titleExtras?.episodes.orEmpty().mapNotNull { it.toMediaVideo() },
                         runtimeEntry = runtimeEntry,
@@ -212,14 +218,16 @@ class DetailsViewModel internal constructor(
                         }
                     val selectedSeason =
                         when {
-                            pendingSeason != null && pendingSeason in state.seasons -> pendingSeason
-                            state.selectedSeason != null && state.selectedSeason in state.seasons -> state.selectedSeason
-                            else -> state.selectedSeasonOrFirst
+                            pendingSeason != null && pendingSeason in extrasSeasons -> pendingSeason
+                            state.selectedSeason != null && state.selectedSeason in extrasSeasons -> state.selectedSeason
+                            extrasSeasons.isNotEmpty() -> extrasSeasons.first()
+                            else -> null
                         }
                     val selectedSeasonEpisodes = selectedSeason?.let { seasonEpisodesCache[it] }.orEmpty()
                     state.copy(
                         extrasIsLoading = false,
                         titleExtras = titleExtras,
+                        seasons = extrasSeasons,
                         selectedSeason = selectedSeason,
                         highlightedEpisodeId = pendingHighlightEpisodeId ?: state.highlightedEpisodeId,
                         seasonEpisodes = selectedSeasonEpisodes.takeIf { it.isNotEmpty() } ?: state.seasonEpisodes,

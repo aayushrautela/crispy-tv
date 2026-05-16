@@ -173,6 +173,7 @@ internal suspend fun CrispyBackendClient.getMetadataTitleExtrasApi(
     )
     val json = requireSuccess(response)
     return MetadataTitleExtrasResponse(
+        seasons = parseMetadataSeasonViews(json.optJSONArray("seasons")),
         episodes = parseMetadataEpisodeViews(json.optJSONArray("episodes")),
         reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
         similar = parseMetadataRelatedItemViews(json.optJSONArray("similar")),
