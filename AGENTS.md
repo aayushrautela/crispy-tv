@@ -103,6 +103,15 @@ General:
 - Determinism: pass `nowMs`/clock; inject seeded RNG; keep output ordering canonical.
 - Gradle repos: `settings.gradle.kts` enforces `repositoriesMode = FAIL_ON_PROJECT_REPOS`; do not add repos in module `build.gradle.kts`.
 
+Code quality principles:
+- Keep solutions simple: follow KISS, DRY, and YAGNI.
+- Refactor existing logic instead of layering new code on top.
+- Remove obsolete, unused, or commented-out code.
+- Keep functions focused on a single responsibility.
+- Avoid premature abstractions; solve the immediate problem first.
+- Prefer self-documenting names over comments.
+- Reuse existing utilities before creating new ones.
+
 Contracts:
 - Fixtures include `contract_version`, `suite`, `case_id` (and `now_ms` when specified).
 - Suites currently covered include: `player_machine`, `continue_watching`, `trakt_scrobble_policy`, `search_ranking_and_dedup`, `sync_planner`, `storage_v1`.
