@@ -12,15 +12,40 @@ public struct ContractMediaExternalIds: Equatable {
     }
 }
 
-public struct ContractMediaItemParent: Equatable {
-    public let mediaKey: String
-    public let mediaType: String
-    public let title: String
+public struct ContractUserItemData: Equatable {
+    public let itemId: String?
+    public let isFavorite: Bool?
+    public let played: Bool?
+    public let playCount: Int?
+    public let playbackPositionSeconds: Double?
+    public let runtimeSeconds: Double?
+    public let playedPercentage: Double?
+    public let lastPlayedDate: String?
+    public let rating: Double?
+    public let dismissedFromContinueWatching: Bool?
 
-    public init(mediaKey: String, mediaType: String, title: String) {
-        self.mediaKey = mediaKey
-        self.mediaType = mediaType
-        self.title = title
+    public init(
+        itemId: String? = nil,
+        isFavorite: Bool? = nil,
+        played: Bool? = nil,
+        playCount: Int? = nil,
+        playbackPositionSeconds: Double? = nil,
+        runtimeSeconds: Double? = nil,
+        playedPercentage: Double? = nil,
+        lastPlayedDate: String? = nil,
+        rating: Double? = nil,
+        dismissedFromContinueWatching: Bool? = nil
+    ) {
+        self.itemId = itemId
+        self.isFavorite = isFavorite
+        self.played = played
+        self.playCount = playCount
+        self.playbackPositionSeconds = playbackPositionSeconds
+        self.runtimeSeconds = runtimeSeconds
+        self.playedPercentage = playedPercentage
+        self.lastPlayedDate = lastPlayedDate
+        self.rating = rating
+        self.dismissedFromContinueWatching = dismissedFromContinueWatching
     }
 }
 
@@ -29,7 +54,6 @@ public struct ContractMediaItem: Equatable {
     public let mediaType: String
     public let title: String
     public let originalTitle: String?
-    public let subtitle: String?
     public let overview: String?
     public let posterUrl: String?
     public let backdropUrl: String?
@@ -43,20 +67,23 @@ public struct ContractMediaItem: Equatable {
     public let status: String?
     public let certification: String?
     public let externalIds: ContractMediaExternalIds
-    public let parent: ContractMediaItemParent?
-    public let showTmdbId: Int?
     public let seasonNumber: Int?
     public let episodeNumber: Int?
     public let absoluteEpisodeNumber: Int?
     public let episodeTitle: String?
     public let airDate: String?
+    public let tagline: String?
+    public let seriesId: String?
+    public let seriesName: String?
+    public let seasonId: String?
+    public let seasonName: String?
+    public let userData: ContractUserItemData?
 
     public init(
         mediaKey: String,
         mediaType: String,
         title: String,
         originalTitle: String? = nil,
-        subtitle: String? = nil,
         overview: String? = nil,
         posterUrl: String? = nil,
         backdropUrl: String? = nil,
@@ -70,19 +97,22 @@ public struct ContractMediaItem: Equatable {
         status: String? = nil,
         certification: String? = nil,
         externalIds: ContractMediaExternalIds,
-        parent: ContractMediaItemParent? = nil,
-        showTmdbId: Int? = nil,
         seasonNumber: Int? = nil,
         episodeNumber: Int? = nil,
         absoluteEpisodeNumber: Int? = nil,
         episodeTitle: String? = nil,
-        airDate: String? = nil
+        airDate: String? = nil,
+        tagline: String? = nil,
+        seriesId: String? = nil,
+        seriesName: String? = nil,
+        seasonId: String? = nil,
+        seasonName: String? = nil,
+        userData: ContractUserItemData? = nil
     ) {
         self.mediaKey = mediaKey
         self.mediaType = mediaType
         self.title = title
         self.originalTitle = originalTitle
-        self.subtitle = subtitle
         self.overview = overview
         self.posterUrl = posterUrl
         self.backdropUrl = backdropUrl
@@ -96,13 +126,17 @@ public struct ContractMediaItem: Equatable {
         self.status = status
         self.certification = certification
         self.externalIds = externalIds
-        self.parent = parent
-        self.showTmdbId = showTmdbId
         self.seasonNumber = seasonNumber
         self.episodeNumber = episodeNumber
         self.absoluteEpisodeNumber = absoluteEpisodeNumber
         self.episodeTitle = episodeTitle
         self.airDate = airDate
+        self.tagline = tagline
+        self.seriesId = seriesId
+        self.seriesName = seriesName
+        self.seasonId = seasonId
+        self.seasonName = seasonName
+        self.userData = userData
     }
 }
 
@@ -522,58 +556,91 @@ private func parseCalendarItem(_ payload: [String: Any]) -> CalendarContractItem
 
 private func parseMediaItem(_ payload: [String: Any]) -> ContractMediaItem? {
     guard let mediaKey = requiredString(payload, "mediaKey"),
-          let mediaType = requiredString(payload, "mediaType"),
-          let title = requiredString(payload, "title") else {
+          let type = requiredString(payload, "type"),
+          let name = requiredString(payload, "name") else {
         return nil
     }
 
+    let imageTags = payload["imageTags"] as? [String: Any]
+    let providerIds = payload["providerIds"] as? [String: Any]
     let externalIds = ContractMediaExternalIds(
-        tmdb: nullableInt(payload, "tmdb") ?? nullableInt(payload, "externalIds", "tmdb"),
-        imdb: optionalString(payload, "imdb") ?? optionalString(payload, "externalIds", "imdb"),
-        tvdb: nullableInt(payload, "tvdb") ?? nullableInt(payload, "externalIds", "tvdb")
+        tmdb: optionalString(providerIds, "tmdb").flatMap { Int($0) },
+        imdb: optionalString(providerIds, "imdb"),
+        tvdb: optionalString(providerIds, "tvdb").flatMap { Int($0) }
     )
-
-    let parent: ContractMediaItemParent?
-    if let parentObject = payload["parent"] as? [String: Any],
-       let parentMediaKey = requiredString(parentObject, "mediaKey"),
-       let parentMediaType = requiredString(parentObject, "mediaType"),
-       let parentTitle = requiredString(parentObject, "title") {
-        parent = ContractMediaItemParent(
-            mediaKey: parentMediaKey,
-            mediaType: parentMediaType,
-            title: parentTitle
-        )
-    } else {
-        parent = nil
-    }
+    let userData = optionalObject(payload, "userData").flatMap(parseContractUserItemData)
 
     return ContractMediaItem(
         mediaKey: mediaKey,
-        mediaType: mediaType,
-        title: title,
+        mediaType: parseContractMediaItemType(type),
+        title: name,
         originalTitle: optionalString(payload, "originalTitle"),
-        subtitle: optionalString(payload, "subtitle"),
         overview: optionalString(payload, "overview"),
-        posterUrl: optionalString(payload, "posterUrl"),
-        backdropUrl: optionalString(payload, "backdropUrl"),
-        logoUrl: optionalString(payload, "logoUrl"),
-        stillUrl: optionalString(payload, "stillUrl"),
-        releaseDate: optionalString(payload, "releaseDate"),
-        releaseYear: nullableInt(payload, "releaseYear"),
-        rating: nullableDouble(payload, "rating"),
+        posterUrl: imageTagMedium(imageTags, "primary"),
+        backdropUrl: backdropMedium(imageTags),
+        logoUrl: imageTagMedium(imageTags, "logo"),
+        stillUrl: imageTagMedium(imageTags, "thumb"),
+        releaseDate: optionalString(payload, "premiereDate"),
+        releaseYear: nullableInt(payload, "productionYear"),
+        rating: nullableDouble(payload, "communityRating"),
         genres: stringArray(payload["genres"] as? [Any] ?? [], key: "genres") ?? [],
-        runtimeMinutes: nullableInt(payload, "runtimeMinutes"),
+        runtimeMinutes: nullableInt(payload, "runTimeSeconds").flatMap { $0 > 0 ? $0 / 60 : nil },
         status: optionalString(payload, "status"),
         certification: optionalString(payload, "certification"),
         externalIds: externalIds,
-        parent: parent,
-        showTmdbId: nullableInt(payload, "showTmdbId"),
-        seasonNumber: nullableInt(payload, "seasonNumber"),
-        episodeNumber: nullableInt(payload, "episodeNumber"),
-        absoluteEpisodeNumber: nullableInt(payload, "absoluteEpisodeNumber"),
+        seasonNumber: nullableInt(payload, "parentIndexNumber"),
+        episodeNumber: nullableInt(payload, "indexNumber"),
+        absoluteEpisodeNumber: nullableInt(payload, "absoluteIndexNumber"),
         episodeTitle: optionalString(payload, "episodeTitle"),
-        airDate: optionalString(payload, "airDate")
+        airDate: optionalString(payload, "airDate"),
+        tagline: optionalString(payload, "tagline"),
+        seriesId: optionalString(payload, "seriesId"),
+        seriesName: optionalString(payload, "seriesName"),
+        seasonId: optionalString(payload, "seasonId"),
+        seasonName: optionalString(payload, "seasonName"),
+        userData: userData
     )
+}
+
+private func parseContractMediaItemType(_ type: String) -> String {
+    switch type.trimmingCharacters(in: .whitespacesAndNewlines) {
+    case "Movie": return "movie"
+    case "Series": return "show"
+    case "Season": return "season"
+    case "Episode": return "episode"
+    case "Unknown": return "unknown"
+    default: return "unknown"
+    }
+}
+
+private func parseContractUserItemData(_ payload: [String: Any]) -> ContractUserItemData? {
+    if payload.isEmpty { return nil }
+    return ContractUserItemData(
+        itemId: optionalString(payload, "itemId"),
+        isFavorite: payload["isFavorite"] as? Bool,
+        played: payload["played"] as? Bool,
+        playCount: (payload["playCount"] as? NSNumber)?.intValue,
+        playbackPositionSeconds: doubleValue(payload["playbackPositionSeconds"] as Any),
+        runtimeSeconds: doubleValue(payload["runtimeSeconds"] as Any),
+        playedPercentage: doubleValue(payload["playedPercentage"] as Any),
+        lastPlayedDate: optionalString(payload, "lastPlayedDate"),
+        rating: doubleValue(payload["rating"] as Any),
+        dismissedFromContinueWatching: payload["dismissedFromContinueWatching"] as? Bool
+    )
+}
+
+private func imageTagMedium(_ tags: [String: Any]?, _ key: String) -> String? {
+    guard let tag = tags?[key] else { return nil }
+    if let string = tag as? String { return string }
+    if let dict = tag as? [String: Any] { return optionalString(dict, "medium") }
+    return nil
+}
+
+private func backdropMedium(_ tags: [String: Any]?) -> String? {
+    guard let backdrops = tags?["backdrop"] as? [Any], let first = backdrops.first else { return nil }
+    if let string = first as? String { return string }
+    if let dict = first as? [String: Any] { return optionalString(dict, "medium") }
+    return nil
 }
 
 private func parseMediaPresentationHint(_ payload: [String: Any]) -> ContractMediaPresentationHint? {
@@ -614,51 +681,10 @@ private func optionalString(_ object: [String: Any], _ key: String) -> String? {
     return value as? String
 }
 
-private func optionalString(_ object: [String: Any], _ key1: String, _ key2: String) -> String? {
-    guard let nested = object[key1] as? [String: Any] else {
-        return nil
-    }
-    return optionalString(nested, key2)
-}
-
-private func optionalObject(_ object: [String: Any], _ key: String) -> [String: Any]? {
-    guard let value = object[key] else {
-        return nil
-    }
-    if value is NSNull {
-        return nil
-    }
-    return value as? [String: Any]
-}
-
-private func stringArray(_ values: [Any], key: String) -> [String]? {
-    var output: [String] = []
-    for value in values {
-        guard let text = value as? String else {
-            return nil
-        }
-        output.append(text)
-    }
-    return output
-}
-
 private func nullableInt(_ object: [String: Any], _ key: String) -> Int? {
     guard let value = object[key] else { return nil }
     if value is NSNull { return nil }
     return intValue(value)
-}
-
-private func nullableInt(_ object: [String: Any], _ key1: String, _ key2: String) -> Int? {
-    guard let nested = object[key1] as? [String: Any] else {
-        return nil
-    }
-    return nullableInt(nested, key2)
-}
-
-private func nullableDouble(_ object: [String: Any], _ key: String) -> Double? {
-    guard let value = object[key] else { return nil }
-    if value is NSNull { return nil }
-    return doubleValue(value)
 }
 
 private func intValue(_ value: Any) -> Int? {

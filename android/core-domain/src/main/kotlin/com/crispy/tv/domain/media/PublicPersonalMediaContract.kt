@@ -8,18 +8,11 @@ data class ContractMediaExternalIds(
     val tvdb: Int?,
 )
 
-data class ContractMediaItemParent(
-    val mediaKey: MediaKey,
-    val mediaType: String,
-    val title: String,
-)
-
 data class ContractMediaItem(
     val mediaKey: MediaKey,
     val mediaType: String,
     val title: String,
     val originalTitle: String?,
-    val subtitle: String?,
     val overview: String?,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -33,13 +26,30 @@ data class ContractMediaItem(
     val status: String?,
     val certification: String?,
     val externalIds: ContractMediaExternalIds,
-    val parent: ContractMediaItemParent?,
-    val showTmdbId: Int?,
     val seasonNumber: Int?,
     val episodeNumber: Int?,
     val absoluteEpisodeNumber: Int?,
     val episodeTitle: String?,
     val airDate: String?,
+    val tagline: String?,
+    val seriesId: String?,
+    val seriesName: String?,
+    val seasonId: String?,
+    val seasonName: String?,
+    val userData: ContractUserItemData?,
+)
+
+data class ContractUserItemData(
+    val itemId: String?,
+    val isFavorite: Boolean?,
+    val played: Boolean?,
+    val playCount: Int?,
+    val playbackPositionSeconds: Double?,
+    val runtimeSeconds: Double?,
+    val playedPercentage: Double?,
+    val lastPlayedDate: String?,
+    val rating: Double?,
+    val dismissedFromContinueWatching: Boolean?,
 )
 
 data class ContractMediaPresentationHint(
@@ -292,51 +302,100 @@ private fun parsePresentation(payload: Map<String, Any?>): ContractMediaPresenta
 }
 
 private fun parseMediaItem(payload: Map<String, Any?>): ContractMediaItem? {
-    if (!payload.hasExactKeys(setOf("mediaKey", "mediaType", "title", "originalTitle", "subtitle", "overview", "posterUrl", "backdropUrl", "logoUrl", "stillUrl", "releaseDate", "releaseYear", "rating", "genres", "runtimeMinutes", "status", "certification", "externalIds", "parent", "showTmdbId", "seasonNumber", "episodeNumber", "absoluteEpisodeNumber", "episodeTitle", "airDate"))) return null
+    if (!payload.hasRequiredKeys(setOf("mediaKey", "type", "name"))) return null
+    val mediaKey = payload.requiredString("mediaKey") ?: return null
+    val type = payload.requiredString("type") ?: return null
+    val name = payload.requiredString("name") ?: return null
+    val imageTags = payload.nullableObject("imageTags")
     return ContractMediaItem(
-        mediaKey = MediaKey(payload.requiredString("mediaKey") ?: return null),
-        mediaType = payload.requiredString("mediaType") ?: return null,
-        title = payload.requiredString("title") ?: return null,
+        mediaKey = MediaKey(mediaKey),
+        mediaType = parseContractMediaItemType(type),
+        title = name,
         originalTitle = payload.nullableString("originalTitle"),
-        subtitle = payload.nullableString("subtitle"),
         overview = payload.nullableString("overview"),
-        posterUrl = payload.nullableString("posterUrl"),
-        backdropUrl = payload.nullableString("backdropUrl"),
-        logoUrl = payload.nullableString("logoUrl"),
-        stillUrl = payload.nullableString("stillUrl"),
-        releaseDate = payload.nullableString("releaseDate"),
-        releaseYear = payload.nullableInt("releaseYear"),
-        rating = payload.nullableNumber("rating"),
+        posterUrl = imageTags?.imageTagMedium("primary"),
+        backdropUrl = imageTags?.backdropMedium(),
+        logoUrl = imageTags?.imageTagMedium("logo"),
+        stillUrl = imageTags?.imageTagMedium("thumb"),
+        releaseDate = payload.nullableString("premiereDate"),
+        releaseYear = payload.nullableInt("productionYear"),
+        rating = payload.nullableNumber("communityRating"),
         genres = payload.requiredStringList("genres") ?: return null,
-        runtimeMinutes = payload.nullableInt("runtimeMinutes"),
+        runtimeMinutes = payload.nullableNumber("runTimeSeconds")?.toInt()?.let { if (it > 0) it / 60 else null },
         status = payload.nullableString("status"),
         certification = payload.nullableString("certification"),
-        externalIds = payload.requiredObject("externalIds")?.let(::parseExternalIds) ?: return null,
-        parent = payload.nullableObject("parent")?.let(::parseParent),
-        showTmdbId = payload.nullableInt("showTmdbId"),
-        seasonNumber = payload.nullableInt("seasonNumber"),
-        episodeNumber = payload.nullableInt("episodeNumber"),
-        absoluteEpisodeNumber = payload.nullableInt("absoluteEpisodeNumber"),
+        externalIds = payload.nullableObject("providerIds")?.let(::parseProviderIds) ?: ContractMediaExternalIds(null, null, null),
+        seasonNumber = payload.nullableInt("parentIndexNumber"),
+        episodeNumber = payload.nullableInt("indexNumber"),
+        absoluteEpisodeNumber = payload.nullableInt("absoluteIndexNumber"),
         episodeTitle = payload.nullableString("episodeTitle"),
         airDate = payload.nullableString("airDate"),
+        tagline = payload.nullableString("tagline"),
+        seriesId = payload.nullableString("seriesId"),
+        seriesName = payload.nullableString("seriesName"),
+        seasonId = payload.nullableString("seasonId"),
+        seasonName = payload.nullableString("seasonName"),
+        userData = payload.nullableObject("userData")?.let(::parseContractUserItemData),
     )
 }
 
-private fun parseExternalIds(payload: Map<String, Any?>): ContractMediaExternalIds? {
-    if (!payload.hasExactKeys(setOf("tmdb", "imdb", "tvdb"))) return null
-    return ContractMediaExternalIds(payload.nullableInt("tmdb"), payload.nullableString("imdb"), payload.nullableInt("tvdb"))
+private fun parseProviderIds(payload: Map<String, Any?>): ContractMediaExternalIds {
+    return ContractMediaExternalIds(
+        tmdb = payload.nullableString("tmdb")?.toIntOrNull(),
+        imdb = payload.nullableString("imdb"),
+        tvdb = payload.nullableString("tvdb")?.toIntOrNull(),
+    )
 }
 
-private fun parseParent(payload: Map<String, Any?>): ContractMediaItemParent? {
-    if (!payload.hasExactKeys(setOf("mediaKey", "mediaType", "title"))) return null
-    return ContractMediaItemParent(
-        mediaKey = MediaKey(payload.requiredString("mediaKey") ?: return null),
-        mediaType = payload.requiredString("mediaType") ?: return null,
-        title = payload.requiredString("title") ?: return null,
+private fun parseContractUserItemData(payload: Map<String, Any?>): ContractUserItemData? {
+    if (payload.isEmpty()) return null
+    return ContractUserItemData(
+        itemId = payload.nullableString("itemId"),
+        isFavorite = payload["isFavorite"] as? Boolean,
+        played = payload["played"] as? Boolean,
+        playCount = (payload["playCount"] as? Number)?.toInt(),
+        playbackPositionSeconds = (payload["playbackPositionSeconds"] as? Number)?.toDouble(),
+        runtimeSeconds = (payload["runtimeSeconds"] as? Number)?.toDouble(),
+        playedPercentage = (payload["playedPercentage"] as? Number)?.toDouble(),
+        lastPlayedDate = payload.nullableString("lastPlayedDate"),
+        rating = (payload["rating"] as? Number)?.toDouble(),
+        dismissedFromContinueWatching = payload["dismissedFromContinueWatching"] as? Boolean,
     )
+}
+
+private fun parseContractMediaItemType(type: String): String {
+    return when (type.trim()) {
+        "Movie" -> "movie"
+        "Series" -> "show"
+        "Season" -> "season"
+        "Episode" -> "episode"
+        "Unknown" -> "unknown"
+        else -> "unknown"
+    }
+}
+
+private fun Map<String, Any?>.imageTagMedium(key: String): String? {
+    val tag = this[key]
+    return when (tag) {
+        is String -> tag
+        is Map<*, *> -> tag.toStringAnyMap()?.nullableString("medium")
+        else -> null
+    }
+}
+
+private fun Map<String, Any?>.backdropMedium(): String? {
+    val backdrops = this["backdrop"] as? List<*>
+    val first = backdrops?.firstOrNull()
+    return when (first) {
+        is String -> first
+        is Map<*, *> -> first.toStringAnyMap()?.nullableString("medium")
+        else -> null
+    }
 }
 
 private fun Map<String, Any?>.hasExactKeys(expected: Set<String>): Boolean = keys == expected
+
+private fun Map<String, Any?>.hasRequiredKeys(required: Set<String>): Boolean = required.all { containsKey(it) }
 
 private fun Map<String, Any?>.requiredString(key: String): String? = this[key] as? String
 

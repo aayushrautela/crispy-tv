@@ -101,6 +101,6 @@ internal fun CrispyBackendClient.MediaItem.toCatalogItem(defaultGenre: String? =
         rating = rating?.toString(),
         year = releaseYear?.toString(),
         genre = genres.firstOrNull() ?: defaultGenre,
-        description = overview ?: subtitle,
+        description = overview ?: tagline ?: episodeTitle,
     )
 }

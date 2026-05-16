@@ -249,7 +249,7 @@ class CalendarService internal constructor(
             highlightEpisodeId = null,
             seriesName = relatedShow.title,
             episodeTitle = mediaItem.episodeTitle,
-            overview = mediaItem.overview ?: mediaItem.subtitle,
+            overview = mediaItem.overview ?: mediaItem.episodeTitle ?: mediaItem.tagline,
             season = season,
             episode = episode,
             episodeRange = null,

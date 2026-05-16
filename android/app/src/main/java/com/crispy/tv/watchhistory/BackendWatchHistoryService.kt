@@ -598,7 +598,7 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
                 add(
                     CanonicalContinueWatchingItem(
                         id = item.id,
-                        titleMediaKey = item.mediaItem.toTitleMediaKey(),
+                        titleMediaKey = item.mediaItem.seriesId ?: item.mediaItem.mediaKey,
                         playbackMediaKey = item.mediaItem.mediaKey,
                         mediaType = item.mediaItem.mediaType,
                         title = item.mediaItem.title,
@@ -612,7 +612,6 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
     logoUrl = item.mediaItem.logoUrl,
     stillUrl = item.mediaItem.stillUrl,
     addonId = "backend",
-                        subtitle = item.mediaItem.subtitle,
                         absoluteEpisodeNumber = item.mediaItem.absoluteEpisodeNumber,
                     )
                 )
@@ -647,10 +646,6 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
             "anime" -> MetadataLabMediaType.ANIME
             else -> MetadataLabMediaType.MOVIE
         }
-    }
-
-    private fun CrispyBackendClient.MediaItem.toTitleMediaKey(): String {
-        return parent?.mediaKey ?: mediaKey
     }
 
     private fun buildEpisodeMediaKey(mediaKey: String?, season: Int?, episode: Int?): String? {

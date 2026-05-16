@@ -310,7 +310,7 @@ class RecommendationCatalogService internal constructor(
             type = normalizedType,
             rating = formatRatingOutOfTen(rating?.toString()),
             year = releaseYear?.toString(),
-            description = subtitle ?: episodeTitle ?: overview,
+            description = tagline ?: episodeTitle ?: overview,
         )
     }
 

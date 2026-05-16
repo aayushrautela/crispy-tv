@@ -81,18 +81,11 @@ class CrispyBackendClient(
         val tvdb: Int?,
     )
 
-    data class MediaItemParent(
-        val mediaKey: String,
-        val mediaType: String,
-        val title: String,
-    )
-
     data class MediaItem(
         val mediaKey: String,
         val mediaType: String,
         val title: String,
         val originalTitle: String?,
-        val subtitle: String?,
         val overview: String?,
         val poster: ResponsiveImageSet,
         val backdrop: ResponsiveImageSet,
@@ -107,13 +100,17 @@ class CrispyBackendClient(
         val maturityRating: String?,
         val certification: String?,
         val externalIds: MediaExternalIds,
-        val parent: MediaItemParent?,
-        val showTmdbId: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
         val absoluteEpisodeNumber: Int?,
         val episodeTitle: String?,
         val airDate: String?,
+        val tagline: String?,
+        val seriesId: String?,
+        val seriesName: String?,
+        val seasonId: String?,
+        val seasonName: String?,
+        val userData: UserItemData?,
     ) {
         val posterUrl: String?
             get() = poster.medium
@@ -127,6 +124,19 @@ class CrispyBackendClient(
         val stillUrl: String?
             get() = still.medium
     }
+
+    data class UserItemData(
+        val itemId: String?,
+        val isFavorite: Boolean?,
+        val played: Boolean?,
+        val playCount: Int?,
+        val playbackPositionSeconds: Double?,
+        val runtimeSeconds: Double?,
+        val playedPercentage: Double?,
+        val lastPlayedDate: String?,
+        val rating: Double?,
+        val dismissedFromContinueWatching: Boolean?,
+    )
 
     data class SurfaceContext(
         val values: Map<String, Any?>,

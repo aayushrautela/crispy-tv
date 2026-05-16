@@ -7,7 +7,7 @@ import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionRespons
 import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingStateView
 import com.crispy.tv.backend.CrispyBackendClient.MediaExternalIds
 import com.crispy.tv.backend.CrispyBackendClient.MediaItem
-import com.crispy.tv.backend.CrispyBackendClient.MediaItemParent
+import com.crispy.tv.backend.CrispyBackendClient.UserItemData
 import com.crispy.tv.backend.CrispyBackendClient.MediaPresentationHint
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationCollectionCard
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationCollectionItem
@@ -376,25 +376,47 @@ internal fun CrispyBackendClient.parseMetadataExternalIds(json: JSONObject?): Me
     )
 }
 
-internal fun CrispyBackendClient.parseMediaExternalIds(json: JSONObject?): MediaExternalIds {
+internal fun CrispyBackendClient.parseProviderIds(json: JSONObject?): MediaExternalIds {
     val safe = json ?: JSONObject()
     return MediaExternalIds(
-        tmdb = safe.optIntOrNull("tmdb"),
-        imdb = safe.optNullableString("imdb"),
-        tvdb = safe.optIntOrNull("tvdb"),
+        tmdb = safe.optString("tmdb").trim().toIntOrNull(),
+        imdb = safe.optString("imdb").trim().ifBlank { null },
+        tvdb = safe.optString("tvdb").trim().toIntOrNull(),
     )
 }
 
-internal fun CrispyBackendClient.parseMediaItemParent(json: JSONObject?): MediaItemParent? {
+private fun parseMediaItemType(type: String): String {
+    return when (type.trim()) {
+        "Movie" -> "movie"
+        "Series" -> "show"
+        "Season" -> "season"
+        "Episode" -> "episode"
+        "Unknown" -> "unknown"
+        else -> "unknown"
+    }
+}
+
+internal fun CrispyBackendClient.parseUserItemData(json: JSONObject?): UserItemData? {
     val safe = json ?: return null
-    val mediaKey = safe.optNullableString("mediaKey") ?: return null
-    val mediaType = safe.optNullableString("mediaType") ?: return null
-    val title = safe.optNullableString("title") ?: return null
-    return MediaItemParent(
-        mediaKey = mediaKey,
-        mediaType = mediaType,
-        title = title,
+    if (safe.length() == 0) return null
+    return UserItemData(
+        itemId = safe.optString("itemId").trim().ifBlank { null },
+        isFavorite = if (safe.has("isFavorite") && !safe.isNull("isFavorite")) safe.optBoolean("isFavorite") else null,
+        played = if (safe.has("played") && !safe.isNull("played")) safe.optBoolean("played") else null,
+        playCount = safe.optIntOrNull("playCount"),
+        playbackPositionSeconds = safe.optDoubleOrNull("playbackPositionSeconds"),
+        runtimeSeconds = safe.optDoubleOrNull("runtimeSeconds"),
+        playedPercentage = safe.optDoubleOrNull("playedPercentage"),
+        lastPlayedDate = safe.optNullableString("lastPlayedDate"),
+        rating = safe.optDoubleOrNull("rating"),
+        dismissedFromContinueWatching = if (safe.has("dismissedFromContinueWatching") && !safe.isNull("dismissedFromContinueWatching")) safe.optBoolean("dismissedFromContinueWatching") else null,
     )
+}
+
+private fun parseImageTagBackdrop(array: JSONArray?, fallbackUrl: String?): ResponsiveImageSet {
+    val first = array?.optJSONObject(0)
+    return first?.let { parseResponsiveImageSet(it, null) }
+        ?: ResponsiveImageSet(fallbackUrl, fallbackUrl, fallbackUrl)
 }
 
 internal fun CrispyBackendClient.parseMediaPresentationHint(json: JSONObject?): MediaPresentationHint? {
@@ -408,38 +430,42 @@ internal fun CrispyBackendClient.parseMediaPresentationHint(json: JSONObject?): 
 
 internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
     val mediaKey = json.optNullableString("mediaKey")
-    val mediaType = json.optNullableString("mediaType")
-    val title = json.optNullableString("title")
-    if (mediaKey.isNullOrBlank() || mediaType.isNullOrBlank() || title.isNullOrBlank()) {
+    val type = json.optNullableString("type")
+    val name = json.optNullableString("name")
+    if (mediaKey.isNullOrBlank() || type.isNullOrBlank() || name.isNullOrBlank()) {
         throw IllegalStateException("MediaItem is missing required identity fields.")
     }
+    val imageTags = json.optJSONObject("imageTags")
     return MediaItem(
         mediaKey = mediaKey,
-        mediaType = mediaType,
-        title = title,
+        mediaType = parseMediaItemType(type),
+        title = name,
         originalTitle = json.optNullableString("originalTitle"),
-        subtitle = json.optNullableString("subtitle"),
         overview = json.optNullableString("overview"),
-        poster = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("poster"), null),
-        backdrop = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("backdrop"), null),
-        logo = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("logo"), null),
-        still = parseResponsiveImageSet(json.optJSONObject("images")?.optJSONObject("still"), null),
-        releaseDate = json.optNullableString("releaseDate"),
-        releaseYear = json.optIntOrNull("releaseYear"),
-        rating = json.optDoubleOrNull("rating"),
+        poster = parseResponsiveImageSet(imageTags?.optJSONObject("primary"), null),
+        backdrop = parseImageTagBackdrop(imageTags?.optJSONArray("backdrop"), null),
+        logo = parseResponsiveImageSet(imageTags?.optJSONObject("logo"), null),
+        still = parseResponsiveImageSet(imageTags?.optJSONObject("thumb"), null),
+        releaseDate = json.optNullableString("premiereDate"),
+        releaseYear = json.optIntOrNull("productionYear"),
+        rating = json.optDoubleOrNull("communityRating"),
         genres = json.optStringList("genres"),
-        runtimeMinutes = json.optIntOrNull("runtimeMinutes"),
+        runtimeMinutes = json.optIntOrNull("runTimeSeconds")?.let { if (it > 0) it / 60 else null },
         status = json.optNullableString("status"),
-        maturityRating = json.optNullableString("maturityRating"),
+        maturityRating = json.optNullableString("officialRating"),
         certification = json.optNullableString("certification"),
-        externalIds = parseMediaExternalIds(json.optJSONObject("externalIds")),
-        parent = parseMediaItemParent(json.optJSONObject("parent")),
-        showTmdbId = json.optIntOrNull("showTmdbId"),
-        seasonNumber = json.optIntOrNull("seasonNumber"),
-        episodeNumber = json.optIntOrNull("episodeNumber"),
-        absoluteEpisodeNumber = json.optIntOrNull("absoluteEpisodeNumber"),
+        externalIds = parseProviderIds(json.optJSONObject("providerIds")),
+        seasonNumber = json.optIntOrNull("parentIndexNumber"),
+        episodeNumber = json.optIntOrNull("indexNumber"),
+        absoluteEpisodeNumber = json.optIntOrNull("absoluteIndexNumber"),
         episodeTitle = json.optNullableString("episodeTitle"),
         airDate = json.optNullableString("airDate"),
+        tagline = json.optNullableString("tagline"),
+        seriesId = json.optNullableString("seriesId"),
+        seriesName = json.optNullableString("seriesName"),
+        seasonId = json.optNullableString("seasonId"),
+        seasonName = json.optNullableString("seasonName"),
+        userData = parseUserItemData(json.optJSONObject("userData")),
     )
 }
 

@@ -14,36 +14,43 @@
           "kind": "continue_watching",
           "mediaItem": {
             "mediaKey": "show:tmdb:1399",
-            "mediaType": "show",
-            "title": "Game of Thrones",
+            "type": "Series",
+            "name": "Game of Thrones",
             "originalTitle": null,
-            "subtitle": null,
             "overview": null,
-            "posterUrl": null,
-            "backdropUrl": "https://img/backdrop.jpg",
-            "logoUrl": null,
-            "stillUrl": null,
-            "releaseDate": null,
-            "releaseYear": 2011,
-            "rating": 9.2,
+            "tagline": null,
+            "imageTags": {
+              "backdrop": [
+                {
+                  "small": null,
+                  "medium": "https://img/backdrop.jpg",
+                  "large": null
+                }
+              ]
+            },
+            "productionYear": 2011,
+            "premiereDate": null,
+            "communityRating": 9.2,
+            "officialRating": null,
+            "certification": null,
             "genres": [
               "Fantasy"
             ],
-            "runtimeMinutes": 55,
+            "runTimeSeconds": 3300,
             "status": null,
-            "certification": null,
-            "externalIds": {
-              "tmdb": 1399,
-              "imdb": null,
-              "tvdb": null
+            "providerIds": {
+              "tmdb": "1399"
             },
-            "parent": null,
-            "showTmdbId": 1399,
-            "seasonNumber": 3,
-            "episodeNumber": 9,
-            "absoluteEpisodeNumber": null,
+            "seriesId": "show:tmdb:1399",
+            "seriesName": null,
+            "seasonId": null,
+            "seasonName": null,
+            "parentIndexNumber": 3,
+            "indexNumber": 9,
+            "absoluteIndexNumber": null,
             "episodeTitle": "The Rains of Castamere",
-            "airDate": "2013-06-02"
+            "airDate": "2013-06-02",
+            "userData": null
           },
           "context": {
             "id": "cw-1",
