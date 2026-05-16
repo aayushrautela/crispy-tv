@@ -5,6 +5,7 @@
 
 package com.crispy.tv.details
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -378,10 +379,27 @@ internal fun DetailsScreen(
             )
 
             if (visibleUiState.aiStoryVisible && visibleUiState.aiInsights != null) {
+                val aiOverlayTitle = visibleDetails?.title ?: details?.title
+                val aiOverlayPosterUrl = visibleDetails?.posterUrl ?: details?.posterUrl
+                val aiOverlayBackdropUrl = visibleDetails?.backdropUrl ?: details?.backdropUrl
+                val shareTitle = aiOverlayTitle?.trim()?.takeIf { it.isNotEmpty() } ?: "this title"
                 AiInsightsStoryOverlay(
                     result = visibleUiState.aiInsights,
                     backdropUrls = aiBackdropUrls,
                     onDismiss = onDismissAiInsights,
+                    title = aiOverlayTitle,
+                    posterUrl = aiOverlayPosterUrl,
+                    backdropUrl = aiOverlayBackdropUrl,
+                    palette = palette,
+                    isInWatchlist = visibleUiState.isInWatchlist,
+                    onToggleWatchlist = onToggleWatchlist,
+                    onShare = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, "Check out $shareTitle on Crispy")
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share $shareTitle"))
+                    },
                 )
             }
         }
