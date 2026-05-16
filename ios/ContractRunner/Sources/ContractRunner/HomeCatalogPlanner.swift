@@ -472,12 +472,22 @@ private extension HomeCatalogList {
     }
 
     func supportsMediaType(_ mediaType: String) -> Bool {
-        mediaTypes.contains(where: { $0.caseInsensitiveCompare(mediaType) == .orderedSame }) ||
-            items.contains(where: { $0.type.caseInsensitiveCompare(mediaType) == .orderedSame })
+        let normalizedMediaType = mediaType.toHomeCatalogMediaType()
+        return mediaTypes.contains(where: { $0.toHomeCatalogMediaType().caseInsensitiveCompare(normalizedMediaType) == .orderedSame }) ||
+            items.contains(where: { $0.type.toHomeCatalogMediaType().caseInsensitiveCompare(normalizedMediaType) == .orderedSame })
     }
 }
 
 private extension String {
+    func toHomeCatalogMediaType() -> String {
+        switch trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "series", "tv":
+            return "show"
+        default:
+            return trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+    }
+
     func nilIfBlank() -> String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

@@ -376,8 +376,16 @@ private fun HomeCatalogList.toSection(): HomeCatalogSection {
 }
 
 private fun HomeCatalogList.supportsMediaType(mediaType: String): Boolean {
-    return mediaTypes.any { it.equals(mediaType, ignoreCase = true) } ||
-        items.any { it.type.equals(mediaType, ignoreCase = true) }
+    val normalizedMediaType = mediaType.toHomeCatalogMediaType()
+    return mediaTypes.any { it.toHomeCatalogMediaType().equals(normalizedMediaType, ignoreCase = true) } ||
+        items.any { it.type.toHomeCatalogMediaType().equals(normalizedMediaType, ignoreCase = true) }
+}
+
+private fun String.toHomeCatalogMediaType(): String {
+    return when (trim().lowercase(Locale.US)) {
+        "series", "tv" -> "show"
+        else -> trim().lowercase(Locale.US)
+    }
 }
 
 private const val DEFAULT_VARIANT_KEY = "default"
