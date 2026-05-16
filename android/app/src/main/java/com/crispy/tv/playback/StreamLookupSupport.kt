@@ -11,7 +11,7 @@ import com.crispy.tv.streams.StreamProviderUiState
 import com.crispy.tv.streams.StreamSelectorUiState
 import java.util.Locale
 
-val TMDB_ID_REGEX: Regex = Regex("\\btmdb:(?:movie:|show:|tv:)?(\\d+)", RegexOption.IGNORE_CASE)
+val TMDB_ID_REGEX: Regex = Regex("tmdb:(\\d+)")
 
 data class StreamLookupTarget(
     val mediaType: MetadataLabMediaType,
@@ -29,7 +29,7 @@ fun resolveStreamLookupTarget(
     val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
 val lookupId =
     when (mediaType) {
-      MetadataLabMediaType.MOVIE -> details.tmdbId?.let { "tmdb:$it" }.orEmpty()
+      MetadataLabMediaType.MOVIE -> details.tmdbId?.let { "movie:tmdb:$it" }.orEmpty()
       MetadataLabMediaType.SERIES,
       MetadataLabMediaType.ANIME -> {
         val fromLoadedEpisodes = seasonEpisodes.firstOrNull { !it.lookupId.isNullOrBlank() }?.lookupId?.trim()
@@ -37,7 +37,7 @@ val lookupId =
           fromLoadedEpisodes
         } else {
           val season = selectedSeason ?: seasonEpisodes.firstOrNull()?.season ?: 1
-          val base = details.showTmdbId?.let { "tmdb:$it" }.orEmpty()
+          val base = details.showTmdbId?.let { "show:tmdb:$it" }.orEmpty()
           if (base.isNotBlank() && season > 0) {
             "$base:$season:1"
           } else {
@@ -73,7 +73,7 @@ fun buildEpisodeLookupId(
 ): String? {
   if (season <= 0 || episode <= 0) return null
   val showTmdbId = details.showTmdbId ?: return null
-  return "tmdb:$showTmdbId:$season:$episode"
+  return "episode:tmdb:$showTmdbId:$season:$episode"
 }
 
 fun buildPlayerSubtitle(

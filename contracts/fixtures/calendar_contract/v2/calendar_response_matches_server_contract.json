@@ -13,7 +13,7 @@
           "bucket": "no_scheduled",
           "kind": "calendar_item",
           "mediaItem": {
-            "mediaKey": "tmdb:episode:1001",
+            "mediaKey": "episode:tmdb:500:1:3",
             "mediaType": "episode",
             "title": "Sunrise, Sunset",
             "originalTitle": null,
@@ -26,11 +26,17 @@
             "releaseDate": null,
             "releaseYear": 2026,
             "rating": 8.1,
-            "genres": ["Drama"],
+            "genres": [
+              "Drama"
+            ],
             "runtimeMinutes": 48,
             "status": null,
             "certification": null,
-            "externalIds": { "tmdb": 1001, "imdb": null, "tvdb": null },
+            "externalIds": {
+              "tmdb": 1001,
+              "imdb": null,
+              "tvdb": null
+            },
             "parent": null,
             "showTmdbId": 500,
             "seasonNumber": 1,
@@ -44,7 +50,7 @@
             "airDate": null,
             "watched": false,
             "relatedShow": {
-              "mediaKey": "tmdb:series:500",
+              "mediaKey": "show:tmdb:500",
               "mediaType": "show",
               "title": "The Morning Bell",
               "originalTitle": null,
@@ -57,11 +63,17 @@
               "releaseDate": null,
               "releaseYear": 2026,
               "rating": 8.3,
-              "genres": ["Drama"],
+              "genres": [
+                "Drama"
+              ],
               "runtimeMinutes": null,
               "status": null,
               "certification": null,
-              "externalIds": { "tmdb": 500, "imdb": null, "tvdb": null },
+              "externalIds": {
+                "tmdb": 500,
+                "imdb": null,
+                "tvdb": null
+              },
               "parent": null,
               "showTmdbId": 500,
               "seasonNumber": null,

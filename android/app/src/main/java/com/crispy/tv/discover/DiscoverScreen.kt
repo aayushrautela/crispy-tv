@@ -99,7 +99,7 @@ import kotlinx.coroutines.withContext
 enum class DiscoverTypeFilter(val label: String, val mediaType: String?) {
     All(label = "All", mediaType = null),
     Movies(label = "Movies", mediaType = "movie"),
-    Series(label = "Series", mediaType = "series")
+    Series(label = "Series", mediaType = "show")
 }
 
 @Immutable

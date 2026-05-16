@@ -52,15 +52,15 @@
   "expected": {
     "items": [
       {
-        "media_type": "series",
-        "item_key": "tmdb:series:123",
+        "media_type": "show",
+        "item_key": "show:tmdb:123",
         "title": "Same Id Series",
         "image_url": "https://image.tmdb.org/t/p/w500/s.jpg",
         "rating": 5.25
       },
       {
         "media_type": "movie",
-        "item_key": "tmdb:movie:123",
+        "item_key": "movie:tmdb:123",
         "title": "Same Id Movie",
         "year": 2018,
         "image_url": "https://image.tmdb.org/t/p/w500/m.jpg",

@@ -5,8 +5,8 @@
   "input": {
     "kind": "landscape_card",
     "payload": {
-      "mediaKey": "tmdb:series:66732",
-      "mediaType": "series",
+      "mediaKey": "show:tmdb:66732",
+      "mediaType": "show",
       "title": "Stranger Things",
       "posterUrl": "https://img/stranger-poster.jpg"
     }

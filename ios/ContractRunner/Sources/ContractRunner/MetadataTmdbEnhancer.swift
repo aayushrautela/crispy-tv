@@ -5,7 +5,8 @@ public enum MetadataMediaType: String {
     case series
 
     public static func fromContractValue(_ value: String) -> MetadataMediaType {
-        value.caseInsensitiveCompare("series") == .orderedSame ? .series : .movie
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return (normalized == "series" || normalized == "show" || normalized == "tv") ? .series : .movie
     }
 }
 
@@ -173,7 +174,7 @@ public func bridgeCandidateIds(
     }
 
     var candidates: [String] = [normalizedEpisodeId(normalizedContentId, season: season, episode: episode)]
-    if normalizedContentId.lowercased().hasPrefix("tmdb:") {
+    if normalizedContentId.lowercased().contains(":tmdb:") {
         let bridgedBase = nonBlankOrNil(tmdbMeta?.imdbId)
             ?? nonBlankOrNil(tmdbMeta?.id).flatMap { candidate -> String? in
                 candidate.caseInsensitiveCompare(normalizedContentId) == .orderedSame ? nil : candidate

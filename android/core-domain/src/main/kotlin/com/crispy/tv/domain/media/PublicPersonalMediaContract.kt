@@ -1,5 +1,7 @@
 package com.crispy.tv.domain.media
 
+import com.crispy.tv.domain.MediaKey
+
 data class ContractMediaExternalIds(
     val tmdb: Int?,
     val imdb: String?,
@@ -7,13 +9,13 @@ data class ContractMediaExternalIds(
 )
 
 data class ContractMediaItemParent(
-    val mediaKey: String,
+    val mediaKey: MediaKey,
     val mediaType: String,
     val title: String,
 )
 
 data class ContractMediaItem(
-    val mediaKey: String,
+    val mediaKey: MediaKey,
     val mediaType: String,
     val title: String,
     val originalTitle: String?,
@@ -292,7 +294,7 @@ private fun parsePresentation(payload: Map<String, Any?>): ContractMediaPresenta
 private fun parseMediaItem(payload: Map<String, Any?>): ContractMediaItem? {
     if (!payload.hasExactKeys(setOf("mediaKey", "mediaType", "title", "originalTitle", "subtitle", "overview", "posterUrl", "backdropUrl", "logoUrl", "stillUrl", "releaseDate", "releaseYear", "rating", "genres", "runtimeMinutes", "status", "certification", "externalIds", "parent", "showTmdbId", "seasonNumber", "episodeNumber", "absoluteEpisodeNumber", "episodeTitle", "airDate"))) return null
     return ContractMediaItem(
-        mediaKey = payload.requiredString("mediaKey") ?: return null,
+        mediaKey = MediaKey(payload.requiredString("mediaKey") ?: return null),
         mediaType = payload.requiredString("mediaType") ?: return null,
         title = payload.requiredString("title") ?: return null,
         originalTitle = payload.nullableString("originalTitle"),
@@ -328,7 +330,7 @@ private fun parseExternalIds(payload: Map<String, Any?>): ContractMediaExternalI
 private fun parseParent(payload: Map<String, Any?>): ContractMediaItemParent? {
     if (!payload.hasExactKeys(setOf("mediaKey", "mediaType", "title"))) return null
     return ContractMediaItemParent(
-        mediaKey = payload.requiredString("mediaKey") ?: return null,
+        mediaKey = MediaKey(payload.requiredString("mediaKey") ?: return null),
         mediaType = payload.requiredString("mediaType") ?: return null,
         title = payload.requiredString("title") ?: return null,
     )

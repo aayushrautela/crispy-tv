@@ -40,14 +40,14 @@
     "items": [
       {
         "media_type": "movie",
-        "item_key": "tmdb:movie:101",
+        "item_key": "movie:tmdb:101",
         "title": "Fallback Movie",
         "year": 2010,
         "rating": 7.0
       },
       {
-        "media_type": "series",
-        "item_key": "tmdb:series:202",
+        "media_type": "show",
+        "item_key": "show:tmdb:202",
         "title": "Fallback Series",
         "year": 2009,
         "image_url": "https://image.tmdb.org/t/p/w500/series.jpg",
@@ -55,7 +55,7 @@
       },
       {
         "media_type": "person",
-        "item_key": "tmdb:person:303",
+        "item_key": "person:tmdb:303",
         "title": "Name From Title",
         "image_url": "https://image.tmdb.org/t/p/h632/person.jpg"
       }

@@ -5,7 +5,7 @@
   "input": {
     "kind": "metadata_card",
     "payload": {
-      "mediaKey": "tmdb:movie:680",
+      "mediaKey": "movie:tmdb:680",
       "mediaType": "movie",
       "title": "Pulp Fiction",
       "images": {
@@ -19,7 +19,7 @@
     "valid": true,
     "normalized": {
       "card_family": "regular",
-      "media_key": "tmdb:movie:680",
+      "media_key": "movie:tmdb:680",
       "media_type": "movie",
       "item_id": null,
       "title": "Pulp Fiction",

@@ -8,7 +8,7 @@
       "id": "rating-333",
       "kind": "rating",
       "mediaItem": {
-        "mediaKey": "tmdb:movie:444",
+        "mediaKey": "movie:tmdb:444",
         "mediaType": "movie",
         "title": "Rated Movie",
         "posterUrl": "https://example.com/poster.jpg",
@@ -21,14 +21,16 @@
         "value": 9.5,
         "ratedAt": "2024-01-02T15:00:00Z"
       },
-      "origins": ["manual"]
+      "origins": [
+        "manual"
+      ]
     }
   },
   "expected": {
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:movie:444",
+      "media_key": "movie:tmdb:444",
       "media_type": "movie",
       "item_id": "rating-333",
       "title": "Rated Movie",
@@ -38,7 +40,9 @@
       "progress_percent": null,
       "watched_at": null,
       "last_activity_at": null,
-      "origins": ["manual"],
+      "origins": [
+        "manual"
+      ],
       "dismissible": null,
       "layout": null,
       "route_kind": null

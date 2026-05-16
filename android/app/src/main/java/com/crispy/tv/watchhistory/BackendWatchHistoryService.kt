@@ -432,10 +432,16 @@ val next =
             MetadataLabMediaType.ANIME -> if (identity.season != null && identity.episode != null) "episode" else "anime"
         }
 
+        val mediaKeyForEvent = if (mediaType == "episode") {
+            buildEpisodeMediaKey(identity.mediaKey, identity.season, identity.episode) ?: identity.mediaKey
+        } else {
+            identity.mediaKey
+        }
+
         val playbackInput = PlaybackEventInput(
             clientEventId = buildClientEventId(identity, eventType),
             eventType = eventType,
-            mediaKey = identity.mediaKey,
+            mediaKey = mediaKeyForEvent,
             mediaType = mediaType,
             seasonNumber = identity.season,
             episodeNumber = identity.episode,
@@ -484,7 +490,7 @@ private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): S
 private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
     val type = when (identity.contentType) {
         MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES -> "series"
+        MetadataLabMediaType.SERIES -> "show"
         MetadataLabMediaType.ANIME -> "anime"
     }
 
@@ -601,10 +607,11 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
                         episode = item.mediaItem.episodeNumber,
                         progressPercent = item.progress?.progressPercent ?: 0.0,
                         lastUpdatedEpochMs = updatedAt,
-                        posterUrl = item.mediaItem.posterUrl,
-                        backdropUrl = item.mediaItem.backdropUrl,
-                        logoUrl = item.mediaItem.logoUrl,
-                        addonId = "backend",
+    posterUrl = item.mediaItem.posterUrl,
+    backdropUrl = item.mediaItem.backdropUrl,
+    logoUrl = item.mediaItem.logoUrl,
+    stillUrl = item.mediaItem.stillUrl,
+    addonId = "backend",
                         subtitle = item.mediaItem.subtitle,
                         absoluteEpisodeNumber = item.mediaItem.absoluteEpisodeNumber,
                     )
@@ -644,6 +651,15 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
 
     private fun CrispyBackendClient.MediaItem.toTitleMediaKey(): String {
         return parent?.mediaKey ?: mediaKey
+    }
+
+    private fun buildEpisodeMediaKey(mediaKey: String?, season: Int?, episode: Int?): String? {
+        if (season == null || episode == null) return null
+        val parts = mediaKey?.trim()?.split(':') ?: return null
+        if (parts.size >= 3 && parts[0] == "show" && parts[1] == "tmdb") {
+            return "episode:tmdb:${parts[2]}:$season:$episode"
+        }
+        return null
     }
 
     private companion object {

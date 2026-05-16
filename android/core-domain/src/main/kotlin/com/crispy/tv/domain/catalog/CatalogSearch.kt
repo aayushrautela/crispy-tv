@@ -1,5 +1,7 @@
 package com.crispy.tv.domain.catalog
 
+import com.crispy.tv.domain.MediaKey
+
 data class CatalogFilter(
     val key: String,
     val value: String
@@ -19,7 +21,7 @@ data class TmdbSearchResultInput(
 
 data class NormalizedSearchItem(
     val mediaType: String,
-    val itemKey: String,
+    val itemKey: MediaKey,
     val title: String,
     val year: Int?,
     val imageUrl: String?,
@@ -29,7 +31,7 @@ data class NormalizedSearchItem(
 private const val TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/"
 
 fun normalizeTmdbSearchResults(results: List<TmdbSearchResultInput>): List<NormalizedSearchItem> {
-    val seenKeys = linkedSetOf<String>()
+    val seenKeys = linkedSetOf<MediaKey>()
     val normalized = mutableListOf<NormalizedSearchItem>()
 
     results.forEach { result ->
@@ -37,7 +39,7 @@ fun normalizeTmdbSearchResults(results: List<TmdbSearchResultInput>): List<Norma
         val type =
             when (rawMediaType) {
                 "movie" -> "movie"
-                "tv" -> "series"
+                "tv" -> "show"
                 "person" -> "person"
                 else -> return@forEach
             }
@@ -47,9 +49,8 @@ fun normalizeTmdbSearchResults(results: List<TmdbSearchResultInput>): List<Norma
             return@forEach
         }
 
-        val itemKey = "tmdb:$type:$tmdbId"
-        val key = itemKey
-        if (!seenKeys.add(key)) {
+        val itemKey = MediaKey.of(type, "tmdb", tmdbId.toString())
+        if (!seenKeys.add(itemKey)) {
             return@forEach
         }
 

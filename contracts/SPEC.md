@@ -5,6 +5,28 @@ This directory defines parity-critical behavior for the rewrite apps.
 The spec version documents the contract surface. Each suite owns its own
 `contract_version` and may evolve independently.
 
+## mediaKey Format
+
+All public media identifiers use the canonical format:
+
+```
+{type}:{provider}:{id}
+```
+
+Where:
+- `type` is `movie`, `show`, `episode`, `person`, or `season`
+- `provider` is `tmdb`
+- `id` is the provider's numeric ID (for `episode`, followed by `:{season}:{episode}`)
+
+Examples:
+- Movie: `movie:tmdb:550`
+- Show: `show:tmdb:1399` (not `series`)
+- Person: `person:tmdb:287`
+- Episode: `episode:tmdb:500:1:3` (showId=500, S1:E3)
+
+The legacy format `{provider}:{type}:{id}` (e.g. `tmdb:series:1399`) has been
+replaced. All fixture inputs and expected outputs reflect the new format.
+
 ## Determinism Rules
 
 - Every fixture must include:
@@ -49,7 +71,7 @@ The spec version documents the contract surface. Each suite owns its own
   - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
   - Non-hero sections remain in feed order; `presentation` drives downstream `hero | pill | rail` UI decisions and unknown values normalize to `rail`.
-  - Discover filtering accepts only `movie` and `series`, includes only `presentation = rail` sections, and page results use canonical attempted-url keys with source + kind + variant.
+  - Discover filtering accepts only `movie` and `show`, includes only `presentation = rail` sections, and page results use canonical attempted-url keys with source + kind + variant.
 - `catalog_url_building`
   - Build deterministic addon catalog request URL variants from addon `base_url`, preserved manifest query params, media type, catalog id, pagination, and filters.
   - For first-page requests with no filters, try simple path first, then path-style extras, then legacy query style.
@@ -58,7 +80,7 @@ The spec version documents the contract surface. Each suite owns its own
 - `search_ranking_and_dedup`
   - Normalize TMDB search results and preserve the upstream (TMDB) ordering.
   - Include `person` results (no filtering).
-  - Type mapping: TMDB `movie` -> `movie`, TMDB `tv` -> `series`, TMDB `person` -> `person` (unknown media types are ignored).
+  - Type mapping: TMDB `movie` -> `movie`, TMDB `tv` -> `show`, TMDB `person` -> `person` (unknown media types are ignored).
   - Dedupe key is `(type, tmdb_id)`; keep the first occurrence.
   - `contract_version` 4 removes provider-derived route identity and emits opaque client `item_key` values. Title results use title-route keys, while people remain a separate route class with distinct keys.
   - Image URLs use `w500` for movie/series posters and `h632` for person profiles.
@@ -102,3 +124,12 @@ Breaking behavior changes are allowed when needed. For every affected suite:
 2) update this spec plus the relevant fixtures/schemas
 3) keep Android + Swift contract runners in lockstep
 4) include migration notes in the PR description
+
+### Migration: mediaKey Format (all suites, 2026-05)
+
+All suites migrated from legacy `{provider}:{type}:{id}` format
+(e.g. `tmdb:series:1399`) to `{type}:{provider}:{id}` (e.g. `show:tmdb:1399`).
+The `series` type was renamed to `show` to match the backend convention.
+Episode keys use `episode:tmdb:{showTmdbId}:{s}:{e}` instead of flat `tmdb:episode:{id}`.
+Affected fixtures updated their `mediaKey`/`media_key`/`item_key` values,
+expected `media_type` values, and schema enums.

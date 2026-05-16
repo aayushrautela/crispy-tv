@@ -13,13 +13,13 @@
           "id": "rating-1",
           "media": {
             "mediaType": "movie",
-            "mediaKey": "tmdb:movie:27205",
+            "mediaKey": "movie:tmdb:27205",
             "title": "Inception",
             "posterUrl": "https://img/inception.jpg",
             "releaseYear": 2010,
             "rating": 8.8,
             "genre": "Sci-Fi",
-            "subtitle": "2010 \u00b7 148 min"
+            "subtitle": "2010 · 148 min"
           },
           "rating": {
             "value": 9,
@@ -48,13 +48,13 @@
           "id": "rating-1",
           "media": {
             "media_type": "movie",
-            "media_key": "tmdb:movie:27205",
+            "media_key": "movie:tmdb:27205",
             "title": "Inception",
             "poster_url": "https://img/inception.jpg",
             "release_year": 2010,
             "rating": 8.8,
             "genre": "Sci-Fi",
-            "subtitle": "2010 \u00b7 148 min"
+            "subtitle": "2010 · 148 min"
           },
           "rating": {
             "value": 9.0,

@@ -12,7 +12,7 @@
       "title": "Trending Now",
       "items": [
         {
-          "mediaKey": "tmdb:movie:550",
+          "mediaKey": "movie:tmdb:550",
           "mediaType": "movie",
           "title": "Fight Club",
           "posterUrl": "https://img/poster.jpg"

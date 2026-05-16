@@ -24,7 +24,7 @@ internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGen
     val normalizedName = name.trim().ifBlank { return null }
     return SearchCatalogItem(
         id = tmdbPersonId.toString(),
-        mediaKey = "tmdb:person:$tmdbPersonId",
+        mediaKey = "person:tmdb:$tmdbPersonId",
         title = normalizedName,
         posterUrl = profileUrl?.trim()?.takeIf { it.isNotBlank() },
         backdropUrl = null,
@@ -48,10 +48,10 @@ internal fun CrispyBackendClient.SearchSuggestionItem.toSearchSuggestion(): Sear
     val normalizedTitle = title.trim()
     if (normalizedTitle.isBlank()) return null
     val normalizedType = when (mediaType) {
-        "tv" -> "series"
+        "tv" -> "show"
         else -> "movie"
     }
-    val mediaKey = "tmdb:$normalizedType:$tmdbId"
+    val mediaKey = "$normalizedType:tmdb:$tmdbId"
     return SearchSuggestion(
         title = normalizedTitle,
         mediaType = normalizedType,

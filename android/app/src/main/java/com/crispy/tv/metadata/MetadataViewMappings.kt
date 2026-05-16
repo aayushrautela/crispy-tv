@@ -67,7 +67,7 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
             }
 val lookupId =
     if (season != null && episode != null && showTmdbId != null) {
-      "tmdb:${showTmdbId}:$season:$episode"
+      "episode:tmdb:${showTmdbId}:$season:$episode"
     } else {
       null
     }
@@ -98,7 +98,7 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
       }
   val lookupId =
     if (season != null && episode != null && showTmdbId != null) {
-      "tmdb:${showTmdbId}:$season:$episode"
+      "episode:tmdb:${showTmdbId}:$season:$episode"
     } else {
       null
     }
@@ -137,7 +137,7 @@ internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
 internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
     return when {
         mediaType.equals("anime", ignoreCase = true) -> "anime"
-        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "show"
         else -> "movie"
     }
 }
@@ -145,7 +145,7 @@ internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): Stri
 internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): String {
     return when {
         mediaType.equals("anime", ignoreCase = true) -> "anime"
-        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "show"
         else -> "movie"
     }
 }

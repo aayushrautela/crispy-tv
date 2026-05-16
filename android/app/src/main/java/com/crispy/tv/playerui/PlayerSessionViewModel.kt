@@ -1051,7 +1051,7 @@ private fun buildFallbackDetails(
     val normalizedTitle = title.trim().ifBlank { return null }
     val mediaType =
         when (identity?.contentType) {
-            MetadataLabMediaType.SERIES -> "series"
+            MetadataLabMediaType.SERIES -> "show"
             MetadataLabMediaType.ANIME -> "anime"
             else -> "movie"
         }
@@ -1061,7 +1061,7 @@ private fun buildFallbackDetails(
         mediaKey = identity?.mediaKey,
         imdbId = null,
         mediaType = mediaType,
-        title = identity?.showTitle?.takeIf { mediaType == "series" } ?: normalizedTitle,
+        title = identity?.showTitle?.takeIf { mediaType == "show" } ?: normalizedTitle,
         posterUrl = normalizedArtworkUrl,
         backdropUrl = normalizedArtworkUrl,
         logoUrl = null,

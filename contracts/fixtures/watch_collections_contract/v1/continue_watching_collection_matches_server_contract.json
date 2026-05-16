@@ -12,8 +12,8 @@
         {
           "id": "cw-1",
           "media": {
-            "mediaType": "series",
-            "mediaKey": "tmdb:series:1399",
+            "mediaType": "show",
+            "mediaKey": "show:tmdb:1399",
             "title": "Game of Thrones",
             "posterUrl": "https://img/poster.jpg",
             "backdropUrl": "https://img/backdrop.jpg",
@@ -57,8 +57,8 @@
         {
           "id": "cw-1",
           "media": {
-            "media_type": "series",
-            "media_key": "tmdb:series:1399",
+            "media_type": "show",
+            "media_key": "show:tmdb:1399",
             "title": "Game of Thrones",
             "poster_url": "https://img/poster.jpg",
             "backdrop_url": "https://img/backdrop.jpg",

@@ -4,11 +4,11 @@
   "case_id": "bridge_candidates_add_imdb_episode_suffix",
   "input": {
     "media_type": "movie",
-    "content_id": " tmdb:200 ",
+    "content_id": " movie:tmdb:200 ",
     "season": 2,
     "episode": 3,
     "meta": {
-      "id": "tmdb:200",
+      "id": "movie:tmdb:200",
       "imdb_id": null,
       "cast": [],
       "director": [],
@@ -19,7 +19,7 @@
       "videos": []
     },
     "tmdb_meta": {
-      "id": "tmdb:200",
+      "id": "movie:tmdb:200",
       "imdb_id": " tt12345 ",
       "cast": [],
       "director": [],
@@ -33,7 +33,7 @@
   "expected": {
     "derived_seasons": [],
     "bridge_candidate_ids": [
-      "tmdb:200:2:3",
+      "movie:tmdb:200:2:3",
       "tt12345:2:3"
     ]
   }

@@ -13,7 +13,7 @@
           "id": "cw-1",
           "kind": "continue_watching",
           "mediaItem": {
-            "mediaKey": "tmdb:series:1399",
+            "mediaKey": "show:tmdb:1399",
             "mediaType": "show",
             "title": "Game of Thrones",
             "originalTitle": null,
@@ -26,11 +26,17 @@
             "releaseDate": null,
             "releaseYear": 2011,
             "rating": 9.2,
-            "genres": ["Fantasy"],
+            "genres": [
+              "Fantasy"
+            ],
             "runtimeMinutes": 55,
             "status": null,
             "certification": null,
-            "externalIds": { "tmdb": 1399, "imdb": null, "tvdb": null },
+            "externalIds": {
+              "tmdb": 1399,
+              "imdb": null,
+              "tvdb": null
+            },
             "parent": null,
             "showTmdbId": 1399,
             "seasonNumber": 3,
@@ -48,7 +54,10 @@
               "lastPlayedAt": "2026-04-11T23:58:00Z"
             },
             "lastActivityAt": "2026-04-11T23:58:10Z",
-            "origins": ["trakt", "watch_activity"],
+            "origins": [
+              "trakt",
+              "watch_activity"
+            ],
             "dismissible": false
           },
           "presentation": null,
@@ -59,11 +68,17 @@
             "lastPlayedAt": "2026-04-11T23:58:00Z"
           },
           "lastActivityAt": "2026-04-11T23:58:10Z",
-          "origins": ["trakt", "watch_activity"],
+          "origins": [
+            "trakt",
+            "watch_activity"
+          ],
           "dismissible": false
         }
       ],
-      "pageInfo": { "nextCursor": null, "hasMore": false }
+      "pageInfo": {
+        "nextCursor": null,
+        "hasMore": false
+      }
     }
   },
   "expected": {

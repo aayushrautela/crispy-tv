@@ -481,7 +481,7 @@ internal fun DetailsBody(
             Spacer(modifier = Modifier.height(22.dp))
 
             val header = when (details.mediaType) {
-                "series" -> "Show Details"
+                "show" -> "Show Details"
                 "anime" -> "Anime Details"
                 else -> "Movie Details"
             }

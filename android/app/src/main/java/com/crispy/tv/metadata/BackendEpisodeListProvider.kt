@@ -16,7 +16,7 @@ internal class BackendEpisodeListProvider(
     ): List<EpisodeInfo>? {
         val normalizedMediaType = mediaType.trim()
         if (
-            !normalizedMediaType.equals("series", ignoreCase = true) &&
+            !normalizedMediaType.equals("show", ignoreCase = true) &&
                 !normalizedMediaType.equals("anime", ignoreCase = true)
         ) {
             return null

@@ -66,7 +66,7 @@ public func normalizeTmdbSearchResults(_ results: [TmdbSearchResultInput]) -> [N
         case "movie":
             type = "movie"
         case "tv":
-            type = "series"
+            type = "show"
         case "person":
             type = "person"
         default:
@@ -78,7 +78,7 @@ public func normalizeTmdbSearchResults(_ results: [TmdbSearchResultInput]) -> [N
             continue
         }
 
-        let itemKey = "tmdb:\(type):\(tmdbId)"
+        let itemKey = "\(type):tmdb:\(tmdbId)"
         let key = itemKey
         if !seenKeys.insert(key).inserted {
             continue

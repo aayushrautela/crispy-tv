@@ -76,8 +76,8 @@ internal fun parseSimilarCatalogItems(
 
             add(
                 CatalogItem(
-                    id = "tmdb:${mediaType.toCatalogType()}:$id",
-                    mediaKey = "tmdb:${mediaType.toCatalogType()}:$id",
+                    id = "${mediaType.toCatalogType()}:tmdb:$id",
+                    mediaKey = "${mediaType.toCatalogType()}:tmdb:$id",
                     title = title,
                     posterUrl = TmdbApi.imageUrl(item.optStringNonBlank("poster_path"), "w500"),
                     backdropUrl = TmdbApi.imageUrl(item.optStringNonBlank("backdrop_path"), "w780"),
@@ -107,8 +107,8 @@ internal fun parseCollection(collection: JSONObject?): TmdbCollection? {
             val title = item.optStringNonBlank("title") ?: item.optStringNonBlank("original_title") ?: continue
             add(
                 CatalogItem(
-                    id = "tmdb:movie:$itemId",
-                    mediaKey = "tmdb:movie:$itemId",
+                    id = "movie:tmdb:$itemId",
+                    mediaKey = "movie:tmdb:$itemId",
                     title = title,
                     posterUrl = TmdbApi.imageUrl(item.optStringNonBlank("poster_path"), "w500"),
                     backdropUrl = TmdbApi.imageUrl(item.optStringNonBlank("backdrop_path"), "w780"),
@@ -385,14 +385,22 @@ internal fun parseTitleDetails(
     }
 }
 
-internal fun parseRecommendationIds(recommendations: JSONObject?): List<String> {
+internal fun parseRecommendationIds(
+    recommendations: JSONObject?,
+    mediaType: MetadataLabMediaType,
+): List<String> {
+    val typePrefix = when (mediaType) {
+        MetadataLabMediaType.MOVIE -> "movie"
+        MetadataLabMediaType.SERIES -> "show"
+        MetadataLabMediaType.ANIME -> "show"
+    }
     val results = recommendations?.optJSONArray("results") ?: return emptyList()
     return buildList {
         for (index in 0 until minOf(results.length(), 20)) {
             val entry = results.optJSONObject(index) ?: continue
             val id = entry.optInt("id", -1)
             if (id > 0) {
-                add("tmdb:$id")
+                add("$typePrefix:tmdb:$id")
             }
         }
     }
@@ -402,7 +410,7 @@ internal fun parseMovieCollectionIds(details: JSONObject): List<String> {
     val collection = details.optJSONObject("belongs_to_collection") ?: return emptyList()
     val collectionId = collection.optInt("id", -1)
     return if (collectionId > 0) {
-        listOf("tmdb:collection:$collectionId")
+        listOf("collection:tmdb:$collectionId")
     } else {
         emptyList()
     }
@@ -420,7 +428,7 @@ internal fun parseMetadataSeasons(details: JSONObject, tmdbId: Int): List<Metada
 
             add(
                 MetadataSeason(
-                    id = "tmdb:$tmdbId:season:$seasonNumber",
+                    id = "show:tmdb:$tmdbId:season:$seasonNumber",
                     name = seasonObject.optStringNonBlank("name") ?: "Season $seasonNumber",
                     overview = seasonObject.optStringNonBlank("overview") ?: "",
                     seasonNumber = seasonNumber,

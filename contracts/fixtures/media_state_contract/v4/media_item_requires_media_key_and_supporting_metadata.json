@@ -5,7 +5,7 @@
   "input": {
     "kind": "media_item",
     "payload": {
-      "mediaKey": "tmdb:movie:123",
+      "mediaKey": "movie:tmdb:123",
       "mediaType": "movie",
       "title": "Test Movie",
       "originalTitle": "Test Movie Original",
@@ -18,7 +18,10 @@
       "releaseDate": "2024-01-01",
       "releaseYear": 2024,
       "rating": 8.5,
-      "genres": ["Action", "Drama"],
+      "genres": [
+        "Action",
+        "Drama"
+      ],
       "runtimeMinutes": 120,
       "status": "Released",
       "certification": "PG-13",
@@ -40,7 +43,7 @@
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:movie:123",
+      "media_key": "movie:tmdb:123",
       "media_type": "movie",
       "item_id": null,
       "title": "Test Movie",

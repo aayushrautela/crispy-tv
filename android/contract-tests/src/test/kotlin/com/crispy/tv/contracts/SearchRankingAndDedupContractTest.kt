@@ -1,5 +1,6 @@
 package com.crispy.tv.contracts
 
+import com.crispy.tv.domain.MediaKey
 import com.crispy.tv.domain.catalog.NormalizedSearchItem
 import com.crispy.tv.domain.catalog.TmdbSearchResultInput
 import com.crispy.tv.domain.catalog.normalizeTmdbSearchResults
@@ -53,7 +54,7 @@ class SearchRankingAndDedupContractTest {
                             ?: error("$caseId: expected.items[$index] must be object")
                     NormalizedSearchItem(
                         mediaType = item.requireString("media_type", path),
-                        itemKey = item.requireString("item_key", path),
+                        itemKey = MediaKey(item.requireString("item_key", path)),
                         title = item.requireString("title", path),
                         year = item.optionalInt("year", path),
                         imageUrl = item.optionalString("image_url", path),

@@ -8,7 +8,7 @@
       "id": "watchlist-789",
       "kind": "watchlist",
       "mediaItem": {
-        "mediaKey": "tmdb:show:222",
+        "mediaKey": "show:tmdb:222",
         "mediaType": "show",
         "title": "Watchlist Show",
         "posterUrl": "https://example.com/poster.jpg",
@@ -18,14 +18,16 @@
       "context": {},
       "presentation": null,
       "addedAt": "2024-01-05T10:00:00Z",
-      "origins": ["manual"]
+      "origins": [
+        "manual"
+      ]
     }
   },
   "expected": {
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:show:222",
+      "media_key": "show:tmdb:222",
       "media_type": "show",
       "item_id": "watchlist-789",
       "title": "Watchlist Show",
@@ -35,7 +37,9 @@
       "progress_percent": null,
       "watched_at": null,
       "last_activity_at": null,
-      "origins": ["manual"],
+      "origins": [
+        "manual"
+      ],
       "dismissible": null,
       "layout": null,
       "route_kind": null

@@ -378,7 +378,7 @@ class RecommendationCatalogService internal constructor(
         val normalizedMediaType = trim().lowercase(Locale.US)
         return when (normalizedMediaType) {
             "anime" -> "anime"
-            "episode", "show", "tv", "series" -> "series"
+            "episode", "show", "tv", "series" -> "show"
             else -> "movie"
         }
     }

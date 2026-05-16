@@ -299,7 +299,7 @@ public func listDiscoverCatalogs(
         .lowercased()
         .nilIfBlank()
 
-    if let normalizedType, normalizedType != "movie", normalizedType != "series" {
+    if let normalizedType, normalizedType != "movie", normalizedType != "show" {
         return ([], "Unsupported media type: \(mediaType ?? "")")
     }
 

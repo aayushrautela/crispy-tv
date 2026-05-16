@@ -4,11 +4,11 @@
   "case_id": "bridge_candidates_dedupe_case_insensitively",
   "input": {
     "media_type": "movie",
-    "content_id": " TMDB:300 ",
+    "content_id": " MOVIE:tmdb:300 ",
     "season": null,
     "episode": null,
     "meta": {
-      "id": "TMDB:300",
+      "id": "MOVIE:tmdb:300",
       "imdb_id": null,
       "cast": [],
       "director": [],
@@ -19,7 +19,7 @@
       "videos": []
     },
     "tmdb_meta": {
-      "id": "tmdb:300",
+      "id": "movie:tmdb:300",
       "imdb_id": "   ",
       "cast": [],
       "director": [],
@@ -33,7 +33,7 @@
   "expected": {
     "derived_seasons": [],
     "bridge_candidate_ids": [
-      "TMDB:300"
+      "MOVIE:tmdb:300"
     ]
   }
 }

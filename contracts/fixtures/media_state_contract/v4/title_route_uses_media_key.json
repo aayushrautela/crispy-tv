@@ -5,15 +5,15 @@
   "input": {
     "kind": "title_route",
     "payload": {
-      "mediaKey": "tmdb:movie:888",
-      "path": "/v1/metadata/titles/tmdb:movie:888"
+      "mediaKey": "movie:tmdb:888",
+      "path": "/v1/metadata/titles/movie:tmdb:888"
     }
   },
   "expected": {
     "valid": true,
     "normalized": {
       "card_family": null,
-      "media_key": "tmdb:movie:888",
+      "media_key": "movie:tmdb:888",
       "media_type": null,
       "item_id": null,
       "title": null,

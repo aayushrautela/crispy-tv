@@ -33,7 +33,7 @@ fun DetailsRoute(
     val normalizedType = remember(mediaType) {
         when (mediaType.trim().lowercase(Locale.US)) {
             "movie" -> "movie"
-            "series", "show", "tv" -> "series"
+            "series", "show", "tv" -> "show"
             "anime" -> "anime"
             else -> ""
         }

@@ -22,7 +22,7 @@
       "properties": {
         "media_type": {
           "type": "string",
-          "enum": ["movie", "series"]
+          "enum": ["movie", "series", "show"]
         },
         "content_id": {
           "type": "string"

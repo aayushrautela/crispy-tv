@@ -7,8 +7,8 @@
     "payload": {
       "id": "lib-1",
       "media": {
-        "mediaKey": "tmdb:series:1396",
-        "mediaType": "series",
+        "mediaKey": "show:tmdb:1396",
+        "mediaType": "show",
         "title": "Breaking Bad",
         "posterUrl": "https://img/bb.jpg"
       },
@@ -24,8 +24,8 @@
     "valid": true,
     "normalized": {
       "card_family": "regular",
-      "media_key": "tmdb:series:1396",
-      "media_type": "series",
+      "media_key": "show:tmdb:1396",
+      "media_type": "show",
       "item_id": "lib-1",
       "title": "Breaking Bad",
       "poster_url": "https://img/bb.jpg",

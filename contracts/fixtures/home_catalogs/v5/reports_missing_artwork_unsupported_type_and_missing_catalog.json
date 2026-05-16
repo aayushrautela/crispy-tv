@@ -21,7 +21,7 @@
           ],
           "items": [
             {
-              "media_key": "tmdb:movie:991001",
+              "media_key": "movie:tmdb:991001",
               "title": "Invisible",
               "poster_url": null,
               "backdrop_url": null,
@@ -47,7 +47,7 @@
           ],
           "items": [
             {
-              "media_key": "tmdb:series:157239",
+              "media_key": "show:tmdb:157239",
               "title": "Dark Matter",
               "poster_url": "https://img/dark-matter.jpg",
               "backdrop_url": "https://img/dark-matter-backdrop.jpg",

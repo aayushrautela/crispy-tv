@@ -8,7 +8,7 @@
     "season": null,
     "episode": null,
     "meta": {
-      "id": "tmdb:100",
+      "id": "show:tmdb:100",
       "imdb_id": null,
       "cast": [],
       "director": [],
@@ -54,7 +54,7 @@
   "expected": {
     "derived_seasons": [
       {
-        "id": "tmdb:100:season:1",
+        "id": "show:tmdb:100:season:1",
         "name": "Season 1",
         "overview": "",
         "season_number": 1,
@@ -62,7 +62,7 @@
         "air_date": "2025-01-01"
       },
       {
-        "id": "tmdb:100:season:2",
+        "id": "show:tmdb:100:season:2",
         "name": "Season 2",
         "overview": "",
         "season_number": 2,

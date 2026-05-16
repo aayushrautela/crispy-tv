@@ -520,7 +520,7 @@ private fun SearchSuggestionRow(
                 overflow = TextOverflow.Ellipsis,
             )
             val subtitle = buildString {
-                append(if (suggestion.mediaType == "series") "Series" else "Movie")
+                append(if (suggestion.mediaType == "show") "Series" else "Movie")
                 if (suggestion.year != null) {
                     append(" · ${suggestion.year}")
                 }

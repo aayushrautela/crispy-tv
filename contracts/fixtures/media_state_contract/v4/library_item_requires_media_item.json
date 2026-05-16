@@ -8,7 +8,7 @@
       "id": "library-555",
       "kind": "watch_state",
       "mediaItem": {
-        "mediaKey": "tmdb:show:666",
+        "mediaKey": "show:tmdb:666",
         "mediaType": "show",
         "title": "Library Show",
         "posterUrl": "https://example.com/poster.jpg",
@@ -18,14 +18,16 @@
       "context": {},
       "presentation": null,
       "state": {},
-      "origins": ["manual"]
+      "origins": [
+        "manual"
+      ]
     }
   },
   "expected": {
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:show:666",
+      "media_key": "show:tmdb:666",
       "media_type": "show",
       "item_id": "library-555",
       "title": "Library Show",
@@ -35,7 +37,9 @@
       "progress_percent": null,
       "watched_at": null,
       "last_activity_at": null,
-      "origins": ["manual"],
+      "origins": [
+        "manual"
+      ],
       "dismissible": null,
       "layout": null,
       "route_kind": null

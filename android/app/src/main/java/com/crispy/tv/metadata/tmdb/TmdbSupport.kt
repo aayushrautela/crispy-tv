@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private val IMDB_ID_REGEX = Regex("tt\\d{4,}", RegexOption.IGNORE_CASE)
-private val TMDB_ID_REGEX = Regex("\\btmdb:(?:movie:|tv:|show:)?(\\d+)", RegexOption.IGNORE_CASE)
+private val TMDB_ID_REGEX = Regex("tmdb:(\\d+)")
 
 internal fun MetadataLabMediaType.pathSegment(): String {
     return when (this) {
@@ -19,7 +19,7 @@ internal fun MetadataLabMediaType.pathSegment(): String {
 internal fun MetadataLabMediaType.toCatalogType(): String {
     return when (this) {
         MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES -> "series"
+        MetadataLabMediaType.SERIES -> "show"
         MetadataLabMediaType.ANIME -> "anime"
     }
 }

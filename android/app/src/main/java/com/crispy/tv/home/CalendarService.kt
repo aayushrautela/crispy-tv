@@ -32,8 +32,7 @@ data class CalendarEpisodeItem(
     val backdropUrl: String?,
     val thumbnailUrl: String?,
     val watchedKeys: Set<String> = emptySet(),
-    val type: String = "series",
-    val absoluteEpisodeNumber: Int? = null,
+    val type: String = "show",
 )
 
 @Immutable
@@ -45,7 +44,7 @@ data class CalendarSeriesItem(
     val posterUrl: String?,
     val backdropUrl: String?,
     val sourceLabel: String?,
-    val type: String = "series",
+    val type: String = "show",
 )
 
 enum class CalendarSectionKey {

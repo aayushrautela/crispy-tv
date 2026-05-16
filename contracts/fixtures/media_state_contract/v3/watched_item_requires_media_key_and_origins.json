@@ -6,7 +6,7 @@
     "kind": "watched_item",
     "payload": {
       "media": {
-        "mediaKey": "tmdb:movie:13",
+        "mediaKey": "movie:tmdb:13",
         "mediaType": "movie",
         "title": "Forrest Gump",
         "posterUrl": "https://img/forrest.jpg"
@@ -21,7 +21,7 @@
     "valid": true,
     "normalized": {
       "card_family": "regular",
-      "media_key": "tmdb:movie:13",
+      "media_key": "movie:tmdb:13",
       "media_type": "movie",
       "item_id": null,
       "title": "Forrest Gump",

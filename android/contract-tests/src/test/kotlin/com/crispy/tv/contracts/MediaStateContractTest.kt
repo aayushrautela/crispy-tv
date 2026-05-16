@@ -1,5 +1,6 @@
 package com.crispy.tv.contracts
 
+import com.crispy.tv.domain.MediaKey
 import com.crispy.tv.domain.media.MediaStateNormalized
 import com.crispy.tv.domain.media.normalizeMediaStateCard
 import kotlinx.serialization.json.JsonObject
@@ -49,7 +50,7 @@ class MediaStateContractTest {
     private fun parseNormalized(normalized: JsonObject, path: java.nio.file.Path): MediaStateNormalized {
         return MediaStateNormalized(
             cardFamily = normalized.optionalString("card_family", path),
-            mediaKey = normalized.optionalString("media_key", path),
+            mediaKey = normalized.optionalString("media_key", path)?.let(::MediaKey),
             mediaType = normalized.optionalString("media_type", path),
             itemId = normalized.optionalString("item_id", path),
             title = normalized.optionalString("title", path),

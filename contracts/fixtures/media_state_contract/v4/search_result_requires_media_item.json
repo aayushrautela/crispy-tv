@@ -7,7 +7,7 @@
     "payload": {
       "kind": "search_result",
       "mediaItem": {
-        "mediaKey": "tmdb:movie:456",
+        "mediaKey": "movie:tmdb:456",
         "mediaType": "movie",
         "title": "Search Result Movie",
         "posterUrl": null,
@@ -22,7 +22,7 @@
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:movie:456",
+      "media_key": "movie:tmdb:456",
       "media_type": "movie",
       "item_id": null,
       "title": "Search Result Movie",

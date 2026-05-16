@@ -13,13 +13,13 @@
           "id": "watchlist-1",
           "media": {
             "mediaType": "movie",
-            "mediaKey": "tmdb:movie:603",
+            "mediaKey": "movie:tmdb:603",
             "title": "The Matrix",
             "posterUrl": "https://img/matrix.jpg",
             "releaseYear": 1999,
             "rating": 8.7,
             "genre": "Action",
-            "subtitle": "1999 \u00b7 136 min"
+            "subtitle": "1999 · 136 min"
           },
           "addedAt": "2026-04-08T12:00:00Z",
           "origins": [
@@ -45,13 +45,13 @@
           "id": "watchlist-1",
           "media": {
             "media_type": "movie",
-            "media_key": "tmdb:movie:603",
+            "media_key": "movie:tmdb:603",
             "title": "The Matrix",
             "poster_url": "https://img/matrix.jpg",
             "release_year": 1999,
             "rating": 8.7,
             "genre": "Action",
-            "subtitle": "1999 \u00b7 136 min"
+            "subtitle": "1999 · 136 min"
           },
           "added_at": "2026-04-08T12:00:00Z",
           "origins": [

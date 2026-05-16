@@ -64,7 +64,7 @@ internal class TmdbPersonRepository(
                     val type =
                         when (mediaType) {
                             "movie" -> "movie"
-                            "tv" -> "series"
+                            "tv" -> "show"
                             else -> continue
                         }
 
@@ -91,8 +91,8 @@ internal class TmdbPersonRepository(
                     add(
                         Entry(
                             item = CatalogItem(
-                                id = "tmdb:$type:$tmdbId",
-                                mediaKey = "tmdb:$type:$tmdbId",
+                                id = "$type:tmdb:$tmdbId",
+                                mediaKey = "$type:tmdb:$tmdbId",
                                 title = title,
                                 posterUrl = TmdbApi.imageUrl(credit.optStringNonBlank("poster_path"), "w500"),
                                 backdropUrl = null,

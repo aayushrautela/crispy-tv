@@ -26,7 +26,7 @@ internal class CalendarMetaEpisodeService(
         maxEpisodes: Int,
         preferredAddonId: String? = null,
     ): SeriesMetaEpisodes? {
-        val metadata = getMetaDetails(type = "series", id = seriesId, preferredAddonId = preferredAddonId) ?: return null
+        val metadata = getMetaDetails(type = "show", id = seriesId, preferredAddonId = preferredAddonId) ?: return null
         val startMs = nowMs - daysBack.coerceAtLeast(0) * DAY_MS
         val endMs = nowMs + daysAhead.coerceAtLeast(0) * DAY_MS
 

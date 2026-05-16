@@ -96,7 +96,7 @@ fun bridgeCandidateIds(
     }
 
     val candidates = mutableListOf(normalizedEpisodeId(normalizedContentId, season, episode))
-    if (normalizedContentId.startsWith("tmdb:", ignoreCase = true)) {
+    if (normalizedContentId.contains(":tmdb:", ignoreCase = true)) {
         val bridgedBase =
             tmdbMeta?.imdbId.nonBlankOrNull()
                 ?: tmdbMeta?.id.nonBlankOrNull()?.takeIf {

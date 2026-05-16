@@ -29,6 +29,7 @@ data class CanonicalContinueWatchingItem(
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
     val logoUrl: String? = null,
+    val stillUrl: String? = null,
     val addonId: String? = null,
     val subtitle: String? = null,
     val absoluteEpisodeNumber: Int? = null,

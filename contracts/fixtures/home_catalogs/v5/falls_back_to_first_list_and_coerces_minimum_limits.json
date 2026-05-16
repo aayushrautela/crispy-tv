@@ -21,7 +21,7 @@
           ],
           "items": [
             {
-              "media_key": "tmdb:series:95396",
+              "media_key": "show:tmdb:95396",
               "title": "Severance",
               "poster_url": "https://img/severance.jpg",
               "backdrop_url": null,
@@ -32,7 +32,7 @@
               "description": null
             },
             {
-              "media_key": "tmdb:series:125988",
+              "media_key": "show:tmdb:125988",
               "title": "Silo",
               "poster_url": "https://img/silo.jpg",
               "backdrop_url": null,
@@ -58,7 +58,7 @@
           ],
           "items": [
             {
-              "media_key": "tmdb:movie:157336",
+              "media_key": "movie:tmdb:157336",
               "title": "Arrival",
               "poster_url": "https://img/arrival.jpg",
               "backdrop_url": null,
@@ -89,7 +89,7 @@
       "hero_result": {
         "items": [
           {
-            "media_key": "tmdb:series:95396",
+            "media_key": "show:tmdb:95396",
             "title": "Severance",
             "description": "Staff picks",
             "rating": null,
@@ -138,7 +138,7 @@
     "page": {
       "items": [
         {
-          "media_key": "tmdb:series:95396",
+          "media_key": "show:tmdb:95396",
           "title": "Severance",
           "poster_url": "https://img/severance.jpg",
           "backdrop_url": null,

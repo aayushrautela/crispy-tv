@@ -82,7 +82,7 @@ internal fun CrispyBackendClient.MediaItem.toCatalogItem(defaultGenre: String? =
     val normalizedType =
         when {
             mediaType.equals("anime", ignoreCase = true) -> "anime"
-            mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "series"
+            mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "show"
             else -> "movie"
         }
     val normalizedMediaKey = mediaKey.trim().ifBlank { return null }

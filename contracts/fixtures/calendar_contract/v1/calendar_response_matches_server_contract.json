@@ -13,7 +13,7 @@
           "bucket": "no_scheduled",
           "media": {
             "mediaType": "episode",
-            "mediaKey": "tmdb:episode:1001",
+            "mediaKey": "episode:tmdb:500:1:3",
             "title": "Sunrise, Sunset",
             "posterUrl": "https://img/episode.jpg",
             "backdropUrl": "https://img/episode-backdrop.jpg",
@@ -27,8 +27,8 @@
             "runtimeMinutes": 48
           },
           "relatedShow": {
-            "mediaType": "series",
-            "mediaKey": "tmdb:series:500",
+            "mediaType": "show",
+            "mediaKey": "show:tmdb:500",
             "title": "The Morning Bell",
             "posterUrl": "https://img/show.jpg",
             "releaseYear": 2026,
@@ -54,7 +54,7 @@
           "bucket": "no_scheduled",
           "media": {
             "media_type": "episode",
-            "media_key": "tmdb:episode:1001",
+            "media_key": "episode:tmdb:500:1:3",
             "title": "Sunrise, Sunset",
             "poster_url": "https://img/episode.jpg",
             "backdrop_url": "https://img/episode-backdrop.jpg",
@@ -68,8 +68,8 @@
             "runtime_minutes": 48
           },
           "related_show": {
-            "media_type": "series",
-            "media_key": "tmdb:series:500",
+            "media_type": "show",
+            "media_key": "show:tmdb:500",
             "title": "The Morning Bell",
             "poster_url": "https://img/show.jpg",
             "release_year": 2026,

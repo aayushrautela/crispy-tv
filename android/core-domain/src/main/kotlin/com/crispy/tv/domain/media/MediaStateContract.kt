@@ -1,8 +1,10 @@
 package com.crispy.tv.domain.media
 
+import com.crispy.tv.domain.MediaKey
+
 data class MediaStateNormalized(
     val cardFamily: String? = null,
-    val mediaKey: String? = null,
+    val mediaKey: MediaKey? = null,
     val mediaType: String? = null,
     val itemId: String? = null,
     val title: String? = null,
@@ -38,12 +40,12 @@ private fun normalizeMediaItemWrapper(payload: Map<String, Any?>): MediaStateNor
 }
 
 private fun normalizeMediaItem(payload: Map<String, Any?>): MediaStateNormalized? {
-    val mediaKey = payload.stringValue("mediaKey") ?: return null
+    val mediaKeyStr = payload.stringValue("mediaKey") ?: return null
     val mediaType = payload.stringValue("mediaType") ?: return null
     val title = payload.stringValue("title") ?: return null
     return MediaStateNormalized(
         cardFamily = "media_item",
-        mediaKey = mediaKey,
+        mediaKey = MediaKey(mediaKeyStr),
         mediaType = mediaType,
         title = title,
         posterUrl = payload.nullableStringValue("posterUrl"),
@@ -107,10 +109,10 @@ private fun normalizeHomeSnapshotSection(payload: Map<String, Any?>): MediaState
 }
 
 private fun normalizeTitleRoute(payload: Map<String, Any?>): MediaStateNormalized? {
-    val mediaKey = payload.stringValue("mediaKey") ?: return null
+    val mediaKeyStr = payload.stringValue("mediaKey") ?: return null
     val path = payload.stringValue("path") ?: return null
-    if (path != "/v1/metadata/titles/$mediaKey") return null
-    return MediaStateNormalized(mediaKey = mediaKey, routeKind = "title")
+    if (path != "/v1/metadata/titles/$mediaKeyStr") return null
+    return MediaStateNormalized(mediaKey = MediaKey(mediaKeyStr), routeKind = "title")
 }
 
 private fun Map<String, Any?>.stringValue(key: String): String? {

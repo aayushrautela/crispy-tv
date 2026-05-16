@@ -14,7 +14,7 @@ enum class MetadataLabMediaType {
     val label: String
         get() = when (this) {
             MOVIE -> "movie"
-            SERIES -> "series"
+            SERIES -> "show"
             ANIME -> "anime"
         }
 }

@@ -1,9 +1,10 @@
 package com.crispy.tv.domain.home
 
+import com.crispy.tv.domain.MediaKey
 import java.util.Locale
 
 data class HomeCatalogItem(
-    val mediaKey: String,
+    val mediaKey: MediaKey,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -84,7 +85,7 @@ data class HomeCatalogSnapshot(
 )
 
 data class HomeCatalogHeroItem(
-    val mediaKey: String,
+    val mediaKey: MediaKey,
     val title: String,
     val description: String,
     val rating: String?,
@@ -178,7 +179,7 @@ fun listDiscoverCatalogs(
     limit: Int = Int.MAX_VALUE,
 ): Pair<List<HomeCatalogDiscoverRef>, String> {
     val normalizedType = mediaType?.trim()?.lowercase(Locale.US)?.takeIf { it.isNotBlank() }
-    if (normalizedType != null && normalizedType != "movie" && normalizedType != "series") {
+    if (normalizedType != null && normalizedType != "movie" && normalizedType != "show") {
         return emptyList<HomeCatalogDiscoverRef>() to "Unsupported media type: $mediaType"
     }
 

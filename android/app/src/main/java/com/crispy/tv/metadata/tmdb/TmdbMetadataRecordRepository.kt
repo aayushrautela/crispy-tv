@@ -66,7 +66,7 @@ internal class TmdbMetadataRecordRepository(
             } else {
                 parseSeriesCreators(details)
             }
-        val similar = parseRecommendationIds(recommendations)
+        val similar = parseRecommendationIds(recommendations, resolvedMediaType)
         val collectionItems =
             if (resolvedMediaType == MetadataLabMediaType.MOVIE) {
                 parseMovieCollectionIds(details)
@@ -80,10 +80,15 @@ internal class TmdbMetadataRecordRepository(
                 emptyList()
             }
 
-        val title = resolveTitle(details, resolvedMediaType) ?: "tmdb:$tmdbId"
+        val idPrefix = when (resolvedMediaType) {
+            MetadataLabMediaType.MOVIE -> "movie"
+            MetadataLabMediaType.SERIES -> "show"
+            MetadataLabMediaType.ANIME -> "show"
+        }
+        val title = resolveTitle(details, resolvedMediaType) ?: "$idPrefix:tmdb:$tmdbId"
 
         val record = MetadataRecord(
-            id = "tmdb:$tmdbId",
+            id = "$idPrefix:tmdb:$tmdbId",
             imdbId = imdbId,
             cast = castNames,
             director = directors,

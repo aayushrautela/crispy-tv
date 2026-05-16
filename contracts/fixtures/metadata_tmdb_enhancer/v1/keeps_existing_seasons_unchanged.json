@@ -8,7 +8,7 @@
     "season": null,
     "episode": null,
     "meta": {
-      "id": "tmdb:101",
+      "id": "show:tmdb:101",
       "imdb_id": null,
       "cast": [],
       "director": [],
@@ -17,7 +17,7 @@
       "collection_items": [],
       "seasons": [
         {
-          "id": "tmdb:101:season:9",
+          "id": "show:tmdb:101:season:9",
           "name": "Season 9",
           "overview": "existing",
           "season_number": 9,
@@ -38,7 +38,7 @@
   "expected": {
     "derived_seasons": [
       {
-        "id": "tmdb:101:season:9",
+        "id": "show:tmdb:101:season:9",
         "name": "Season 9",
         "overview": "existing",
         "season_number": 9,

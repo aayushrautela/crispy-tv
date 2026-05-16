@@ -5,7 +5,7 @@
   "input": {
     "kind": "regular_card",
     "payload": {
-      "mediaKey": "tmdb:movie:550",
+      "mediaKey": "movie:tmdb:550",
       "mediaType": "movie",
       "title": "Fight Club",
       "posterUrl": "https://img/poster.jpg",
@@ -16,7 +16,7 @@
     "valid": true,
     "normalized": {
       "card_family": "regular",
-      "media_key": "tmdb:movie:550",
+      "media_key": "movie:tmdb:550",
       "media_type": "movie",
       "item_id": null,
       "title": "Fight Club",

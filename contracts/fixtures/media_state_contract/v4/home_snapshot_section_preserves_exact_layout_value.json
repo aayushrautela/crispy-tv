@@ -10,7 +10,7 @@
         {
           "kind": "recommendation",
           "mediaItem": {
-            "mediaKey": "tmdb:movie:777",
+            "mediaKey": "movie:tmdb:777",
             "mediaType": "movie",
             "title": "Section Item",
             "posterUrl": null,

@@ -8,7 +8,7 @@
       "id": "watched-456",
       "kind": "watch_history",
       "mediaItem": {
-        "mediaKey": "tmdb:movie:111",
+        "mediaKey": "movie:tmdb:111",
         "mediaType": "movie",
         "title": "Watched Movie",
         "posterUrl": "https://example.com/poster.jpg",
@@ -18,14 +18,16 @@
       "context": {},
       "presentation": null,
       "watchedAt": "2024-01-10T18:30:00Z",
-      "origins": ["manual"]
+      "origins": [
+        "manual"
+      ]
     }
   },
   "expected": {
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:movie:111",
+      "media_key": "movie:tmdb:111",
       "media_type": "movie",
       "item_id": "watched-456",
       "title": "Watched Movie",
@@ -35,7 +37,9 @@
       "progress_percent": null,
       "watched_at": "2024-01-10T18:30:00Z",
       "last_activity_at": null,
-      "origins": ["manual"],
+      "origins": [
+        "manual"
+      ],
       "dismissible": null,
       "layout": null,
       "route_kind": null

@@ -7,7 +7,7 @@
     "payload": {
       "kind": "recommendation",
       "mediaItem": {
-        "mediaKey": "tmdb:show:789",
+        "mediaKey": "show:tmdb:789",
         "mediaType": "show",
         "title": "Recommended Show",
         "posterUrl": "https://example.com/poster.jpg",
@@ -16,7 +16,9 @@
       },
       "context": {
         "reason": "Because you watched similar shows",
-        "reasonCodes": ["similar"],
+        "reasonCodes": [
+          "similar"
+        ],
         "score": 0.95,
         "rank": 1,
         "payload": {}
@@ -36,7 +38,7 @@
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:show:789",
+      "media_key": "show:tmdb:789",
       "media_type": "show",
       "item_id": null,
       "title": "Recommended Show",

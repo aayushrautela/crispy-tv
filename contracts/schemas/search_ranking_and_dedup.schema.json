@@ -113,6 +113,7 @@
                   "enum": [
                     "movie",
                     "series",
+                    "show",
                     "person"
                   ]
                 },

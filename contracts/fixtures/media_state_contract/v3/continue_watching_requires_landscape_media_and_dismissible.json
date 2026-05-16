@@ -7,8 +7,8 @@
     "payload": {
       "id": "cw-123",
       "media": {
-        "mediaKey": "tmdb:series:1399",
-        "mediaType": "series",
+        "mediaKey": "show:tmdb:1399",
+        "mediaType": "show",
         "title": "Game of Thrones",
         "posterUrl": "https://img/poster.jpg",
         "backdropUrl": "https://img/backdrop.jpg",
@@ -33,8 +33,8 @@
     "valid": true,
     "normalized": {
       "card_family": "landscape",
-      "media_key": "tmdb:series:1399",
-      "media_type": "series",
+      "media_key": "show:tmdb:1399",
+      "media_type": "show",
       "item_id": "cw-123",
       "title": "Game of Thrones",
       "poster_url": "https://img/poster.jpg",

@@ -59,6 +59,7 @@ private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): Can
     backdropUrl = entry.backdropUrl,
     posterUrl = entry.posterUrl,
     logoUrl = entry.logoUrl,
+    stillUrl = entry.stillUrl,
     addonId = entry.addonId,
     subtitle = entry.subtitle,
     absoluteEpisodeNumber = entry.absoluteEpisodeNumber,

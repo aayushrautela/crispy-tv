@@ -8,7 +8,7 @@
       "id": "continue-watching-123",
       "kind": "continue_watching",
       "mediaItem": {
-        "mediaKey": "tmdb:episode:999",
+        "mediaKey": "episode:tmdb:999:1:5",
         "mediaType": "episode",
         "title": "Episode Title",
         "posterUrl": null,
@@ -25,7 +25,9 @@
         "lastPlayedAt": "2024-01-15T12:00:00Z"
       },
       "lastActivityAt": "2024-01-15T12:00:00Z",
-      "origins": ["manual"],
+      "origins": [
+        "manual"
+      ],
       "dismissible": true
     }
   },
@@ -33,7 +35,7 @@
     "valid": true,
     "normalized": {
       "card_family": "media_item",
-      "media_key": "tmdb:episode:999",
+      "media_key": "episode:tmdb:999:1:5",
       "media_type": "episode",
       "item_id": "continue-watching-123",
       "title": "Episode Title",
@@ -43,7 +45,9 @@
       "progress_percent": 44.44,
       "watched_at": null,
       "last_activity_at": "2024-01-15T12:00:00Z",
-      "origins": ["manual"],
+      "origins": [
+        "manual"
+      ],
       "dismissible": true,
       "layout": null,
       "route_kind": null

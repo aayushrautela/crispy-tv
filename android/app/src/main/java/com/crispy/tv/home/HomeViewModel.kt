@@ -489,11 +489,19 @@ private fun CanonicalContinueWatchingItem.sectionKey(): String {
 }
 
 internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
+    val isEpisode = mediaType.equals("episode", ignoreCase = true)
+    val displayTitle = if (isEpisode) {
+        val seasonPart = season?.let { String.format(Locale.US, "S%02d", it) }
+        val episodePart = episode?.let { String.format(Locale.US, "E%02d", it) }
+        listOfNotNull(seasonPart, episodePart).joinToString(":")
+    } else {
+        title
+    }
     return HomeWideRailItemUi(
         key = "${type}:${localKey}",
-        title = title,
+        title = displayTitle,
         subtitle = buildHomeWatchActivitySubtitle(nowMs),
-        imageUrl = backdropUrl ?: posterUrl,
+        imageUrl = stillUrl ?: backdropUrl ?: posterUrl,
         progressFraction = progressPercent.takeIf { it > 0.0 }?.let { (it / 100.0).coerceIn(0.0, 1.0).toFloat() },
         kind = HomeWideRailItemKind.WATCH_ACTIVITY,
         continueWatchingItem = this,
@@ -589,8 +597,10 @@ internal fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): S
 }
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
+    val isEpisode = mediaType.equals("episode", ignoreCase = true)
+    val showName = if (isEpisode) title?.takeIf { it.isNotBlank() } else null
     val seasonEpisode =
-        if ((type.equals("series", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {
+        if (!isEpisode && (type.equals("show", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {
             String.format(Locale.US, "S%02d:E%02d", season, episode)
         } else {
             null
@@ -603,5 +613,5 @@ private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: 
             DateUtils.MINUTE_IN_MILLIS,
         ).toString()
 
-    return listOfNotNull(seasonEpisode, episodeName, relativeWatched).joinToString(separator = " • ")
+    return listOfNotNull(showName, seasonEpisode, episodeName, relativeWatched).joinToString(separator = " • ")
 }
