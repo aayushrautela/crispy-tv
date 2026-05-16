@@ -32,6 +32,7 @@ data class CalendarEpisodeItem(
     val backdropUrl: String?,
     val thumbnailUrl: String?,
     val watchedKeys: Set<String> = emptySet(),
+    val absoluteEpisodeNumber: Int? = null,
     val type: String = "show",
 )
 

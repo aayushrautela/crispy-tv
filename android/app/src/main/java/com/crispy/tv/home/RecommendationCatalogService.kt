@@ -9,6 +9,7 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.catalog.DiscoverCatalogRef
+import com.crispy.tv.domain.MediaKey
 import com.crispy.tv.domain.home.HomeCatalogItem
 import com.crispy.tv.domain.home.HomeCatalogList
 import com.crispy.tv.domain.home.HomeCatalogPresentation
@@ -297,7 +298,7 @@ class RecommendationCatalogService internal constructor(
         val normalizedTitle = title.trim().ifBlank { return null }
         val normalizedType = mediaType.toCatalogType()
         return HomeCatalogItem(
-            mediaKey = normalizedMediaKey,
+            mediaKey = MediaKey(normalizedMediaKey),
             title = normalizedTitle,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
@@ -318,7 +319,7 @@ class RecommendationCatalogService internal constructor(
         val normalizedTitle = title.trim().ifBlank { return null }
         val normalizedType = mediaType.toCatalogType()
         return HomeCatalogItem(
-            mediaKey = normalizedMediaKey,
+            mediaKey = MediaKey(normalizedMediaKey),
             title = normalizedTitle,
             posterUrl = poster.medium,
             backdropUrl = backdrop.medium,
@@ -338,7 +339,7 @@ class RecommendationCatalogService internal constructor(
         val firstItem = items.firstOrNull() ?: return null
         val mediaKey = "collection:${title.trim().lowercase(Locale.US).replace(' ', '-')}"
         return HomeCatalogItem(
-            mediaKey = mediaKey,
+            mediaKey = MediaKey(mediaKey),
             title = title.trim(),
             posterUrl = firstItem.poster.medium,
             backdropUrl = null,
@@ -355,7 +356,7 @@ class RecommendationCatalogService internal constructor(
     }
 
     private fun HomeCatalogItem.toCatalogItem(): CatalogItem? {
-        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+        val normalizedMediaKey = mediaKey.value.trim().ifBlank { return null }
         return CatalogItem(
             id = normalizedMediaKey,
             mediaKey = normalizedMediaKey,
@@ -454,7 +455,7 @@ class RecommendationCatalogService internal constructor(
                                                 list.items.forEach { item ->
                                                     put(
                                                         JSONObject()
-                                                            .put("media_key", item.mediaKey)
+                                                            .put("media_key", item.mediaKey.value)
                                                             .put("title", item.title)
                                                             .put("poster_url", item.posterUrl)
                                                             .put("backdrop_url", item.backdropUrl)
@@ -534,7 +535,7 @@ class RecommendationCatalogService internal constructor(
             return null
         }
         return HomeCatalogItem(
-            mediaKey = mediaKey,
+            mediaKey = MediaKey(mediaKey),
             title = title,
             posterUrl = json.optString("poster_url").trim().ifBlank { null },
             backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
@@ -570,7 +571,7 @@ class RecommendationCatalogService internal constructor(
                     items =
                         feedPlan.heroResult.items.mapNotNull { hero ->
                             HomeHeroItem(
-                                id = hero.mediaKey,
+                                id = hero.mediaKey.value,
                                 title = hero.title,
                                 description = hero.description,
                                 rating = hero.rating,
