@@ -696,6 +696,9 @@ private fun HistoryLibraryContent(
             }
 
             item(key = "load-more") {
+                if (pagingItems.itemCount > 0) {
+                    pagingItems[pagingItems.itemCount - 1]
+                }
                 LibraryAppendState(
                     appendState = appendState,
                     onRetry = { pagingItems.retry() },
@@ -814,6 +817,9 @@ private fun RatingsLibraryContent(
             }
 
             item(key = "load-more") {
+                if (pagingItems.itemCount > 0) {
+                    pagingItems[pagingItems.itemCount - 1]
+                }
                 LibraryAppendState(
                     appendState = appendState,
                     onRetry = { pagingItems.retry() },
@@ -932,6 +938,9 @@ private fun WatchlistLibraryContent(
             }
 
             item(key = "load-more") {
+                if (pagingItems.itemCount > 0) {
+                    pagingItems[pagingItems.itemCount - 1]
+                }
                 LibraryAppendState(
                     appendState = appendState,
                     onRetry = { pagingItems.retry() },
