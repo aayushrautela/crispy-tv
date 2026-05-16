@@ -602,10 +602,8 @@ private fun HistoryLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems = remember(pagingItems.itemSnapshotList) {
-        pagingItems.itemSnapshotList.filterNotNull()
-    }
-    val monthSections = remember(loadedItems) { buildHistoryMonthSections(loadedItems) }
+    val loadedItems = (0 until pagingItems.itemCount).map { index -> pagingItems[index] }.filterNotNull()
+    val monthSections = buildHistoryMonthSections(loadedItems)
     val displayRows = remember(monthSections) {
         monthSections.flatMap { section ->
             listOf(
@@ -696,9 +694,6 @@ private fun HistoryLibraryContent(
             }
 
             item(key = "load-more") {
-                if (pagingItems.itemCount > 0) {
-                    pagingItems[pagingItems.itemCount - 1]
-                }
                 LibraryAppendState(
                     appendState = appendState,
                     onRetry = { pagingItems.retry() },
@@ -723,10 +718,8 @@ private fun RatingsLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems = remember(pagingItems.itemSnapshotList) {
-        pagingItems.itemSnapshotList.filterNotNull()
-    }
-    val bandSections = remember(loadedItems) { buildRatingBandSections(loadedItems) }
+    val loadedItems = (0 until pagingItems.itemCount).map { index -> pagingItems[index] }.filterNotNull()
+    val bandSections = buildRatingBandSections(loadedItems)
     val displayRows = remember(bandSections) {
         bandSections.flatMap { section ->
             listOf(
@@ -817,9 +810,6 @@ private fun RatingsLibraryContent(
             }
 
             item(key = "load-more") {
-                if (pagingItems.itemCount > 0) {
-                    pagingItems[pagingItems.itemCount - 1]
-                }
                 LibraryAppendState(
                     appendState = appendState,
                     onRetry = { pagingItems.retry() },
@@ -844,10 +834,8 @@ private fun WatchlistLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems = remember(pagingItems.itemSnapshotList) {
-        pagingItems.itemSnapshotList.filterNotNull()
-    }
-    val dateSections = remember(loadedItems) { buildWatchlistDateSections(loadedItems) }
+    val loadedItems = (0 until pagingItems.itemCount).map { index -> pagingItems[index] }.filterNotNull()
+    val dateSections = buildWatchlistDateSections(loadedItems)
     val displayRows = remember(dateSections) {
         dateSections.flatMap { section ->
             listOf(
@@ -938,9 +926,6 @@ private fun WatchlistLibraryContent(
             }
 
             item(key = "load-more") {
-                if (pagingItems.itemCount > 0) {
-                    pagingItems[pagingItems.itemCount - 1]
-                }
                 LibraryAppendState(
                     appendState = appendState,
                     onRetry = { pagingItems.retry() },
