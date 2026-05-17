@@ -43,6 +43,7 @@ import com.crispy.tv.backend.CrispyBackendClient.PageInfo
 import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProviderState
 import com.crispy.tv.backend.CrispyBackendClient.RatingStateView
+import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionItem
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
@@ -1064,7 +1065,7 @@ internal fun CrispyBackendClient.parseRecommendationHeroItems(array: JSONArray?)
             val backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop"), item.optNullableString("backdropUrl"))
             val poster = parseResponsiveImageSet(item.optJSONObject("poster"), item.optNullableString("posterUrl"))
             val logo = parseResponsiveImageSet(item.optJSONObject("logo"), item.optNullableString("logoUrl"))
-            if (backdrop.isEmpty) continue
+            if (backdrop.isEmpty()) continue
             add(
                 RecommendationHeroItem(
                     mediaKey = mediaKey,
@@ -1090,7 +1091,7 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
             val item = safeArray.optJSONObject(index) ?: continue
             val title = item.optString("title").trim().ifBlank { continue }
             val logo = parseResponsiveImageSet(item.optJSONObject("logo"), item.optNullableString("logoUrl"))
-            if (logo.isEmpty) continue
+            if (logo.isEmpty()) continue
             val items = buildList {
                 val parts = item.optJSONArray("items") ?: JSONArray()
                 for (partIndex in 0 until parts.length()) {
@@ -1098,7 +1099,7 @@ internal fun CrispyBackendClient.parseRecommendationCollectionCards(array: JSONA
                     val mediaType = part.optString("mediaType").trim().ifBlank { continue }
                     val partTitle = part.optString("title").trim().ifBlank { continue }
                     val poster = parseResponsiveImageSet(part.optJSONObject("poster"), part.optNullableString("posterUrl"))
-                    if (poster.isEmpty) continue
+                    if (poster.isEmpty()) continue
                     add(
                         RecommendationCollectionItem(
                             mediaType = mediaType,
