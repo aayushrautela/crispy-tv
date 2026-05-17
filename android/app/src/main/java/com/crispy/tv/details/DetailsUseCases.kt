@@ -1,5 +1,6 @@
 package com.crispy.tv.details
 
+import android.util.Log
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.BackendContextResolver
@@ -195,12 +196,22 @@ internal class DetailsUseCases(
         val accessToken = backendContext?.accessToken ?: session?.accessToken
 
         val titleExtras =
-            accessToken?.let {
+            if (accessToken == null) {
+                Log.w(TAG, "Skipping title extras load: missing access token for mediaKey=$mediaKey")
+                null
+            } else {
                 runCatching {
                     catalogRepository.getTitleExtras(
-                        accessToken = it,
+                        accessToken = accessToken,
                         mediaKey = mediaKey,
                     )
+                }.onSuccess { extras ->
+                    Log.d(
+                        TAG,
+                        "Loaded title extras for mediaKey=$mediaKey seasons=${extras.seasons.size} episodes=${extras.episodes.size} reviews=${extras.reviews.size} similar=${extras.similar.size} hasCollection=${extras.collection != null}",
+                    )
+                }.onFailure { error ->
+                    Log.w(TAG, "Failed to load title extras for mediaKey=$mediaKey", error)
                 }.getOrNull()
             }
 
@@ -435,5 +446,10 @@ private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRe
     private fun mutationSucceeded(result: WatchHistoryResult): Boolean {
         return result.accepted
     }
+
+    private companion object {
+        private const val TAG = "DetailsUseCases"
+    }
+}
 
 }
