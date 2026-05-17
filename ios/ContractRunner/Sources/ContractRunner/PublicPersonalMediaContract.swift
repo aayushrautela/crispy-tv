@@ -564,9 +564,9 @@ private func parseMediaItem(_ payload: [String: Any]) -> ContractMediaItem? {
     let imageTags = payload["imageTags"] as? [String: Any]
     let providerIds = payload["providerIds"] as? [String: Any]
     let externalIds = ContractMediaExternalIds(
-        tmdb: optionalString(providerIds, "tmdb").flatMap { Int($0) },
-        imdb: optionalString(providerIds, "imdb"),
-        tvdb: optionalString(providerIds, "tvdb").flatMap { Int($0) }
+        tmdb: optionalString(providerIds ?? [:], "tmdb").flatMap { Int($0) },
+        imdb: optionalString(providerIds ?? [:], "imdb"),
+        tvdb: optionalString(providerIds ?? [:], "tvdb").flatMap { Int($0) }
     )
     let userData = optionalObject(payload, "userData").flatMap(parseContractUserItemData)
 
@@ -722,4 +722,28 @@ private func mapStrict<T>(_ values: [Any], transform: (Any) -> T?) -> [T]? {
         output.append(transformed)
     }
     return output
+}
+
+private func stringArray(_ values: [Any], key: String) -> [String]? {
+    var output: [String] = []
+    for value in values {
+        if let string = value as? String {
+            output.append(string)
+        } else {
+            return nil
+        }
+    }
+    return output
+}
+
+private func optionalObject(_ object: [String: Any], _ key: String) -> [String: Any]? {
+    guard let value = object[key] else { return nil }
+    if value is NSNull { return nil }
+    return value as? [String: Any]
+}
+
+private func nullableDouble(_ object: [String: Any], _ key: String) -> Double? {
+    guard let value = object[key] else { return nil }
+    if value is NSNull { return nil }
+    return doubleValue(value)
 }
