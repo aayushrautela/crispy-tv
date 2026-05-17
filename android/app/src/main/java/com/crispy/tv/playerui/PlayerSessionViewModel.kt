@@ -17,7 +17,6 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.metadata.seasonNumbers
 import com.crispy.tv.playback.PlayerStreamLookupTarget
 import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.applyProviderResult
@@ -470,25 +469,15 @@ class PlayerSessionViewModel(
 
         val backendDetails = backendDetail?.toMediaDetails()
         val fetchedDetails = backendDetails ?: return
-        val titleDetail = backendDetail
-
-        val seasons =
-            if (titleDetail.seasonNumbers().isNotEmpty()) {
-                titleDetail.seasonNumbers()
-            } else {
-                emptyList()
-            }
 
         _uiState.update { state ->
             val selectedSeason =
                 state.selectedSeason
                     ?: activeIdentity?.season
-                    ?: seasons.firstOrNull()
             state.copy(
                 details = fetchedDetails,
                 backdropUrl = fetchedDetails.backdropUrl,
                 artworkUrl = state.artworkUrl ?: fetchedDetails.backdropUrl ?: fetchedDetails.posterUrl,
-                seasons = if (seasons.isNotEmpty()) seasons else state.seasons,
                 selectedSeason = selectedSeason,
                 seasonEpisodes = emptyList(),
                 episodesIsLoading = true,

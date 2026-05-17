@@ -371,16 +371,12 @@ data class PlaybackEventInput(
 
     data class MetadataTitleDetailResponse(
         val item: MetadataView,
-        val seasons: List<MetadataSeasonView>,
-        val episodes: List<MetadataEpisodeView>,
         val nextEpisode: MetadataEpisodeView?,
         val videos: List<MetadataVideoView>,
         val cast: List<MetadataPersonRefView>,
         val directors: List<MetadataPersonRefView>,
         val creators: List<MetadataPersonRefView>,
         val production: MetadataProductionInfoView,
-        val collection: MetadataCollectionView?,
-        val similar: List<MetadataCardView>,
     )
 
     data class MetadataTitleExtrasResponse(

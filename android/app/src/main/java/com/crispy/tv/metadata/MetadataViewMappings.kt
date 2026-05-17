@@ -21,7 +21,7 @@ internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): M
     )
 }
 
-internal fun CrispyBackendClient.MetadataTitleDetailResponse.seasonNumbers(): List<Int> {
+internal fun CrispyBackendClient.MetadataTitleExtrasResponse.seasonNumbers(): List<Int> {
     val seasonNumbers = seasons.map { it.seasonNumber }.filter { it > 0 }.distinct().sorted()
     return seasonNumbers
 }

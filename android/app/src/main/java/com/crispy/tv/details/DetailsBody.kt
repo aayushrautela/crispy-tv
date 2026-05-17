@@ -476,7 +476,7 @@ internal fun DetailsBody(
             }
         }
 
-        val detailRows = remember(details, titleDetail) { buildDetailsRows(details = details, titleDetail = titleDetail) }
+        val detailRows = remember(details, titleDetail, uiState.titleExtras) { buildDetailsRows(details = details, titleDetail = titleDetail, titleExtras = uiState.titleExtras) }
         if (detailRows.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
 

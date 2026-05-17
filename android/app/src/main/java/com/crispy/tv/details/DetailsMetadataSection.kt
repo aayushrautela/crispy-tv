@@ -26,6 +26,7 @@ import java.util.Locale
 internal fun buildDetailsRows(
     details: MediaDetails,
     titleDetail: CrispyBackendClient.MetadataTitleDetailResponse?,
+    titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse?,
 ): List<Pair<String, String>> {
     val rows = mutableListOf<Pair<String, String>>()
     val item = titleDetail?.item
@@ -39,7 +40,7 @@ internal fun buildDetailsRows(
 
         formatLongDate(item?.releaseDate)?.let { rows += "FIRST AIR DATE" to it }
 
-        titleDetail?.seasons?.size?.takeIf { it > 0 }?.let { rows += "SEASONS" to "$it" }
+        titleExtras?.seasons?.size?.takeIf { it > 0 }?.let { rows += "SEASONS" to "$it" }
         item?.episodeCount?.takeIf { it > 0 }?.let { rows += "EPISODES" to "$it" }
 
         details.runtime?.takeIf { it.isNotBlank() }?.let { rows += "EPISODE RUNTIME" to it }

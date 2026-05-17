@@ -9,7 +9,6 @@ import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.seasonNumbers
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
@@ -114,12 +113,7 @@ internal class DetailsUseCases(
         val providerState = watchCtaResolver.resolveProviderState(details, mediaKey)
         val ctaResolution = watchCtaResolver.resolveWatchCta(details, providerState, nowMs)
 
-        val seasons =
-            if (details?.mediaType?.toMetadataLabMediaTypeOrNull() == MetadataLabMediaType.MOVIE) {
-                emptyList()
-            } else {
-                titleDetail?.seasonNumbers().orEmpty()
-            }
+        val seasons = emptyList<Int>()
 
         val statusMessage =
             when {
