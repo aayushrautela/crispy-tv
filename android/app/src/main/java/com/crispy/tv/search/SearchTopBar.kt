@@ -184,16 +184,16 @@ private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            animation = tween(durationMillis = 2800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "ai_search_border_progress",
     )
     val glowAlpha by borderSweepTransition.animateFloat(
-        initialValue = 0.18f,
-        targetValue = 0.42f,
+        initialValue = 0.10f,
+        targetValue = 0.22f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = LinearEasing),
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "ai_search_border_glow_alpha",
@@ -230,7 +230,7 @@ private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
                 size = Size(size.width - 2 * outlineOffset, size.height - 2 * outlineOffset),
                 cornerRadius = CornerRadius(28.dp.toPx() - outlineOffset, 28.dp.toPx() - outlineOffset),
                 style = Stroke(width = currentWidth),
-                alpha = (glowAlpha / glowLevels) * 1.5f,
+                alpha = (glowAlpha / glowLevels) * 1.0f,
             )
         }
 

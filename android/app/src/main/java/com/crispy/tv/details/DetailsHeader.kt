@@ -98,16 +98,16 @@ private fun Modifier.aiInsightsBorderModifier(showBorder: Boolean): Modifier {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            animation = tween(durationMillis = 2800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "ai_insights_border_sweep",
     )
     val glow by transition.animateFloat(
-        initialValue = 0.18f,
-        targetValue = 0.42f,
+        initialValue = 0.10f,
+        targetValue = 0.22f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = LinearEasing),
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "ai_insights_border_glow",
@@ -144,7 +144,7 @@ private fun Modifier.aiInsightsBorderModifier(showBorder: Boolean): Modifier {
                     size = Size(size.width - 2f * off, size.height - 2f * off),
                     cornerRadius = CornerRadius(28.dp.toPx() - off, 28.dp.toPx() - off),
                     style = Stroke(width = w),
-                    alpha = (glow / glowLevels) * 1.5f,
+                    alpha = (glow / glowLevels) * 1.0f,
                 )
             }
 
@@ -335,14 +335,20 @@ internal fun HeaderInfoSection(
             placeholderColor = Color(0xFF9E9E9E)
         )
 
+        var showAiInsightsBorder by remember { mutableStateOf(false) }
+        if (aiInsightsIsLoading) showAiInsightsBorder = true
+
         FilledTonalButton(
-            onClick = onAiInsightsClick,
+            onClick = {
+                showAiInsightsBorder = false
+                onAiInsightsClick()
+            },
             enabled = !aiInsightsIsLoading,
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .aiInsightsBorderModifier(!aiInsightsIsLoading),
+                    .aiInsightsBorderModifier(showAiInsightsBorder),
             shape = MaterialTheme.shapes.extraLarge,
             colors =
                 ButtonDefaults.filledTonalButtonColors(
@@ -352,35 +358,26 @@ internal fun HeaderInfoSection(
                     disabledContentColor = palette.onPillBackground.copy(alpha = 0.65f)
                 )
         ) {
-            if (aiInsightsIsLoading) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(
-                    modifier =
-                        Modifier
-                            .size(18.dp)
-                            .skeletonElement(shape = androidx.compose.foundation.shape.CircleShape, color = DetailsSkeletonColors.Elevated)
-                )
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.width(34.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(
-                        modifier = Modifier.width(34.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AutoAwesome,
-                            contentDescription = null,
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text("AI insights")
-                    }
-                    Spacer(modifier = Modifier.width(34.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                    )
                 }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("AI insights")
+                }
+                Spacer(modifier = Modifier.width(34.dp))
             }
         }
 
