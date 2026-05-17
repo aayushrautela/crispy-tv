@@ -190,8 +190,8 @@ private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
         label = "ai_search_border_progress",
     )
     val glowAlpha by borderSweepTransition.animateFloat(
-        initialValue = 0.10f,
-        targetValue = 0.22f,
+        initialValue = 0.18f,
+        targetValue = 0.42f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
@@ -202,7 +202,7 @@ private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
     return Modifier.drawWithContent {
         drawContent()
 
-        val strokeWidth = 2.5.dp.toPx()
+        val strokeWidth = 1.5.dp.toPx()
         val inset = strokeWidth / 2f
         val maxGlowWidth = 6.dp.toPx()
         val cornerRadius = CornerRadius(28.dp.toPx(), 28.dp.toPx())
@@ -230,7 +230,7 @@ private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
                 size = Size(size.width - 2 * outlineOffset, size.height - 2 * outlineOffset),
                 cornerRadius = CornerRadius(28.dp.toPx() - outlineOffset, 28.dp.toPx() - outlineOffset),
                 style = Stroke(width = currentWidth),
-                alpha = (glowAlpha / glowLevels) * 1.0f,
+                alpha = (glowAlpha / glowLevels) * 1.5f,
             )
         }
 
@@ -243,6 +243,7 @@ private fun aiSearchBorderModifier(isAiLoading: Boolean): Modifier {
             ),
             cornerRadius = cornerRadius,
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            alpha = 0.55f,
         )
     }
 }

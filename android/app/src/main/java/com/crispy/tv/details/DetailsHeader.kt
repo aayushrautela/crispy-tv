@@ -104,8 +104,8 @@ private fun Modifier.aiInsightsBorderModifier(showBorder: Boolean): Modifier {
         label = "ai_insights_border_sweep",
     )
     val glow by transition.animateFloat(
-        initialValue = 0.10f,
-        targetValue = 0.22f,
+        initialValue = 0.18f,
+        targetValue = 0.42f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1800, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
@@ -117,7 +117,7 @@ private fun Modifier.aiInsightsBorderModifier(showBorder: Boolean): Modifier {
         Modifier.drawWithContent {
             drawContent()
 
-            val strokeWidth = 2.5.dp.toPx()
+            val strokeWidth = 1.5.dp.toPx()
             val inset = strokeWidth / 2f
             val maxGlowWidth = 6.dp.toPx()
             val cornerRadius = CornerRadius(28.dp.toPx(), 28.dp.toPx())
@@ -144,7 +144,7 @@ private fun Modifier.aiInsightsBorderModifier(showBorder: Boolean): Modifier {
                     size = Size(size.width - 2f * off, size.height - 2f * off),
                     cornerRadius = CornerRadius(28.dp.toPx() - off, 28.dp.toPx() - off),
                     style = Stroke(width = w),
-                    alpha = (glow / glowLevels) * 1.0f,
+                    alpha = (glow / glowLevels) * 1.5f,
                 )
             }
 
@@ -154,6 +154,7 @@ private fun Modifier.aiInsightsBorderModifier(showBorder: Boolean): Modifier {
                 size = Size(size.width - strokeWidth, size.height - strokeWidth),
                 cornerRadius = cornerRadius,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                alpha = 0.55f,
             )
         },
     )
