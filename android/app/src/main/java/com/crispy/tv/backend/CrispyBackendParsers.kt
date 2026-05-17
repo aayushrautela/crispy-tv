@@ -29,7 +29,7 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataCompanyView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodePreview
 import com.crispy.tv.backend.CrispyBackendClient.MetadataEpisodeView
 import com.crispy.tv.backend.CrispyBackendClient.MetadataExternalIds
-import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
+import com.crispy.tv.backend.CrispyBackendClient.MetadataImages
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonKnownForItem
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonRefView
