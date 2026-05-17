@@ -13,13 +13,50 @@
           "id": "rating-1",
           "media": {
             "mediaType": "movie",
-            "mediaKey": "movie:tmdb:27205",
+            "Id": "movie:tmdb:27205",
             "title": "Inception",
             "posterUrl": "https://img/inception.jpg",
             "releaseYear": 2010,
             "rating": 8.8,
             "genre": "Sci-Fi",
-            "subtitle": "2010 · 148 min"
+            "subtitle": "2010 \u00b7 148 min",
+            "OriginalTitle": null,
+            "Overview": null,
+            "Taglines": [],
+            "ProductionYear": null,
+            "PremiereDate": null,
+            "CommunityRating": null,
+            "OfficialRating": null,
+            "Certification": null,
+            "Genres": [],
+            "RunTimeTicks": null,
+            "Status": null,
+            "ProviderIds": {
+              "Tmdb": null,
+              "Imdb": null,
+              "Tvdb": null
+            },
+            "ImageTags": {
+              "Primary": null,
+              "Backdrop": [],
+              "Logo": null,
+              "Thumb": null,
+              "Screenshot": []
+            },
+            "ParentImageTags": null,
+            "SeriesId": null,
+            "SeriesName": null,
+            "SeasonId": null,
+            "SeasonName": null,
+            "ParentIndexNumber": null,
+            "IndexNumber": null,
+            "AbsoluteIndexNumber": null,
+            "EpisodeTitle": null,
+            "AirDate": null,
+            "RemoteTrailers": [],
+            "PosterColor": null,
+            "BackdropColor": null,
+            "UserData": null
           },
           "rating": {
             "value": 9,
@@ -54,7 +91,7 @@
             "release_year": 2010,
             "rating": 8.8,
             "genre": "Sci-Fi",
-            "subtitle": "2010 · 148 min"
+            "subtitle": "2010 \u00b7 148 min"
           },
           "rating": {
             "value": 9.0,

@@ -555,49 +555,50 @@ private func parseCalendarItem(_ payload: [String: Any]) -> CalendarContractItem
 }
 
 private func parseMediaItem(_ payload: [String: Any]) -> ContractMediaItem? {
-    guard let mediaKey = requiredString(payload, "mediaKey"),
-          let type = requiredString(payload, "type"),
-          let name = requiredString(payload, "name") else {
+    guard let mediaKey = requiredString(payload, "Id"),
+          let type = requiredString(payload, "Type"),
+          let name = requiredString(payload, "Name") else {
         return nil
     }
 
-    let imageTags = payload["imageTags"] as? [String: Any]
-    let providerIds = payload["providerIds"] as? [String: Any]
+    let imageTags = payload["ImageTags"] as? [String: Any]
+    let providerIds = payload["ProviderIds"] as? [String: Any]
     let externalIds = ContractMediaExternalIds(
-        tmdb: optionalString(providerIds ?? [:], "tmdb").flatMap { Int($0) },
-        imdb: optionalString(providerIds ?? [:], "imdb"),
-        tvdb: optionalString(providerIds ?? [:], "tvdb").flatMap { Int($0) }
+        tmdb: optionalString(providerIds ?? [:], "Tmdb").flatMap { Int($0) },
+        imdb: optionalString(providerIds ?? [:], "Imdb"),
+        tvdb: optionalString(providerIds ?? [:], "Tvdb").flatMap { Int($0) }
     )
-    let userData = optionalObject(payload, "userData").flatMap(parseContractUserItemData)
+    let userData = optionalObject(payload, "UserData").flatMap(parseContractUserItemData)
+    let taglines = stringArray(payload["Taglines"] as? [Any] ?? [], key: "Taglines") ?? []
 
     return ContractMediaItem(
         mediaKey: mediaKey,
         mediaType: parseContractMediaItemType(type),
         title: name,
-        originalTitle: optionalString(payload, "originalTitle"),
-        overview: optionalString(payload, "overview"),
-        posterUrl: imageTagMedium(imageTags, "primary"),
+        originalTitle: optionalString(payload, "OriginalTitle"),
+        overview: optionalString(payload, "Overview"),
+        posterUrl: imageTagMedium(imageTags, "Primary"),
         backdropUrl: backdropMedium(imageTags),
-        logoUrl: imageTagMedium(imageTags, "logo"),
-        stillUrl: imageTagMedium(imageTags, "thumb"),
-        releaseDate: optionalString(payload, "premiereDate"),
-        releaseYear: nullableInt(payload, "productionYear"),
-        rating: nullableDouble(payload, "communityRating"),
-        genres: stringArray(payload["genres"] as? [Any] ?? [], key: "genres") ?? [],
-        runtimeMinutes: nullableInt(payload, "runTimeSeconds").flatMap { $0 > 0 ? $0 / 60 : nil },
-        status: optionalString(payload, "status"),
-        certification: optionalString(payload, "certification"),
+        logoUrl: imageTagMedium(imageTags, "Logo"),
+        stillUrl: imageTagMedium(imageTags, "Thumb"),
+        releaseDate: optionalString(payload, "PremiereDate"),
+        releaseYear: nullableInt(payload, "ProductionYear"),
+        rating: nullableDouble(payload, "CommunityRating"),
+        genres: stringArray(payload["Genres"] as? [Any] ?? [], key: "Genres") ?? [],
+        runtimeMinutes: nullableDouble(payload, "RunTimeTicks").flatMap { $0 > 0 ? Int($0 / 600_000_000) : nil },
+        status: optionalString(payload, "Status"),
+        certification: optionalString(payload, "Certification"),
         externalIds: externalIds,
-        seasonNumber: nullableInt(payload, "parentIndexNumber"),
-        episodeNumber: nullableInt(payload, "indexNumber"),
-        absoluteEpisodeNumber: nullableInt(payload, "absoluteIndexNumber"),
-        episodeTitle: optionalString(payload, "episodeTitle"),
-        airDate: optionalString(payload, "airDate"),
-        tagline: optionalString(payload, "tagline"),
-        seriesId: optionalString(payload, "seriesId"),
-        seriesName: optionalString(payload, "seriesName"),
-        seasonId: optionalString(payload, "seasonId"),
-        seasonName: optionalString(payload, "seasonName"),
+        seasonNumber: nullableInt(payload, "ParentIndexNumber"),
+        episodeNumber: nullableInt(payload, "IndexNumber"),
+        absoluteEpisodeNumber: nullableInt(payload, "AbsoluteIndexNumber"),
+        episodeTitle: optionalString(payload, "EpisodeTitle"),
+        airDate: optionalString(payload, "AirDate"),
+        tagline: taglines.first,
+        seriesId: optionalString(payload, "SeriesId"),
+        seriesName: optionalString(payload, "SeriesName"),
+        seasonId: optionalString(payload, "SeasonId"),
+        seasonName: optionalString(payload, "SeasonName"),
         userData: userData
     )
 }
@@ -616,16 +617,16 @@ private func parseContractMediaItemType(_ type: String) -> String {
 private func parseContractUserItemData(_ payload: [String: Any]) -> ContractUserItemData? {
     if payload.isEmpty { return nil }
     return ContractUserItemData(
-        itemId: optionalString(payload, "itemId"),
-        isFavorite: payload["isFavorite"] as? Bool,
-        played: payload["played"] as? Bool,
-        playCount: (payload["playCount"] as? NSNumber)?.intValue,
-        playbackPositionSeconds: doubleValue(payload["playbackPositionSeconds"] as Any),
-        runtimeSeconds: doubleValue(payload["runtimeSeconds"] as Any),
-        playedPercentage: doubleValue(payload["playedPercentage"] as Any),
-        lastPlayedDate: optionalString(payload, "lastPlayedDate"),
-        rating: doubleValue(payload["rating"] as Any),
-        dismissedFromContinueWatching: payload["dismissedFromContinueWatching"] as? Bool
+        itemId: optionalString(payload, "ItemId"),
+        isFavorite: payload["IsFavorite"] as? Bool,
+        played: payload["Played"] as? Bool,
+        playCount: (payload["PlayCount"] as? NSNumber)?.intValue,
+        playbackPositionSeconds: doubleValue(payload["PlaybackPositionTicks"] as Any).map { $0 / 10_000_000 },
+        runtimeSeconds: doubleValue(payload["RuntimeTicks"] as Any).map { $0 / 10_000_000 },
+        playedPercentage: doubleValue(payload["PlayedPercentage"] as Any),
+        lastPlayedDate: optionalString(payload, "LastPlayedDate"),
+        rating: doubleValue(payload["Rating"] as Any),
+        dismissedFromContinueWatching: payload["DismissedFromContinueWatching"] as? Bool
     )
 }
 
@@ -637,7 +638,7 @@ private func imageTagMedium(_ tags: [String: Any]?, _ key: String) -> String? {
 }
 
 private func backdropMedium(_ tags: [String: Any]?) -> String? {
-    guard let backdrops = tags?["backdrop"] as? [Any], let first = backdrops.first else { return nil }
+    guard let backdrops = tags?["Backdrop"] as? [Any], let first = backdrops.first else { return nil }
     if let string = first as? String { return string }
     if let dict = first as? [String: Any] { return optionalString(dict, "medium") }
     return nil

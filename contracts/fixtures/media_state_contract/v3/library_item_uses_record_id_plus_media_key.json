@@ -7,10 +7,47 @@
     "payload": {
       "id": "lib-1",
       "media": {
-        "mediaKey": "show:tmdb:1396",
+        "Id": "show:tmdb:1396",
         "mediaType": "show",
         "title": "Breaking Bad",
-        "posterUrl": "https://img/bb.jpg"
+        "posterUrl": "https://img/bb.jpg",
+        "OriginalTitle": null,
+        "Overview": null,
+        "Taglines": [],
+        "ProductionYear": null,
+        "PremiereDate": null,
+        "CommunityRating": null,
+        "OfficialRating": null,
+        "Certification": null,
+        "Genres": [],
+        "RunTimeTicks": null,
+        "Status": null,
+        "ProviderIds": {
+          "Tmdb": null,
+          "Imdb": null,
+          "Tvdb": null
+        },
+        "ImageTags": {
+          "Primary": null,
+          "Backdrop": [],
+          "Logo": null,
+          "Thumb": null,
+          "Screenshot": []
+        },
+        "ParentImageTags": null,
+        "SeriesId": null,
+        "SeriesName": null,
+        "SeasonId": null,
+        "SeasonName": null,
+        "ParentIndexNumber": null,
+        "IndexNumber": null,
+        "AbsoluteIndexNumber": null,
+        "EpisodeTitle": null,
+        "AirDate": null,
+        "RemoteTrailers": [],
+        "PosterColor": null,
+        "BackdropColor": null,
+        "UserData": null
       },
       "state": {
         "watchedAt": "2026-04-01T10:00:00Z"

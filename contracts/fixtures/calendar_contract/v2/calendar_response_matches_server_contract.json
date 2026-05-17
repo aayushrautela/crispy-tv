@@ -14,97 +14,113 @@
           "kind": "calendar_item",
           "mediaItem": {
             "id": "episode:tmdb:500:1:3",
-            "mediaKey": "episode:tmdb:500:1:3",
-            "type": "Episode",
-            "name": "Sunrise, Sunset",
-            "originalTitle": null,
-            "tagline": null,
-            "overview": null,
-            "productionYear": 2026,
-            "premiereDate": null,
-            "communityRating": 8.1,
-            "officialRating": null,
-            "certification": null,
-            "genres": ["Drama"],
-            "runTimeSeconds": 2880,
-            "status": null,
-            "providerIds": {
-              "tmdb": "1001",
-              "imdb": null,
-              "tvdb": null
+            "Id": "episode:tmdb:500:1:3",
+            "Type": "Episode",
+            "Name": "Sunrise, Sunset",
+            "OriginalTitle": null,
+            "Taglines": [],
+            "Overview": null,
+            "ProductionYear": 2026,
+            "PremiereDate": null,
+            "CommunityRating": 8.1,
+            "OfficialRating": null,
+            "Certification": null,
+            "Genres": [
+              "Drama"
+            ],
+            "RunTimeTicks": 28800000000,
+            "Status": null,
+            "ProviderIds": {
+              "Tmdb": "1001",
+              "Imdb": null,
+              "Tvdb": null
             },
-            "imageTags": {
-              "primary": null,
-              "backdrop": ["https://img/episode-backdrop.jpg"],
-              "logo": null,
-              "thumb": null
+            "ImageTags": {
+              "Primary": null,
+              "Backdrop": [
+                "https://img/episode-backdrop.jpg"
+              ],
+              "Logo": null,
+              "Thumb": null,
+              "Screenshot": []
             },
-            "parentImageTags": null,
-            "seriesId": "show:tmdb:500",
-            "seriesName": "The Morning Bell",
-            "seasonId": null,
-            "seasonName": null,
-            "parentIndexNumber": 1,
-            "indexNumber": 3,
-            "absoluteIndexNumber": null,
-            "episodeTitle": "Sunrise, Sunset",
-            "airDate": null,
-            "trailerUrl": null,
-            "trailerThumbnailUrl": null,
-            "posterColor": null,
-            "backdropColor": null,
-            "userData": null
+            "ParentImageTags": {
+              "Primary": null,
+              "Backdrop": [],
+              "Logo": null,
+              "Thumb": null
+            },
+            "SeriesId": "show:tmdb:500",
+            "SeriesName": "The Morning Bell",
+            "SeasonId": null,
+            "SeasonName": null,
+            "ParentIndexNumber": 1,
+            "IndexNumber": 3,
+            "AbsoluteIndexNumber": null,
+            "EpisodeTitle": "Sunrise, Sunset",
+            "AirDate": null,
+            "RemoteTrailers": [],
+            "PosterColor": null,
+            "BackdropColor": null,
+            "UserData": null
           },
           "context": {
             "bucket": "no_scheduled",
-            "airDate": null,
+            "AirDate": null,
             "watched": false,
             "relatedShow": {
               "id": "show:tmdb:500",
-              "mediaKey": "show:tmdb:500",
-              "type": "Series",
-              "name": "The Morning Bell",
-              "originalTitle": null,
-              "tagline": null,
-              "overview": null,
-              "productionYear": 2026,
-              "premiereDate": null,
-              "communityRating": 8.3,
-              "officialRating": null,
-              "certification": null,
-              "genres": ["Drama"],
-              "runTimeSeconds": null,
-              "status": null,
-              "providerIds": {
-                "tmdb": "500",
-                "imdb": null,
-                "tvdb": null
+              "Id": "show:tmdb:500",
+              "Type": "Series",
+              "Name": "The Morning Bell",
+              "OriginalTitle": null,
+              "Taglines": [],
+              "Overview": null,
+              "ProductionYear": 2026,
+              "PremiereDate": null,
+              "CommunityRating": 8.3,
+              "OfficialRating": null,
+              "Certification": null,
+              "Genres": [
+                "Drama"
+              ],
+              "RunTimeTicks": null,
+              "Status": null,
+              "ProviderIds": {
+                "Tmdb": "500",
+                "Imdb": null,
+                "Tvdb": null
               },
-              "imageTags": {
-                "primary": null,
-                "backdrop": [],
-                "logo": null,
-                "thumb": null
+              "ImageTags": {
+                "Primary": null,
+                "Backdrop": [],
+                "Logo": null,
+                "Thumb": null,
+                "Screenshot": []
               },
-              "parentImageTags": null,
-              "seriesId": null,
-              "seriesName": null,
-              "seasonId": null,
-              "seasonName": null,
-              "parentIndexNumber": null,
-              "indexNumber": null,
-              "absoluteIndexNumber": null,
-              "episodeTitle": null,
-              "airDate": null,
-              "trailerUrl": null,
-              "trailerThumbnailUrl": null,
-              "posterColor": null,
-              "backdropColor": null,
-              "userData": null
+              "ParentImageTags": {
+                "Primary": null,
+                "Backdrop": [],
+                "Logo": null,
+                "Thumb": null
+              },
+              "SeriesId": null,
+              "SeriesName": null,
+              "SeasonId": null,
+              "SeasonName": null,
+              "ParentIndexNumber": null,
+              "IndexNumber": null,
+              "AbsoluteIndexNumber": null,
+              "EpisodeTitle": null,
+              "AirDate": null,
+              "RemoteTrailers": [],
+              "PosterColor": null,
+              "BackdropColor": null,
+              "UserData": null
             }
           },
           "presentation": null,
-          "airDate": null,
+          "AirDate": null,
           "watched": false
         }
       ]

@@ -5,14 +5,51 @@
   "input": {
     "kind": "metadata_card",
     "payload": {
-      "mediaKey": "movie:tmdb:680",
+      "Id": "movie:tmdb:680",
       "mediaType": "movie",
       "title": "Pulp Fiction",
       "images": {
         "posterUrl": "https://img/pulp-poster.jpg",
         "backdropUrl": "https://img/pulp-backdrop.jpg"
       },
-      "summary": "Crime stories interlock."
+      "summary": "Crime stories interlock.",
+      "OriginalTitle": null,
+      "Overview": null,
+      "Taglines": [],
+      "ProductionYear": null,
+      "PremiereDate": null,
+      "CommunityRating": null,
+      "OfficialRating": null,
+      "Certification": null,
+      "Genres": [],
+      "RunTimeTicks": null,
+      "Status": null,
+      "ProviderIds": {
+        "Tmdb": null,
+        "Imdb": null,
+        "Tvdb": null
+      },
+      "ImageTags": {
+        "Primary": null,
+        "Backdrop": [],
+        "Logo": null,
+        "Thumb": null,
+        "Screenshot": []
+      },
+      "ParentImageTags": null,
+      "SeriesId": null,
+      "SeriesName": null,
+      "SeasonId": null,
+      "SeasonName": null,
+      "ParentIndexNumber": null,
+      "IndexNumber": null,
+      "AbsoluteIndexNumber": null,
+      "EpisodeTitle": null,
+      "AirDate": null,
+      "RemoteTrailers": [],
+      "PosterColor": null,
+      "BackdropColor": null,
+      "UserData": null
     }
   },
   "expected": {

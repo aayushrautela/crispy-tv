@@ -7,12 +7,49 @@
     "payload": {
       "kind": "recommendation",
       "mediaItem": {
-        "mediaKey": "show:tmdb:789",
+        "Id": "show:tmdb:789",
         "mediaType": "show",
         "title": "Recommended Show",
         "posterUrl": "https://example.com/poster.jpg",
         "backdropUrl": null,
-        "subtitle": null
+        "subtitle": null,
+        "OriginalTitle": null,
+        "Overview": null,
+        "Taglines": [],
+        "ProductionYear": null,
+        "PremiereDate": null,
+        "CommunityRating": null,
+        "OfficialRating": null,
+        "Certification": null,
+        "Genres": [],
+        "RunTimeTicks": null,
+        "Status": null,
+        "ProviderIds": {
+          "Tmdb": null,
+          "Imdb": null,
+          "Tvdb": null
+        },
+        "ImageTags": {
+          "Primary": null,
+          "Backdrop": [],
+          "Logo": null,
+          "Thumb": null,
+          "Screenshot": []
+        },
+        "ParentImageTags": null,
+        "SeriesId": null,
+        "SeriesName": null,
+        "SeasonId": null,
+        "SeasonName": null,
+        "ParentIndexNumber": null,
+        "IndexNumber": null,
+        "AbsoluteIndexNumber": null,
+        "EpisodeTitle": null,
+        "AirDate": null,
+        "RemoteTrailers": [],
+        "PosterColor": null,
+        "BackdropColor": null,
+        "UserData": null
       },
       "context": {
         "reason": "Because you watched similar shows",

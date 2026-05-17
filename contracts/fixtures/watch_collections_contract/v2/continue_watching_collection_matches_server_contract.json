@@ -13,44 +13,54 @@
           "id": "cw-1",
           "kind": "continue_watching",
           "mediaItem": {
-            "mediaKey": "show:tmdb:1399",
-            "type": "Series",
-            "name": "Game of Thrones",
-            "originalTitle": null,
-            "overview": null,
-            "tagline": null,
-            "imageTags": {
-              "backdrop": [
+            "Id": "show:tmdb:1399",
+            "Type": "Series",
+            "Name": "Game of Thrones",
+            "OriginalTitle": null,
+            "Overview": null,
+            "Taglines": [],
+            "ImageTags": {
+              "Backdrop": [
                 {
                   "small": null,
                   "medium": "https://img/backdrop.jpg",
                   "large": null
                 }
-              ]
+              ],
+              "Primary": null,
+              "Logo": null,
+              "Thumb": null,
+              "Screenshot": []
             },
-            "productionYear": 2011,
-            "premiereDate": null,
-            "communityRating": 9.2,
-            "officialRating": null,
-            "certification": null,
-            "genres": [
+            "ProductionYear": 2011,
+            "PremiereDate": null,
+            "CommunityRating": 9.2,
+            "OfficialRating": null,
+            "Certification": null,
+            "Genres": [
               "Fantasy"
             ],
-            "runTimeSeconds": 3300,
-            "status": null,
-            "providerIds": {
-              "tmdb": "1399"
+            "RunTimeTicks": 33000000000,
+            "Status": null,
+            "ProviderIds": {
+              "Tmdb": "1399",
+              "Imdb": null,
+              "Tvdb": null
             },
-            "seriesId": "show:tmdb:1399",
-            "seriesName": null,
-            "seasonId": null,
-            "seasonName": null,
-            "parentIndexNumber": 3,
-            "indexNumber": 9,
-            "absoluteIndexNumber": null,
-            "episodeTitle": "The Rains of Castamere",
-            "airDate": "2013-06-02",
-            "userData": null
+            "SeriesId": "show:tmdb:1399",
+            "SeriesName": null,
+            "SeasonId": null,
+            "SeasonName": null,
+            "ParentIndexNumber": 3,
+            "IndexNumber": 9,
+            "AbsoluteIndexNumber": null,
+            "EpisodeTitle": "The Rains of Castamere",
+            "AirDate": "2013-06-02",
+            "UserData": null,
+            "ParentImageTags": null,
+            "RemoteTrailers": [],
+            "PosterColor": null,
+            "BackdropColor": null
           },
           "context": {
             "id": "cw-1",

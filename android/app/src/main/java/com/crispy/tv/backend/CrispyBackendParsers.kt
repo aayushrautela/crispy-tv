@@ -385,9 +385,9 @@ internal fun CrispyBackendClient.parseMetadataExternalIds(json: JSONObject?): Me
 internal fun CrispyBackendClient.parseProviderIds(json: JSONObject?): MediaExternalIds {
     val safe = json ?: JSONObject()
     return MediaExternalIds(
-        tmdb = safe.optString("tmdb").trim().toIntOrNull(),
-        imdb = safe.optString("imdb").trim().ifBlank { null },
-        tvdb = safe.optString("tvdb").trim().toIntOrNull(),
+        tmdb = safe.optString("Tmdb").trim().toIntOrNull(),
+        imdb = safe.optString("Imdb").trim().ifBlank { null },
+        tvdb = safe.optString("Tvdb").trim().toIntOrNull(),
     )
 }
 
@@ -406,16 +406,16 @@ internal fun CrispyBackendClient.parseUserItemData(json: JSONObject?): UserItemD
     val safe = json ?: return null
     if (safe.length() == 0) return null
     return UserItemData(
-        itemId = safe.optString("itemId").trim().ifBlank { null },
-        isFavorite = if (safe.has("isFavorite") && !safe.isNull("isFavorite")) safe.optBoolean("isFavorite") else null,
-        played = if (safe.has("played") && !safe.isNull("played")) safe.optBoolean("played") else null,
-        playCount = safe.optIntOrNull("playCount"),
-        playbackPositionSeconds = safe.optDoubleOrNull("playbackPositionSeconds"),
-        runtimeSeconds = safe.optDoubleOrNull("runtimeSeconds"),
-        playedPercentage = safe.optDoubleOrNull("playedPercentage"),
-        lastPlayedDate = safe.optNullableString("lastPlayedDate"),
-        rating = safe.optDoubleOrNull("rating"),
-        dismissedFromContinueWatching = if (safe.has("dismissedFromContinueWatching") && !safe.isNull("dismissedFromContinueWatching")) safe.optBoolean("dismissedFromContinueWatching") else null,
+        itemId = safe.optString("ItemId").trim().ifBlank { null },
+        isFavorite = if (safe.has("IsFavorite") && !safe.isNull("IsFavorite")) safe.optBoolean("IsFavorite") else null,
+        played = if (safe.has("Played") && !safe.isNull("Played")) safe.optBoolean("Played") else null,
+        playCount = safe.optIntOrNull("PlayCount"),
+        playbackPositionSeconds = safe.optDoubleOrNull("PlaybackPositionTicks")?.let { it / 10_000_000.0 },
+        runtimeSeconds = safe.optDoubleOrNull("RuntimeTicks")?.let { it / 10_000_000.0 },
+        playedPercentage = safe.optDoubleOrNull("PlayedPercentage"),
+        lastPlayedDate = safe.optNullableString("LastPlayedDate"),
+        rating = safe.optDoubleOrNull("Rating"),
+        dismissedFromContinueWatching = if (safe.has("DismissedFromContinueWatching") && !safe.isNull("DismissedFromContinueWatching")) safe.optBoolean("DismissedFromContinueWatching") else null,
     )
 }
 
@@ -435,43 +435,44 @@ internal fun CrispyBackendClient.parseMediaPresentationHint(json: JSONObject?): 
 }
 
 internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
-    val mediaKey = json.optNullableString("mediaKey")
-    val type = json.optNullableString("type")
-    val name = json.optNullableString("name")
+    val mediaKey = json.optNullableString("Id")
+    val type = json.optNullableString("Type")
+    val name = json.optNullableString("Name")
     if (mediaKey.isNullOrBlank() || type.isNullOrBlank() || name.isNullOrBlank()) {
-        throw IllegalStateException("MediaItem is missing required identity fields.")
+        throw IllegalStateException("BaseItemDto is missing required identity fields.")
     }
-    val imageTags = json.optJSONObject("imageTags")
+    val imageTags = json.optJSONObject("ImageTags")
+    val taglines = json.optStringList("Taglines")
     return MediaItem(
         mediaKey = mediaKey,
         mediaType = parseMediaItemType(type),
         title = name,
-        originalTitle = json.optNullableString("originalTitle"),
-        overview = json.optNullableString("overview"),
-        poster = parseResponsiveImageSet(imageTags?.optJSONObject("primary"), null),
-        backdrop = parseImageTagBackdrop(imageTags?.optJSONArray("backdrop"), null),
-        logo = parseResponsiveImageSet(imageTags?.optJSONObject("logo"), null),
-        still = parseResponsiveImageSet(imageTags?.optJSONObject("thumb"), null),
-        releaseDate = json.optNullableString("premiereDate"),
-        releaseYear = json.optIntOrNull("productionYear"),
-        rating = json.optDoubleOrNull("communityRating"),
-        genres = json.optStringList("genres"),
-        runtimeMinutes = json.optIntOrNull("runTimeSeconds")?.let { if (it > 0) it / 60 else null },
-        status = json.optNullableString("status"),
-        maturityRating = json.optNullableString("officialRating"),
-        certification = json.optNullableString("certification"),
-        externalIds = parseProviderIds(json.optJSONObject("providerIds")),
-        seasonNumber = json.optIntOrNull("parentIndexNumber"),
-        episodeNumber = json.optIntOrNull("indexNumber"),
-        absoluteEpisodeNumber = json.optIntOrNull("absoluteIndexNumber"),
-        episodeTitle = json.optNullableString("episodeTitle"),
-        airDate = json.optNullableString("airDate"),
-        tagline = json.optNullableString("tagline"),
-        seriesId = json.optNullableString("seriesId"),
-        seriesName = json.optNullableString("seriesName"),
-        seasonId = json.optNullableString("seasonId"),
-        seasonName = json.optNullableString("seasonName"),
-        userData = parseUserItemData(json.optJSONObject("userData")),
+        originalTitle = json.optNullableString("OriginalTitle"),
+        overview = json.optNullableString("Overview"),
+        poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary"), null),
+        backdrop = parseImageTagBackdrop(imageTags?.optJSONArray("Backdrop"), null),
+        logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo"), null),
+        still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb"), null),
+        releaseDate = json.optNullableString("PremiereDate"),
+        releaseYear = json.optIntOrNull("ProductionYear"),
+        rating = json.optDoubleOrNull("CommunityRating"),
+        genres = json.optStringList("Genres"),
+        runtimeMinutes = json.optLongOrNull("RunTimeTicks")?.let { if (it > 0L) (it / 600_000_000L).toInt() else null },
+        status = json.optNullableString("Status"),
+        maturityRating = json.optNullableString("OfficialRating"),
+        certification = json.optNullableString("Certification"),
+        externalIds = parseProviderIds(json.optJSONObject("ProviderIds")),
+        seasonNumber = json.optIntOrNull("ParentIndexNumber"),
+        episodeNumber = json.optIntOrNull("IndexNumber"),
+        absoluteEpisodeNumber = json.optIntOrNull("AbsoluteIndexNumber"),
+        episodeTitle = json.optNullableString("EpisodeTitle"),
+        airDate = json.optNullableString("AirDate"),
+        tagline = taglines.firstOrNull(),
+        seriesId = json.optNullableString("SeriesId"),
+        seriesName = json.optNullableString("SeriesName"),
+        seasonId = json.optNullableString("SeasonId"),
+        seasonName = json.optNullableString("SeasonName"),
+        userData = parseUserItemData(json.optJSONObject("UserData")),
     )
 }
 

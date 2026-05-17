@@ -6,10 +6,47 @@
     "kind": "watched_item",
     "payload": {
       "media": {
-        "mediaKey": "movie:tmdb:13",
+        "Id": "movie:tmdb:13",
         "mediaType": "movie",
         "title": "Forrest Gump",
-        "posterUrl": "https://img/forrest.jpg"
+        "posterUrl": "https://img/forrest.jpg",
+        "OriginalTitle": null,
+        "Overview": null,
+        "Taglines": [],
+        "ProductionYear": null,
+        "PremiereDate": null,
+        "CommunityRating": null,
+        "OfficialRating": null,
+        "Certification": null,
+        "Genres": [],
+        "RunTimeTicks": null,
+        "Status": null,
+        "ProviderIds": {
+          "Tmdb": null,
+          "Imdb": null,
+          "Tvdb": null
+        },
+        "ImageTags": {
+          "Primary": null,
+          "Backdrop": [],
+          "Logo": null,
+          "Thumb": null,
+          "Screenshot": []
+        },
+        "ParentImageTags": null,
+        "SeriesId": null,
+        "SeriesName": null,
+        "SeasonId": null,
+        "SeasonName": null,
+        "ParentIndexNumber": null,
+        "IndexNumber": null,
+        "AbsoluteIndexNumber": null,
+        "EpisodeTitle": null,
+        "AirDate": null,
+        "RemoteTrailers": [],
+        "PosterColor": null,
+        "BackdropColor": null,
+        "UserData": null
       },
       "watchedAt": "2026-04-01T10:00:00Z",
       "origins": [

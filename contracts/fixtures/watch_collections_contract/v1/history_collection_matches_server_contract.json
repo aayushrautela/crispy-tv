@@ -13,13 +13,50 @@
           "id": "hist-1",
           "media": {
             "mediaType": "movie",
-            "mediaKey": "movie:tmdb:157336",
+            "Id": "movie:tmdb:157336",
             "title": "Interstellar",
             "posterUrl": "https://img/interstellar.jpg",
             "releaseYear": 2014,
             "rating": 8.7,
             "genre": "Sci-Fi",
-            "subtitle": "2014 · 169 min"
+            "subtitle": "2014 \u00b7 169 min",
+            "OriginalTitle": null,
+            "Overview": null,
+            "Taglines": [],
+            "ProductionYear": null,
+            "PremiereDate": null,
+            "CommunityRating": null,
+            "OfficialRating": null,
+            "Certification": null,
+            "Genres": [],
+            "RunTimeTicks": null,
+            "Status": null,
+            "ProviderIds": {
+              "Tmdb": null,
+              "Imdb": null,
+              "Tvdb": null
+            },
+            "ImageTags": {
+              "Primary": null,
+              "Backdrop": [],
+              "Logo": null,
+              "Thumb": null,
+              "Screenshot": []
+            },
+            "ParentImageTags": null,
+            "SeriesId": null,
+            "SeriesName": null,
+            "SeasonId": null,
+            "SeasonName": null,
+            "ParentIndexNumber": null,
+            "IndexNumber": null,
+            "AbsoluteIndexNumber": null,
+            "EpisodeTitle": null,
+            "AirDate": null,
+            "RemoteTrailers": [],
+            "PosterColor": null,
+            "BackdropColor": null,
+            "UserData": null
           },
           "watchedAt": "2026-04-10T18:00:00Z",
           "origins": [
@@ -51,7 +88,7 @@
             "release_year": 2014,
             "rating": 8.7,
             "genre": "Sci-Fi",
-            "subtitle": "2014 · 169 min"
+            "subtitle": "2014 \u00b7 169 min"
           },
           "watched_at": "2026-04-10T18:00:00Z",
           "origins": [

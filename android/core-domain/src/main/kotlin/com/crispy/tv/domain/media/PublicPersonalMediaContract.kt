@@ -302,64 +302,64 @@ private fun parsePresentation(payload: Map<String, Any?>): ContractMediaPresenta
 }
 
 private fun parseMediaItem(payload: Map<String, Any?>): ContractMediaItem? {
-    if (!payload.hasRequiredKeys(setOf("mediaKey", "type", "name"))) return null
-    val mediaKey = payload.requiredString("mediaKey") ?: return null
-    val type = payload.requiredString("type") ?: return null
-    val name = payload.requiredString("name") ?: return null
-    val imageTags = payload.nullableObject("imageTags")
+    if (!payload.hasRequiredKeys(setOf("Id", "Type", "Name"))) return null
+    val mediaKey = payload.requiredString("Id") ?: return null
+    val type = payload.requiredString("Type") ?: return null
+    val name = payload.requiredString("Name") ?: return null
+    val imageTags = payload.nullableObject("ImageTags")
     return ContractMediaItem(
         mediaKey = MediaKey(mediaKey),
         mediaType = parseContractMediaItemType(type),
         title = name,
-        originalTitle = payload.nullableString("originalTitle"),
-        overview = payload.nullableString("overview"),
-        posterUrl = imageTags?.imageTagMedium("primary"),
+        originalTitle = payload.nullableString("OriginalTitle"),
+        overview = payload.nullableString("Overview"),
+        posterUrl = imageTags?.imageTagMedium("Primary"),
         backdropUrl = imageTags?.backdropMedium(),
-        logoUrl = imageTags?.imageTagMedium("logo"),
-        stillUrl = imageTags?.imageTagMedium("thumb"),
-        releaseDate = payload.nullableString("premiereDate"),
-        releaseYear = payload.nullableInt("productionYear"),
-        rating = payload.nullableNumber("communityRating"),
-        genres = payload.requiredStringList("genres") ?: return null,
-        runtimeMinutes = payload.nullableNumber("runTimeSeconds")?.toInt()?.let { if (it > 0) it / 60 else null },
-        status = payload.nullableString("status"),
-        certification = payload.nullableString("certification"),
-        externalIds = payload.nullableObject("providerIds")?.let(::parseProviderIds) ?: ContractMediaExternalIds(null, null, null),
-        seasonNumber = payload.nullableInt("parentIndexNumber"),
-        episodeNumber = payload.nullableInt("indexNumber"),
-        absoluteEpisodeNumber = payload.nullableInt("absoluteIndexNumber"),
-        episodeTitle = payload.nullableString("episodeTitle"),
-        airDate = payload.nullableString("airDate"),
-        tagline = payload.nullableString("tagline"),
-        seriesId = payload.nullableString("seriesId"),
-        seriesName = payload.nullableString("seriesName"),
-        seasonId = payload.nullableString("seasonId"),
-        seasonName = payload.nullableString("seasonName"),
-        userData = payload.nullableObject("userData")?.let(::parseContractUserItemData),
+        logoUrl = imageTags?.imageTagMedium("Logo"),
+        stillUrl = imageTags?.imageTagMedium("Thumb"),
+        releaseDate = payload.nullableString("PremiereDate"),
+        releaseYear = payload.nullableInt("ProductionYear"),
+        rating = payload.nullableNumber("CommunityRating"),
+        genres = payload.requiredStringList("Genres") ?: return null,
+        runtimeMinutes = payload.nullableNumber("RunTimeTicks")?.toLong()?.let { if (it > 0L) (it / 600_000_000L).toInt() else null },
+        status = payload.nullableString("Status"),
+        certification = payload.nullableString("Certification"),
+        externalIds = payload.nullableObject("ProviderIds")?.let(::parseProviderIds) ?: ContractMediaExternalIds(null, null, null),
+        seasonNumber = payload.nullableInt("ParentIndexNumber"),
+        episodeNumber = payload.nullableInt("IndexNumber"),
+        absoluteEpisodeNumber = payload.nullableInt("AbsoluteIndexNumber"),
+        episodeTitle = payload.nullableString("EpisodeTitle"),
+        airDate = payload.nullableString("AirDate"),
+        tagline = payload.requiredStringList("Taglines")?.firstOrNull(),
+        seriesId = payload.nullableString("SeriesId"),
+        seriesName = payload.nullableString("SeriesName"),
+        seasonId = payload.nullableString("SeasonId"),
+        seasonName = payload.nullableString("SeasonName"),
+        userData = payload.nullableObject("UserData")?.let(::parseContractUserItemData),
     )
 }
 
 private fun parseProviderIds(payload: Map<String, Any?>): ContractMediaExternalIds {
     return ContractMediaExternalIds(
-        tmdb = payload.nullableString("tmdb")?.toIntOrNull(),
-        imdb = payload.nullableString("imdb"),
-        tvdb = payload.nullableString("tvdb")?.toIntOrNull(),
+        tmdb = payload.nullableString("Tmdb")?.toIntOrNull(),
+        imdb = payload.nullableString("Imdb"),
+        tvdb = payload.nullableString("Tvdb")?.toIntOrNull(),
     )
 }
 
 private fun parseContractUserItemData(payload: Map<String, Any?>): ContractUserItemData? {
     if (payload.isEmpty()) return null
     return ContractUserItemData(
-        itemId = payload.nullableString("itemId"),
-        isFavorite = payload["isFavorite"] as? Boolean,
-        played = payload["played"] as? Boolean,
-        playCount = (payload["playCount"] as? Number)?.toInt(),
-        playbackPositionSeconds = (payload["playbackPositionSeconds"] as? Number)?.toDouble(),
-        runtimeSeconds = (payload["runtimeSeconds"] as? Number)?.toDouble(),
-        playedPercentage = (payload["playedPercentage"] as? Number)?.toDouble(),
-        lastPlayedDate = payload.nullableString("lastPlayedDate"),
-        rating = (payload["rating"] as? Number)?.toDouble(),
-        dismissedFromContinueWatching = payload["dismissedFromContinueWatching"] as? Boolean,
+        itemId = payload.nullableString("ItemId"),
+        isFavorite = payload["IsFavorite"] as? Boolean,
+        played = payload["Played"] as? Boolean,
+        playCount = (payload["PlayCount"] as? Number)?.toInt(),
+        playbackPositionSeconds = (payload["PlaybackPositionTicks"] as? Number)?.toDouble()?.let { it / 10_000_000.0 },
+        runtimeSeconds = (payload["RuntimeTicks"] as? Number)?.toDouble()?.let { it / 10_000_000.0 },
+        playedPercentage = (payload["PlayedPercentage"] as? Number)?.toDouble(),
+        lastPlayedDate = payload.nullableString("LastPlayedDate"),
+        rating = (payload["Rating"] as? Number)?.toDouble(),
+        dismissedFromContinueWatching = payload["DismissedFromContinueWatching"] as? Boolean,
     )
 }
 
@@ -384,13 +384,14 @@ private fun Map<String, Any?>.imageTagMedium(key: String): String? {
 }
 
 private fun Map<String, Any?>.backdropMedium(): String? {
-    val backdrops = this["backdrop"] as? List<*>
-    val first = backdrops?.firstOrNull()
+    val backdrops = this["Backdrop"] as? List<*> ?: return null
+    val first = backdrops.firstOrNull() ?: return null
     return when (first) {
-        is String -> first
-        is Map<*, *> -> first.toStringAnyMap()?.nullableString("medium")
+        is String -> first.trim().ifBlank { null }
+        is Map<*, *> -> first.stringValue("medium")
         else -> null
     }
+}
 }
 
 private fun Map<String, Any?>.hasExactKeys(expected: Set<String>): Boolean = keys == expected

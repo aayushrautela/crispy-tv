@@ -13,13 +13,50 @@
           "id": "watchlist-1",
           "media": {
             "mediaType": "movie",
-            "mediaKey": "movie:tmdb:603",
+            "Id": "movie:tmdb:603",
             "title": "The Matrix",
             "posterUrl": "https://img/matrix.jpg",
             "releaseYear": 1999,
             "rating": 8.7,
             "genre": "Action",
-            "subtitle": "1999 · 136 min"
+            "subtitle": "1999 \u00b7 136 min",
+            "OriginalTitle": null,
+            "Overview": null,
+            "Taglines": [],
+            "ProductionYear": null,
+            "PremiereDate": null,
+            "CommunityRating": null,
+            "OfficialRating": null,
+            "Certification": null,
+            "Genres": [],
+            "RunTimeTicks": null,
+            "Status": null,
+            "ProviderIds": {
+              "Tmdb": null,
+              "Imdb": null,
+              "Tvdb": null
+            },
+            "ImageTags": {
+              "Primary": null,
+              "Backdrop": [],
+              "Logo": null,
+              "Thumb": null,
+              "Screenshot": []
+            },
+            "ParentImageTags": null,
+            "SeriesId": null,
+            "SeriesName": null,
+            "SeasonId": null,
+            "SeasonName": null,
+            "ParentIndexNumber": null,
+            "IndexNumber": null,
+            "AbsoluteIndexNumber": null,
+            "EpisodeTitle": null,
+            "AirDate": null,
+            "RemoteTrailers": [],
+            "PosterColor": null,
+            "BackdropColor": null,
+            "UserData": null
           },
           "addedAt": "2026-04-08T12:00:00Z",
           "origins": [
@@ -51,7 +88,7 @@
             "release_year": 1999,
             "rating": 8.7,
             "genre": "Action",
-            "subtitle": "1999 · 136 min"
+            "subtitle": "1999 \u00b7 136 min"
           },
           "added_at": "2026-04-08T12:00:00Z",
           "origins": [

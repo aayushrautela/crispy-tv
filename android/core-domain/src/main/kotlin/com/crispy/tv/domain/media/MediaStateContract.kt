@@ -35,22 +35,23 @@ fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStat
 }
 
 private fun normalizeMediaItemWrapper(payload: Map<String, Any?>): MediaStateNormalized? {
-    val media = payload.objectValue("mediaItem") ?: payload.takeIf { it.containsKey("mediaKey") } ?: return null
+    val media = payload.objectValue("mediaItem") ?: payload.takeIf { it.containsKey("Id") } ?: return null
     return normalizeMediaItem(media)
 }
 
 private fun normalizeMediaItem(payload: Map<String, Any?>): MediaStateNormalized? {
-    val mediaKeyStr = payload.stringValue("mediaKey") ?: return null
-    val mediaType = payload.stringValue("mediaType") ?: return null
-    val title = payload.stringValue("title") ?: return null
+    val mediaKeyStr = payload.stringValue("Id") ?: return null
+    val mediaType = payload.stringValue("Type") ?: return null
+    val title = payload.stringValue("Name") ?: return null
+    val imageTags = payload.objectValue("ImageTags")
     return MediaStateNormalized(
         cardFamily = "media_item",
         mediaKey = MediaKey(mediaKeyStr),
         mediaType = mediaType,
         title = title,
-        posterUrl = payload.nullableStringValue("posterUrl"),
-        backdropUrl = payload.nullableStringValue("backdropUrl"),
-        subtitle = payload.nullableStringValue("subtitle") ?: payload.nullableStringValue("episodeTitle") ?: payload.nullableStringValue("overview"),
+        posterUrl = imageTags?.imageTagMedium("Primary"),
+        backdropUrl = imageTags?.backdropMedium(),
+        subtitle = payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview"),
     )
 }
 
@@ -127,6 +128,29 @@ private fun Map<String, Any?>.nullableStringValue(key: String): String? {
 private fun Map<String, Any?>.objectValue(key: String): Map<String, Any?>? {
     @Suppress("UNCHECKED_CAST")
     return this[key] as? Map<String, Any?>
+}
+
+private fun Map<String, Any?>.imageTagMedium(key: String): String? {
+    val tag = this[key]
+    return when (tag) {
+        is String -> tag.trim().ifBlank { null }
+        is Map<*, *> -> tag.stringValue("medium")
+        else -> null
+    }
+}
+
+private fun Map<String, Any?>.backdropMedium(): String? {
+    val backdrops = this["Backdrop"] as? List<*> ?: return null
+    val first = backdrops.firstOrNull() ?: return null
+    return when (first) {
+        is String -> first.trim().ifBlank { null }
+        is Map<*, *> -> first.stringValue("medium")
+        else -> null
+    }
+}
+
+private fun Map<*, *>.stringValue(key: String): String? {
+    return this[key]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 private fun Map<String, Any?>.booleanValue(key: String): Boolean? {

@@ -7,17 +7,52 @@
     "payload": {
       "id": "cw-123",
       "media": {
-        "mediaKey": "show:tmdb:1399",
+        "Id": "show:tmdb:1399",
         "mediaType": "show",
         "title": "Game of Thrones",
         "posterUrl": "https://img/poster.jpg",
         "backdropUrl": "https://img/backdrop.jpg",
-        "episodeTitle": "The Rains of Castamere",
+        "EpisodeTitle": "The Rains of Castamere",
         "seasonNumber": 3,
         "episodeNumber": 9,
-        "airDate": "2013-06-02",
+        "AirDate": "2013-06-02",
         "runtimeMinutes": 55,
-        "subtitle": "S3 E9"
+        "subtitle": "S3 E9",
+        "OriginalTitle": null,
+        "Overview": null,
+        "Taglines": [],
+        "ProductionYear": null,
+        "PremiereDate": null,
+        "CommunityRating": null,
+        "OfficialRating": null,
+        "Certification": null,
+        "Genres": [],
+        "RunTimeTicks": null,
+        "Status": null,
+        "ProviderIds": {
+          "Tmdb": null,
+          "Imdb": null,
+          "Tvdb": null
+        },
+        "ImageTags": {
+          "Primary": null,
+          "Backdrop": [],
+          "Logo": null,
+          "Thumb": null,
+          "Screenshot": []
+        },
+        "ParentImageTags": null,
+        "SeriesId": null,
+        "SeriesName": null,
+        "SeasonId": null,
+        "SeasonName": null,
+        "ParentIndexNumber": null,
+        "IndexNumber": null,
+        "AbsoluteIndexNumber": null,
+        "RemoteTrailers": [],
+        "PosterColor": null,
+        "BackdropColor": null,
+        "UserData": null
       },
       "progress": {
         "progressPercent": 47.5

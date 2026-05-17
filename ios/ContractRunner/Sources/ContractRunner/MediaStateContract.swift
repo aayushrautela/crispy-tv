@@ -76,7 +76,7 @@ public func normalizeMediaStateCard(payload: [String: Any], kind: String) -> Med
 }
 
 private func normalizeMediaItemWrapper(_ payload: [String: Any]) -> MediaStateNormalized? {
-    let media = objectValue(payload, "mediaItem") ?? (payload.keys.contains("mediaKey") ? payload : nil)
+    let media = objectValue(payload, "mediaItem") ?? (payload.keys.contains("Id") ? payload : nil)
     guard let media else {
         return nil
     }
@@ -84,19 +84,20 @@ private func normalizeMediaItemWrapper(_ payload: [String: Any]) -> MediaStateNo
 }
 
 private func normalizeMediaItem(_ payload: [String: Any]) -> MediaStateNormalized? {
-    guard let mediaKey = stringValue(payload, "mediaKey"),
-          let mediaType = stringValue(payload, "mediaType"),
-          let title = stringValue(payload, "title") else {
+    guard let mediaKey = stringValue(payload, "Id"),
+          let mediaType = stringValue(payload, "Type"),
+          let title = stringValue(payload, "Name") else {
         return nil
     }
+    let imageTags = objectValue(payload, "ImageTags")
     return MediaStateNormalized(
         cardFamily: "media_item",
         mediaKey: mediaKey,
         mediaType: mediaType,
         title: title,
-        posterUrl: nullableStringValue(payload, "posterUrl"),
-        backdropUrl: nullableStringValue(payload, "backdropUrl"),
-        subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "episodeTitle") ?? nullableStringValue(payload, "overview")
+        posterUrl: imageTagMedium(imageTags, "Primary"),
+        backdropUrl: backdropMedium(imageTags),
+        subtitle: nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "Overview")
     )
 }
 
@@ -229,8 +230,22 @@ private func doubleValue(_ object: [String: Any]?, _ key: String) -> Double? {
     return nil
 }
 
-private func objectValue(_ object: [String: Any], _ key: String) -> [String: Any]? {
-    return object[key] as? [String: Any]
+private func objectValue(_ object: [String: Any]?, _ key: String) -> [String: Any]? {
+    return object?[key] as? [String: Any]
+}
+
+private func imageTagMedium(_ tags: [String: Any]?, _ key: String) -> String? {
+    guard let tag = tags?[key] else { return nil }
+    if let string = tag as? String { return string }
+    if let dict = tag as? [String: Any] { return nullableStringValue(dict, "medium") }
+    return nil
+}
+
+private func backdropMedium(_ tags: [String: Any]?) -> String? {
+    guard let backdrops = tags?["Backdrop"] as? [Any], let first = backdrops.first else { return nil }
+    if let string = first as? String { return string }
+    if let dict = first as? [String: Any] { return nullableStringValue(dict, "medium") }
+    return nil
 }
 
 private func stringArray(_ values: [Any]) -> [String]? {

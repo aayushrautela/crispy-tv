@@ -5,12 +5,12 @@
   "input": {
     "kind": "media_item",
     "payload": {
-      "mediaKey": "movie:tmdb:123",
+      "Id": "movie:tmdb:123",
       "mediaType": "movie",
       "title": "Test Movie",
-      "originalTitle": "Test Movie Original",
+      "OriginalTitle": "Test Movie Original",
       "subtitle": "2024",
-      "overview": "A test movie",
+      "Overview": "A test movie",
       "posterUrl": "https://example.com/poster.jpg",
       "backdropUrl": "https://example.com/backdrop.jpg",
       "logoUrl": "https://example.com/logo.jpg",
@@ -18,13 +18,13 @@
       "releaseDate": "2024-01-01",
       "releaseYear": 2024,
       "rating": 8.5,
-      "genres": [
+      "Genres": [
         "Action",
         "Drama"
       ],
       "runtimeMinutes": 120,
-      "status": "Released",
-      "certification": "PG-13",
+      "Status": "Released",
+      "Certification": "PG-13",
       "externalIds": {
         "tmdb": 123,
         "imdb": "tt1234567",
@@ -35,8 +35,38 @@
       "seasonNumber": null,
       "episodeNumber": null,
       "absoluteEpisodeNumber": null,
-      "episodeTitle": null,
-      "airDate": null
+      "EpisodeTitle": null,
+      "AirDate": null,
+      "Taglines": [],
+      "ProductionYear": null,
+      "PremiereDate": null,
+      "CommunityRating": null,
+      "OfficialRating": null,
+      "RunTimeTicks": null,
+      "ProviderIds": {
+        "Tmdb": null,
+        "Imdb": null,
+        "Tvdb": null
+      },
+      "ImageTags": {
+        "Primary": null,
+        "Backdrop": [],
+        "Logo": null,
+        "Thumb": null,
+        "Screenshot": []
+      },
+      "ParentImageTags": null,
+      "SeriesId": null,
+      "SeriesName": null,
+      "SeasonId": null,
+      "SeasonName": null,
+      "ParentIndexNumber": null,
+      "IndexNumber": null,
+      "AbsoluteIndexNumber": null,
+      "RemoteTrailers": [],
+      "PosterColor": null,
+      "BackdropColor": null,
+      "UserData": null
     }
   },
   "expected": {
