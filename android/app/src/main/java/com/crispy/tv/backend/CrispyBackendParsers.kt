@@ -324,27 +324,32 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemViews(array: JSONArray?
 internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject): MetadataCardView {
     val mediaItem = json.optJSONObject("mediaItem")
         ?: error("Metadata related item is missing mediaItem.")
+    val item = parseMediaItem(mediaItem)
     return MetadataCardView(
-        id = mediaItem.optNullableString("mediaKey"),
-        mediaKey = mediaItem.optNullableString("mediaKey"),
-        mediaType = mediaItem.optNullableString("mediaType")
-            ?: error("Metadata related item mediaItem is missing mediaType."),
+        id = item.mediaKey,
+        mediaKey = item.mediaKey,
+        mediaType = item.mediaType,
         kind = json.optNullableString("kind") ?: "metadata_detail",
-        tmdbId = mediaItem.optJSONObject("externalIds")?.optIntOrNull("tmdb"),
-        showTmdbId = mediaItem.optIntOrNull("showTmdbId"),
-        absoluteEpisodeNumber = mediaItem.optIntOrNull("absoluteEpisodeNumber"),
-        seasonNumber = mediaItem.optIntOrNull("seasonNumber"),
-        episodeNumber = mediaItem.optIntOrNull("episodeNumber"),
-        title = mediaItem.optNullableString("title"),
-        subtitle = mediaItem.optNullableString("subtitle"),
-        summary = mediaItem.optNullableString("overview"),
-        overview = mediaItem.optNullableString("overview"),
-        images = parseMetadataImages(mediaItem.optJSONObject("images")),
-        releaseDate = mediaItem.optNullableString("releaseDate"),
-        releaseYear = mediaItem.optIntOrNull("releaseYear"),
-        runtimeMinutes = mediaItem.optIntOrNull("runtimeMinutes"),
-        rating = mediaItem.optDoubleOrNull("rating"),
-        status = mediaItem.optNullableString("status"),
+        tmdbId = item.externalIds.tmdb,
+        showTmdbId = item.seriesId?.trim()?.toIntOrNull(),
+        absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+        seasonNumber = item.seasonNumber,
+        episodeNumber = item.episodeNumber,
+        title = item.title,
+        subtitle = null,
+        summary = item.overview,
+        overview = item.overview,
+        images = MetadataImages(
+            poster = item.poster,
+            backdrop = item.backdrop,
+            still = item.still,
+            logo = item.logo,
+        ),
+        releaseDate = item.releaseDate,
+        releaseYear = item.releaseYear,
+        runtimeMinutes = item.runtimeMinutes,
+        rating = item.rating,
+        status = item.status,
     )
 }
 
