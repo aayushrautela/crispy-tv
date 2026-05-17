@@ -1,11 +1,5 @@
 package com.crispy.tv.details
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -120,11 +114,7 @@ internal fun AiInsightsStoryOverlay(
 
     val safeIndex = index.coerceIn(0, slides.lastIndex)
     val currentSlide = slides[safeIndex]
-    val accentColor by animateColorAsState(
-        targetValue = accentColorForType(currentSlide.type),
-        animationSpec = tween(durationMillis = 320),
-        label = "ai_insights_accent",
-    )
+    val accentColor = accentColorForType(currentSlide.type)
 
     fun prev() {
         index = (safeIndex - 1).coerceAtLeast(0)
@@ -181,43 +171,34 @@ internal fun AiInsightsStoryOverlay(
                             }
                         },
             ) {
-                AnimatedContent(
-                    targetState = safeIndex,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
-                    },
-                    label = "ai_insights_slide",
-                    modifier = Modifier.fillMaxSize(),
-                ) { target ->
-                    val slide = slides[target]
-                    val slideAccent = accentColorForType(slide.type)
-                    val slideBackdrop = slideBackdrops.getOrNull(target)
-                    if (target == 0) {
-                        AiInsightsHeroSlide(
-                            slide = slide,
-                            index = target,
-                            title = title,
-                            imageUrl = imageUrlForHero(
-                                backdropUrl = backdropUrl,
-                                slideBackdropUrl = slideBackdrop,
-                                posterUrl = posterUrl,
-                            ),
-                            palette = palette,
-                            accentColor = slideAccent,
-                        )
-                    } else {
-                        AiInsightsDetailSlide(
-                            slide = slide,
-                            index = target,
-                            title = title,
-                            imageUrl = imageUrlForThumbnail(
-                                posterUrl = posterUrl,
-                                backdropUrl = backdropUrl,
-                            ),
-                            palette = palette,
-                            accentColor = slideAccent,
-                        )
-                    }
+                val slide = slides[safeIndex]
+                val slideAccent = accentColorForType(slide.type)
+                val slideBackdrop = slideBackdrops.getOrNull(safeIndex)
+                if (safeIndex == 0) {
+                    AiInsightsHeroSlide(
+                        slide = slide,
+                        index = safeIndex,
+                        title = title,
+                        imageUrl = imageUrlForHero(
+                            backdropUrl = backdropUrl,
+                            slideBackdropUrl = slideBackdrop,
+                            posterUrl = posterUrl,
+                        ),
+                        palette = palette,
+                        accentColor = slideAccent,
+                    )
+                } else {
+                    AiInsightsDetailSlide(
+                        slide = slide,
+                        index = safeIndex,
+                        title = title,
+                        imageUrl = imageUrlForThumbnail(
+                            posterUrl = posterUrl,
+                            backdropUrl = backdropUrl,
+                        ),
+                        palette = palette,
+                        accentColor = slideAccent,
+                    )
                 }
             }
 
