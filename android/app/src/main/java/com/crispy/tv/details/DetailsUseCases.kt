@@ -451,5 +451,3 @@ private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRe
         private const val TAG = "DetailsUseCases"
     }
 }
-
-}
