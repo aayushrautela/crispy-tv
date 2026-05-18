@@ -13,19 +13,16 @@ class CalendarContractTest {
     @Test
     fun fixturesMatchServerCalendarContract() {
         val fixturePaths = ContractTestSupport.fixtureFiles("calendar_contract")
-            .filter { it.toString().contains("/v2/") }
-        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one calendar_contract v2 fixture")
+            .filter { it.toString().contains("/v3/") }
+        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one calendar_contract v3 fixture")
 
         fixturePaths.forEach { path ->
             val fixture = ContractTestSupport.parseFixture(path)
             val caseId = fixture.requireString("case_id", path)
             assertEquals("calendar_contract", fixture.requireString("suite", path), "$caseId: wrong suite")
 
-            val input = fixture.requireJsonObject("input", path)
-            val route = input.requireString("route", path)
-            val payload = input.requireJsonObject("payload", path).toKotlinMap()
-
-            val actual = normalizeCalendarEnvelope(payload, route)
+            val payload = fixture.requireJsonObject("input", path).requireJsonObject("payload", path).toKotlinMap()
+            val actual = normalizeCalendarEnvelope(payload)
             val expectedValid = fixture.requireJsonObject("expected", path).requireBoolean("valid", path)
 
             assertEquals(expectedValid, actual != null, "$caseId: valid")

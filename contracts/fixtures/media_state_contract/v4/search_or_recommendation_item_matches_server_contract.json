@@ -1,0 +1,70 @@
+{
+  "contract_version": 4,
+  "suite": "media_state_contract",
+  "case_id": "search_or_recommendation_item_matches_server_contract",
+  "input": {
+    "kind": "recommendation_item",
+    "payload": {
+      "Id": "show:tmdb:789",
+      "Type": "Series",
+      "Name": "Recommended Show",
+      "OriginalTitle": null,
+      "Overview": null,
+      "Taglines": [],
+      "ProductionYear": null,
+      "PremiereDate": null,
+      "CommunityRating": null,
+      "OfficialRating": null,
+      "Certification": null,
+      "Genres": [],
+      "RunTimeTicks": null,
+      "Status": null,
+      "ProviderIds": {
+        "Tmdb": null,
+        "Imdb": null,
+        "Tvdb": null
+      },
+      "ImageTags": {
+        "Primary": null,
+        "Backdrop": [],
+        "Logo": null,
+        "Thumb": null,
+        "Screenshot": []
+      },
+      "ParentImageTags": null,
+      "SeriesId": null,
+      "SeriesName": null,
+      "SeasonId": null,
+      "SeasonName": null,
+      "ParentIndexNumber": null,
+      "IndexNumber": null,
+      "AbsoluteIndexNumber": null,
+      "EpisodeTitle": null,
+      "AirDate": null,
+      "RemoteTrailers": [],
+      "PosterColor": null,
+      "BackdropColor": null,
+      "UserData": null
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "media_key": "show:tmdb:789",
+      "media_type": "Series",
+      "item_id": null,
+      "title": "Recommended Show",
+      "poster_url": null,
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": null,
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

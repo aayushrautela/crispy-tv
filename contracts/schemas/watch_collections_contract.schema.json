@@ -27,31 +27,13 @@
     },
     "expected": {
       "type": "object",
-      "required": ["valid", "normalized"],
+      "required": ["valid"],
       "properties": {
         "valid": {
           "type": "boolean"
         },
         "normalized": {
-          "type": ["object", "null"],
-          "required": ["profile_id", "kind", "source", "generated_at", "items", "page_info"],
-          "properties": {
-            "profile_id": { "type": "string" },
-            "kind": { "type": "string" },
-            "source": { "type": "string" },
-            "generated_at": { "type": "string" },
-            "items": { "type": "array", "items": { "type": "object" } },
-            "page_info": {
-              "type": "object",
-              "required": ["next_cursor", "has_more"],
-              "properties": {
-                "next_cursor": { "type": ["string", "null"] },
-                "has_more": { "type": "boolean" }
-              },
-              "additionalProperties": false
-            }
-          },
-          "additionalProperties": false
+          "type": ["object", "null"]
         }
       },
       "additionalProperties": false

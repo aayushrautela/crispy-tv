@@ -6,53 +6,48 @@
     "kind": "media_item",
     "payload": {
       "Id": "movie:tmdb:123",
-      "mediaType": "movie",
-      "title": "Test Movie",
+      "Type": "Movie",
+      "Name": "Test Movie",
       "OriginalTitle": "Test Movie Original",
-      "subtitle": "2024",
       "Overview": "A test movie",
-      "posterUrl": "https://example.com/poster.jpg",
-      "backdropUrl": "https://example.com/backdrop.jpg",
-      "logoUrl": "https://example.com/logo.jpg",
-      "stillUrl": "https://example.com/still.jpg",
-      "releaseDate": "2024-01-01",
-      "releaseYear": 2024,
-      "rating": 8.5,
+      "Taglines": [
+        "A tagline"
+      ],
+      "ProductionYear": 2024,
+      "PremiereDate": "2024-01-01",
+      "CommunityRating": 8.5,
+      "OfficialRating": null,
+      "Certification": "PG-13",
       "Genres": [
         "Action",
         "Drama"
       ],
-      "runtimeMinutes": 120,
+      "RunTimeTicks": 72000000000,
       "Status": "Released",
-      "Certification": "PG-13",
-      "externalIds": {
-        "tmdb": 123,
-        "imdb": "tt1234567",
-        "tvdb": null
-      },
-      "parent": null,
-      "showTmdbId": null,
-      "seasonNumber": null,
-      "episodeNumber": null,
-      "absoluteEpisodeNumber": null,
-      "EpisodeTitle": null,
-      "AirDate": null,
-      "Taglines": [],
-      "ProductionYear": null,
-      "PremiereDate": null,
-      "CommunityRating": null,
-      "OfficialRating": null,
-      "RunTimeTicks": null,
       "ProviderIds": {
-        "Tmdb": null,
-        "Imdb": null,
+        "Tmdb": "123",
+        "Imdb": "tt1234567",
         "Tvdb": null
       },
       "ImageTags": {
-        "Primary": null,
-        "Backdrop": [],
-        "Logo": null,
-        "Thumb": null,
+        "Primary": "https://example.com/poster.jpg",
+        "Backdrop": [
+          {
+            "medium": "https://example.com/backdrop.jpg",
+            "small": null,
+            "large": null
+          }
+        ],
+        "Logo": {
+          "medium": "https://example.com/logo.jpg",
+          "small": null,
+          "large": null
+        },
+        "Thumb": {
+          "medium": "https://example.com/still.jpg",
+          "small": null,
+          "large": null
+        },
         "Screenshot": []
       },
       "ParentImageTags": null,
@@ -63,6 +58,8 @@
       "ParentIndexNumber": null,
       "IndexNumber": null,
       "AbsoluteIndexNumber": null,
+      "EpisodeTitle": "Test Episode",
+      "AirDate": null,
       "RemoteTrailers": [],
       "PosterColor": null,
       "BackdropColor": null,
@@ -74,12 +71,12 @@
     "normalized": {
       "card_family": "media_item",
       "media_key": "movie:tmdb:123",
-      "media_type": "movie",
+      "media_type": "Movie",
       "item_id": null,
       "title": "Test Movie",
       "poster_url": "https://example.com/poster.jpg",
       "backdrop_url": "https://example.com/backdrop.jpg",
-      "subtitle": "2024",
+      "subtitle": "Test Episode",
       "progress_percent": null,
       "watched_at": null,
       "last_activity_at": null,

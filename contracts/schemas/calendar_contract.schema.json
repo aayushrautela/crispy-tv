@@ -17,12 +17,8 @@
     },
     "input": {
       "type": "object",
-      "required": ["route", "payload"],
+      "required": ["payload"],
       "properties": {
-        "route": {
-          "type": "string",
-          "enum": ["calendar", "this-week"]
-        },
         "payload": {
           "type": "object"
         }
@@ -31,22 +27,13 @@
     },
     "expected": {
       "type": "object",
-      "required": ["valid", "normalized"],
+      "required": ["valid"],
       "properties": {
         "valid": {
           "type": "boolean"
         },
         "normalized": {
-          "type": ["object", "null"],
-          "required": ["profile_id", "source", "generated_at", "items"],
-          "properties": {
-            "profile_id": { "type": "string" },
-            "source": { "type": "string" },
-            "generated_at": { "type": "string" },
-            "kind": { "type": ["string", "null"] },
-            "items": { "type": "array", "items": { "type": "object" } }
-          },
-          "additionalProperties": false
+          "type": ["object", "null"]
         }
       },
       "additionalProperties": false

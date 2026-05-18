@@ -1,6 +1,6 @@
 package com.crispy.tv.contracts
 
-import com.crispy.tv.domain.media.normalizeWatchCollectionEnvelope
+import com.crispy.tv.domain.media.normalizeBaseItemDtoQueryResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -13,8 +13,8 @@ class WatchCollectionsContractTest {
     @Test
     fun fixturesMatchServerWatchCollectionContract() {
         val fixturePaths = ContractTestSupport.fixtureFiles("watch_collections_contract")
-            .filter { it.toString().contains("/v2/") }
-        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one watch_collections_contract v2 fixture")
+            .filter { it.toString().contains("/v3/") }
+        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one watch_collections_contract v3 fixture")
 
         fixturePaths.forEach { path ->
             val fixture = ContractTestSupport.parseFixture(path)
@@ -23,7 +23,7 @@ class WatchCollectionsContractTest {
 
             val payload = fixture.requireJsonObject("input", path).requireJsonObject("payload", path).toKotlinMap()
             val expectedValid = fixture.requireJsonObject("expected", path).requireBoolean("valid", path)
-            val actual = normalizeWatchCollectionEnvelope(payload)
+            val actual = normalizeBaseItemDtoQueryResult(payload)
 
             assertEquals(expectedValid, actual != null, "$caseId: valid")
         }

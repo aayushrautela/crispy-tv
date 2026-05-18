@@ -52,253 +52,44 @@ data class ContractUserItemData(
     val dismissedFromContinueWatching: Boolean?,
 )
 
-data class ContractMediaPresentationHint(
-    val preferredSize: String?,
-    val sectionId: String?,
-    val sectionTitle: String?,
-)
-
-data class ContractWatchProgress(
-    val positionSeconds: Double?,
-    val durationSeconds: Double?,
-    val progressPercent: Double,
-    val lastPlayedAt: String?,
-)
-
-data class ContractPageInfo(
+data class ContractBaseItemDtoQueryResult(
+    val items: List<ContractMediaItem>,
+    val startIndex: Int,
+    val totalRecordCount: Int,
     val nextCursor: String?,
     val hasMore: Boolean,
 )
 
-sealed interface WatchCollectionContractItem
-
-data class ContractContinueWatchingItem(
-    val id: String,
-    val mediaItem: ContractMediaItem,
-    val context: Map<String, Any?>,
-    val presentation: ContractMediaPresentationHint?,
-    val progress: ContractWatchProgress?,
-    val lastActivityAt: String,
-    val origins: List<String>,
-    val dismissible: Boolean,
-) : WatchCollectionContractItem
-
-data class ContractHistoryItem(
-    val id: String,
-    val mediaItem: ContractMediaItem,
-    val context: Map<String, Any?>,
-    val presentation: ContractMediaPresentationHint?,
-    val eventType: String,
-    val occurredAt: String?,
-    val watchedAt: String?,
-    val origins: List<String>,
-) : WatchCollectionContractItem
-
-data class ContractWatchlistItem(
-    val id: String,
-    val mediaItem: ContractMediaItem,
-    val context: Map<String, Any?>,
-    val presentation: ContractMediaPresentationHint?,
-    val addedAt: String,
-    val origins: List<String>,
-) : WatchCollectionContractItem
-
-data class ContractRatingState(
-    val value: Double,
-    val ratedAt: String,
-)
-
-data class ContractRatingItem(
-    val id: String,
-    val mediaItem: ContractMediaItem,
-    val context: Map<String, Any?>,
-    val presentation: ContractMediaPresentationHint?,
-    val rating: ContractRatingState,
-    val origins: List<String>,
-) : WatchCollectionContractItem
-
-data class WatchCollectionContractEnvelope(
-    val profileId: String,
-    val kind: String,
-    val source: String,
-    val generatedAt: String,
-    val items: List<WatchCollectionContractItem>,
-    val pageInfo: ContractPageInfo,
-)
-
-data class CalendarContractContext(
-    val bucket: String,
-    val airDate: String?,
-    val watched: Boolean,
-    val relatedShow: ContractMediaItem,
-)
-
-data class CalendarContractItem(
-    val bucket: String,
-    val kind: String,
-    val mediaItem: ContractMediaItem,
-    val context: CalendarContractContext,
-    val presentation: ContractMediaPresentationHint?,
-    val airDate: String?,
-    val watched: Boolean,
-)
-
-data class CalendarContractEnvelope(
+data class ContractCalendarEnvelope(
     val profileId: String,
     val source: String,
-    val generatedAt: String,
     val kind: String?,
-    val items: List<CalendarContractItem>,
+    val generatedAt: String,
+    val items: List<ContractMediaItem>,
 )
 
-fun normalizeWatchCollectionEnvelope(payload: Map<String, Any?>): WatchCollectionContractEnvelope? {
-    if (!payload.hasExactKeys(setOf("profileId", "kind", "source", "generatedAt", "items", "pageInfo"))) return null
-    val profileId = payload.requiredString("profileId") ?: return null
-    val kind = payload.requiredString("kind") ?: return null
-    if (kind !in setOf("continue-watching", "history", "watchlist", "ratings")) return null
-    val source = payload.requiredString("source") ?: return null
-    if (source != "canonical_watch") return null
-    val generatedAt = payload.requiredString("generatedAt") ?: return null
-    val items = payload.requiredList("items") ?: return null
-    val pageInfo = payload.requiredObject("pageInfo")?.let(::parsePageInfo) ?: return null
-    val normalizedItems = when (kind) {
-        "continue-watching" -> items.mapStrict { value -> (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseContinueWatchingItem) }
-        "history" -> items.mapStrict { value -> (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseHistoryItem) }
-        "watchlist" -> items.mapStrict { value -> (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseWatchlistItem) }
-        "ratings" -> items.mapStrict { value -> (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseRatingItem) }
-        else -> null
+fun normalizeBaseItemDtoQueryResult(payload: Map<String, Any?>): ContractBaseItemDtoQueryResult? {
+    if (!payload.hasExactKeys(setOf("Items", "StartIndex", "TotalRecordCount", "NextCursor", "HasMore"))) return null
+    val items = payload.requiredList("Items")?.mapStrict { value ->
+        (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseMediaItem)
     } ?: return null
-    return WatchCollectionContractEnvelope(profileId, kind, source, generatedAt, normalizedItems, pageInfo)
+    val startIndex = payload.nullableInt("StartIndex") ?: 0
+    val totalRecordCount = payload.nullableInt("TotalRecordCount") ?: items.size
+    val nextCursor = payload.nullableString("NextCursor")
+    val hasMore = payload.requiredBoolean("HasMore") ?: return null
+    return ContractBaseItemDtoQueryResult(items, startIndex, totalRecordCount, nextCursor, hasMore)
 }
 
-fun normalizeCalendarEnvelope(payload: Map<String, Any?>, route: String): CalendarContractEnvelope? {
-    val expectedKeys = when (route) {
-        "calendar" -> setOf("profileId", "source", "generatedAt", "items")
-        "this-week" -> setOf("profileId", "source", "kind", "generatedAt", "items")
-        else -> return null
-    }
-    if (!payload.hasExactKeys(expectedKeys)) return null
+fun normalizeCalendarEnvelope(payload: Map<String, Any?>): ContractCalendarEnvelope? {
+    if (!payload.hasRequiredKeys(setOf("profileId", "source", "generatedAt", "items"))) return null
     val profileId = payload.requiredString("profileId") ?: return null
     val source = payload.requiredString("source") ?: return null
-    if (source != "canonical_calendar") return null
     val generatedAt = payload.requiredString("generatedAt") ?: return null
-    val kind = when (route) {
-        "this-week" -> payload.requiredString("kind")?.takeIf { it == "this-week" } ?: return null
-        else -> null
-    }
     val items = payload.requiredList("items")?.mapStrict { value ->
-        (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseCalendarItem)
+        (value as? Map<*, *>)?.toStringAnyMap()?.let(::parseMediaItem)
     } ?: return null
-    return CalendarContractEnvelope(profileId, source, generatedAt, kind, items)
-}
-
-private fun parseContinueWatchingItem(payload: Map<String, Any?>): ContractContinueWatchingItem? {
-    if (!payload.hasExactKeys(setOf("id", "kind", "mediaItem", "context", "presentation", "progress", "lastActivityAt", "origins", "dismissible"))) return null
-    return ContractContinueWatchingItem(
-        id = payload.requiredString("id") ?: return null,
-        mediaItem = payload.requiredObject("mediaItem")?.let(::parseMediaItem) ?: return null,
-        context = payload.requiredObject("context") ?: return null,
-        presentation = payload.nullableObject("presentation")?.let(::parsePresentation),
-        progress = payload.nullableObject("progress")?.let(::parseWatchProgress),
-        lastActivityAt = payload.requiredString("lastActivityAt") ?: return null,
-        origins = payload.requiredStringList("origins") ?: return null,
-        dismissible = payload.requiredBoolean("dismissible") ?: return null,
-    )
-}
-
-private fun parseHistoryItem(payload: Map<String, Any?>): ContractHistoryItem? {
-    if (!payload.hasExactKeys(setOf("id", "kind", "mediaItem", "context", "presentation", "eventType", "occurredAt", "watchedAt", "origins"))) return null
-    return ContractHistoryItem(
-        id = payload.requiredString("id") ?: return null,
-        mediaItem = payload.requiredObject("mediaItem")?.let(::parseMediaItem) ?: return null,
-        context = payload.requiredObject("context") ?: return null,
-        presentation = payload.nullableObject("presentation")?.let(::parsePresentation),
-        eventType = payload.requiredString("eventType") ?: return null,
-        occurredAt = payload.nullableString("occurredAt"),
-        watchedAt = payload.nullableString("watchedAt"),
-        origins = payload.requiredStringList("origins") ?: return null,
-    )
-}
-
-private fun parseWatchlistItem(payload: Map<String, Any?>): ContractWatchlistItem? {
-    if (!payload.hasExactKeys(setOf("id", "kind", "mediaItem", "context", "presentation", "addedAt", "origins"))) return null
-    return ContractWatchlistItem(
-        id = payload.requiredString("id") ?: return null,
-        mediaItem = payload.requiredObject("mediaItem")?.let(::parseMediaItem) ?: return null,
-        context = payload.requiredObject("context") ?: return null,
-        presentation = payload.nullableObject("presentation")?.let(::parsePresentation),
-        addedAt = payload.requiredString("addedAt") ?: return null,
-        origins = payload.requiredStringList("origins") ?: return null,
-    )
-}
-
-private fun parseRatingItem(payload: Map<String, Any?>): ContractRatingItem? {
-    if (!payload.hasExactKeys(setOf("id", "kind", "mediaItem", "context", "presentation", "rating", "origins"))) return null
-    return ContractRatingItem(
-        id = payload.requiredString("id") ?: return null,
-        mediaItem = payload.requiredObject("mediaItem")?.let(::parseMediaItem) ?: return null,
-        context = payload.requiredObject("context") ?: return null,
-        presentation = payload.nullableObject("presentation")?.let(::parsePresentation),
-        rating = payload.requiredObject("rating")?.let(::parseRatingState) ?: return null,
-        origins = payload.requiredStringList("origins") ?: return null,
-    )
-}
-
-private fun parseCalendarItem(payload: Map<String, Any?>): CalendarContractItem? {
-    if (!payload.hasExactKeys(setOf("bucket", "kind", "mediaItem", "context", "presentation", "AirDate", "watched"))) return null
-    val bucket = payload.requiredString("bucket") ?: return null
-    if (bucket !in setOf("up_next", "this_week", "upcoming", "recently_released", "no_scheduled")) return null
-    val context = payload.requiredObject("context") ?: return null
-    return CalendarContractItem(
-        bucket = bucket,
-        kind = payload.requiredString("kind")?.takeIf { it == "calendar_item" } ?: return null,
-        mediaItem = payload.requiredObject("mediaItem")?.let(::parseMediaItem) ?: return null,
-        context = parseCalendarContext(context) ?: return null,
-        presentation = payload.nullableObject("presentation")?.let(::parsePresentation),
-        airDate = payload.nullableString("AirDate"),
-        watched = payload.requiredBoolean("watched") ?: return null,
-    )
-}
-
-private fun parseCalendarContext(payload: Map<String, Any?>): CalendarContractContext? {
-    if (!payload.hasExactKeys(setOf("bucket", "AirDate", "watched", "relatedShow"))) return null
-    val bucket = payload.requiredString("bucket") ?: return null
-    if (bucket !in setOf("up_next", "this_week", "upcoming", "recently_released", "no_scheduled")) return null
-    return CalendarContractContext(
-        bucket = bucket,
-        airDate = payload.nullableString("AirDate"),
-        watched = payload.requiredBoolean("watched") ?: return null,
-        relatedShow = payload.requiredObject("relatedShow")?.let(::parseMediaItem) ?: return null,
-    )
-}
-
-private fun parseRatingState(payload: Map<String, Any?>): ContractRatingState? {
-    if (!payload.hasExactKeys(setOf("value", "ratedAt"))) return null
-    return ContractRatingState(payload.requiredNumber("value") ?: return null, payload.requiredString("ratedAt") ?: return null)
-}
-
-private fun parseWatchProgress(payload: Map<String, Any?>): ContractWatchProgress? {
-    if (!payload.hasExactKeys(setOf("positionSeconds", "durationSeconds", "progressPercent", "lastPlayedAt"))) return null
-    return ContractWatchProgress(
-        positionSeconds = payload.nullableNumber("positionSeconds"),
-        durationSeconds = payload.nullableNumber("durationSeconds"),
-        progressPercent = payload.requiredNumber("progressPercent") ?: return null,
-        lastPlayedAt = payload.nullableString("lastPlayedAt"),
-    )
-}
-
-private fun parsePageInfo(payload: Map<String, Any?>): ContractPageInfo? {
-    if (!payload.hasExactKeys(setOf("nextCursor", "hasMore"))) return null
-    return ContractPageInfo(payload.nullableString("nextCursor"), payload.requiredBoolean("hasMore") ?: return null)
-}
-
-private fun parsePresentation(payload: Map<String, Any?>): ContractMediaPresentationHint? {
-    if (!payload.hasExactKeys(setOf("preferredSize", "sectionId", "sectionTitle"))) return null
-    return ContractMediaPresentationHint(
-        preferredSize = payload.nullableString("preferredSize"),
-        sectionId = payload.nullableString("sectionId"),
-        sectionTitle = payload.nullableString("sectionTitle"),
-    )
+    val kind = payload.nullableString("kind")
+    return ContractCalendarEnvelope(profileId, source, kind, generatedAt, items)
 }
 
 private fun parseMediaItem(payload: Map<String, Any?>): ContractMediaItem? {

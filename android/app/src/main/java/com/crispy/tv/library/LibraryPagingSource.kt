@@ -4,7 +4,7 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
+import com.crispy.tv.backend.CrispyBackendClient.BaseItemDtoQueryResult
 import com.crispy.tv.images.toUiResponsiveImageSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -122,57 +122,61 @@ private fun CrispyBackendClient.MediaItem.toLibrarySectionItemUi(
     )
 }
 
-private fun CanonicalWatchCollectionResponse<CrispyBackendClient.HistoryItem>.toHistorySectionPageUi(): LibrarySectionPageUi {
+private fun CrispyBackendClient.BaseItemDtoQueryResult.toHistorySectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
         items = items.map { item ->
-            item.mediaItem.toLibrarySectionItemUi(
-                id = item.id,
+            val userData = item.userData
+            val watchedAt = userData?.lastPlayedDate?.takeIf { userData.played == true }
+            item.toLibrarySectionItemUi(
+                id = item.mediaKey,
                 addedAt = null,
-                watchedAt = item.watchedAt,
+                watchedAt = watchedAt,
                 ratedAt = null,
                 ratingValue = null,
-                lastActivityAt = item.occurredAt ?: item.watchedAt,
-                origins = item.origins,
+                lastActivityAt = watchedAt,
+                origins = emptyList(),
             )
         },
-        nextCursor = pageInfo.nextCursor,
-        hasMore = pageInfo.hasMore,
+        nextCursor = nextCursor,
+        hasMore = hasMore,
     )
 }
 
-private fun CanonicalWatchCollectionResponse<CrispyBackendClient.WatchlistItem>.toWatchlistSectionPageUi(): LibrarySectionPageUi {
+private fun CrispyBackendClient.BaseItemDtoQueryResult.toWatchlistSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
         items = items.map { item ->
-            item.mediaItem.toLibrarySectionItemUi(
-                id = item.id,
-                addedAt = item.addedAt,
+            item.toLibrarySectionItemUi(
+                id = item.mediaKey,
+                addedAt = null,
                 watchedAt = null,
                 ratedAt = null,
                 ratingValue = null,
-                lastActivityAt = item.addedAt,
-                origins = item.origins,
+                lastActivityAt = null,
+                origins = emptyList(),
             )
         },
-        nextCursor = pageInfo.nextCursor,
-        hasMore = pageInfo.hasMore,
+        nextCursor = nextCursor,
+        hasMore = hasMore,
     )
 }
 
-private fun CanonicalWatchCollectionResponse<CrispyBackendClient.RatingItem>.toRatingsSectionPageUi(): LibrarySectionPageUi {
+private fun CrispyBackendClient.BaseItemDtoQueryResult.toRatingsSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
         items = items.map { item ->
-            item.mediaItem.toLibrarySectionItemUi(
-                id = item.id,
+            val userData = item.userData
+            val ratingValue = userData?.rating?.toInt()?.takeIf { it in 1..10 }
+            item.toLibrarySectionItemUi(
+                id = item.mediaKey,
                 addedAt = null,
                 watchedAt = null,
-                ratedAt = item.rating.ratedAt,
-                ratingValue = item.rating.value,
-                lastActivityAt = item.rating.ratedAt,
-                origins = item.origins,
+                ratedAt = null,
+                ratingValue = ratingValue,
+                lastActivityAt = null,
+                origins = emptyList(),
             )
         },
-        nextCursor = pageInfo.nextCursor,
-        hasMore = pageInfo.hasMore,
+        nextCursor = nextCursor,
+        hasMore = hasMore,
     )
 }
 

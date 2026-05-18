@@ -22,11 +22,11 @@ data class MediaStateNormalized(
 
 fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStateNormalized? {
     return when (kind.trim().lowercase()) {
-        "media_item", "search_result", "recommendation_item" -> normalizeMediaItemWrapper(payload)
+        "media_item", "search_result", "recommendation_item" -> normalizeBaseItemDto(payload)
         "continue_watching_item" -> normalizeContinueWatching(payload)
-        "watched_item" -> normalizeWatchItem(payload, stateKey = "watchedAt")
-        "watchlist_item" -> normalizeWatchItem(payload, stateKey = "addedAt")
-        "rating_item" -> normalizeWatchItem(payload, stateKey = "ratedAt")
+        "watched_item" -> normalizeWatchedItem(payload)
+        "watchlist_item" -> normalizeWatchlistItem(payload)
+        "rating_item" -> normalizeRatingItem(payload)
         "library_item" -> normalizeLibraryItem(payload)
         "home_snapshot_section" -> normalizeHomeSnapshotSection(payload)
         "title_route" -> normalizeTitleRoute(payload)
@@ -34,71 +34,70 @@ fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStat
     }
 }
 
-private fun normalizeMediaItemWrapper(payload: Map<String, Any?>): MediaStateNormalized? {
-    val media = payload.objectValue("mediaItem") ?: payload.takeIf { it.containsKey("Id") } ?: return null
-    return normalizeMediaItem(media)
-}
-
-private fun normalizeMediaItem(payload: Map<String, Any?>): MediaStateNormalized? {
+private fun normalizeBaseItemDto(payload: Map<String, Any?>): MediaStateNormalized? {
     val mediaKeyStr = payload.stringValue("Id") ?: return null
-    val mediaType = payload.stringValue("Type") ?: payload.stringValue("mediaType") ?: return null
-    val title = payload.stringValue("Name") ?: payload.stringValue("title") ?: return null
+    val mediaType = payload.stringValue("Type") ?: return null
+    val title = payload.stringValue("Name") ?: return null
     val imageTags = payload.objectValue("ImageTags")
     return MediaStateNormalized(
         cardFamily = "media_item",
         mediaKey = MediaKey(mediaKeyStr),
         mediaType = mediaType,
         title = title,
-        posterUrl = imageTags?.imageTagMedium("Primary") ?: payload.stringValue("posterUrl"),
-        backdropUrl = imageTags?.backdropMedium() ?: payload.stringValue("backdropUrl"),
-        subtitle = payload.nullableStringValue("subtitle") ?: payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview"),
+        posterUrl = imageTags?.imageTagMedium("Primary"),
+        backdropUrl = imageTags?.backdropMedium(),
+        subtitle = payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview"),
     )
+}
+
+private fun userDataFrom(payload: Map<String, Any?>): Map<String, Any?>? {
+    return payload.objectValue("UserData")
 }
 
 private fun normalizeContinueWatching(payload: Map<String, Any?>): MediaStateNormalized? {
-    val id = payload.stringValue("id") ?: return null
-    val media = payload.objectValue("mediaItem") ?: return null
-    val normalizedMedia = normalizeMediaItem(media) ?: return null
-    if (!payload.containsKey("progress")) return null
-    val lastActivityAt = payload.stringValue("lastActivityAt") ?: return null
-    val origins = payload.stringList("origins") ?: return null
-    val dismissible = payload.booleanValue("dismissible") ?: return null
-    val progressPercent = payload.objectValue("progress")?.doubleValue("progressPercent") ?: 0.0
-    return normalizedMedia.copy(
-        itemId = id,
-        progressPercent = progressPercent,
-        lastActivityAt = lastActivityAt,
-        origins = origins,
-        dismissible = dismissible,
+    val normalized = normalizeBaseItemDto(payload) ?: return null
+    val ud = userDataFrom(payload)
+    return normalized.copy(
+        itemId = normalized.mediaKey?.value,
+        progressPercent = ud?.doubleValue("PlayedPercentage") ?: 0.0,
+        lastActivityAt = ud?.stringValue("LastPlayedDate") ?: payload.stringValue("LastPlayedDate"),
+        dismissible = ud?.booleanValue("DismissedFromContinueWatching") ?: false,
+        origins = emptyList(),
     )
 }
 
-private fun normalizeWatchItem(payload: Map<String, Any?>, stateKey: String): MediaStateNormalized? {
-    val media = payload.objectValue("mediaItem") ?: return null
-    val normalizedMedia = normalizeMediaItem(media) ?: return null
-    val origins = payload.stringList("origins") ?: return null
-    if (!payload.hasRequiredState(stateKey)) return null
-    return normalizedMedia.copy(
-        itemId = payload.stringValue("id"),
-        watchedAt = payload.stringValue(stateKey).takeIf { stateKey == "watchedAt" },
-        origins = origins,
+private fun normalizeWatchedItem(payload: Map<String, Any?>): MediaStateNormalized? {
+    val normalized = normalizeBaseItemDto(payload) ?: return null
+    val ud = userDataFrom(payload)
+    return normalized.copy(
+        itemId = normalized.mediaKey?.value,
+        watchedAt = ud?.stringValue("LastPlayedDate"),
+        origins = emptyList(),
     )
 }
 
-private fun Map<String, Any?>.hasRequiredState(stateKey: String): Boolean {
-    return when (stateKey) {
-        "ratedAt" -> objectValue("rating")?.stringValue(stateKey) != null
-        else -> stringValue(stateKey) != null
-    }
+private fun normalizeWatchlistItem(payload: Map<String, Any?>): MediaStateNormalized? {
+    val normalized = normalizeBaseItemDto(payload) ?: return null
+    return normalized.copy(
+        itemId = normalized.mediaKey?.value,
+        origins = emptyList(),
+    )
+}
+
+private fun normalizeRatingItem(payload: Map<String, Any?>): MediaStateNormalized? {
+    val normalized = normalizeBaseItemDto(payload) ?: return null
+    return normalized.copy(
+        itemId = normalized.mediaKey?.value,
+        origins = emptyList(),
+    )
 }
 
 private fun normalizeLibraryItem(payload: Map<String, Any?>): MediaStateNormalized? {
-    val itemId = payload.stringValue("id") ?: return null
-    val media = payload.objectValue("mediaItem") ?: return null
-    val normalizedMedia = normalizeMediaItem(media) ?: return null
-    val origins = payload.stringList("origins") ?: return null
-    if (!payload.containsKey("state")) return null
-    return normalizedMedia.copy(itemId = itemId, origins = origins)
+    val normalized = normalizeBaseItemDto(payload) ?: return null
+    return normalized.copy(
+        itemId = normalized.mediaKey?.value,
+        origins = emptyList(),
+    )
 }
 
 private fun normalizeHomeSnapshotSection(payload: Map<String, Any?>): MediaStateNormalized? {
@@ -171,9 +170,4 @@ private fun Map<String, Any?>.doubleValue(key: String): Double? {
         is String -> value.trim().toDoubleOrNull()
         else -> null
     }
-}
-
-private fun Map<String, Any?>.stringList(key: String): List<String>? {
-    val values = this[key] as? List<*> ?: return null
-    return values.mapNotNull { value -> value?.toString()?.trim()?.takeIf { it.isNotEmpty() } }
 }

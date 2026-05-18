@@ -1,17 +1,12 @@
 package com.crispy.tv.backend
 
+import com.crispy.tv.backend.CrispyBackendClient.BaseItemDtoQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
-import com.crispy.tv.backend.CrispyBackendClient.CanonicalWatchCollectionResponse
-import com.crispy.tv.backend.CrispyBackendClient.ContinueWatchingItem
-import com.crispy.tv.backend.CrispyBackendClient.RatingItem
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationsResponse
-import com.crispy.tv.backend.CrispyBackendClient.HistoryItem
-import com.crispy.tv.backend.CrispyBackendClient.WatchlistItem
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchMutationInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
-import com.crispy.tv.backend.CrispyBackendClient.WatchStateResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchStatesEnvelope
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -110,8 +105,10 @@ internal suspend fun CrispyBackendClient.listContinueWatchingApi(
     profileId: String,
     limit: Int = 20,
     cursor: String? = null,
-): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
-    return listContinueWatchingItemsApi(accessToken, profileId, path = "continue-watching", limit = limit, cursor = cursor)
+): BaseItemDtoQueryResult {
+    return listBaseItemDtoQueryResultApi(
+        accessToken, profileId, path = "continue-watching", limit = limit, cursor = cursor,
+    )
 }
 
 internal suspend fun CrispyBackendClient.dismissContinueWatchingApi(
@@ -133,29 +130,9 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
     profileId: String,
     limit: Int = 50,
     cursor: String? = null,
-): CanonicalWatchCollectionResponse<HistoryItem> {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/history".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
-            .apply {
-                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
-                if (nextCursor != null) {
-                    addQueryParameter("cursor", nextCursor)
-                }
-            }
-            .build(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = requireSuccess(response)
-    return CanonicalWatchCollectionResponse(
-        profileId = json.optString("profileId").trim(),
-        kind = json.optString("kind").trim(),
-        source = json.optString("source").trim(),
-        generatedAt = json.optNullableString("generatedAt"),
-        items = parseHistoryItems(json.optJSONArray("items")),
-        pageInfo = parsePageInfo(json.optJSONObject("pageInfo")),
+): BaseItemDtoQueryResult {
+    return listBaseItemDtoQueryResultApi(
+        accessToken, profileId, path = "history", limit = limit, cursor = cursor,
     )
 }
 
@@ -164,23 +141,10 @@ internal suspend fun CrispyBackendClient.listWatchlistApi(
     profileId: String,
     limit: Int = 50,
     cursor: String? = null,
-): CanonicalWatchCollectionResponse<WatchlistItem> {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
-            .apply {
-                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
-                if (nextCursor != null) {
-                    addQueryParameter("cursor", nextCursor)
-                }
-            }
-            .build(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
+): BaseItemDtoQueryResult {
+    return listBaseItemDtoQueryResultApi(
+        accessToken, profileId, path = "watchlist", limit = limit, cursor = cursor,
     )
-    val json = requireSuccess(response)
-    return parseWatchlistCollectionResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.listRatingsApi(
@@ -188,23 +152,10 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
     profileId: String,
     limit: Int = 50,
     cursor: String? = null,
-): CanonicalWatchCollectionResponse<RatingItem> {
-    checkConfigured()
-    val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/ratings".toHttpUrl().newBuilder()
-            .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
-            .apply {
-                val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
-                if (nextCursor != null) {
-                    addQueryParameter("cursor", nextCursor)
-                }
-            }
-            .build(),
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
+): BaseItemDtoQueryResult {
+    return listBaseItemDtoQueryResultApi(
+        accessToken, profileId, path = "ratings", limit = limit, cursor = cursor,
     )
-    val json = requireSuccess(response)
-    return parseRatingCollectionResponse(json)
 }
 
 internal suspend fun CrispyBackendClient.getWatchStateApi(
@@ -345,13 +296,13 @@ internal suspend fun CrispyBackendClient.deleteNativeRatingApi(
     return parseWatchActionResponse(requireSuccess(response))
 }
 
-private suspend fun CrispyBackendClient.listContinueWatchingItemsApi(
+private suspend fun CrispyBackendClient.listBaseItemDtoQueryResultApi(
     accessToken: String,
     profileId: String,
     path: String,
     limit: Int,
     cursor: String?,
-): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
+): BaseItemDtoQueryResult {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl().newBuilder()
@@ -367,7 +318,7 @@ private suspend fun CrispyBackendClient.listContinueWatchingItemsApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return parseWatchCollectionResponse(json)
+    return parseBaseItemDtoQueryResult(json)
 }
 
 private suspend fun CrispyBackendClient.postWatchMutationApi(

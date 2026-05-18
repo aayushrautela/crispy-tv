@@ -64,8 +64,8 @@ internal fun CrispyBackendClient.SearchResultsResponse.toSearchResultsPayload(de
     return SearchResultsPayload(
         query = query,
         buckets = SearchResultBuckets(
-            movies = movies.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
-            series = series.mapNotNull { it.mediaItem.toCatalogItem(defaultGenre = defaultGenre) },
+            movies = movies.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
+            series = series.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
             people = people.mapNotNull { it.toCatalogItem(defaultGenre = defaultGenre) },
         ),
     )

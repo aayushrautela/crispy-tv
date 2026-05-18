@@ -271,23 +271,18 @@ class RecommendationCatalogService internal constructor(
     }
 
     private fun CrispyBackendClient.RecommendationSection.toCatalogList(): HomeCatalogList? {
-        val catalogItems = when (layout.trim().lowercase(Locale.US)) {
-            "hero" -> heroItems.mapNotNull { item -> item.toCatalogItem() }
-            "collection" -> collectionItems.mapNotNull { item -> item.toCatalogItem() }
-            else -> recommendationItems.mapNotNull { item -> item.mediaItem.toCatalogItem() }
-        }
+        val catalogItems = items.mapNotNull { item -> item.toCatalogItem() }
         if (catalogItems.isEmpty()) return null
-        val meta = recommendationItems.firstOrNull()?.payload.orEmpty()
         return HomeCatalogList(
             kind = id.normalizedKind(),
-            variantKey = recommendationVariantKey(id, meta, sourceKey),
+            variantKey = id.normalizedVariantKey().takeIf { it != DEFAULT_VARIANT_KEY } ?: sourceKey.normalizedVariantKey(),
             source = HomeCatalogSource.PERSONAL,
             presentation = layout.toPresentation(),
             layout = layout.normalizedBackendLayout(),
             name = title,
             heading = title,
             title = title,
-            subtitle = recommendationSubtitle(meta).ifBlank { defaultRecommendationSubtitle(id) },
+            subtitle = defaultRecommendationSubtitle(id),
             items = catalogItems,
             mediaTypes = catalogItems.map { it.type }.toSet(),
         )
@@ -311,47 +306,6 @@ class RecommendationCatalogService internal constructor(
             rating = formatRatingOutOfTen(rating?.toString()),
             year = releaseYear?.toString(),
             description = tagline ?: episodeTitle ?: overview,
-        )
-    }
-
-    private fun CrispyBackendClient.RecommendationHeroItem.toCatalogItem(): HomeCatalogItem? {
-        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
-        val normalizedTitle = title.trim().ifBlank { return null }
-        val normalizedType = mediaType.toCatalogType()
-        return HomeCatalogItem(
-            mediaKey = MediaKey(normalizedMediaKey),
-            title = normalizedTitle,
-            posterUrl = poster.medium,
-            backdropUrl = backdrop.medium,
-            logoUrl = logo.medium,
-            poster = poster.toDomainMap(),
-            backdrop = backdrop.toDomainMap(),
-            logo = logo.toDomainMap(),
-            addonId = "backend",
-            type = normalizedType,
-            rating = formatRatingOutOfTen(rating?.toString()),
-            year = releaseYear?.toString(),
-            description = description,
-        )
-    }
-
-    private fun CrispyBackendClient.RecommendationCollectionCard.toCatalogItem(): HomeCatalogItem? {
-        val firstItem = items.firstOrNull() ?: return null
-        val mediaKey = "collection:${title.trim().lowercase(Locale.US).replace(' ', '-')}"
-        return HomeCatalogItem(
-            mediaKey = MediaKey(mediaKey),
-            title = title.trim(),
-            posterUrl = firstItem.poster.medium,
-            backdropUrl = null,
-            logoUrl = logo.medium,
-            poster = firstItem.poster.toDomainMap(),
-            backdrop = emptyMap(),
-            logo = logo.toDomainMap(),
-            addonId = "backend",
-            type = firstItem.mediaType.toCatalogType(),
-            rating = formatRatingOutOfTen(firstItem.rating?.toString()),
-            year = firstItem.releaseYear?.toString(),
-            description = title.trim(),
         )
     }
 
@@ -418,15 +372,8 @@ class RecommendationCatalogService internal constructor(
         }
     }
 
-    private fun recommendationSubtitle(meta: Map<String, Any?>): String {
-        return meta["subtitle"]?.toString()?.trim().orEmpty()
-    }
-
-    private fun recommendationVariantKey(id: String, meta: Map<String, Any?>, source: String): String {
-        val metaKey =
-            listOf("key", "variantKey", "slug", "strategy")
-                .firstNotNullOfOrNull { key -> meta[key]?.toString()?.trim()?.takeIf { it.isNotBlank() } }
-        return metaKey ?: id.normalizedVariantKey().takeIf { it != DEFAULT_VARIANT_KEY } ?: source.normalizedVariantKey()
+    private fun recommendationVariantKey(id: String, source: String): String {
+        return id.normalizedVariantKey().takeIf { it != DEFAULT_VARIANT_KEY } ?: source.normalizedVariantKey()
     }
 
     private fun HomeCatalogSnapshot.toCachePayload(): String {

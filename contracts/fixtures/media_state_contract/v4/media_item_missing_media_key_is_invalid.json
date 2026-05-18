@@ -5,8 +5,9 @@
   "input": {
     "kind": "media_item",
     "payload": {
-      "mediaType": "movie",
-      "title": "Test Movie"
+      "Type": "Movie",
+      "Name": "No Key Movie",
+      "Genres": []
     }
   },
   "expected": {

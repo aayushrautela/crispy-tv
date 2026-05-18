@@ -585,34 +585,35 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
     ).takeIf { it.mediaKey != null || it.tmdbId != null }
 }
 
-    private fun List<CrispyBackendClient.ContinueWatchingItem>.toContinueWatchingEntries(
+    private fun List<CrispyBackendClient.MediaItem>.toContinueWatchingItems(
         nowMs: Long,
         limit: Int,
     ): List<CanonicalContinueWatchingItem> {
         return buildList {
-            for (item in this@toContinueWatchingEntries) {
-                val updatedAt =
-                    parseIsoToEpochMs(item.lastActivityAt)
-                        ?: parseIsoToEpochMs(item.progress?.lastPlayedAt)
-                        ?: nowMs
+            for (item in this@toContinueWatchingItems) {
+                val userData = item.userData
+                val progressPercent = userData?.playedPercentage ?: 0.0
+                val lastPlayedDate = userData?.lastPlayedDate
+                val updatedAt = parseIsoToEpochMs(lastPlayedDate) ?: nowMs
+                val itemId = userData?.itemId ?: item.mediaKey
                 add(
                     CanonicalContinueWatchingItem(
-                        id = item.id,
-                        titleMediaKey = item.mediaItem.seriesId ?: item.mediaItem.mediaKey,
-                        playbackMediaKey = item.mediaItem.mediaKey,
-                        mediaType = item.mediaItem.mediaType,
-                        title = item.mediaItem.title,
-                        episodeTitle = item.mediaItem.episodeTitle,
-                        season = item.mediaItem.seasonNumber,
-                        episode = item.mediaItem.episodeNumber,
-                        progressPercent = item.progress?.progressPercent ?: 0.0,
+                        id = itemId,
+                        titleMediaKey = item.seriesId ?: item.mediaKey,
+                        playbackMediaKey = item.mediaKey,
+                        mediaType = item.mediaType,
+                        title = item.title,
+                        episodeTitle = item.episodeTitle,
+                        season = item.seasonNumber,
+                        episode = item.episodeNumber,
+                        progressPercent = progressPercent,
                         lastUpdatedEpochMs = updatedAt,
-    posterUrl = item.mediaItem.posterUrl,
-    backdropUrl = item.mediaItem.backdropUrl,
-    logoUrl = item.mediaItem.logoUrl,
-    stillUrl = item.mediaItem.stillUrl,
-    addonId = "backend",
-                        absoluteEpisodeNumber = item.mediaItem.absoluteEpisodeNumber,
+                        posterUrl = item.posterUrl,
+                        backdropUrl = item.backdropUrl,
+                        logoUrl = item.logoUrl,
+                        stillUrl = item.stillUrl,
+                        addonId = "backend",
+                        absoluteEpisodeNumber = item.absoluteEpisodeNumber,
                     )
                 )
             }
@@ -621,20 +622,20 @@ private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
             .take(limit)
     }
 
-    private fun List<CrispyBackendClient.ContinueWatchingItem>.toCanonicalContinueWatchingItems(
+    private fun List<CrispyBackendClient.MediaItem>.toCanonicalContinueWatchingItems(
         nowMs: Long,
         limit: Int,
     ): List<CanonicalContinueWatchingItem> {
-        return toContinueWatchingEntries(nowMs, limit)
+        return toContinueWatchingItems(nowMs, limit)
     }
 
     private fun CrispyBackendClient.WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {
         return CanonicalWatchStateSnapshot(
             isWatched = watched != null,
             watchedAtEpochMs = parseIsoToEpochMs(watched?.watchedAt),
-            isInWatchlist = watchlist != null,
-            isRated = rating != null,
-            userRating = rating?.value,
+            isInWatchlist = false,
+            isRated = false,
+            userRating = null,
             watchedEpisodeKeys = watchedEpisodeKeys.map { it.trim().lowercase(Locale.US) }.filter { it.isNotBlank() }.toSet(),
             playCount = playCount,
         )

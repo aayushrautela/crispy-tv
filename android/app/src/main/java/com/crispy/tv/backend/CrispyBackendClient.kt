@@ -75,6 +75,13 @@ class CrispyBackendClient(
         val providerStates: List<ProviderState>,
     )
 
+    data class StartImportResult(
+        val job: ImportJob,
+        val providerState: ProviderState,
+        val authUrl: String?,
+        val nextAction: String,
+    )
+
     data class MediaExternalIds(
         val tmdb: Int?,
         val imdb: String?,
@@ -138,22 +145,16 @@ class CrispyBackendClient(
         val dismissedFromContinueWatching: Boolean?,
     )
 
-    data class SurfaceContext(
-        val values: Map<String, Any?>,
-    )
+    data class ResponsiveImageSet(
+        val small: String?,
+        val medium: String?,
+        val large: String?,
+    ) {
+        val isEmpty: Boolean
+            get() = small.isNullOrBlank() && medium.isNullOrBlank() && large.isNullOrBlank()
+    }
 
-    data class MediaPresentationHint(
-        val preferredSize: String?,
-        val sectionId: String?,
-        val sectionTitle: String?,
-    )
-
-    data class SearchResultItem(
-        val kind: String,
-        val mediaItem: MediaItem,
-        val context: SurfaceContext,
-        val presentation: MediaPresentationHint?,
-    )
+    // --- Search ---
 
     data class PersonSearchResultItem(
         val kind: String,
@@ -166,9 +167,9 @@ class CrispyBackendClient(
 
     data class SearchResultsResponse(
         val query: String,
-        val all: List<SearchResultItem>,
-        val movies: List<SearchResultItem>,
-        val series: List<SearchResultItem>,
+        val all: List<MediaItem>,
+        val movies: List<MediaItem>,
+        val series: List<MediaItem>,
         val people: List<PersonSearchResultItem>,
     )
 
@@ -198,59 +199,74 @@ class CrispyBackendClient(
         val trivia: String,
     )
 
-    data class ImportJobsResponse(
-        val jobs: List<ImportJob>,
+    // --- Recommendations ---
+
+    data class RecommendationSection(
+        val id: String,
+        val title: String,
+        val layout: String,
+        val sourceKey: String,
+        val items: List<MediaItem>,
     )
 
-    data class StartImportResult(
-        val job: ImportJob,
-        val providerState: ProviderState,
-        val authUrl: String?,
-        val nextAction: String,
+    data class RecommendationsResponse(
+        val profileId: String,
+        val sourceKey: String,
+        val algorithmVersion: String,
+        val source: String,
+        val generatedAt: String?,
+        val expiresAt: String?,
+        val updatedAt: String?,
+        val sections: List<RecommendationSection>,
     )
 
-data class MediaLookupInput(
-    val mediaKey: String? = null,
-    val mediaType: String? = null,
-    val tmdbId: Int? = null,
-    val showTmdbId: Int? = null,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-)
+    // --- Calendar ---
 
-data class WatchMutationInput(
-    val mediaKey: String? = null,
-    val mediaType: String,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val absoluteEpisodeNumber: Int? = null,
-    val occurredAt: String? = null,
-    val rating: Int? = null,
-    val payload: Map<String, Any?> = emptyMap(),
-)
+    data class CalendarResponse(
+        val profileId: String,
+        val source: String,
+        val kind: String?,
+        val generatedAt: String?,
+        val items: List<MediaItem>,
+    )
 
-data class PlaybackEventInput(
-    val clientEventId: String,
-    val eventType: String,
-    val mediaKey: String? = null,
-    val mediaType: String,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val absoluteEpisodeNumber: Int? = null,
-    val positionSeconds: Double? = null,
-    val durationSeconds: Double? = null,
-    val occurredAt: String? = null,
-    val payload: Map<String, Any?> = emptyMap(),
-)
+    // --- Watch State ---
 
-    data class ResponsiveImageSet(
-        val small: String?,
-        val medium: String?,
-        val large: String?,
-    ) {
-        val isEmpty: Boolean
-            get() = small.isNullOrBlank() && medium.isNullOrBlank() && large.isNullOrBlank()
-    }
+    data class WatchedStateView(
+        val watchedAt: String,
+    )
+
+    data class WatchStateResponse(
+        val watched: WatchedStateView?,
+        val playCount: Int,
+        val watchedEpisodeKeys: List<String>,
+    )
+
+    data class WatchStateEnvelope(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val item: WatchStateResponse,
+    )
+
+    data class WatchStatesEnvelope(
+        val profileId: String,
+        val source: String,
+        val generatedAt: String?,
+        val items: List<WatchStateResponse>,
+    )
+
+    // --- Paged media lists (BaseItemDtoQueryResult) ---
+
+    data class BaseItemDtoQueryResult(
+        val items: List<MediaItem>,
+        val startIndex: Int,
+        val totalRecordCount: Int,
+        val nextCursor: String?,
+        val hasMore: Boolean,
+    )
+
+    // --- Metadata / Playback (Jellyfin Item-based, unchanged) ---
 
     data class MetadataImages(
         val poster: ResponsiveImageSet,
@@ -526,207 +542,7 @@ data class PlaybackEventInput(
         val knownFor: List<MetadataPersonKnownForItem>,
     )
 
-    data class WatchProgressView(
-        val positionSeconds: Double?,
-        val durationSeconds: Double?,
-        val progressPercent: Double,
-        val lastPlayedAt: String?,
-    )
-
-    data class ContinueWatchingStateView(
-        val id: String,
-        val positionSeconds: Double?,
-        val durationSeconds: Double?,
-        val progressPercent: Double,
-        val lastActivityAt: String,
-    )
-
-    data class WatchedStateView(
-        val watchedAt: String,
-    )
-
-    data class WatchlistStateView(
-        val addedAt: String,
-    )
-
-    data class RatingStateView(
-        val value: Int,
-        val ratedAt: String,
-    )
-
-    data class ContinueWatchingItem(
-        val id: String,
-        val mediaItem: MediaItem,
-        val context: SurfaceContext,
-        val presentation: MediaPresentationHint?,
-        val progress: WatchProgressView?,
-        val lastActivityAt: String,
-        val origins: List<String>,
-        val dismissible: Boolean,
-    )
-
-    data class HistoryItem(
-        val id: String,
-        val mediaItem: MediaItem,
-        val context: SurfaceContext,
-        val presentation: MediaPresentationHint?,
-        val eventType: String,
-        val occurredAt: String?,
-        val watchedAt: String?,
-        val origins: List<String>,
-    )
-
-    data class WatchlistItem(
-        val id: String?,
-        val mediaItem: MediaItem,
-        val context: SurfaceContext,
-        val presentation: MediaPresentationHint?,
-        val addedAt: String?,
-        val origins: List<String>,
-    )
-
-    data class RatingItem(
-        val id: String?,
-        val mediaItem: MediaItem,
-        val context: SurfaceContext,
-        val presentation: MediaPresentationHint?,
-        val rating: RatingStateView,
-        val origins: List<String>,
-    )
-
-    data class PageInfo(
-        val nextCursor: String?,
-        val hasMore: Boolean,
-    )
-
-    data class CanonicalWatchCollectionResponse<T>(
-        val profileId: String,
-        val kind: String,
-        val source: String,
-        val generatedAt: String?,
-        val items: List<T>,
-        val pageInfo: PageInfo,
-    )
-
-    data class WatchStateResponse(
-        val kind: String,
-        val mediaItem: MediaItem,
-        val context: SurfaceContext,
-        val presentation: MediaPresentationHint?,
-        val progress: WatchProgressView?,
-        val continueWatching: ContinueWatchingStateView?,
-        val watched: WatchedStateView?,
-        val watchlist: WatchlistStateView?,
-        val rating: RatingStateView?,
-        val watchedEpisodeKeys: List<String>,
-        val playCount: Int = 0,
-    )
-
-    data class WatchStateEnvelope(
-        val profileId: String,
-        val source: String,
-        val generatedAt: String?,
-        val item: WatchStateResponse,
-    )
-
-    data class WatchStatesEnvelope(
-        val profileId: String,
-        val source: String,
-        val generatedAt: String?,
-        val items: List<WatchStateResponse>,
-    )
-
-    data class CalendarContext(
-        val bucket: String,
-        val airDate: String?,
-        val watched: Boolean,
-        val relatedShow: MediaItem,
-    )
-
-    data class CalendarItem(
-        val bucket: String,
-        val kind: String,
-        val mediaItem: MediaItem,
-        val context: CalendarContext,
-        val presentation: MediaPresentationHint?,
-        val airDate: String?,
-        val watched: Boolean,
-    )
-
-    data class CalendarResponse(
-        val profileId: String,
-        val source: String,
-        val kind: String?,
-        val generatedAt: String?,
-        val items: List<CalendarItem>,
-    )
-
-    data class RecommendationItemContext(
-        val reason: String?,
-        val reasonCodes: List<String>,
-        val score: Double?,
-        val rank: Double?,
-        val payload: Map<String, Any?>,
-    )
-
-    data class RecommendationItem(
-        val kind: String,
-        val mediaItem: MediaItem,
-        val context: RecommendationItemContext,
-        val presentation: MediaPresentationHint?,
-        val reason: String?,
-        val score: Double?,
-        val rank: Double,
-        val payload: Map<String, Any?>,
-    )
-
-    data class RecommendationHeroItem(
-        val mediaKey: String,
-        val mediaType: String,
-        val title: String,
-        val description: String,
-        val backdrop: ResponsiveImageSet,
-        val poster: ResponsiveImageSet,
-        val logo: ResponsiveImageSet,
-        val releaseYear: Int?,
-        val rating: Double?,
-        val genre: String?,
-    )
-
-    data class RecommendationCollectionItem(
-        val mediaType: String,
-        val title: String,
-        val poster: ResponsiveImageSet,
-        val releaseYear: Int?,
-        val rating: Double?,
-    )
-
-    data class RecommendationCollectionCard(
-        val title: String,
-        val logo: ResponsiveImageSet,
-        val items: List<RecommendationCollectionItem>,
-    )
-
-    data class RecommendationSection(
-        val id: String,
-        val title: String,
-        val layout: String,
-        val sourceKey: String,
-        val recommendationItems: List<RecommendationItem> = emptyList(),
-        val heroItems: List<RecommendationHeroItem> = emptyList(),
-        val collectionItems: List<RecommendationCollectionCard> = emptyList(),
-    )
-
-    data class RecommendationsResponse(
-        val profileId: String,
-        val sourceKey: String,
-        val algorithmVersion: String,
-        val source: String,
-        val generatedAt: String?,
-        val expiresAt: String?,
-        val updatedAt: String?,
-        val sections: List<RecommendationSection>,
-    )
+    // --- Watch Actions ---
 
     data class WatchActionResponse(
         val accepted: Boolean,
@@ -918,7 +734,7 @@ data class PlaybackEventInput(
         profileId: String,
         limit: Int = 20,
         cursor: String? = null,
-    ): CanonicalWatchCollectionResponse<ContinueWatchingItem> {
+    ): BaseItemDtoQueryResult {
         return listContinueWatchingApi(accessToken, profileId, limit, cursor)
     }
 
@@ -931,7 +747,7 @@ data class PlaybackEventInput(
         profileId: String,
         limit: Int = 50,
         cursor: String? = null,
-    ): CanonicalWatchCollectionResponse<HistoryItem> {
+    ): BaseItemDtoQueryResult {
         return listWatchHistoryApi(accessToken, profileId, limit, cursor)
     }
 
@@ -940,7 +756,7 @@ data class PlaybackEventInput(
         profileId: String,
         limit: Int = 50,
         cursor: String? = null,
-    ): CanonicalWatchCollectionResponse<WatchlistItem> {
+    ): BaseItemDtoQueryResult {
         return listWatchlistApi(accessToken, profileId, limit, cursor)
     }
 
@@ -949,7 +765,7 @@ data class PlaybackEventInput(
         profileId: String,
         limit: Int = 50,
         cursor: String? = null,
-    ): CanonicalWatchCollectionResponse<RatingItem> {
+    ): BaseItemDtoQueryResult {
         return listRatingsApi(accessToken, profileId, limit, cursor)
     }
 
@@ -1076,21 +892,59 @@ data class PlaybackEventInput(
     internal val jsonMediaType
         get() = JSON_MEDIA_TYPE
 
-internal fun metadataLookupUrl(
-    path: String,
-    input: MediaLookupInput,
-) = path.toHttpUrl().newBuilder()
-    .apply {
-        if (!input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
-        if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
-        if (input.tmdbId != null) addQueryParameter("tmdbId", input.tmdbId.toString())
-        if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
-        if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
-    }
-    .build()
+    internal fun metadataLookupUrl(
+        path: String,
+        input: MediaLookupInput,
+    ) = path.toHttpUrl().newBuilder()
+        .apply {
+            if (!input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
+            if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
+            if (input.tmdbId != null) addQueryParameter("tmdbId", input.tmdbId.toString())
+            if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
+            if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
+        }
+        .build()
 
     private companion object {
         private const val CALL_TIMEOUT_MS = 45_000L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
+
+data class MediaLookupInput(
+    val mediaKey: String? = null,
+    val mediaType: String? = null,
+    val tmdbId: Int? = null,
+    val showTmdbId: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+)
+
+data class WatchMutationInput(
+    val mediaKey: String? = null,
+    val mediaType: String,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val absoluteEpisodeNumber: Int? = null,
+    val occurredAt: String? = null,
+    val rating: Int? = null,
+    val payload: Map<String, Any?> = emptyMap(),
+)
+
+data class PlaybackEventInput(
+    val clientEventId: String,
+    val eventType: String,
+    val mediaKey: String? = null,
+    val mediaType: String,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val absoluteEpisodeNumber: Int? = null,
+    val positionSeconds: Double? = null,
+    val durationSeconds: Double? = null,
+    val occurredAt: String? = null,
+    val payload: Map<String, Any?> = emptyMap(),
+)
+
+data class ImportJobsResponse(
+    val jobs: List<CrispyBackendClient.ImportJob>,
+)
