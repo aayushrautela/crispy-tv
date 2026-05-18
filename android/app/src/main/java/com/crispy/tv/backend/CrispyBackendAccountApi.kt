@@ -1,6 +1,6 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.backend.CrispyBackendClient.ImportJobsResponse
+import com.crispy.tv.backend.ImportJobsResponse
 import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
 import com.crispy.tv.backend.CrispyBackendClient.MeResponse
 import com.crispy.tv.backend.CrispyBackendClient.Profile

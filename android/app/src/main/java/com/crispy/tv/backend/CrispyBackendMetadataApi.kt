@@ -1,7 +1,7 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.AiInsightsResponse
-import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
+import com.crispy.tv.backend.MediaLookupInput
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
 import com.crispy.tv.backend.CrispyBackendClient.MetadataResolveResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse

@@ -3,9 +3,9 @@ package com.crispy.tv.backend
 import com.crispy.tv.backend.CrispyBackendClient.BaseItemDtoQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
 import com.crispy.tv.backend.CrispyBackendClient.RecommendationsResponse
-import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
+import com.crispy.tv.backend.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
-import com.crispy.tv.backend.CrispyBackendClient.WatchMutationInput
+import com.crispy.tv.backend.WatchMutationInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
 import com.crispy.tv.backend.CrispyBackendClient.WatchStatesEnvelope
 import okhttp3.Request

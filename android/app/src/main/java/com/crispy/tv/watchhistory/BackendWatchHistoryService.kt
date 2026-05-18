@@ -4,9 +4,9 @@ import android.content.Context
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.backend.CrispyBackendClient.MediaLookupInput
-import com.crispy.tv.backend.CrispyBackendClient.PlaybackEventInput
-import com.crispy.tv.backend.CrispyBackendClient.WatchMutationInput
+import com.crispy.tv.backend.MediaLookupInput
+import com.crispy.tv.backend.PlaybackEventInput
+import com.crispy.tv.backend.WatchMutationInput
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.CanonicalWatchStateSnapshot
