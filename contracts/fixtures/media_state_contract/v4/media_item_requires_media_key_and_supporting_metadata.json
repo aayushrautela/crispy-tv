@@ -30,7 +30,11 @@
         "Tvdb": null
       },
       "ImageTags": {
-        "Primary": "https://example.com/poster.jpg",
+        "Primary": {
+          "medium": "https://example.com/poster.jpg",
+          "small": null,
+          "large": null
+        },
         "Backdrop": [
           {
             "medium": "https://example.com/backdrop.jpg",

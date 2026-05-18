@@ -233,10 +233,10 @@ internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
         title = name,
         originalTitle = json.optNullableString("OriginalTitle"),
         overview = json.optNullableString("Overview"),
-        poster = parseImageUrl(imageTags?.optString("Primary")),
+        poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
         backdrop = parseBackdropImageUrl(imageTags),
-        logo = parseImageUrl(imageTags?.optString("Logo")),
-        still = parseImageUrl(imageTags?.optString("Thumb")),
+        logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
+        still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
         releaseDate = json.optNullableString("PremiereDate"),
         releaseYear = json.optIntOrNull("ProductionYear"),
         rating = json.optDoubleOrNull("CommunityRating"),
@@ -306,11 +306,12 @@ private fun parseBackdropImageUrl(imageTags: JSONObject?): ResponsiveImageSet {
     if (imageTags == null) return ResponsiveImageSet(null, null, null)
     val arr = imageTags.optJSONArray("Backdrop")
     if (arr != null && arr.length() > 0) {
-        val firstUrl = arr.optString(0).trim().ifBlank { null }
-        return ResponsiveImageSet(firstUrl, firstUrl, firstUrl)
+        val first = arr.optJSONObject(0)
+        if (first != null) {
+            return parseResponsiveImageSet(first, null)
+        }
     }
-    val url = imageTags.optString("Backdrop").trim().ifBlank { null }
-    return ResponsiveImageSet(url, url, url)
+    return ResponsiveImageSet(null, null, null)
 }
 
 private fun parseResponsiveImageSet(json: JSONObject?, fallbackUrl: String?): ResponsiveImageSet {
@@ -436,10 +437,10 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
         summary = item.overview,
         overview = item.overview,
         images = MetadataImages(
-            poster = parseImageUrl(imageTags?.optString("Primary")),
+            poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
             backdrop = parseBackdropImageUrl(imageTags),
-            still = parseImageUrl(imageTags?.optString("Thumb")),
-            logo = parseImageUrl(imageTags?.optString("Logo")),
+            still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
+            logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
         ),
         releaseDate = item.releaseDate,
         releaseYear = item.releaseYear,
@@ -487,10 +488,10 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject):
         summary = item.overview,
         overview = item.overview,
         images = MetadataImages(
-            poster = parseImageUrl(imageTags?.optString("Primary")),
+            poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
             backdrop = parseBackdropImageUrl(imageTags),
-            still = parseImageUrl(imageTags?.optString("Thumb")),
-            logo = parseImageUrl(imageTags?.optString("Logo")),
+            still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
+            logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
         ),
         releaseDate = item.releaseDate,
         releaseYear = item.releaseYear,
@@ -525,7 +526,7 @@ internal fun CrispyBackendClient.parseMetadataSeasonView(json: JSONObject): Meta
         summary = json.optNullableString("Overview"),
         airDate = json.optNullableString("PremiereDate"),
         episodeCount = null,
-        posterUrl = parseImageUrl(imageTags?.optString("Primary")).medium,
+        posterUrl = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")).medium,
     )
 }
 
@@ -560,10 +561,10 @@ internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): Met
         runtimeMinutes = json.optLongOrNull("RunTimeTicks")?.let { if (it > 0L) (it / 600_000_000L).toInt() else null },
         rating = json.optDoubleOrNull("CommunityRating"),
         images = MetadataImages(
-            poster = parseImageUrl(imageTags?.optString("Primary")),
+            poster = parseResponsiveImageSet(imageTags?.optJSONObject("Primary")),
             backdrop = parseBackdropImageUrl(imageTags),
-            still = parseImageUrl(imageTags?.optString("Thumb")),
-            logo = parseImageUrl(imageTags?.optString("Logo")),
+            still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
+            logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
         ),
         showMediaKey = json.optNullableString("SeriesId"),
         showTitle = json.optNullableString("SeriesName"),

@@ -27,7 +27,11 @@
       "ImageTags": {
         "Primary": null,
         "Backdrop": [
-          "https://example.com/backdrop.jpg"
+          {
+            "medium": "https://example.com/backdrop.jpg",
+            "small": null,
+            "large": null
+          }
         ],
         "Logo": null,
         "Thumb": null,
