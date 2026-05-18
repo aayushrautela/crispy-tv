@@ -85,8 +85,8 @@ private func normalizeMediaItemWrapper(_ payload: [String: Any]) -> MediaStateNo
 
 private func normalizeMediaItem(_ payload: [String: Any]) -> MediaStateNormalized? {
     guard let mediaKey = stringValue(payload, "Id"),
-          let mediaType = stringValue(payload, "Type"),
-          let title = stringValue(payload, "Name") else {
+          let mediaType = stringValue(payload, "Type") ?? stringValue(payload, "mediaType"),
+          let title = stringValue(payload, "Name") ?? stringValue(payload, "title") else {
         return nil
     }
     let imageTags = objectValue(payload, "ImageTags")
@@ -95,9 +95,9 @@ private func normalizeMediaItem(_ payload: [String: Any]) -> MediaStateNormalize
         mediaKey: mediaKey,
         mediaType: mediaType,
         title: title,
-        posterUrl: imageTagMedium(imageTags, "Primary"),
-        backdropUrl: backdropMedium(imageTags),
-        subtitle: nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "Overview")
+        posterUrl: imageTagMedium(imageTags, "Primary") ?? stringValue(payload, "posterUrl"),
+        backdropUrl: backdropMedium(imageTags) ?? stringValue(payload, "backdropUrl"),
+        subtitle: nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "Overview") ?? nullableStringValue(payload, "subtitle")
     )
 }
 

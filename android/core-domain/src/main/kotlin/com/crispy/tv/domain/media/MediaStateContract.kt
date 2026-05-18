@@ -41,17 +41,17 @@ private fun normalizeMediaItemWrapper(payload: Map<String, Any?>): MediaStateNor
 
 private fun normalizeMediaItem(payload: Map<String, Any?>): MediaStateNormalized? {
     val mediaKeyStr = payload.stringValue("Id") ?: return null
-    val mediaType = payload.stringValue("Type") ?: return null
-    val title = payload.stringValue("Name") ?: return null
+    val mediaType = payload.stringValue("Type") ?: payload.stringValue("mediaType") ?: return null
+    val title = payload.stringValue("Name") ?: payload.stringValue("title") ?: return null
     val imageTags = payload.objectValue("ImageTags")
     return MediaStateNormalized(
         cardFamily = "media_item",
         mediaKey = MediaKey(mediaKeyStr),
         mediaType = mediaType,
         title = title,
-        posterUrl = imageTags?.imageTagMedium("Primary"),
-        backdropUrl = imageTags?.backdropMedium(),
-        subtitle = payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview"),
+        posterUrl = imageTags?.imageTagMedium("Primary") ?: payload.stringValue("posterUrl"),
+        backdropUrl = imageTags?.backdropMedium() ?: payload.stringValue("backdropUrl"),
+        subtitle = payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview") ?: payload.nullableStringValue("subtitle"),
     )
 }
 
@@ -134,7 +134,7 @@ private fun Map<String, Any?>.imageTagMedium(key: String): String? {
     val tag = this[key]
     return when (tag) {
         is String -> tag.trim().ifBlank { null }
-        is Map<*, *> -> tag.stringValue("medium")
+        is Map<*, *> -> tag.mapStringValue("medium")
         else -> null
     }
 }
@@ -144,12 +144,12 @@ private fun Map<String, Any?>.backdropMedium(): String? {
     val first = backdrops.firstOrNull() ?: return null
     return when (first) {
         is String -> first.trim().ifBlank { null }
-        is Map<*, *> -> first.stringValue("medium")
+        is Map<*, *> -> first.mapStringValue("medium")
         else -> null
     }
 }
 
-private fun Map<*, *>.stringValue(key: String): String? {
+private fun Map<*, *>.mapStringValue(key: String): String? {
     return this[key]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 }
 
