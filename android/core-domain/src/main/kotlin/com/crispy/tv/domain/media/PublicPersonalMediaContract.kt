@@ -245,7 +245,7 @@ private fun parseRatingItem(payload: Map<String, Any?>): ContractRatingItem? {
 }
 
 private fun parseCalendarItem(payload: Map<String, Any?>): CalendarContractItem? {
-    if (!payload.hasExactKeys(setOf("bucket", "kind", "mediaItem", "context", "presentation", "airDate", "watched"))) return null
+    if (!payload.hasExactKeys(setOf("bucket", "kind", "mediaItem", "context", "presentation", "AirDate", "watched"))) return null
     val bucket = payload.requiredString("bucket") ?: return null
     if (bucket !in setOf("up_next", "this_week", "upcoming", "recently_released", "no_scheduled")) return null
     val context = payload.requiredObject("context") ?: return null
@@ -255,18 +255,18 @@ private fun parseCalendarItem(payload: Map<String, Any?>): CalendarContractItem?
         mediaItem = payload.requiredObject("mediaItem")?.let(::parseMediaItem) ?: return null,
         context = parseCalendarContext(context) ?: return null,
         presentation = payload.nullableObject("presentation")?.let(::parsePresentation),
-        airDate = payload.nullableString("airDate"),
+        airDate = payload.nullableString("AirDate"),
         watched = payload.requiredBoolean("watched") ?: return null,
     )
 }
 
 private fun parseCalendarContext(payload: Map<String, Any?>): CalendarContractContext? {
-    if (!payload.hasExactKeys(setOf("bucket", "airDate", "watched", "relatedShow"))) return null
+    if (!payload.hasExactKeys(setOf("bucket", "AirDate", "watched", "relatedShow"))) return null
     val bucket = payload.requiredString("bucket") ?: return null
     if (bucket !in setOf("up_next", "this_week", "upcoming", "recently_released", "no_scheduled")) return null
     return CalendarContractContext(
         bucket = bucket,
-        airDate = payload.nullableString("airDate"),
+        airDate = payload.nullableString("AirDate"),
         watched = payload.requiredBoolean("watched") ?: return null,
         relatedShow = payload.requiredObject("relatedShow")?.let(::parseMediaItem) ?: return null,
     )
@@ -388,10 +388,9 @@ private fun Map<String, Any?>.backdropMedium(): String? {
     val first = backdrops.firstOrNull() ?: return null
     return when (first) {
         is String -> first.trim().ifBlank { null }
-        is Map<*, *> -> first.stringValue("medium")
+        is Map<*, *> -> first.toStringAnyMap()?.nullableString("medium")
         else -> null
     }
-}
 }
 
 private fun Map<String, Any?>.hasExactKeys(expected: Set<String>): Boolean = keys == expected

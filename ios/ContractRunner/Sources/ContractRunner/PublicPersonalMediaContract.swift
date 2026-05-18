@@ -192,8 +192,9 @@ public struct ContractHistoryItem: Equatable {
     public let mediaItem: ContractMediaItem
     public let context: [String: String]
     public let presentation: ContractMediaPresentationHint?
-    public let watchedAt: String
-    public let lastActivityAt: String?
+    public let eventType: String
+    public let occurredAt: String?
+    public let watchedAt: String?
     public let origins: [String]
 }
 
@@ -424,13 +425,13 @@ private func parseContinueWatchingItem(_ payload: [String: Any]) -> ContractCont
 }
 
 private func parseHistoryItem(_ payload: [String: Any]) -> ContractHistoryItem? {
-    guard hasExactKeys(payload, expected: ["id", "kind", "mediaItem", "context", "presentation", "watchedAt", "origins"]),
+    guard hasExactKeys(payload, expected: ["id", "kind", "mediaItem", "context", "presentation", "eventType", "occurredAt", "watchedAt", "origins"]),
           let id = requiredString(payload, "id"),
           let mediaItemObject = payload["mediaItem"] as? [String: Any],
           let mediaItem = parseMediaItem(mediaItemObject),
           let contextObject = payload["context"] as? [String: Any],
           let context = stringifyContext(contextObject),
-          let watchedAt = requiredString(payload, "watchedAt"),
+          let eventType = requiredString(payload, "eventType"),
           let originsRaw = payload["origins"] as? [Any],
           let origins = stringArray(originsRaw, key: "origins") else {
         return nil
@@ -441,8 +442,9 @@ private func parseHistoryItem(_ payload: [String: Any]) -> ContractHistoryItem? 
         mediaItem: mediaItem,
         context: context,
         presentation: presentation,
-        watchedAt: watchedAt,
-        lastActivityAt: nil,
+        eventType: eventType,
+        occurredAt: optionalString(payload, "occurredAt"),
+        watchedAt: optionalString(payload, "watchedAt"),
         origins: origins
     )
 }
@@ -525,32 +527,44 @@ private func parsePageInfo(_ payload: [String: Any]) -> ContractPageInfo? {
 }
 
 private func parseCalendarItem(_ payload: [String: Any]) -> CalendarContractItem? {
-    guard hasExactKeys(payload, expected: ["bucket", "kind", "mediaItem", "context", "presentation", "airDate", "watched"]),
+    guard hasExactKeys(payload, expected: ["bucket", "kind", "mediaItem", "context", "presentation", "AirDate", "watched"]),
           let bucket = requiredString(payload, "bucket"),
           ["up_next", "this_week", "upcoming", "recently_released", "no_scheduled"].contains(bucket),
           let kind = requiredString(payload, "kind"),
+          kind == "calendar_item",
           let mediaItemObject = payload["mediaItem"] as? [String: Any],
           let mediaItem = parseMediaItem(mediaItemObject),
           let contextObject = payload["context"] as? [String: Any],
-          let _ = stringifyContext(contextObject),
+          let context = parseCalendarContext(contextObject),
           let watched = payload["watched"] as? Bool else {
         return nil
     }
     let presentation = optionalObject(payload, "presentation").flatMap(parseMediaPresentationHint)
-    let context = CalendarContractContext(
-        bucket: bucket,
-        airDate: optionalString(payload, "airDate"),
-        watched: watched,
-        relatedShow: optionalObject(contextObject, "relatedShow").flatMap(parseMediaItem)
-    )
     return CalendarContractItem(
         bucket: bucket,
         kind: kind,
         mediaItem: mediaItem,
         context: context,
         presentation: presentation,
-        airDate: optionalString(payload, "airDate"),
+        airDate: optionalString(payload, "AirDate"),
         watched: watched
+    )
+}
+
+private func parseCalendarContext(_ payload: [String: Any]) -> CalendarContractContext? {
+    guard hasExactKeys(payload, expected: ["bucket", "AirDate", "watched", "relatedShow"]),
+          let bucket = requiredString(payload, "bucket"),
+          ["up_next", "this_week", "upcoming", "recently_released", "no_scheduled"].contains(bucket),
+          let watched = payload["watched"] as? Bool,
+          let relatedShowObject = payload["relatedShow"] as? [String: Any],
+          let relatedShow = parseMediaItem(relatedShowObject) else {
+        return nil
+    }
+    return CalendarContractContext(
+        bucket: bucket,
+        airDate: optionalString(payload, "AirDate"),
+        watched: watched,
+        relatedShow: relatedShow
     )
 }
 
