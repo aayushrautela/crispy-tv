@@ -876,6 +876,7 @@ internal fun CrispyBackendClient.parseWatchStateResponse(json: JSONObject): Watc
     val isFavorite = userData?.optBoolean("IsFavorite") ?: false
     val ratingValue = userData?.optIntOrNull("Rating")
     val playCount = userData?.optInt("PlayCount") ?: 0
+    val lastPlayedDate = userData?.optNullableString("LastPlayedDate")
     return WatchStateResponse(
         kind = "watch_state",
         mediaItem = parseMediaItem(json),
@@ -883,9 +884,9 @@ internal fun CrispyBackendClient.parseWatchStateResponse(json: JSONObject): Watc
         presentation = null,
         progress = null,
         continueWatching = null,
-        watched = if (played) WatchedStateView(watchedAt = userData?.optNullableString("LastPlayedDate")) else null,
-        watchlist = if (isFavorite) WatchlistStateView(addedAt = null) else null,
-        rating = ratingValue?.let { RatingStateView(value = it, ratedAt = null) },
+        watched = if (played && lastPlayedDate != null) WatchedStateView(watchedAt = lastPlayedDate) else null,
+        watchlist = null,
+        rating = null,
         watchedEpisodeKeys = emptyList(),
         playCount = playCount,
     )
