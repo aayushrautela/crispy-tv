@@ -51,7 +51,7 @@ private fun normalizeMediaItem(payload: Map<String, Any?>): MediaStateNormalized
         title = title,
         posterUrl = imageTags?.imageTagMedium("Primary") ?: payload.stringValue("posterUrl"),
         backdropUrl = imageTags?.backdropMedium() ?: payload.stringValue("backdropUrl"),
-        subtitle = payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview") ?: payload.nullableStringValue("subtitle"),
+        subtitle = payload.nullableStringValue("subtitle") ?: payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview"),
     )
 }
 

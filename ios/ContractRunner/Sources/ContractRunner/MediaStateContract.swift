@@ -97,7 +97,7 @@ private func normalizeMediaItem(_ payload: [String: Any]) -> MediaStateNormalize
         title: title,
         posterUrl: imageTagMedium(imageTags, "Primary") ?? stringValue(payload, "posterUrl"),
         backdropUrl: backdropMedium(imageTags) ?? stringValue(payload, "backdropUrl"),
-        subtitle: nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "Overview") ?? nullableStringValue(payload, "subtitle")
+        subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "Overview")
     )
 }
 
