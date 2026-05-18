@@ -297,29 +297,23 @@ private fun parseMediaItemType(type: String): String {
     }
 }
 
-private fun parseImageUrl(url: String?): ResponsiveImageSet {
-    val value = url?.trim()?.ifBlank { null }
-    return ResponsiveImageSet(value, value, value)
-}
-
 private fun parseBackdropImageUrl(imageTags: JSONObject?): ResponsiveImageSet {
     if (imageTags == null) return ResponsiveImageSet(null, null, null)
     val arr = imageTags.optJSONArray("Backdrop")
     if (arr != null && arr.length() > 0) {
         val first = arr.optJSONObject(0)
         if (first != null) {
-            return parseResponsiveImageSet(first, null)
+            return parseResponsiveImageSet(first)
         }
     }
     return ResponsiveImageSet(null, null, null)
 }
 
-private fun parseResponsiveImageSet(json: JSONObject?, fallbackUrl: String?): ResponsiveImageSet {
-    val fallback = fallbackUrl?.trim()?.ifBlank { null }
+private fun parseResponsiveImageSet(json: JSONObject?): ResponsiveImageSet {
     return ResponsiveImageSet(
-        small = json.optNullableString("small") ?: fallback,
-        medium = json.optNullableString("medium") ?: fallback,
-        large = json.optNullableString("large") ?: fallback,
+        small = json.optNullableString("small"),
+        medium = json.optNullableString("medium"),
+        large = json.optNullableString("large"),
     )
 }
 
@@ -709,7 +703,7 @@ internal fun CrispyBackendClient.parseMetadataCompanyViews(array: JSONArray?): L
                 MetadataCompanyView(
                     id = id,
                     name = name,
-                    logo = parseResponsiveImageSet(item.optJSONObject("logo"), null),
+                    logo = parseResponsiveImageSet(item.optJSONObject("logo")),
                     originCountry = item.optNullableString("originCountry"),
                 )
             )
