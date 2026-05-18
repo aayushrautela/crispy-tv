@@ -184,7 +184,7 @@ private func normalizeHomeSnapshotSection(_ payload: [String: Any]) -> MediaStat
 }
 
 private func normalizeTitleRoute(_ payload: [String: Any]) -> MediaStateNormalized? {
-    guard let mediaKey = stringValue(payload, "mediaKey"),
+    guard let mediaKey = stringValue(payload, "mediaKey") ?? stringValue(payload, "Id"),
           let path = stringValue(payload, "path"),
           path == "/v1/metadata/titles/\(mediaKey)" else {
         return nil

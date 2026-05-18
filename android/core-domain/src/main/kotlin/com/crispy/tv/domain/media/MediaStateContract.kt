@@ -110,7 +110,7 @@ private fun normalizeHomeSnapshotSection(payload: Map<String, Any?>): MediaState
 }
 
 private fun normalizeTitleRoute(payload: Map<String, Any?>): MediaStateNormalized? {
-    val mediaKeyStr = payload.stringValue("mediaKey") ?: return null
+    val mediaKeyStr = payload.stringValue("mediaKey") ?: payload.stringValue("Id") ?: return null
     val path = payload.stringValue("path") ?: return null
     if (path != "/v1/metadata/titles/$mediaKeyStr") return null
     return MediaStateNormalized(mediaKey = MediaKey(mediaKeyStr), routeKind = "title")
