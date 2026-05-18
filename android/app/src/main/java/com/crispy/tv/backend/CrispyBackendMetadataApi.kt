@@ -131,7 +131,7 @@ internal suspend fun CrispyBackendClient.resolveMetadataApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    val itemJson = json.optJSONObject("item") ?: throw IllegalStateException("Backend metadata resolve did not return an item.")
+    val itemJson = json.optJSONObject("Item") ?: throw IllegalStateException("Backend metadata resolve did not return an Item.")
     return MetadataResolveResponse(item = parseMetadataView(itemJson))
 }
 
@@ -147,13 +147,13 @@ internal suspend fun CrispyBackendClient.getMetadataTitleDetailApi(
     )
     val json = requireSuccess(response)
     return MetadataTitleDetailResponse(
-        item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend title detail is missing item.")),
-        nextEpisode = json.optJSONObject("nextEpisode")?.let(::parseMetadataEpisodeView),
-        videos = parseMetadataVideoViews(json.optJSONArray("videos")),
-        cast = parseMetadataPersonRefViews(json.optJSONArray("cast")),
-        directors = parseMetadataPersonRefViews(json.optJSONArray("directors")),
-        creators = parseMetadataPersonRefViews(json.optJSONArray("creators")),
-        production = parseMetadataProductionInfoView(json.optJSONObject("production")),
+        item = parseMetadataView(json.optJSONObject("Item") ?: throw IllegalStateException("Backend title detail is missing Item.")),
+        nextEpisode = json.optJSONObject("NextEpisode")?.let(::parseMetadataEpisodeView),
+        videos = parseMetadataVideoViews(json.optJSONArray("Videos")),
+        cast = parseMetadataPersonRefViews(json.optJSONArray("Cast")),
+        directors = parseMetadataPersonRefViews(json.optJSONArray("Directors")),
+        creators = parseMetadataPersonRefViews(json.optJSONArray("Creators")),
+        production = parseMetadataProductionInfoView(json.optJSONObject("Production")),
     )
 }
 
@@ -169,11 +169,11 @@ internal suspend fun CrispyBackendClient.getMetadataTitleExtrasApi(
     )
     val json = requireSuccess(response)
     return MetadataTitleExtrasResponse(
-        seasons = parseMetadataSeasonViews(json.optJSONArray("seasons")),
-        episodes = parseMetadataEpisodeViews(json.optJSONArray("episodes")),
-        reviews = parseMetadataReviewViews(json.optJSONArray("reviews")),
-        similar = parseMetadataRelatedItemViews(json.optJSONArray("similar")),
-        collection = parseMetadataCollectionView(json.optJSONObject("collection")),
+        seasons = parseMetadataSeasonViews(json.optJSONArray("Seasons")),
+        episodes = parseMetadataEpisodeViews(json.optJSONArray("Episodes")),
+        reviews = parseMetadataReviewViews(json.optJSONArray("Reviews")),
+        similar = parseMetadataRelatedItemViews(json.optJSONArray("Similar")),
+        collection = parseMetadataCollectionView(json.optJSONObject("Collection")),
     )
 }
 
@@ -190,7 +190,7 @@ internal suspend fun CrispyBackendClient.getMetadataTitleRatingsApi(
     )
     val json = requireSuccess(response)
     return MetadataTitleRatingsResponse(
-        ratings = parseMetadataTitleRatings(json.optJSONObject("ratings")),
+        ratings = parseMetadataTitleRatings(json.optJSONObject("Ratings")),
     )
 }
 
@@ -229,8 +229,8 @@ internal suspend fun CrispyBackendClient.resolvePlaybackApi(
     )
     val json = requireSuccess(response)
     return PlaybackResolveResponse(
-        item = parseMetadataView(json.optJSONObject("item") ?: throw IllegalStateException("Backend playback resolve is missing item.")),
-        show = json.optJSONObject("show")?.let(::parseMetadataView),
-        season = json.optJSONObject("season")?.let(::parseMetadataSeasonView),
+        item = parseMetadataView(json.optJSONObject("Item") ?: throw IllegalStateException("Backend playback resolve is missing Item.")),
+        show = json.optJSONObject("Show")?.let(::parseMetadataView),
+        season = json.optJSONObject("Season")?.let(::parseMetadataSeasonView),
     )
 }

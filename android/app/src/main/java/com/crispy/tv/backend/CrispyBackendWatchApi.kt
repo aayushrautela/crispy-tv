@@ -222,7 +222,7 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return parseWatchStateEnvelope(json)
+    return parseWatchStateEnvelope(json, profileId)
 }
 
 internal suspend fun CrispyBackendClient.getWatchStatesApi(
@@ -250,7 +250,7 @@ internal suspend fun CrispyBackendClient.getWatchStatesApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return parseWatchStatesEnvelope(json)
+    return parseWatchStatesEnvelope(json, profileId)
 }
 
 internal suspend fun CrispyBackendClient.markWatchedApi(
