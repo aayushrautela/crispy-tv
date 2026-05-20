@@ -11,11 +11,9 @@ final class FixtureSanityTests: XCTestCase {
             "calendar_contract",
             "next_episode",
             "trakt_scrobble_policy",
-            "metadata_tmdb_enhancer",
             "omdb",
             "home_catalogs",
             "catalog_url_building",
-            "search_ranking_and_dedup",
             "sync_planner",
             "storage_v1",
         ]

@@ -81,7 +81,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         }
 
         return HomeCatalogItem(
-            mediaKey: try requireString(object, "media_key", fixture: fixture),
+            mediaKey: try requireString(object, "item_id", fixture: fixture),
             title: try requireString(object, "title", fixture: fixture),
             posterUrl: optionalString(object, "poster_url"),
             backdropUrl: optionalString(object, "backdrop_url"),
@@ -114,7 +114,7 @@ final class HomeCatalogsContractTests: XCTestCase {
         }
 
         return HomeCatalogHeroItem(
-            mediaKey: try requireString(object, "media_key", fixture: fixture),
+            mediaKey: try requireString(object, "item_id", fixture: fixture),
             title: try requireString(object, "title", fixture: fixture),
             description: try requireString(object, "description", fixture: fixture),
             rating: optionalString(object, "rating"),
