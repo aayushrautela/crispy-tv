@@ -4,8 +4,8 @@ import XCTest
 final class MediaStateContractTests: XCTestCase {
     func testMediaStateFixtures() throws {
         let fixtures = try FixtureLoader.listFixtureFiles(in: "media_state_contract")
-            .filter { $0.path.contains("/v4/") }
-        XCTAssertFalse(fixtures.isEmpty, "Expected at least one media_state_contract v4 fixture")
+            .filter { $0.path.contains("/v5/") }
+        XCTAssertFalse(fixtures.isEmpty, "Expected at least one media_state_contract v5 fixture")
 
         for fixtureURL in fixtures {
             let root = try FixtureLoader.readJSONObject(from: fixtureURL)
@@ -30,9 +30,8 @@ final class MediaStateContractTests: XCTestCase {
     private func parseNormalized(_ object: [String: Any], fixture: URL) throws -> MediaStateNormalized {
         return MediaStateNormalized(
             cardFamily: optionalString(object, "card_family"),
-            mediaKey: optionalString(object, "media_key"),
-            mediaType: optionalString(object, "media_type"),
             itemId: optionalString(object, "item_id"),
+            mediaType: optionalString(object, "media_type"),
             title: optionalString(object, "title"),
             posterUrl: optionalString(object, "poster_url"),
             backdropUrl: optionalString(object, "backdrop_url"),

@@ -1,0 +1,17 @@
+{
+  "contract_version": 5,
+  "suite": "media_state_contract",
+  "case_id": "media_item_missing_item_id_is_invalid",
+  "input": {
+    "kind": "media_item",
+    "payload": {
+      "Type": "Movie",
+      "Name": "No Key Movie",
+      "Genres": []
+    }
+  },
+  "expected": {
+    "valid": false,
+    "normalized": null
+  }
+}

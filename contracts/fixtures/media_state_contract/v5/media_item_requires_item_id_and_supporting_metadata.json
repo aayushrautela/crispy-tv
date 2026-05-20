@@ -1,0 +1,92 @@
+{
+  "contract_version": 5,
+  "suite": "media_state_contract",
+  "case_id": "media_item_requires_item_id_and_supporting_metadata",
+  "input": {
+    "kind": "media_item",
+    "payload": {
+      "Id": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+      "Type": "Movie",
+      "Name": "Test Movie",
+      "OriginalTitle": "Test Movie Original",
+      "Overview": "A test movie",
+      "Taglines": [
+        "A tagline"
+      ],
+      "ProductionYear": 2024,
+      "PremiereDate": "2024-01-01",
+      "CommunityRating": 8.5,
+      "OfficialRating": null,
+      "Certification": "PG-13",
+      "Genres": [
+        "Action",
+        "Drama"
+      ],
+      "RunTimeTicks": 72000000000,
+      "Status": "Released",
+      "ProviderIds": {
+        "Tmdb": "123",
+        "Imdb": "tt1234567",
+        "Tvdb": null
+      },
+      "ImageTags": {
+        "Primary": {
+          "medium": "https://example.com/poster.jpg",
+          "small": null,
+          "large": null
+        },
+        "Backdrop": [
+          {
+            "medium": "https://example.com/backdrop.jpg",
+            "small": null,
+            "large": null
+          }
+        ],
+        "Logo": {
+          "medium": "https://example.com/logo.jpg",
+          "small": null,
+          "large": null
+        },
+        "Thumb": {
+          "medium": "https://example.com/still.jpg",
+          "small": null,
+          "large": null
+        },
+        "Screenshot": []
+      },
+      "ParentImageTags": null,
+      "SeriesId": null,
+      "SeriesName": null,
+      "SeasonId": null,
+      "SeasonName": null,
+      "ParentIndexNumber": null,
+      "IndexNumber": null,
+      "AbsoluteIndexNumber": null,
+      "EpisodeTitle": "Test Episode",
+      "AirDate": null,
+      "RemoteTrailers": [],
+      "PosterColor": null,
+      "BackdropColor": null,
+      "UserData": null
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "item_id": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+      "media_type": "Movie",
+      "title": "Test Movie",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": "https://example.com/backdrop.jpg",
+      "subtitle": "Test Episode",
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": null,
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

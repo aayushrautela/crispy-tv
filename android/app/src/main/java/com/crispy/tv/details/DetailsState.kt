@@ -18,7 +18,7 @@ data class EpisodeWatchState(
 
 @Immutable
 data class DetailsUiState(
-    val mediaKey: String,
+    val itemId: String,
     val isLoading: Boolean = true,
     val extrasIsLoading: Boolean = false,
     val ratingsIsLoading: Boolean = false,

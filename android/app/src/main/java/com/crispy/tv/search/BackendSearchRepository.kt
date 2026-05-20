@@ -81,14 +81,14 @@ class BackendSearchRepository(
 internal fun CrispyBackendClient.MediaItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val normalizedType =
         when {
-            mediaType.equals("anime", ignoreCase = true) -> "anime"
-            mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "show"
+            itemType.equals("anime", ignoreCase = true) -> "anime"
+            itemType.equals("show", ignoreCase = true) || itemType.equals("tv", ignoreCase = true) -> "show"
             else -> "movie"
         }
-    val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+    val normalizedItemId = itemId.trim().ifBlank { return null }
     return SearchCatalogItem(
-        id = normalizedMediaKey,
-        mediaKey = normalizedMediaKey,
+        id = normalizedItemId,
+        itemId = normalizedItemId,
         title = title,
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,

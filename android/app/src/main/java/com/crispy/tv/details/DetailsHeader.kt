@@ -458,7 +458,7 @@ internal fun HeaderInfoSection(
             enabled = !isMutating,
             isInWatchlist = isInWatchlist,
             isWatched = isWatched,
-            showWatched = details.mediaType == "movie",
+            showWatched = details.itemType == "movie",
             isRated = isRated,
             userRating = userRating,
             onToggleWatchlist = onToggleWatchlist,

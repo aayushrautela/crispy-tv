@@ -127,22 +127,7 @@ def process_file(filepath):
     data = json.loads(content)
     suite = data.get('suite', '')
     
-    if suite == 'metadata_tmdb_enhancer':
-        # Get media_type context from input
-        input_data = data.get('input', {})
-        mt = input_data.get('media_type', 'movie')
-        data = fix_metadata_tmdb_enhancer(data, mt)
-        content = json.dumps(data, indent=2, ensure_ascii=False) + '\n'
-    
-    elif suite == 'search_ranking_and_dedup':
-        # Change expected media_type from "series" to "show"
-        items = data.get('expected', {}).get('items', [])
-        for item in items:
-            if item.get('media_type') == 'series':
-                item['media_type'] = 'show'
-        content = json.dumps(data, indent=2, ensure_ascii=False) + '\n'
-    
-    elif suite in ('media_state_contract', 'watch_collections_contract', 'calendar_contract'):
+    if suite in ('media_state_contract', 'watch_collections_contract', 'calendar_contract'):
         # Change media_type "series" -> "show" in expected normalized output
         # AND in input payloads (which represent server responses)
         expected = data.get('expected')
@@ -174,6 +159,9 @@ def process_file(filepath):
         return False
 
 
+
+
+
 def fix_media_type_in_object(obj):
     """Recursively fix 'media_type': 'series' -> 'show' in an object tree."""
     if isinstance(obj, dict):
@@ -181,14 +169,12 @@ def fix_media_type_in_object(obj):
             obj['media_type'] = 'show'
         if 'mediaType' in obj and obj['mediaType'] == 'series':
             obj['mediaType'] = 'show'
-        # Also in nested dicts like .media
         if 'media' in obj and isinstance(obj['media'], dict):
             fix_media_type_in_object(obj['media'])
         if 'mediaItem' in obj and isinstance(obj['mediaItem'], dict):
             fix_media_type_in_object(obj['mediaItem'])
         if 'relatedShow' in obj and isinstance(obj['relatedShow'], dict):
             fix_media_type_in_object(obj['relatedShow'])
-        # Check all nested objects
         for v in obj.values():
             if isinstance(v, dict):
                 fix_media_type_in_object(v)
@@ -208,64 +194,6 @@ def fix_normalized_media_type(normalized):
             if isinstance(item, dict):
                 fix_media_type_in_object(item)
     return normalized
-
-
-def fix_metadata_tmdb_enhancer(data, media_type):
-    """Fix metadata_tmdb_enhancer: content_id, meta.id, tmdb_meta.id, season ids, bridge candidates."""
-    type_prefix = 'show' if media_type in ('series', 'show') else media_type
-    type_prefix_upper = type_prefix.upper()
-    
-    input_data = data.get('input', {})
-    
-    # Fix content_id (may have whitespace)
-    cid = input_data.get('content_id', '')
-    if cid.strip():
-        m = re.match(r'^\s*(TMDB|tmdb):(\d+)\s*$', cid)
-        if m:
-            prefix, i = m.group(1), m.group(2)
-            new_prefix = type_prefix_upper if prefix == 'TMDB' else type_prefix
-            # Preserve whitespace
-            ws_left = len(cid) - len(cid.lstrip())
-            ws_right = len(cid) - len(cid.rstrip())
-            input_data['content_id'] = ' ' * ws_left + f'{new_prefix}:tmdb:{i}' + ' ' * ws_right
-    
-    # Fix meta.id and tmdb_meta.id
-    for meta_key in ['meta', 'tmdb_meta']:
-        meta = input_data.get(meta_key)
-        if meta and isinstance(meta, dict) and 'id' in meta:
-            tid = meta['id']
-            m = re.match(r'^(TMDB|tmdb):(\d+)$', tid)
-            if m:
-                prefix, i = m.group(1), m.group(2)
-                new_prefix = type_prefix_upper if prefix == 'TMDB' else type_prefix
-                meta['id'] = f'{new_prefix}:tmdb:{i}'
-    
-    # Fix expected derived_seasons IDs
-    expected = data.get('expected', {})
-    for season in expected.get('derived_seasons', []):
-        sid = season.get('id', '')
-        m = re.match(r'^(TMDB|tmdb):(\d+):season:(\d+)$', sid)
-        if m:
-            prefix, sid_num, snum = m.group(1), m.group(2), m.group(3)
-            new_prefix = type_prefix_upper if prefix == 'TMDB' else type_prefix
-            season['id'] = f'{new_prefix}:tmdb:{sid_num}:season:{snum}'
-    
-    # Fix bridge_candidate_ids
-    if 'bridge_candidate_ids' in expected:
-        expected['bridge_candidate_ids'] = [
-            transform_bridge_candidate(c) or c for c in expected['bridge_candidate_ids']
-        ]
-    
-    # Fix input meta.seasons (if any)
-    for season in input_data.get('meta', {}).get('seasons', []):
-        sid = season.get('id', '')
-        m = re.match(r'^(TMDB|tmdb):(\d+):season:(\d+)$', sid)
-        if m:
-            prefix, sid_num, snum = m.group(1), m.group(2), m.group(3)
-            new_prefix = type_prefix_upper if prefix == 'TMDB' else type_prefix
-            season['id'] = f'{new_prefix}:tmdb:{sid_num}:season:{snum}'
-    
-    return data
 
 
 def main():

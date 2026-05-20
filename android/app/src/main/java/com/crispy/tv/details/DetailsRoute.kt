@@ -18,8 +18,8 @@ import java.util.Locale
 
 @Composable
 fun DetailsRoute(
-    mediaKey: String,
-    mediaType: String,
+    itemId: String,
+    itemType: String,
     runtimeEntry: RuntimeDetailsEntry? = null,
     highlightEpisodeId: String? = null,
     autoOpenEpisode: Boolean = false,
@@ -30,8 +30,8 @@ fun DetailsRoute(
 ) {
     val appContext = LocalContext.current.applicationContext
 
-    val normalizedType = remember(mediaType) {
-        when (mediaType.trim().lowercase(Locale.US)) {
+    val normalizedType = remember(itemType) {
+        when (itemType.trim().lowercase(Locale.US)) {
             "movie" -> "movie"
             "series", "show", "tv" -> "show"
             "anime" -> "anime"
@@ -43,16 +43,16 @@ fun DetailsRoute(
         return
     }
 
-    // Important: mediaKey alone is not guaranteed to be collision-free across differing route classes.
-    // Keep mediaType in the key to prevent ViewModel reuse across different title shapes.
-    val viewModelKey = remember(mediaKey, normalizedType) {
-        "$normalizedType:$mediaKey"
+    // Important: itemId alone is not guaranteed to be collision-free across differing route classes.
+    // Keep itemType in the key to prevent ViewModel reuse across different title shapes.
+    val viewModelKey = remember(itemId, normalizedType) {
+        "$normalizedType:$itemId"
     }
     val viewModel: DetailsViewModel =
         viewModel(
             key = viewModelKey,
-            factory = remember(appContext, mediaKey, normalizedType, runtimeEntry) {
-                appContext.appGraph().detailsViewModelFactory(mediaKey, normalizedType, runtimeEntry)
+            factory = remember(appContext, itemId, normalizedType, runtimeEntry) {
+                appContext.appGraph().detailsViewModelFactory(itemId, normalizedType, runtimeEntry)
             }
         )
     val playbackSettingsRepository = remember(appContext) {

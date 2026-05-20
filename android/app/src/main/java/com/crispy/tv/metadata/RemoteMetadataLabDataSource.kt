@@ -3,7 +3,6 @@ package com.crispy.tv.metadata
 import android.content.Context
 import com.crispy.tv.domain.metadata.AddonMetadataCandidate
 import com.crispy.tv.domain.metadata.MetadataRecord
-import com.crispy.tv.metadata.tmdb.TmdbMetadataRecordRepository
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabDataSource
 import com.crispy.tv.player.MetadataLabMediaType
@@ -23,7 +22,6 @@ import java.nio.charset.StandardCharsets
 internal class RemoteMetadataLabDataSource(
     context: Context,
     addonManifestUrlsCsv: String,
-    private val tmdbRepository: TmdbMetadataRecordRepository,
     private val httpClient: CrispyHttpClient,
 ) : MetadataLabDataSource {
     private val addonRegistry = MetadataAddonRegistry(context.applicationContext, addonManifestUrlsCsv)
@@ -36,9 +34,7 @@ internal class RemoteMetadataLabDataSource(
         val contentId = parsedLookupId.baseId
         val streamLookupId = buildLookupId(contentId, parsedLookupId.season, parsedLookupId.episode)
         val subtitleLookupId = streamLookupId
-        val tmdbResult = tmdbRepository.fetchMeta(request.mediaType, contentId)
-        val tmdbMeta = tmdbResult?.record
-        var transportStats = addonClient.fetchTransportStats(
+        val transportStats = addonClient.fetchTransportStats(
             mediaType = request.mediaType,
             contentId = contentId,
             streamLookupId = streamLookupId,
@@ -46,39 +42,17 @@ internal class RemoteMetadataLabDataSource(
             preferredAddonId = request.preferredAddonId
         )
 
-        if (transportStats.isEmpty() && contentId.startsWith("tmdb:", ignoreCase = true)) {
-            val bridgedImdb = tmdbMeta?.imdbId?.takeIf { it.startsWith("tt", ignoreCase = true) }
-            if (bridgedImdb != null) {
-                transportStats = addonClient.fetchTransportStats(
-                    mediaType = request.mediaType,
-                    contentId = bridgedImdb,
-                    streamLookupId = rewriteLookupBase(streamLookupId, contentId, bridgedImdb),
-                    subtitleLookupId = rewriteLookupBase(subtitleLookupId, contentId, bridgedImdb),
-                    preferredAddonId = request.preferredAddonId
-                )
-            }
-        }
-
-        val primaryMeta = tmdbMeta ?: fallbackMetadata(contentId)
-        val primaryCandidate =
-            if (tmdbResult != null) {
-                AddonMetadataCandidate(
-                    addonId = "tmdb",
-                    mediaId = primaryMeta.id,
-                    title = tmdbResult.title
-                )
-            } else {
-                AddonMetadataCandidate(
-                    addonId = "fallback.local",
-                    mediaId = primaryMeta.id,
-                    title = "Unavailable"
-                )
-            }
+        val primaryMeta = fallbackMetadata(contentId)
+        val primaryCandidate = AddonMetadataCandidate(
+            addonId = "fallback.local",
+            mediaId = primaryMeta.id,
+            title = "Unavailable"
+        )
 
         MetadataLabPayload(
             addonResults = listOf(primaryCandidate),
             addonMeta = primaryMeta,
-            tmdbMeta = tmdbMeta,
+            tmdbMeta = null,
             transportStats = transportStats
         )
     }
@@ -95,15 +69,6 @@ internal class RemoteMetadataLabDataSource(
             seasons = emptyList(),
             videos = emptyList()
         )
-    }
-
-    private fun rewriteLookupBase(lookupId: String, originalBase: String, bridgedBase: String): String {
-        val prefix = "$originalBase:"
-        return if (lookupId.startsWith(prefix)) {
-            bridgedBase + lookupId.removePrefix(originalBase)
-        } else {
-            bridgedBase
-        }
     }
 }
 

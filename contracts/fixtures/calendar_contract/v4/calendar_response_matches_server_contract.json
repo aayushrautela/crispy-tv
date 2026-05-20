@@ -1,0 +1,69 @@
+{
+  "contract_version": 4,
+  "suite": "calendar_contract",
+  "case_id": "calendar_response_matches_server_contract",
+  "input": {
+    "payload": {
+      "profileId": "profile-123",
+      "source": "canonical_calendar",
+      "generatedAt": "2026-04-12T00:00:00Z",
+      "items": [
+        {
+          "Id": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6",
+          "Type": "Episode",
+          "Name": "Sunrise, Sunset",
+          "OriginalTitle": null,
+          "Overview": null,
+          "Taglines": [],
+          "ProductionYear": 2026,
+          "PremiereDate": null,
+          "CommunityRating": 8.1,
+          "OfficialRating": null,
+          "Certification": null,
+          "Genres": [
+            "Drama"
+          ],
+          "RunTimeTicks": 28800000000,
+          "Status": null,
+          "ProviderIds": {
+            "Tmdb": "1001",
+            "Imdb": null,
+            "Tvdb": null
+          },
+          "ImageTags": {
+            "Primary": null,
+            "Backdrop": [
+              "https://img/episode-backdrop.jpg"
+            ],
+            "Logo": null,
+            "Thumb": null,
+            "Screenshot": []
+          },
+          "ParentImageTags": {
+            "Primary": null,
+            "Backdrop": [],
+            "Logo": null,
+            "Thumb": null
+          },
+          "SeriesId": "c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
+          "SeriesName": "The Morning Bell",
+          "SeasonId": null,
+          "SeasonName": null,
+          "ParentIndexNumber": 1,
+          "IndexNumber": 3,
+          "AbsoluteIndexNumber": null,
+          "EpisodeTitle": "Sunrise, Sunset",
+          "AirDate": null,
+          "RemoteTrailers": [],
+          "PosterColor": null,
+          "BackdropColor": null,
+          "UserData": null
+        }
+      ]
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": null
+  }
+}

@@ -14,13 +14,21 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal suspend fun CrispyBackendClient.getRecommendationsApi(
+internal suspend fun CrispyBackendClient.getHomeApi(
     accessToken: String,
     profileId: String,
+    sourceKey: String? = null,
+    algorithmVersion: String? = null,
 ): RecommendationsResponse? {
     checkConfigured()
+    val url = "$baseUrl/v1/profiles/${profileId.trim()}/home".toHttpUrl().newBuilder()
+        .apply {
+            if (!sourceKey.isNullOrBlank()) addQueryParameter("sourceKey", sourceKey.trim())
+            if (!algorithmVersion.isNullOrBlank()) addQueryParameter("algorithmVersion", algorithmVersion.trim())
+        }
+        .build()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/recommendations".toHttpUrl(),
+        url = url,
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -81,11 +89,7 @@ internal suspend fun CrispyBackendClient.sendWatchEventApi(
     val payload = JSONObject().apply {
         put("clientEventId", input.clientEventId.trim())
         put("eventType", input.eventType.trim())
-        put("mediaType", input.mediaType.trim())
-        if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
-        if (input.absoluteEpisodeNumber != null) put("absoluteEpisodeNumber", input.absoluteEpisodeNumber)
-        if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
-        if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
+        put("itemId", input.itemId.trim())
         if (input.positionSeconds != null) put("positionSeconds", input.positionSeconds)
         if (input.durationSeconds != null) put("durationSeconds", input.durationSeconds)
         if (!input.occurredAt.isNullOrBlank()) put("occurredAt", input.occurredAt.trim())
@@ -161,13 +165,13 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
 internal suspend fun CrispyBackendClient.getWatchStateApi(
     accessToken: String,
     profileId: String,
-    mediaKey: String,
+    itemId: String,
 ): WatchStateEnvelope {
     checkConfigured()
-    val normalizedMediaKey = mediaKey.trim()
+    val normalizedItemId = itemId.trim()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/state".toHttpUrl().newBuilder()
-            .addQueryParameter("mediaKey", normalizedMediaKey)
+            .addQueryParameter("itemId", normalizedItemId)
             .build(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -179,16 +183,16 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
 internal suspend fun CrispyBackendClient.getWatchStatesApi(
     accessToken: String,
     profileId: String,
-    mediaKeys: List<String>,
+    itemIds: List<String>,
 ): WatchStatesEnvelope {
     checkConfigured()
     val payload = JSONObject().put(
         "items",
         JSONArray().apply {
-            mediaKeys.forEach { mediaKey ->
+            itemIds.forEach { itemId ->
                 put(
                     JSONObject().apply {
-                        put("mediaKey", mediaKey.trim())
+                        put("itemId", itemId.trim())
                     }
                 )
             }
@@ -220,10 +224,10 @@ internal suspend fun CrispyBackendClient.unmarkWatchedApi(
     return postWatchMutationApi(accessToken, profileId, "unmark-watched", input)
 }
 
-internal suspend fun CrispyBackendClient.putNativeWatchlistApi(
+internal suspend fun CrispyBackendClient.putWatchlistApi(
     accessToken: String,
     profileId: String,
-    mediaKey: String,
+    itemId: String,
     occurredAt: String? = null,
     payload: Map<String, Any?> = emptyMap(),
 ): WatchActionResponse {
@@ -234,7 +238,7 @@ internal suspend fun CrispyBackendClient.putNativeWatchlistApi(
     }.toString()
     val response = httpClient.execute(
         request = Request.Builder()
-            .url("$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${mediaKey.trim()}".toHttpUrl())
+            .url("$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${itemId.trim()}".toHttpUrl())
             .headers(authHeaders(accessToken))
             .put(requestBody.toRequestBody(jsonMediaType))
             .build(),
@@ -243,24 +247,24 @@ internal suspend fun CrispyBackendClient.putNativeWatchlistApi(
     return parseWatchActionResponse(requireSuccess(response))
 }
 
-internal suspend fun CrispyBackendClient.deleteNativeWatchlistApi(
+internal suspend fun CrispyBackendClient.deleteWatchlistApi(
     accessToken: String,
     profileId: String,
-    mediaKey: String,
+    itemId: String,
 ): WatchActionResponse {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${mediaKey.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/watchlist/${itemId.trim()}".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
     return parseWatchActionResponse(requireSuccess(response))
 }
 
-internal suspend fun CrispyBackendClient.putNativeRatingApi(
+internal suspend fun CrispyBackendClient.putRatingApi(
     accessToken: String,
     profileId: String,
-    mediaKey: String,
+    itemId: String,
     rating: Int,
     occurredAt: String? = null,
     payload: Map<String, Any?> = emptyMap(),
@@ -273,7 +277,7 @@ internal suspend fun CrispyBackendClient.putNativeRatingApi(
     }.toString()
     val response = httpClient.execute(
         request = Request.Builder()
-            .url("$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${mediaKey.trim()}".toHttpUrl())
+            .url("$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${itemId.trim()}".toHttpUrl())
             .headers(authHeaders(accessToken))
             .put(requestBody.toRequestBody(jsonMediaType))
             .build(),
@@ -282,14 +286,14 @@ internal suspend fun CrispyBackendClient.putNativeRatingApi(
     return parseWatchActionResponse(requireSuccess(response))
 }
 
-internal suspend fun CrispyBackendClient.deleteNativeRatingApi(
+internal suspend fun CrispyBackendClient.deleteRatingApi(
     accessToken: String,
     profileId: String,
-    mediaKey: String,
+    itemId: String,
 ): WatchActionResponse {
     checkConfigured()
     val response = httpClient.delete(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${mediaKey.trim()}".toHttpUrl(),
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/rating/${itemId.trim()}".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -329,11 +333,7 @@ private suspend fun CrispyBackendClient.postWatchMutationApi(
 ): WatchActionResponse {
     checkConfigured()
     val payload = JSONObject().apply {
-        put("mediaType", input.mediaType.trim())
-        if (!input.mediaKey.isNullOrBlank()) put("mediaKey", input.mediaKey.trim())
-        if (input.absoluteEpisodeNumber != null) put("absoluteEpisodeNumber", input.absoluteEpisodeNumber)
-        if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
-        if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
+        put("itemId", input.itemId.trim())
         if (!input.occurredAt.isNullOrBlank()) put("occurredAt", input.occurredAt.trim())
         if (input.rating != null) put("rating", input.rating)
         put("payload", input.payload.toJsonObject())

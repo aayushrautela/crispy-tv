@@ -4,6 +4,11 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
+data class CatalogFilter(
+    val key: String,
+    val value: String
+)
+
 fun buildCatalogUrls(
     baseUrl: String,
     encodedQuery: String? = null,

@@ -13,7 +13,7 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.crispy.tv.images.ResponsiveImageSet
-import com.crispy.tv.metadata.tmdb.TmdbApi
+import com.crispy.tv.images.ImageUrlHelper
 import com.crispy.tv.settings.ImageQuality
 import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import java.util.Locale
@@ -71,7 +71,7 @@ internal fun rememberCrispyImageModel(
     val resolvedUrl = remember(selectedUrl, tmdbSize) {
         when {
             tmdbSize.isNullOrBlank() -> selectedUrl
-            else -> TmdbApi.resizedImageUrl(selectedUrl, tmdbSize)
+            else -> ImageUrlHelper.resizedImageUrl(selectedUrl, tmdbSize)
         }
     }
     val resolvedCacheKey = remember(cacheKey, imageQuality) {

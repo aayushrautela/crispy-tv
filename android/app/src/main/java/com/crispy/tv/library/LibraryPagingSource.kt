@@ -99,9 +99,9 @@ private fun CrispyBackendClient.MediaItem.toLibrarySectionItemUi(
     origins: List<String>,
 ): LibrarySectionItemUi {
     return LibrarySectionItemUi(
-        id = id ?: mediaKey,
-        mediaKey = mediaKey,
-        mediaType = mediaType,
+        id = id ?: itemId,
+        itemId = itemId,
+        itemType = itemType,
         title = title,
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,
@@ -128,7 +128,7 @@ private fun CrispyBackendClient.BaseItemDtoQueryResult.toHistorySectionPageUi():
             val userData = item.userData
             val watchedAt = userData?.lastPlayedDate?.takeIf { userData.played == true }
             item.toLibrarySectionItemUi(
-                id = item.mediaKey,
+                id = item.itemId,
                 addedAt = null,
                 watchedAt = watchedAt,
                 ratedAt = null,
@@ -146,7 +146,7 @@ private fun CrispyBackendClient.BaseItemDtoQueryResult.toWatchlistSectionPageUi(
     return LibrarySectionPageUi(
         items = items.map { item ->
             item.toLibrarySectionItemUi(
-                id = item.mediaKey,
+                id = item.itemId,
                 addedAt = null,
                 watchedAt = null,
                 ratedAt = null,
@@ -166,7 +166,7 @@ private fun CrispyBackendClient.BaseItemDtoQueryResult.toRatingsSectionPageUi():
             val userData = item.userData
             val ratingValue = userData?.rating?.toInt()?.takeIf { it in 1..10 }
             item.toLibrarySectionItemUi(
-                id = item.mediaKey,
+                id = item.itemId,
                 addedAt = null,
                 watchedAt = null,
                 ratedAt = null,

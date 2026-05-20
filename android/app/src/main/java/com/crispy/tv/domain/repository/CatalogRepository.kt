@@ -5,17 +5,17 @@ import com.crispy.tv.backend.CrispyBackendClient
 interface CatalogRepository {
     suspend fun getTitleDetail(
         accessToken: String,
-        mediaKey: String,
+        itemId: String,
     ): CrispyBackendClient.MetadataTitleDetailResponse
 
     suspend fun getTitleExtras(
         accessToken: String,
-        mediaKey: String,
+        itemId: String,
     ): CrispyBackendClient.MetadataTitleExtrasResponse
 
     suspend fun getTitleRatings(
         accessToken: String,
         profileId: String,
-        mediaKey: String,
+        itemId: String,
     ): CrispyBackendClient.MetadataTitleRatingsResponse
 }

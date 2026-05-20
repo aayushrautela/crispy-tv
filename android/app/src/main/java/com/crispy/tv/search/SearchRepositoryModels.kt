@@ -22,9 +22,10 @@ typealias SearchCatalogItem = CatalogItem
 
 internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val normalizedName = name.trim().ifBlank { return null }
+    val personItemId = "person:$tmdbPersonId"
     return SearchCatalogItem(
-        id = tmdbPersonId.toString(),
-        mediaKey = "person:tmdb:$tmdbPersonId",
+        id = personItemId,
+        itemId = personItemId,
         title = normalizedName,
         posterUrl = profileUrl?.trim()?.takeIf { it.isNotBlank() },
         backdropUrl = null,
@@ -39,24 +40,24 @@ internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGen
 
 data class SearchSuggestion(
     val title: String,
-    val mediaType: String,
+    val itemType: String,
     val year: Int?,
-    val mediaKey: String,
+    val itemId: String,
 )
 
 internal fun CrispyBackendClient.SearchSuggestionItem.toSearchSuggestion(): SearchSuggestion? {
     val normalizedTitle = title.trim()
     if (normalizedTitle.isBlank()) return null
-    val normalizedType = when (mediaType) {
+    val normalizedType = when (itemType) {
         "tv" -> "show"
         else -> "movie"
     }
-    val mediaKey = "$normalizedType:tmdb:$tmdbId"
+    val itemId = itemId.trim().ifBlank { return null }
     return SearchSuggestion(
         title = normalizedTitle,
-        mediaType = normalizedType,
+        itemType = normalizedType,
         year = year,
-        mediaKey = mediaKey,
+        itemId = itemId,
     )
 }
 

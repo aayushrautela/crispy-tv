@@ -1,10 +1,9 @@
 package com.crispy.tv.domain.home
 
-import com.crispy.tv.domain.MediaKey
 import java.util.Locale
 
 data class HomeCatalogItem(
-    val mediaKey: MediaKey,
+    val itemId: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -85,7 +84,7 @@ data class HomeCatalogSnapshot(
 )
 
 data class HomeCatalogHeroItem(
-    val mediaKey: MediaKey,
+    val itemId: String,
     val title: String,
     val description: String,
     val rating: String?,
@@ -322,7 +321,7 @@ private fun buildHeroResult(
                 val backdrop = item.backdropUrl ?: item.posterUrl
                 if (backdrop.isNullOrBlank()) return@mapNotNull null
                 HomeCatalogHeroItem(
-                    mediaKey = item.mediaKey,
+                    itemId = item.itemId,
                     title = item.title,
                     description = item.description ?: fallbackDescription,
                     rating = item.rating,

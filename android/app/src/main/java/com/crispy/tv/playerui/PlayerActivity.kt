@@ -276,7 +276,7 @@ class PlayerActivity : ComponentActivity() {
 
         private const val EXTRA_IMDB_ID = "extra_imdb_id"
         private const val EXTRA_CONTENT_ID = "extra_content_id"
-        private const val EXTRA_MEDIA_KEY = "extra_media_key"
+        private const val EXTRA_ITEM_ID = "extra_item_id"
         private const val EXTRA_MEDIA_TYPE = "extra_media_type"
         private const val EXTRA_SEASON = "extra_season"
         private const val EXTRA_EPISODE = "extra_episode"
@@ -307,7 +307,7 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(EXTRA_SUBTITLE, subtitle)
                 .putExtra(EXTRA_ARTWORK_URL, artworkUrl)
 .putExtra(EXTRA_LAUNCH_SNAPSHOT, launchSnapshot?.toJsonString())
-        .putExtra(EXTRA_MEDIA_KEY, identity.mediaKey)
+        .putExtra(EXTRA_ITEM_ID, identity.itemId)
         .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
         .putExtra(EXTRA_SEASON, identity.season ?: -1)
         .putExtra(EXTRA_EPISODE, identity.episode ?: -1)
@@ -324,7 +324,7 @@ class PlayerActivity : ComponentActivity() {
                 ?: return null
 
             val contentId = intent.getStringExtra(EXTRA_CONTENT_ID)?.trim()?.ifBlank { null }
-            val mediaKey = intent.getStringExtra(EXTRA_MEDIA_KEY)?.trim()?.ifBlank { null }
+            val itemId = intent.getStringExtra(EXTRA_ITEM_ID)?.trim()?.ifBlank { null }
             val imdbId = intent.getStringExtra(EXTRA_IMDB_ID)?.trim()?.ifBlank { null }
             val season = intent.getIntExtra(EXTRA_SEASON, -1).takeIf { it > 0 }
             val episode = intent.getIntExtra(EXTRA_EPISODE, -1).takeIf { it > 0 }
@@ -339,8 +339,7 @@ class PlayerActivity : ComponentActivity() {
             val absoluteEpisodeNumber = intent.getIntExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, -1).takeIf { it > 0 }
 
 return PlaybackIdentity(
-            mediaKey = mediaKey,
-            tmdbId = null,
+            itemId = itemId,
             contentType = contentType,
             season = season,
             episode = episode,

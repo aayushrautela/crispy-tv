@@ -12,7 +12,7 @@ interface UserMediaRepository {
     suspend fun getCanonicalWatchState(identity: PlaybackIdentity): CanonicalWatchStateSnapshot?
 
     suspend fun getTitleWatchState(
-        mediaKey: String,
+        itemId: String,
         contentType: MetadataLabMediaType,
     ): CanonicalWatchStateSnapshot?
 
@@ -37,7 +37,7 @@ interface UserMediaRepository {
     ): WatchHistoryResult
 
     suspend fun setTitleInWatchlist(
-        mediaKey: String,
+        itemId: String,
         inWatchlist: Boolean,
     ): WatchHistoryResult
 
@@ -47,7 +47,7 @@ interface UserMediaRepository {
     ): WatchHistoryResult
 
     suspend fun setTitleRating(
-        mediaKey: String,
+        itemId: String,
         rating: Int?,
     ): WatchHistoryResult
 }

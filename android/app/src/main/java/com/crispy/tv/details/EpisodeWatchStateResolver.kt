@@ -27,7 +27,7 @@ internal class EpisodeWatchStateResolver(
 
         val watchedKeys = resolveWatchKeys(details)
         val yearInt = details.year?.trim()?.toIntOrNull()
-        val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
+        val contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
         val parentMediaType =
             when (contentType) {
                 MetadataLabMediaType.MOVIE -> null
@@ -45,7 +45,7 @@ internal class EpisodeWatchStateResolver(
                 val localProgress =
                     userMediaRepository.getLocalWatchProgress(
                         PlaybackIdentity(
-                            mediaKey = details.mediaKey,
+                            itemId = details.itemId,
                             contentType = contentType,
                             season = season,
                             episode = episode,
@@ -71,14 +71,14 @@ internal class EpisodeWatchStateResolver(
     private suspend fun resolveWatchKeys(details: MediaDetails): Set<String> {
         cachedEpisodeWatchKeys?.let { return it }
 
-        val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+        val itemId = details.itemId?.trim()?.ifBlank { null }
         val canonical =
-            if (mediaKey == null) {
+            if (itemId == null) {
                 null
             } else {
                 userMediaRepository.getTitleWatchState(
-                    mediaKey = mediaKey,
-                    contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
+                    itemId = itemId,
+                    contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
                 )
             }
         val canonicalKeys =

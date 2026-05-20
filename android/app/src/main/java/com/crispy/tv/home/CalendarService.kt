@@ -11,8 +11,8 @@ import java.time.LocalDate
 @Immutable
 data class CalendarEpisodeItem(
     val id: String,
-    val titleMediaKey: String,
-    val playbackMediaKey: String,
+    val titleItemId: String,
+    val playbackItemId: String,
     val localKey: String,
     val highlightEpisodeId: String? = null,
     val seriesName: String,
@@ -37,7 +37,7 @@ data class CalendarEpisodeItem(
 @Immutable
 data class CalendarSeriesItem(
     val id: String,
-    val mediaKey: String,
+    val itemId: String,
     val localKey: String,
     val title: String,
     val posterUrl: String?,
@@ -190,7 +190,7 @@ class CalendarService internal constructor(
 
             if (releasedAtMs == null) {
                 val seriesItem = media.toCalendarSeriesItem()
-                if (!noScheduled.any { it.mediaKey == seriesItem.mediaKey }) {
+                if (!noScheduled.any { it.itemId == seriesItem.itemId }) {
                     noScheduled.add(seriesItem)
                 }
             } else if (releasedAtMs <= nowMs + WEEK_MS && releasedAtMs >= nowMs) {
@@ -224,20 +224,20 @@ class CalendarService internal constructor(
         val releaseDate = releaseDate?.trim()?.takeIf { !it.isNullOrBlank() } ?: airDate?.trim()?.takeIf { !it.isNullOrBlank() }
         val releasedAtMs = parseCalendarReleaseToEpochMs(releaseDate)
         val watchedKey = if (season != null && episode != null) {
-            "$mediaKey:$season:$episode"
+            "$itemId:$season:$episode"
         } else {
-            mediaKey
+            itemId
         }
         val localKeySuffix = when {
             season != null && episode != null -> ":$season:$episode"
             !releaseDate.isNullOrBlank() -> ":${releaseDate.take(10)}"
             else -> ""
         }
-        val localKey = "$mediaKey$localKeySuffix"
+        val localKey = "$itemId$localKeySuffix"
         return CalendarEpisodeItem(
             id = localKey,
-            titleMediaKey = seriesId ?: mediaKey,
-            playbackMediaKey = mediaKey,
+            titleItemId = seriesId ?: itemId,
+            playbackItemId = itemId,
             localKey = localKey,
             highlightEpisodeId = null,
             seriesName = seriesName ?: title,
@@ -260,10 +260,10 @@ class CalendarService internal constructor(
     }
 
     private fun CrispyBackendClient.MediaItem.toCalendarSeriesItem(): CalendarSeriesItem {
-        val localKey = seriesId ?: mediaKey
+        val localKey = seriesId ?: itemId
         return CalendarSeriesItem(
             id = localKey,
-            mediaKey = localKey,
+            itemId = localKey,
             localKey = localKey,
             title = seriesName ?: title,
             posterUrl = poster.medium,
@@ -279,7 +279,7 @@ class CalendarService internal constructor(
         val rawItems = items.take(HOME_THIS_WEEK_RAW_LIMIT)
 
         return rawItems
-            .groupBy { item -> "${item.titleMediaKey}_${item.releaseDate?.take(10).orEmpty()}" }
+            .groupBy { item -> "${item.titleItemId}_${item.releaseDate?.take(10).orEmpty()}" }
             .values
             .map { group ->
                 val sorted = group.sortedWith(compareBy(nullsLast()) { it.episode })
@@ -288,7 +288,7 @@ class CalendarService internal constructor(
                 if (sorted.size == 1) {
                     first
                 } else {
-                    val groupedLocalKey = "group_${first.titleMediaKey}_${first.releaseDate?.take(10).orEmpty()}"
+                    val groupedLocalKey = "group_${first.titleItemId}_${first.releaseDate?.take(10).orEmpty()}"
                     first.copy(
                         id = groupedLocalKey,
                         localKey = groupedLocalKey,

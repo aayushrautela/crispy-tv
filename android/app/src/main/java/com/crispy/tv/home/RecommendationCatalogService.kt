@@ -9,7 +9,6 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogPageResult
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.domain.MediaKey
 import com.crispy.tv.domain.home.HomeCatalogItem
 import com.crispy.tv.domain.home.HomeCatalogList
 import com.crispy.tv.domain.home.HomeCatalogPresentation
@@ -69,9 +68,9 @@ data class HomePrimaryFeedLoadResult(
 @Immutable
 data class MediaDetails(
     val id: String,
-    val mediaKey: String? = null,
+    val itemId: String? = null,
     val imdbId: String?,
-    val mediaType: String,
+    val itemType: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,
@@ -86,8 +85,6 @@ data class MediaDetails(
     val directors: List<String> = emptyList(),
     val creators: List<String> = emptyList(),
     val videos: List<MediaVideo> = emptyList(),
-    val tmdbId: Int? = null,
-    val showTmdbId: Int? = null,
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
     val addonId: String?,
@@ -105,8 +102,6 @@ data class MediaVideo(
     val overview: String?,
     val thumbnailUrl: String?,
     val lookupId: String? = null,
-    val tmdbId: Int? = null,
-    val showTmdbId: Int? = null,
     val absoluteEpisodeNumber: Int? = null,
 )
 
@@ -205,7 +200,7 @@ class RecommendationCatalogService internal constructor(
 
     private suspend fun loadSnapshotUncached(backendContext: BackendContext): HomeCatalogSnapshot {
         return try {
-            val response = backendClient.getRecommendations(
+            val response = backendClient.getHome(
                 accessToken = backendContext.accessToken,
                 profileId = backendContext.profileId,
             )
@@ -289,11 +284,11 @@ class RecommendationCatalogService internal constructor(
     }
 
     private fun CrispyBackendClient.MediaItem.toCatalogItem(): HomeCatalogItem? {
-        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+        val normalizedItemId = itemId.trim().ifBlank { return null }
         val normalizedTitle = title.trim().ifBlank { return null }
-        val normalizedType = mediaType.toCatalogType()
+        val normalizedType = itemType.toCatalogType()
         return HomeCatalogItem(
-            mediaKey = MediaKey(normalizedMediaKey),
+            itemId = normalizedItemId,
             title = normalizedTitle,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
@@ -310,10 +305,10 @@ class RecommendationCatalogService internal constructor(
     }
 
     private fun HomeCatalogItem.toCatalogItem(): CatalogItem? {
-        val normalizedMediaKey = mediaKey.value.trim().ifBlank { return null }
+        val normalizedItemId = itemId.trim().ifBlank { return null }
         return CatalogItem(
-            id = normalizedMediaKey,
-            mediaKey = normalizedMediaKey,
+            id = normalizedItemId,
+            itemId = normalizedItemId,
             title = title,
             posterUrl = posterUrl,
             backdropUrl = backdropUrl,
@@ -402,7 +397,7 @@ class RecommendationCatalogService internal constructor(
                                                 list.items.forEach { item ->
                                                     put(
                                                         JSONObject()
-                                                            .put("media_key", item.mediaKey.value)
+                                                            .put("item_id", item.itemId)
                                                             .put("title", item.title)
                                                             .put("poster_url", item.posterUrl)
                                                             .put("backdrop_url", item.backdropUrl)
@@ -474,15 +469,15 @@ class RecommendationCatalogService internal constructor(
     }
 
     private fun parseCachedItem(json: JSONObject): HomeCatalogItem? {
-        val mediaKey = json.optString("media_key").trim()
+        val itemId = json.optString("item_id").trim()
         val title = json.optString("title").trim()
         val addonId = json.optString("addon_id").trim()
         val type = json.optString("type").trim()
-        if (mediaKey.isBlank() || title.isBlank() || addonId.isBlank() || type.isBlank()) {
+        if (itemId.isBlank() || title.isBlank() || addonId.isBlank() || type.isBlank()) {
             return null
         }
         return HomeCatalogItem(
-            mediaKey = MediaKey(mediaKey),
+            itemId = itemId,
             title = title,
             posterUrl = json.optString("poster_url").trim().ifBlank { null },
             backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },
@@ -518,7 +513,7 @@ class RecommendationCatalogService internal constructor(
                     items =
                         feedPlan.heroResult.items.mapNotNull { hero ->
                             HomeHeroItem(
-                                id = hero.mediaKey.value,
+                                id = hero.itemId,
                                 title = hero.title,
                                 description = hero.description,
                                 rating = hero.rating,

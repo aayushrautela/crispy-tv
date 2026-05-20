@@ -4,8 +4,8 @@ import XCTest
 final class CalendarContractTests: XCTestCase {
     func testCalendarFixtures() throws {
         let fixtures = try FixtureLoader.listFixtureFiles(in: "calendar_contract")
-            .filter { $0.path.contains("/v3/") }
-        XCTAssertFalse(fixtures.isEmpty, "Expected at least one calendar_contract v3 fixture")
+            .filter { $0.path.contains("/v4/") }
+        XCTAssertFalse(fixtures.isEmpty, "Expected at least one calendar_contract v4 fixture")
 
         for fixtureURL in fixtures {
             let root = try FixtureLoader.readJSONObject(from: fixtureURL)

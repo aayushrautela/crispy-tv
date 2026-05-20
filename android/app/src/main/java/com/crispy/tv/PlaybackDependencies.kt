@@ -9,7 +9,6 @@ import com.crispy.tv.introskip.IntroSkipService
 import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
 import com.crispy.tv.metadata.RemoteSupabaseSyncLabService
-import com.crispy.tv.metadata.tmdb.TmdbServicesProvider
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.watchhistory.BackendWatchHistoryService
@@ -47,12 +46,10 @@ private class NativeTorrentResolver(context: Context) : TorrentResolver {
 
 private fun newMetadataResolver(context: Context): MetadataLabResolver {
     val appContext = context.applicationContext
-    val tmdbRepository = TmdbServicesProvider.metadataRecordRepository(appContext)
     return CoreDomainMetadataLabResolver(
         RemoteMetadataLabDataSource(
             context = appContext,
             addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-            tmdbRepository = tmdbRepository,
             httpClient = AppHttp.client(appContext),
         )
     )

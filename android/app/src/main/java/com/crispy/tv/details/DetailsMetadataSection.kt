@@ -33,8 +33,8 @@ internal fun buildDetailsRows(
     val production = titleDetail?.production
 
     if (
-        details.mediaType.equals("show", ignoreCase = true) ||
-            details.mediaType.equals("anime", ignoreCase = true)
+        details.itemType.equals("show", ignoreCase = true) ||
+            details.itemType.equals("anime", ignoreCase = true)
     ) {
         item?.status?.takeIf { it.isNotBlank() }?.let { rows += "STATUS" to it }
 

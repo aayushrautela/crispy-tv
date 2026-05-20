@@ -41,19 +41,19 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 class DetailsViewModel internal constructor(
-    private val mediaKey: String,
-    private val mediaType: String,
+    private val itemId: String,
+    private val itemType: String,
     private val runtimeEntry: RuntimeDetailsEntry?,
     private val detailsUseCases: DetailsUseCases,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DetailsUiState(mediaKey = mediaKey))
+    private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
     private val _navigationEvents = MutableSharedFlow<DetailsNavigationEvent>(extraBufferCapacity = 1)
     val navigationEvents: SharedFlow<DetailsNavigationEvent> = _navigationEvents.asSharedFlow()
 
     private val requestedMediaType: MetadataLabMediaType =
-        checkNotNull(mediaType.toMetadataLabMediaTypeOrNull()) { "Unsupported mediaType: $mediaType" }
+        checkNotNull(itemType.toMetadataLabMediaTypeOrNull()) { "Unsupported itemType: $itemType" }
 
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
@@ -113,7 +113,7 @@ class DetailsViewModel internal constructor(
             val result =
                 withContext(Dispatchers.IO) {
                     detailsUseCases.loadScreen(
-                        mediaKey = mediaKey,
+                        itemId = itemId,
                         requestedMediaType = requestedMediaType,
                         runtimeEntry = runtimeEntry,
                         nowMs = nowMs,
@@ -160,12 +160,12 @@ class DetailsViewModel internal constructor(
 
             val detailsForAi = enrichedDetails
             val aiLocale = Locale.getDefault()
-            val aiMediaKey = detailsForAi?.mediaKey?.trim()
+            val aiItemId = detailsForAi?.itemId?.trim()
 
-            if (!aiMediaKey.isNullOrBlank()) {
+            if (!aiItemId.isNullOrBlank()) {
                 val cached =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.loadCachedAiInsights(aiMediaKey, aiLocale)
+                        detailsUseCases.loadCachedAiInsights(aiItemId, aiLocale)
                     }
                 if (cached != null && isCurrentGeneration(generation)) {
                     _uiState.update { it.copy(aiInsights = cached) }
@@ -182,7 +182,7 @@ class DetailsViewModel internal constructor(
             viewModelScope.launch {
                 val result =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.loadExtras(mediaKey = mediaKey)
+                        detailsUseCases.loadExtras(itemId = itemId)
                     }
                 if (!isCurrentGeneration(generation)) return@launch
 
@@ -258,7 +258,7 @@ class DetailsViewModel internal constructor(
             viewModelScope.launch {
                 val result =
                     withContext(Dispatchers.IO) {
-                        detailsUseCases.loadRatings(mediaKey = mediaKey)
+                        detailsUseCases.loadRatings(itemId = itemId)
                     }
                 if (!isCurrentGeneration(generation)) return@launch
 
@@ -279,8 +279,8 @@ class DetailsViewModel internal constructor(
     fun onAiInsightsClick() {
         val state = uiState.value
         val details = state.details
-        val aiMediaKey = details?.mediaKey?.trim()
-        if (details == null || aiMediaKey.isNullOrBlank()) {
+        val aiItemId = details?.itemId?.trim()
+        if (details == null || aiItemId.isNullOrBlank()) {
             _uiState.update { it.copy(statusMessage = "AI insights aren't available for this title yet.") }
             return
         }
@@ -294,7 +294,7 @@ class DetailsViewModel internal constructor(
         if (state.aiIsLoading) return
 
         startAiGeneration(
-            mediaKey = aiMediaKey,
+            itemId = aiItemId,
             locale = Locale.getDefault(),
             showStory = true,
             announce = true,
@@ -306,7 +306,7 @@ class DetailsViewModel internal constructor(
     }
 
     private fun startAiGeneration(
-        mediaKey: String,
+        itemId: String,
         locale: Locale,
         showStory: Boolean,
         announce: Boolean,
@@ -323,7 +323,7 @@ class DetailsViewModel internal constructor(
                 runCatching {
                     withContext(Dispatchers.IO) {
                         detailsUseCases.generateAiInsights(
-                            mediaKey = mediaKey,
+                            itemId = itemId,
                             locale = locale,
                         )
                     }
@@ -439,7 +439,7 @@ class DetailsViewModel internal constructor(
     ) {
         val state = _uiState.value
         val details = state.details ?: return
-        if (details.mediaType.toMetadataLabMediaTypeOrNull()?.let { it != MetadataLabMediaType.MOVIE } != true) return
+        if (details.itemType.toMetadataLabMediaTypeOrNull()?.let { it != MetadataLabMediaType.MOVIE } != true) return
 
         val cached = if (!force) seasonEpisodesCache[season] else null
         if (cached != null) {
@@ -827,7 +827,7 @@ class DetailsViewModel internal constructor(
                 _uiState.update { it.copy(details = enriched) }
             }
 
-            val resolvedMediaType = enriched.mediaType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
+            val resolvedMediaType = enriched.itemType.toMetadataLabMediaTypeOrNull() ?: requestedMediaType
             val targetEpisode =
                 currentState.streamSelector.headerEpisode
                     ?: findEpisodeForLookupId(
@@ -862,8 +862,7 @@ class DetailsViewModel internal constructor(
             val yearInt = enriched.year?.trim()?.toIntOrNull()
 val identity =
             PlaybackIdentity(
-                mediaKey = enriched.mediaKey,
-                tmdbId = if (resolvedMediaType == MetadataLabMediaType.MOVIE) enriched.tmdbId ?: targetEpisode?.tmdbId else null,
+                itemId = enriched.itemId,
                 contentType = resolvedMediaType,
                 season = season,
                 episode = episode,
@@ -894,11 +893,11 @@ val identity =
                     launchSnapshot =
                         PlayerLaunchSnapshot(
                             contentId = enriched.id,
-                            mediaKey = enriched.mediaKey,
+                            itemId = enriched.itemId,
                             imdbId = enriched.imdbId,
                             seasonNumber = season,
                             episodeNumber = episode,
-                            mediaType = enriched.mediaType,
+                            itemType = enriched.itemType,
                             parentMediaType = enriched.parentMediaType ?: parentMediaType,
                             absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
                             title = enriched.title,
@@ -957,7 +956,7 @@ val identity =
 
     fun toggleWatched() {
         val details = uiState.value.details ?: return
-        val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        val mediaType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
         if (mediaType != MetadataLabMediaType.MOVIE) {
             _uiState.update { it.copy(statusMessage = "Marking an entire episodic title as watched isn't supported yet. Mark episodes from the episode list.") }
             return
@@ -974,7 +973,7 @@ val identity =
                 withContext(Dispatchers.IO) {
                     detailsUseCases.resolveProviderState(
                         details = result.details,
-                        itemId = mediaKey,
+                        itemId = itemId,
                         requestedMediaType = requestedMediaType,
                     )
                 }
@@ -1038,7 +1037,7 @@ val identity =
                 withContext(Dispatchers.IO) {
                     detailsUseCases.resolveProviderState(
                         details = result.details,
-                        itemId = mediaKey,
+                        itemId = itemId,
                         requestedMediaType = requestedMediaType,
                     )
                 }
@@ -1103,8 +1102,8 @@ val identity =
 
     companion object {
         internal fun factory(
-            mediaKey: String,
-            mediaType: String,
+            itemId: String,
+            itemType: String,
             runtimeEntry: RuntimeDetailsEntry?,
             detailsUseCases: DetailsUseCases,
         ): ViewModelProvider.Factory {
@@ -1112,8 +1111,8 @@ val identity =
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     return DetailsViewModel(
-                        mediaKey = mediaKey,
-                        mediaType = mediaType,
+                        itemId = itemId,
+                        itemType = itemType,
                         runtimeEntry = runtimeEntry,
                         detailsUseCases = detailsUseCases,
                     ) as T

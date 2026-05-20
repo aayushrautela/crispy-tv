@@ -1,6 +1,5 @@
 package com.crispy.tv.contracts
 
-import com.crispy.tv.domain.MediaKey
 import com.crispy.tv.domain.media.MediaStateNormalized
 import com.crispy.tv.domain.media.normalizeMediaStateCard
 import kotlinx.serialization.json.JsonObject
@@ -17,8 +16,8 @@ class MediaStateContractTest {
     @Test
     fun fixturesMatchMediaStateContract() {
         val fixturePaths = ContractTestSupport.fixtureFiles("media_state_contract")
-            .filter { it.toString().contains("/v4/") }
-        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one media_state_contract v4 fixture")
+            .filter { it.toString().contains("/v5/") }
+        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one media_state_contract v5 fixture")
 
         fixturePaths.forEach { path ->
             val fixture = ContractTestSupport.parseFixture(path)
@@ -50,9 +49,8 @@ class MediaStateContractTest {
     private fun parseNormalized(normalized: JsonObject, path: java.nio.file.Path): MediaStateNormalized {
         return MediaStateNormalized(
             cardFamily = normalized.optionalString("card_family", path),
-            mediaKey = normalized.optionalString("media_key", path)?.let(::MediaKey),
-            mediaType = normalized.optionalString("media_type", path),
             itemId = normalized.optionalString("item_id", path),
+            mediaType = normalized.optionalString("media_type", path),
             title = normalized.optionalString("title", path),
             posterUrl = normalized.optionalString("poster_url", path),
             backdropUrl = normalized.optionalString("backdrop_url", path),

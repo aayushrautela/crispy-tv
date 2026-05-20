@@ -5,27 +5,16 @@ This directory defines parity-critical behavior for the rewrite apps.
 The spec version documents the contract surface. Each suite owns its own
 `contract_version` and may evolve independently.
 
-## mediaKey Format
+## Item Identity
 
-All public media identifiers use the canonical format:
+All public media identifiers are opaque server-assigned item IDs.
+The app treats them as strings without parsing or deriving provider information.
+Server `BaseItemDto.Id`, `SeriesId`, `SeasonId`, and `UserData.ItemId` are all
+public item IDs (32-character lowercase dashless UUID hex for server-originated items).
 
-```
-{type}:{provider}:{id}
-```
-
-Where:
-- `type` is `movie`, `show`, `episode`, `person`, or `season`
-- `provider` is `tmdb`
-- `id` is the provider's numeric ID (for `episode`, followed by `:{season}:{episode}`)
-
-Examples:
-- Movie: `movie:tmdb:550`
-- Show: `show:tmdb:1399` (not `series`)
-- Person: `person:tmdb:287`
-- Episode: `episode:tmdb:500:1:3` (showId=500, S1:E3)
-
-The legacy format `{provider}:{type}:{id}` (e.g. `tmdb:series:1399`) has been
-replaced. All fixture inputs and expected outputs reflect the new format.
+Provider-derived strings like `movie:tmdb:550` are no longer public route identity.
+Local pre-server contracts (e.g. `home_catalogs` input snapshots) may still carry
+provider-key strings for planning purposes, but these are never sent to the server.
 
 ## Determinism Rules
 
@@ -53,12 +42,7 @@ replaced. All fixture inputs and expected outputs reflect the new format.
   - Time-sensitive comparisons use fixture-provided `now_ms`.
 - `trakt_scrobble_policy`
   - Deterministic Trakt scrobble decisions (endpoint + watched/progress flags) based on stage and progress.
-- `metadata_tmdb_enhancer`
-  - Derive season rows from valid episode metadata only when series metadata has no seasons.
-  - Derived seasons sort ascending, count valid episode rows, and keep the first non-blank release per season as `air_date`.
-  - Bridge candidate ids start with the normalized content id, append `:season:episode` suffixes when present, and add TMDB fallback ids from TMDB metadata when available.
-  - Bridge candidate ids dedupe case-insensitively while preserving first-seen order.
-- `omdb`
+- `trakt_scrobble_policy`
   - Normalize IMDb ids to trimmed lowercase `tt<digits>` form; invalid ids resolve to `null`.
   - Ignore blank and `N/A` fields case-insensitively.
   - Ratings dedupe by source case-insensitively while preserving first-seen order.
@@ -66,7 +50,7 @@ replaced. All fixture inputs and expected outputs reflect the new format.
 - `home_catalogs`
   - Plan home-screen hero shelves, header sections, discover catalog refs, and paged catalog results from deterministic snapshot input.
   - `contract_version` 3 removes `member_shared` and uses canonical section ids in the form `source:kind:variant_key`.
-  - `contract_version` 5 requires `media_key` on client-facing title items; provider identity is not part of client routing.
+  - `contract_version` 6 replaces `media_key` with opaque `item_id` on client-facing title items.
   - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
@@ -76,15 +60,7 @@ replaced. All fixture inputs and expected outputs reflect the new format.
   - Build deterministic addon catalog request URL variants from addon `base_url`, preserved manifest query params, media type, catalog id, pagination, and filters.
   - For first-page requests with no filters, try simple path first, then path-style extras, then legacy query style.
   - Path/query forms always include canonical `skip` and `limit`; filters trim blanks, drop empty entries, sort deterministically by key then value, and preserve duplicates.
-  - Generated URLs keep addon query parameters and percent-encode path/query components consistently.
-- `search_ranking_and_dedup`
-  - Normalize TMDB search results and preserve the upstream (TMDB) ordering.
-  - Include `person` results (no filtering).
-  - Type mapping: TMDB `movie` -> `movie`, TMDB `tv` -> `show`, TMDB `person` -> `person` (unknown media types are ignored).
-  - Dedupe key is `(type, tmdb_id)`; keep the first occurrence.
-  - `contract_version` 4 removes provider-derived route identity and emits opaque client `item_key` values. Title results use title-route keys, while people remain a separate route class with distinct keys.
-  - Image URLs use `w500` for movie/series posters and `h632` for person profiles.
-  - `year` is parsed from the first 4 digits of `release_date`/`first_air_date` when present; invalid/missing yields `null`.
+   - Generated URLs keep addon query parameters and percent-encode path/query components consistently.
 - `sync_planner`
   - Canonicalize shared (household) vs per-profile cloud payloads.
   - Pull planning: `get_household_addons` is allowed only when there are no unsynced household changes.
@@ -96,18 +72,22 @@ replaced. All fixture inputs and expected outputs reflect the new format.
   - Logical storage namespace/versioning and schema mismatch behavior.
 - `media_state_contract`
   - Validate exact backend payload-shape rules for client-facing runtime and card-like metadata surfaces.
-  - `contract_version` 4 migrated to raw `BaseItemDto` shapes (`Id`, `Type`, `Name`, `ImageTags`, `Genres`, `UserData`) with no `mediaItem`, `context`, or `presentation` wrappers.
+  - `contract_version` 5 migrated to server `PublicItemId` identity (32-character lowercase dashless UUID hex).
+    `BaseItemDto.Id`, `SeriesId`, `SeasonId`, and `UserData.ItemId` are all public item IDs.
+    Provider-derived strings like `movie:tmdb:550` are no longer public route identity.
   - Continue-watching items derive state from `UserData.PlayedPercentage` (progress), `UserData.LastPlayedDate` (activity), and `UserData.DismissedFromContinueWatching` (dismissible).
   - Watched items derive state from `UserData.LastPlayedDate`.
   - Search results, recommendations, and other card-like title metadata items are raw `BaseItemDto`.
-  - Title metadata routes use `/v1/metadata/titles/:mediaKey` and nested title-content routes hang off that same public key rather than internal ids.
+  - Title metadata routes use `/v1/metadata/items/:itemId`.
   - Home snapshot sections preserve exact backend `layout` values: `regular`, `landscape`, `collection`, `hero`.
 - `watch_collections_contract`
   - Validate public `/v1/profiles/:profileId/watch/*` responses against the server contract.
+  - `contract_version` 4 uses `PublicItemId` for all item identity.
   - Responses follow `BaseItemDtoQueryResult` shape: `Items`, `StartIndex`, `TotalRecordCount`, `NextCursor`, `HasMore`.
   - Items are raw `BaseItemDto` arrays; user state is embedded per-item in `UserData`.
 - `calendar_contract`
   - Validate public `/v1/profiles/:profileId/calendar` and `/calendar/this-week` responses against the server contract.
+  - `contract_version` 4 uses `PublicItemId` for all item identity.
   - Calendar envelopes: `profileId`, `source`, `generatedAt`, `items: BaseItemDto[]`.
   - Calendar items are raw `BaseItemDto` (no wrapper objects).
 
@@ -120,11 +100,13 @@ Breaking behavior changes are allowed when needed. For every affected suite:
 3) keep Android + Swift contract runners in lockstep
 4) include migration notes in the PR description
 
-### Migration: mediaKey Format (all suites, 2026-05)
+### Migration: Jellyfin-first identity (all suites, 2026-05)
 
-All suites migrated from legacy `{provider}:{type}:{id}` format
-(e.g. `tmdb:series:1399`) to `{type}:{provider}:{id}` (e.g. `show:tmdb:1399`).
-The `series` type was renamed to `show` to match the backend convention.
-Episode keys use `episode:tmdb:{showTmdbId}:{s}:{e}` instead of flat `tmdb:episode:{id}`.
-Affected fixtures updated their `mediaKey`/`media_key`/`item_key` values,
-expected `media_type` values, and schema enums.
+All suites migrated from provider-derived `mediaKey` strings to opaque server-assigned
+item IDs. The app no longer parses or constructs `{type}:{provider}:{id}` format strings.
+Server `BaseItemDto.Id`, `SeriesId`, `SeasonId`, and `UserData.ItemId` are all public
+item IDs. The TMDB provider stack was removed from normal app DI; provider IDs remain
+only as passive metadata in `ProviderIds`/`externalIds`.
+Home catalog fixtures now use `item_id` instead of `media_key`.
+The `search_ranking_and_dedup` contract was removed — it was a pre-server TMDB normalization
+contract and no longer has a runtime caller after TMDB provider removal.

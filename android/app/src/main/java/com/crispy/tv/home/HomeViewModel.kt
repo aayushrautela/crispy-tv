@@ -489,7 +489,7 @@ private fun CanonicalContinueWatchingItem.sectionKey(): String {
 }
 
 internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWideRailItemUi {
-    val isEpisode = mediaType.equals("episode", ignoreCase = true)
+    val isEpisode = itemType.equals("episode", ignoreCase = true)
     val displayTitle = if (isEpisode) {
         val seasonPart = season?.let { String.format(Locale.US, "S%02d", it) }
         val episodePart = episode?.let { String.format(Locale.US, "E%02d", it) }
@@ -593,11 +593,11 @@ class ContinueWatchingSuppressionStore(context: Context) {
 }
 
 internal fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): String {
-    return entry.titleMediaKey.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
+    return entry.titleItemId.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
 }
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
-    val isEpisode = mediaType.equals("episode", ignoreCase = true)
+    val isEpisode = itemType.equals("episode", ignoreCase = true)
     val showName = if (isEpisode) title?.takeIf { it.isNotBlank() } else null
     val seasonEpisode =
         if (!isEpisode && (type.equals("show", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {

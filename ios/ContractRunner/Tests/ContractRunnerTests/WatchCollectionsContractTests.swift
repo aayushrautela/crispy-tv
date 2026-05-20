@@ -4,8 +4,8 @@ import XCTest
 final class WatchCollectionsContractTests: XCTestCase {
     func testWatchCollectionFixtures() throws {
         let fixtures = try FixtureLoader.listFixtureFiles(in: "watch_collections_contract")
-            .filter { $0.path.contains("/v3/") }
-        XCTAssertFalse(fixtures.isEmpty, "Expected at least one watch_collections_contract v3 fixture")
+            .filter { $0.path.contains("/v4/") }
+        XCTAssertFalse(fixtures.isEmpty, "Expected at least one watch_collections_contract v4 fixture")
 
         for fixtureURL in fixtures {
             let root = try FixtureLoader.readJSONObject(from: fixtureURL)

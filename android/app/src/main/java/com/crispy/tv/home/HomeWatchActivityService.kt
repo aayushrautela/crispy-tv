@@ -46,10 +46,10 @@ class HomeWatchActivityService {
 private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
   return CanonicalContinueWatchingItem(
     id = entry.id.trim(),
-    titleMediaKey = entry.titleMediaKey,
-    playbackMediaKey = entry.playbackMediaKey,
+    titleItemId = entry.titleItemId,
+    playbackItemId = entry.playbackItemId,
     localKey = entry.localKey,
-    mediaType = entry.mediaType,
+    itemType = entry.itemType,
     title = entry.title,
     episodeTitle = entry.episodeTitle,
     season = entry.season,

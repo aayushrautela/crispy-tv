@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 3
+      "minimum": 5
     },
     "suite": {
       "const": "media_state_contract"
@@ -80,19 +80,13 @@
                 null
               ]
             },
-            "media_key": {
+            "item_id": {
               "type": [
                 "string",
                 "null"
               ]
             },
             "media_type": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "item_id": {
               "type": [
                 "string",
                 "null"

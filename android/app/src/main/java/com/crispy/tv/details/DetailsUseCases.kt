@@ -81,19 +81,19 @@ internal class DetailsUseCases(
     }
 
     suspend fun loadScreen(
-        mediaKey: String,
+        itemId: String,
         requestedMediaType: MetadataLabMediaType,
         runtimeEntry: RuntimeDetailsEntry?,
         nowMs: Long,
     ): DetailsScreenLoadResult {
-        val cacheKey = detailsCacheKey(mediaKey, requestedMediaType)
+        val cacheKey = detailsCacheKey(itemId, requestedMediaType)
         val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
         val accessToken = backendContext?.accessToken ?: session?.accessToken
         val profileId = backendContext?.profileId
         cachedBaseResults[cacheKey]?.takeIf { cached -> cached.details != null && accessToken != null }?.let { cached ->
             val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
-            val providerState = watchCtaResolver.resolveProviderState(cached.details, mediaKey)
+            val providerState = watchCtaResolver.resolveProviderState(cached.details, itemId)
             val ctaResolution = watchCtaResolver.resolveWatchCta(cached.details, providerState, nowMs)
             return cached.copy(
                 providerState = providerState,
@@ -104,14 +104,14 @@ internal class DetailsUseCases(
         val titleDetailResult =
             accessToken?.let {
                 runCatching {
-                    catalogRepository.getTitleDetail(accessToken = it, mediaKey = mediaKey)
+                    catalogRepository.getTitleDetail(accessToken = it, itemId = itemId)
                 }
             }
         val titleDetail = titleDetailResult?.getOrNull()
         val titleDetailError = titleDetailResult?.exceptionOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
-        val providerState = watchCtaResolver.resolveProviderState(details, mediaKey)
+        val providerState = watchCtaResolver.resolveProviderState(details, itemId)
         val ctaResolution = watchCtaResolver.resolveWatchCta(details, providerState, nowMs)
 
         val seasons = emptyList<Int>()
@@ -189,7 +189,7 @@ internal class DetailsUseCases(
     }
 
     suspend fun loadExtras(
-        mediaKey: String,
+        itemId: String,
     ): DetailsExtrasLoadResult {
         val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
@@ -197,21 +197,21 @@ internal class DetailsUseCases(
 
         val titleExtras =
             if (accessToken == null) {
-                Log.w(TAG, "Skipping title extras load: missing access token for mediaKey=$mediaKey")
+                Log.w(TAG, "Skipping title extras load: missing access token for itemId=$itemId")
                 null
             } else {
                 runCatching {
                     catalogRepository.getTitleExtras(
                         accessToken = accessToken,
-                        mediaKey = mediaKey,
+                        itemId = itemId,
                     )
                 }.onSuccess { extras ->
                     Log.d(
                         TAG,
-                        "Loaded title extras for mediaKey=$mediaKey seasons=${extras.seasons.size} episodes=${extras.episodes.size} reviews=${extras.reviews.size} similar=${extras.similar.size} hasCollection=${extras.collection != null}",
+                        "Loaded title extras for itemId=$itemId seasons=${extras.seasons.size} episodes=${extras.episodes.size} reviews=${extras.reviews.size} similar=${extras.similar.size} hasCollection=${extras.collection != null}",
                     )
                 }.onFailure { error ->
-                    Log.w(TAG, "Failed to load title extras for mediaKey=$mediaKey", error)
+                    Log.w(TAG, "Failed to load title extras for itemId=$itemId", error)
                 }.getOrNull()
             }
 
@@ -219,7 +219,7 @@ internal class DetailsUseCases(
     }
 
     suspend fun loadRatings(
-        mediaKey: String,
+        itemId: String,
     ): DetailsRatingsLoadResult {
         val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
         val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
@@ -232,7 +232,7 @@ internal class DetailsUseCases(
                     catalogRepository.getTitleRatings(
                         accessToken = it,
                         profileId = checkNotNull(profileId),
-                        mediaKey = mediaKey,
+                        itemId = itemId,
                     )
                 }.getOrNull()
             }
@@ -295,24 +295,24 @@ internal class DetailsUseCases(
     }
 
     private fun detailsCacheKey(
-        mediaKey: String,
+        itemId: String,
         requestedMediaType: MetadataLabMediaType,
     ): String {
-        return "${requestedMediaType.name.lowercase(Locale.US)}:${mediaKey.trim()}"
+        return "${requestedMediaType.name.lowercase(Locale.US)}:${itemId.trim()}"
     }
 
     fun loadCachedAiInsights(
-        mediaKey: String,
+        itemId: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult? {
-        return aiRepository.loadCached(mediaKey, locale)
+        return aiRepository.loadCached(itemId, locale)
     }
 
     suspend fun generateAiInsights(
-        mediaKey: String,
+        itemId: String,
         locale: Locale = Locale.getDefault(),
     ): AiInsightsResult {
-        return aiRepository.generate(mediaKey, locale)
+        return aiRepository.generate(itemId, locale)
     }
 
     suspend fun loadStreams(
@@ -345,13 +345,13 @@ suspend fun updateWatchlist(
     details: MediaDetails,
     desired: Boolean,
 ): DetailsMutationResult {
-    val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+    val itemId = details.itemId?.trim()?.ifBlank { null }
         ?: return DetailsMutationResult(
             details = details,
             success = false,
-            statusMessage = "Title media key is unavailable.",
+            statusMessage = "Title item id is unavailable.",
         )
-    val result = userMediaRepository.setTitleInWatchlist(mediaKey, desired)
+    val result = userMediaRepository.setTitleInWatchlist(itemId, desired)
     return DetailsMutationResult(
         details = details,
         success = mutationSucceeded(result),
@@ -392,10 +392,10 @@ suspend fun updateEpisodeWatched(
         success = false,
         statusMessage = "Episode metadata is incomplete.",
     )
-    val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
+    val contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
     val request =
         WatchHistoryRequest(
-            mediaKey = details.mediaKey,
+            itemId = details.itemId,
             contentType = contentType,
             title = details.title,
             season = season,
@@ -419,13 +419,13 @@ suspend fun updateRating(
     details: MediaDetails,
     rating: Int?,
 ): DetailsMutationResult {
-    val mediaKey = details.mediaKey?.trim()?.ifBlank { null }
+    val itemId = details.itemId?.trim()?.ifBlank { null }
         ?: return DetailsMutationResult(
             details = details,
             success = false,
-            statusMessage = "Title media key is unavailable.",
+            statusMessage = "Title item id is unavailable.",
         )
-    val result = userMediaRepository.setTitleRating(mediaKey, rating)
+    val result = userMediaRepository.setTitleRating(itemId, rating)
     return DetailsMutationResult(
         details = details,
         success = mutationSucceeded(result),
@@ -434,9 +434,9 @@ suspend fun updateRating(
 }
 
 private fun buildTitleWatchHistoryRequest(details: MediaDetails): WatchHistoryRequest {
-    val contentType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+    val contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
     return WatchHistoryRequest(
-        mediaKey = details.mediaKey,
+        itemId = details.itemId,
         contentType = contentType,
         title = details.title,
         absoluteEpisodeNumber = details.absoluteEpisodeNumber,

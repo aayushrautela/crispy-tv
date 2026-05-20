@@ -18,10 +18,10 @@ class DefaultUserMediaRepository(
     }
 
     override suspend fun getTitleWatchState(
-        mediaKey: String,
+        itemId: String,
         contentType: MetadataLabMediaType,
     ): CanonicalWatchStateSnapshot? {
-        return watchHistoryService.getTitleWatchState(mediaKey, contentType)
+        return watchHistoryService.getTitleWatchState(itemId, contentType)
     }
 
     override suspend fun getCanonicalContinueWatching(
@@ -58,10 +58,10 @@ class DefaultUserMediaRepository(
     }
 
     override suspend fun setTitleInWatchlist(
-        mediaKey: String,
+        itemId: String,
         inWatchlist: Boolean,
     ): WatchHistoryResult {
-        return watchHistoryService.setTitleInWatchlist(mediaKey, inWatchlist)
+        return watchHistoryService.setTitleInWatchlist(itemId, inWatchlist)
     }
 
     override suspend fun setRating(
@@ -72,9 +72,9 @@ class DefaultUserMediaRepository(
     }
 
     override suspend fun setTitleRating(
-        mediaKey: String,
+        itemId: String,
         rating: Int?,
     ): WatchHistoryResult {
-        return watchHistoryService.setTitleRating(mediaKey, rating)
+        return watchHistoryService.setTitleRating(itemId, rating)
     }
 }

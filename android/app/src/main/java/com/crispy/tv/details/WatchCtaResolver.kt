@@ -37,8 +37,8 @@ internal class WatchCtaResolver(
         details: MediaDetails?,
         itemId: String,
     ): ProviderState {
-        val mediaKey = details?.mediaKey?.trim()?.ifBlank { null } ?: itemId.trim().ifBlank { null }
-        if (mediaKey == null) {
+        val lookupId = details?.itemId?.trim()?.ifBlank { null } ?: itemId.trim().ifBlank { null }
+        if (lookupId == null) {
             return ProviderState(
                 isWatched = false,
                 watchedAtEpochMs = null,
@@ -48,7 +48,7 @@ internal class WatchCtaResolver(
             )
         }
 
-        val snapshot = userMediaRepository.getTitleWatchState(mediaKey, requestedMediaType)
+        val snapshot = userMediaRepository.getTitleWatchState(itemId, requestedMediaType)
         return if (snapshot == null) {
             ProviderState(
                 isWatched = false,
@@ -74,8 +74,8 @@ suspend fun resolveContinueWatchingEntry(
     nowMs: Long,
   ): CanonicalContinueWatchingItem? {
     val targetId = details.id.trim().lowercase(Locale.US)
-    val targetMediaKey = details.mediaKey?.trim()?.lowercase(Locale.US)
-    if (targetId.isBlank() && targetMediaKey.isNullOrBlank()) {
+    val targetItemId = details.itemId?.trim()?.lowercase(Locale.US)
+    if (targetId.isBlank() && targetItemId.isNullOrBlank()) {
       return null
     }
 
@@ -84,11 +84,11 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
   return snapshot.entries
     .asSequence()
     .filter { entry ->
-      val entryMediaKey = entry.titleMediaKey.trim().lowercase(Locale.US)
+      val entryItemId = entry.titleItemId.trim().lowercase(Locale.US)
       val entryId = entry.id.trim().lowercase(Locale.US)
       val matchesIdentity =
         when {
-          !targetMediaKey.isNullOrBlank() -> entryMediaKey == targetMediaKey || entryId == targetMediaKey
+          !targetItemId.isNullOrBlank() -> entryItemId == targetItemId || entryId == targetItemId
           else -> entryId == targetId
         }
       matchesIdentity &&
@@ -139,11 +139,9 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
 
             val continueVideoId =
                 if (isSeries && continueSeason != null && continueEpisode != null) {
-                    com.crispy.tv.playback.buildEpisodeLookupId(
-                        details = details,
-                        season = continueSeason,
-                        episode = continueEpisode,
-                    )
+                    details.videos.firstOrNull {
+                        it.season == continueSeason && it.episode == continueEpisode
+                    }?.id
                 } else {
                     null
                 }

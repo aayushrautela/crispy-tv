@@ -1,0 +1,84 @@
+{
+  "contract_version": 5,
+  "suite": "media_state_contract",
+  "case_id": "watched_item_matches_server_contract",
+  "input": {
+    "kind": "watched_item",
+    "payload": {
+      "Id": "f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6",
+      "Type": "Movie",
+      "Name": "Watched Movie",
+      "OriginalTitle": null,
+      "Overview": null,
+      "Taglines": [],
+      "ProductionYear": null,
+      "PremiereDate": null,
+      "CommunityRating": null,
+      "OfficialRating": null,
+      "Certification": null,
+      "Genres": [],
+      "RunTimeTicks": null,
+      "Status": null,
+      "ProviderIds": {
+        "Tmdb": null,
+        "Imdb": null,
+        "Tvdb": null
+      },
+      "ImageTags": {
+        "Primary": {
+          "medium": "https://example.com/poster.jpg",
+          "small": null,
+          "large": null
+        },
+        "Backdrop": [],
+        "Logo": null,
+        "Thumb": null,
+        "Screenshot": []
+      },
+      "ParentImageTags": null,
+      "SeriesId": null,
+      "SeriesName": null,
+      "SeasonId": null,
+      "SeasonName": null,
+      "ParentIndexNumber": null,
+      "IndexNumber": null,
+      "AbsoluteIndexNumber": null,
+      "EpisodeTitle": null,
+      "AirDate": null,
+      "RemoteTrailers": [],
+      "PosterColor": null,
+      "BackdropColor": null,
+      "UserData": {
+        "ItemId": "f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6",
+        "IsFavorite": null,
+        "Played": true,
+        "PlayCount": 1,
+        "PlaybackPositionTicks": null,
+        "RuntimeTicks": null,
+        "PlayedPercentage": null,
+        "LastPlayedDate": "2024-01-10T18:30:00Z",
+        "Rating": null,
+        "DismissedFromContinueWatching": null
+      }
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "item_id": "f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6",
+      "media_type": "Movie",
+      "title": "Watched Movie",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": "2024-01-10T18:30:00Z",
+      "last_activity_at": null,
+      "origins": [],
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

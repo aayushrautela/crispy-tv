@@ -89,8 +89,8 @@ class CrispyBackendClient(
     )
 
     data class MediaItem(
-        val mediaKey: String,
-        val mediaType: String,
+        val itemId: String,
+        val itemType: String,
         val title: String,
         val originalTitle: String?,
         val overview: String?,
@@ -174,13 +174,12 @@ class CrispyBackendClient(
     )
 
     data class SearchSuggestionItem(
-        val tmdbId: Int,
-        val mediaType: String,
+        val itemId: String,
+        val itemType: String,
         val title: String,
         val year: Int?,
-        val posterPath: String?,
-        val popularity: Double,
-        val overview: String?,
+        val posterUrl: String?,
+        val providerIds: MediaExternalIds,
     )
 
     data class SearchSuggestionsResponse(
@@ -294,10 +293,8 @@ class CrispyBackendClient(
     )
 
     data class MetadataEpisodePreview(
-        val mediaKey: String,
-        val mediaType: String,
-        val tmdbId: Int?,
-        val showTmdbId: Int?,
+        val itemId: String,
+        val itemType: String,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -309,15 +306,13 @@ class CrispyBackendClient(
         val images: MetadataImages,
     ) {
         val id: String
-            get() = mediaKey
+            get() = itemId
     }
 
     data class MetadataView(
-        val mediaKey: String,
-        val mediaType: String,
+        val itemId: String,
+        val itemType: String,
         val kind: String,
-        val tmdbId: Int?,
-        val showTmdbId: Int?,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -339,12 +334,11 @@ class CrispyBackendClient(
         val nextEpisode: MetadataEpisodePreview?,
     ) {
         val id: String
-            get() = mediaKey
+            get() = itemId
     }
 
     data class MetadataSeasonView(
-        val mediaKey: String,
-        val showTmdbId: Int?,
+        val itemId: String,
         val seasonNumber: Int,
         val title: String?,
         val summary: String?,
@@ -353,14 +347,12 @@ class CrispyBackendClient(
         val posterUrl: String?,
     ) {
         val id: String
-            get() = mediaKey
+            get() = itemId
     }
 
     data class MetadataEpisodeView(
-        val mediaKey: String,
-        val mediaType: String,
-        val tmdbId: Int?,
-        val showTmdbId: Int?,
+        val itemId: String,
+        val itemType: String,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -370,15 +362,15 @@ class CrispyBackendClient(
         val runtimeMinutes: Int?,
         val rating: Double?,
         val images: MetadataImages,
-        val showMediaKey: String?,
+        val showItemId: String?,
         val showTitle: String?,
         val showExternalIds: MetadataExternalIds,
     ) {
         val id: String
-            get() = mediaKey
+            get() = itemId
 
         val showId: String?
-            get() = showMediaKey
+            get() = showItemId
     }
 
     data class MetadataResolveResponse(
@@ -405,11 +397,9 @@ class CrispyBackendClient(
 
     data class MetadataCardView(
         val id: String?,
-        val mediaKey: String?,
-        val mediaType: String,
+        val itemId: String?,
+        val itemType: String,
         val kind: String,
-        val tmdbId: Int?,
-        val showTmdbId: Int?,
         val absoluteEpisodeNumber: Int?,
         val seasonNumber: Int?,
         val episodeNumber: Int?,
@@ -515,16 +505,15 @@ class CrispyBackendClient(
     )
 
     data class MetadataPersonKnownForItem(
-        val mediaKey: String,
-        val mediaType: String,
-        val tmdbId: Int?,
+        val itemId: String,
+        val itemType: String,
         val title: String,
         val posterUrl: String?,
         val rating: Double?,
         val releaseYear: Int?,
     ) {
         val id: String
-            get() = mediaKey
+            get() = itemId
     }
 
     data class MetadataPersonDetail(
@@ -665,13 +654,13 @@ class CrispyBackendClient(
     suspend fun getAiInsights(
         accessToken: String,
         profileId: String,
-        mediaKey: String,
+        itemId: String,
         locale: String? = null,
     ): AiInsightsResponse {
         return getAiInsightsApi(
             accessToken = accessToken,
             profileId = profileId,
-            mediaKey = mediaKey,
+            itemId = itemId,
             locale = locale,
         )
     }
@@ -680,27 +669,27 @@ class CrispyBackendClient(
         return disconnectImportConnectionApi(accessToken, profileId, provider)
     }
 
-    suspend fun resolveMetadata(accessToken: String, input: MediaLookupInput): MetadataResolveResponse {
+    suspend fun resolveMetadata(accessToken: String, input: ItemLookupInput): MetadataResolveResponse {
         return resolveMetadataApi(accessToken, input)
     }
 
-    suspend fun getMetadataTitleDetail(accessToken: String, mediaKey: String): MetadataTitleDetailResponse {
-        return getMetadataTitleDetailApi(accessToken, mediaKey)
+    suspend fun getMetadataItemDetail(accessToken: String, itemId: String): MetadataTitleDetailResponse {
+        return getMetadataItemDetailApi(accessToken, itemId)
     }
 
-    suspend fun getMetadataTitleExtras(accessToken: String, mediaKey: String): MetadataTitleExtrasResponse {
-        return getMetadataTitleExtrasApi(accessToken, mediaKey)
+    suspend fun getMetadataItemExtras(accessToken: String, itemId: String): MetadataTitleExtrasResponse {
+        return getMetadataItemExtrasApi(accessToken, itemId)
     }
 
-    suspend fun getMetadataTitleRatings(
+    suspend fun getMetadataItemRatings(
         accessToken: String,
         profileId: String,
-        mediaKey: String,
+        itemId: String,
     ): MetadataTitleRatingsResponse {
-        return getMetadataTitleRatingsApi(
+        return getMetadataItemRatingsApi(
             accessToken = accessToken,
             profileId = profileId,
-            mediaKey = mediaKey,
+            itemId = itemId,
         )
     }
 
@@ -709,12 +698,17 @@ class CrispyBackendClient(
     }
 
 
-    suspend fun resolvePlayback(accessToken: String, input: MediaLookupInput): PlaybackResolveResponse {
+    suspend fun resolvePlayback(accessToken: String, input: ItemLookupInput): PlaybackResolveResponse {
         return resolvePlaybackApi(accessToken, input)
     }
 
-    suspend fun getRecommendations(accessToken: String, profileId: String): RecommendationsResponse? {
-        return getRecommendationsApi(accessToken, profileId)
+    suspend fun getHome(
+        accessToken: String,
+        profileId: String,
+        sourceKey: String? = null,
+        algorithmVersion: String? = null,
+    ): RecommendationsResponse? {
+        return getHomeApi(accessToken, profileId, sourceKey, algorithmVersion)
     }
 
     suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse {
@@ -769,16 +763,16 @@ class CrispyBackendClient(
         return listRatingsApi(accessToken, profileId, limit, cursor)
     }
 
-    suspend fun getWatchState(accessToken: String, profileId: String, mediaKey: String): WatchStateEnvelope {
-        return getWatchStateApi(accessToken, profileId, mediaKey)
+    suspend fun getWatchState(accessToken: String, profileId: String, itemId: String): WatchStateEnvelope {
+        return getWatchStateApi(accessToken, profileId, itemId)
     }
 
     suspend fun getWatchStates(
         accessToken: String,
         profileId: String,
-        mediaKeys: List<String>,
+        itemIds: List<String>,
     ): WatchStatesEnvelope {
-        return getWatchStatesApi(accessToken, profileId, mediaKeys)
+        return getWatchStatesApi(accessToken, profileId, itemIds)
     }
 
     suspend fun markWatched(accessToken: String, profileId: String, input: WatchMutationInput): WatchActionResponse {
@@ -789,46 +783,46 @@ class CrispyBackendClient(
         return unmarkWatchedApi(accessToken, profileId, input)
     }
 
-    suspend fun putNativeWatchlist(
+    suspend fun putWatchlist(
         accessToken: String,
         profileId: String,
-        mediaKey: String,
+        itemId: String,
         occurredAt: String? = null,
         payload: Map<String, Any?> = emptyMap(),
     ): WatchActionResponse {
-        return putNativeWatchlistApi(
+        return putWatchlistApi(
             accessToken = accessToken,
             profileId = profileId,
-            mediaKey = mediaKey,
+            itemId = itemId,
             occurredAt = occurredAt,
             payload = payload,
         )
     }
 
-    suspend fun deleteNativeWatchlist(accessToken: String, profileId: String, mediaKey: String): WatchActionResponse {
-        return deleteNativeWatchlistApi(accessToken, profileId, mediaKey)
+    suspend fun deleteWatchlist(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
+        return deleteWatchlistApi(accessToken, profileId, itemId)
     }
 
-    suspend fun putNativeRating(
+    suspend fun putRating(
         accessToken: String,
         profileId: String,
-        mediaKey: String,
+        itemId: String,
         rating: Int,
         occurredAt: String? = null,
         payload: Map<String, Any?> = emptyMap(),
     ): WatchActionResponse {
-        return putNativeRatingApi(
+        return putRatingApi(
             accessToken = accessToken,
             profileId = profileId,
-            mediaKey = mediaKey,
+            itemId = itemId,
             rating = rating,
             occurredAt = occurredAt,
             payload = payload,
         )
     }
 
-    suspend fun deleteNativeRating(accessToken: String, profileId: String, mediaKey: String): WatchActionResponse {
-        return deleteNativeRatingApi(accessToken, profileId, mediaKey)
+    suspend fun deleteRating(accessToken: String, profileId: String, itemId: String): WatchActionResponse {
+        return deleteRatingApi(accessToken, profileId, itemId)
     }
 
     internal fun checkConfigured() {
@@ -892,40 +886,18 @@ class CrispyBackendClient(
     internal val jsonMediaType
         get() = JSON_MEDIA_TYPE
 
-    internal fun metadataLookupUrl(
-        path: String,
-        input: MediaLookupInput,
-    ) = path.toHttpUrl().newBuilder()
-        .apply {
-            if (!input.mediaKey.isNullOrBlank()) addQueryParameter("mediaKey", input.mediaKey.trim())
-            if (!input.mediaType.isNullOrBlank()) addQueryParameter("mediaType", input.mediaType.trim())
-            if (input.tmdbId != null) addQueryParameter("tmdbId", input.tmdbId.toString())
-            if (input.seasonNumber != null) addQueryParameter("seasonNumber", input.seasonNumber.toString())
-            if (input.episodeNumber != null) addQueryParameter("episodeNumber", input.episodeNumber.toString())
-        }
-        .build()
-
     private companion object {
         private const val CALL_TIMEOUT_MS = 45_000L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
 
-data class MediaLookupInput(
-    val mediaKey: String? = null,
-    val mediaType: String? = null,
-    val tmdbId: Int? = null,
-    val showTmdbId: Int? = null,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
+data class ItemLookupInput(
+    val itemId: String? = null,
 )
 
 data class WatchMutationInput(
-    val mediaKey: String? = null,
-    val mediaType: String,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val absoluteEpisodeNumber: Int? = null,
+    val itemId: String,
     val occurredAt: String? = null,
     val rating: Int? = null,
     val payload: Map<String, Any?> = emptyMap(),
@@ -934,11 +906,7 @@ data class WatchMutationInput(
 data class PlaybackEventInput(
     val clientEventId: String,
     val eventType: String,
-    val mediaKey: String? = null,
-    val mediaType: String,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val absoluteEpisodeNumber: Int? = null,
+    val itemId: String,
     val positionSeconds: Double? = null,
     val durationSeconds: Double? = null,
     val occurredAt: String? = null,

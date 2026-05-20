@@ -8,27 +8,27 @@ class DefaultCatalogRepository(
 ) : CatalogRepository {
     override suspend fun getTitleDetail(
         accessToken: String,
-        mediaKey: String,
+        itemId: String,
     ): CrispyBackendClient.MetadataTitleDetailResponse {
-        return backendClient.getMetadataTitleDetail(accessToken = accessToken, mediaKey = mediaKey)
+        return backendClient.getMetadataItemDetail(accessToken = accessToken, itemId = itemId)
     }
 
     override suspend fun getTitleExtras(
         accessToken: String,
-        mediaKey: String,
+        itemId: String,
     ): CrispyBackendClient.MetadataTitleExtrasResponse {
-        return backendClient.getMetadataTitleExtras(accessToken = accessToken, mediaKey = mediaKey)
+        return backendClient.getMetadataItemExtras(accessToken = accessToken, itemId = itemId)
     }
 
     override suspend fun getTitleRatings(
         accessToken: String,
         profileId: String,
-        mediaKey: String,
+        itemId: String,
     ): CrispyBackendClient.MetadataTitleRatingsResponse {
-        return backendClient.getMetadataTitleRatings(
+        return backendClient.getMetadataItemRatings(
             accessToken = accessToken,
             profileId = profileId,
-            mediaKey = mediaKey,
+            itemId = itemId,
         )
     }
 }

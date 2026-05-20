@@ -14,8 +14,8 @@ object AppRoutes {
     const val SettingsRoute = "settings"
 
     const val HomeDetailsRoute = "home/details"
-    const val HomeDetailsMediaKeyArg = "mediaKey"
-    const val HomeDetailsMediaTypeArg = "mediaType"
+    const val HomeDetailsItemIdArg = "itemId"
+    const val HomeDetailsItemTypeArg = "itemType"
     const val HomeDetailsHighlightEpisodeIdArg = "highlightEpisodeId"
     const val HomeDetailsAutoOpenEpisodeArg = "autoOpenEpisode"
     const val HomeDetailsRuntimeSeasonNumberArg = "runtimeSeasonNumber"
@@ -35,9 +35,9 @@ object AppRoutes {
     const val CatalogIdArg = "catalogId"
     const val CatalogTitleArg = "title"
 
-    // Details: mediaKey is the public title identity route segment.
+    // Details: itemId is the public title identity route segment.
     val HomeDetailsRoutePattern: String =
-        "$HomeDetailsRoute/{$HomeDetailsMediaTypeArg}/{$HomeDetailsMediaKeyArg}" +
+        "$HomeDetailsRoute/{$HomeDetailsItemTypeArg}/{$HomeDetailsItemIdArg}" +
             "?$HomeDetailsHighlightEpisodeIdArg={$HomeDetailsHighlightEpisodeIdArg}" +
             "&$HomeDetailsAutoOpenEpisodeArg={$HomeDetailsAutoOpenEpisodeArg}" +
             "&$HomeDetailsRuntimeSeasonNumberArg={$HomeDetailsRuntimeSeasonNumberArg}" +
@@ -50,15 +50,15 @@ object AppRoutes {
             "?$CatalogTitleArg={$CatalogTitleArg}"
 
     fun homeDetailsRoute(
-        mediaKey: String,
-        mediaType: String,
+        itemId: String,
+        itemType: String,
         seasonNumber: Int? = null,
         episodeNumber: Int? = null,
         absoluteEpisodeNumber: Int? = null,
         highlightEpisodeId: String? = null,
         autoOpenEpisode: Boolean = false,
     ): String {
-        return "$HomeDetailsRoute/${Uri.encode(mediaType.trim())}/${Uri.encode(mediaKey.trim())}" +
+        return "$HomeDetailsRoute/${Uri.encode(itemType.trim())}/${Uri.encode(itemId.trim())}" +
             "?$HomeDetailsHighlightEpisodeIdArg=${Uri.encode(highlightEpisodeId.orEmpty())}" +
             "&$HomeDetailsAutoOpenEpisodeArg=${autoOpenEpisode}" +
             "&$HomeDetailsRuntimeSeasonNumberArg=${seasonNumber?.toString().orEmpty()}" +

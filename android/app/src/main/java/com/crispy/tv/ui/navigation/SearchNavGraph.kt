@@ -15,8 +15,8 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
                 } else {
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
-                            mediaKey = item.mediaKey,
-                            mediaType = item.type,
+                            itemId = item.itemId,
+                            itemType = item.type,
                         )
                     )
                 }

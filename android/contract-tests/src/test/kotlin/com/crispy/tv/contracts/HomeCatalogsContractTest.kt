@@ -1,6 +1,5 @@
 package com.crispy.tv.contracts
 
-import com.crispy.tv.domain.MediaKey
 import com.crispy.tv.domain.home.HomeCatalogDiscoverRef
 import com.crispy.tv.domain.home.HomeCatalogHeroItem
 import com.crispy.tv.domain.home.HomeCatalogHeroResult
@@ -101,7 +100,7 @@ class HomeCatalogsContractTest {
 
     private fun parseItem(json: JsonObject, path: Path): HomeCatalogItem {
         return HomeCatalogItem(
-            mediaKey = MediaKey(json.requireString("media_key", path)),
+            itemId = json.requireString("item_id", path),
             title = json.requireString("title", path),
             posterUrl = json.optionalString("poster_url", path),
             backdropUrl = json.optionalString("backdrop_url", path),
@@ -131,7 +130,7 @@ class HomeCatalogsContractTest {
 
     private fun parseHeroItem(json: JsonObject, path: Path): HomeCatalogHeroItem {
         return HomeCatalogHeroItem(
-            mediaKey = MediaKey(json.requireString("media_key", path)),
+            itemId = json.requireString("item_id", path),
             title = json.requireString("title", path),
             description = json.requireString("description", path),
             rating = json.optionalString("rating", path),

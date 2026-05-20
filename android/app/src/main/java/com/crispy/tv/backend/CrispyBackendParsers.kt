@@ -185,24 +185,27 @@ internal fun CrispyBackendClient.parseSearchSuggestionItems(array: JSONArray?): 
 }
 
 internal fun CrispyBackendClient.parseSearchSuggestionItem(json: JSONObject): SearchSuggestionItem {
-    val tmdbId = json.optIntOrNull("tmdbId")
-        ?: throw IllegalStateException("Search suggestion is missing tmdbId.")
-    val mediaType = json.optString("mediaType").trim().lowercase()
-    if (mediaType != "movie" && mediaType != "tv") {
-        throw IllegalStateException("Search suggestion has invalid mediaType: $mediaType")
+    val itemId = json.optNullableString("Id")
+    if (itemId.isNullOrBlank()) {
+        throw IllegalStateException("Search suggestion is missing Id.")
     }
-    val title = json.optString("title").trim()
-    if (title.isBlank()) {
+    val type = json.optNullableString("Type")
+    if (type.isNullOrBlank()) {
+        throw IllegalStateException("Search suggestion is missing Type.")
+    }
+    val title = json.optNullableString("Name")
+    if (title.isNullOrBlank()) {
         throw IllegalStateException("Search suggestion is missing title.")
     }
+    val imageTags = json.optJSONObject("ImageTags")
+    val primaryImage = imageTags?.optJSONObject("Primary")
     return SearchSuggestionItem(
-        tmdbId = tmdbId,
-        mediaType = mediaType,
+        itemId = itemId,
+        itemType = parseMediaItemType(type),
         title = title,
-        year = json.optIntOrNull("year"),
-        posterPath = json.optNullableString("posterPath"),
-        popularity = json.optDouble("popularity", 0.0),
-        overview = json.optNullableString("overview"),
+        year = json.optIntOrNull("ProductionYear"),
+        posterUrl = primaryImage?.optNullableString("medium") ?: primaryImage?.optNullableString("large") ?: primaryImage?.optNullableString("small"),
+        providerIds = parseProviderIds(json.optJSONObject("ProviderIds")),
     )
 }
 
@@ -219,17 +222,17 @@ internal fun CrispyBackendClient.parseMediaItems(array: JSONArray?): List<MediaI
 }
 
 internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
-    val mediaKey = json.optNullableString("Id")
+    val itemId = json.optNullableString("Id")
     val type = json.optNullableString("Type")
     val name = json.optNullableString("Name")
-    if (mediaKey.isNullOrBlank() || type.isNullOrBlank() || name.isNullOrBlank()) {
+    if (itemId.isNullOrBlank() || type.isNullOrBlank() || name.isNullOrBlank()) {
         throw IllegalStateException("BaseItemDto is missing required identity fields.")
     }
     val imageTags = json.optJSONObject("ImageTags")
     val taglines = json.optStringList("Taglines")
     return MediaItem(
-        mediaKey = mediaKey,
-        mediaType = parseMediaItemType(type),
+        itemId = itemId,
+        itemType = parseMediaItemType(type),
         title = name,
         originalTitle = json.optNullableString("OriginalTitle"),
         overview = json.optNullableString("Overview"),
@@ -418,11 +421,9 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
     val item = parseMediaItem(json)
     val imageTags = json.optJSONObject("ImageTags")
     return MetadataView(
-        mediaKey = item.mediaKey,
-        mediaType = item.mediaType,
+        itemId = item.itemId,
+        itemType = item.itemType,
         kind = "metadata_detail",
-        tmdbId = item.externalIds.tmdb,
-        showTmdbId = item.seriesId?.trim()?.toIntOrNull(),
         absoluteEpisodeNumber = item.absoluteEpisodeNumber,
         seasonNumber = item.seasonNumber,
         episodeNumber = item.episodeNumber,
@@ -468,12 +469,10 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject):
     val item = parseMediaItem(json)
     val imageTags = json.optJSONObject("ImageTags")
     return MetadataCardView(
-        id = item.mediaKey,
-        mediaKey = item.mediaKey,
-        mediaType = item.mediaType,
+        id = item.itemId,
+        itemId = item.itemId,
+        itemType = item.itemType,
         kind = "metadata_detail",
-        tmdbId = item.externalIds.tmdb,
-        showTmdbId = item.seriesId?.trim()?.toIntOrNull(),
         absoluteEpisodeNumber = item.absoluteEpisodeNumber,
         seasonNumber = item.seasonNumber,
         episodeNumber = item.episodeNumber,
@@ -506,15 +505,14 @@ internal fun CrispyBackendClient.parseMetadataSeasonViews(array: JSONArray?): Li
 }
 
 internal fun CrispyBackendClient.parseMetadataSeasonView(json: JSONObject): MetadataSeasonView {
-    val mediaKey = json.optNullableString("Id")
+    val itemId = json.optNullableString("Id")
     val seasonNumber = json.optIntOrNull("IndexNumber")
-    if (mediaKey.isNullOrBlank() || seasonNumber == null) {
+    if (itemId.isNullOrBlank() || seasonNumber == null) {
         throw IllegalStateException("Backend season view is missing required fields.")
     }
     val imageTags = json.optJSONObject("ImageTags")
     return MetadataSeasonView(
-        mediaKey = mediaKey,
-        showTmdbId = json.optNullableString("SeriesId")?.trim()?.toIntOrNull(),
+        itemId = itemId,
         seasonNumber = seasonNumber,
         title = json.optNullableString("Name"),
         summary = json.optNullableString("Overview"),
@@ -535,17 +533,15 @@ internal fun CrispyBackendClient.parseMetadataEpisodeViews(array: JSONArray?): L
 }
 
 internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): MetadataEpisodeView {
-    val mediaKey = json.optNullableString("Id")
-    if (mediaKey.isNullOrBlank()) {
+    val itemId = json.optNullableString("Id")
+    if (itemId.isNullOrBlank()) {
         throw IllegalStateException("Backend episode view is missing Id.")
     }
     val imageTags = json.optJSONObject("ImageTags")
     val providerIds = parseProviderIds(json.optJSONObject("ProviderIds"))
     return MetadataEpisodeView(
-        mediaKey = mediaKey,
-        mediaType = parseMediaItemType(json.optNullableString("Type") ?: "Episode"),
-        tmdbId = providerIds.tmdb,
-        showTmdbId = json.optNullableString("SeriesId")?.trim()?.toIntOrNull(),
+        itemId = itemId,
+        itemType = parseMediaItemType(json.optNullableString("Type") ?: "Episode"),
         absoluteEpisodeNumber = json.optIntOrNull("AbsoluteIndexNumber"),
         seasonNumber = json.optIntOrNull("ParentIndexNumber"),
         episodeNumber = json.optIntOrNull("IndexNumber"),
@@ -560,7 +556,7 @@ internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): Met
             still = parseResponsiveImageSet(imageTags?.optJSONObject("Thumb")),
             logo = parseResponsiveImageSet(imageTags?.optJSONObject("Logo")),
         ),
-        showMediaKey = json.optNullableString("SeriesId"),
+        showItemId = json.optNullableString("SeriesId"),
         showTitle = json.optNullableString("SeriesName"),
         showExternalIds = MetadataExternalIds(
             tmdb = providerIds.tmdb,
@@ -604,9 +600,8 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
             }
             add(
                 MetadataPersonKnownForItem(
-                    mediaKey = item.optString("mediaKey").trim(),
-                    mediaType = item.optNullableString("mediaType") ?: error("Person known-for item is missing mediaType."),
-                    tmdbId = item.optIntOrNull("tmdbId"),
+                    itemId = item.optString("itemId").trim(),
+                    itemType = item.optNullableString("itemType") ?: error("Person known-for item is missing itemType."),
                     title = title,
                     posterUrl = item.optNullableString("posterUrl"),
                     rating = item.optDoubleOrNull("rating"),

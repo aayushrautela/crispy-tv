@@ -29,9 +29,9 @@ internal fun CrispyBackendClient.MetadataTitleExtrasResponse.seasonNumbers(): Li
 internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
     return MediaDetails(
         id = id,
-        mediaKey = mediaKey,
+        itemId = itemId,
         imdbId = externalIds.imdb,
-        mediaType = normalizedCatalogMediaType(),
+        itemType = normalizedCatalogMediaType(),
         title = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: id,
         posterUrl = images.posterUrl,
         backdropUrl = images.backdropUrl,
@@ -46,8 +46,6 @@ internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
         directors = emptyList(),
         creators = emptyList(),
         videos = nextEpisode?.let { listOfNotNull(it.toMediaVideo()) } ?: emptyList(),
-        tmdbId = tmdbId,
-        showTmdbId = showTmdbId,
         seasonNumber = seasonNumber,
         episodeNumber = episodeNumber,
         addonId = "backend",
@@ -65,12 +63,6 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
                 episode != null -> "Episode $episode"
                 else -> canonicalId
             }
-val lookupId =
-    if (season != null && episode != null && showTmdbId != null) {
-      "episode:tmdb:${showTmdbId}:$season:$episode"
-    } else {
-      null
-    }
     return MediaVideo(
         id = canonicalId,
         title = titleText,
@@ -79,9 +71,7 @@ val lookupId =
         released = airDate,
         overview = summary,
         thumbnailUrl = images.stillUrl ?: images.posterUrl,
-        lookupId = lookupId,
-        tmdbId = tmdbId,
-        showTmdbId = showTmdbId,
+        lookupId = itemId,
         absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
@@ -96,12 +86,6 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
         episode != null -> "Episode $episode"
         else -> canonicalId
       }
-  val lookupId =
-    if (season != null && episode != null && showTmdbId != null) {
-      "episode:tmdb:${showTmdbId}:$season:$episode"
-    } else {
-      null
-    }
   return MediaVideo(
     id = canonicalId,
     title = titleText,
@@ -110,9 +94,7 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
     released = airDate,
     overview = summary,
     thumbnailUrl = images.stillUrl ?: images.posterUrl,
-    lookupId = lookupId,
-    tmdbId = tmdbId,
-    showTmdbId = showTmdbId,
+    lookupId = itemId,
     absoluteEpisodeNumber = absoluteEpisodeNumber,
   )
 }
@@ -129,35 +111,33 @@ internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
         overview = type,
         thumbnailUrl = thumbnailUrl,
         lookupId = url,
-        tmdbId = null,
-        showTmdbId = null,
     )
 }
 
 internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
     return when {
-        mediaType.equals("anime", ignoreCase = true) -> "anime"
-        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "show"
+        itemType.equals("anime", ignoreCase = true) -> "anime"
+        itemType.equals("show", ignoreCase = true) || itemType.equals("tv", ignoreCase = true) -> "show"
         else -> "movie"
     }
 }
 
 internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): String {
     return when {
-        mediaType.equals("anime", ignoreCase = true) -> "anime"
-        mediaType.equals("show", ignoreCase = true) || mediaType.equals("tv", ignoreCase = true) -> "show"
+        itemType.equals("anime", ignoreCase = true) -> "anime"
+        itemType.equals("show", ignoreCase = true) || itemType.equals("tv", ignoreCase = true) -> "show"
         else -> "movie"
     }
 }
 
 internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
     val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val normalizedMediaKey = mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedItemId = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedType = normalizedCatalogMediaType()
     val normalizedPosterUrl = images.posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
     return CatalogItem(
-        id = normalizedMediaKey,
-        mediaKey = normalizedMediaKey,
+        id = normalizedItemId,
+        itemId = normalizedItemId,
         title = itemTitle,
         posterUrl = normalizedPosterUrl,
         backdropUrl = images.backdropUrl,

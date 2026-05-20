@@ -24,16 +24,16 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onHeroClick = { hero ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = hero.id,
-                        mediaType = hero.type,
+                        itemId = hero.id,
+                        itemType = hero.type,
                     )
                 )
             },
             onContinueWatchingClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.titleMediaKey,
-                        mediaType = item.type,
+                        itemId = item.titleItemId,
+                        itemType = item.type,
                         seasonNumber = item.season,
                         episodeNumber = item.episode,
                         absoluteEpisodeNumber = item.absoluteEpisodeNumber,
@@ -44,8 +44,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onContinueWatchingOpenDetails = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.titleMediaKey,
-                        mediaType = item.type,
+                        itemId = item.titleItemId,
+                        itemType = item.type,
                         seasonNumber = item.season,
                         episodeNumber = item.episode,
                         absoluteEpisodeNumber = item.absoluteEpisodeNumber,
@@ -63,8 +63,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onCatalogItemClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.mediaKey,
-                        mediaType = item.type,
+                        itemId = item.itemId,
+                        itemType = item.type,
                     )
                 )
             },
@@ -90,8 +90,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onSeriesClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.mediaKey,
-                        mediaType = item.type,
+                        itemId = item.itemId,
+                        itemType = item.type,
                     )
                 )
             },
@@ -120,8 +120,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onItemClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.mediaKey,
-                        mediaType = item.type,
+                        itemId = item.itemId,
+                        itemType = item.type,
                     )
                 )
             }
@@ -131,8 +131,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(
         route = AppRoutes.HomeDetailsRoutePattern,
         arguments = listOf(
-                navArgument(AppRoutes.HomeDetailsMediaTypeArg) { type = NavType.StringType },
-                navArgument(AppRoutes.HomeDetailsMediaKeyArg) { type = NavType.StringType },
+                navArgument(AppRoutes.HomeDetailsItemTypeArg) { type = NavType.StringType },
+                navArgument(AppRoutes.HomeDetailsItemIdArg) { type = NavType.StringType },
                 navArgument(AppRoutes.HomeDetailsHighlightEpisodeIdArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsAutoOpenEpisodeArg) { type = NavType.BoolType; defaultValue = false },
                 navArgument(AppRoutes.HomeDetailsRuntimeSeasonNumberArg) { type = NavType.StringType; defaultValue = "" },
@@ -140,8 +140,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navArgument(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
-        val mediaKey = entry.arguments?.getString(AppRoutes.HomeDetailsMediaKeyArg).orEmpty()
-        val mediaType = entry.arguments?.getString(AppRoutes.HomeDetailsMediaTypeArg).orEmpty()
+        val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
+        val itemType = entry.arguments?.getString(AppRoutes.HomeDetailsItemTypeArg).orEmpty()
         val highlightEpisodeId = entry.arguments?.getString(AppRoutes.HomeDetailsHighlightEpisodeIdArg)?.ifBlank { null }
         val autoOpenEpisode = entry.arguments?.getBoolean(AppRoutes.HomeDetailsAutoOpenEpisodeArg) == true
         val runtimeEntry = RuntimeDetailsEntry(
@@ -153,8 +153,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         }
         val context = LocalContext.current
         DetailsRoute(
-            mediaKey = mediaKey,
-            mediaType = mediaType,
+            itemId = itemId,
+            itemType = itemType,
             runtimeEntry = runtimeEntry,
             highlightEpisodeId = highlightEpisodeId,
             autoOpenEpisode = autoOpenEpisode,
@@ -162,8 +162,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onItemClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.mediaKey,
-                        mediaType = item.type,
+                        itemId = item.itemId,
+                        itemType = item.type,
                     )
                 )
             },
@@ -198,8 +198,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             onItemClick = { item ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
-                        mediaKey = item.mediaKey,
-                        mediaType = item.type,
+                        itemId = item.itemId,
+                        itemType = item.type,
                     )
                 )
             }
@@ -210,8 +210,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
 private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeItem) {
     navigate(
         AppRoutes.homeDetailsRoute(
-            mediaKey = item.titleMediaKey,
-            mediaType = item.type,
+            itemId = item.titleItemId,
+            itemType = item.type,
             seasonNumber = item.season,
             episodeNumber = item.episode,
             absoluteEpisodeNumber = item.absoluteEpisodeNumber,

@@ -402,8 +402,7 @@ class PlayerSessionViewModel(
         val nextSubtitle = buildPlayerSubtitle(nextMediaType, details, nextTitle, nextSeason, nextEpisodeNumber)
         val nextIdentity =
             PlaybackIdentity(
-                mediaKey = details.mediaKey,
-                tmdbId = if (nextMediaType == MetadataLabMediaType.MOVIE) details.tmdbId ?: nextEpisode?.tmdbId else null,
+                itemId = details.itemId,
                 contentType = nextMediaType,
                 season = nextSeason,
                 episode = nextEpisodeNumber,
@@ -451,16 +450,16 @@ class PlayerSessionViewModel(
     private suspend fun loadInitialMetadata() {
         val rawId = rawPlaybackId ?: return
         val snapshotDetails = _uiState.value.details
-        val mediaKey =
-            launchSnapshotState?.mediaKey?.trim()?.takeIf { it.isNotBlank() }
-                ?: activeIdentity?.mediaKey?.trim()?.takeIf { it.isNotBlank() }
-                ?: snapshotDetails?.mediaKey?.trim()?.takeIf { it.isNotBlank() }
+        val itemId =
+            launchSnapshotState?.itemId?.trim()?.takeIf { it.isNotBlank() }
+                ?: activeIdentity?.itemId?.trim()?.takeIf { it.isNotBlank() }
+                ?: snapshotDetails?.itemId?.trim()?.takeIf { it.isNotBlank() }
         val session = withContext(Dispatchers.IO) { runCatching { supabase.ensureValidSession() }.getOrNull() }
         val backendDetail =
-            if (session != null && mediaKey != null) {
+            if (session != null && itemId != null) {
                 withContext(Dispatchers.IO) {
                     runCatching {
-                        backendClient.getMetadataTitleDetail(accessToken = session.accessToken, mediaKey = mediaKey)
+                        backendClient.getMetadataItemDetail(accessToken = session.accessToken, itemId = itemId)
                     }.getOrNull()
                 }
             } else {
@@ -486,7 +485,7 @@ class PlayerSessionViewModel(
 
         val seasonToLoad = _uiState.value.selectedSeason
         if (
-            fetchedDetails.mediaType
+            fetchedDetails.itemType
                 .toMetadataLabMediaTypeOrNull()
                 ?.let { it != MetadataLabMediaType.MOVIE }
             == true && seasonToLoad != null
@@ -500,7 +499,7 @@ class PlayerSessionViewModel(
         force: Boolean = false,
     ) {
         val details = _uiState.value.details ?: return
-        if (details.mediaType.toMetadataLabMediaTypeOrNull()?.let { it != MetadataLabMediaType.MOVIE } != true) return
+        if (details.itemType.toMetadataLabMediaTypeOrNull()?.let { it != MetadataLabMediaType.MOVIE } != true) return
         val cached = if (!force) seasonEpisodesCache[season] else null
         if (cached != null) {
             _uiState.update {
@@ -558,10 +557,10 @@ class PlayerSessionViewModel(
             val response =
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        val mediaKey = details.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
-                        backendClient.getMetadataTitleExtras(
+                        val itemId = details.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
+                        backendClient.getMetadataItemExtras(
                             accessToken = session.accessToken,
-                            mediaKey = mediaKey,
+                            itemId = itemId,
                         )
                     }
                 }.getOrElse {
@@ -1036,7 +1035,7 @@ private fun buildFallbackDetails(
     artworkUrl: String?,
     identity: PlaybackIdentity?,
 ): MediaDetails? {
-    val contentId = identity?.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val contentId = identity?.itemId?.trim()?.takeIf { it.isNotBlank() } ?: rawId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val normalizedTitle = title.trim().ifBlank { return null }
     val mediaType =
         when (identity?.contentType) {
@@ -1047,9 +1046,9 @@ private fun buildFallbackDetails(
     val normalizedArtworkUrl = artworkUrl?.trim()?.ifBlank { null }
     return MediaDetails(
         id = contentId,
-        mediaKey = identity?.mediaKey,
+        itemId = identity?.itemId,
         imdbId = null,
-        mediaType = mediaType,
+        itemType = mediaType,
         title = identity?.showTitle?.takeIf { mediaType == "show" } ?: normalizedTitle,
         posterUrl = normalizedArtworkUrl,
         backdropUrl = normalizedArtworkUrl,
@@ -1064,8 +1063,6 @@ private fun buildFallbackDetails(
         directors = emptyList(),
         creators = emptyList(),
         videos = emptyList(),
-        tmdbId = null,
-        showTmdbId = null,
         seasonNumber = identity?.season,
         episodeNumber = identity?.episode,
         addonId = null,

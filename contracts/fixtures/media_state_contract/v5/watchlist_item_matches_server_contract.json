@@ -1,0 +1,73 @@
+{
+  "contract_version": 5,
+  "suite": "media_state_contract",
+  "case_id": "watchlist_item_matches_server_contract",
+  "input": {
+    "kind": "watchlist_item",
+    "payload": {
+      "Id": "e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6",
+      "Type": "Series",
+      "Name": "Watchlist Show",
+      "OriginalTitle": null,
+      "Overview": null,
+      "Taglines": [],
+      "ProductionYear": null,
+      "PremiereDate": null,
+      "CommunityRating": null,
+      "OfficialRating": null,
+      "Certification": null,
+      "Genres": [],
+      "RunTimeTicks": null,
+      "Status": null,
+      "ProviderIds": {
+        "Tmdb": null,
+        "Imdb": null,
+        "Tvdb": null
+      },
+      "ImageTags": {
+        "Primary": {
+          "medium": "https://example.com/poster.jpg",
+          "small": null,
+          "large": null
+        },
+        "Backdrop": [],
+        "Logo": null,
+        "Thumb": null,
+        "Screenshot": []
+      },
+      "ParentImageTags": null,
+      "SeriesId": null,
+      "SeriesName": null,
+      "SeasonId": null,
+      "SeasonName": null,
+      "ParentIndexNumber": null,
+      "IndexNumber": null,
+      "AbsoluteIndexNumber": null,
+      "EpisodeTitle": null,
+      "AirDate": null,
+      "RemoteTrailers": [],
+      "PosterColor": null,
+      "BackdropColor": null,
+      "UserData": null
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "item_id": "e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6",
+      "media_type": "Series",
+      "title": "Watchlist Show",
+      "poster_url": "https://example.com/poster.jpg",
+      "backdrop_url": null,
+      "subtitle": null,
+      "progress_percent": null,
+      "watched_at": null,
+      "last_activity_at": null,
+      "origins": [],
+      "dismissible": null,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

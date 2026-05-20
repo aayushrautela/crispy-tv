@@ -1,0 +1,86 @@
+{
+  "contract_version": 5,
+  "suite": "media_state_contract",
+  "case_id": "continue_watching_item_matches_server_contract",
+  "input": {
+    "kind": "continue_watching_item",
+    "payload": {
+      "Id": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6",
+      "Type": "Episode",
+      "Name": "Episode Title",
+      "OriginalTitle": null,
+      "Overview": null,
+      "Taglines": [],
+      "ProductionYear": null,
+      "PremiereDate": null,
+      "CommunityRating": null,
+      "OfficialRating": null,
+      "Certification": null,
+      "Genres": [],
+      "RunTimeTicks": null,
+      "Status": null,
+      "ProviderIds": {
+        "Tmdb": null,
+        "Imdb": null,
+        "Tvdb": null
+      },
+      "ImageTags": {
+        "Primary": null,
+        "Backdrop": [
+          {
+            "medium": "https://example.com/backdrop.jpg",
+            "small": null,
+            "large": null
+          }
+        ],
+        "Logo": null,
+        "Thumb": null,
+        "Screenshot": []
+      },
+      "ParentImageTags": null,
+      "SeriesId": null,
+      "SeriesName": null,
+      "SeasonId": null,
+      "SeasonName": null,
+      "ParentIndexNumber": null,
+      "IndexNumber": null,
+      "AbsoluteIndexNumber": null,
+      "EpisodeTitle": "Episode Title",
+      "AirDate": null,
+      "RemoteTrailers": [],
+      "PosterColor": null,
+      "BackdropColor": null,
+      "UserData": {
+        "ItemId": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6",
+        "IsFavorite": null,
+        "Played": null,
+        "PlayCount": null,
+        "PlaybackPositionTicks": 12000000000,
+        "RuntimeTicks": 27000000000,
+        "PlayedPercentage": 44.44,
+        "LastPlayedDate": "2024-01-15T12:00:00Z",
+        "Rating": null,
+        "DismissedFromContinueWatching": true
+      }
+    }
+  },
+  "expected": {
+    "valid": true,
+    "normalized": {
+      "card_family": "media_item",
+      "item_id": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6",
+      "media_type": "Episode",
+      "title": "Episode Title",
+      "poster_url": null,
+      "backdrop_url": "https://example.com/backdrop.jpg",
+      "subtitle": "Episode Title",
+      "progress_percent": 44.44,
+      "watched_at": null,
+      "last_activity_at": "2024-01-15T12:00:00Z",
+      "origins": [],
+      "dismissible": true,
+      "layout": null,
+      "route_kind": null
+    }
+  }
+}

@@ -13,8 +13,8 @@ class WatchCollectionsContractTest {
     @Test
     fun fixturesMatchServerWatchCollectionContract() {
         val fixturePaths = ContractTestSupport.fixtureFiles("watch_collections_contract")
-            .filter { it.toString().contains("/v3/") }
-        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one watch_collections_contract v3 fixture")
+            .filter { it.toString().contains("/v4/") }
+        assertTrue(fixturePaths.isNotEmpty(), "Expected at least one watch_collections_contract v4 fixture")
 
         fixturePaths.forEach { path ->
             val fixture = ContractTestSupport.parseFixture(path)

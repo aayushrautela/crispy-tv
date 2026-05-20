@@ -1,7 +1,5 @@
 package com.crispy.tv.domain.media
 
-import com.crispy.tv.domain.MediaKey
-
 data class ContractMediaExternalIds(
     val tmdb: Int?,
     val imdb: String?,
@@ -9,7 +7,7 @@ data class ContractMediaExternalIds(
 )
 
 data class ContractMediaItem(
-    val mediaKey: MediaKey,
+    val itemId: String,
     val mediaType: String,
     val title: String,
     val originalTitle: String?,
@@ -94,12 +92,12 @@ fun normalizeCalendarEnvelope(payload: Map<String, Any?>): ContractCalendarEnvel
 
 private fun parseMediaItem(payload: Map<String, Any?>): ContractMediaItem? {
     if (!payload.hasRequiredKeys(setOf("Id", "Type", "Name"))) return null
-    val mediaKey = payload.requiredString("Id") ?: return null
+    val itemId = payload.requiredString("Id") ?: return null
     val type = payload.requiredString("Type") ?: return null
     val name = payload.requiredString("Name") ?: return null
     val imageTags = payload.nullableObject("ImageTags")
     return ContractMediaItem(
-        mediaKey = MediaKey(mediaKey),
+        itemId = itemId,
         mediaType = parseContractMediaItemType(type),
         title = name,
         originalTitle = payload.nullableString("OriginalTitle"),

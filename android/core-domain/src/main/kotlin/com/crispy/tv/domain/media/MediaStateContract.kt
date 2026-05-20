@@ -1,12 +1,9 @@
 package com.crispy.tv.domain.media
 
-import com.crispy.tv.domain.MediaKey
-
 data class MediaStateNormalized(
     val cardFamily: String? = null,
-    val mediaKey: MediaKey? = null,
-    val mediaType: String? = null,
     val itemId: String? = null,
+    val mediaType: String? = null,
     val title: String? = null,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
@@ -35,13 +32,13 @@ fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStat
 }
 
 private fun normalizeBaseItemDto(payload: Map<String, Any?>): MediaStateNormalized? {
-    val mediaKeyStr = payload.stringValue("Id") ?: return null
+    val itemId = payload.stringValue("Id") ?: return null
     val mediaType = payload.stringValue("Type") ?: return null
     val title = payload.stringValue("Name") ?: return null
     val imageTags = payload.objectValue("ImageTags")
     return MediaStateNormalized(
         cardFamily = "media_item",
-        mediaKey = MediaKey(mediaKeyStr),
+        itemId = itemId,
         mediaType = mediaType,
         title = title,
         posterUrl = imageTags?.imageTagMedium("Primary"),
@@ -58,7 +55,6 @@ private fun normalizeContinueWatching(payload: Map<String, Any?>): MediaStateNor
     val normalized = normalizeBaseItemDto(payload) ?: return null
     val ud = userDataFrom(payload)
     return normalized.copy(
-        itemId = normalized.mediaKey?.value,
         progressPercent = ud?.doubleValue("PlayedPercentage") ?: 0.0,
         lastActivityAt = ud?.stringValue("LastPlayedDate") ?: payload.stringValue("LastPlayedDate"),
         dismissible = ud?.booleanValue("DismissedFromContinueWatching") ?: false,
@@ -70,7 +66,6 @@ private fun normalizeWatchedItem(payload: Map<String, Any?>): MediaStateNormaliz
     val normalized = normalizeBaseItemDto(payload) ?: return null
     val ud = userDataFrom(payload)
     return normalized.copy(
-        itemId = normalized.mediaKey?.value,
         watchedAt = ud?.stringValue("LastPlayedDate"),
         origins = emptyList(),
     )
@@ -79,7 +74,6 @@ private fun normalizeWatchedItem(payload: Map<String, Any?>): MediaStateNormaliz
 private fun normalizeWatchlistItem(payload: Map<String, Any?>): MediaStateNormalized? {
     val normalized = normalizeBaseItemDto(payload) ?: return null
     return normalized.copy(
-        itemId = normalized.mediaKey?.value,
         origins = emptyList(),
     )
 }
@@ -87,7 +81,6 @@ private fun normalizeWatchlistItem(payload: Map<String, Any?>): MediaStateNormal
 private fun normalizeRatingItem(payload: Map<String, Any?>): MediaStateNormalized? {
     val normalized = normalizeBaseItemDto(payload) ?: return null
     return normalized.copy(
-        itemId = normalized.mediaKey?.value,
         origins = emptyList(),
     )
 }
@@ -95,7 +88,6 @@ private fun normalizeRatingItem(payload: Map<String, Any?>): MediaStateNormalize
 private fun normalizeLibraryItem(payload: Map<String, Any?>): MediaStateNormalized? {
     val normalized = normalizeBaseItemDto(payload) ?: return null
     return normalized.copy(
-        itemId = normalized.mediaKey?.value,
         origins = emptyList(),
     )
 }
@@ -109,10 +101,10 @@ private fun normalizeHomeSnapshotSection(payload: Map<String, Any?>): MediaState
 }
 
 private fun normalizeTitleRoute(payload: Map<String, Any?>): MediaStateNormalized? {
-    val mediaKeyStr = payload.stringValue("mediaKey") ?: payload.stringValue("Id") ?: return null
+    val itemId = payload.stringValue("Id") ?: return null
     val path = payload.stringValue("path") ?: return null
-    if (path != "/v1/metadata/titles/$mediaKeyStr") return null
-    return MediaStateNormalized(mediaKey = MediaKey(mediaKeyStr), routeKind = "title")
+    if (path != "/v1/metadata/items/$itemId") return null
+    return MediaStateNormalized(itemId = itemId, routeKind = "title")
 }
 
 private fun Map<String, Any?>.stringValue(key: String): String? {

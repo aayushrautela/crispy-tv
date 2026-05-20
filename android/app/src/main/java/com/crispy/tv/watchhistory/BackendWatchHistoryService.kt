@@ -4,7 +4,7 @@ import android.content.Context
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.backend.MediaLookupInput
+import com.crispy.tv.backend.ItemLookupInput
 import com.crispy.tv.backend.PlaybackEventInput
 import com.crispy.tv.backend.WatchMutationInput
 import com.crispy.tv.player.CanonicalContinueWatchingItem
@@ -50,20 +50,20 @@ class BackendWatchHistoryService(
     ): WatchHistoryResult {
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update watchlist.")
-        val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
+        val itemId = request.itemId?.trim()?.ifBlank { null }
             ?: return WatchHistoryResult(statusMessage = "Watchlist update failed.")
         val action = try {
             if (inWatchlist) {
-                backend.putNativeWatchlist(
+                backend.putWatchlist(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = mediaKey,
+                    itemId = itemId,
                 )
             } else {
-                backend.deleteNativeWatchlist(
+                backend.deleteWatchlist(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = mediaKey,
+                    itemId = itemId,
                 )
             }
         } catch (error: Throwable) {
@@ -81,27 +81,27 @@ class BackendWatchHistoryService(
     }
 
     override suspend fun setTitleInWatchlist(
-        mediaKey: String,
+        itemId: String,
         inWatchlist: Boolean,
     ): WatchHistoryResult {
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update watchlist.")
-        val normalizedMediaKey = mediaKey.trim().ifBlank {
+        val normalizedItemId = itemId.trim().ifBlank {
             return WatchHistoryResult(statusMessage = "Watchlist update failed.")
         }
 
         val action = try {
             if (inWatchlist) {
-                backend.putNativeWatchlist(
+                backend.putWatchlist(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = normalizedMediaKey,
+                    itemId = normalizedItemId,
                 )
             } else {
-                backend.deleteNativeWatchlist(
+                backend.deleteWatchlist(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = normalizedMediaKey,
+                    itemId = normalizedItemId,
                 )
             }
         } catch (error: Throwable) {
@@ -124,20 +124,20 @@ class BackendWatchHistoryService(
     ): WatchHistoryResult {
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
-        val mediaKey = request.mediaKey?.trim()?.ifBlank { null }
+        val itemId = request.itemId?.trim()?.ifBlank { null }
             ?: return WatchHistoryResult(statusMessage = "Rating update failed.")
         val action = try {
             if (rating == null) {
-                backend.deleteNativeRating(
+                backend.deleteRating(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = mediaKey,
+                    itemId = itemId,
                 )
             } else {
-                backend.putNativeRating(
+                backend.putRating(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = mediaKey,
+                    itemId = itemId,
                     rating = rating.coerceIn(1, 10),
                 )
             }
@@ -156,27 +156,27 @@ class BackendWatchHistoryService(
     }
 
     override suspend fun setTitleRating(
-        mediaKey: String,
+        itemId: String,
         rating: Int?,
     ): WatchHistoryResult {
         val backendContext = getBackendContext()
             ?: return WatchHistoryResult(statusMessage = "Select a profile to update ratings.")
-        val normalizedMediaKey = mediaKey.trim().ifBlank {
+        val normalizedItemId = itemId.trim().ifBlank {
             return WatchHistoryResult(statusMessage = "Rating update failed.")
         }
 
         val action = try {
             if (rating == null) {
-                backend.deleteNativeRating(
+                backend.deleteRating(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = normalizedMediaKey,
+                    itemId = normalizedItemId,
                 )
             } else {
-                backend.putNativeRating(
+                backend.putRating(
                     accessToken = backendContext.accessToken,
                     profileId = backendContext.profileId,
-                    mediaKey = normalizedMediaKey,
+                    itemId = normalizedItemId,
                     rating = rating.coerceIn(1, 10),
                 )
             }
@@ -235,15 +235,15 @@ class BackendWatchHistoryService(
                 null
             } else {
                 try {
-                    val mediaKey =
+                    val itemId =
                         backend.resolvePlayback(
                             accessToken = backendContext.accessToken,
                             input = input,
-                        ).item.mediaKey.trim().takeIf { it.isNotBlank() } ?: return null
+                        ).item.itemId.trim().takeIf { it.isNotBlank() } ?: return null
                     val envelope = backend.getWatchState(
                         accessToken = backendContext.accessToken,
                         profileId = backendContext.profileId,
-                        mediaKey = mediaKey,
+                        itemId = itemId,
                     )
                     envelope.item.toCanonicalWatchStateSnapshot()
                 } catch (_: Throwable) {
@@ -254,10 +254,10 @@ class BackendWatchHistoryService(
     }
 
     override suspend fun getTitleWatchState(
-        mediaKey: String,
+        itemId: String,
         contentType: MetadataLabMediaType,
     ): CanonicalWatchStateSnapshot? {
-        val normalizedMediaKey = mediaKey.trim().ifBlank { return null }
+        val normalizedItemId = itemId.trim().ifBlank { return null }
         val backendContext = getBackendContext()
         val backendSnapshot =
             if (backendContext == null) {
@@ -267,7 +267,7 @@ class BackendWatchHistoryService(
                     backend.getWatchState(
                         accessToken = backendContext.accessToken,
                         profileId = backendContext.profileId,
-                        mediaKey = normalizedMediaKey,
+                        itemId = normalizedItemId,
                     ).item.toCanonicalWatchStateSnapshot()
                 } catch (_: Throwable) {
                     null
@@ -426,26 +426,12 @@ val next =
         eventType: String,
     ) {
         val backendContext = getBackendContext() ?: return
-        val mediaType = when (identity.contentType) {
-            MetadataLabMediaType.MOVIE -> "movie"
-            MetadataLabMediaType.SERIES -> if (identity.season != null && identity.episode != null) "episode" else "show"
-            MetadataLabMediaType.ANIME -> if (identity.season != null && identity.episode != null) "episode" else "anime"
-        }
-
-        val mediaKeyForEvent = if (mediaType == "episode") {
-            buildEpisodeMediaKey(identity.mediaKey, identity.season, identity.episode) ?: identity.mediaKey
-        } else {
-            identity.mediaKey
-        }
+        val itemId = identity.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return
 
         val playbackInput = PlaybackEventInput(
             clientEventId = buildClientEventId(identity, eventType),
             eventType = eventType,
-            mediaKey = mediaKeyForEvent,
-            mediaType = mediaType,
-            seasonNumber = identity.season,
-            episodeNumber = identity.episode,
-            absoluteEpisodeNumber = identity.absoluteEpisodeNumber,
+            itemId = itemId,
             positionSeconds = positionMs.coerceAtLeast(0L).toDouble() / 1000.0,
             durationSeconds = durationMs.coerceAtLeast(0L).toDouble() / 1000.0,
             occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
@@ -470,7 +456,7 @@ val next =
 private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): String {
     val suffix =
         listOfNotNull(
-            identity.mediaKey?.trim()?.takeIf { it.isNotBlank() },
+            identity.itemId?.trim()?.takeIf { it.isNotBlank() },
             identity.season?.toString(),
             identity.episode?.toString(),
             identity.absoluteEpisodeNumber?.toString(),
@@ -494,15 +480,15 @@ private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
         MetadataLabMediaType.ANIME -> "anime"
     }
 
-    val mediaKey = identity.mediaKey?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val itemId = identity.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val episodeId =
         if (identity.contentType != MetadataLabMediaType.MOVIE && identity.season != null && identity.episode != null) {
-            "$mediaKey:${identity.season}:${identity.episode}"
+            "$itemId:${identity.season}:${identity.episode}"
         } else {
             null
         }
 
-    return ProgressKeyParts(type = type, id = mediaKey, episodeId = episodeId)
+    return ProgressKeyParts(type = type, id = itemId, episodeId = episodeId)
 }
 
     private data class ProgressKeyParts(
@@ -538,124 +524,12 @@ private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
         return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
     }
 
-    private fun MetadataLabMediaType.toBackendMediaType(request: WatchHistoryRequest): String {
-        return when (this) {
-            MetadataLabMediaType.MOVIE -> "movie"
-            MetadataLabMediaType.SERIES -> if (request.season != null && request.episode != null) "episode" else "show"
-            MetadataLabMediaType.ANIME -> if (request.season != null && request.episode != null) "episode" else "anime"
-        }
-    }
-
-private fun WatchHistoryRequest.toProviderLookupInput(): MediaLookupInput {
-    return MediaLookupInput(
-        mediaKey = mediaKey?.trim()?.ifBlank { null },
-        mediaType = contentType.toBackendMediaType(this),
-        seasonNumber = season,
-        episodeNumber = episode,
-    )
-}
-
-    private suspend fun buildWatchMutationInput(
-        request: WatchHistoryRequest,
-    ): WatchMutationInput? {
-        val directMediaKey = request.mediaKey?.trim()?.ifBlank { null } ?: return null
-        return WatchMutationInput(
-            mediaKey = directMediaKey,
-            mediaType = request.contentType.toBackendMediaType(request),
-            seasonNumber = request.season,
-            episodeNumber = request.episode,
-            absoluteEpisodeNumber = request.absoluteEpisodeNumber,
-            occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
-        )
-    }
-
-private fun PlaybackIdentity.toPlaybackLookupInput(): MediaLookupInput? {
-    val normalizedMediaKey = mediaKey?.trim()?.takeIf { it.isNotBlank() }
-    val mediaType = when (contentType) {
-        MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES -> if (season != null && episode != null) "episode" else "show"
-        MetadataLabMediaType.ANIME -> if (season != null && episode != null) "episode" else "anime"
-    }
-    return MediaLookupInput(
-        mediaKey = normalizedMediaKey,
-        tmdbId = tmdbId,
-        mediaType = mediaType,
-        seasonNumber = season,
-        episodeNumber = episode,
-    ).takeIf { it.mediaKey != null || it.tmdbId != null }
-}
-
-    private fun List<CrispyBackendClient.MediaItem>.toContinueWatchingItems(
-        nowMs: Long,
-        limit: Int,
-    ): List<CanonicalContinueWatchingItem> {
-        return buildList {
-            for (item in this@toContinueWatchingItems) {
-                val userData = item.userData
-                val progressPercent = userData?.playedPercentage ?: 0.0
-                val lastPlayedDate = userData?.lastPlayedDate
-                val updatedAt = parseIsoToEpochMs(lastPlayedDate) ?: nowMs
-                val itemId = userData?.itemId ?: item.mediaKey
-                add(
-                    CanonicalContinueWatchingItem(
-                        id = itemId,
-                        titleMediaKey = item.seriesId ?: item.mediaKey,
-                        playbackMediaKey = item.mediaKey,
-                        mediaType = item.mediaType,
-                        title = item.title,
-                        episodeTitle = item.episodeTitle,
-                        season = item.seasonNumber,
-                        episode = item.episodeNumber,
-                        progressPercent = progressPercent,
-                        lastUpdatedEpochMs = updatedAt,
-                        posterUrl = item.posterUrl,
-                        backdropUrl = item.backdropUrl,
-                        logoUrl = item.logoUrl,
-                        stillUrl = item.stillUrl,
-                        addonId = "backend",
-                        absoluteEpisodeNumber = item.absoluteEpisodeNumber,
-                    )
-                )
-            }
-        }
-            .sortedByDescending { it.lastUpdatedEpochMs }
-            .take(limit)
-    }
-
-    private fun List<CrispyBackendClient.MediaItem>.toCanonicalContinueWatchingItems(
-        nowMs: Long,
-        limit: Int,
-    ): List<CanonicalContinueWatchingItem> {
-        return toContinueWatchingItems(nowMs, limit)
-    }
-
-    private fun CrispyBackendClient.WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {
-        return CanonicalWatchStateSnapshot(
-            isWatched = watched != null,
-            watchedAtEpochMs = parseIsoToEpochMs(watched?.watchedAt),
-            isInWatchlist = false,
-            isRated = false,
-            userRating = null,
-            watchedEpisodeKeys = watchedEpisodeKeys.map { it.trim().lowercase(Locale.US) }.filter { it.isNotBlank() }.toSet(),
-            playCount = playCount,
-        )
-    }
-
     private fun String.toMetadataLabMediaType(): MetadataLabMediaType {
         return when (trim().lowercase(Locale.US)) {
             "show", "series", "tv", "episode" -> MetadataLabMediaType.SERIES
             "anime" -> MetadataLabMediaType.ANIME
             else -> MetadataLabMediaType.MOVIE
         }
-    }
-
-    private fun buildEpisodeMediaKey(mediaKey: String?, season: Int?, episode: Int?): String? {
-        if (season == null || episode == null) return null
-        val parts = mediaKey?.trim()?.split(':') ?: return null
-        if (parts.size >= 3 && parts[0] == "show" && parts[1] == "tmdb") {
-            return "episode:tmdb:${parts[2]}:$season:$episode"
-        }
-        return null
     }
 
     private companion object {

@@ -1,7 +1,7 @@
 package com.crispy.tv.player
 
 data class WatchHistoryRequest(
-    val mediaKey: String? = null,
+    val itemId: String? = null,
     val contentType: MetadataLabMediaType,
     val title: String? = null,
     val season: Int? = null,
@@ -16,10 +16,10 @@ data class WatchHistoryResult(
 
 data class CanonicalContinueWatchingItem(
     val id: String,
-    val titleMediaKey: String,
-    val playbackMediaKey: String,
-    val localKey: String = titleMediaKey,
-    val mediaType: String,
+    val titleItemId: String,
+    val playbackItemId: String,
+    val localKey: String = titleItemId,
+    val itemType: String,
     val title: String,
     val episodeTitle: String? = null,
     val season: Int?,
@@ -35,7 +35,7 @@ data class CanonicalContinueWatchingItem(
     val absoluteEpisodeNumber: Int? = null,
 ) {
     val type: String
-    get() = when (mediaType.lowercase()) {
+    get() = when (itemType.lowercase()) {
         "show", "tv", "series", "episode" -> MetadataLabMediaType.SERIES.label
         "anime" -> MetadataLabMediaType.ANIME.label
         else -> MetadataLabMediaType.MOVIE.label
@@ -71,7 +71,6 @@ enum class ProviderCommentScope {
 data class ProviderCommentQuery(
     val scope: ProviderCommentScope,
     val imdbId: String,
-    val tmdbId: Int? = null,
     val season: Int? = null,
     val episode: Int? = null,
     val page: Int = 1,
@@ -94,8 +93,7 @@ data class ProviderCommentResult(
 
 
 data class PlaybackIdentity(
-    val mediaKey: String?,
-    val tmdbId: Int? = null,
+    val itemId: String?,
     val contentType: MetadataLabMediaType,
     val season: Int? = null,
     val episode: Int? = null,
@@ -151,7 +149,7 @@ interface WatchHistoryService {
     }
 
     suspend fun getTitleWatchState(
-        mediaKey: String,
+        itemId: String,
         contentType: MetadataLabMediaType,
     ): CanonicalWatchStateSnapshot? {
         return null
@@ -166,14 +164,14 @@ interface WatchHistoryService {
     }
 
     suspend fun setTitleInWatchlist(
-        mediaKey: String,
+        itemId: String,
         inWatchlist: Boolean,
     ): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Watchlist unavailable.")
     }
 
     suspend fun setTitleRating(
-        mediaKey: String,
+        itemId: String,
         rating: Int?,
     ): WatchHistoryResult {
         return WatchHistoryResult(statusMessage = "Rating unavailable.")

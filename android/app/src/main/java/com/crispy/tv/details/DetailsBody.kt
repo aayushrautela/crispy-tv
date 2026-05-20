@@ -328,7 +328,7 @@ internal fun DetailsBody(
             }
         }
 
-        if (details.mediaType != "movie" && (uiState.seasons.isNotEmpty() || uiState.episodesIsLoading)) {
+        if (details.itemType != "movie" && (uiState.seasons.isNotEmpty() || uiState.episodesIsLoading)) {
             Spacer(modifier = Modifier.height(22.dp))
             Text(
                 text = "Episodes",
@@ -480,7 +480,7 @@ internal fun DetailsBody(
         if (detailRows.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
 
-            val header = when (details.mediaType) {
+            val header = when (details.itemType) {
                 "show" -> "Show Details"
                 "anime" -> "Anime Details"
                 else -> "Movie Details"

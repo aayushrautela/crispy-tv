@@ -93,8 +93,8 @@ private val LIBRARY_SECTIONS =
 @Immutable
 data class LibrarySectionItemUi(
     val id: String,
-    val mediaKey: String,
-    val mediaType: String,
+    val itemId: String,
+    val itemType: String,
     val title: String,
     val posterUrl: String?,
     val backdropUrl: String?,

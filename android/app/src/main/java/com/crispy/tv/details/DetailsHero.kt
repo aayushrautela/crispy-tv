@@ -62,7 +62,7 @@ import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.metadata.tmdb.TmdbApi
+import com.crispy.tv.images.ImageUrlHelper
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -74,7 +74,7 @@ internal fun detailsHeroBackdropSize(screenWidthPx: Float): String {
 }
 
 internal fun detailsHeroImageUrl(details: MediaDetails?, backdropSize: String): String? {
-    return details?.backdropUrl?.let { TmdbApi.resizedImageUrl(it, size = backdropSize) }
+    return details?.backdropUrl?.let { ImageUrlHelper.resizedImageUrl(it, size = backdropSize) }
         ?: details?.posterUrl
 }
 

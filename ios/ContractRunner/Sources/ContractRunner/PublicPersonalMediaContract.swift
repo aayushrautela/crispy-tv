@@ -50,7 +50,7 @@ public struct ContractUserItemData: Equatable {
 }
 
 public struct ContractMediaItem: Equatable {
-    public let mediaKey: String
+    public let itemId: String
     public let mediaType: String
     public let title: String
     public let originalTitle: String?
@@ -80,7 +80,7 @@ public struct ContractMediaItem: Equatable {
     public let userData: ContractUserItemData?
 
     public init(
-        mediaKey: String,
+        itemId: String,
         mediaType: String,
         title: String,
         originalTitle: String? = nil,
@@ -109,7 +109,7 @@ public struct ContractMediaItem: Equatable {
         seasonName: String? = nil,
         userData: ContractUserItemData? = nil
     ) {
-        self.mediaKey = mediaKey
+        self.itemId = itemId
         self.mediaType = mediaType
         self.title = title
         self.originalTitle = originalTitle
@@ -204,7 +204,7 @@ public func normalizeCalendarEnvelope(payload: [String: Any]) -> ContractCalenda
 }
 
 private func parseMediaItem(_ payload: [String: Any]) -> ContractMediaItem? {
-    guard let mediaKey = requiredString(payload, "Id"),
+    guard let itemId = requiredString(payload, "Id"),
           let type = requiredString(payload, "Type"),
           let name = requiredString(payload, "Name") else {
         return nil
@@ -221,7 +221,7 @@ private func parseMediaItem(_ payload: [String: Any]) -> ContractMediaItem? {
     let taglines = stringArray(payload["Taglines"] as? [Any] ?? [], key: "Taglines") ?? []
 
     return ContractMediaItem(
-        mediaKey: mediaKey,
+        itemId: itemId,
         mediaType: parseContractMediaItemType(type),
         title: name,
         originalTitle: optionalString(payload, "OriginalTitle"),

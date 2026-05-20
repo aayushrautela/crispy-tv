@@ -66,13 +66,13 @@ class AppGraph(
     }
 
     fun detailsViewModelFactory(
-        mediaKey: String,
-        mediaType: String,
+        itemId: String,
+        itemType: String,
         runtimeEntry: RuntimeDetailsEntry? = null,
     ): ViewModelProvider.Factory {
         return DetailsViewModel.factory(
-            mediaKey = mediaKey,
-            mediaType = mediaType,
+            itemId = itemId,
+            itemType = itemType,
             runtimeEntry = runtimeEntry,
             detailsUseCases = detailsUseCases,
         )

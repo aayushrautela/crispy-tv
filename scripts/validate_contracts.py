@@ -9,12 +9,10 @@ from jsonschema import Draft202012Validator
 
 SUITE_TO_SCHEMA = {
     "player_machine": "player_machine.schema.json",
-    "search_ranking_and_dedup": "search_ranking_and_dedup.schema.json",
     "sync_planner": "sync_planner.schema.json",
     "storage_v1": "storage_v1.schema.json",
     "continue_watching": "continue_watching.schema.json",
     "next_episode": "next_episode.schema.json",
-    "metadata_tmdb_enhancer": "metadata_tmdb_enhancer.schema.json",
     "omdb": "omdb.schema.json",
     "home_catalogs": "home_catalogs.schema.json",
     "catalog_url_building": "catalog_url_building.schema.json",

@@ -11,8 +11,6 @@ import com.crispy.tv.streams.StreamProviderUiState
 import com.crispy.tv.streams.StreamSelectorUiState
 import java.util.Locale
 
-val TMDB_ID_REGEX: Regex = Regex("tmdb:(\\d+)")
-
 data class StreamLookupTarget(
     val mediaType: MetadataLabMediaType,
     val lookupId: String,
@@ -26,26 +24,20 @@ fun resolveStreamLookupTarget(
     seasonEpisodes: List<MediaVideo>,
     fallbackMediaType: MetadataLabMediaType,
 ): StreamLookupTarget {
-    val mediaType = details.mediaType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
-val lookupId =
-    when (mediaType) {
-      MetadataLabMediaType.MOVIE -> details.tmdbId?.let { "movie:tmdb:$it" }.orEmpty()
-      MetadataLabMediaType.SERIES,
-      MetadataLabMediaType.ANIME -> {
-        val fromLoadedEpisodes = seasonEpisodes.firstOrNull { !it.lookupId.isNullOrBlank() }?.lookupId?.trim()
-        if (fromLoadedEpisodes != null) {
-          fromLoadedEpisodes
-        } else {
-          val season = selectedSeason ?: seasonEpisodes.firstOrNull()?.season ?: 1
-          val base = details.showTmdbId?.let { "show:tmdb:$it" }.orEmpty()
-          if (base.isNotBlank() && season > 0) {
-            "$base:$season:1"
-          } else {
-            base
-          }
+    val mediaType = details.itemType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
+    val lookupId =
+        when (mediaType) {
+            MetadataLabMediaType.MOVIE -> details.itemId
+            MetadataLabMediaType.SERIES,
+            MetadataLabMediaType.ANIME -> {
+                val fromLoadedEpisodes = seasonEpisodes.firstOrNull()?.id?.trim()
+                if (!fromLoadedEpisodes.isNullOrBlank()) {
+                    fromLoadedEpisodes
+                } else {
+                    details.itemId
+                }
+            }
         }
-      }
-    }
 
     return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
 }
@@ -61,19 +53,8 @@ fun findEpisodeForLookupId(
     return sequenceOf(currentEpisodes.asSequence(), cachedEpisodes.asSequence().flatten())
         .flatten()
         .firstOrNull { episode ->
-            episode.lookupId?.equals(normalizedLookupId, ignoreCase = true) == true ||
-                episode.id.equals(normalizedLookupId, ignoreCase = true)
+            episode.id.equals(normalizedLookupId, ignoreCase = true)
         }
-}
-
-fun buildEpisodeLookupId(
-  details: MediaDetails,
-  season: Int,
-  episode: Int,
-): String? {
-  if (season <= 0 || episode <= 0) return null
-  val showTmdbId = details.showTmdbId ?: return null
-  return "episode:tmdb:$showTmdbId:$season:$episode"
 }
 
 fun buildPlayerSubtitle(
@@ -108,13 +89,6 @@ fun buildPlayerSubtitle(
 
         MetadataLabMediaType.MOVIE -> details.year?.trim()?.ifBlank { null }
     }
-}
-
-fun extractTmdbIdOrNull(rawId: String?): Int? {
-    val value = rawId?.trim().orEmpty()
-    if (value.isBlank()) return null
-    val match = TMDB_ID_REGEX.find(value) ?: return null
-    return match.groupValues.getOrNull(1)?.toIntOrNull()
 }
 
 data class ParsedLookupId(
