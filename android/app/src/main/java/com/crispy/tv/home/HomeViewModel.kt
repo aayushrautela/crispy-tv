@@ -131,22 +131,20 @@ class HomeViewModel internal constructor(
     private val _catalogSectionsState = MutableStateFlow<Map<String, HomeCatalogSectionUi>>(emptyMap())
 
     val uiState: StateFlow<HomeUiState> = combine(
-        listOf(
-            _isRefreshing,
-            _headerPillsState,
-            _heroState,
-            _layoutState,
-            _wideRailSectionsState,
-            _catalogSectionsState,
-        ),
-    ) { arr ->
+        _isRefreshing,
+        _headerPillsState,
+        _heroState,
+        _layoutState,
+        _wideRailSectionsState,
+        _catalogSectionsState,
+    ) { isRefreshing, headerPills, heroState, layoutState, wideRailSections, catalogSections ->
         HomeUiState(
-            isRefreshing = arr[0] as Boolean,
-            headerPills = arr[1] as List<CatalogSectionRef>,
-            heroState = arr[2] as HeroState,
-            layoutState = arr[3] as HomeLayoutState,
-            wideRailSections = arr[4] as Map<String, HomeWideRailSectionUi>,
-            catalogSections = arr[5] as Map<String, HomeCatalogSectionUi>,
+            isRefreshing = isRefreshing,
+            headerPills = headerPills,
+            heroState = heroState,
+            layoutState = layoutState,
+            wideRailSections = wideRailSections,
+            catalogSections = catalogSections,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -598,7 +596,7 @@ internal fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): S
 
 private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
     val isEpisode = itemType.equals("episode", ignoreCase = true)
-    val showName = if (isEpisode) title?.takeIf { it.isNotBlank() } else null
+    val showName = if (isEpisode) title.takeIf { it.isNotBlank() } else null
     val seasonEpisode =
         if (!isEpisode && (type.equals("show", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {
             String.format(Locale.US, "S%02d:E%02d", season, episode)
