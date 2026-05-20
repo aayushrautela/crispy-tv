@@ -27,14 +27,14 @@ fun resolveStreamLookupTarget(
     val mediaType = details.itemType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
     val lookupId =
         when (mediaType) {
-            MetadataLabMediaType.MOVIE -> details.itemId
+            MetadataLabMediaType.MOVIE -> details.itemId?.trim()?.ifBlank { null } ?: details.id
             MetadataLabMediaType.SERIES,
             MetadataLabMediaType.ANIME -> {
                 val fromLoadedEpisodes = seasonEpisodes.firstOrNull()?.id?.trim()
                 if (!fromLoadedEpisodes.isNullOrBlank()) {
                     fromLoadedEpisodes
                 } else {
-                    details.itemId
+                    details.itemId?.trim()?.ifBlank { null } ?: details.id
                 }
             }
         }

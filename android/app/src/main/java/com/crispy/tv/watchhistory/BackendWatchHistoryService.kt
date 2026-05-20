@@ -328,7 +328,7 @@ class BackendWatchHistoryService(
             type = parts.type,
             episodeId = parts.episodeId,
         )
-val next =
+        val next =
             (existing ?: WatchProgress(currentTimeSeconds = 0.0, durationSeconds = durationSeconds, lastUpdatedEpochMs = 0L))
             .copy(
                 currentTimeSeconds = currentSeconds.coerceIn(0.0, durationSeconds),
@@ -453,18 +453,18 @@ val next =
         }
     }
 
-private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): String {
-    val suffix =
-        listOfNotNull(
-            identity.itemId?.trim()?.takeIf { it.isNotBlank() },
-            identity.season?.toString(),
-            identity.episode?.toString(),
-            identity.absoluteEpisodeNumber?.toString(),
-        ).filterNot { it.isBlank() }
-            .joinToString(":")
-            .ifBlank { identity.title.trim().replace(' ', '_') }
-    return "$eventType:$suffix:${System.currentTimeMillis()}"
-}
+    private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): String {
+        val suffix =
+            listOfNotNull(
+                identity.itemId?.trim()?.takeIf { it.isNotBlank() },
+                identity.season?.toString(),
+                identity.episode?.toString(),
+                identity.absoluteEpisodeNumber?.toString(),
+            ).filterNot { it.isBlank() }
+                .joinToString(":")
+                .ifBlank { identity.title.trim().replace(' ', '_') }
+        return "$eventType:$suffix:${System.currentTimeMillis()}"
+    }
 
     private suspend fun getBackendContext(): BackendContext? {
         if (!backend.isConfigured()) {
@@ -473,23 +473,23 @@ private fun buildClientEventId(identity: PlaybackIdentity, eventType: String): S
         return backendContextResolver.resolve()
     }
 
-private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
-    val type = when (identity.contentType) {
-        MetadataLabMediaType.MOVIE -> "movie"
-        MetadataLabMediaType.SERIES -> "show"
-        MetadataLabMediaType.ANIME -> "anime"
-    }
-
-    val itemId = identity.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val episodeId =
-        if (identity.contentType != MetadataLabMediaType.MOVIE && identity.season != null && identity.episode != null) {
-            "$itemId:${identity.season}:${identity.episode}"
-        } else {
-            null
+    private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
+        val type = when (identity.contentType) {
+            MetadataLabMediaType.MOVIE -> "movie"
+            MetadataLabMediaType.SERIES -> "show"
+            MetadataLabMediaType.ANIME -> "anime"
         }
 
-    return ProgressKeyParts(type = type, id = itemId, episodeId = episodeId)
-}
+        val itemId = identity.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val episodeId =
+            if (identity.contentType != MetadataLabMediaType.MOVIE && identity.season != null && identity.episode != null) {
+                "$itemId:${identity.season}:${identity.episode}"
+            } else {
+                null
+            }
+
+        return ProgressKeyParts(type = type, id = itemId, episodeId = episodeId)
+    }
 
     private data class ProgressKeyParts(
         val type: String,
@@ -497,25 +497,115 @@ private fun progressKeyParts(identity: PlaybackIdentity): ProgressKeyParts? {
         val episodeId: String?,
     )
 
-    private fun normalizedImdbIdOrNull(raw: String?): String? {
-        val value = raw?.trim()?.lowercase(Locale.US).orEmpty()
-        if (value.isBlank()) return null
-        val candidate = when {
-            value.startsWith("tt") -> value
-            value.startsWith("imdb:") -> value.substringAfter("imdb:")
-            value.all { it.isDigit() } -> "tt$value"
-            else -> return null
-        }
-        if (!candidate.startsWith("tt")) return null
-        if (candidate.length < 4) return null
-        if (!candidate.substring(2).all { it.isDigit() }) return null
-        return candidate
-    }
-
     private fun toProgressPercent(positionMs: Long, durationMs: Long): Double? {
         if (durationMs <= 0L) return null
         val percent = (positionMs.coerceAtLeast(0L).toDouble() / durationMs.toDouble()) * 100.0
         return percent.coerceIn(0.0, 100.0)
+    }
+
+    private fun PlaybackIdentity.toPlaybackLookupInput(): ItemLookupInput? {
+        val itemId = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return ItemLookupInput(itemId = itemId)
+    }
+
+    private fun CrispyBackendClient.WatchStateResponse.toCanonicalWatchStateSnapshot(): CanonicalWatchStateSnapshot {
+        return CanonicalWatchStateSnapshot(
+            isWatched = watched != null,
+            watchedAtEpochMs = parseIsoToEpochMs(watched?.watchedAt),
+            isInWatchlist = false,
+            isRated = false,
+            userRating = null,
+            watchedEpisodeKeys = watchedEpisodeKeys.toSet(),
+            playCount = playCount,
+        )
+    }
+
+    private fun buildWatchMutationInput(request: WatchHistoryRequest): WatchMutationInput? {
+        val itemId = request.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return WatchMutationInput(
+            itemId = itemId,
+            occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
+            payload = mapOf(
+                "source" to "android",
+                "appVersion" to appVersion,
+                "contentType" to request.contentType.label,
+                "title" to request.title,
+                "season" to request.season,
+                "episode" to request.episode,
+                "absoluteEpisodeNumber" to request.absoluteEpisodeNumber,
+            ),
+        )
+    }
+
+    private fun List<CrispyBackendClient.MediaItem>.toCanonicalContinueWatchingItems(
+        nowMs: Long,
+        limit: Int,
+    ): List<CanonicalContinueWatchingItem> {
+        return asSequence()
+            .mapNotNull { item -> item.toCanonicalContinueWatchingItem(nowMs) }
+            .sortedByDescending { entry -> entry.lastUpdatedEpochMs }
+            .take(limit.coerceAtLeast(1))
+            .toList()
+    }
+
+    private fun CrispyBackendClient.MediaItem.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
+        val userData = userData ?: return null
+        val progressPercent = userData.playedPercentage
+            ?: progressPercent(userData.playbackPositionSeconds, userData.runtimeSeconds)
+            ?: return null
+        if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) return null
+        if (userData.dismissedFromContinueWatching == true) return null
+        val titleId = seriesId?.trim()?.takeIf { it.isNotBlank() } ?: itemId.trim().takeIf { it.isNotBlank() } ?: return null
+        val playbackId = userData.itemId?.trim()?.takeIf { it.isNotBlank() } ?: itemId.trim().takeIf { it.isNotBlank() } ?: return null
+        val type = itemType.toMetadataLabMediaType()
+        val updatedAt = parseIsoToEpochMs(userData.lastPlayedDate) ?: nowMs
+        return CanonicalContinueWatchingItem(
+            id = playbackId,
+            titleItemId = titleId,
+            playbackItemId = playbackId,
+            localKey = buildString {
+                append(titleId)
+                if (type != MetadataLabMediaType.MOVIE && seasonNumber != null && episodeNumber != null) {
+                    append(':')
+                    append(seasonNumber)
+                    append(':')
+                    append(episodeNumber)
+                }
+            },
+            itemType = itemType,
+            title = seriesName?.trim()?.takeIf { it.isNotBlank() } ?: title,
+            episodeTitle = episodeTitle?.trim()?.takeIf { it.isNotBlank() } ?: title.takeIf { type != MetadataLabMediaType.MOVIE },
+            season = seasonNumber,
+            episode = episodeNumber,
+            progressPercent = progressPercent.coerceIn(0.0, 100.0),
+            lastUpdatedEpochMs = updatedAt,
+            posterUrl = posterUrl,
+            backdropUrl = backdropUrl,
+            logoUrl = logoUrl,
+            stillUrl = stillUrl,
+            subtitle = buildContinueWatchingSubtitle(type, seasonNumber, episodeNumber),
+            absoluteEpisodeNumber = absoluteEpisodeNumber,
+        )
+    }
+
+    private fun progressPercent(positionSeconds: Double?, durationSeconds: Double?): Double? {
+        val duration = durationSeconds ?: return null
+        if (duration <= 0.0) return null
+        val position = positionSeconds ?: return null
+        return ((position.coerceAtLeast(0.0) / duration) * 100.0).coerceIn(0.0, 100.0)
+    }
+
+    private fun buildContinueWatchingSubtitle(
+        type: MetadataLabMediaType,
+        season: Int?,
+        episode: Int?,
+    ): String? {
+        if (type == MetadataLabMediaType.MOVIE) return null
+        return when {
+            season != null && episode != null -> "S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
+            season != null -> "Season $season"
+            else -> null
+        }
     }
 
     private fun parseIsoToEpochMs(raw: String?): Long? {
