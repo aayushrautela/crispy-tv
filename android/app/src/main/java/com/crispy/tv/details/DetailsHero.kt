@@ -62,20 +62,14 @@ import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.images.ImageUrlHelper
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal fun detailsHeroBackdropSize(screenWidthPx: Float): String {
-    return if (screenWidthPx > 1280f) "original" else "w1280"
-}
-
-internal fun detailsHeroImageUrl(details: MediaDetails?, backdropSize: String): String? {
-    return details?.backdropUrl?.let { ImageUrlHelper.resizedImageUrl(it, size = backdropSize) }
-        ?: details?.posterUrl
+internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
+    return details?.backdropUrl ?: details?.posterUrl
 }
 
 @Composable

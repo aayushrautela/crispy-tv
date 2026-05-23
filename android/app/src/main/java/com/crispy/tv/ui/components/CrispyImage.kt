@@ -13,7 +13,6 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.crispy.tv.images.ResponsiveImageSet
-import com.crispy.tv.images.ImageUrlHelper
 import com.crispy.tv.settings.ImageQuality
 import com.crispy.tv.settings.ImageSettingsRepositoryProvider
 import java.util.Locale
@@ -35,7 +34,6 @@ internal fun rememberCrispyImageModel(
     url: String?,
     width: Dp,
     height: Dp,
-    tmdbSize: String? = null,
     enableCrossfade: Boolean = false,
     cacheKey: String? = null,
 ): Any? {
@@ -43,7 +41,6 @@ internal fun rememberCrispyImageModel(
         image = ResponsiveImageSet.fromSingle(url),
         width = width,
         height = height,
-        tmdbSize = tmdbSize,
         enableCrossfade = enableCrossfade,
         cacheKey = cacheKey,
     )
@@ -54,7 +51,6 @@ internal fun rememberCrispyImageModel(
     image: ResponsiveImageSet?,
     width: Dp,
     height: Dp,
-    tmdbSize: String? = null,
     enableCrossfade: Boolean = false,
     cacheKey: String? = null,
 ): Any? {
@@ -65,15 +61,8 @@ internal fun rememberCrispyImageModel(
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    val selectedUrl = image.urlFor(imageQuality)
-    if (selectedUrl.isNullOrBlank()) return null
-
-    val resolvedUrl = remember(selectedUrl, tmdbSize) {
-        when {
-            tmdbSize.isNullOrBlank() -> selectedUrl
-            else -> ImageUrlHelper.resizedImageUrl(selectedUrl, tmdbSize)
-        }
-    }
+    val resolvedUrl = image.urlFor(imageQuality)
+    if (resolvedUrl.isNullOrBlank()) return null
     val resolvedCacheKey = remember(cacheKey, imageQuality) {
         cacheKey?.trim()?.ifBlank { null }?.let { "$it:${imageQuality.key}" }
     }

@@ -107,7 +107,7 @@ internal fun MetadataCastCard(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             if (profileUrl.isNotBlank()) {
-                val profileModel = rememberCrispyImageModel(url = profileUrl, width = 80.dp, height = 80.dp, tmdbSize = "w185")
+                val profileModel = rememberCrispyImageModel(url = profileUrl, width = 80.dp, height = 80.dp)
                 if (profileModel != null) {
                     AsyncImage(
                         model = profileModel,

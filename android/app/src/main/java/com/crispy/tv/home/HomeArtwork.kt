@@ -144,7 +144,6 @@ internal fun rememberPosterImageModel(image: ResponsiveImageSet?): Any? {
         image = image,
         width = Dimensions.PosterCardWidth,
         height = Dimensions.PosterCardHeight,
-        tmdbSize = "w342",
     )
 }
 
@@ -159,6 +158,5 @@ internal fun rememberLandscapeImageModel(image: ResponsiveImageSet?, width: Dp):
         image = image,
         width = width,
         height = width * (9f / 16f),
-        tmdbSize = "w500",
     )
 }

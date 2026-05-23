@@ -247,7 +247,7 @@ private fun HomeCollectionMovieRow(
     onClick: () -> Unit,
 ) {
     val image = item.poster?.takeUnless { it.isEmpty } ?: item.backdrop
-    val imageModel = rememberCrispyImageModel(image, width = 56.dp, height = 56.dp, tmdbSize = "w185")
+    val imageModel = rememberCrispyImageModel(image, width = 56.dp, height = 56.dp)
     val detailText = collectionMovieMetaText(item)
     val ratingText = normalizeRatingText(item.rating)
 

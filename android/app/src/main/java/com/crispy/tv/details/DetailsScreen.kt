@@ -92,11 +92,8 @@ internal fun DetailsScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val screenWidthPx = remember(configuration.screenWidthDp, density) {
-        with(density) { configuration.screenWidthDp.dp.toPx() }
-    }
-    val imageUrl = remember(details, screenWidthPx) {
-        detailsHeroImageUrl(details = details, backdropSize = detailsHeroBackdropSize(screenWidthPx))
+    val imageUrl = remember(details) {
+        detailsHeroImageUrl(details = details)
     }
     val baseScheme = MaterialTheme.colorScheme
     val fallbackSeed = baseScheme.primary
