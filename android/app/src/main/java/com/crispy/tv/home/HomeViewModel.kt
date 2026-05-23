@@ -23,10 +23,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -123,39 +121,12 @@ class HomeViewModel internal constructor(
         }
     }
 
-    private val _isRefreshing = MutableStateFlow(false)
-    private val _headerPillsState = MutableStateFlow<List<CatalogSectionRef>>(emptyList())
-    private val _heroState = MutableStateFlow(HeroState())
-    private val _layoutState = MutableStateFlow(HomeLayoutState())
-    private val _wideRailSectionsState = MutableStateFlow(defaultWideRailSections())
-    private val _catalogSectionsState = MutableStateFlow<Map<String, HomeCatalogSectionUi>>(emptyMap())
+    private val _state = MutableStateFlow(HomeUiState())
 
-    val uiState: StateFlow<HomeUiState> = combine(
-        _isRefreshing,
-        _headerPillsState,
-        _heroState,
-        _layoutState,
-        _wideRailSectionsState,
-        _catalogSectionsState,
-    ) { isRefreshing, headerPills, heroState, layoutState, wideRailSections, catalogSections ->
-        HomeUiState(
-            isRefreshing = isRefreshing,
-            headerPills = headerPills,
-            heroState = heroState,
-            layoutState = layoutState,
-            wideRailSections = wideRailSections,
-            catalogSections = catalogSections,
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _state.asStateFlow()
 
     private var catalogSectionLayoutMeta: List<CatalogSectionLayoutMeta> = emptyList()
     private var catalogStatusMessage: String = ""
-    private var watchActivitySnapshot = HomeWatchActivitySnapshot()
-    private var thisWeekSection = defaultWideRailSection(
-        key = THIS_WEEK_SECTION_KEY,
-        title = "This Week",
-        kind = HomeWideRailSectionKind.THIS_WEEK,
-    )
 
     private var suppressedItemsByKey: MutableMap<String, Long>? = null
     @Volatile
@@ -255,7 +226,7 @@ class HomeViewModel internal constructor(
                     }
                 } finally {
                     if (isCurrentRefresh(currentRefreshGeneration)) {
-                        _isRefreshing.value = false
+                        _state.update { it.copy(isRefreshing = false) }
                         lastRefreshCompletedAtMs = System.currentTimeMillis()
                     }
                     refreshCompletion.complete(Unit)
@@ -329,36 +300,40 @@ class HomeViewModel internal constructor(
     }
 
     private fun prepareForRefresh(showForegroundLoading: Boolean) {
-        _isRefreshing.value = true
         if (!showForegroundLoading) {
+            _state.update { it.copy(isRefreshing = true) }
             return
         }
-
-        _heroState.update { current ->
-            current.copy(
-                isLoading = true,
-                statusMessage = current.statusMessage.ifBlank { "Loading featured content..." },
-            )
-        }
-        _wideRailSectionsState.value =
-            _wideRailSectionsState.value.mapValues { (_, section) ->
+        _state.update { current ->
+            val updatedWideRails = current.wideRailSections.mapValues { (_, section) ->
                 section.copy(isLoading = true)
             }
-        _catalogSectionsState.update { current ->
-            current.mapValues { (_, sectionUi) ->
-                sectionUi.copy(
-                    items = sectionUi.items.ifEmpty { sectionUi.section.previewItems },
+            current.copy(
+                isRefreshing = true,
+                heroState = current.heroState.copy(
                     isLoading = true,
-                )
-            }
+                    statusMessage = current.heroState.statusMessage.ifBlank { "Loading featured content..." },
+                ),
+                wideRailSections = updatedWideRails,
+                catalogSections = current.catalogSections.mapValues { (_, sectionUi) ->
+                    sectionUi.copy(
+                        items = sectionUi.items.ifEmpty { sectionUi.section.previewItems },
+                        isLoading = true,
+                    )
+                },
+                layoutState = buildHomeLayoutState(
+                    wideRails = updatedWideRails,
+                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
+                    catalogStatusMessage = catalogStatusMessage,
+                ),
+            )
         }
-        updateLayout()
     }
 
     private fun hasLoadedHomeContent(): Boolean {
-        return _heroState.value.items.isNotEmpty() ||
-            _headerPillsState.value.isNotEmpty() ||
-            _layoutState.value.blocks.isNotEmpty()
+        return _state.value.heroState.items.isNotEmpty() ||
+            _state.value.headerPills.isNotEmpty() ||
+            _state.value.layoutState.blocks.isNotEmpty()
     }
 
     private fun isCurrentRefresh(generation: Long): Boolean {
@@ -366,69 +341,71 @@ class HomeViewModel internal constructor(
     }
 
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {
-        _heroState.value = snapshot.hero
-        _headerPillsState.value = snapshot.headerPills
+        catalogSectionLayoutMeta = snapshot.catalogSections.map { sectionUi ->
+            CatalogSectionLayoutMeta(key = sectionUi.section.key, layout = sectionUi.section.layout)
+        }
         catalogStatusMessage = snapshot.catalogStatusMessage
-
-        catalogSectionLayoutMeta =
-            snapshot.catalogSections.map { sectionUi ->
-                CatalogSectionLayoutMeta(
-                    key = sectionUi.section.key,
-                    layout = sectionUi.section.layout,
-                )
-            }
-        _catalogSectionsState.value = snapshot.catalogSections.associateBy { it.section.key }
-        updateLayout()
+        _state.update { current ->
+            current.copy(
+                heroState = snapshot.hero,
+                headerPills = snapshot.headerPills,
+                catalogSections = snapshot.catalogSections.associateBy { it.section.key },
+                layoutState = buildHomeLayoutState(
+                    wideRails = current.wideRailSections,
+                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
+                    catalogStatusMessage = catalogStatusMessage,
+                ),
+            )
+        }
     }
 
     private fun applyWatchActivitySnapshot(snapshot: HomeWatchActivitySnapshot) {
-        watchActivitySnapshot = snapshot
-        _wideRailSectionsState.update { current ->
-            current + mapOf(
+        _state.update { current ->
+            val updatedWideRails = current.wideRailSections + mapOf(
                 snapshot.continueWatching.key to snapshot.continueWatching,
                 snapshot.upNext.key to snapshot.upNext,
             )
+            current.copy(
+                wideRailSections = updatedWideRails,
+                layoutState = buildHomeLayoutState(
+                    wideRails = updatedWideRails,
+                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
+                    catalogStatusMessage = catalogStatusMessage,
+                ),
+            )
         }
-        updateLayout()
     }
 
     private fun applyThisWeekSection(section: HomeWideRailSectionUi) {
-        thisWeekSection = section
-        _wideRailSectionsState.update { current -> current + (section.key to section) }
-        updateLayout()
+        _state.update { current ->
+            val updatedWideRails = current.wideRailSections + (section.key to section)
+            current.copy(
+                wideRailSections = updatedWideRails,
+                layoutState = buildHomeLayoutState(
+                    wideRails = updatedWideRails,
+                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
+                    catalogStatusMessage = catalogStatusMessage,
+                ),
+            )
+        }
     }
 
     private fun updateWideRailSection(
         key: String,
         transform: (HomeWideRailSectionUi) -> HomeWideRailSectionUi,
     ) {
-        _wideRailSectionsState.update { current ->
-            val existing = current[key] ?: return@update current
-            current + (key to transform(existing))
+        _state.update { current ->
+            val existing = current.wideRailSections[key] ?: return@update current
+            val updatedWideRails = current.wideRailSections + (key to transform(existing))
+            current.copy(
+                wideRailSections = updatedWideRails,
+                layoutState = buildHomeLayoutState(
+                    wideRails = updatedWideRails,
+                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
+                    catalogStatusMessage = catalogStatusMessage,
+                ),
+            )
         }
-
-        watchActivitySnapshot =
-            when (key) {
-                CONTINUE_WATCHING_SECTION_KEY -> watchActivitySnapshot.copy(
-                    continueWatching = _wideRailSectionsState.value[key] ?: watchActivitySnapshot.continueWatching,
-                )
-                UP_NEXT_SECTION_KEY -> watchActivitySnapshot.copy(
-                    upNext = _wideRailSectionsState.value[key] ?: watchActivitySnapshot.upNext,
-                )
-                else -> watchActivitySnapshot
-            }
-        if (key == THIS_WEEK_SECTION_KEY) {
-            thisWeekSection = _wideRailSectionsState.value[key] ?: thisWeekSection
-        }
-        updateLayout()
-    }
-
-    private fun updateLayout() {
-        _layoutState.value = buildHomeLayoutState(
-            wideRails = _wideRailSectionsState.value,
-            catalogSectionLayoutMeta = catalogSectionLayoutMeta,
-            catalogStatusMessage = catalogStatusMessage,
-        )
     }
 
     private fun suppressKeys(vararg keys: String) {
