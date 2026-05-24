@@ -22,10 +22,10 @@ typealias SearchCatalogItem = CatalogItem
 
 internal fun CrispyBackendClient.PersonSearchResultItem.toCatalogItem(defaultGenre: String? = null): SearchCatalogItem? {
     val normalizedName = name.trim().ifBlank { return null }
-    val personItemId = "person:$tmdbPersonId"
+    val normalizedPersonId = personId.trim().ifBlank { return null }
     return SearchCatalogItem(
-        id = personItemId,
-        itemId = personItemId,
+        id = normalizedPersonId,
+        itemId = normalizedPersonId,
         title = normalizedName,
         posterUrl = profileUrl?.trim()?.takeIf { it.isNotBlank() },
         backdropUrl = null,

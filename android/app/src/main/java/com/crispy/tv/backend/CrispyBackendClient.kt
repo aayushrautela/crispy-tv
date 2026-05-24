@@ -158,7 +158,7 @@ class CrispyBackendClient(
 
     data class PersonSearchResultItem(
         val kind: String,
-        val tmdbPersonId: Int,
+        val personId: String,
         val name: String,
         val knownForDepartment: String?,
         val profileUrl: String?,
@@ -468,8 +468,7 @@ class CrispyBackendClient(
     )
 
     data class MetadataPersonRefView(
-        val id: String,
-        val tmdbPersonId: Int?,
+        val personId: String,
         val name: String,
         val role: String?,
         val department: String?,
@@ -546,9 +545,9 @@ class CrispyBackendClient(
 
     data class MetadataPersonKnownForItem(
         val itemId: String,
-        val itemType: String,
+        val mediaType: String,
         val title: String,
-        val posterUrl: String?,
+        val poster: ResponsiveImageSet,
         val rating: Double?,
         val releaseYear: Int?,
     ) {
@@ -557,17 +556,13 @@ class CrispyBackendClient(
     }
 
     data class MetadataPersonDetail(
-        val id: String,
-        val tmdbPersonId: Int,
+        val personId: String,
         val name: String,
         val knownForDepartment: String?,
         val biography: String?,
         val birthday: String?,
         val placeOfBirth: String?,
         val profileUrl: String?,
-        val imdbId: String?,
-        val instagramId: String?,
-        val twitterId: String?,
         val knownFor: List<MetadataPersonKnownForItem>,
     )
 
@@ -733,8 +728,8 @@ class CrispyBackendClient(
         )
     }
 
-    suspend fun getMetadataPersonDetail(accessToken: String, id: String, language: String? = null): MetadataPersonDetail {
-        return getMetadataPersonDetailApi(accessToken, id, language)
+    suspend fun getMetadataPersonDetail(accessToken: String, personId: String, language: String? = null): MetadataPersonDetail {
+        return getMetadataPersonDetailApi(accessToken, personId, language)
     }
 
 

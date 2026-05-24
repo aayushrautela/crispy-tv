@@ -268,10 +268,10 @@ internal fun DetailsBody(
                 contentPadding = contentPadding,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(items = cast, key = { it.id }, contentType = { "cast" }) { member ->
+                items(items = cast, key = { it.personId }, contentType = { "cast" }) { member ->
                     MetadataCastCard(
                         member = member,
-                        onClick = { onPersonClick(member.id) }
+                        onClick = { onPersonClick(member.personId) }
                     )
                 }
             }

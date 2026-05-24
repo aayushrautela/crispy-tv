@@ -97,11 +97,11 @@ internal suspend fun CrispyBackendClient.searchSuggestionsApi(
 
 internal suspend fun CrispyBackendClient.getMetadataPersonDetailApi(
     accessToken: String,
-    id: String,
+    personId: String,
     language: String? = null,
 ): MetadataPersonDetail {
     checkConfigured()
-    val url = "$baseUrl/v1/metadata/people/${id.trim()}".toHttpUrl().newBuilder()
+    val url = "$baseUrl/v1/metadata/people/${personId.trim()}".toHttpUrl().newBuilder()
         .apply {
             if (!language.isNullOrBlank()) {
                 addQueryParameter("language", language)

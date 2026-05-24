@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -45,7 +44,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,10 +53,6 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.woowla.compose.icon.collections.simpleicons.Simpleicons
-import com.woowla.compose.icon.collections.simpleicons.simpleicons.Imdb
-import com.woowla.compose.icon.collections.simpleicons.simpleicons.Instagram
-import com.woowla.compose.icon.collections.simpleicons.simpleicons.X
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -72,7 +66,7 @@ fun PersonDetailsRoute(
     val context = LocalContext.current
     val viewModel: PersonDetailsViewModel =
         viewModel(
-            key = "person:$personId",
+            key = personId,
             factory = PersonDetailsViewModel.factory(context, personId)
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -307,8 +301,6 @@ private fun PersonBody(
             Spacer(modifier = Modifier.height(18.dp))
         }
 
-        PersonSocialLinks(person = person)
-
         if (person.knownFor.isNotEmpty()) {
             Spacer(modifier = Modifier.height(22.dp))
             Text(
@@ -342,52 +334,6 @@ private fun PersonMeta(label: String, value: String, modifier: Modifier = Modifi
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(text = value, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun PersonSocialLinks(person: PersonDetails) {
-    val uriHandler = LocalUriHandler.current
-
-    val imdbUrl = person.imdbId?.trim()?.takeIf { it.isNotBlank() }?.let { "https://www.imdb.com/name/$it/" }
-    val instagramUrl =
-        person.instagramId?.trim()?.takeIf { it.isNotBlank() }?.let { "https://www.instagram.com/$it/" }
-    val twitterUrl = person.twitterId?.trim()?.takeIf { it.isNotBlank() }?.let { "https://twitter.com/$it" }
-
-    data class Link(
-        val label: String,
-        val url: String,
-        val icon: androidx.compose.ui.graphics.vector.ImageVector
-    )
-
-    val links =
-        remember(imdbUrl, instagramUrl, twitterUrl) {
-            listOfNotNull(
-                imdbUrl?.let { Link(label = "IMDb", url = it, icon = Simpleicons.Imdb) },
-                instagramUrl?.let { Link(label = "Instagram", url = it, icon = Simpleicons.Instagram) },
-                twitterUrl?.let { Link(label = "Twitter", url = it, icon = Simpleicons.X) }
-            )
-        }
-
-    if (links.isEmpty()) {
-        return
-    }
-
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        links.forEach { link ->
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            ) {
-                IconButton(
-                    onClick = { uriHandler.openUri(link.url) },
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(imageVector = link.icon, contentDescription = link.label)
-                }
-            }
-        }
     }
 }
 

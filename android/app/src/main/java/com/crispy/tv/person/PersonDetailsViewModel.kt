@@ -20,16 +20,13 @@ import kotlinx.coroutines.withContext
 
 @Immutable
 data class PersonDetails(
-    val tmdbPersonId: Int,
+    val personId: String,
     val name: String,
     val knownForDepartment: String?,
     val biography: String?,
     val birthday: String?,
     val placeOfBirth: String?,
     val profileUrl: String?,
-    val imdbId: String?,
-    val instagramId: String?,
-    val twitterId: String?,
     val knownFor: List<CatalogItem>
 )
 
@@ -102,7 +99,7 @@ class PersonDetailsViewModel internal constructor(
                             runCatching {
                                 backend.getMetadataPersonDetail(
                                     accessToken = session.accessToken,
-                                    id = requestedPersonId,
+                                    personId = requestedPersonId,
                                     language = locale.toLanguageTag(),
                                 ).toUiModel()
                             }.getOrNull()
@@ -119,31 +116,31 @@ class PersonDetailsViewModel internal constructor(
 
 private fun CrispyBackendClient.MetadataPersonDetail.toUiModel(): PersonDetails {
     return PersonDetails(
-        tmdbPersonId = tmdbPersonId,
+        personId = personId,
         name = name,
         knownForDepartment = knownForDepartment,
         biography = biography,
         birthday = birthday,
         placeOfBirth = placeOfBirth,
         profileUrl = profileUrl,
-        imdbId = imdbId,
-        instagramId = instagramId,
-        twitterId = twitterId,
         knownFor = knownFor.mapNotNull { it.toCatalogItem() },
     )
 }
 
 private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): CatalogItem? {
-    val type = if (itemType.equals("movie", ignoreCase = true)) "movie" else "show"
+    val type = if (mediaType.equals("movie", ignoreCase = true)) "movie" else "show"
     val normalizedItemId = itemId.trim().ifBlank { return null }
-    val normalizedPosterUrl = posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedPosterUrl = poster.medium?.trim()?.takeIf { it.isNotBlank() }
+        ?: poster.large?.trim()?.takeIf { it.isNotBlank() }
+        ?: poster.small?.trim()?.takeIf { it.isNotBlank() }
+        ?: return null
     return CatalogItem(
         id = normalizedItemId,
         itemId = normalizedItemId,
         title = title,
         posterUrl = normalizedPosterUrl,
         backdropUrl = null,
-        addonId = "tmdb",
+        addonId = "backend",
         type = type,
         rating = formatRating(rating),
         year = releaseYear?.toString(),

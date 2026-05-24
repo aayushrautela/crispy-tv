@@ -146,15 +146,14 @@ internal fun CrispyBackendClient.parsePersonSearchResultItems(array: JSONArray?)
 }
 
 internal fun CrispyBackendClient.parsePersonSearchResultItem(json: JSONObject): PersonSearchResultItem {
-    val tmdbPersonId = json.optIntOrNull("tmdbPersonId")
-        ?: throw IllegalStateException("Person search result is missing tmdbPersonId.")
+    val personId = json.optNullableString("personId")
     val name = json.optString("name").trim()
-    if (name.isBlank()) {
-        throw IllegalStateException("Person search result is missing name.")
+    if (personId.isNullOrBlank() || name.isBlank()) {
+        throw IllegalStateException("Person search result is missing required fields.")
     }
     return PersonSearchResultItem(
         kind = json.optNullableString("kind") ?: "person_search_result",
-        tmdbPersonId = tmdbPersonId,
+        personId = personId,
         name = name,
         knownForDepartment = json.optNullableString("knownForDepartment"),
         profileUrl = json.optNullableString("profileUrl"),
@@ -646,24 +645,19 @@ internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): Met
 }
 
 internal fun CrispyBackendClient.parseMetadataPersonDetail(json: JSONObject): MetadataPersonDetail {
-    val id = json.optString("id").trim()
-    val tmdbPersonId = json.optIntOrNull("tmdbPersonId")
+    val personId = json.optString("personId").trim()
     val name = json.optString("name").trim()
-    if (id.isBlank() || tmdbPersonId == null || name.isBlank()) {
+    if (personId.isBlank() || name.isBlank()) {
         throw IllegalStateException("Backend person detail is missing required fields.")
     }
     return MetadataPersonDetail(
-        id = id,
-        tmdbPersonId = tmdbPersonId,
+        personId = personId,
         name = name,
         knownForDepartment = json.optNullableString("knownForDepartment"),
         biography = json.optNullableString("biography"),
         birthday = json.optNullableString("birthday"),
         placeOfBirth = json.optNullableString("placeOfBirth"),
         profileUrl = json.optNullableString("profileUrl"),
-        imdbId = json.optNullableString("imdbId"),
-        instagramId = json.optNullableString("instagramId"),
-        twitterId = json.optNullableString("twitterId"),
         knownFor = parseMetadataPersonKnownForItems(json.optJSONArray("knownFor")),
     )
 }
@@ -673,16 +667,18 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
+            val itemId = item.optString("itemId").trim()
+            val mediaType = item.optString("mediaType").trim()
             val title = item.optString("title").trim()
-            if (title.isBlank()) {
+            if (itemId.isBlank() || mediaType.isBlank() || title.isBlank()) {
                 continue
             }
             add(
                 MetadataPersonKnownForItem(
-                    itemId = item.optString("itemId").trim(),
-                    itemType = item.optNullableString("itemType") ?: error("Person known-for item is missing itemType."),
+                    itemId = itemId,
+                    mediaType = mediaType,
                     title = title,
-                    posterUrl = item.optNullableString("posterUrl"),
+                    poster = parseResponsiveImageSet(item.optJSONObject("poster")),
                     rating = item.optDoubleOrNull("rating"),
                     releaseYear = item.optIntOrNull("releaseYear"),
                 )
@@ -721,14 +717,12 @@ internal fun CrispyBackendClient.parseMetadataPersonRefViews(array: JSONArray?):
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
-            val id = item.optString("id").trim()
-            val tmdbPersonId = item.optIntOrNull("tmdbPersonId")
+            val personId = item.optString("personId").trim()
             val name = item.optString("name").trim()
-            if (id.isBlank() || name.isBlank()) continue
+            if (personId.isBlank() || name.isBlank()) continue
             add(
                 MetadataPersonRefView(
-                    id = id,
-                    tmdbPersonId = tmdbPersonId,
+                    personId = personId,
                     name = name,
                     role = item.optNullableString("role"),
                     department = item.optNullableString("department"),
