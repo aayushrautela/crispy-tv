@@ -101,7 +101,7 @@ class HomeViewModel internal constructor(
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
                             refreshCoordinator = HomeRefreshCoordinator(
-                                recommendationCatalogService = SupabaseServicesProvider.recommendationCatalogService(appContext),
+                                homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
                                 homeWatchActivityService = HomeWatchActivityService(),
                                 watchHistoryService = watchHistoryService,
                                 calendarService =

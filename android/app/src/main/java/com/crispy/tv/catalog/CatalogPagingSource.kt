@@ -2,12 +2,12 @@ package com.crispy.tv.catalog
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.crispy.tv.home.RecommendationCatalogService
+import com.crispy.tv.home.HomeCatalogService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class CatalogPagingSource(
-    private val recommendationCatalogService: RecommendationCatalogService,
+    private val homeCatalogService: HomeCatalogService,
     private val section: CatalogSectionRef
 ) : PagingSource<Int, CatalogItem>() {
 
@@ -24,7 +24,7 @@ class CatalogPagingSource(
 
         return runCatching {
             val result = withContext(Dispatchers.IO) {
-                recommendationCatalogService.fetchCatalogPage(
+                homeCatalogService.fetchCatalogPage(
                     section = section,
                     page = page,
                     pageSize = pageSize

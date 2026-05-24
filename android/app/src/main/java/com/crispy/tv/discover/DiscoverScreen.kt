@@ -73,7 +73,7 @@ import com.crispy.tv.catalog.CatalogPagingSource
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.DiscoverCatalogRef
-import com.crispy.tv.home.RecommendationCatalogService
+import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.ui.components.PosterCard
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -115,7 +115,7 @@ data class DiscoverUiState(
 }
 
 class DiscoverViewModel(
-    private val recommendationCatalogService: RecommendationCatalogService
+    private val homeCatalogService: HomeCatalogService
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DiscoverUiState())
@@ -140,7 +140,7 @@ class DiscoverViewModel(
                             ),
                         pagingSourceFactory = {
                             CatalogPagingSource(
-                                recommendationCatalogService = recommendationCatalogService,
+                                homeCatalogService = homeCatalogService,
                                 section = selectedCatalog.section,
                             )
                         },
@@ -182,7 +182,7 @@ class DiscoverViewModel(
         viewModelScope.launch {
             val catalogsResult =
                 withContext(Dispatchers.IO) {
-                    recommendationCatalogService.listDiscoverCatalogs(
+                    homeCatalogService.listDiscoverCatalogs(
                         mediaType = filterSnapshot.mediaType,
                     )
                 }
@@ -211,7 +211,7 @@ class DiscoverViewModel(
                     if (modelClass.isAssignableFrom(DiscoverViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return DiscoverViewModel(
-                            recommendationCatalogService = SupabaseServicesProvider.recommendationCatalogService(appContext)
+                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext)
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

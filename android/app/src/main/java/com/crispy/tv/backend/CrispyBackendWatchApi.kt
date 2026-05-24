@@ -2,7 +2,7 @@ package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.BaseItemDtoQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
-import com.crispy.tv.backend.CrispyBackendClient.RecommendationsResponse
+import com.crispy.tv.backend.CrispyBackendClient.ProfileHomeResponse
 import com.crispy.tv.backend.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.WatchMutationInput
@@ -17,32 +17,21 @@ import org.json.JSONObject
 internal suspend fun CrispyBackendClient.getHomeApi(
     accessToken: String,
     profileId: String,
-    sourceKey: String? = null,
-    algorithmVersion: String? = null,
-): RecommendationsResponse? {
+): ProfileHomeResponse? {
     checkConfigured()
-    val url = "$baseUrl/v1/profiles/${profileId.trim()}/home".toHttpUrl().newBuilder()
-        .apply {
-            if (!sourceKey.isNullOrBlank()) addQueryParameter("sourceKey", sourceKey.trim())
-            if (!algorithmVersion.isNullOrBlank()) addQueryParameter("algorithmVersion", algorithmVersion.trim())
-        }
-        .build()
     val response = httpClient.get(
-        url = url,
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/home".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    val recommendations = json.optJSONObject("recommendations") ?: return null
-    return RecommendationsResponse(
-        profileId = recommendations.optString("profileId").trim(),
-        sourceKey = recommendations.optString("sourceKey").trim(),
-        algorithmVersion = recommendations.optString("algorithmVersion").trim(),
-        source = recommendations.optString("source").trim(),
-        generatedAt = recommendations.optNullableString("generatedAt"),
-        expiresAt = recommendations.optNullableString("expiresAt"),
-        updatedAt = recommendations.optNullableString("updatedAt"),
-        sections = parseRecommendationSections(recommendations.optJSONArray("sections")),
+    val parsedProfileId = json.optString("profileId").trim()
+    if (parsedProfileId.isBlank()) return null
+    return ProfileHomeResponse(
+        profileId = parsedProfileId,
+        generatedAt = json.optNullableString("generatedAt"),
+        expiresAt = json.optNullableString("expiresAt"),
+        sections = parseProfileHomeSections(json.optJSONArray("sections")),
     )
 }
 

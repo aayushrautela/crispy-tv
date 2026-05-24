@@ -5,49 +5,32 @@
   "input": {
     "kind": "home_snapshot_section",
     "payload": {
+      "listKey": "new-for-you",
+      "title": "New for You",
+      "subtitle": "Fresh recommendations",
       "layout": "landscape",
+      "meta": {},
       "items": [
         {
-          "Id": "c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7",
-          "Type": "Movie",
-          "Name": "Section Item",
-          "OriginalTitle": null,
-          "Overview": null,
-          "Taglines": [],
-          "ProductionYear": null,
-          "PremiereDate": null,
-          "CommunityRating": null,
-          "OfficialRating": null,
-          "Certification": null,
-          "Genres": [],
-          "RunTimeTicks": null,
-          "Status": null,
-          "ProviderIds": {
-            "Tmdb": null,
-            "Imdb": null,
-            "Tvdb": null
+          "itemId": "c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7",
+          "mediaType": "movie",
+          "title": "Section Item",
+          "subtitle": null,
+          "overview": null,
+          "year": null,
+          "releaseDate": null,
+          "rating": null,
+          "maturityRating": null,
+          "genres": [],
+          "runtimeSeconds": null,
+          "images": {
+            "poster": null,
+            "backdrop": null,
+            "logo": null,
+            "still": null
           },
-          "ImageTags": {
-            "Primary": null,
-            "Backdrop": [],
-            "Logo": null,
-            "Thumb": null,
-            "Screenshot": []
-          },
-          "ParentImageTags": null,
-          "SeriesId": null,
-          "SeriesName": null,
-          "SeasonId": null,
-          "SeasonName": null,
-          "ParentIndexNumber": null,
-          "IndexNumber": null,
-          "AbsoluteIndexNumber": null,
-          "EpisodeTitle": null,
-          "AirDate": null,
-          "RemoteTrailers": [],
-          "PosterColor": null,
-          "BackdropColor": null,
-          "UserData": null
+          "progress": null,
+          "parent": null
         }
       ]
     }

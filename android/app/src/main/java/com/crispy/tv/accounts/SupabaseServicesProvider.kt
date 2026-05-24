@@ -5,7 +5,7 @@ import com.crispy.tv.BuildConfig
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
-import com.crispy.tv.home.RecommendationCatalogService
+import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.metadata.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
@@ -19,7 +19,7 @@ object SupabaseServicesProvider {
     private var activeProfileStore: ActiveProfileStore? = null
 
     @Volatile
-    private var recommendationCatalogService: RecommendationCatalogService? = null
+    private var homeCatalogService: HomeCatalogService? = null
 
     fun accountClient(context: Context): SupabaseAccountClient {
         supabaseAccountClient?.let { return it }
@@ -48,18 +48,18 @@ object SupabaseServicesProvider {
         }
     }
 
-    fun recommendationCatalogService(context: Context): RecommendationCatalogService {
-        recommendationCatalogService?.let { return it }
+    fun homeCatalogService(context: Context): HomeCatalogService {
+        homeCatalogService?.let { return it }
         synchronized(this) {
-            recommendationCatalogService?.let { return it }
+            homeCatalogService?.let { return it }
             val appContext = context.applicationContext
             val created =
-                RecommendationCatalogService(
+                HomeCatalogService(
                     backendClient = BackendServicesProvider.backendClient(appContext),
                     backendContextResolver = BackendContextResolverProvider.get(appContext),
                     diskCacheStore = RecommendationCatalogDiskCacheStore(appContext),
                 )
-            recommendationCatalogService = created
+            homeCatalogService = created
             return created
         }
     }

@@ -75,6 +75,7 @@
               ],
               "enum": [
                 "media_item",
+                "recommendation_item",
                 "regular",
                 "landscape",
                 null

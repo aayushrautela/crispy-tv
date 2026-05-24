@@ -5,59 +5,61 @@
   "input": {
     "kind": "recommendation_item",
     "payload": {
-      "Id": "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6",
-      "Type": "Series",
-      "Name": "Recommended Show",
-      "OriginalTitle": null,
-      "Overview": null,
-      "Taglines": [],
-      "ProductionYear": null,
-      "PremiereDate": null,
-      "CommunityRating": null,
-      "OfficialRating": null,
-      "Certification": null,
-      "Genres": [],
-      "RunTimeTicks": null,
-      "Status": null,
-      "ProviderIds": {
-        "Tmdb": null,
-        "Imdb": null,
-        "Tvdb": null
+      "itemId": "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6",
+      "mediaType": "tv",
+      "title": "Recommended Show",
+      "subtitle": "Because you watched mystery series",
+      "overview": null,
+      "year": 2024,
+      "releaseDate": "2024-01-15",
+      "rating": 8.2,
+      "maturityRating": "TV-14",
+      "genres": ["Mystery"],
+      "runtimeSeconds": 2700,
+      "images": {
+        "poster": {
+          "small": "https://image.example/poster-small.jpg",
+          "medium": "https://image.example/poster-medium.jpg",
+          "large": "https://image.example/poster-large.jpg"
+        },
+        "backdrop": {
+          "small": "https://image.example/backdrop-small.jpg",
+          "medium": "https://image.example/backdrop-medium.jpg",
+          "large": "https://image.example/backdrop-large.jpg"
+        },
+        "logo": null,
+        "still": null
       },
-      "ImageTags": {
-        "Primary": null,
-        "Backdrop": [],
-        "Logo": null,
-        "Thumb": null,
-        "Screenshot": []
+      "progress": {
+        "played": false,
+        "playCount": 0,
+        "positionSeconds": 0,
+        "durationSeconds": 2700,
+        "percent": 12.5,
+        "lastPlayedAt": null,
+        "watchlisted": true,
+        "userRating": null
       },
-      "ParentImageTags": null,
-      "SeriesId": null,
-      "SeriesName": null,
-      "SeasonId": null,
-      "SeasonName": null,
-      "ParentIndexNumber": null,
-      "IndexNumber": null,
-      "AbsoluteIndexNumber": null,
-      "EpisodeTitle": null,
-      "AirDate": null,
-      "RemoteTrailers": [],
-      "PosterColor": null,
-      "BackdropColor": null,
-      "UserData": null
+      "parent": {
+        "seriesItemId": "series-1",
+        "seriesTitle": "Recommended Show",
+        "seasonItemId": "season-1",
+        "seasonNumber": 1,
+        "episodeNumber": null
+      }
     }
   },
   "expected": {
     "valid": true,
     "normalized": {
-      "card_family": "media_item",
+      "card_family": "recommendation_item",
       "item_id": "d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6",
-      "media_type": "Series",
+      "media_type": "tv",
       "title": "Recommended Show",
-      "poster_url": null,
-      "backdrop_url": null,
-      "subtitle": null,
-      "progress_percent": null,
+      "poster_url": "https://image.example/poster-medium.jpg",
+      "backdrop_url": "https://image.example/backdrop-medium.jpg",
+      "subtitle": "Because you watched mystery series",
+      "progress_percent": 12.5,
       "watched_at": null,
       "last_activity_at": null,
       "origins": null,

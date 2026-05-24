@@ -19,7 +19,8 @@ data class MediaStateNormalized(
 
 fun normalizeMediaStateCard(payload: Map<String, Any?>, kind: String): MediaStateNormalized? {
     return when (kind.trim().lowercase()) {
-        "media_item", "search_result", "recommendation_item" -> normalizeBaseItemDto(payload)
+        "media_item", "search_result" -> normalizeBaseItemDto(payload)
+        "recommendation_item" -> normalizeClientMediaCard(payload)
         "continue_watching_item" -> normalizeContinueWatching(payload)
         "watched_item" -> normalizeWatchedItem(payload)
         "watchlist_item" -> normalizeWatchlistItem(payload)
@@ -44,6 +45,24 @@ private fun normalizeBaseItemDto(payload: Map<String, Any?>): MediaStateNormaliz
         posterUrl = imageTags?.imageTagMedium("Primary"),
         backdropUrl = imageTags?.backdropMedium(),
         subtitle = payload.nullableStringValue("EpisodeTitle") ?: payload.nullableStringValue("Overview"),
+    )
+}
+
+private fun normalizeClientMediaCard(payload: Map<String, Any?>): MediaStateNormalized? {
+    val itemId = payload.stringValue("itemId") ?: return null
+    val mediaType = payload.stringValue("mediaType") ?: return null
+    val title = payload.stringValue("title") ?: return null
+    val images = payload.objectValue("images")
+    val progress = payload.objectValue("progress")
+    return MediaStateNormalized(
+        cardFamily = "recommendation_item",
+        itemId = itemId,
+        mediaType = mediaType,
+        title = title,
+        posterUrl = images?.imageSetMedium("poster"),
+        backdropUrl = images?.imageSetMedium("backdrop"),
+        subtitle = payload.nullableStringValue("subtitle") ?: payload.nullableStringValue("overview"),
+        progressPercent = progress?.doubleValue("percent"),
     )
 }
 
@@ -138,6 +157,10 @@ private fun Map<String, Any?>.backdropMedium(): String? {
         is Map<*, *> -> first.mapStringValue("medium")
         else -> null
     }
+}
+
+private fun Map<String, Any?>.imageSetMedium(key: String): String? {
+    return objectValue(key)?.mapStringValue("medium")
 }
 
 private fun Map<*, *>.mapStringValue(key: String): String? {

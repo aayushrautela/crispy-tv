@@ -198,25 +198,65 @@ class CrispyBackendClient(
         val trivia: String,
     )
 
-    // --- Recommendations ---
+    // --- Home ---
 
-    data class RecommendationSection(
-        val id: String,
-        val title: String,
-        val layout: String,
-        val sourceKey: String,
-        val items: List<MediaItem>,
+    data class ClientProgress(
+        val played: Boolean,
+        val playCount: Int,
+        val positionSeconds: Int?,
+        val durationSeconds: Int?,
+        val percent: Double?,
+        val lastPlayedAt: String?,
+        val watchlisted: Boolean,
+        val userRating: Double?,
     )
 
-    data class RecommendationsResponse(
+    data class ClientParentRef(
+        val seriesItemId: String?,
+        val seriesTitle: String?,
+        val seasonItemId: String?,
+        val seasonNumber: Int?,
+        val episodeNumber: Int?,
+    )
+
+    data class ClientImages(
+        val poster: ResponsiveImageSet,
+        val backdrop: ResponsiveImageSet,
+        val logo: ResponsiveImageSet,
+        val still: ResponsiveImageSet,
+    )
+
+    data class ClientMediaCard(
+        val itemId: String,
+        val mediaType: String,
+        val title: String,
+        val subtitle: String?,
+        val overview: String?,
+        val year: Int?,
+        val releaseDate: String?,
+        val rating: Double?,
+        val maturityRating: String?,
+        val genres: List<String>,
+        val runtimeSeconds: Int?,
+        val images: ClientImages,
+        val progress: ClientProgress?,
+        val parent: ClientParentRef?,
+    )
+
+    data class ProfileHomeSection(
+        val listKey: String,
+        val title: String,
+        val subtitle: String?,
+        val layout: String,
+        val items: List<ClientMediaCard>,
+        val meta: Map<String, String>,
+    )
+
+    data class ProfileHomeResponse(
         val profileId: String,
-        val sourceKey: String,
-        val algorithmVersion: String,
-        val source: String,
         val generatedAt: String?,
         val expiresAt: String?,
-        val updatedAt: String?,
-        val sections: List<RecommendationSection>,
+        val sections: List<ProfileHomeSection>,
     )
 
     // --- Calendar ---
@@ -705,10 +745,8 @@ class CrispyBackendClient(
     suspend fun getHome(
         accessToken: String,
         profileId: String,
-        sourceKey: String? = null,
-        algorithmVersion: String? = null,
-    ): RecommendationsResponse? {
-        return getHomeApi(accessToken, profileId, sourceKey, algorithmVersion)
+    ): ProfileHomeResponse? {
+        return getHomeApi(accessToken, profileId)
     }
 
     suspend fun getCalendar(accessToken: String, profileId: String): CalendarResponse {

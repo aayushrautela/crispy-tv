@@ -9,11 +9,11 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.home.RecommendationCatalogService
+import com.crispy.tv.home.HomeCatalogService
 import kotlinx.coroutines.flow.Flow
 
 class CatalogViewModel(
-    recommendationCatalogService: RecommendationCatalogService,
+    homeCatalogService: HomeCatalogService,
     section: CatalogSectionRef
 ) : ViewModel() {
 
@@ -26,7 +26,7 @@ class CatalogViewModel(
                 enablePlaceholders = false
             ),
             pagingSourceFactory = {
-                CatalogPagingSource(recommendationCatalogService, section)
+                CatalogPagingSource(homeCatalogService, section)
             }
         ).flow.cachedIn(viewModelScope)
 
@@ -38,7 +38,7 @@ class CatalogViewModel(
                     if (modelClass.isAssignableFrom(CatalogViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return CatalogViewModel(
-                            recommendationCatalogService = SupabaseServicesProvider.recommendationCatalogService(appContext),
+                            homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
                             section = section
                         ) as T
                     }
