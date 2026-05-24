@@ -51,8 +51,10 @@ public struct MediaStateNormalized: Equatable {
 
 public func normalizeMediaStateCard(payload: [String: Any], kind: String) -> MediaStateNormalized? {
     switch kind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-    case "media_item", "search_result", "recommendation_item":
+    case "media_item", "search_result":
         return normalizeBaseItemDto(payload)
+    case "recommendation_item":
+        return normalizeClientMediaCard(payload)
     case "continue_watching_item":
         return normalizeContinueWatching(payload)
     case "watched_item":
@@ -88,6 +90,31 @@ private func normalizeBaseItemDto(_ payload: [String: Any]) -> MediaStateNormali
         backdropUrl: backdropMedium(imageTags),
         subtitle: nullableStringValue(payload, "EpisodeTitle") ?? nullableStringValue(payload, "Overview")
     )
+}
+
+private func normalizeClientMediaCard(_ payload: [String: Any]) -> MediaStateNormalized? {
+    guard let itemId = stringValue(payload, "itemId"),
+          let mediaType = stringValue(payload, "mediaType"),
+          let title = stringValue(payload, "title") else {
+        return nil
+    }
+    let images = objectValue(payload, "images")
+    let progress = objectValue(payload, "progress")
+    return MediaStateNormalized(
+        cardFamily: "recommendation_item",
+        itemId: itemId,
+        mediaType: mediaType,
+        title: title,
+        posterUrl: imageSetMedium(images, "poster"),
+        backdropUrl: imageSetMedium(images, "backdrop"),
+        subtitle: nullableStringValue(payload, "subtitle") ?? nullableStringValue(payload, "overview"),
+        progressPercent: doubleValue(progress, "percent")
+    )
+}
+
+private func imageSetMedium(_ set: [String: Any]?, _ key: String) -> String? {
+    guard let object = set?[key] as? [String: Any] else { return nil }
+    return nullableStringValue(object, "medium")
 }
 
 private func userDataFrom(_ payload: [String: Any]) -> [String: Any]? {
