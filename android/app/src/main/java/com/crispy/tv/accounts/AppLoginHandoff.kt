@@ -3,32 +3,14 @@ package com.crispy.tv.accounts
 import android.net.Uri
 import com.crispy.tv.BuildConfig
 
-object AppLoginHandoff {
+object AccountPortalUrls {
     fun portalUrl(): String = BuildConfig.ACCOUNT_PORTAL_URL.trim().trimEnd('/')
 
-    fun isPortalConfigured(): Boolean = portalUrl().isNotBlank()
+    fun isConfigured(): Boolean = portalUrl().isNotBlank()
 
-    val defaultReturnUri: String get() = "crispy://auth/callback"
-
-    fun buildPortalLoginUrl(returnUri: String): Uri? {
-        val base = portalUrl()
-        if (base.isBlank()) return null
-        return Uri.parse("$base/app-login?return_uri=${Uri.encode(returnUri)}")
-    }
-
-    fun buildPortalPageUrl(path: String): Uri? {
+    fun portalPageUrl(path: String): Uri? {
         val base = portalUrl()
         if (base.isBlank()) return null
         return Uri.parse("$base/${path.trimStart('/')}")
     }
-
-    fun portalAccountUrl(): Uri? = buildPortalPageUrl("/account")
-
-    fun portalProviderImportsUrl(): Uri? = buildPortalPageUrl("/provider-imports")
-
-    fun portalApiKeysUrl(): Uri? = buildPortalPageUrl("/api-keys")
-
-    fun portalAddonsUrl(): Uri? = buildPortalPageUrl("/addons")
-
-    fun portalProfilesUrl(): Uri? = buildPortalPageUrl("/profiles")
 }

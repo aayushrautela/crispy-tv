@@ -1,41 +1,54 @@
 package com.crispy.tv.settings
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
+import android.graphics.Bitmap
+import android.view.ViewGroup
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.accounts.AppLoginHandoff
+import com.crispy.tv.accounts.AccountPortalUrls
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
@@ -50,13 +63,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @Immutable
-data class AccountsPortalUiState(
+data class AccountUiState(
+    val supabaseConfigured: Boolean = false,
     val portalConfigured: Boolean = false,
     val isBusy: Boolean = false,
     val authenticated: Boolean = false,
-    val userId: String? = null,
     val email: String? = null,
-    val activeProfileName: String? = null,
     val statusMessage: String = "",
     val pendingPortalUrl: String? = null,
 )
@@ -74,21 +86,30 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
-    LaunchedEffect(uiState.pendingPortalUrl) {
-        val urlStr = uiState.pendingPortalUrl
-        if (urlStr != null) {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(urlStr)))
-            viewModel.clearPortalUrl()
-        }
+    var mode by remember { mutableStateOf(0) }
+    var signInEmail by remember { mutableStateOf("") }
+    var signInPassword by remember { mutableStateOf("") }
+    var signUpEmail by remember { mutableStateOf("") }
+    var signUpPassword by remember { mutableStateOf("") }
+
+    val topBarTitle = when {
+        uiState.pendingPortalUrl != null -> "Account & Subscription"
+        else -> "Account"
     }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
-                title = "Account",
+                title = topBarTitle,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (uiState.pendingPortalUrl != null) {
+                            viewModel.clearPortalUrl()
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = "Back"
@@ -99,99 +120,203 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
             )
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = pageHorizontalPadding,
-                end = pageHorizontalPadding,
-                top = Dimensions.SectionSpacing,
-                bottom = Dimensions.PageBottomPadding
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (!uiState.portalConfigured) {
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
+        when {
+            uiState.pendingPortalUrl != null -> {
+                AccountPortalWebView(
+                    url = uiState.pendingPortalUrl!!,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                )
+            }
+
+            !uiState.authenticated -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentPadding = PaddingValues(
+                        start = pageHorizontalPadding,
+                        end = pageHorizontalPadding,
+                        top = Dimensions.SectionSpacing,
+                        bottom = Dimensions.PageBottomPadding
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (uiState.statusMessage.isNotBlank()) {
+                        item {
                             Text(
-                                text = "Account portal is not configured.",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = "Set ACCOUNT_PORTAL_URL in your Gradle properties.",
+                                text = uiState.statusMessage,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                }
-            }
 
-            if (uiState.statusMessage.isNotBlank()) {
-                item {
-                    Text(
-                        text = uiState.statusMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (!uiState.authenticated) {
-                item {
-                    Button(
-                        onClick = { viewModel.openSignIn() },
-                        enabled = uiState.portalConfigured && !uiState.isBusy,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Sign in with Crispy Account")
+                    if (!uiState.supabaseConfigured) {
+                        item {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
+                                    Text(
+                                        text = "Authentication is not configured.",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        text = "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in your Gradle properties.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else if (mode == 0) {
+                        item {
+                            OutlinedTextField(
+                                value = signInEmail,
+                                onValueChange = { signInEmail = it.trim() },
+                                label = { Text("Email") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Email,
+                                    imeAction = ImeAction.Next
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        item {
+                            OutlinedTextField(
+                                value = signInPassword,
+                                onValueChange = { signInPassword = it },
+                                label = { Text("Password") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Password,
+                                    imeAction = ImeAction.Done
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        item {
+                            Button(
+                                onClick = { viewModel.signIn(signInEmail, signInPassword) },
+                                enabled = !uiState.isBusy && signInEmail.isNotBlank() && signInPassword.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Sign in")
+                            }
+                        }
+                        item {
+                            TextButton(
+                                onClick = { mode = 1; signInEmail = ""; signInPassword = "" },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Create account")
+                            }
+                        }
+                    } else {
+                        item {
+                            OutlinedTextField(
+                                value = signUpEmail,
+                                onValueChange = { signUpEmail = it.trim() },
+                                label = { Text("Email") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Email,
+                                    imeAction = ImeAction.Next
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        item {
+                            OutlinedTextField(
+                                value = signUpPassword,
+                                onValueChange = { signUpPassword = it },
+                                label = { Text("Password") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Password,
+                                    imeAction = ImeAction.Done
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        item {
+                            Button(
+                                onClick = { viewModel.signUp(signUpEmail, signUpPassword) },
+                                enabled = !uiState.isBusy && signUpEmail.isNotBlank() && signUpPassword.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Create account")
+                            }
+                        }
+                        item {
+                            TextButton(
+                                onClick = { mode = 0; signUpEmail = ""; signUpPassword = "" },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Already have an account? Sign in")
+                            }
+                        }
                     }
                 }
-            } else {
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentPadding = PaddingValues(
+                        start = pageHorizontalPadding,
+                        end = pageHorizontalPadding,
+                        top = Dimensions.SectionSpacing,
+                        bottom = Dimensions.PageBottomPadding
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (uiState.statusMessage.isNotBlank()) {
+                        item {
                             Text(
-                                text = "Signed in",
-                                style = MaterialTheme.typography.titleMedium
+                                text = uiState.statusMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(
-                                text = uiState.email ?: "(unknown)",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            if (!uiState.activeProfileName.isNullOrBlank()) {
+                        }
+                    }
+
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
                                 Text(
-                                    text = "Active profile: ${uiState.activeProfileName}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "Signed in",
+                                    style = MaterialTheme.typography.titleMedium
                                 )
-                            }
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = { viewModel.openPortalPage("account") },
-                                    enabled = uiState.portalConfigured && !uiState.isBusy,
-                                    modifier = Modifier.fillMaxWidth()
+                                Text(
+                                    text = uiState.email ?: "(unknown)",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("Account settings")
-                                }
-                                Button(
-                                    onClick = { viewModel.openPortalPage("profiles") },
-                                    enabled = uiState.portalConfigured && !uiState.isBusy,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Manage profiles")
-                                }
-                                OutlinedButton(
-                                    onClick = viewModel::signOut,
-                                    enabled = !uiState.isBusy,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Sign out")
+                                    Button(
+                                        onClick = { viewModel.openAccountPortal() },
+                                        enabled = uiState.portalConfigured && !uiState.isBusy,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Account and subscription")
+                                    }
+                                    OutlinedButton(
+                                        onClick = viewModel::signOut,
+                                        enabled = !uiState.isBusy,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Sign out")
+                                    }
                                 }
                             }
                         }
@@ -202,16 +327,58 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
     }
 }
 
+@Composable
+private fun AccountPortalWebView(
+    url: String,
+    modifier: Modifier = Modifier,
+) {
+    var isLoading by remember { mutableStateOf(true) }
+
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            isLoading = true
+                        }
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            isLoading = false
+                        }
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                            return false
+                        }
+                    }
+                    loadUrl(url)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+    }
+}
+
 internal class AccountsPortalViewModel(
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
-        AccountsPortalUiState(
-            portalConfigured = AppLoginHandoff.isPortalConfigured(),
+        AccountUiState(
+            supabaseConfigured = supabase.isConfigured(),
+            portalConfigured = AccountPortalUrls.isConfigured(),
         ),
     )
-    val uiState: StateFlow<AccountsPortalUiState> = _uiState
+    val uiState: StateFlow<AccountUiState> = _uiState
 
     init {
         refresh()
@@ -223,47 +390,68 @@ internal class AccountsPortalViewModel(
             val session = runCatching { supabase.ensureValidSession() }.getOrNull()
             if (session == null) {
                 _uiState.update {
-                    it.copy(
-                        isBusy = false,
-                        authenticated = false,
-                        userId = null,
-                        email = null,
-                        activeProfileName = null,
-                    )
+                    it.copy(isBusy = false, authenticated = false, email = null)
                 }
                 return@launch
             }
             _uiState.update {
-                it.copy(
-                    isBusy = false,
-                    authenticated = true,
-                    userId = session.userId,
-                    email = session.email,
-                )
+                it.copy(isBusy = false, authenticated = true, email = session.email)
             }
-            val me = runCatching { backend.getMe(session.accessToken) }.getOrNull()
-            if (me != null) {
+        }
+    }
+
+    fun signIn(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
+            try {
+                supabase.signInWithEmail(email.trim(), password)
+                refresh()
+            } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(
-                        activeProfileName = me.profiles.firstOrNull()?.name,
-                        statusMessage = "",
-                    )
+                    it.copy(isBusy = false, statusMessage = e.message ?: "Sign in failed.")
                 }
             }
         }
     }
 
-    fun openSignIn() {
-        val url = AppLoginHandoff.buildPortalLoginUrl(AppLoginHandoff.defaultReturnUri)
-        if (url != null) {
-            _uiState.update { it.copy(pendingPortalUrl = url.toString()) }
+    fun signUp(email: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
+            try {
+                val result = supabase.signUpWithEmail(email.trim(), password)
+                if (result.session != null) {
+                    refresh()
+                } else {
+                    _uiState.update {
+                        it.copy(isBusy = false, statusMessage = result.message)
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isBusy = false, statusMessage = e.message ?: "Sign up failed.")
+                }
+            }
         }
     }
 
-    fun openPortalPage(path: String) {
-        val url = AppLoginHandoff.buildPortalPageUrl(path)
-        if (url != null) {
-            _uiState.update { it.copy(pendingPortalUrl = url.toString()) }
+    fun openAccountPortal() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
+            val session = runCatching { supabase.ensureValidSession() }.getOrNull()
+            if (session != null) {
+                try {
+                    val result = backend.createPortalHandoffCode(session.accessToken, "/account")
+                    _uiState.update { it.copy(pendingPortalUrl = result.portalUrl, isBusy = false) }
+                } catch (e: Exception) {
+                    _uiState.update {
+                        it.copy(isBusy = false, statusMessage = e.message ?: "Failed to open portal.")
+                    }
+                }
+            } else {
+                _uiState.update {
+                    it.copy(isBusy = false, statusMessage = "Session expired. Sign in again.")
+                }
+            }
         }
     }
 
@@ -273,25 +461,21 @@ internal class AccountsPortalViewModel(
 
     fun signOut() {
         viewModelScope.launch {
-            val userId = uiState.value.userId
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
             runCatching { supabase.signOut() }
             _uiState.update {
                 it.copy(
                     isBusy = false,
                     authenticated = false,
-                    userId = null,
                     email = null,
-                    activeProfileName = null,
                     statusMessage = "Signed out.",
                 )
             }
-            refresh()
         }
     }
 
     companion object {
-        fun factory(appContext: Context): ViewModelProvider.Factory {
+        fun factory(appContext: android.content.Context): ViewModelProvider.Factory {
             val safeContext = appContext.applicationContext
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")

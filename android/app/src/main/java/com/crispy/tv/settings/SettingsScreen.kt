@@ -72,7 +72,6 @@ fun SettingsScreen(
     onNavigateToAddonsSettings: () -> Unit = {},
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToImageSettings: () -> Unit = {},
-    onNavigateToProviderPortal: () -> Unit = {},
     onNavigateToAccountsProfiles: () -> Unit = {},
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
@@ -90,6 +89,19 @@ fun SettingsScreen(
 
     val settingsGroups =
         listOf(
+            SettingsGroup(
+                title = "ACCOUNT",
+                items =
+                    listOf(
+                        SettingsItem(
+                            label = "Account and subscription",
+                            description = "Manage your account, subscription, profiles, and billing",
+                            icon = Icons.Outlined.Person,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onClick = onNavigateToAccountsProfiles
+                        )
+                    )
+            ),
             SettingsGroup(
                 title = "PERSONALIZATION",
                 items =
@@ -126,20 +138,6 @@ fun SettingsScreen(
                             icon = Icons.Outlined.Extension,
                             iconTint = MaterialTheme.colorScheme.primary,
                             onClick = onNavigateToAddonsSettings
-                        ),
-                        SettingsItem(
-                            label = "Provider Imports",
-                            description = "Connect Trakt, Simkl, and import history",
-                            icon = Icons.Outlined.Cloud,
-                            iconTint = MaterialTheme.colorScheme.tertiary,
-                            onClick = onNavigateToProviderPortal
-                        ),
-                        SettingsItem(
-                            label = "Account",
-                            description = "Sign in, manage profiles, and account settings",
-                            icon = Icons.Outlined.Person,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            onClick = onNavigateToAccountsProfiles
                         ),
                         SettingsItem(
                             label = "Language & Region",

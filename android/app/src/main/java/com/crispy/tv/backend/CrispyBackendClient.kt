@@ -82,10 +82,8 @@ class CrispyBackendClient(
         val nextAction: String,
     )
 
-    data class AppLoginExchangeResult(
-        val plaintextToken: String,
-        val userId: String,
-        val email: String?,
+    data class PortalHandoffResult(
+        val portalUrl: String,
     )
 
     data class MediaExternalIds(
@@ -710,8 +708,8 @@ class CrispyBackendClient(
         return disconnectImportConnectionApi(accessToken, profileId, provider)
     }
 
-    suspend fun exchangeAppLoginCode(code: String, deviceName: String? = null): AppLoginExchangeResult {
-        return exchangeAppLoginCodeApi(code, deviceName)
+    suspend fun createPortalHandoffCode(accessToken: String, redirectPath: String = "/account"): PortalHandoffResult {
+        return createPortalHandoffCodeApi(accessToken, redirectPath)
     }
 
     suspend fun resolveMetadata(accessToken: String, input: ItemLookupInput): MetadataResolveResponse {

@@ -41,18 +41,6 @@ class SupabaseAccountClient(
         return baseUrl.isNotBlank() && supabasePublishableKey.isNotBlank()
     }
 
-    fun saveAppSession(accessToken: String, userId: String, email: String?) {
-        val session = Session(
-            accessToken = accessToken,
-            refreshToken = "",
-            expiresAtEpochSec = null,
-            userId = userId,
-            email = email,
-            anonymous = false,
-        )
-        saveSession(session)
-    }
-
     fun clearLocalSession() {
         saveSession(null)
     }
