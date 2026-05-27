@@ -60,9 +60,10 @@ class MainActivity : ComponentActivity() {
         val code = data.getQueryParameter("code")
         if (code.isNullOrBlank()) return
 
+        val appContext = applicationContext
+
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val appContext = applicationContext
                 val backend = BackendServicesProvider.backendClient(appContext)
                 val supabase = SupabaseServicesProvider.accountClient(appContext)
 
