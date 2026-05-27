@@ -15,4 +15,20 @@ object AppLoginHandoff {
         if (base.isBlank()) return null
         return Uri.parse("$base/app-login?return_uri=${Uri.encode(returnUri)}")
     }
+
+    fun buildPortalPageUrl(path: String): Uri? {
+        val base = portalUrl()
+        if (base.isBlank()) return null
+        return Uri.parse("$base/${path.trimStart('/')}")
+    }
+
+    fun portalAccountUrl(): Uri? = buildPortalPageUrl("/account")
+
+    fun portalProviderImportsUrl(): Uri? = buildPortalPageUrl("/provider-imports")
+
+    fun portalApiKeysUrl(): Uri? = buildPortalPageUrl("/api-keys")
+
+    fun portalAddonsUrl(): Uri? = buildPortalPageUrl("/addons")
+
+    fun portalProfilesUrl(): Uri? = buildPortalPageUrl("/profiles")
 }

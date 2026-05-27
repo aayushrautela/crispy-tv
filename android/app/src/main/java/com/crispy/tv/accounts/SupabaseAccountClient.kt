@@ -67,6 +67,11 @@ class SupabaseAccountClient(
             return existing
         }
 
+        if (!isConfigured()) {
+            saveSession(null)
+            return null
+        }
+
         return sessionMutex.withLock {
             val latest = loadSession() ?: return@withLock null
             if (!shouldRefresh(latest)) {

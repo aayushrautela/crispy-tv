@@ -3,18 +3,13 @@ package com.crispy.tv.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Button
@@ -22,11 +17,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,26 +26,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.nestedscroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.AppLoginHandoff
-import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.player.WatchHistoryService
-import com.crispy.tv.sync.ProfileDataCloudSync
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -64,18 +50,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @Immutable
-data class AccountsProfilesUiState(
-    val configured: Boolean = false,
+data class AccountsPortalUiState(
+    val portalConfigured: Boolean = false,
     val isBusy: Boolean = false,
-    val statusMessage: String = "",
-    val emailInput: String = "",
-    val passwordInput: String = "",
     val authenticated: Boolean = false,
     val userId: String? = null,
     val email: String? = null,
-    val profiles: List<CrispyBackendClient.Profile> = emptyList(),
-    val activeProfileId: String? = null,
-    val newProfileNameInput: String = "",
+    val activeProfileName: String? = null,
+    val statusMessage: String = "",
     val pendingPortalUrl: String? = null,
 )
 
@@ -85,8 +67,8 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
 
-    val viewModel: AccountsProfilesViewModel = viewModel(
-        factory = remember(appContext) { AccountsProfilesViewModel.factory(appContext) }
+    val viewModel: AccountsPortalViewModel = viewModel(
+        factory = remember(appContext) { AccountsPortalViewModel.factory(appContext) }
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = appBarScrollBehavior()
@@ -95,8 +77,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
     LaunchedEffect(uiState.pendingPortalUrl) {
         val urlStr = uiState.pendingPortalUrl
         if (urlStr != null) {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlStr))
-            context.startActivity(intent)
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(urlStr)))
             viewModel.clearPortalUrl()
         }
     }
@@ -105,7 +86,7 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
-                title = "Accounts & Profiles",
+                title = "Account",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -130,20 +111,16 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (!uiState.configured) {
+            if (!uiState.portalConfigured) {
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
                             Text(
-                                text = "Account services are not configured.",
+                                text = "Account portal is not configured.",
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = if (AppLoginHandoff.isPortalConfigured())
-                                    "Set CRISPY_BACKEND_URL in your Gradle properties."
-                                else
-                                    "Set ACCOUNT_PORTAL_URL or SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in your Gradle properties.",
+                                text = "Set ACCOUNT_PORTAL_URL in your Gradle properties.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -162,67 +139,14 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                 }
             }
 
-            item {
-                Text(
-                    text = "Account",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
             if (!uiState.authenticated) {
                 item {
-                    if (AppLoginHandoff.isPortalConfigured()) {
-                        Button(
-                            onClick = viewModel::startPortalLogin,
-                            enabled = uiState.configured && !uiState.isBusy,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Sign in with Crispy Account")
-                        }
-                    } else {
-                        OutlinedTextField(
-                            value = uiState.emailInput,
-                            onValueChange = viewModel::onEmailChanged,
-                            label = { Text("Email") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            enabled = uiState.configured && !uiState.isBusy
-                        )
-                    }
-                }
-                if (!AppLoginHandoff.isPortalConfigured()) {
-                    item {
-                        OutlinedTextField(
-                            value = uiState.passwordInput,
-                            onValueChange = viewModel::onPasswordChanged,
-                            label = { Text("Password") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            enabled = uiState.configured && !uiState.isBusy
-                        )
-                    }
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = viewModel::signIn,
-                                enabled = uiState.configured && !uiState.isBusy,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Sign in")
-                            }
-                            OutlinedButton(
-                                onClick = viewModel::signUp,
-                                enabled = uiState.configured && !uiState.isBusy,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Create")
-                            }
-                        }
+                    Button(
+                        onClick = { viewModel.openSignIn() },
+                        enabled = uiState.portalConfigured && !uiState.isBusy,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Sign in with Crispy Account")
                     }
                 }
             } else {
@@ -233,35 +157,39 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                                 text = "Signed in",
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = uiState.email ?: "(unknown email)",
+                                text = uiState.email ?: "(unknown)",
                                 style = MaterialTheme.typography.bodyMedium
                             )
-                            if (!uiState.userId.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(4.dp))
+                            if (!uiState.activeProfileName.isNullOrBlank()) {
                                 Text(
-                                    text = "User: ${uiState.userId}",
+                                    text = "Active profile: ${uiState.activeProfileName}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                OutlinedButton(
-                                    onClick = viewModel::refresh,
-                                    enabled = uiState.configured && !uiState.isBusy,
-                                    modifier = Modifier.weight(1f)
+                                Button(
+                                    onClick = { viewModel.openPortalPage("account") },
+                                    enabled = uiState.portalConfigured && !uiState.isBusy,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Refresh")
+                                    Text("Account settings")
                                 }
                                 Button(
+                                    onClick = { viewModel.openPortalPage("profiles") },
+                                    enabled = uiState.portalConfigured && !uiState.isBusy,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Manage profiles")
+                                }
+                                OutlinedButton(
                                     onClick = viewModel::signOut,
-                                    enabled = uiState.configured && !uiState.isBusy,
-                                    modifier = Modifier.weight(1f)
+                                    enabled = !uiState.isBusy,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text("Sign out")
                                 }
@@ -270,104 +198,23 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                     }
                 }
             }
-
-            if (uiState.authenticated) {
-                item {
-                    Text(
-                        text = "Profiles",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (uiState.profiles.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No profiles yet.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    items(items = uiState.profiles, key = { it.id }) { profile ->
-                        ListItem(
-                            headlineContent = { Text(profile.name) },
-                            supportingContent = {
-                                Text(
-                                    text = "Order ${profile.sortOrder}",
-                                    maxLines = 1
-                                )
-                            },
-                            trailingContent = {
-                                RadioButton(
-                                    selected = profile.id == uiState.activeProfileId,
-                                    onClick = { viewModel.selectProfile(profile.id) }
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { viewModel.selectProfile(profile.id) }
-                        )
-                    }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                item {
-                    OutlinedTextField(
-                        value = uiState.newProfileNameInput,
-                        onValueChange = viewModel::onNewProfileNameChanged,
-                        label = { Text("New profile name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = uiState.configured && !uiState.isBusy
-                    )
-                }
-
-                item {
-                    Button(
-                        onClick = viewModel::createProfile,
-                        enabled = uiState.configured && !uiState.isBusy,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Create profile")
-                    }
-                }
-            }
         }
     }
 }
 
-internal class AccountsProfilesViewModel(
+internal class AccountsPortalViewModel(
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
-    private val profileStore: ActiveProfileStore,
-    private val profileDataCloudSync: ProfileDataCloudSync,
-    private val watchHistoryService: WatchHistoryService,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
-        AccountsProfilesUiState(
-            configured = backend.isConfigured() && (supabase.isConfigured() || AppLoginHandoff.isPortalConfigured()),
+        AccountsPortalUiState(
+            portalConfigured = AppLoginHandoff.isPortalConfigured(),
         ),
     )
-    val uiState: StateFlow<AccountsProfilesUiState> = _uiState
+    val uiState: StateFlow<AccountsPortalUiState> = _uiState
 
     init {
         refresh()
-    }
-
-    fun onEmailChanged(value: String) {
-        _uiState.update { it.copy(emailInput = value) }
-    }
-
-    fun onPasswordChanged(value: String) {
-        _uiState.update { it.copy(passwordInput = value) }
-    }
-
-    fun onNewProfileNameChanged(value: String) {
-        _uiState.update { it.copy(newProfileNameInput = value) }
     }
 
     fun refresh() {
@@ -381,135 +228,40 @@ internal class AccountsProfilesViewModel(
                         authenticated = false,
                         userId = null,
                         email = null,
-                        profiles = emptyList(),
-                        activeProfileId = null
+                        activeProfileName = null,
                     )
                 }
                 return@launch
             }
-
-            val me =
-                runCatching { backend.getMe(session.accessToken) }
-                    .getOrElse {
-                        _uiState.update { state ->
-                            state.copy(
-                                isBusy = false,
-                                authenticated = true,
-                                userId = session.userId,
-                                email = session.email,
-                                statusMessage = it.message.orEmpty(),
-                            )
-                        }
-                        return@launch
-                    }
-
-            val profiles = me.profiles
-
-            val userId = session.userId?.ifBlank { me.user.id } ?: me.user.id
-            val storedActive = profileStore.getActiveProfileId(userId)
-            val resolvedActive =
-                storedActive?.takeIf { id -> profiles.any { it.id == id } }
-                    ?: profiles.firstOrNull()?.id
-
-            if (resolvedActive != null && resolvedActive != storedActive) {
-                profileStore.setActiveProfileId(userId, resolvedActive)
-            }
-
-            val settingsSyncError =
-                profileDataCloudSync.pullForActiveProfile().exceptionOrNull()?.message
-
             _uiState.update {
                 it.copy(
                     isBusy = false,
                     authenticated = true,
-                    userId = userId,
-                    email = me.user.email ?: session.email,
-                    profiles = profiles,
-                    activeProfileId = resolvedActive,
-                    statusMessage =
-                        when {
-                            !settingsSyncError.isNullOrBlank() -> "Settings sync failed: $settingsSyncError"
-                            else -> ""
-                        }
+                    userId = session.userId,
+                    email = session.email,
                 )
             }
-        }
-    }
-
-    fun signIn() {
-        viewModelScope.launch {
-            val email = uiState.value.emailInput.trim()
-            val password = uiState.value.passwordInput
-            if (email.isBlank() || password.isBlank()) {
-                _uiState.update { it.copy(statusMessage = "Enter email and password.") }
-                return@launch
-            }
-
-            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
-            val result = runCatching { supabase.signInWithEmail(email, password) }
-            result.onFailure {
-                _uiState.update { state ->
-                    state.copy(isBusy = false, statusMessage = it.message.orEmpty())
+            val me = runCatching { backend.getMe(session.accessToken) }.getOrNull()
+            if (me != null) {
+                _uiState.update {
+                    it.copy(
+                        activeProfileName = me.profiles.firstOrNull()?.name,
+                        statusMessage = "",
+                    )
                 }
-                return@launch
-            }
-
-            _uiState.update { it.copy(passwordInput = "") }
-            refresh()
-        }
-    }
-
-    fun signUp() {
-        viewModelScope.launch {
-            val email = uiState.value.emailInput.trim()
-            val password = uiState.value.passwordInput
-            if (email.isBlank() || password.isBlank()) {
-                _uiState.update { it.copy(statusMessage = "Enter email and password.") }
-                return@launch
-            }
-
-            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
-            val result = runCatching { supabase.signUpWithEmail(email, password) }
-            val signUp = result.getOrNull()
-            if (signUp == null) {
-                _uiState.update { state ->
-                    state.copy(isBusy = false, statusMessage = result.exceptionOrNull()?.message.orEmpty())
-                }
-                return@launch
-            }
-
-            _uiState.update { it.copy(passwordInput = "", statusMessage = signUp.message, isBusy = false) }
-            if (signUp.session != null) {
-                refresh()
             }
         }
     }
 
-    fun signOut() {
-        viewModelScope.launch {
-            val userId = uiState.value.userId
-            _uiState.update { it.copy(isBusy = true, statusMessage = "") }
-            runCatching { supabase.signOut() }
-            profileStore.clear(userId)
-            refresh()
-        }
-    }
-
-    fun selectProfile(profileId: String) {
-        val userId = uiState.value.userId
-        if (userId.isNullOrBlank()) return
-        profileStore.setActiveProfileId(userId, profileId)
-        _uiState.update { it.copy(activeProfileId = profileId, statusMessage = "") }
-
-        viewModelScope.launch {
-            profileDataCloudSync.pullForActiveProfile().onFailure {
-                _uiState.update { s -> s.copy(statusMessage = "Settings sync failed: ${it.message.orEmpty()}") }
-            }
-        }
-    }
-
-    fun startPortalLogin() {
+    fun openSignIn() {
         val url = AppLoginHandoff.buildPortalLoginUrl(AppLoginHandoff.defaultReturnUri)
+        if (url != null) {
+            _uiState.update { it.copy(pendingPortalUrl = url.toString()) }
+        }
+    }
+
+    fun openPortalPage(path: String) {
+        val url = AppLoginHandoff.buildPortalPageUrl(path)
         if (url != null) {
             _uiState.update { it.copy(pendingPortalUrl = url.toString()) }
         }
@@ -519,47 +271,20 @@ internal class AccountsProfilesViewModel(
         _uiState.update { it.copy(pendingPortalUrl = null) }
     }
 
-    fun createProfile() {
+    fun signOut() {
         viewModelScope.launch {
-            val state = uiState.value
-            val name = state.newProfileNameInput.trim()
-            if (name.isBlank()) {
-                _uiState.update { it.copy(statusMessage = "Enter a profile name.") }
-                return@launch
-            }
-            if (name.length > 32) {
-                _uiState.update { it.copy(statusMessage = "Profile name must be 32 characters or less.") }
-                return@launch
-            }
-
-            val session = runCatching { supabase.ensureValidSession() }.getOrNull()
-            if (session == null) {
-                _uiState.update { it.copy(statusMessage = "Not signed in.") }
-                return@launch
-            }
-
-            val nextSortOrder = (state.profiles.maxOfOrNull { it.sortOrder } ?: -1) + 1
-
+            val userId = uiState.value.userId
             _uiState.update { it.copy(isBusy = true, statusMessage = "") }
-            val created =
-                runCatching {
-                    backend.createProfile(
-                        accessToken = session.accessToken,
-                        name = name,
-                        sortOrder = nextSortOrder,
-                    )
-                }
-
-            created.onFailure {
-                _uiState.update { s -> s.copy(isBusy = false, statusMessage = it.message.orEmpty()) }
-                return@launch
-            }
-
-            _uiState.update { it.copy(newProfileNameInput = "", isBusy = false) }
-            val newId = created.getOrNull()?.id
-            val userKey = state.userId?.trim().orEmpty().ifBlank { session.userId.orEmpty().trim() }
-            if (!newId.isNullOrBlank() && userKey.isNotBlank()) {
-                profileStore.setActiveProfileId(userKey, newId)
+            runCatching { supabase.signOut() }
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    authenticated = false,
+                    userId = null,
+                    email = null,
+                    activeProfileName = null,
+                    statusMessage = "Signed out.",
+                )
             }
             refresh()
         }
@@ -573,17 +298,9 @@ internal class AccountsProfilesViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val supabase = SupabaseServicesProvider.accountClient(safeContext)
                     val backend = BackendServicesProvider.backendClient(safeContext)
-                    val profileStore = SupabaseServicesProvider.activeProfileStore(safeContext)
-                    val profileDataCloudSync =
-                        SupabaseServicesProvider.createProfileDataCloudSync(
-                            context = safeContext,
-                        )
-                    return AccountsProfilesViewModel(
+                    return AccountsPortalViewModel(
                         supabase = supabase,
                         backend = backend,
-                        profileStore = profileStore,
-                        profileDataCloudSync = profileDataCloudSync,
-                        watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(safeContext),
                     ) as T
                 }
             }

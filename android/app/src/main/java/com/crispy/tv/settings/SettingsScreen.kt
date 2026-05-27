@@ -128,15 +128,15 @@ fun SettingsScreen(
                             onClick = onNavigateToAddonsSettings
                         ),
                         SettingsItem(
-                            label = "Provider Login Portal",
-                            description = "Connect Trakt and Simkl accounts",
+                            label = "Provider Imports",
+                            description = "Connect Trakt, Simkl, and import history",
                             icon = Icons.Outlined.Cloud,
                             iconTint = MaterialTheme.colorScheme.tertiary,
                             onClick = onNavigateToProviderPortal
                         ),
                         SettingsItem(
-                            label = "Accounts & Profiles",
-                            description = "Sign in and manage profiles",
+                            label = "Account",
+                            description = "Sign in, manage profiles, and account settings",
                             icon = Icons.Outlined.Person,
                             iconTint = MaterialTheme.colorScheme.primary,
                             onClick = onNavigateToAccountsProfiles
