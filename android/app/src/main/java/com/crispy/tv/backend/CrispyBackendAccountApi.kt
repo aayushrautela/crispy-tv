@@ -7,6 +7,7 @@ import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileSettings
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAccountsResponse
 import com.crispy.tv.backend.CrispyBackendClient.StartImportResult
+import okhttp3.Headers
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -163,4 +164,30 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
     val json = requireSuccess(response)
     val providerStateJson = json.optJSONObject("providerState") ?: throw IllegalStateException("Backend did not return a provider state.")
     return parseProviderState(providerStateJson)
+}
+
+internal suspend fun CrispyBackendClient.exchangeAppLoginCodeApi(
+    code: String,
+    deviceName: String?,
+): CrispyBackendClient.AppLoginExchangeResult {
+    checkConfigured()
+    val payload = JSONObject().put("code", code).apply {
+        if (!deviceName.isNullOrBlank()) put("deviceName", deviceName.trim())
+    }.toString()
+    val response = httpClient.postJson(
+        url = "$baseUrl/v1/auth/app-login/exchange".toHttpUrl(),
+        jsonBody = payload,
+        headers = Headers.Builder()
+            .add("Content-Type", "application/json")
+            .add("Accept", "application/json")
+            .build(),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    val user = json.optJSONObject("user") ?: throw IllegalStateException("Backend did not return user.")
+    return CrispyBackendClient.AppLoginExchangeResult(
+        plaintextToken = json.optString("plaintextToken").trim(),
+        userId = user.optString("id").trim(),
+        email = user.optString("email").trim().ifBlank { null },
+    )
 }

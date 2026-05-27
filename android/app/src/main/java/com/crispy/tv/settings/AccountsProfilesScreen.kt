@@ -1,6 +1,8 @@
 package com.crispy.tv.settings
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
@@ -43,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.accounts.AppLoginHandoff
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
@@ -72,6 +76,7 @@ data class AccountsProfilesUiState(
     val profiles: List<CrispyBackendClient.Profile> = emptyList(),
     val activeProfileId: String? = null,
     val newProfileNameInput: String = "",
+    val pendingPortalUrl: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +91,15 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
+
+    LaunchedEffect(uiState.pendingPortalUrl) {
+        val urlStr = uiState.pendingPortalUrl
+        if (urlStr != null) {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlStr))
+            context.startActivity(intent)
+            viewModel.clearPortalUrl()
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -126,7 +140,10 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Set SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, and CRISPY_BACKEND_URL in your Gradle properties.",
+                                text = if (AppLoginHandoff.isPortalConfigured())
+                                    "Set CRISPY_BACKEND_URL in your Gradle properties."
+                                else
+                                    "Set ACCOUNT_PORTAL_URL or SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in your Gradle properties.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -155,44 +172,56 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
 
             if (!uiState.authenticated) {
                 item {
-                    OutlinedTextField(
-                        value = uiState.emailInput,
-                        onValueChange = viewModel::onEmailChanged,
-                        label = { Text("Email") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = uiState.configured && !uiState.isBusy
-                    )
-                }
-                item {
-                    OutlinedTextField(
-                        value = uiState.passwordInput,
-                        onValueChange = viewModel::onPasswordChanged,
-                        label = { Text("Password") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        enabled = uiState.configured && !uiState.isBusy
-                    )
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    if (AppLoginHandoff.isPortalConfigured()) {
                         Button(
-                            onClick = viewModel::signIn,
+                            onClick = viewModel::startPortalLogin,
                             enabled = uiState.configured && !uiState.isBusy,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Sign in")
+                            Text("Sign in with Crispy Account")
                         }
-                        OutlinedButton(
-                            onClick = viewModel::signUp,
-                            enabled = uiState.configured && !uiState.isBusy,
-                            modifier = Modifier.weight(1f)
+                    } else {
+                        OutlinedTextField(
+                            value = uiState.emailInput,
+                            onValueChange = viewModel::onEmailChanged,
+                            label = { Text("Email") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = uiState.configured && !uiState.isBusy
+                        )
+                    }
+                }
+                if (!AppLoginHandoff.isPortalConfigured()) {
+                    item {
+                        OutlinedTextField(
+                            value = uiState.passwordInput,
+                            onValueChange = viewModel::onPasswordChanged,
+                            label = { Text("Password") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            enabled = uiState.configured && !uiState.isBusy
+                        )
+                    }
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("Create")
+                            Button(
+                                onClick = viewModel::signIn,
+                                enabled = uiState.configured && !uiState.isBusy,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Sign in")
+                            }
+                            OutlinedButton(
+                                onClick = viewModel::signUp,
+                                enabled = uiState.configured && !uiState.isBusy,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Create")
+                            }
                         }
                     }
                 }
@@ -318,7 +347,11 @@ internal class AccountsProfilesViewModel(
     private val profileDataCloudSync: ProfileDataCloudSync,
     private val watchHistoryService: WatchHistoryService,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(AccountsProfilesUiState(configured = supabase.isConfigured() && backend.isConfigured()))
+    private val _uiState = MutableStateFlow(
+        AccountsProfilesUiState(
+            configured = backend.isConfigured() && (supabase.isConfigured() || AppLoginHandoff.isPortalConfigured()),
+        ),
+    )
     val uiState: StateFlow<AccountsProfilesUiState> = _uiState
 
     init {
@@ -473,6 +506,17 @@ internal class AccountsProfilesViewModel(
                 _uiState.update { s -> s.copy(statusMessage = "Settings sync failed: ${it.message.orEmpty()}") }
             }
         }
+    }
+
+    fun startPortalLogin() {
+        val url = AppLoginHandoff.buildPortalLoginUrl(AppLoginHandoff.defaultReturnUri)
+        if (url != null) {
+            _uiState.update { it.copy(pendingPortalUrl = url.toString()) }
+        }
+    }
+
+    fun clearPortalUrl() {
+        _uiState.update { it.copy(pendingPortalUrl = null) }
     }
 
     fun createProfile() {

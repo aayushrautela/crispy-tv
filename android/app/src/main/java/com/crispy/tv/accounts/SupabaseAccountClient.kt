@@ -41,6 +41,18 @@ class SupabaseAccountClient(
         return baseUrl.isNotBlank() && supabasePublishableKey.isNotBlank()
     }
 
+    fun saveAppSession(accessToken: String, userId: String, email: String?) {
+        val session = Session(
+            accessToken = accessToken,
+            refreshToken = "",
+            expiresAtEpochSec = null,
+            userId = userId,
+            email = email,
+            anonymous = false,
+        )
+        saveSession(session)
+    }
+
     fun clearLocalSession() {
         saveSession(null)
     }
@@ -122,7 +134,7 @@ class SupabaseAccountClient(
             return
         }
         val session = loadSession()
-        if (session != null) {
+        if (session != null && !session.accessToken.startsWith("cp_pat_")) {
             runCatching {
                 val url = "$baseUrl/auth/v1/logout".toHttpUrl()
                 httpClient.postJson(url, "{}", authHeaders(session.accessToken), callTimeoutMs = CALL_TIMEOUT_MS)

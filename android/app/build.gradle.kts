@@ -43,6 +43,11 @@ val crispyBackendUrl =
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
+val accountPortalUrl =
+    (providers.gradleProperty("ACCOUNT_PORTAL_URL").orNull ?: "")
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 val introDbApiUrl =
     (providers.gradleProperty("INTRODB_API_URL").orNull ?: "https://api.introdb.app")
         .replace("\\", "\\\\")
@@ -86,6 +91,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
         buildConfigField("String", "CRISPY_BACKEND_URL", "\"$crispyBackendUrl\"")
+        buildConfigField("String", "ACCOUNT_PORTAL_URL", "\"$accountPortalUrl\"")
         buildConfigField("String", "INTRODB_API_URL", "\"$introDbApiUrl\"")
         buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }

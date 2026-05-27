@@ -82,6 +82,12 @@ class CrispyBackendClient(
         val nextAction: String,
     )
 
+    data class AppLoginExchangeResult(
+        val plaintextToken: String,
+        val userId: String,
+        val email: String?,
+    )
+
     data class MediaExternalIds(
         val tmdb: Int?,
         val imdb: String?,
@@ -702,6 +708,10 @@ class CrispyBackendClient(
 
     suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ProviderState {
         return disconnectImportConnectionApi(accessToken, profileId, provider)
+    }
+
+    suspend fun exchangeAppLoginCode(code: String, deviceName: String? = null): AppLoginExchangeResult {
+        return exchangeAppLoginCodeApi(code, deviceName)
     }
 
     suspend fun resolveMetadata(accessToken: String, input: ItemLookupInput): MetadataResolveResponse {
