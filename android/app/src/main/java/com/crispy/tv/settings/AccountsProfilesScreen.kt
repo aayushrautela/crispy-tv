@@ -1,8 +1,15 @@
 package com.crispy.tv.settings
 
 import android.graphics.Bitmap
+import android.net.Uri
+import android.util.Log
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +55,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
+import com.crispy.tv.BuildConfig
 import com.crispy.tv.accounts.AccountPortalUrls
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
@@ -61,6 +69,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+private const val AccountPortalLogTag = "AccountPortalWebView"
 
 @Immutable
 data class AccountUiState(
@@ -333,10 +343,15 @@ private fun AccountPortalWebView(
     modifier: Modifier = Modifier,
 ) {
     var isLoading by remember { mutableStateOf(true) }
+    val sessionProbeScript = remember { portalSessionProbeScript() }
 
     Box(modifier = modifier) {
         AndroidView(
             factory = { context ->
+                val cookieManager = CookieManager.getInstance()
+                cookieManager.setAcceptCookie(true)
+                WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+
                 WebView(context).apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -344,14 +359,55 @@ private fun AccountPortalWebView(
                     )
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+
+                    val thirdPartyBefore = cookieManager.acceptThirdPartyCookies(this)
+                    cookieManager.setAcceptThirdPartyCookies(this, true)
+                    val thirdPartyAfter = cookieManager.acceptThirdPartyCookies(this)
+                    Log.d(
+                        AccountPortalLogTag,
+                        "open url=${redactUrlForLog(url)} api=${redactUrlForLog(BuildConfig.CRISPY_BACKEND_URL)} cookies=${cookieManager.acceptCookie()} thirdPartyBefore=$thirdPartyBefore thirdPartyAfter=$thirdPartyAfter webDebug=${BuildConfig.DEBUG}"
+                    )
+
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                            Log.d(
+                                AccountPortalLogTag,
+                                "console level=${consoleMessage?.messageLevel()} source=${redactForLog(consoleMessage?.sourceId())}:${consoleMessage?.lineNumber()} message=${redactForLog(consoleMessage?.message())}"
+                            )
+                            return false
+                        }
+                    }
+
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                             isLoading = true
+                            logPortalCookieState("pageStarted", url)
                         }
+
                         override fun onPageFinished(view: WebView?, url: String?) {
                             isLoading = false
+                            logPortalCookieState("pageFinished", url)
+                            view?.evaluateJavascript(sessionProbeScript) { result ->
+                                Log.d(AccountPortalLogTag, "sessionProbe result=${redactForLog(result)}")
+                            }
                         }
+
+                        override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                            Log.w(
+                                AccountPortalLogTag,
+                                "resourceError mainFrame=${request?.isForMainFrame} url=${redactUrlForLog(request?.url?.toString())} code=${error?.errorCode} description=${redactForLog(error?.description?.toString())}"
+                            )
+                        }
+
+                        override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
+                            Log.w(
+                                AccountPortalLogTag,
+                                "httpError mainFrame=${request?.isForMainFrame} url=${redactUrlForLog(request?.url?.toString())} status=${errorResponse?.statusCode} reason=${redactForLog(errorResponse?.reasonPhrase)}"
+                            )
+                        }
+
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                            Log.d(AccountPortalLogTag, "navigation url=${redactUrlForLog(request?.url?.toString())}")
                             return false
                         }
                     }
@@ -366,6 +422,64 @@ private fun AccountPortalWebView(
             )
         }
     }
+}
+
+private fun logPortalCookieState(stage: String, pageUrl: String?) {
+    val cookieManager = CookieManager.getInstance()
+    val apiCookies = cookieManager.getCookie(BuildConfig.CRISPY_BACKEND_URL)
+    val pageCookies = pageUrl?.let { runCatching { cookieManager.getCookie(it) }.getOrNull() }
+    Log.d(
+        AccountPortalLogTag,
+        "$stage page=${redactUrlForLog(pageUrl)} apiCookiePresent=${apiCookies?.contains("crispy_portal_session") == true} apiCookieNames=${cookieNamesForLog(apiCookies)} pageCookieNames=${cookieNamesForLog(pageCookies)}"
+    )
+}
+
+private fun cookieNamesForLog(cookies: String?): String {
+    if (cookies.isNullOrBlank()) return "[]"
+    return cookies
+        .split(';')
+        .mapNotNull { part -> part.trim().substringBefore('=', "").takeIf { it.isNotBlank() } }
+        .joinToString(prefix = "[", postfix = "]")
+}
+
+private fun redactUrlForLog(raw: String?): String {
+    if (raw.isNullOrBlank()) return "null"
+    return runCatching {
+        val uri = Uri.parse(raw)
+        buildString {
+            append(uri.scheme ?: "")
+            append("://")
+            append(uri.host ?: "")
+            if (uri.port != -1) append(":").append(uri.port)
+            append(uri.path ?: "")
+            if (!uri.query.isNullOrBlank()) append("?redactedQuery=true")
+        }
+    }.getOrElse { "invalid-url" }
+}
+
+private fun redactForLog(value: String?): String {
+    if (value.isNullOrBlank()) return "null"
+    return value
+        .replace(Regex("cp_ph_[A-Za-z0-9_-]+"), "cp_ph_[redacted]")
+        .replace(Regex("crispy_portal_session=[^;\\s]+"), "crispy_portal_session=[redacted]")
+}
+
+private fun portalSessionProbeScript(): String {
+    val apiBaseUrl = BuildConfig.CRISPY_BACKEND_URL.replace("\\", "\\\\").replace("'", "\\'")
+    return """
+        (async function() {
+          try {
+            const response = await fetch('$apiBaseUrl/v1/auth/portal/session', { credentials: 'include' });
+            const body = await response.json().catch(() => null);
+            const data = body && (body.data || body);
+            console.log('[crispy-portal-probe] status=' + response.status + ' user=' + Boolean(data && data.user) + ' csrf=' + Boolean(data && data.csrfToken));
+            return JSON.stringify({ status: response.status, user: Boolean(data && data.user), csrf: Boolean(data && data.csrfToken) });
+          } catch (error) {
+            console.log('[crispy-portal-probe] error=' + String(error));
+            return JSON.stringify({ error: String(error) });
+          }
+        })();
+    """.trimIndent()
 }
 
 internal class AccountsPortalViewModel(
