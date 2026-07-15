@@ -3,22 +3,17 @@ package com.crispy.tv.ui.navigation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -33,14 +28,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-private val FloatingBarHorizontalMargin = 16.dp
-private val FloatingBarPillCornerRadius = 24.dp
-private val FloatingBarPillInnerPadding = 8.dp
-private val FloatingBarChipCornerRadius = 16.dp // outer − inner padding, for concentric nesting
-private val FloatingBarPillHeight = 48.dp
-private val FloatingBarElevation = 3.dp
-private val FloatingBarCircleDiameter = 48.dp
-private val FloatingBarIconSize = 18.dp
+// Outer capsule
+private val BarHeight = 60.dp
+private val BarCornerRadius = 30.dp             // BarHeight / 2 → capsule
+private val BarInnerPadding = 6.dp
+private val BarElevation = 6.dp
+private val BarBottomMargin = 16.dp
+
+// Inner selected-chip (concentric capsule)
+private val ChipHeight = 48.dp                  // BarHeight − 2 × BarInnerPadding
+private val ChipCornerRadius = 24.dp            // ChipHeight / 2 → capsule
+
+// Trailing circle & icon
+private val CircleDiameter = 60.dp
+private val IconSize = 18.dp
+
+private val AnimDuration = 250
 
 @Composable
 internal fun FloatingBottomBar(
@@ -53,60 +56,46 @@ internal fun FloatingBottomBar(
     val pillItems = items.dropLast(1)
     val trailingItem = items.last()
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = FloatingBarHorizontalMargin),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    Row(
+        modifier = modifier
+            .navigationBarsPadding()
+            .padding(bottom = BarBottomMargin),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            modifier = Modifier.height(BarHeight),
+            shape = RoundedCornerShape(BarCornerRadius),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            tonalElevation = BarElevation,
         ) {
-            // Pill containing text labels — selected tab gets an inline icon
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(FloatingBarPillHeight),
-                shape = RoundedCornerShape(FloatingBarPillCornerRadius),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = FloatingBarElevation,
+            Row(
+                modifier = Modifier.padding(BarInnerPadding),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = FloatingBarPillInnerPadding),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    pillItems.forEach { destination ->
-                        FloatingPillTextItem(
-                            destination = destination,
-                            currentRoute = currentRoute,
-                            topLevelRoutes = topLevelRoutes,
-                            onItemClick = onItemClick,
-                        )
-                    }
+                pillItems.forEach { destination ->
+                    BarChip(
+                        destination = destination,
+                        currentRoute = currentRoute,
+                        topLevelRoutes = topLevelRoutes,
+                        onItemClick = onItemClick,
+                    )
                 }
             }
-
-            // Trailing circular button (Search)
-            FloatingCircleButton(
-                destination = trailingItem,
-                currentRoute = currentRoute,
-                topLevelRoutes = topLevelRoutes,
-                onItemClick = onItemClick,
-            )
         }
 
-        Spacer(
-            Modifier
-                .windowInsetsBottomHeight(WindowInsets.navigationBars)
-                .fillMaxWidth(),
+        TrailingCircleButton(
+            destination = trailingItem,
+            currentRoute = currentRoute,
+            topLevelRoutes = topLevelRoutes,
+            onItemClick = onItemClick,
         )
     }
 }
 
 @Composable
-private fun FloatingPillTextItem(
+private fun BarChip(
     destination: TopLevelDestination,
     currentRoute: String?,
     topLevelRoutes: Set<String>,
@@ -115,46 +104,47 @@ private fun FloatingPillTextItem(
     val isSelected = remember(currentRoute, destination.route) {
         isRouteSelected(currentRoute, destination.route, topLevelRoutes)
     }
-    val textColor by animateColorAsState(
+    val contentColor by animateColorAsState(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.onSecondaryContainer
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = tween(200),
-        label = "pillTextColor",
+        animationSpec = tween(AnimDuration),
+        label = "chipContent",
     )
-    val chipBackground by animateColorAsState(
+    val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainer
         },
-        animationSpec = tween(250),
-        label = "chipBackground",
+        animationSpec = tween(AnimDuration),
+        label = "chipBg",
     )
 
     Surface(
         onClick = { onItemClick(destination, isSelected) },
-        color = chipBackground,
-        shape = RoundedCornerShape(FloatingBarChipCornerRadius),
+        modifier = Modifier.height(ChipHeight),
+        shape = RoundedCornerShape(ChipCornerRadius),
+        color = backgroundColor,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
             AnimatedVisibility(
                 visible = isSelected,
-                enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.6f),
-                exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.6f),
+                enter = expandHorizontally(tween(AnimDuration), expandFrom = Alignment.Start),
+                exit = shrinkHorizontally(tween(200), shrinkTowards = Alignment.Start),
             ) {
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = destination.activeIcon,
                         contentDescription = null,
-                        tint = textColor,
-                        modifier = Modifier.size(FloatingBarIconSize),
+                        tint = contentColor,
+                        modifier = Modifier.size(IconSize),
                     )
                     Spacer(Modifier.width(6.dp))
                 }
@@ -163,14 +153,14 @@ private fun FloatingPillTextItem(
                 text = destination.label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = textColor,
+                color = contentColor,
             )
         }
     }
 }
 
 @Composable
-private fun FloatingCircleButton(
+private fun TrailingCircleButton(
     destination: TopLevelDestination,
     currentRoute: String?,
     topLevelRoutes: Set<String>,
@@ -185,24 +175,25 @@ private fun FloatingCircleButton(
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = tween(200),
-        label = "circleButtonTint",
+        animationSpec = tween(AnimDuration),
+        label = "circleTint",
     )
+
     Surface(
         onClick = { onItemClick(destination, isSelected) },
-        modifier = Modifier.size(FloatingBarCircleDiameter),
+        modifier = Modifier.size(CircleDiameter),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = FloatingBarElevation,
+        tonalElevation = BarElevation,
     ) {
-        Icon(
-            imageVector = if (isSelected) destination.activeIcon else destination.inactiveIcon,
-            contentDescription = destination.label,
-            tint = tint,
-            modifier = Modifier
-                .padding(12.dp)
-                .size(FloatingBarIconSize),
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = if (isSelected) destination.activeIcon else destination.inactiveIcon,
+                contentDescription = destination.label,
+                tint = tint,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 
@@ -211,11 +202,7 @@ internal fun isRouteSelected(
     screenRoute: String,
     topLevelRoutes: Set<String>,
 ): Boolean {
-    if (currentRoute == null) {
-        return false
-    }
-    if (currentRoute == screenRoute) {
-        return true
-    }
+    if (currentRoute == null) return false
+    if (currentRoute == screenRoute) return true
     return topLevelRoutes.contains(screenRoute) && currentRoute.startsWith("$screenRoute/")
 }

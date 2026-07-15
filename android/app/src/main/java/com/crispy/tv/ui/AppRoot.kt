@@ -1,5 +1,6 @@
 package com.crispy.tv.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +9,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -56,22 +58,25 @@ fun AppRoot() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues),
+        ) {
+            AppNavHost(
+                navController = navController,
+                modifier = Modifier.fillMaxSize(),
+            )
             if (shouldShowNavigationBar) {
                 FloatingBottomBar(
                     items = topLevelDestinations,
                     currentRoute = currentRoute,
                     onItemClick = onTopLevelDestinationClick,
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
-        },
-    ) { paddingValues ->
-        AppNavHost(
-            navController = navController,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .consumeWindowInsets(paddingValues),
-        )
+        }
     }
 }
