@@ -49,7 +49,8 @@ import com.crispy.tv.backend.CrispyBackendClient
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -602,7 +603,7 @@ private fun HistoryLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems = (0 until pagingItems.itemCount).map { index -> pagingItems[index] }.filterNotNull()
+    val loadedItems = remember(pagingItems.itemCount) { (0 until pagingItems.itemCount).mapNotNull { index -> pagingItems[index] } }
     val monthSections = buildHistoryMonthSections(loadedItems)
     val displayRows = remember(monthSections) {
         monthSections.flatMap { section ->
@@ -671,20 +672,17 @@ private fun HistoryLibraryContent(
                             contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                         ) {
                             items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
-                                PosterCard(
+                                LandscapeCard(
                                     title = item.title,
-                                    posterUrl = item.posterUrl,
                                     backdropUrl = item.backdropUrl,
+                                    posterUrl = item.posterUrl,
+                                    logoUrl = item.logoUrl,
                                     rating = item.rating?.toString(),
                                     year = item.year?.toString(),
                                     maturityRating = item.maturityRating,
                                     genre = item.genre,
-                                    logoUrl = item.logoUrl,
-                                    poster = item.poster,
-                                    backdrop = item.backdrop,
-                                    logo = item.logo,
                                     gradientColorHex = null,
-                                    modifier = Modifier.width(Dimensions.PosterCardWidth),
+                                    modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                                     onClick = { onItemClick(item) },
                                 )
                             }
@@ -718,7 +716,7 @@ private fun RatingsLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems = (0 until pagingItems.itemCount).map { index -> pagingItems[index] }.filterNotNull()
+    val loadedItems = remember(pagingItems.itemCount) { (0 until pagingItems.itemCount).mapNotNull { index -> pagingItems[index] } }
     val bandSections = buildRatingBandSections(loadedItems)
     val displayRows = remember(bandSections) {
         bandSections.flatMap { section ->
@@ -787,20 +785,17 @@ private fun RatingsLibraryContent(
                             contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                         ) {
                             items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
-                                PosterCard(
+                                LandscapeCard(
                                     title = item.title,
-                                    posterUrl = item.posterUrl,
                                     backdropUrl = item.backdropUrl,
+                                    posterUrl = item.posterUrl,
+                                    logoUrl = item.logoUrl,
                                     rating = item.rating?.toString(),
                                     year = item.year?.toString(),
                                     maturityRating = item.maturityRating,
                                     genre = item.genre,
-                                    logoUrl = item.logoUrl,
-                                    poster = item.poster,
-                                    backdrop = item.backdrop,
-                                    logo = item.logo,
                                     gradientColorHex = null,
-                                    modifier = Modifier.width(Dimensions.PosterCardWidth),
+                                    modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                                     onClick = { onItemClick(item) },
                                 )
                             }
@@ -834,7 +829,7 @@ private fun WatchlistLibraryContent(
     onSelectSection: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val loadedItems = (0 until pagingItems.itemCount).map { index -> pagingItems[index] }.filterNotNull()
+    val loadedItems = remember(pagingItems.itemCount) { (0 until pagingItems.itemCount).mapNotNull { index -> pagingItems[index] } }
     val dateSections = buildWatchlistDateSections(loadedItems)
     val displayRows = remember(dateSections) {
         dateSections.flatMap { section ->
@@ -903,20 +898,17 @@ private fun WatchlistLibraryContent(
                             contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                         ) {
                             items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
-                                PosterCard(
+                                LandscapeCard(
                                     title = item.title,
-                                    posterUrl = item.posterUrl,
                                     backdropUrl = item.backdropUrl,
+                                    posterUrl = item.posterUrl,
+                                    logoUrl = item.logoUrl,
                                     rating = item.rating?.toString(),
                                     year = item.year?.toString(),
                                     maturityRating = item.maturityRating,
                                     genre = item.genre,
-                                    logoUrl = item.logoUrl,
-                                    poster = item.poster,
-                                    backdrop = item.backdrop,
-                                    logo = item.logo,
                                     gradientColorHex = null,
-                                    modifier = Modifier.width(Dimensions.PosterCardWidth),
+                                    modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                                     onClick = { onItemClick(item) },
                                 )
                             }

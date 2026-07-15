@@ -31,7 +31,7 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory {
                     ),
                 )
             }
-            .crossfade(200)
+            .crossfade(true)
             .allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             .memoryCache {
                 MemoryCache.Builder()

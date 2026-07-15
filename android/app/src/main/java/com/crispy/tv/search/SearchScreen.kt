@@ -62,7 +62,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.CrispyShelfSection
+import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
@@ -374,33 +376,26 @@ private fun SearchSectionRow(
     items: List<CatalogItem>,
     onItemClick: (CatalogItem) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(items, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
-                PosterCard(
-                    title = item.title,
-                    posterUrl = item.posterUrl,
-                    backdropUrl = item.backdropUrl,
-                    rating = item.rating,
-                    year = item.year,
-                    genre = item.genre,
-                    logoUrl = item.logoUrl,
-                    poster = item.poster,
-                    backdrop = item.backdrop,
-                    logo = item.logo,
-                    gradientColorHex = null,
-                    modifier = Modifier.width(Dimensions.PosterCardWidth),
-                    onClick = { onItemClick(item) },
-                )
-            }
-        }
-    }
+    CrispyShelfSection(
+        title = title,
+        entries = items,
+        itemSpacing = 12.dp,
+        key = { "${it.type}:${it.id}" },
+        itemContent = { item ->
+            LandscapeCard(
+                title = item.title,
+                backdropUrl = item.backdropUrl,
+                posterUrl = item.posterUrl,
+                logoUrl = item.logoUrl,
+                rating = item.rating,
+                year = item.year,
+                genre = item.genre,
+                gradientColorHex = null,
+                modifier = Modifier.width(CardStyle.landscapeCardWidth()),
+                onClick = { onItemClick(item) },
+            )
+        },
+    )
 }
 
 @Composable
@@ -416,8 +411,8 @@ private fun SearchSectionSkeleton() {
             items(6, contentType = { "posterSkeleton" }) {
                 Box(
                     modifier = Modifier
-                        .width(Dimensions.PosterCardWidth)
-                        .aspectRatio(Dimensions.PosterCardAspectRatio)
+                        .width(CardStyle.landscapeCardWidth())
+                        .aspectRatio(CardStyle.LandscapeAspectRatio)
                         .skeletonElement(pulse = false),
                 )
             }

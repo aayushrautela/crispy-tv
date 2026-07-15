@@ -21,9 +21,6 @@ object Dimensions {
     val SmallSpacing: Dp = 8.dp
     val ExtraSmallSpacing: Dp = 4.dp
     
-    val PosterCardWidth: Dp = 146.dp
-    val PosterCardHeight: Dp = 219.dp
-    const val PosterCardAspectRatio: Float = 2f / 3f
     val WideCardWidth: Dp = 280.dp
     const val WideCardAspectRatio: Float = 16f / 9f
 

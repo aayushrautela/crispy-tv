@@ -27,9 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.skeletonElement
-import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_POSTER_SKELETON_COUNT = 5
 
@@ -102,8 +102,8 @@ internal fun HomeCatalogSectionRow(
                 items(HOME_POSTER_SKELETON_COUNT, contentType = { "posterSkeleton" }) {
                     Box(
                         modifier = Modifier
-                            .width(Dimensions.PosterCardWidth)
-                            .aspectRatio(Dimensions.PosterCardAspectRatio)
+                            .width(CardStyle.landscapeCardWidth())
+                            .aspectRatio(CardStyle.LandscapeAspectRatio)
                             .skeletonElement(pulse = false)
                     )
                 }
@@ -125,19 +125,16 @@ internal fun HomeCatalogPosterCard(
     item: CatalogItem,
     onClick: () -> Unit
 ) {
-    PosterCard(
+    LandscapeCard(
         title = item.title,
-        posterUrl = item.posterUrl,
         backdropUrl = item.backdropUrl,
+        posterUrl = item.posterUrl,
+        logoUrl = item.logoUrl,
         rating = item.rating,
         year = item.year,
         genre = item.genre,
-        logoUrl = item.logoUrl,
-        poster = item.poster,
-        backdrop = item.backdrop,
-        logo = item.logo,
         gradientColorHex = null,
-        modifier = Modifier.width(Dimensions.PosterCardWidth),
+        modifier = Modifier.width(CardStyle.landscapeCardWidth()),
         onClick = onClick
     )
 }

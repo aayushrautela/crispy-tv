@@ -1,111 +1,58 @@
 package com.crispy.tv.ui.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.crispy.tv.images.ResponsiveImageSet
-import com.crispy.tv.settings.ImageQuality
-import com.crispy.tv.settings.ImageSettingsRepositoryProvider
-import java.util.Locale
-
-internal val LocalCrispyImageQuality = compositionLocalOf { ImageQuality.MEDIUM }
 
 @Composable
-internal fun ProvideCrispyImageSettings(content: @Composable () -> Unit) {
-    val context = LocalContext.current
-    val repository = remember(context) {
-        ImageSettingsRepositoryProvider.get(context.applicationContext)
-    }
-    val settings by repository.settings.collectAsState()
-    CompositionLocalProvider(LocalCrispyImageQuality provides settings.quality, content = content)
-}
-
-@Composable
-internal fun rememberCrispyImageModel(
+fun crispyImageRequest(
     url: String?,
     width: Dp,
     height: Dp,
-    enableCrossfade: Boolean = false,
-    cacheKey: String? = null,
 ): Any? {
-    return rememberCrispyImageModel(
-        image = ResponsiveImageSet.fromSingle(url),
-        width = width,
-        height = height,
-        enableCrossfade = enableCrossfade,
-        cacheKey = cacheKey,
-    )
-}
-
-@Composable
-internal fun rememberCrispyImageModel(
-    image: ResponsiveImageSet?,
-    width: Dp,
-    height: Dp,
-    enableCrossfade: Boolean = false,
-    cacheKey: String? = null,
-): Any? {
-    if (image == null || image.isEmpty) return null
+    if (url.isNullOrBlank()) return null
     val context = LocalContext.current
-    val imageQuality = LocalCrispyImageQuality.current
-
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    val resolvedUrl = image.urlFor(imageQuality)
-    if (resolvedUrl.isNullOrBlank()) return null
-    val resolvedCacheKey = remember(cacheKey, imageQuality) {
-        cacheKey?.trim()?.ifBlank { null }?.let { "$it:${imageQuality.key}" }
-    }
+    return rememberCrispyImageModel(url, widthPx, heightPx)
+}
 
-    return remember(context, resolvedUrl, widthPx, heightPx, enableCrossfade, resolvedCacheKey) {
-        val requestBuilder = ImageRequest.Builder(context)
-            .data(resolvedUrl)
+@Composable
+private fun rememberCrispyImageModel(
+    url: String,
+    widthPx: Int,
+    heightPx: Int,
+): ImageRequest {
+    val context = LocalContext.current
+    return androidx.compose.runtime.remember(context, url, widthPx, heightPx) {
+        ImageRequest.Builder(context)
+            .data(url)
             .size(widthPx, heightPx)
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .diskCachePolicy(CachePolicy.ENABLED)
-            .networkCachePolicy(CachePolicy.ENABLED)
-            .crossfade(if (enableCrossfade) 200 else 0)
-            .diskCacheKey(resolvedUrl)
-
-        if (resolvedCacheKey != null) {
-            requestBuilder
-                .memoryCacheKey(resolvedCacheKey)
-                .placeholderMemoryCacheKey(resolvedCacheKey)
-        }
-
-        requestBuilder.build()
+            .crossfade(true)
+            .diskCacheKey(url)
+            .build()
     }
 }
 
-internal fun crispyPosterImageKey(type: String?, id: String?): String? {
-    return crispyImageKey("poster", type, id)
-}
+@Composable
+fun rememberCrispyImageModel(
+    url: String?,
+    width: Dp,
+    height: Dp,
+): Any? = crispyImageRequest(url = url, width = width, height = height)
 
-internal fun crispyBackdropImageKey(type: String?, id: String?): String? {
-    return crispyImageKey("backdrop", type, id)
-}
-
-internal fun crispyLogoImageKey(type: String?, id: String?): String? {
-    return crispyImageKey("logo", type, id)
-}
-
-internal fun crispyAvatarImageKey(id: String?): String? {
-    val normalizedId = id?.trim()?.lowercase(Locale.US)?.ifBlank { null } ?: return null
-    return "avatar:$normalizedId"
-}
-
-private fun crispyImageKey(kind: String, type: String?, id: String?): String? {
-    val normalizedType = type?.trim()?.lowercase(Locale.US)?.ifBlank { null } ?: return null
-    val normalizedId = id?.trim()?.lowercase(Locale.US)?.ifBlank { null } ?: return null
-    return "$kind:$normalizedType:$normalizedId"
+@Composable
+fun rememberCrispyImageModel(
+    image: ResponsiveImageSet?,
+    width: Dp,
+    height: Dp,
+): Any? {
+    if (image == null || image.isEmpty) return null
+    val url = image.medium ?: image.high ?: image.low
+    return crispyImageRequest(url = url, width = width, height = height)
 }

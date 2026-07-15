@@ -38,7 +38,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import com.crispy.tv.ui.components.PosterCard
+import com.crispy.tv.ui.components.CardStyle
+import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
@@ -95,7 +96,7 @@ fun CatalogRoute(
                 modifier = Modifier.fillMaxSize()
             ) {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = Dimensions.PosterCardWidth),
+                    columns = GridCells.Adaptive(minSize = CardStyle.landscapeCardWidth()),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = pageHorizontalPadding,
@@ -112,17 +113,14 @@ fun CatalogRoute(
                         contentType = { "poster" }
                     ) { index ->
                         val item = pagingItems[index] ?: return@items
-                        PosterCard(
+                        LandscapeCard(
                             title = item.title,
-                            posterUrl = item.posterUrl,
                             backdropUrl = item.backdropUrl,
+                            posterUrl = item.posterUrl,
+                            logoUrl = item.logoUrl,
                             rating = item.rating,
                             year = item.year,
                             genre = item.genre,
-                            logoUrl = item.logoUrl,
-                            poster = item.poster,
-                            backdrop = item.backdrop,
-                            logo = item.logo,
                             gradientColorHex = null,
                             onClick = { onItemClick(item) }
                         )
@@ -159,7 +157,7 @@ fun CatalogRoute(
 @Composable
 private fun CatalogLoadingSkeleton(modifier: Modifier = Modifier) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = Dimensions.PosterCardWidth),
+        columns = GridCells.Adaptive(minSize = CardStyle.landscapeCardWidth()),
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -175,7 +173,7 @@ private fun CatalogPosterSkeleton(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(Dimensions.PosterCardAspectRatio)
+            .aspectRatio(CardStyle.LandscapeAspectRatio)
             .skeletonElement(pulse = false),
     )
 }
