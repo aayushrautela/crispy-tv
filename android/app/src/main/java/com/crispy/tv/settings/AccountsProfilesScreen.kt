@@ -12,6 +12,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,6 +106,20 @@ fun AccountsProfilesRoute(
     var signUpEmail by remember { mutableStateOf("") }
     var signUpPassword by remember { mutableStateOf("") }
 
+    var portalWebView by remember { mutableStateOf<WebView?>(null) }
+    val portalBack: () -> Unit = {
+        val webView = portalWebView
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            viewModel.clearPortalUrl()
+            portalWebView = null
+        }
+    }
+    BackHandler(enabled = uiState.pendingPortalUrl != null) {
+        portalBack()
+    }
+
     val topBarTitle = when {
         uiState.pendingPortalUrl != null -> "Account & Subscription"
         else -> "Account"
@@ -117,8 +132,8 @@ fun AccountsProfilesRoute(
                 title = topBarTitle,
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (uiState.pendingPortalUrl != null) {
-                            viewModel.clearPortalUrl()
+                if (uiState.pendingPortalUrl != null) {
+                            portalBack()
                         } else {
                             onBack()
                         }
@@ -139,7 +154,8 @@ fun AccountsProfilesRoute(
                     url = uiState.pendingPortalUrl!!,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
+                        .padding(innerPadding),
+                    onWebViewCreated = { portalWebView = it }
                 )
             }
 
@@ -350,6 +366,7 @@ fun AccountsProfilesRoute(
 private fun AccountPortalWebView(
     url: String,
     modifier: Modifier = Modifier,
+    onWebViewCreated: (WebView) -> Unit = {},
 ) {
     var isLoading by remember { mutableStateOf(true) }
     val sessionProbeScript = remember { portalSessionProbeScript() }
@@ -362,6 +379,7 @@ private fun AccountPortalWebView(
                 WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
                 WebView(context).apply {
+                    onWebViewCreated(this)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
