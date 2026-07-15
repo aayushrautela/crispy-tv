@@ -132,6 +132,7 @@ fun LandscapeCard(
                             .fillMaxWidth(0.60f)
                             .height(24.dp),
                         contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
                     )
                 } else {
                     Text(
