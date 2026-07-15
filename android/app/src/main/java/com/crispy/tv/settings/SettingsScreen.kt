@@ -26,18 +26,18 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.VideoSettings
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,13 +45,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
-import kotlinx.coroutines.flow.StateFlow
 
 data class SettingsItem(
     val label: String,
@@ -73,19 +71,10 @@ fun SettingsScreen(
     onNavigateToPlaybackSettings: () -> Unit = {},
     onNavigateToImageSettings: () -> Unit = {},
     onNavigateToAccountsProfiles: () -> Unit = {},
-    scrollToTopRequests: StateFlow<Int>,
-    onScrollToTopConsumed: () -> Unit,
+    onBack: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
-    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
     val scrollBehavior = appBarScrollBehavior()
-
-    LaunchedEffect(scrollToTopRequest) {
-        if (scrollToTopRequest > 0) {
-            scrollState.animateScrollTo(0)
-            onScrollToTopConsumed()
-        }
-    }
 
     val settingsGroups =
         listOf(
@@ -171,6 +160,14 @@ fun SettingsScreen(
         topBar = {
             StandardTopAppBar(
                 title = "Settings",
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
                 scrollBehavior = scrollBehavior,
                 colors = topLevelAppBarColors(),
             )

@@ -85,7 +85,10 @@ data class AccountUiState(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountsProfilesRoute(onBack: () -> Unit) {
+fun AccountsProfilesRoute(
+    onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
 
@@ -326,6 +329,12 @@ fun AccountsProfilesRoute(onBack: () -> Unit) {
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text("Sign out")
+                                    }
+                                    OutlinedButton(
+                                        onClick = onOpenSettings,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Settings")
                                     }
                                 }
                             }

@@ -8,7 +8,6 @@ import com.crispy.tv.search.SearchRoute
 internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController) {
     composable(AppRoutes.SearchRoute) { entry ->
         SearchRoute(
-            onBack = { navController.navigateUp() },
             onItemClick = { item ->
                 if (item.type.equals("person", ignoreCase = true)) {
                     navController.navigate(AppRoutes.personDetailsRoute(item.id))

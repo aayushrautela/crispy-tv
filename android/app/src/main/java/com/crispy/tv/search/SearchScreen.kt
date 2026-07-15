@@ -1,6 +1,5 @@
 package com.crispy.tv.search
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -73,7 +72,6 @@ import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun SearchRoute(
-    onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
@@ -96,8 +94,6 @@ fun SearchRoute(
             onScrollToTopConsumed()
         }
     }
-
-    BackHandler(onBack = onBack)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),

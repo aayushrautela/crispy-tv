@@ -34,10 +34,7 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
             onNavigateToAccountsProfiles = {
                 navController.navigate(AppRoutes.AccountsProfilesRoute)
             },
-            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
-            onScrollToTopConsumed = {
-                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
-            },
+            onBack = { navController.popBackStack() },
         )
     }
 
@@ -46,7 +43,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
     }
 
     composable(AppRoutes.AccountsProfilesRoute) {
-        AccountsProfilesRoute(onBack = { navController.popBackStack() })
+        AccountsProfilesRoute(
+            onBack = { navController.popBackStack() },
+            onOpenSettings = { navController.navigate(AppRoutes.SettingsRoute) },
+        )
     }
 
     composable(AppRoutes.ImageSettingsRoute) {
