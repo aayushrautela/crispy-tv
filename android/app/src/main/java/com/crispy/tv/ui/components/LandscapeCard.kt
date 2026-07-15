@@ -53,7 +53,7 @@ fun LandscapeCard(
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight)
-    val logoModel = crispyImageRequest(url = logoUrl, width = 90.dp, height = 24.dp)
+    val logoModel = crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp)
 
     val gradientColor = remember(gradientColorHex) {
         gradientColorHex?.toComposeColorOrNull() ?: PosterGradientFallback
@@ -130,7 +130,7 @@ fun LandscapeCard(
                         contentDescription = title,
                         modifier = Modifier
                             .fillMaxWidth(0.60f)
-                            .height(24.dp),
+                            .height(30.dp),
                         contentScale = ContentScale.Fit,
                         alignment = Alignment.CenterStart,
                     )
