@@ -26,11 +26,9 @@ fun AppRoot() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Bar is visible on top-level tabs AND on the search screen; hidden on detail screens etc.
+    // Bar is visible only on top-level tabs; hidden on search, details, etc.
     val topLevelRoutes = remember(destinations) { destinations.map { it.route }.toSet() }
-    val showBar = currentRoute == null
-        || topLevelRoutes.contains(currentRoute)
-        || currentRoute == AppRoutes.SearchRoute
+    val showBar = currentRoute == null || topLevelRoutes.contains(currentRoute)
 
     val onDestinationClick: (TopLevelDestination, Boolean) -> Unit = remember(navController) {
         { destination: TopLevelDestination, isSelected: Boolean ->
