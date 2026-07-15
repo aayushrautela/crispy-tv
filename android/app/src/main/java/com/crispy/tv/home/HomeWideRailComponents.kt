@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 
@@ -164,7 +165,11 @@ internal fun HomeWideRailCard(
     var actionSheetVisible by remember { mutableStateOf(false) }
     val removeAction = onRemoveClick
     val hasItemActions = showActions && removeAction != null
-    val artworkModel = rememberLandscapeImageModel(item.imageUrl, Dimensions.WideCardWidth)
+    val artworkModel = rememberCrispyImageModel(
+        url = item.imageUrl,
+        width = Dimensions.WideCardWidth,
+        height = Dimensions.WideCardWidth * Dimensions.WideCardAspectRatio.inverse(),
+    )
 
     val cardInteractionModifier =
         if (hasItemActions) {

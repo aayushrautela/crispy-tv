@@ -16,13 +16,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @Composable
 internal fun CalendarEpisodeCard(
     item: CalendarEpisodeItem,
     onClick: () -> Unit,
 ) {
-    val imageModel = rememberLandscapeImageModel(item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl, Dimensions.WideCardWidth)
+    val imageModel = rememberCrispyImageModel(
+        url = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
+        width = Dimensions.WideCardWidth,
+        height = Dimensions.WideCardWidth * Dimensions.WideCardAspectRatio.inverse(),
+    )
     LandscapeArtworkFrame(
         title = item.seriesName,
         imageModel = imageModel,
@@ -67,7 +72,11 @@ internal fun CalendarSeriesCard(
     item: CalendarSeriesItem,
     onClick: () -> Unit,
 ) {
-    val imageModel = rememberLandscapeImageModel(item.backdropUrl ?: item.posterUrl, Dimensions.WideCardWidth)
+    val imageModel = rememberCrispyImageModel(
+        url = item.backdropUrl ?: item.posterUrl,
+        width = Dimensions.WideCardWidth,
+        height = Dimensions.WideCardWidth * Dimensions.WideCardAspectRatio.inverse(),
+    )
     LandscapeArtworkFrame(
         title = item.title,
         imageModel = imageModel,

@@ -71,7 +71,6 @@ internal fun HomeHeroCarousel(
             image = item.backdrop,
             width = 320.dp,
             height = 320.dp,
-            enableCrossfade = true,
         )
 
         Box(

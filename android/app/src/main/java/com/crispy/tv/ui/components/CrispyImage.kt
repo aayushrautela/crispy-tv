@@ -13,13 +13,14 @@ fun crispyImageRequest(
     url: String?,
     width: Dp,
     height: Dp,
+    enableCrossfade: Boolean = true,
 ): Any? {
     if (url.isNullOrBlank()) return null
     val context = LocalContext.current
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    return rememberCrispyImageModel(url, widthPx, heightPx)
+    return rememberCrispyImageModel(url, widthPx, heightPx, enableCrossfade)
 }
 
 @Composable
@@ -27,13 +28,14 @@ private fun rememberCrispyImageModel(
     url: String,
     widthPx: Int,
     heightPx: Int,
+    enableCrossfade: Boolean = true,
 ): ImageRequest {
     val context = LocalContext.current
-    return androidx.compose.runtime.remember(context, url, widthPx, heightPx) {
+    return androidx.compose.runtime.remember(context, url, widthPx, heightPx, enableCrossfade) {
         ImageRequest.Builder(context)
             .data(url)
             .size(widthPx, heightPx)
-            .crossfade(true)
+            .apply { if (enableCrossfade) crossfade(true) }
             .diskCacheKey(url)
             .build()
     }
@@ -44,15 +46,17 @@ fun rememberCrispyImageModel(
     url: String?,
     width: Dp,
     height: Dp,
-): Any? = crispyImageRequest(url = url, width = width, height = height)
+    enableCrossfade: Boolean = true,
+): Any? = crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade)
 
 @Composable
 fun rememberCrispyImageModel(
     image: ResponsiveImageSet?,
     width: Dp,
     height: Dp,
+    enableCrossfade: Boolean = true,
 ): Any? {
     if (image == null || image.isEmpty) return null
     val url = image.medium ?: image.high ?: image.low
-    return crispyImageRequest(url = url, width = width, height = height)
+    return crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade)
 }

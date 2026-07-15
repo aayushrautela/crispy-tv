@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.crispy.tv.images.ResponsiveImageSet
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @Composable
 internal fun LandscapeArtworkFrame(
@@ -127,19 +129,5 @@ internal fun BoxScope.HomeArtworkBottomScrim(
             .fillMaxWidth()
             .fillMaxHeight(heightFraction.coerceIn(0f, 1f))
             .background(scrimBrush),
-    )
-}
-
-@Composable
-internal fun rememberLandscapeImageModel(url: String?, width: Dp): Any? {
-    return rememberLandscapeImageModel(ResponsiveImageSet.fromSingle(url), width)
-}
-
-@Composable
-internal fun rememberLandscapeImageModel(image: ResponsiveImageSet?, width: Dp): Any? {
-    return rememberCrispyImageModel(
-        image = image,
-        width = width,
-        height = width * (9f / 16f),
     )
 }

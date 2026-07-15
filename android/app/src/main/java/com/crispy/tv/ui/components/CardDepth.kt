@@ -1,5 +1,6 @@
 package com.crispy.tv.ui.components
 
+import androidx.compose.foundation.border
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size

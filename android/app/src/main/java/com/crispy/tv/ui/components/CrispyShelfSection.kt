@@ -1,6 +1,7 @@
 package com.crispy.tv.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -151,12 +152,13 @@ private fun CrispyViewAllPill(
 ) {
     val actionSize = if (size == CrispyViewAllPillSize.Compact) 32.dp else 40.dp
     val iconSize = if (size == CrispyViewAllPillSize.Compact) 18.dp else 22.dp
+    val clickModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     Box(
         modifier = modifier
             .size(actionSize)
             .clip(RoundedCornerShape(999.dp))
             .background(MaterialTheme.colorScheme.secondaryContainer)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(clickModifier),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

@@ -113,7 +113,6 @@ private fun HomeCollectionCard(
         image = logo,
         width = 256.dp,
         height = 80.dp,
-        enableCrossfade = true,
     )
     val collectionTitle = remember(sectionUi.section.displayTitle) { collectionDisplayTitle(sectionUi.section.displayTitle) }
 
