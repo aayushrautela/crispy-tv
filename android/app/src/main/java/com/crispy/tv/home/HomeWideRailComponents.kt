@@ -168,7 +168,7 @@ internal fun HomeWideRailCard(
     val artworkModel = rememberCrispyImageModel(
         url = item.imageUrl,
         width = Dimensions.WideCardWidth,
-        height = Dimensions.WideCardWidth * Dimensions.WideCardAspectRatio.inverse(),
+        height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
     )
 
     val cardInteractionModifier =

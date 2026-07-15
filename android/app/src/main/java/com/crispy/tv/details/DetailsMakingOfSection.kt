@@ -72,7 +72,7 @@ private fun MakingOfCard(
     val imageModel = rememberCrispyImageModel(
         url = video.thumbnailUrl,
         width = Dimensions.WideCardWidth,
-        height = Dimensions.WideCardWidth * Dimensions.WideCardAspectRatio.inverse(),
+        height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
     )
     LandscapeArtworkFrame(
         title = video.name.orEmpty(),

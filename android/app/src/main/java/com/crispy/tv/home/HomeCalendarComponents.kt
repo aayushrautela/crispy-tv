@@ -26,7 +26,7 @@ internal fun CalendarEpisodeCard(
     val imageModel = rememberCrispyImageModel(
         url = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
         width = Dimensions.WideCardWidth,
-        height = Dimensions.WideCardWidth * Dimensions.WideCardAspectRatio.inverse(),
+        height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
     )
     LandscapeArtworkFrame(
         title = item.seriesName,
@@ -75,7 +75,7 @@ internal fun CalendarSeriesCard(
     val imageModel = rememberCrispyImageModel(
         url = item.backdropUrl ?: item.posterUrl,
         width = Dimensions.WideCardWidth,
-        height = Dimensions.WideCardWidth * Dimensions.WideCardAspectRatio.inverse(),
+        height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
     )
     LandscapeArtworkFrame(
         title = item.title,
