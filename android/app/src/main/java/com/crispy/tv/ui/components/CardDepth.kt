@@ -21,7 +21,7 @@ fun Modifier.cardDepth(
 
     val withEdge = if (edge > 0f) {
         this.then(
-            androidx.compose.foundation.border(
+            Modifier.border(
                 width = 1.dp,
                 brush = Brush.verticalGradient(
                     colors = listOf(
