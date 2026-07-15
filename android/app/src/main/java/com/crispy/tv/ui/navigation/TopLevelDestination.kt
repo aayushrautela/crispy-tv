@@ -3,11 +3,9 @@ package com.crispy.tv.ui.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -34,11 +32,5 @@ enum class TopLevelDestination(
         label = "Library",
         inactiveIcon = Icons.Outlined.VideoLibrary,
         activeIcon = Icons.Filled.VideoLibrary,
-    ),
-    Search(
-        route = AppRoutes.SearchRoute,
-        label = "Search",
-        inactiveIcon = Icons.Outlined.Search,
-        activeIcon = Icons.Filled.Search,
     ),
 }

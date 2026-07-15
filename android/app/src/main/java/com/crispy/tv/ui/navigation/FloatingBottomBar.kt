@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,7 +41,7 @@ private val BarBottomMargin = 16.dp
 private val ChipHeight = 48.dp                  // BarHeight − 2 × BarInnerPadding
 private val ChipCornerRadius = 24.dp            // ChipHeight / 2 → capsule
 
-// Trailing circle & icon
+// Trailing circle
 private val CircleDiameter = 60.dp
 private val IconSize = 18.dp
 
@@ -47,14 +49,13 @@ private val AnimDuration = 250
 
 @Composable
 internal fun FloatingBottomBar(
-    items: List<TopLevelDestination>,
+    destinations: List<TopLevelDestination>,
     currentRoute: String?,
-    onItemClick: (TopLevelDestination, Boolean) -> Unit,
+    onDestinationClick: (TopLevelDestination, Boolean) -> Unit,
+    onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val topLevelRoutes = remember(items) { items.map { it.route }.toSet() }
-    val pillItems = items.dropLast(1)
-    val trailingItem = items.last()
+    val topLevelRoutes = remember(destinations) { destinations.map { it.route }.toSet() }
 
     Row(
         modifier = modifier
@@ -63,6 +64,7 @@ internal fun FloatingBottomBar(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Navigation capsule pill
         Surface(
             modifier = Modifier.height(BarHeight),
             shape = RoundedCornerShape(BarCornerRadius),
@@ -74,23 +76,34 @@ internal fun FloatingBottomBar(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                pillItems.forEach { destination ->
+                destinations.forEach { destination ->
                     BarChip(
                         destination = destination,
                         currentRoute = currentRoute,
                         topLevelRoutes = topLevelRoutes,
-                        onItemClick = onItemClick,
+                        onClick = onDestinationClick,
                     )
                 }
             }
         }
 
-        TrailingCircleButton(
-            destination = trailingItem,
-            currentRoute = currentRoute,
-            topLevelRoutes = topLevelRoutes,
-            onItemClick = onItemClick,
-        )
+        // Search action button (not a navigation tab)
+        Surface(
+            onClick = onSearchClick,
+            modifier = Modifier.size(CircleDiameter),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            tonalElevation = BarElevation,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Search",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
     }
 }
 
@@ -99,7 +112,7 @@ private fun BarChip(
     destination: TopLevelDestination,
     currentRoute: String?,
     topLevelRoutes: Set<String>,
-    onItemClick: (TopLevelDestination, Boolean) -> Unit,
+    onClick: (TopLevelDestination, Boolean) -> Unit,
 ) {
     val isSelected = remember(currentRoute, destination.route) {
         isRouteSelected(currentRoute, destination.route, topLevelRoutes)
@@ -124,7 +137,7 @@ private fun BarChip(
     )
 
     Surface(
-        onClick = { onItemClick(destination, isSelected) },
+        onClick = { onClick(destination, isSelected) },
         modifier = Modifier.height(ChipHeight),
         shape = RoundedCornerShape(ChipCornerRadius),
         color = backgroundColor,
@@ -154,44 +167,6 @@ private fun BarChip(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = contentColor,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TrailingCircleButton(
-    destination: TopLevelDestination,
-    currentRoute: String?,
-    topLevelRoutes: Set<String>,
-    onItemClick: (TopLevelDestination, Boolean) -> Unit,
-) {
-    val isSelected = remember(currentRoute, destination.route) {
-        isRouteSelected(currentRoute, destination.route, topLevelRoutes)
-    }
-    val tint by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = tween(AnimDuration),
-        label = "circleTint",
-    )
-
-    Surface(
-        onClick = { onItemClick(destination, isSelected) },
-        modifier = Modifier.size(CircleDiameter),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = BarElevation,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = if (isSelected) destination.activeIcon else destination.inactiveIcon,
-                contentDescription = destination.label,
-                tint = tint,
-                modifier = Modifier.size(22.dp),
             )
         }
     }
