@@ -6,22 +6,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -35,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.ratings.formatRating
 
@@ -60,7 +53,7 @@ fun LandscapeCard(
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight)
-    val logoModel = crispyImageRequest(url = logoUrl, width = 128.dp, height = 34.dp)
+    val logoModel = crispyImageRequest(url = logoUrl, width = 90.dp, height = 24.dp)
 
     val gradientColor = remember(gradientColorHex) {
         gradientColorHex?.toComposeColorOrNull() ?: PosterGradientFallback
@@ -131,48 +124,13 @@ fun LandscapeCard(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                if (yearText != null || maturityText != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        yearText?.let { value ->
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = metadataColor,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        maturityText?.let { value ->
-                            Surface(
-                                shape = MaterialTheme.shapes.small,
-                                color = Color.Transparent,
-                                contentColor = metadataColor,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, metadataColor),
-                            ) {
-                                Text(
-                                    text = value,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(3.dp))
-                }
-
                 if (logoModel != null) {
                     AsyncImage(
                         model = logoModel,
                         contentDescription = title,
                         modifier = Modifier
-                            .fillMaxWidth(0.82f)
-                            .height(34.dp),
+                            .fillMaxWidth(0.60f)
+                            .height(24.dp),
                         contentScale = ContentScale.Fit,
                     )
                 } else {
@@ -188,37 +146,26 @@ fun LandscapeCard(
                     )
                 }
 
-                if (genreText != null || formattedRating != null) {
-                    Spacer(modifier = Modifier.height(3.dp))
+                val metadataParts = buildList {
+                    yearText?.let { add(it) }
+                    maturityText?.let { add(it) }
+                    genreText?.let { add(it) }
+                    formattedRating?.let { add("★ $it") }
+                }
+                if (metadataParts.isNotEmpty()) {
                     Row(
+                        modifier = Modifier.padding(top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        genreText?.let { value ->
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = metadataColor,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        formattedRating?.let { value ->
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(11.dp),
-                                tint = metadataColor,
-                            )
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = metadataColor,
-                                fontSize = 11.sp,
-                            )
-                        }
+                        Text(
+                            text = metadataParts.joinToString(separator = " · "),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = metadataColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
