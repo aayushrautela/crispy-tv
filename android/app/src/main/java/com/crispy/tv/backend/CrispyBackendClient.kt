@@ -82,10 +82,6 @@ class CrispyBackendClient(
         val nextAction: String,
     )
 
-    data class PortalHandoffResult(
-        val portalUrl: String,
-    )
-
     data class AccountSettings(
         val email: String?,
         val hasPassword: Boolean,
@@ -645,8 +641,10 @@ class CrispyBackendClient(
         profileId: String,
         provider: ImportProvider,
         action: String,
+        clientId: String,
+        returnTo: String,
     ): StartImportResult {
-        return startImportApi(accessToken, profileId, provider, action)
+        return startImportApi(accessToken, profileId, provider, action, clientId, returnTo)
     }
 
     suspend fun getProfileSettings(accessToken: String, profileId: String): ProfileSettings {
@@ -727,10 +725,6 @@ class CrispyBackendClient(
 
     suspend fun disconnectImportConnection(accessToken: String, profileId: String, provider: ImportProvider): ProviderState {
         return disconnectImportConnectionApi(accessToken, profileId, provider)
-    }
-
-    suspend fun createPortalHandoffCode(accessToken: String, redirectPath: String = "/account"): PortalHandoffResult {
-        return createPortalHandoffCodeApi(accessToken, redirectPath)
     }
 
     suspend fun listProfiles(accessToken: String): List<Profile> {

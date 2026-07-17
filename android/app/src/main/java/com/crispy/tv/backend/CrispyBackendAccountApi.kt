@@ -89,6 +89,8 @@ internal suspend fun CrispyBackendClient.startImportApi(
     profileId: String,
     provider: ImportProvider,
     action: String,
+    clientId: String,
+    returnTo: String,
 ): StartImportResult {
     checkConfigured()
     val response = httpClient.postJson(
@@ -96,6 +98,8 @@ internal suspend fun CrispyBackendClient.startImportApi(
         jsonBody = JSONObject()
             .put("provider", provider.apiValue)
             .put("action", action)
+            .put("clientId", clientId)
+            .put("returnTo", returnTo)
             .toString(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -164,24 +168,6 @@ internal suspend fun CrispyBackendClient.disconnectImportConnectionApi(
     val json = requireSuccess(response)
     val providerStateJson = json.optJSONObject("providerState") ?: throw IllegalStateException("Backend did not return a provider state.")
     return parseProviderState(providerStateJson)
-}
-
-internal suspend fun CrispyBackendClient.createPortalHandoffCodeApi(
-    accessToken: String,
-    redirectPath: String,
-): CrispyBackendClient.PortalHandoffResult {
-    checkConfigured()
-    val payload = JSONObject().put("redirectPath", redirectPath.trim()).toString()
-    val response = httpClient.postJson(
-        url = "$baseUrl/v1/auth/portal-handoff-codes".toHttpUrl(),
-        jsonBody = payload,
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = requireSuccess(response)
-    return CrispyBackendClient.PortalHandoffResult(
-        portalUrl = json.optString("portalUrl").trim(),
-    )
 }
 
 internal suspend fun CrispyBackendClient.listProfilesApi(accessToken: String): List<Profile> {

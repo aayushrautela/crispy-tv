@@ -53,9 +53,11 @@ class MainActivity : ComponentActivity() {
         val data: Uri = intent?.data ?: return
         if (data.scheme != "crispytv" || data.host != "oauth-callback") return
         val provider = data.getQueryParameter("provider").orEmpty().trim()
-        val state = data.getQueryParameter("state").orEmpty().trim()
         if (provider.isBlank()) return
-        SupabaseServicesProvider.pendingProviderAuthStore(applicationContext).put(provider, state)
+        // The server redirects here after the provider OAuth callback (status=ok|error).
+        // We only care that we came back; the actual connection state is re-fetched
+        // from the backend. Park the provider so OnboardingRoute can advance.
+        SupabaseServicesProvider.pendingProviderAuthStore(applicationContext).put(provider, "")
     }
 
 
