@@ -39,7 +39,7 @@ class AccountBootstrapRepository(
         )
     }
 
-    fun signOut() {
+    suspend fun signOut() {
         supabase.signOut()
         backendContextResolver.clear()
     }
@@ -56,7 +56,7 @@ class OnboardingRepository(
         val context = backendContextResolver.resolve() ?: return OnboardingState(OnboardingStep.SERVICE, null)
         val profileId = context.profileId
         val settings = backendClient.getProfileSettings(accessToken, profileId).settings
-        val connectedService = settings["syncProvider"]?.trim().takeIf { it.isNotBlank() }
+        val connectedService = settings["syncProvider"]?.trim()?.takeIf { it.isNotBlank() }
         val step = if (connectedService != null) OnboardingStep.COMPLETE else OnboardingStep.SERVICE
         cacheMutex.withLock { cachedStep = step }
         return OnboardingState(currentStep = step, connectedService = connectedService)

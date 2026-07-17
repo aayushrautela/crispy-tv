@@ -98,7 +98,7 @@ private fun AuthScreen(
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val languages = remember { com.crispy.tv.domain.account.SUPPORTED_LANGUAGES }
-    val avatarStyles = remember { com.crispy.tv.domain.account.SUPPORTED_DICEBEAR_STYLES }
+    val avatarStyles = remember { com.crispy.tv.domain.account.DicebearStyle.SUPPORTED_DICEBEAR_STYLES }
     var languageMenuOpen by remember { mutableStateOf(false) }
     var avatarDialogOpen by remember { mutableStateOf(false) }
 

@@ -6,10 +6,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.avatar.AvatarUrlResolver
 import com.crispy.tv.domain.account.DicebearStyle
+import com.crispy.tv.domain.account.OnboardingState
+import com.crispy.tv.domain.account.OnboardingStep
+import com.crispy.tv.domain.account.OnboardingTransition
 import com.crispy.tv.domain.account.normalizeLanguageCode
 import com.crispy.tv.domain.account.validateProfileName
 import com.crispy.tv.domain.account.validateSignupMetadata
 import com.crispy.tv.domain.account.SignupMetadata
+import com.crispy.tv.domain.account.advanceOnboarding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -165,8 +169,7 @@ class OnboardingViewModel internal constructor(
             runCatching {
                 val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
                 val state = onboardingRepository.getState(session.accessToken)
-                val transition = advanceOnboarding(state)
-                transition
+                advanceOnboarding(state)
             }.onSuccess { transition ->
                 _state.update {
                     it.copy(

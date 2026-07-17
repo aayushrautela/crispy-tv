@@ -5,6 +5,8 @@ import com.crispy.tv.backend.CrispyBackendClient.ImportProvider
 import com.crispy.tv.backend.CrispyBackendClient.MeResponse
 import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileSettings
+import com.crispy.tv.backend.CrispyBackendClient.AccountSettings
+import com.crispy.tv.backend.CrispyBackendClient.AddonSetting
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAccountsResponse
 import com.crispy.tv.backend.CrispyBackendClient.StartImportResult
 import com.crispy.tv.backend.CrispyBackendClient.UpdateProfileInput
