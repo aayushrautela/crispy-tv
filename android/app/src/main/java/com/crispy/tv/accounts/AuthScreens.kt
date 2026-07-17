@@ -305,38 +305,37 @@ fun OnboardingRoute(
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
-    val viewModel: OnboardingViewModel = viewModel(factory = remember(appContext) { OnboardingViewModel.factory(appContext) })
+    val viewModel: ProfileListViewModel = viewModel(factory = remember(appContext) { ProfileListViewModel.factory(appContext) })
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
-    LaunchedEffect(uiState.isComplete) {
-        if (uiState.isComplete) onComplete()
-    }
-
-    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
-        if (viewModel.consumePendingAuth("trakt")) {
-            viewModel.completeWithService("trakt")
-        } else if (viewModel.consumePendingAuth("simkl")) {
-            viewModel.completeWithService("simkl")
-        }
-        onPauseOrDispose { }
+    // Onboarding completes once the user has created a profile. The Trakt/Simkl sync
+    // provider is chosen later from Account Settings.
+    LaunchedEffect(uiState.justSaved) {
+        if (uiState.justSaved) onComplete()
     }
 
     OnboardingScreen(
         uiState = uiState,
-        onSelectTrakt = { viewModel.completeWithService("trakt") },
-        onSelectSimkl = { viewModel.completeWithService("simkl") },
         onBack = onBack,
+        onCreateProfile = viewModel::createProfile,
+        onDialogNameChange = viewModel::onNameChange,
+        onDialogKidsToggle = viewModel::onKidsToggle,
+        onOpenCreateDialog = viewModel::openCreateDialog,
+        onDismissDialog = viewModel::dismissDialog,
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OnboardingScreen(
-    uiState: OnboardingUiState,
-    onSelectTrakt: () -> Unit,
-    onSelectSimkl: () -> Unit,
+    uiState: ProfileListUiState,
     onBack: () -> Unit,
+    onCreateProfile: (String, Boolean) -> Unit,
+    onDialogNameChange: (String) -> Unit,
+    onDialogKidsToggle: (Boolean) -> Unit,
+    onOpenCreateDialog: () -> Unit,
+    onDismissDialog: () -> Unit,
 ) {
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
@@ -363,25 +362,36 @@ private fun OnboardingScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Choose a sync service to finish setup.",
+                text = "Create a profile to finish setup.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             uiState.error?.let { error ->
                 Text(text = error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             }
-            ServiceChoiceCard(
-                title = "Trakt",
-                description = "Sync your watch history and progress with Trakt.",
-                onClick = onSelectTrakt,
-                enabled = !uiState.isBusy,
-            )
-            ServiceChoiceCard(
-                title = "SIMKL",
-                description = "Sync your watch history and progress with SIMKL.",
-                onClick = onSelectSimkl,
-                enabled = !uiState.isBusy,
-            )
+            if (uiState.profiles.isEmpty()) {
+                OutlinedButton(
+                    onClick = onOpenCreateDialog,
+                    enabled = !uiState.isBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Create profile")
+                }
+            } else {
+                uiState.profiles.forEach { profile ->
+                    ListItem(
+                        headlineContent = { Text(text = profile.name) },
+                        supportingContent = if (profile.isKids) ({ Text(text = "Kids") }) else null,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onOpenCreateDialog,
+                    enabled = !uiState.isBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Add another profile")
+                }
+            }
             if (uiState.isBusy) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -389,24 +399,41 @@ private fun OnboardingScreen(
             }
         }
     }
-}
 
-@Composable
-private fun ServiceChoiceCard(
-    title: String,
-    description: String,
-    onClick: () -> Unit,
-    enabled: Boolean,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick),
-    ) {
-        Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Text(text = description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    if (uiState.dialogOpen) {
+        AlertDialog(
+            onDismissRequest = onDismissDialog,
+            confirmButton = {
+                TextButton(onClick = { onCreateProfile(uiState.dialogName, uiState.dialogIsKids) }) {
+                    Text("Create")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissDialog) { Text("Cancel") }
+            },
+            title = { Text("New profile") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = uiState.dialogName,
+                        onValueChange = onDialogNameChange,
+                        label = { Text("Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(text = "Kids profile")
+                        Switch(checked = uiState.dialogIsKids, onCheckedChange = onDialogKidsToggle)
+                    }
+                    uiState.dialogError?.let { error ->
+                        Text(text = error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+        )
     }
 }
 
@@ -579,12 +606,19 @@ fun AccountSettingsRoute(
     LaunchedEffect(uiState.deleted) {
         if (uiState.deleted) onSignedOut()
     }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        viewModel.consumePendingProviderAuth()
+        onPauseOrDispose { }
+    }
 
     AccountSettingsScreen(
         uiState = uiState,
         onBack = onBack,
         onUpdateEmail = viewModel::updateEmail,
         onChangePassword = viewModel::changePassword,
+        onSelectTrakt = { viewModel.setSyncProvider("trakt") },
+        onSelectSimkl = { viewModel.setSyncProvider("simkl") },
+        onClearSync = viewModel::clearSyncProvider,
         onDeleteAccount = viewModel::deleteAccount,
     )
 }
@@ -596,6 +630,9 @@ private fun AccountSettingsScreen(
     onBack: () -> Unit,
     onUpdateEmail: (String) -> Unit,
     onChangePassword: (String, String) -> Unit,
+    onSelectTrakt: () -> Unit,
+    onSelectSimkl: () -> Unit,
+    onClearSync: () -> Unit,
     onDeleteAccount: () -> Unit,
 ) {
     val scrollBehavior = appBarScrollBehavior()
@@ -694,6 +731,36 @@ private fun AccountSettingsScreen(
                             Text(text = "Referral", style = MaterialTheme.typography.titleMedium)
                             SelectionContainer {
                                 Text(text = code, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                Card(modifier = Modifier.fillMaxWidth().clickable(enabled = !uiState.isBusy, onClick = onSelectTrakt)) {
+                    Column(modifier = Modifier.padding(Dimensions.CardInternalPadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = "Sync service", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = uiState.syncProvider?.takeIf { it.isNotBlank() }
+                                ?.replaceFirstChar { it.uppercase() }
+                                ?: "Not connected",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = onSelectTrakt,
+                                enabled = !uiState.isBusy,
+                            ) { Text("Trakt") }
+                            OutlinedButton(
+                                onClick = onSelectSimkl,
+                                enabled = !uiState.isBusy,
+                            ) { Text("SIMKL") }
+                            if (uiState.syncProvider?.isNotBlank() == true) {
+                                OutlinedButton(
+                                    onClick = onClearSync,
+                                    enabled = !uiState.isBusy,
+                                ) { Text("Disconnect") }
                             }
                         }
                     }

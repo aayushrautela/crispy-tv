@@ -56,7 +56,8 @@ class MainActivity : ComponentActivity() {
         if (provider.isBlank()) return
         // The server redirects here after the provider OAuth callback (status=ok|error).
         // We only care that we came back; the actual connection state is re-fetched
-        // from the backend. Park the provider so OnboardingRoute can advance.
+        // from the backend. Park the provider so AccountSettingsRoute can consume it
+        // via consumePendingProviderAuth() and mark the sync provider as connected.
         SupabaseServicesProvider.pendingProviderAuthStore(applicationContext).put(provider, "")
     }
 

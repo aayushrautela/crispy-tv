@@ -8,69 +8,56 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.accounts.AppBootstrapViewModel
+import com.crispy.tv.accounts.AuthRoute
+import com.crispy.tv.accounts.BootstrapState
+import com.crispy.tv.accounts.OnboardingRoute
 import com.crispy.tv.ui.navigation.AppNavHost
 import com.crispy.tv.ui.navigation.AppRoutes
 import com.crispy.tv.ui.navigation.FloatingBottomBar
 import com.crispy.tv.ui.navigation.TopLevelDestination
 
-private enum class StartupDestination {
-    Loading,
-    Auth,
-    Onboarding,
-    Home,
-}
-
 @Composable
 fun AppRoot() {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
-    val bootstrapRepository = remember(appContext) { SupabaseServicesProvider.bootstrapRepository(appContext) }
+    val bootstrapViewModel: AppBootstrapViewModel =
+        viewModel(factory = remember(appContext) { AppBootstrapViewModel.factory(appContext) })
+    val state by bootstrapViewModel.state.collectAsStateWithLifecycle()
 
-    var startupDestination by remember { mutableStateOf(StartupDestination.Loading) }
-
-    LaunchedEffect(Unit) {
-        val result = runCatching { bootstrapRepository.bootstrap() }.getOrNull()
-        startupDestination = when {
-            result == null || !result.signedIn -> StartupDestination.Auth
-            !result.onboardingComplete -> StartupDestination.Onboarding
-            else -> StartupDestination.Home
-        }
-    }
-
-    when (startupDestination) {
-        StartupDestination.Loading -> {
+    when (state) {
+        BootstrapState.Loading -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
-        StartupDestination.Auth -> {
-            val navController = rememberNavController()
-            AppNavHost(navController = navController, startDestinationOverride = AppRoutes.AuthRoute)
+        BootstrapState.NeedsAuth -> {
+            AuthRoute(onSignedIn = { bootstrapViewModel.refresh() })
         }
-        StartupDestination.Onboarding -> {
-            val navController = rememberNavController()
-            AppNavHost(navController = navController, startDestinationOverride = AppRoutes.OnboardingRoute)
+        BootstrapState.NeedsOnboarding -> {
+            OnboardingRoute(
+                onComplete = { bootstrapViewModel.refresh() },
+                onBack = { bootstrapViewModel.refresh() },
+            )
         }
-        StartupDestination.Home -> {
-            MainAppShell()
+        BootstrapState.Ready -> {
+            MainAppShell(onSignedOut = { bootstrapViewModel.onSignedOut() })
         }
     }
 }
 
 @Composable
-private fun MainAppShell() {
+private fun MainAppShell(onSignedOut: () -> Unit) {
     val navController = rememberNavController()
     val destinations = remember { TopLevelDestination.entries }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -119,6 +106,7 @@ private fun MainAppShell() {
             AppNavHost(
                 navController = navController,
                 modifier = Modifier.fillMaxSize(),
+                onSignedOut = onSignedOut,
             )
             if (showBar) {
                 FloatingBottomBar(

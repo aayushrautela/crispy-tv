@@ -49,8 +49,8 @@ object SupabaseServicesProvider {
         }
     }
 
-    fun onboardingRepository(context: Context): OnboardingRepository {
-        return OnboardingRepository(
+    fun syncProviderRepository(context: Context): SyncProviderRepository {
+        return SyncProviderRepository(
             backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
             backendClient = BackendServicesProvider.backendClient(context.applicationContext),
         )
@@ -73,7 +73,6 @@ object SupabaseServicesProvider {
         return AccountBootstrapRepository(
             supabase = accountClient(context.applicationContext),
             backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
-            onboardingRepository = onboardingRepository(context.applicationContext),
         )
     }
 

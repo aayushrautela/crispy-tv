@@ -2,11 +2,6 @@ package com.crispy.tv.accounts
 
 import com.crispy.tv.accounts.SupabaseAccountClient.Session
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.domain.account.OnboardingState
-import com.crispy.tv.domain.account.OnboardingStep
-import com.crispy.tv.domain.account.advanceOnboarding
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 data class BootstrapResult(
     val signedIn: Boolean,
@@ -18,19 +13,16 @@ data class BootstrapResult(
 class AccountBootstrapRepository(
     private val supabase: SupabaseAccountClient,
     private val backendContextResolver: BackendContextResolver,
-    private val onboardingRepository: OnboardingRepository,
 ) {
     suspend fun bootstrap(): BootstrapResult {
         val session = supabase.ensureValidSession()
         if (session == null) {
             return BootstrapResult(signedIn = false, anonymous = false, onboardingComplete = false, session = null)
         }
-        val context = backendContextResolver.resolve()
-        val onboardingComplete = if (context != null) {
-            onboardingRepository.isOnboardingComplete(context.accessToken)
-        } else {
-            false
-        }
+        // Onboarding is complete once a backend context resolves: that requires a valid
+        // session *and* an active profile. The Trakt/Simkl sync provider is an account
+        // setting, not an onboarding gate.
+        val onboardingComplete = backendContextResolver.resolve() != null
         return BootstrapResult(
             signedIn = true,
             anonymous = session.anonymous,
@@ -45,37 +37,37 @@ class AccountBootstrapRepository(
     }
 }
 
-class OnboardingRepository(
+/**
+ * Reads/writes the `syncProvider` profile setting (Trakt/Simkl). This is an optional account
+ * setting surfaced in Account Settings; it is NOT part of the onboarding gate — onboarding
+ * completes once the user has a profile (see [AccountBootstrapRepository.bootstrap]).
+ */
+class SyncProviderRepository(
     private val backendContextResolver: BackendContextResolver,
     private val backendClient: com.crispy.tv.backend.CrispyBackendClient,
 ) {
-    private val cacheMutex = Mutex()
-    private var cachedStep: OnboardingStep? = null
-
-    suspend fun getState(accessToken: String): OnboardingState {
-        val context = backendContextResolver.resolve() ?: return OnboardingState(OnboardingStep.SERVICE, null)
-        val profileId = context.profileId
-        val settings = backendClient.getProfileSettings(accessToken, profileId).settings
-        val connectedService = settings["syncProvider"]?.trim()?.takeIf { it.isNotBlank() }
-        val step = if (connectedService != null) OnboardingStep.COMPLETE else OnboardingStep.SERVICE
-        cacheMutex.withLock { cachedStep = step }
-        return OnboardingState(currentStep = step, connectedService = connectedService)
+    suspend fun getConnectedProvider(accessToken: String): String? {
+        val context = backendContextResolver.resolve() ?: return null
+        val settings = backendClient.getProfileSettings(accessToken, context.profileId).settings
+        return settings["syncProvider"]?.trim()?.takeIf { it.isNotBlank() }
     }
 
-    suspend fun isOnboardingComplete(accessToken: String): Boolean {
-        return getState(accessToken).connectedService != null
-    }
-
-    suspend fun markServiceConnected(accessToken: String, provider: String): OnboardingStep {
-        val context = backendContextResolver.resolve() ?: return OnboardingStep.SERVICE
-        val profileId = context.profileId
+    suspend fun setConnectedProvider(accessToken: String, provider: String) {
+        val context = backendContextResolver.resolve() ?: return
         backendClient.patchProfileSettings(
             accessToken = accessToken,
-            profileId = profileId,
+            profileId = context.profileId,
             settings = mapOf("syncProvider" to provider.trim()),
         )
-        cacheMutex.withLock { cachedStep = OnboardingStep.COMPLETE }
-        return OnboardingStep.COMPLETE
+    }
+
+    suspend fun clearConnectedProvider(accessToken: String) {
+        val context = backendContextResolver.resolve() ?: return
+        backendClient.patchProfileSettings(
+            accessToken = accessToken,
+            profileId = context.profileId,
+            settings = mapOf("syncProvider" to ""),
+        )
     }
 }
 

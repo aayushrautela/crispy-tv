@@ -6,14 +6,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.avatar.AvatarUrlResolver
 import com.crispy.tv.domain.account.DicebearStyle
-import com.crispy.tv.domain.account.OnboardingState
-import com.crispy.tv.domain.account.OnboardingStep
-import com.crispy.tv.domain.account.OnboardingTransition
 import com.crispy.tv.domain.account.normalizeLanguageCode
 import com.crispy.tv.domain.account.validateProfileName
 import com.crispy.tv.domain.account.validateSignupMetadata
 import com.crispy.tv.domain.account.SignupMetadata
-import com.crispy.tv.domain.account.advanceOnboarding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -128,86 +124,6 @@ class AuthViewModel internal constructor(
     }
 }
 
-data class OnboardingUiState(
-    val isBusy: Boolean = false,
-    val currentStep: String = "SERVICE",
-    val connectedService: String? = null,
-    val isComplete: Boolean = false,
-    val error: String? = null,
-)
-
-class OnboardingViewModel internal constructor(
-    private val bootstrapRepository: AccountBootstrapRepository,
-    private val onboardingRepository: OnboardingRepository,
-    private val pendingAuthStore: PendingProviderAuthStore,
-) : ViewModel() {
-    companion object {
-        fun factory(context: Context): ViewModelProvider.Factory {
-            val appContext = context.applicationContext
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {
-                        @Suppress("UNCHECKED_CAST")
-                        return OnboardingViewModel(
-                            bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
-                            onboardingRepository = SupabaseServicesProvider.onboardingRepository(appContext),
-                            pendingAuthStore = SupabaseServicesProvider.pendingProviderAuthStore(appContext),
-                        ) as T
-                    }
-                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-                }
-            }
-        }
-    }
-
-    private val _state = MutableStateFlow(OnboardingUiState())
-    val uiState: StateFlow<OnboardingUiState> = _state.asStateFlow()
-
-    fun load() {
-        _state.update { it.copy(isBusy = true, error = null) }
-        viewModelScope.launch {
-            runCatching {
-                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                val state = onboardingRepository.getState(session.accessToken)
-                advanceOnboarding(state)
-            }.onSuccess { transition ->
-                _state.update {
-                    it.copy(
-                        isBusy = false,
-                        currentStep = transition.nextStep.name,
-                        connectedService = null,
-                        isComplete = transition.isComplete,
-                    )
-                }
-            }.onFailure { error ->
-                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to load onboarding.") }
-            }
-        }
-    }
-
-    fun completeWithService(provider: String) {
-        _state.update { it.copy(isBusy = true, error = null) }
-        viewModelScope.launch {
-            runCatching {
-                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                onboardingRepository.markServiceConnected(session.accessToken, provider)
-            }.onSuccess { step ->
-                _state.update { it.copy(isBusy = false, currentStep = step.name, connectedService = provider, isComplete = true) }
-            }.onFailure { error ->
-                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to connect service.") }
-            }
-        }
-    }
-
-    fun consumePendingAuth(provider: String): Boolean {
-        val pending = pendingAuthStore.consume() ?: return false
-        if (pending.first.equals(provider, ignoreCase = true)) {
-            return true
-        }
-        return false
-    }
-}
-
 data class ProfileListItem(
     val id: String,
     val name: String,
@@ -311,11 +227,14 @@ data class AccountSettingsUiState(
     val error: String? = null,
     val statusMessage: String? = null,
     val deleted: Boolean = false,
+    val syncProvider: String? = null,
 )
 
 class AccountSettingsViewModel internal constructor(
     private val bootstrapRepository: AccountBootstrapRepository,
     private val accountSettingsRepository: AccountSettingsRepository,
+    private val syncProviderRepository: SyncProviderRepository,
+    private val pendingProviderAuthStore: PendingProviderAuthStore,
 ) : ViewModel() {
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {
@@ -327,6 +246,8 @@ class AccountSettingsViewModel internal constructor(
                         return AccountSettingsViewModel(
                             bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
                             accountSettingsRepository = SupabaseServicesProvider.accountSettingsRepository(appContext),
+                            syncProviderRepository = SupabaseServicesProvider.syncProviderRepository(appContext),
+                            pendingProviderAuthStore = SupabaseServicesProvider.pendingProviderAuthStore(appContext),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -343,18 +264,62 @@ class AccountSettingsViewModel internal constructor(
         viewModelScope.launch {
             runCatching {
                 val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                accountSettingsRepository.getAccountSettings(session.accessToken)
-            }.onSuccess { settings ->
+                val settings = accountSettingsRepository.getAccountSettings(session.accessToken)
+                val syncProvider = syncProviderRepository.getConnectedProvider(session.accessToken)
+                Triple(settings, syncProvider, session.accessToken)
+            }.onSuccess { (settings, syncProvider, _) ->
                 _state.update {
                     it.copy(
                         isBusy = false,
                         email = settings.email.orEmpty(),
                         hasPassword = settings.hasPassword,
                         referralCode = settings.referralCode,
+                        syncProvider = syncProvider,
                     )
                 }
             }.onFailure { error ->
                 _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to load account settings.") }
+            }
+        }
+    }
+
+    /**
+     * Called on resume to consume a pending provider OAuth callback parked by the deep link
+     * (see [com.crispy.tv.MainActivity.handleDeepLink]). If a provider is pending, we mark it
+     * as connected and refresh the state.
+     */
+    fun consumePendingProviderAuth() {
+        val pending = pendingProviderAuthStore.consume() ?: return
+        val provider = pending.first.trim().takeIf { it.isNotBlank() } ?: return
+        setSyncProvider(provider)
+    }
+
+    fun setSyncProvider(provider: String) {
+        val normalized = provider.trim()
+        if (normalized.isBlank()) return
+        _state.update { it.copy(isBusy = true, error = null, statusMessage = null) }
+        viewModelScope.launch {
+            runCatching {
+                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
+                syncProviderRepository.setConnectedProvider(session.accessToken, normalized)
+            }.onSuccess {
+                _state.update { it.copy(isBusy = false, syncProvider = normalized, statusMessage = "Sync connected.") }
+            }.onFailure { error ->
+                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to connect sync.") }
+            }
+        }
+    }
+
+    fun clearSyncProvider() {
+        _state.update { it.copy(isBusy = true, error = null, statusMessage = null) }
+        viewModelScope.launch {
+            runCatching {
+                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
+                syncProviderRepository.clearConnectedProvider(session.accessToken)
+            }.onSuccess {
+                _state.update { it.copy(isBusy = false, syncProvider = null, statusMessage = "Sync disconnected.") }
+            }.onFailure { error ->
+                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to disconnect sync.") }
             }
         }
     }
