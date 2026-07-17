@@ -26,12 +26,7 @@ struct SignupProfileContractTests {
             )
 
             let expectedComplete = try requireBool(expected, "is_complete", fixture: fixture)
-            let expectedMissing = optionalArray(expected, "missing")?.map { any in
-                guard let value = any as? String else {
-                    throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): missing entry must be string")
-                }
-                return value
-            } ?? []
+            let expectedMissing = try optionalStringArray(expected, "missing", fixture: fixture) ?? []
             let expectedName = optionalString(expected, "normalized_name")
             let expectedLanguage = optionalString(expected, "normalized_language")
             let expectedRegion = optionalString(expected, "normalized_region")
@@ -45,10 +40,4 @@ struct SignupProfileContractTests {
             #expect(result.normalizedAvatarUrl == expectedAvatarUrl, "avatarUrl mismatch in \(fixture.lastPathComponent)")
         }
     }
-}
-
-private func optionalArray(_ object: [String: Any], _ key: String) -> [Any]? {
-    guard let value = object[key] else { return nil }
-    if value is NSNull { return nil }
-    return value as? [Any]
 }

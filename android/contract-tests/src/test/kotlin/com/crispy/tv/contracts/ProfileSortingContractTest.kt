@@ -3,7 +3,6 @@ package com.crispy.tv.contracts
 import com.crispy.tv.domain.account.ProfileSortInput
 import com.crispy.tv.domain.account.sortProfiles
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.longOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -34,9 +33,3 @@ class ProfileSortingContractTest {
     }
 }
 
-private fun JsonObject.optionalLong(key: String, path: java.nio.file.Path): Long? {
-    val value = this[key] ?: return null
-    val primitive = value as? kotlinx.serialization.json.JsonPrimitive
-        ?: error("${path.toDisplayPath()}: '$key' must be long or null")
-    return primitive.longOrNull
-}

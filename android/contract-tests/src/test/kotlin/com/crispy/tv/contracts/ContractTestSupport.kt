@@ -9,6 +9,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.longOrNull
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.absolute
@@ -87,6 +88,22 @@ internal fun JsonObject.optionalString(key: String, path: Path): String? {
     val primitive = value as? JsonPrimitive
         ?: error("${path.toDisplayPath()}: '$key' must be string or null")
     return primitive.content
+}
+
+internal fun JsonObject.optionalLong(key: String, path: Path): Long? {
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    val primitive = value as? JsonPrimitive
+        ?: error("${path.toDisplayPath()}: '$key' must be integer or null")
+    return primitive.longOrNull
+        ?: error("${path.toDisplayPath()}: '$key' must be integer or null")
+}
+
+internal fun JsonObject.optionalJsonArray(key: String, path: Path): JsonArray? {
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    return value as? JsonArray
+        ?: error("${path.toDisplayPath()}: '$key' must be array or null")
 }
 
 internal fun JsonObject.requireJsonObject(key: String, path: Path): JsonObject {

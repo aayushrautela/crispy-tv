@@ -69,6 +69,19 @@ func optionalObject(_ object: [String: Any], _ key: String) -> [String: Any]? {
     return value as? [String: Any]
 }
 
+func optionalStringArray(_ object: [String: Any], _ key: String, fixture: URL) throws -> [String]? {
+    guard let value = object[key] else {
+        return nil
+    }
+    if value is NSNull {
+        return nil
+    }
+    guard let array = value as? [Any] else {
+        throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): \(key) must be array or null")
+    }
+    return try stringArray(array, fixture: fixture, key: key)
+}
+
 func requireArray(_ object: [String: Any], _ key: String, fixture: URL) throws -> [Any] {
     guard let value = object[key] as? [Any] else {
         throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): missing array \(key)")

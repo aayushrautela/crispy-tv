@@ -17,7 +17,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.longOrNull
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -131,15 +130,6 @@ private fun JsonObject.optionalBoolean(key: String, path: Path): Boolean? {
         ?: error("${path.toDisplayPath()}: '$key' must be boolean or null")
     return primitive.booleanOrNull
         ?: error("${path.toDisplayPath()}: '$key' must be boolean or null")
-}
-
-private fun JsonObject.optionalLong(key: String, path: Path): Long? {
-    val value = this[key] ?: return null
-    if (value is JsonNull) return null
-    val primitive = value as? JsonPrimitive
-        ?: error("${path.toDisplayPath()}: '$key' must be integer or null")
-    return primitive.longOrNull
-        ?: error("${path.toDisplayPath()}: '$key' must be integer or null")
 }
 
 private fun JsonObject.toStringMap(path: Path, label: String): Map<String, String> {

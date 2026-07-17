@@ -1,7 +1,6 @@
 package com.crispy.tv.contracts
 
 import com.crispy.tv.domain.account.validateProfileName
-import kotlinx.serialization.json.JsonNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -35,10 +34,3 @@ class ProfileNameValidationContractTest {
     }
 }
 
-private fun JsonObject.optionalString(key: String, path: java.nio.file.Path): String? {
-    val value = this[key] ?: return null
-    if (value is JsonNull) return null
-    val primitive = value as? kotlinx.serialization.json.JsonPrimitive
-        ?: error("${path.toDisplayPath()}: '$key' must be string or null")
-    return primitive.content
-}

@@ -2,7 +2,6 @@ package com.crispy.tv.contracts
 
 import com.crispy.tv.domain.account.ProfileSettings
 import com.crispy.tv.domain.account.mergeProfileSettings
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,21 +32,5 @@ class ProfileSettingsSyncContractTest {
             onboardingStep = obj.optionalString("onboarding_step", path),
             onboardingCompletedAtMs = obj.optionalLong("onboarding_completed_at_ms", path)
         )
-    }
-
-    private fun JsonObject.optionalString(key: String, path: java.nio.file.Path): String? {
-        val value = this[key] ?: return null
-        if (value is JsonNull) return null
-        val primitive = value as? kotlinx.serialization.json.JsonPrimitive
-            ?: error("${path.toDisplayPath()}: '$key' must be string or null")
-        return primitive.content
-    }
-
-    private fun JsonObject.optionalLong(key: String, path: java.nio.file.Path): Long? {
-        val value = this[key] ?: return null
-        if (value is JsonNull) return null
-        val primitive = value as? kotlinx.serialization.json.JsonPrimitive
-            ?: error("${path.toDisplayPath()}: '$key' must be long or null")
-        return primitive.longOrNull
     }
 }

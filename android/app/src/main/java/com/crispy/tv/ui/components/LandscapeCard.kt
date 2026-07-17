@@ -70,7 +70,7 @@ fun LandscapeCard(
     val formattedRating = remember(rating) { formatRating(rating?.toDoubleOrNull()) }
     val yearText = remember(year) { year?.trim()?.ifBlank { null } }
     val maturityText = remember(maturityRating) { maturityRating?.trim()?.ifBlank { null } }
-    val genreText = remember(genre) { genre?.trim()?.ifBlank { null }?.let { shortenGenre(it) } }
+    val genreText = remember(genre) { genre?.trim()?.ifBlank { null } }
     val metadataColor = Color.White.copy(alpha = 0.82f)
     val cardShape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp)
 
@@ -173,19 +173,6 @@ fun LandscapeCard(
         }
     }
 }
-
-private val genreShortLabels =
-    mapOf(
-        "Action & Adventure" to "Action",
-        "Sci-Fi & Fantasy" to "Sci-Fi",
-        "Science Fiction" to "Sci-Fi",
-        "War & Politics" to "War",
-        "Documentary" to "Doc",
-        "Adventure" to "Adv",
-    )
-
-private fun shortenGenre(genre: String): String =
-    genreShortLabels[genre] ?: genre
 
 private fun String.toComposeColorOrNull(): Color? {
     val normalized = trim().removePrefix("#")

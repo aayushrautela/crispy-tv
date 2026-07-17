@@ -1,11 +1,6 @@
 package com.crispy.tv.contracts
 
 import com.crispy.tv.domain.account.validateSignupProfile
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -32,11 +27,7 @@ class SignupProfileContractTest {
             )
 
             val expectedComplete = expected.requireBoolean("is_complete", path)
-            val expectedMissing = expected.optionalJsonArray("missing", path)?.map { any ->
-                val primitive = any as? JsonPrimitive
-                    ?: error("${path.toDisplayPath()}: missing entry must be string")
-                primitive.content
-            } ?: emptyList()
+            val expectedMissing = expected.optionalJsonArray("missing", path)?.toStringList(path) ?: emptyList()
             val expectedName = expected.optionalString("normalized_name", path)
             val expectedLanguage = expected.optionalString("normalized_language", path)
             val expectedRegion = expected.optionalString("normalized_region", path)
@@ -52,17 +43,3 @@ class SignupProfileContractTest {
     }
 }
 
-private fun JsonObject.optionalString(key: String, path: java.nio.file.Path): String? {
-    val value = this[key] ?: return null
-    if (value is JsonNull) return null
-    val primitive = value as? JsonPrimitive
-        ?: error("${path.toDisplayPath()}: '$key' must be string or null")
-    return primitive.content
-}
-
-private fun JsonObject.optionalJsonArray(key: String, path: java.nio.file.Path): JsonArray? {
-    val value = this[key] ?: return null
-    if (value is JsonNull) return null
-    return value as? JsonArray
-        ?: error("${path.toDisplayPath()}: '$key' must be array or null")
-}
