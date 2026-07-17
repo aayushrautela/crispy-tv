@@ -86,6 +86,27 @@ class CrispyBackendClient(
         val portalUrl: String,
     )
 
+    data class AccountSettings(
+        val email: String?,
+        val hasPassword: Boolean,
+        val referralCode: String?,
+    )
+
+    data class AddonSetting(
+        val id: String,
+        val manifestUrl: String,
+        val name: String?,
+        val type: String?,
+        val enabled: Boolean,
+    )
+
+    data class UpdateProfileInput(
+        val name: String? = null,
+        val isKids: Boolean? = null,
+        val avatarKey: String? = null,
+        val sortOrder: Int? = null,
+    )
+
     data class MediaExternalIds(
         val tmdb: Int?,
         val imdb: String?,
@@ -710,6 +731,44 @@ class CrispyBackendClient(
 
     suspend fun createPortalHandoffCode(accessToken: String, redirectPath: String = "/account"): PortalHandoffResult {
         return createPortalHandoffCodeApi(accessToken, redirectPath)
+    }
+
+    suspend fun listProfiles(accessToken: String): List<Profile> {
+        return listProfilesApi(accessToken)
+    }
+
+    suspend fun updateProfile(
+        accessToken: String,
+        profileId: String,
+        input: UpdateProfileInput,
+    ): Profile {
+        return updateProfileApi(accessToken, profileId, input)
+    }
+
+    suspend fun getAccountSettings(accessToken: String): AccountSettings {
+        return getAccountSettingsApi(accessToken)
+    }
+
+    suspend fun patchAccountSettings(
+        accessToken: String,
+        email: String? = null,
+        currentPassword: String? = null,
+        newPassword: String? = null,
+    ): AccountSettings {
+        return patchAccountSettingsApi(
+            accessToken = accessToken,
+            email = email,
+            currentPassword = currentPassword,
+            newPassword = newPassword,
+        )
+    }
+
+    suspend fun deleteAccount(accessToken: String): Boolean {
+        return deleteAccountApi(accessToken)
+    }
+
+    suspend fun listProfileAddons(accessToken: String, profileId: String): List<AddonSetting> {
+        return listProfileAddonsApi(accessToken, profileId)
     }
 
     suspend fun resolveMetadata(accessToken: String, input: ItemLookupInput): MetadataResolveResponse {

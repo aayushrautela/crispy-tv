@@ -23,10 +23,11 @@ private val topLevelRouteIndices = TopLevelDestination.entries.mapIndexed { inde
 fun AppNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
+    startDestinationOverride: String? = null,
 ) {
     NavHost(
         navController = navController,
-        startDestination = TopLevelDestination.Home.route,
+        startDestination = startDestinationOverride ?: TopLevelDestination.Home.route,
         modifier = modifier,
         enterTransition = {
             val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
@@ -102,6 +103,15 @@ fun AppNavHost(
         addDiscoverNavGraph(navController)
         addLibraryNavGraph(navController)
         addSettingsNavGraph(navController)
+        addAuthNavGraph(
+            navController = navController,
+            onAuthedAndOnboarded = { navController.navigate(AppRoutes.HomeRoute) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            } },
+            onSignedOut = { navController.navigate(AppRoutes.AuthRoute) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            } },
+        )
     }
 }
 

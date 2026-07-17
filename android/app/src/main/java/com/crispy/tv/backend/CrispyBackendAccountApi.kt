@@ -7,6 +7,7 @@ import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileSettings
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAccountsResponse
 import com.crispy.tv.backend.CrispyBackendClient.StartImportResult
+import com.crispy.tv.backend.CrispyBackendClient.UpdateProfileInput
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -181,4 +182,99 @@ internal suspend fun CrispyBackendClient.createPortalHandoffCodeApi(
     return CrispyBackendClient.PortalHandoffResult(
         portalUrl = json.optString("portalUrl").trim(),
     )
+}
+
+internal suspend fun CrispyBackendClient.listProfilesApi(accessToken: String): List<Profile> {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseProfiles(json.optJSONArray("profiles"))
+}
+
+internal suspend fun CrispyBackendClient.updateProfileApi(
+    accessToken: String,
+    profileId: String,
+    input: UpdateProfileInput,
+): Profile {
+    checkConfigured()
+    val payload = JSONObject().apply {
+        if (input.name != null) put("name", input.name.trim())
+        if (input.isKids != null) put("isKids", input.isKids)
+        if (input.avatarKey != null) put("avatarKey", input.avatarKey.trim())
+        if (input.sortOrder != null) put("sortOrder", input.sortOrder)
+    }.toString()
+    val response = httpClient.execute(
+        request = Request.Builder()
+            .url("$baseUrl/v1/profiles/${profileId.trim()}".toHttpUrl())
+            .headers(authHeaders(accessToken))
+            .patch(payload.toRequestBody(jsonMediaType))
+            .build(),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    val profileJson = json.optJSONObject("profile") ?: throw IllegalStateException("Backend did not return an updated profile.")
+    return parseProfile(profileJson)
+}
+
+internal suspend fun CrispyBackendClient.getAccountSettingsApi(accessToken: String): AccountSettings {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/account".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseAccountSettings(json)
+}
+
+internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
+    accessToken: String,
+    email: String? = null,
+    currentPassword: String? = null,
+    newPassword: String? = null,
+): AccountSettings {
+    checkConfigured()
+    val payload = JSONObject().apply {
+        if (email != null) put("email", email.trim())
+        if (currentPassword != null) put("currentPassword", currentPassword)
+        if (newPassword != null) put("newPassword", newPassword)
+    }.toString()
+    val response = httpClient.execute(
+        request = Request.Builder()
+            .url("$baseUrl/v1/account".toHttpUrl())
+            .headers(authHeaders(accessToken))
+            .patch(payload.toRequestBody(jsonMediaType))
+            .build(),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseAccountSettings(json)
+}
+
+internal suspend fun CrispyBackendClient.deleteAccountApi(accessToken: String): Boolean {
+    checkConfigured()
+    val response = httpClient.delete(
+        url = "$baseUrl/v1/account".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    return response.code in 200..299
+}
+
+internal suspend fun CrispyBackendClient.listProfileAddonsApi(
+    accessToken: String,
+    profileId: String,
+): List<AddonSetting> {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/addons".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseAddonSettings(json.optJSONArray("addons"))
 }

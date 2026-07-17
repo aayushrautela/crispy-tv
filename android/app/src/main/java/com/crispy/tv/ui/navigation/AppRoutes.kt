@@ -29,6 +29,10 @@ object AppRoutes {
     const val ImageSettingsRoute = "settings/image"
     const val AddonsSettingsRoute = "settings/addons"
     const val AccountsProfilesRoute = "settings/accounts"
+    const val AuthRoute = "auth"
+    const val OnboardingRoute = "onboarding"
+    const val ProfileManagementRoute = "settings/profiles"
+    const val AccountSettingsRoute = "settings/account"
 
     const val CatalogListRoute = "catalog"
     const val CatalogIdArg = "catalogId"

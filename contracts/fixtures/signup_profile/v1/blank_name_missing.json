@@ -1,0 +1,19 @@
+{
+  "contract_version": 1,
+  "suite": "signup_profile",
+  "case_id": "blank_name_missing",
+  "input": {
+    "raw_name": "   ",
+    "raw_language": "es",
+    "raw_region": "MX",
+    "raw_avatar_url": null
+  },
+  "expected": {
+    "is_complete": false,
+    "missing": ["name"],
+    "normalized_name": null,
+    "normalized_language": "es",
+    "normalized_region": "MX",
+    "normalized_avatar_url": null
+  }
+}

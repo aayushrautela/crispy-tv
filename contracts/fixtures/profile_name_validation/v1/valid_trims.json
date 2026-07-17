@@ -1,0 +1,7 @@
+{
+  "contract_version": 1,
+  "suite": "profile_name_validation",
+  "case_id": "valid_trims",
+  "input": { "raw_name": "  Alex  " },
+  "expected": { "is_valid": true, "normalized_name": "Alex", "error": null }
+}

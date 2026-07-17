@@ -1,0 +1,7 @@
+{
+  "contract_version": 1,
+  "suite": "profile_name_validation",
+  "case_id": "too_long_is_invalid",
+  "input": { "raw_name": "A very long profile name that exceeds twenty characters" },
+  "expected": { "is_valid": false, "normalized_name": null, "error": "too_long" }
+}

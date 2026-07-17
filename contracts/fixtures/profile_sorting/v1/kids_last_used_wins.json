@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "profile_sorting",
+  "case_id": "kids_last_used_wins",
+  "input": {
+    "profiles": [
+      { "id": "p1", "name": "Main", "is_kids": false, "last_used_ms": 1000 },
+      { "id": "p2", "name": "Kids", "is_kids": true, "last_used_ms": 5000 },
+      { "id": "p3", "name": "Guest", "is_kids": false, "last_used_ms": 3000 }
+    ]
+  },
+  "expected": {
+    "ordered_ids": ["p2", "p3", "p1"]
+  }
+}

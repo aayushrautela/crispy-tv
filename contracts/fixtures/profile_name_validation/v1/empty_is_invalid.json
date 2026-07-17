@@ -1,0 +1,7 @@
+{
+  "contract_version": 1,
+  "suite": "profile_name_validation",
+  "case_id": "empty_is_invalid",
+  "input": { "raw_name": "   " },
+  "expected": { "is_valid": false, "normalized_name": null, "error": "blank" }
+}

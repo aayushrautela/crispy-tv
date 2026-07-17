@@ -1,0 +1,7 @@
+{
+  "contract_version": 1,
+  "suite": "onboarding_state_machine",
+  "case_id": "complete_is_terminal",
+  "input": { "current_step": "COMPLETE", "connected_service": "simkl" },
+  "expected": { "next_step": "COMPLETE", "is_complete": true }
+}

@@ -98,10 +98,22 @@ class SupabaseAccountClient(
         return session
     }
 
-    suspend fun signUpWithEmail(email: String, password: String): SignUpResult {
+    suspend fun signUpWithEmail(
+        email: String,
+        password: String,
+        metadata: Map<String, String?> = emptyMap(),
+    ): SignUpResult {
         checkConfigured()
         val url = "$baseUrl/auth/v1/signup".toHttpUrl()
-        val payload = JSONObject().put("email", email.trim()).put("password", password).toString()
+        val payload = JSONObject().put("email", email.trim()).put("password", password).apply {
+            val data = JSONObject()
+            metadata.forEach { (key, value) ->
+                if (value != null) data.put(key, value) else data.put(key, JSONObject.NULL)
+            }
+            if (data.length() > 0) {
+                put("data", data)
+            }
+        }.toString()
         val response = httpClient.postJson(url, payload, baseHeaders(), callTimeoutMs = CALL_TIMEOUT_MS)
         val body = requireSuccess(response)
         val json = JSONObject(body)

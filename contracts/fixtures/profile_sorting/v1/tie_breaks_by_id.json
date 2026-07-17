@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "profile_sorting",
+  "case_id": "tie_breaks_by_id",
+  "input": {
+    "profiles": [
+      { "id": "p3", "name": "C", "is_kids": false, "last_used_ms": 1000 },
+      { "id": "p1", "name": "A", "is_kids": false, "last_used_ms": 1000 },
+      { "id": "p2", "name": "B", "is_kids": false, "last_used_ms": 1000 }
+    ]
+  },
+  "expected": {
+    "ordered_ids": ["p1", "p2", "p3"]
+  }
+}

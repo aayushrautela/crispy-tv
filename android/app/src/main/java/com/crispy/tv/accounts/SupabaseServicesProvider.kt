@@ -4,6 +4,7 @@ import android.content.Context
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
 import com.crispy.tv.home.HomeCatalogService
 import com.crispy.tv.metadata.MetadataAddonRegistry
@@ -46,6 +47,38 @@ object SupabaseServicesProvider {
             activeProfileStore = created
             return created
         }
+    }
+
+    fun onboardingRepository(context: Context): OnboardingRepository {
+        return OnboardingRepository(
+            backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
+            backendClient = BackendServicesProvider.backendClient(context.applicationContext),
+        )
+    }
+
+    fun profileRepository(context: Context): ProfileRepository {
+        return ProfileRepository(
+            backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
+            backendClient = BackendServicesProvider.backendClient(context.applicationContext),
+        )
+    }
+
+    fun accountSettingsRepository(context: Context): AccountSettingsRepository {
+        return AccountSettingsRepository(
+            backendClient = BackendServicesProvider.backendClient(context.applicationContext),
+        )
+    }
+
+    fun bootstrapRepository(context: Context): AccountBootstrapRepository {
+        return AccountBootstrapRepository(
+            supabase = accountClient(context.applicationContext),
+            backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
+            onboardingRepository = onboardingRepository(context.applicationContext),
+        )
+    }
+
+    fun pendingProviderAuthStore(context: Context): PendingProviderAuthStore {
+        return PendingProviderAuthStore(context.applicationContext)
     }
 
     fun homeCatalogService(context: Context): HomeCatalogService {

@@ -1,0 +1,7 @@
+{
+  "contract_version": 1,
+  "suite": "addon_url_normalization",
+  "case_id": "https_strips_trailing_slash",
+  "input": { "raw_url": "https://addon.example.com/manifest.json/" },
+  "expected": { "is_valid": true, "normalized_url": "https://addon.example.com/manifest.json" }
+}

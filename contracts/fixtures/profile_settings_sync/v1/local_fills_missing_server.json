@@ -1,0 +1,30 @@
+{
+  "contract_version": 1,
+  "suite": "profile_settings_sync",
+  "case_id": "local_fills_missing_server",
+  "input": {
+    "local": {
+      "display_name": "Local Name",
+      "avatar_url": null,
+      "sync_provider": "simkl",
+      "onboarding_step": "COMPLETE",
+      "onboarding_completed_at_ms": 1700000000000
+    },
+    "server": {
+      "display_name": null,
+      "avatar_url": null,
+      "sync_provider": null,
+      "onboarding_step": null,
+      "onboarding_completed_at_ms": null
+    }
+  },
+  "expected": {
+    "merged": {
+      "display_name": "Local Name",
+      "avatar_url": null,
+      "sync_provider": "simkl",
+      "onboarding_step": "COMPLETE",
+      "onboarding_completed_at_ms": 1700000000000
+    }
+  }
+}

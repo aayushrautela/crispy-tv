@@ -1,0 +1,19 @@
+{
+  "contract_version": 1,
+  "suite": "signup_profile",
+  "case_id": "unsupported_language",
+  "input": {
+    "raw_name": "Dana",
+    "raw_language": "xx",
+    "raw_region": null,
+    "raw_avatar_url": null
+  },
+  "expected": {
+    "is_complete": false,
+    "missing": ["interfaceLanguage"],
+    "normalized_name": "Dana",
+    "normalized_language": null,
+    "normalized_region": null,
+    "normalized_avatar_url": null
+  }
+}

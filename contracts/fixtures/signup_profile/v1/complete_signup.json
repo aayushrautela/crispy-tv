@@ -1,0 +1,19 @@
+{
+  "contract_version": 1,
+  "suite": "signup_profile",
+  "case_id": "complete_signup",
+  "input": {
+    "raw_name": "  Alex  ",
+    "raw_language": "en",
+    "raw_region": "US",
+    "raw_avatar_url": "https://api.dicebear.com/v9/thumbs/svg?seed=Alex"
+  },
+  "expected": {
+    "is_complete": true,
+    "missing": [],
+    "normalized_name": "Alex",
+    "normalized_language": "en",
+    "normalized_region": "US",
+    "normalized_avatar_url": "https://api.dicebear.com/v9/thumbs/svg?seed=Alex"
+  }
+}

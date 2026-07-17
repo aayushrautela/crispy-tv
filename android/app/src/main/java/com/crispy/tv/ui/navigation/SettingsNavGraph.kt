@@ -9,7 +9,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.crispy.tv.accounts.SupabaseServicesProvider
-import com.crispy.tv.settings.AccountsProfilesRoute
+import com.crispy.tv.accounts.ProfileManagementRoute
 import com.crispy.tv.settings.AddonsSettingsRoute
 import com.crispy.tv.settings.ImageQuality
 import com.crispy.tv.settings.ImageSettingsRepositoryProvider
@@ -43,9 +43,9 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
     }
 
     composable(AppRoutes.AccountsProfilesRoute) {
-        AccountsProfilesRoute(
+        ProfileManagementRoute(
             onBack = { navController.popBackStack() },
-            onOpenSettings = { navController.navigate(AppRoutes.SettingsRoute) },
+            onOpenAccountSettings = { navController.navigate(AppRoutes.AccountSettingsRoute) },
         )
     }
 

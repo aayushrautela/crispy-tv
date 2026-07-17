@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "onboarding_state_machine fixture",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "suite",
+    "case_id",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "suite": {
+      "const": "onboarding_state_machine"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "current_step",
+        "connected_service"
+      ],
+      "properties": {
+        "current_step": {
+          "type": "string",
+          "enum": [
+            "SERVICE",
+            "COMPLETE"
+          ]
+        },
+        "connected_service": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "trakt",
+            "simkl",
+            null
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "next_step",
+        "is_complete"
+      ],
+      "properties": {
+        "next_step": {
+          "type": "string",
+          "enum": [
+            "SERVICE",
+            "COMPLETE"
+          ]
+        },
+        "is_complete": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

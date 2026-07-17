@@ -1,0 +1,19 @@
+{
+  "contract_version": 1,
+  "suite": "signup_profile",
+  "case_id": "invalid_avatar_url",
+  "input": {
+    "raw_name": "Cara",
+    "raw_language": "en",
+    "raw_region": null,
+    "raw_avatar_url": "https://example.com/avatar.png"
+  },
+  "expected": {
+    "is_complete": false,
+    "missing": ["avatarUrl"],
+    "normalized_name": "Cara",
+    "normalized_language": "en",
+    "normalized_region": null,
+    "normalized_avatar_url": null
+  }
+}

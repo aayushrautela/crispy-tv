@@ -1,0 +1,19 @@
+{
+  "contract_version": 1,
+  "suite": "signup_profile",
+  "case_id": "missing_language",
+  "input": {
+    "raw_name": "Bob",
+    "raw_language": null,
+    "raw_region": null,
+    "raw_avatar_url": null
+  },
+  "expected": {
+    "is_complete": false,
+    "missing": ["interfaceLanguage"],
+    "normalized_name": "Bob",
+    "normalized_language": null,
+    "normalized_region": null,
+    "normalized_avatar_url": null
+  }
+}

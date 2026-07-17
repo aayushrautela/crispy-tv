@@ -28,6 +28,8 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataView
 import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileHomeSection
 import com.crispy.tv.backend.CrispyBackendClient.ProviderState
+import com.crispy.tv.backend.CrispyBackendClient.AccountSettings
+import com.crispy.tv.backend.CrispyBackendClient.AddonSetting
 import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionItem
@@ -130,6 +132,39 @@ internal fun CrispyBackendClient.parseImportJob(json: JSONObject): ImportJob {
         startedAt = json.optString("startedAt").trim().ifBlank { null },
         finishedAt = json.optString("finishedAt").trim().ifBlank { null },
         updatedAt = json.optString("updatedAt").trim().ifBlank { null },
+    )
+}
+
+internal fun CrispyBackendClient.parseAccountSettings(json: JSONObject): AccountSettings {
+    return AccountSettings(
+        email = json.optString("email").trim().ifBlank { null },
+        hasPassword = json.optBoolean("hasPassword", false),
+        referralCode = json.optString("referralCode").trim().ifBlank { null },
+    )
+}
+
+internal fun CrispyBackendClient.parseAddonSettings(array: JSONArray?): List<AddonSetting> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val addon = safeArray.optJSONObject(index) ?: continue
+            add(parseAddonSetting(addon))
+        }
+    }
+}
+
+internal fun CrispyBackendClient.parseAddonSetting(json: JSONObject): AddonSetting {
+    val id = json.optString("id").trim()
+    val manifestUrl = json.optString("manifestUrl").trim()
+    if (id.isBlank() || manifestUrl.isBlank()) {
+        throw IllegalStateException("Backend addon setting is missing required fields.")
+    }
+    return AddonSetting(
+        id = id,
+        manifestUrl = manifestUrl,
+        name = json.optString("name").trim().ifBlank { null },
+        type = json.optString("type").trim().ifBlank { null },
+        enabled = json.optBoolean("enabled", true),
     )
 }
 

@@ -1,0 +1,30 @@
+{
+  "contract_version": 1,
+  "suite": "profile_settings_sync",
+  "case_id": "server_wins_when_present",
+  "input": {
+    "local": {
+      "display_name": "Local Name",
+      "avatar_url": "https://local.example/a.png",
+      "sync_provider": null,
+      "onboarding_step": "SERVICE",
+      "onboarding_completed_at_ms": null
+    },
+    "server": {
+      "display_name": "Server Name",
+      "avatar_url": "https://server.example/b.png",
+      "sync_provider": "trakt",
+      "onboarding_step": "COMPLETE",
+      "onboarding_completed_at_ms": 1700000000000
+    }
+  },
+  "expected": {
+    "merged": {
+      "display_name": "Server Name",
+      "avatar_url": "https://server.example/b.png",
+      "sync_provider": "trakt",
+      "onboarding_step": "COMPLETE",
+      "onboarding_completed_at_ms": 1700000000000
+    }
+  }
+}
