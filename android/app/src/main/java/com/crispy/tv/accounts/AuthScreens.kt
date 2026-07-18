@@ -124,7 +124,7 @@ private fun AuthScreen(
             if (uiState.error != null) {
                 item {
                     Text(
-                        text = uiState.error!!,
+                        text = uiState.error,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
