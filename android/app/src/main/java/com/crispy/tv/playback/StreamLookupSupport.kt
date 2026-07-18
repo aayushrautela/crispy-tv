@@ -2,6 +2,7 @@ package com.crispy.tv.playback
 
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.metadata.toAddonLookupId
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.streams.AddonStream
@@ -27,14 +28,14 @@ fun resolveStreamLookupTarget(
     val mediaType = details.itemType.toMetadataLabMediaTypeOrNull() ?: fallbackMediaType
     val lookupId =
         when (mediaType) {
-            MetadataLabMediaType.MOVIE -> details.itemId?.trim()?.ifBlank { null } ?: details.id
+            MetadataLabMediaType.MOVIE -> details.toAddonLookupId() ?: details.id
             MetadataLabMediaType.SERIES,
             MetadataLabMediaType.ANIME -> {
-                val fromLoadedEpisodes = seasonEpisodes.firstOrNull()?.id?.trim()
-                if (!fromLoadedEpisodes.isNullOrBlank()) {
+                val fromLoadedEpisodes = seasonEpisodes.firstOrNull()?.lookupId?.trim()?.ifBlank { null }
+                if (fromLoadedEpisodes != null) {
                     fromLoadedEpisodes
                 } else {
-                    details.itemId?.trim()?.ifBlank { null } ?: details.id
+                    details.toAddonLookupId() ?: details.id
                 }
             }
         }
@@ -53,7 +54,8 @@ fun findEpisodeForLookupId(
     return sequenceOf(currentEpisodes.asSequence(), cachedEpisodes.asSequence().flatten())
         .flatten()
         .firstOrNull { episode ->
-            episode.id.equals(normalizedLookupId, ignoreCase = true)
+            episode.id.equals(normalizedLookupId, ignoreCase = true) ||
+                episode.lookupId?.equals(normalizedLookupId, ignoreCase = true) == true
         }
 }
 

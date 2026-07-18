@@ -71,7 +71,7 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
         released = airDate,
         overview = summary,
         thumbnailUrl = images.stillUrl ?: images.posterUrl,
-        lookupId = itemId,
+        lookupId = buildAddonEpisodeLookupId(showExternalIds.imdb, season, episode) ?: itemId,
         absoluteEpisodeNumber = absoluteEpisodeNumber,
     )
 }
@@ -112,6 +112,16 @@ internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
         thumbnailUrl = thumbnailUrl,
         lookupId = url,
     )
+}
+
+internal fun buildAddonEpisodeLookupId(imdbId: String?, season: Int?, episode: Int?): String? {
+    val normalizedImdbId = imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) } ?: return null
+    if (season == null || season <= 0 || episode == null || episode <= 0) return normalizedImdbId
+    return "$normalizedImdbId:$season:$episode"
+}
+
+internal fun MediaDetails.toAddonLookupId(): String? {
+    return imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) } ?: itemId?.trim()?.ifBlank { null } ?: id.trim().ifBlank { null }
 }
 
 internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
