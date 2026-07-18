@@ -211,7 +211,7 @@ internal suspend fun CrispyBackendClient.updateProfileApi(
 internal suspend fun CrispyBackendClient.getAccountSettingsApi(accessToken: String): AccountSettings {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/account".toHttpUrl(),
+        url = "$baseUrl/v1/account/settings".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
@@ -221,19 +221,15 @@ internal suspend fun CrispyBackendClient.getAccountSettingsApi(accessToken: Stri
 
 internal suspend fun CrispyBackendClient.patchAccountSettingsApi(
     accessToken: String,
-    email: String? = null,
-    currentPassword: String? = null,
-    newPassword: String? = null,
+    settings: Map<String, String>,
 ): AccountSettings {
     checkConfigured()
     val payload = JSONObject().apply {
-        if (email != null) put("email", email.trim())
-        if (currentPassword != null) put("currentPassword", currentPassword)
-        if (newPassword != null) put("newPassword", newPassword)
+        settings.forEach { (key, value) -> put(key, value) }
     }.toString()
     val response = httpClient.execute(
         request = Request.Builder()
-            .url("$baseUrl/v1/account".toHttpUrl())
+            .url("$baseUrl/v1/account/settings".toHttpUrl())
             .headers(authHeaders(accessToken))
             .patch(payload.toRequestBody(jsonMediaType))
             .build(),

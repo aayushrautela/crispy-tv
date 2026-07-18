@@ -3,11 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val tmdbApiKey =
-    (providers.gradleProperty("TMDB_API_KEY").orNull ?: "")
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-
 val supabaseUrl =
     (providers.gradleProperty("SUPABASE_URL").orNull ?: "")
         .replace("\\", "\\\\")
@@ -58,7 +53,6 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
         buildConfigField("String", "CRISPY_BACKEND_URL", "\"$crispyBackendUrl\"")

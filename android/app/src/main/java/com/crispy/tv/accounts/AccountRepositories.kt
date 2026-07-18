@@ -127,20 +127,11 @@ class AccountSettingsRepository(
         return backendClient.getAccountSettings(accessToken)
     }
 
-    suspend fun updateEmail(accessToken: String, email: String): com.crispy.tv.backend.CrispyBackendClient.AccountSettings {
-        return backendClient.patchAccountSettings(accessToken = accessToken, email = email)
-    }
-
-    suspend fun changePassword(
+    suspend fun patchSettings(
         accessToken: String,
-        currentPassword: String,
-        newPassword: String,
+        settings: Map<String, String>,
     ): com.crispy.tv.backend.CrispyBackendClient.AccountSettings {
-        return backendClient.patchAccountSettings(
-            accessToken = accessToken,
-            currentPassword = currentPassword,
-            newPassword = newPassword,
-        )
+        return backendClient.patchAccountSettings(accessToken = accessToken, settings = settings)
     }
 
     suspend fun deleteAccount(accessToken: String): Boolean {

@@ -136,10 +136,11 @@ internal fun CrispyBackendClient.parseImportJob(json: JSONObject): ImportJob {
 }
 
 internal fun CrispyBackendClient.parseAccountSettings(json: JSONObject): AccountSettings {
+    val settings = json.optJSONObject("settings") ?: JSONObject()
+    val metadata = settings.optJSONObject("metadata") ?: JSONObject()
     return AccountSettings(
-        email = json.optString("email").trim().ifBlank { null },
-        hasPassword = json.optBoolean("hasPassword", false),
-        referralCode = json.optString("referralCode").trim().ifBlank { null },
+        pricingTier = settings.optString("pricingTier").trim().ifBlank { null },
+        hasMdbListAccess = metadata.optBoolean("hasMdbListAccess", false),
     )
 }
 

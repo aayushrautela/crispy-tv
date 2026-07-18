@@ -221,9 +221,8 @@ class ProfileListViewModel internal constructor(
 
 data class AccountSettingsUiState(
     val isBusy: Boolean = false,
-    val email: String = "",
-    val hasPassword: Boolean = false,
-    val referralCode: String? = null,
+    val pricingTier: String? = null,
+    val hasMdbListAccess: Boolean = false,
     val error: String? = null,
     val statusMessage: String? = null,
     val deleted: Boolean = false,
@@ -271,9 +270,8 @@ class AccountSettingsViewModel internal constructor(
                 _state.update {
                     it.copy(
                         isBusy = false,
-                        email = settings.email.orEmpty(),
-                        hasPassword = settings.hasPassword,
-                        referralCode = settings.referralCode,
+                        pricingTier = settings.pricingTier,
+                        hasMdbListAccess = settings.hasMdbListAccess,
                         syncProvider = syncProvider,
                     )
                 }
@@ -320,43 +318,6 @@ class AccountSettingsViewModel internal constructor(
                 _state.update { it.copy(isBusy = false, syncProvider = null, statusMessage = "Sync disconnected.") }
             }.onFailure { error ->
                 _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to disconnect sync.") }
-            }
-        }
-    }
-
-    fun updateEmail(email: String) {
-        val trimmed = email.trim()
-        if (trimmed.isBlank()) {
-            _state.update { it.copy(error = "Email cannot be blank.") }
-            return
-        }
-        _state.update { it.copy(isBusy = true, error = null, statusMessage = null) }
-        viewModelScope.launch {
-            runCatching {
-                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                accountSettingsRepository.updateEmail(session.accessToken, trimmed)
-            }.onSuccess { settings ->
-                _state.update { it.copy(isBusy = false, email = settings.email.orEmpty(), statusMessage = "Email updated.") }
-            }.onFailure { error ->
-                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to update email.") }
-            }
-        }
-    }
-
-    fun changePassword(current: String, new: String) {
-        if (current.isBlank() || new.isBlank()) {
-            _state.update { it.copy(error = "Enter current and new password.") }
-            return
-        }
-        _state.update { it.copy(isBusy = true, error = null, statusMessage = null) }
-        viewModelScope.launch {
-            runCatching {
-                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                accountSettingsRepository.changePassword(session.accessToken, current, new)
-            }.onSuccess {
-                _state.update { it.copy(isBusy = false, statusMessage = "Password changed.") }
-            }.onFailure { error ->
-                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to change password.") }
             }
         }
     }

@@ -614,8 +614,6 @@ fun AccountSettingsRoute(
     AccountSettingsScreen(
         uiState = uiState,
         onBack = onBack,
-        onUpdateEmail = viewModel::updateEmail,
-        onChangePassword = viewModel::changePassword,
         onSelectTrakt = { viewModel.setSyncProvider("trakt") },
         onSelectSimkl = { viewModel.setSyncProvider("simkl") },
         onClearSync = viewModel::clearSyncProvider,
@@ -628,8 +626,6 @@ fun AccountSettingsRoute(
 private fun AccountSettingsScreen(
     uiState: AccountSettingsUiState,
     onBack: () -> Unit,
-    onUpdateEmail: (String) -> Unit,
-    onChangePassword: (String, String) -> Unit,
     onSelectTrakt: () -> Unit,
     onSelectSimkl: () -> Unit,
     onClearSync: () -> Unit,
@@ -637,9 +633,6 @@ private fun AccountSettingsScreen(
 ) {
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
-    var emailDraft by remember(uiState.email) { mutableStateOf(uiState.email) }
-    var currentPassword by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -674,65 +667,18 @@ private fun AccountSettingsScreen(
             }
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(Dimensions.CardInternalPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(text = "Email", style = MaterialTheme.typography.titleMedium)
-                        OutlinedTextField(
-                            value = emailDraft,
-                            onValueChange = { emailDraft = it },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                    Column(modifier = Modifier.padding(Dimensions.CardInternalPadding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = "Plan", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = uiState.pricingTier?.replaceFirstChar { it.uppercase() } ?: "—",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(
-                            onClick = { onUpdateEmail(emailDraft) },
-                            enabled = !uiState.isBusy && emailDraft.isNotBlank(),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Update email")
-                        }
-                    }
-                }
-            }
-            if (uiState.hasPassword) {
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(Dimensions.CardInternalPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(text = "Password", style = MaterialTheme.typography.titleMedium)
-                            OutlinedTextField(
-                                value = currentPassword,
-                                onValueChange = { currentPassword = it },
-                                label = { Text("Current password") },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            OutlinedTextField(
-                                value = newPassword,
-                                onValueChange = { newPassword = it },
-                                label = { Text("New password") },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Button(
-                                onClick = { onChangePassword(currentPassword, newPassword) },
-                                enabled = !uiState.isBusy && currentPassword.isNotBlank() && newPassword.isNotBlank(),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text("Change password")
-                            }
-                        }
-                    }
-                }
-            }
-            uiState.referralCode?.let { code ->
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(Dimensions.CardInternalPadding)) {
-                            Text(text = "Referral", style = MaterialTheme.typography.titleMedium)
-                            SelectionContainer {
-                                Text(text = code, style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
+                        Text(
+                            text = if (uiState.hasMdbListAccess) "MDBList access enabled" else "MDBList access not enabled",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }

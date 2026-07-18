@@ -83,9 +83,8 @@ class CrispyBackendClient(
     )
 
     data class AccountSettings(
-        val email: String?,
-        val hasPassword: Boolean,
-        val referralCode: String?,
+        val pricingTier: String?,
+        val hasMdbListAccess: Boolean,
     )
 
     data class AddonSetting(
@@ -745,15 +744,11 @@ class CrispyBackendClient(
 
     suspend fun patchAccountSettings(
         accessToken: String,
-        email: String? = null,
-        currentPassword: String? = null,
-        newPassword: String? = null,
+        settings: Map<String, String>,
     ): AccountSettings {
         return patchAccountSettingsApi(
             accessToken = accessToken,
-            email = email,
-            currentPassword = currentPassword,
-            newPassword = newPassword,
+            settings = settings,
         )
     }
 
