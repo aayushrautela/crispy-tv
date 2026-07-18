@@ -255,6 +255,10 @@ class AccountSettingsViewModel internal constructor(
                 }
             }
         }
+
+        // Must match the Android entry in the server's IMPORT_OAUTH_ALLOWED_RETURN_URIS
+        // allowlist and the deep link registered in AndroidManifest.xml.
+        private const val OAUTH_RETURN_TO = "crispytv://oauth-callback"
     }
 
     private val _state = MutableStateFlow(AccountSettingsUiState())
@@ -353,12 +357,6 @@ class AccountSettingsViewModel internal constructor(
             "simkl" -> com.crispy.tv.backend.CrispyBackendClient.ImportProvider.SIMKL
             else -> null
         }
-    }
-
-    private companion object {
-        // Must match the Android entry in the server's IMPORT_OAUTH_ALLOWED_RETURN_URIS
-        // allowlist and the deep link registered in AndroidManifest.xml.
-        const val OAUTH_RETURN_TO = "crispytv://oauth-callback"
     }
 
     fun deleteAccount() {
