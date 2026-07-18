@@ -614,9 +614,9 @@ fun AccountSettingsRoute(
     AccountSettingsScreen(
         uiState = uiState,
         onBack = onBack,
-        onSelectTrakt = { viewModel.setSyncProvider("trakt") },
-        onSelectSimkl = { viewModel.setSyncProvider("simkl") },
-        onClearSync = viewModel::clearSyncProvider,
+        onSelectTrakt = { viewModel.startImport("trakt") },
+        onSelectSimkl = { viewModel.startImport("simkl") },
+        onClearSync = viewModel::disconnectSyncProvider,
         onDeleteAccount = viewModel::deleteAccount,
     )
 }

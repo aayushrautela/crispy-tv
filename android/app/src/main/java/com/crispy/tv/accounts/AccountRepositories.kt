@@ -38,9 +38,10 @@ class AccountBootstrapRepository(
 }
 
 /**
- * Reads/writes the `syncProvider` profile setting (Trakt/Simkl). This is an optional account
- * setting surfaced in Account Settings; it is NOT part of the onboarding gate — onboarding
- * completes once the user has a profile (see [AccountBootstrapRepository.bootstrap]).
+ * Drives Trakt/Simkl sync connections via the backend import-connections API.
+ * Connect/reconnect go through OAuth: [startImport] returns an `authUrl` the
+ * client opens in the browser; the server's `/v1/imports/:provider/callback`
+ * then redirects back to the app's deep link (`crispytv://oauth-callback`).
  */
 class SyncProviderRepository(
     private val backendContextResolver: BackendContextResolver,
@@ -48,26 +49,44 @@ class SyncProviderRepository(
 ) {
     suspend fun getConnectedProvider(accessToken: String): String? {
         val context = backendContextResolver.resolve() ?: return null
-        val settings = backendClient.getProfileSettings(accessToken, context.profileId).settings
-        return settings["syncProvider"]?.trim()?.takeIf { it.isNotBlank() }
+        val states = backendClient
+            .listImportConnections(accessToken, context.profileId)
+            .providerStates
+        return states
+            .firstOrNull { it.connectionState.equals("connected", ignoreCase = true) }
+            ?.provider
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
     }
 
-    suspend fun setConnectedProvider(accessToken: String, provider: String) {
-        val context = backendContextResolver.resolve() ?: return
-        backendClient.patchProfileSettings(
+    suspend fun startImport(
+        accessToken: String,
+        provider: com.crispy.tv.backend.CrispyBackendClient.ImportProvider,
+        action: String,
+        returnTo: String,
+    ): com.crispy.tv.backend.CrispyBackendClient.StartImportResult {
+        val context = backendContextResolver.resolve()
+            ?: throw IllegalStateException("No active profile.")
+        return backendClient.startImport(
             accessToken = accessToken,
             profileId = context.profileId,
-            settings = mapOf("syncProvider" to provider.trim()),
+            provider = provider,
+            action = action,
+            clientId = ANDROID_CLIENT_ID,
+            returnTo = returnTo,
         )
     }
 
-    suspend fun clearConnectedProvider(accessToken: String) {
+    suspend fun disconnectImportConnection(
+        accessToken: String,
+        provider: com.crispy.tv.backend.CrispyBackendClient.ImportProvider,
+    ) {
         val context = backendContextResolver.resolve() ?: return
-        backendClient.patchProfileSettings(
-            accessToken = accessToken,
-            profileId = context.profileId,
-            settings = mapOf("syncProvider" to ""),
-        )
+        backendClient.disconnectImportConnection(accessToken, context.profileId, provider)
+    }
+
+    private companion object {
+        const val ANDROID_CLIENT_ID = "crispy-android"
     }
 }
 

@@ -230,6 +230,7 @@ data class AccountSettingsUiState(
 )
 
 class AccountSettingsViewModel internal constructor(
+    private val appContext: Context,
     private val bootstrapRepository: AccountBootstrapRepository,
     private val accountSettingsRepository: AccountSettingsRepository,
     private val syncProviderRepository: SyncProviderRepository,
@@ -243,6 +244,7 @@ class AccountSettingsViewModel internal constructor(
                     if (modelClass.isAssignableFrom(AccountSettingsViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
                         return AccountSettingsViewModel(
+                            appContext = appContext,
                             bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
                             accountSettingsRepository = SupabaseServicesProvider.accountSettingsRepository(appContext),
                             syncProviderRepository = SupabaseServicesProvider.syncProviderRepository(appContext),
@@ -283,43 +285,80 @@ class AccountSettingsViewModel internal constructor(
 
     /**
      * Called on resume to consume a pending provider OAuth callback parked by the deep link
-     * (see [com.crispy.tv.MainActivity.handleDeepLink]). If a provider is pending, we mark it
-     * as connected and refresh the state.
+     * (see [com.crispy.tv.MainActivity.handleDeepLink]). The connection was already persisted
+     * server-side during the callback; just refresh the state.
      */
     fun consumePendingProviderAuth() {
         val pending = pendingProviderAuthStore.consume() ?: return
-        val provider = pending.first.trim().takeIf { it.isNotBlank() } ?: return
-        setSyncProvider(provider)
+        if (pending.first.isBlank()) return
+        load()
     }
 
-    fun setSyncProvider(provider: String) {
-        val normalized = provider.trim()
-        if (normalized.isBlank()) return
+    fun startImport(provider: String) {
+        val importProvider = parseImportProvider(provider) ?: return
         _state.update { it.copy(isBusy = true, error = null, statusMessage = null) }
         viewModelScope.launch {
             runCatching {
-                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                syncProviderRepository.setConnectedProvider(session.accessToken, normalized)
+                val session = bootstrapRepository.bootstrap().session
+                    ?: throw IllegalStateException("Not signed in.")
+                val result = syncProviderRepository.startImport(
+                    accessToken = session.accessToken,
+                    provider = importProvider,
+                    action = if (importProvider.apiValue == uiState.value.syncProvider) "reconnect" else "connect",
+                    returnTo = OAUTH_RETURN_TO,
+                )
+                val authUrl = result.authUrl?.takeIf { it.isNotBlank() }
+                if (authUrl != null) launchBrowser(authUrl)
             }.onSuccess {
-                _state.update { it.copy(isBusy = false, syncProvider = normalized, statusMessage = "Sync connected.") }
+                _state.update {
+                    it.copy(
+                        isBusy = false,
+                        statusMessage = "Complete ${importProvider.apiValue} sign-in in your browser.",
+                    )
+                }
             }.onFailure { error ->
-                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to connect sync.") }
+                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to start ${importProvider.apiValue} connection.") }
             }
         }
     }
 
-    fun clearSyncProvider() {
+    fun disconnectSyncProvider() {
+        val provider = uiState.value.syncProvider?.let { parseImportProvider(it) } ?: return
         _state.update { it.copy(isBusy = true, error = null, statusMessage = null) }
         viewModelScope.launch {
             runCatching {
-                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                syncProviderRepository.clearConnectedProvider(session.accessToken)
+                val session = bootstrapRepository.bootstrap().session
+                    ?: throw IllegalStateException("Not signed in.")
+                syncProviderRepository.disconnectImportConnection(session.accessToken, provider)
             }.onSuccess {
                 _state.update { it.copy(isBusy = false, syncProvider = null, statusMessage = "Sync disconnected.") }
             }.onFailure { error ->
                 _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to disconnect sync.") }
             }
         }
+    }
+
+    private fun launchBrowser(url: String) {
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse(url),
+        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        appContext.startActivity(intent)
+    }
+
+    private fun parseImportProvider(value: String): com.crispy.tv.backend.CrispyBackendClient.ImportProvider? {
+        val normalized = value.trim().lowercase()
+        return when (normalized) {
+            "trakt" -> com.crispy.tv.backend.CrispyBackendClient.ImportProvider.TRAKT
+            "simkl" -> com.crispy.tv.backend.CrispyBackendClient.ImportProvider.SIMKL
+            else -> null
+        }
+    }
+
+    private companion object {
+        // Must match the Android entry in the server's IMPORT_OAUTH_ALLOWED_RETURN_URIS
+        // allowlist and the deep link registered in AndroidManifest.xml.
+        const val OAUTH_RETURN_TO = "crispytv://oauth-callback"
     }
 
     fun deleteAccount() {
