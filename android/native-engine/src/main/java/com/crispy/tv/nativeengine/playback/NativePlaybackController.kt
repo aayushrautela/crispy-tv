@@ -31,7 +31,7 @@ class NativePlaybackController(
             .apply {
                 playWhenReady = true
             }
-    private val vlcRuntime = VlcPlaybackRuntime(appContext)
+    private val mpvRuntime = MpvPlaybackRuntime(appContext)
     private var currentEngine: NativePlaybackEngine = NativePlaybackEngine.EXO
     private var exoVideoLayout: NativeVideoLayout? = null
     private var exoError: NativePlaybackError? = null
@@ -66,7 +66,7 @@ class NativePlaybackController(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                val codecLikely = shouldFallbackToVlc(error)
+                val codecLikely = shouldFallbackToMpv(error)
                 exoError =
                     NativePlaybackError(
                         token = nextExoErrorToken++,
@@ -75,14 +75,14 @@ class NativePlaybackController(
                     )
                 Log.w(
                     TAG,
-                    "Exo onPlayerError code=${error.errorCodeName} message=${error.message} cause=${error.cause?.javaClass?.simpleName} fallbackToVlc=$codecLikely",
+                    "Exo onPlayerError code=${error.errorCodeName} message=${error.message} cause=${error.cause?.javaClass?.simpleName} fallbackToMpv=$codecLikely",
                     error,
                 )
             }
         }
 
     init {
-        Log.d(TAG, "init created ExoPlayer and VLC runtime")
+        Log.d(TAG, "init created ExoPlayer and MPV runtime")
         exoPlayer.addListener(exoListener)
     }
 
@@ -98,17 +98,17 @@ class NativePlaybackController(
             NativePlaybackEngine.EXO -> {
                 exoError = null
                 exoVideoLayout = null
-                vlcRuntime.stop()
+                mpvRuntime.stop()
                 httpDataSourceFactory.setDefaultRequestProperties(source.headers)
                 exoPlayer.setMediaItem(MediaItem.fromUri(url))
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
             }
 
-            NativePlaybackEngine.VLC -> {
+            NativePlaybackEngine.MPV -> {
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
-                vlcRuntime.play(source)
+                mpvRuntime.play(source)
             }
         }
     }
@@ -124,8 +124,8 @@ class NativePlaybackController(
                 }
             }
 
-            NativePlaybackEngine.VLC -> {
-                vlcRuntime.setPlaying(isPlaying)
+            NativePlaybackEngine.MPV -> {
+                mpvRuntime.setPlaying(isPlaying)
             }
         }
     }
@@ -133,7 +133,7 @@ class NativePlaybackController(
     override fun snapshot(): NativePlaybackSnapshot {
         return when (currentEngine) {
             NativePlaybackEngine.EXO -> currentExoSnapshot()
-            NativePlaybackEngine.VLC -> vlcRuntime.snapshot()
+            NativePlaybackEngine.MPV -> mpvRuntime.snapshot()
         }
     }
 
@@ -141,7 +141,7 @@ class NativePlaybackController(
         val clampedPositionMs = positionMs.coerceAtLeast(0L)
         when (currentEngine) {
             NativePlaybackEngine.EXO -> exoPlayer.seekTo(clampedPositionMs)
-            NativePlaybackEngine.VLC -> vlcRuntime.seekTo(clampedPositionMs)
+            NativePlaybackEngine.MPV -> mpvRuntime.seekTo(clampedPositionMs)
         }
     }
 
@@ -149,14 +149,14 @@ class NativePlaybackController(
         Log.d(TAG, "stop currentEngine=$currentEngine")
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
-        vlcRuntime.stop()
+        mpvRuntime.stop()
     }
 
     override fun release() {
         Log.d(TAG, "release currentEngine=$currentEngine")
         exoPlayer.removeListener(exoListener)
         exoPlayer.release()
-        vlcRuntime.release()
+        mpvRuntime.release()
     }
 
     override fun bindExoPlayerView(playerView: PlayerView) {
@@ -164,14 +164,14 @@ class NativePlaybackController(
         playerView.player = exoPlayer
     }
 
-    override fun createVlcSurfaceView(context: Context): SurfaceView {
-        Log.d(TAG, "createVlcSurfaceView")
-        return vlcRuntime.createSurfaceView(context)
+    override fun createMpvSurfaceView(context: Context): SurfaceView {
+        Log.d(TAG, "createMpvSurfaceView")
+        return mpvRuntime.createSurfaceView(context)
     }
 
-    override fun attachVlcSurface(surfaceView: SurfaceView) {
-        Log.d(TAG, "attachVlcSurface viewHash=${System.identityHashCode(surfaceView)}")
-        vlcRuntime.attach(surfaceView)
+    override fun attachMpvSurface(surfaceView: SurfaceView) {
+        Log.d(TAG, "attachMpvSurface viewHash=${System.identityHashCode(surfaceView)}")
+        mpvRuntime.attach(surfaceView)
     }
 
     private fun currentExoSnapshot(): NativePlaybackSnapshot {
@@ -218,7 +218,7 @@ class NativePlaybackController(
         }
     }
 
-    private fun shouldFallbackToVlc(error: PlaybackException): Boolean {
+    private fun shouldFallbackToMpv(error: PlaybackException): Boolean {
         val message = error.message.orEmpty().lowercase()
         val causeName = error.cause?.javaClass?.simpleName.orEmpty().lowercase()
 

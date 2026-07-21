@@ -136,7 +136,7 @@ fun PlayerRoute(
                 )
             }
 
-            NativePlaybackEngine.VLC -> {
+            NativePlaybackEngine.MPV -> {
                 AndroidView(
                     modifier =
                         Modifier
@@ -152,9 +152,9 @@ fun PlayerRoute(
                                     ),
                                 )
                             },
-                    factory = { viewContext -> session.createVlcSurfaceView(viewContext) },
+                    factory = { viewContext -> session.createMpvSurfaceView(viewContext) },
                     update = { surfaceView: SurfaceView ->
-                        session.attachVlcSurface(surfaceView)
+                        session.attachMpvSurface(surfaceView)
                     },
                 )
             }

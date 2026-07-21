@@ -188,10 +188,10 @@ class PlayerSessionViewModel(
         playbackController.bindExoPlayerView(playerView)
     }
 
-    fun createVlcSurfaceView(context: Context): SurfaceView = playbackController.createVlcSurfaceView(context)
+    fun createMpvSurfaceView(context: Context): SurfaceView = playbackController.createMpvSurfaceView(context)
 
-    fun attachVlcSurface(surfaceView: SurfaceView) {
-        playbackController.attachVlcSurface(surfaceView)
+    fun attachMpvSurface(surfaceView: SurfaceView) {
+        playbackController.attachMpvSurface(surfaceView)
     }
 
     fun setPlaying(isPlaying: Boolean) {
@@ -894,21 +894,21 @@ class PlayerSessionViewModel(
             return false
         }
 
-        Log.w(TAG, "Codec issue detected in EXO, retrying with VLC. message=${error.message}")
+        Log.w(TAG, "Codec issue detected in EXO, retrying with MPV. message=${error.message}")
         _uiState.update { state ->
             state.copy(
-                activeEngine = NativePlaybackEngine.VLC,
+                activeEngine = NativePlaybackEngine.MPV,
                 isBuffering = true,
                 isPlaying = false,
                 positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
-                statusMessage = "Codec issue detected, retrying with VLC...",
+                statusMessage = "Codec issue detected, retrying with MPV...",
                 errorMessage = null,
                 videoLayout = null,
             )
         }
-        requestPlayback(engine = NativePlaybackEngine.VLC)
+        requestPlayback(engine = NativePlaybackEngine.MPV)
         return true
     }
 

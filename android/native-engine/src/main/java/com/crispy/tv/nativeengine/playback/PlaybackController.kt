@@ -7,7 +7,7 @@ import okhttp3.Headers
 
 enum class NativePlaybackEngine {
     EXO,
-    VLC
+    MPV
 }
 
 enum class NativePlaybackState {
@@ -87,8 +87,8 @@ interface PlaybackSessionController {
 
 interface PlaybackSurfaceController {
     fun bindExoPlayerView(playerView: PlayerView)
-    fun createVlcSurfaceView(context: Context): SurfaceView
-    fun attachVlcSurface(surfaceView: SurfaceView)
+    fun createMpvSurfaceView(context: Context): SurfaceView
+    fun attachMpvSurface(surfaceView: SurfaceView)
 }
 
 interface PlaybackController : PlaybackSessionController, PlaybackSurfaceController
