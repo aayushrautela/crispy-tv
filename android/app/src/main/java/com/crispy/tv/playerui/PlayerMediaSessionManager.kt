@@ -46,14 +46,21 @@ internal class PlayerMediaSessionManager(
             setCallback(
                 object : MediaSessionCompat.Callback() {
                     override fun onPlay() {
+                        if (released) return
                         playbackController.setPlaying(true)
+                        currentIsError = false
+                        currentErrorMessage = null
                         currentIsPlaying = true
+                        currentIsBuffering = false
                         publishPlaybackState()
                         publishNotification(force = true)
                     }
 
                     override fun onPause() {
+                        if (released) return
                         playbackController.setPlaying(false)
+                        currentIsError = false
+                        currentErrorMessage = null
                         currentIsPlaying = false
                         currentIsBuffering = false
                         publishPlaybackState()
@@ -61,12 +68,14 @@ internal class PlayerMediaSessionManager(
                     }
 
                     override fun onSeekTo(pos: Long) {
+                        if (released) return
                         playbackController.seekTo(pos)
                         currentPositionMs = pos.coerceAtLeast(0L)
                         publishPlaybackState()
                     }
 
                     override fun onRewind() {
+                        if (released) return
                         val playbackSnapshot = playbackController.snapshot()
                         val targetPositionMs = (playbackSnapshot.positionMs - REWIND_MS).coerceAtLeast(0L)
                         playbackController.seekTo(targetPositionMs)
@@ -75,6 +84,7 @@ internal class PlayerMediaSessionManager(
                     }
 
                     override fun onFastForward() {
+                        if (released) return
                         val playbackSnapshot = playbackController.snapshot()
                         val durationMs = playbackSnapshot.durationMs
                         val unclampedTargetMs = playbackSnapshot.positionMs + FAST_FORWARD_MS
@@ -91,7 +101,10 @@ internal class PlayerMediaSessionManager(
                     }
 
                     override fun onStop() {
+                        if (released) return
                         playbackController.setPlaying(false)
+                        currentIsError = false
+                        currentErrorMessage = null
                         currentIsPlaying = false
                         currentIsBuffering = false
                         publishPlaybackState()
@@ -109,8 +122,13 @@ internal class PlayerMediaSessionManager(
     private var currentArtworkBitmap: Bitmap? = null
     private var currentIsPlaying: Boolean = false
     private var currentIsBuffering: Boolean = true
+    private var currentIsError: Boolean = false
+    private var currentErrorMessage: String? = null
     private var currentPositionMs: Long = 0L
     private var currentDurationMs: Long = 0L
+    private var currentPlaybackSpeed: Float = 1f
+    private var currentBufferedPositionMs: Long = 0L
+    private var released: Boolean = false
     private var artworkJob: Job? = null
     private var lastNotificationSnapshot: NotificationSnapshot? = null
 
@@ -126,6 +144,9 @@ internal class PlayerMediaSessionManager(
         subtitle: String?,
         artworkUrl: String?,
     ) {
+        if (released) {
+            return
+        }
         val normalizedTitle = title.ifBlank { "Player" }
         val normalizedSubtitle = subtitle?.trim()?.ifBlank { null }
         val normalizedArtworkUrl = artworkUrl?.trim()?.ifBlank { null }
@@ -152,17 +173,50 @@ internal class PlayerMediaSessionManager(
         isBuffering: Boolean,
         positionMs: Long,
         durationMs: Long,
+        playbackSpeed: Float = 1f,
+        bufferedPositionMs: Long = positionMs,
     ) {
+        if (released) {
+            return
+        }
         updateMetadata(title = title, subtitle = subtitle, artworkUrl = artworkUrl)
+        val wasError = currentIsError
         currentIsPlaying = isPlaying
         currentIsBuffering = isBuffering
+        currentIsError = false
+        currentErrorMessage = null
+        currentPositionMs = positionMs.coerceAtLeast(0L)
+        currentDurationMs = durationMs.coerceAtLeast(0L)
+        currentPlaybackSpeed = if (playbackSpeed.isFinite() && playbackSpeed > 0f) playbackSpeed else 1f
+        currentBufferedPositionMs = bufferedPositionMs.coerceAtLeast(0L)
+        publishPlaybackState()
+        publishNotification(force = wasError)
+    }
+
+    fun updatePlaybackError(
+        title: String,
+        subtitle: String?,
+        artworkUrl: String?,
+        positionMs: Long,
+        durationMs: Long,
+        errorMessage: String?,
+    ) {
+        if (released) {
+            return
+        }
+        updateMetadata(title = title, subtitle = subtitle, artworkUrl = artworkUrl)
+        currentIsError = true
+        currentErrorMessage = errorMessage?.trim()?.ifBlank { null } ?: "Playback error"
+        currentIsPlaying = false
+        currentIsBuffering = false
         currentPositionMs = positionMs.coerceAtLeast(0L)
         currentDurationMs = durationMs.coerceAtLeast(0L)
         publishPlaybackState()
-        publishNotification()
+        publishNotification(force = true)
     }
 
     fun release() {
+        released = true
         artworkJob?.cancel()
         NotificationManagerCompat.from(appContext).cancel(NOTIFICATION_ID)
         if (activeManager === this) {
@@ -172,6 +226,9 @@ internal class PlayerMediaSessionManager(
         mediaSession.release()
         scope.cancel()
     }
+
+    val isActive: Boolean
+        get() = !released
 
     private fun loadArtwork(artworkUrl: String?) {
         artworkJob?.cancel()
@@ -229,14 +286,17 @@ internal class PlayerMediaSessionManager(
     }
 
     private fun publishPlaybackState() {
-        val state =
+        val (state, includeSpeed) =
             when {
-                currentIsBuffering -> PlaybackStateCompat.STATE_BUFFERING
-                currentIsPlaying -> PlaybackStateCompat.STATE_PLAYING
-                else -> PlaybackStateCompat.STATE_PAUSED
+                currentIsError -> PlaybackStateCompat.STATE_ERROR to false
+                currentIsBuffering -> PlaybackStateCompat.STATE_BUFFERING to true
+                currentIsPlaying -> PlaybackStateCompat.STATE_PLAYING to true
+                else -> PlaybackStateCompat.STATE_PAUSED to true
             }
 
-        val playbackState =
+        val speed = if (includeSpeed && currentIsPlaying) currentPlaybackSpeed else 0f
+
+        val builder =
             PlaybackStateCompat.Builder()
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or
@@ -247,14 +307,23 @@ internal class PlayerMediaSessionManager(
                         PlaybackStateCompat.ACTION_FAST_FORWARD or
                         PlaybackStateCompat.ACTION_STOP,
                 )
-                .setState(
-                    state,
-                    currentPositionMs,
-                    if (currentIsPlaying) 1f else 0f,
-                    SystemClock.elapsedRealtime(),
-                ).build()
 
-        mediaSession.setPlaybackState(playbackState)
+        if (currentIsError && currentErrorMessage != null) {
+            builder.setErrorMessage(0, currentErrorMessage)
+        }
+
+        builder.setState(
+            state,
+            currentPositionMs,
+            speed,
+            SystemClock.elapsedRealtime(),
+        )
+
+        if (currentBufferedPositionMs > currentPositionMs) {
+            builder.setBufferedPosition(currentBufferedPositionMs)
+        }
+
+        mediaSession.setPlaybackState(builder.build())
     }
 
     private fun publishNotification(force: Boolean = false) {
@@ -270,6 +339,7 @@ internal class PlayerMediaSessionManager(
                 hasArtwork = currentArtworkBitmap != null,
                 isPlaying = currentIsPlaying,
                 isBuffering = currentIsBuffering,
+                isError = currentIsError,
             )
         if (!force && snapshot == lastNotificationSnapshot) {
             return
@@ -381,6 +451,7 @@ internal class PlayerMediaSessionManager(
         val hasArtwork: Boolean,
         val isPlaying: Boolean,
         val isBuffering: Boolean,
+        val isError: Boolean,
     )
 
     companion object {

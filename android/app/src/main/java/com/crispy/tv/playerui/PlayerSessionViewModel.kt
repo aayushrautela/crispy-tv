@@ -830,7 +830,9 @@ class PlayerSessionViewModel(
         while (currentCoroutineContext().isActive) {
             val snapshot = playbackController.snapshot()
 
-            if (maybeHandlePlaybackError(snapshot.error, snapshot.engine)) {
+            val fallbackHandled = maybeHandlePlaybackError(snapshot.error, snapshot.engine)
+            if (fallbackHandled) {
+                publishMediaSessionFromUiState()
                 delay(500)
                 continue
             }
@@ -842,7 +844,30 @@ class PlayerSessionViewModel(
 
             onPlaybackMetrics(snapshot)
 
-            val uiStateSnapshot = uiState.value
+            publishMediaSessionFromUiState()
+            syncWatchHistory(
+                positionMs = uiState.value.positionMs,
+                durationMs = uiState.value.durationMs,
+                isPlaying = uiState.value.isPlaying,
+            )
+
+            delay(500)
+        }
+    }
+
+    private fun publishMediaSessionFromUiState() {
+        val uiStateSnapshot = uiState.value
+        val errorMessage = uiStateSnapshot.errorMessage
+        if (errorMessage != null) {
+            mediaSessionManager.updatePlaybackError(
+                title = uiStateSnapshot.title,
+                subtitle = uiStateSnapshot.subtitle,
+                artworkUrl = uiStateSnapshot.artworkUrl,
+                positionMs = uiStateSnapshot.positionMs,
+                durationMs = uiStateSnapshot.durationMs,
+                errorMessage = errorMessage,
+            )
+        } else {
             mediaSessionManager.updatePlayback(
                 title = uiStateSnapshot.title,
                 subtitle = uiStateSnapshot.subtitle,
@@ -852,14 +877,6 @@ class PlayerSessionViewModel(
                 positionMs = uiStateSnapshot.positionMs,
                 durationMs = uiStateSnapshot.durationMs,
             )
-
-            syncWatchHistory(
-                positionMs = uiStateSnapshot.positionMs,
-                durationMs = uiStateSnapshot.durationMs,
-                isPlaying = uiStateSnapshot.isPlaying,
-            )
-
-            delay(500)
         }
     }
 
@@ -894,7 +911,7 @@ class PlayerSessionViewModel(
             return false
         }
 
-        Log.w(TAG, "Codec issue detected in EXO, retrying with MPV. message=${error.message}")
+        Log.w(TAG, "ExoPlayer error, retrying on MPV fallback. message=${error.message}")
         _uiState.update { state ->
             state.copy(
                 activeEngine = NativePlaybackEngine.MPV,
@@ -903,7 +920,7 @@ class PlayerSessionViewModel(
                 positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
-                statusMessage = "Codec issue detected, retrying with MPV...",
+                statusMessage = "Switching to fallback engine...",
                 errorMessage = null,
                 videoLayout = null,
             )
@@ -914,9 +931,11 @@ class PlayerSessionViewModel(
 
     private fun syncPlaybackSnapshot(snapshot: NativePlaybackSnapshot) {
         if (maybeHandlePlaybackError(snapshot.error, snapshot.engine)) {
+            publishMediaSessionFromUiState()
             return
         }
         onPlaybackMetrics(snapshot)
+        publishMediaSessionFromUiState()
     }
 
     private fun statusMessage(snapshot: NativePlaybackSnapshot): String {
