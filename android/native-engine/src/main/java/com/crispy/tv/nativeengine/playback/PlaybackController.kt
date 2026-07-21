@@ -64,6 +64,7 @@ data class NativePlaybackSnapshot(
 data class PlaybackSource(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
+    val streamType: String? = null,
 )
 
 fun PlaybackSource.toOkHttpHeaders(): Headers {

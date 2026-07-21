@@ -2,40 +2,81 @@ package com.crispy.tv.nativeengine.playback
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
 import android.util.Log
 import android.view.SurfaceView
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.LoadControl
+import androidx.media3.exoplayer.RenderersFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
+import androidx.media3.extractor.ts.TsExtractor
 import androidx.media3.ui.PlayerView
+import java.util.concurrent.Executors
 
+@UnstableApi
 class NativePlaybackController(
     context: Context,
 ) : PlaybackController {
     private val appContext = context.applicationContext
+    private val mainHandler = Handler(appContext.mainLooper)
 
     private val httpDataSourceFactory =
         DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
 
-    private val exoPlayer: ExoPlayer =
-        ExoPlayer.Builder(appContext)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
+    private val extractorsFactory =
+        DefaultExtractorsFactory()
+            .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
+            .setTsExtractorTimestampSearchBytes(1500 * TsExtractor.TS_PACKET_SIZE)
+
+    private val trackSelector =
+        DefaultTrackSelector(appContext).apply {
+            setParameters(
+                buildUponParameters()
+                    .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true),
+            )
+        }
+
+    private val loadControl: LoadControl =
+        DefaultLoadControl.Builder()
+            .setTargetBufferBytes(100 * 1024 * 1024)
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 15_000,
+                /* maxBufferMs = */ 70_000,
+                /* bufferForPlaybackMs = */ DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                /* bufferForPlaybackAfterRebufferMs = */ 5_000,
+            )
             .build()
-            .apply {
-                playWhenReady = true
-            }
+
+    private var currentlyBoundPlayerView: PlayerView? = null
+
+    private var extensionRendererMode: Int = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+    private var exoPlayer: ExoPlayer = buildExoPlayer(extensionRendererMode)
     private val mpvRuntime = MpvPlaybackRuntime(appContext)
     private var currentEngine: NativePlaybackEngine = NativePlaybackEngine.EXO
     private var exoVideoLayout: NativeVideoLayout? = null
     private var exoError: NativePlaybackError? = null
     private var nextExoErrorToken: Long = 1L
+
+    private var lastPlaybackSource: PlaybackSource? = null
+    private var lastExoPositionMs: Long = 0L
+    private var probeAttempted: Boolean = false
+    private var decoderPriorityEscalated: Boolean = false
+    private val probeExecutor =
+        Executors.newSingleThreadExecutor { r ->
+            Thread(r, "crispy-exo-probe").apply { isDaemon = true }
+        }
 
     private val exoListener =
         object : Player.Listener {
@@ -66,27 +107,35 @@ class NativePlaybackController(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                val codecLikely = shouldFallbackToMpv(error)
-                exoError =
-                    NativePlaybackError(
-                        token = nextExoErrorToken++,
-                        message = error.message ?: "ExoPlayer error",
-                        codecLikely = codecLikely,
-                    )
-                Log.w(
-                    TAG,
-                    "Exo onPlayerError code=${error.errorCodeName} message=${error.message} cause=${error.cause?.javaClass?.simpleName} fallbackToMpv=$codecLikely",
-                    error,
-                )
+                handleExoPlayerError(error)
             }
         }
 
     init {
-        Log.d(TAG, "init created ExoPlayer and MPV runtime")
+        Log.d(TAG, "init created ExoPlayer with hardened config and MPV runtime")
         exoPlayer.addListener(exoListener)
     }
 
-    @UnstableApi
+    private fun buildExoPlayer(rendererMode: Int): ExoPlayer {
+        val renderersFactory: RenderersFactory =
+            DefaultRenderersFactory(appContext)
+                .setExtensionRendererMode(rendererMode)
+                .setEnableDecoderFallback(true)
+
+        val mediaSourceFactory =
+            DefaultMediaSourceFactory(httpDataSourceFactory, extractorsFactory)
+
+        return ExoPlayer.Builder(appContext)
+            .setRenderersFactory(renderersFactory)
+            .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
+            .apply {
+                playWhenReady = true
+            }
+    }
+
     override fun play(source: PlaybackSource, engine: NativePlaybackEngine) {
         val url = source.url
         Log.d(
@@ -98,9 +147,13 @@ class NativePlaybackController(
             NativePlaybackEngine.EXO -> {
                 exoError = null
                 exoVideoLayout = null
+                probeAttempted = false
+                decoderPriorityEscalated = false
+                lastExoPositionMs = 0L
                 mpvRuntime.stop()
                 httpDataSourceFactory.setDefaultRequestProperties(source.headers)
-                exoPlayer.setMediaItem(MediaItem.fromUri(url))
+                val mediaItem = playbackMediaItemFromUrl(url = url, streamType = source.streamType)
+                exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
             }
@@ -111,6 +164,7 @@ class NativePlaybackController(
                 mpvRuntime.play(source)
             }
         }
+        lastPlaybackSource = source
     }
 
     override fun setPlaying(isPlaying: Boolean) {
@@ -154,6 +208,7 @@ class NativePlaybackController(
 
     override fun release() {
         Log.d(TAG, "release currentEngine=$currentEngine")
+        probeExecutor.shutdownNow()
         exoPlayer.removeListener(exoListener)
         exoPlayer.release()
         mpvRuntime.release()
@@ -162,6 +217,7 @@ class NativePlaybackController(
     override fun bindExoPlayerView(playerView: PlayerView) {
         Log.d(TAG, "bindExoPlayerView viewHash=${System.identityHashCode(playerView)}")
         playerView.player = exoPlayer
+        currentlyBoundPlayerView = playerView
     }
 
     override fun createMpvSurfaceView(context: Context): SurfaceView {
@@ -172,6 +228,114 @@ class NativePlaybackController(
     override fun attachMpvSurface(surfaceView: SurfaceView) {
         Log.d(TAG, "attachMpvSurface viewHash=${System.identityHashCode(surfaceView)}")
         mpvRuntime.attach(surfaceView)
+    }
+
+    private fun handleExoPlayerError(error: PlaybackException) {
+        Log.w(
+            TAG,
+            "Exo onPlayerError code=${error.errorCodeName} isDecoder=${error.isDecoderFailure()} isSource=${error.isSourceError()} isDrm=${error.isDrmError()} cause=${error.cause?.javaClass?.simpleName}",
+            error,
+        )
+        lastExoPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+
+        if (error.isSourceError() && !probeAttempted) {
+            probeAttempted = true
+            val source = lastPlaybackSource
+            if (source == null) {
+                surfaceError(error)
+                return
+            }
+            Log.d(TAG, "Source error; launching MIME probe before retry")
+            probeExecutor.execute {
+                val probed = probeMimeType(source.url, source.headers)
+                mainHandler.post {
+                    if (probed != null) {
+                        Log.d(TAG, "Probe succeeded mimeType=$probed; retrying with inferred MIME")
+                        retryExoWithMimeType(source, probed)
+                    } else {
+                        Log.d(TAG, "Probe returned no MIME; surfacing error / fallback")
+                        surfaceError(error)
+                    }
+                }
+            }
+            return
+        }
+
+        if (error.isDecoderFailure() && !decoderPriorityEscalated) {
+            decoderPriorityEscalated = true
+            if (extensionRendererMode == DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER) {
+                Log.d(TAG, "Decoder failure but priority already PREFER; surfacing for fallback")
+                surfaceError(error)
+                return
+            }
+            Log.w(TAG, "Decoder failure; escalating to EXTENSION_RENDERER_MODE_PREFER and retrying")
+            retryExoWithEscalatedDecoderPriority()
+            return
+        }
+
+        surfaceError(error)
+    }
+
+    private fun retryExoWithMimeType(
+        source: PlaybackSource,
+        mimeType: String,
+    ) {
+        exoError = null
+        httpDataSourceFactory.setDefaultRequestProperties(source.headers)
+        val mediaItem =
+            playbackMediaItemFromUrl(
+                url = source.url,
+                streamType = source.streamType,
+                mimeTypeOverride = mimeType,
+            )
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
+        if (lastExoPositionMs > 0L) {
+            exoPlayer.seekTo(lastExoPositionMs)
+        }
+        exoPlayer.playWhenReady = true
+    }
+
+    private fun retryExoWithEscalatedDecoderPriority() {
+        val newMode = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+        extensionRendererMode = newMode
+        val listener = exoListener
+        val source = lastPlaybackSource
+        val resumeMs = lastExoPositionMs
+        val boundView = currentlyBoundPlayerView
+        exoError = null
+        exoVideoLayout = null
+        lastExoPositionMs = 0L
+        exoPlayer.removeListener(listener)
+        exoPlayer.release()
+        exoPlayer = buildExoPlayer(newMode)
+        exoPlayer.addListener(listener)
+        boundView?.let { it.player = exoPlayer }
+        if (source != null) {
+            httpDataSourceFactory.setDefaultRequestProperties(source.headers)
+            val mediaItem =
+                playbackMediaItemFromUrl(
+                    url = source.url,
+                    streamType = source.streamType,
+                    mimeTypeOverride = null,
+                )
+            exoPlayer.setMediaItem(mediaItem)
+            exoPlayer.prepare()
+            if (resumeMs > 0L) {
+                exoPlayer.seekTo(resumeMs)
+            }
+            exoPlayer.playWhenReady = true
+        }
+        Log.d(TAG, "ExoPlayer rebuilt with PREFER extension renderers and same source")
+    }
+
+    private fun surfaceError(error: PlaybackException) {
+        exoError =
+            NativePlaybackError(
+                token = nextExoErrorToken++,
+                message = error.message ?: "ExoPlayer error",
+                codecLikely = shouldFallbackToMpv(error),
+            )
     }
 
     private fun currentExoSnapshot(): NativePlaybackSnapshot {
@@ -219,13 +383,10 @@ class NativePlaybackController(
     }
 
     private fun shouldFallbackToMpv(error: PlaybackException): Boolean {
-        val message = error.message.orEmpty().lowercase()
-        val causeName = error.cause?.javaClass?.simpleName.orEmpty().lowercase()
-
-        return message.contains("codec") ||
-            message.contains("decoder") ||
-            causeName.contains("codec") ||
-            causeName.contains("decoder")
+        if (error.isDrmError()) {
+            return false
+        }
+        return true
     }
 
     private fun debugUrl(url: String): String {
