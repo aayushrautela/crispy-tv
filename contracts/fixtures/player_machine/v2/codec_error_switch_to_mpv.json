@@ -1,7 +1,7 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "player_machine",
-  "case_id": "codec_error_switch_to_vlc",
+  "case_id": "codec_error_switch_to_mpv",
   "now_ms": 1739923200000,
   "steps": [
     {
@@ -24,7 +24,7 @@
       "expect": {
         "phase": "loading_media",
         "intent": "play",
-        "engine": "vlc"
+        "engine": "mpv"
       }
     }
   ]

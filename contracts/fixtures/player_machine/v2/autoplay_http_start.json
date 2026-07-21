@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "suite": "player_machine",
   "case_id": "autoplay_http_start",
   "now_ms": 1739923200000,

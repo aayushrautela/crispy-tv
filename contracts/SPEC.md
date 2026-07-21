@@ -32,6 +32,7 @@ provider-key strings for planning purposes, but these are never sent to the serv
 
 - `player_machine`
   - Event-driven playback transitions and engine fallback behavior.
+  - `contract_version` 2 renames the fallback engine identifier from `vlc` to `mpv` (libVLC replaced by libmpv). v1 fixtures are superseded.
 - `continue_watching`
   - Continue Watching planning: filter, dedupe, and canonical ordering for in-progress items and placeholders.
   - Dedupe: for the same episode/movie, prefer higher progress only if it is > 0.5 percentage points ahead; otherwise prefer newer `last_updated_ms`.
@@ -99,6 +100,16 @@ Breaking behavior changes are allowed when needed. For every affected suite:
 2) update this spec plus the relevant fixtures/schemas
 3) keep Android + Swift contract runners in lockstep
 4) include migration notes in the PR description
+
+### Migration: player_machine v2 (2026-07)
+
+The `player_machine` suite migrated from `contract_version` 1 to 2. The fallback
+engine identifier changed from `vlc` to `mpv` because the Android fallback
+engine switched from libVLC to libmpv (Findroid's `dev.jdtech.mpv:libmpv`
+AAR from Maven Central). v1 fixtures were removed; v2 fixtures live under
+`contracts/fixtures/player_machine/v2/`. The Kotlin `PlayerReducer` and the
+Swift `reducePlayerState` both return `"mpv"` when the active engine is `"exo"`
+and a `NATIVE_CODEC_ERROR` event is reduced.
 
 ### Migration: Jellyfin-first identity (all suites, 2026-05)
 

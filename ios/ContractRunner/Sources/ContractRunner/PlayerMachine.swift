@@ -98,7 +98,7 @@ public func reducePlayerState(_ state: PlayerState, action: PlayerAction, nowMs:
     case .nativeCodecError:
         next.phase = .loading_media
         if next.engine.lowercased() == "exo" {
-            next.engine = "vlc"
+            next.engine = "mpv"
         }
 
     case .userIntentPlay:

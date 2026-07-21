@@ -58,7 +58,7 @@ fun reducePlayerState(
 
         PlayerAction.NativeCodecError -> state.copy(
             phase = PlayerPhase.LOADING_MEDIA,
-            engine = if (state.engine.equals("exo", ignoreCase = true)) "vlc" else state.engine,
+            engine = if (state.engine.equals("exo", ignoreCase = true)) "mpv" else state.engine,
             updatedAtMs = nowMs
         )
 

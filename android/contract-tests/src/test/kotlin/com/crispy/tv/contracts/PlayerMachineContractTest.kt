@@ -26,7 +26,7 @@ class PlayerMachineContractTest {
 
     @Test
     fun playerMachineFixtures() {
-        val fixturesRoot = repositoryRoot().resolve("contracts/fixtures/player_machine")
+        val fixturesRoot = repositoryRoot().resolve("contracts/fixtures/player_machine/v2")
         val fixtures = fixtureFiles(fixturesRoot)
         assertTrue(fixtures.isNotEmpty(), "No player_machine fixtures found at $fixturesRoot")
 
