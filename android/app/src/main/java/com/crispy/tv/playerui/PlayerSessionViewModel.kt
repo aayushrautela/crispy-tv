@@ -34,11 +34,15 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackError
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
+import com.crispy.tv.nativeengine.playback.NativeTrack
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import com.crispy.tv.nativeengine.playback.PlaybackController
+import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.settings.PlaybackSettingsRepository
+import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.ProviderStreamsResult
@@ -92,6 +96,13 @@ data class PlayerUiState(
     val episodesStatusMessage: String = "",
     val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
     val currentPlaybackUrl: String? = null,
+    val playbackSpeed: Float = 1f,
+    val muted: Boolean = false,
+    val audioTracks: List<NativeTrack> = emptyList(),
+    val selectedAudioTrackId: String? = null,
+    val subtitleTracks: List<NativeTrack> = emptyList(),
+    val selectedSubtitleTrackId: String? = null,
+    val subtitleDelayMs: Int = 0,
 )
 
 class PlayerSessionViewModel(
@@ -113,6 +124,8 @@ class PlayerSessionViewModel(
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playbackMetrics = PlaybackMetricsHolder()
     private val playbackController: PlaybackController = PlaybackDependencies.playbackControllerFactory(this.appContext)
+    private val playbackSettingsRepository: PlaybackSettingsRepository =
+        PlaybackSettingsRepositoryProvider.get(this.appContext)
     private val mediaSessionManager =
         PlayerMediaSessionManager(
             context = this.appContext,
@@ -199,9 +212,73 @@ class PlayerSessionViewModel(
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
+    fun onForegroundStart() {
+        val snapshot = playbackController.snapshot()
+        if (snapshot.isBuffering || snapshot.state == NativePlaybackState.PAUSED) {
+            return
+        }
+        if (!snapshot.isPlaying && snapshot.state != NativePlaybackState.ERROR && snapshot.state != NativePlaybackState.ENDED) {
+            playbackController.setPlaying(true)
+            syncPlaybackSnapshot(playbackController.snapshot())
+        }
+    }
+
+    fun onBackgroundStop() {
+        val snapshot = playbackController.snapshot()
+        if (snapshot.isPlaying) {
+            playbackController.setPlaying(false)
+            syncPlaybackSnapshot(playbackController.snapshot())
+        }
+    }
+
     fun seekTo(positionMs: Long) {
         playbackController.seekTo(positionMs)
         syncPlaybackSnapshot(playbackController.snapshot())
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        val safeSpeed = if (speed.isFinite() && speed > 0f) speed else 1f
+        playbackSettingsRepository.setPlaybackSpeed(safeSpeed)
+        playbackController.setPlaybackSpeed(safeSpeed)
+        _uiState.update { it.copy(playbackSpeed = safeSpeed) }
+        publishMediaSessionFromUiState()
+    }
+
+    fun setMuted(muted: Boolean) {
+        playbackSettingsRepository.setMuted(muted)
+        playbackController.setMuted(muted)
+        _uiState.update { it.copy(muted = muted) }
+        publishMediaSessionFromUiState()
+    }
+
+    fun selectAudioTrack(trackId: String?) {
+        playbackController.selectAudioTrack(trackId)
+        trackId?.let { playbackSettingsRepository.setDefaultAudioLanguage(languageFromTrack(trackId) ?: return@let) }
+        syncPlaybackSnapshot(playbackController.snapshot())
+    }
+
+    fun selectSubtitleTrack(trackId: String?) {
+        playbackController.selectSubtitleTrack(trackId)
+        trackId?.let { playbackSettingsRepository.setDefaultSubtitleLanguage(languageFromTrack(trackId) ?: return@let) }
+        syncPlaybackSnapshot(playbackController.snapshot())
+    }
+
+    fun setExternalSubtitle(url: String, language: String? = null, name: String? = null) {
+        playbackController.setExternalSubtitle(
+            PlaybackExternalSubtitle(url = url, language = language, name = name),
+        )
+        syncPlaybackSnapshot(playbackController.snapshot())
+    }
+
+    fun setSubtitleDelayMs(delayMs: Int) {
+        playbackController.setSubtitleDelayMs(delayMs)
+        _uiState.update { it.copy(subtitleDelayMs = delayMs) }
+    }
+
+    private fun languageFromTrack(trackId: String): String? {
+        val audio = uiState.value.audioTracks.firstOrNull { it.id == trackId }
+        val sub = uiState.value.subtitleTracks.firstOrNull { it.id == trackId }
+        return audio?.language ?: sub?.language
     }
 
     fun showInfo() {
@@ -796,8 +873,17 @@ class PlayerSessionViewModel(
                     nextStatusMessage != state.statusMessage ||
                     nextErrorMessage != state.errorMessage ||
                     snapshot.videoLayout != state.videoLayout
+            val shouldUpdateTracks =
+                snapshot.audioTracks != state.audioTracks ||
+                    snapshot.subtitleTracks != state.subtitleTracks ||
+                    snapshot.selectedAudioTrackId != state.selectedAudioTrackId ||
+                    snapshot.selectedSubtitleTrackId != state.selectedSubtitleTrackId
+            val shouldUpdateSpeedOrMute =
+                snapshot.playbackSpeed != state.playbackSpeed ||
+                    snapshot.muted != state.muted ||
+                    snapshot.subtitleDelayMs != state.subtitleDelayMs
 
-            if (!(shouldUpdatePosition || shouldUpdateDuration || shouldUpdatePlaybackState)) {
+            if (!(shouldUpdatePosition || shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSpeedOrMute)) {
                 state
             } else {
                 state.copy(
@@ -810,6 +896,13 @@ class PlayerSessionViewModel(
                     statusMessage = nextStatusMessage,
                     errorMessage = nextErrorMessage,
                     videoLayout = snapshot.videoLayout,
+                    playbackSpeed = snapshot.playbackSpeed,
+                    muted = snapshot.muted,
+                    audioTracks = snapshot.audioTracks,
+                    selectedAudioTrackId = snapshot.selectedAudioTrackId,
+                    subtitleTracks = snapshot.subtitleTracks,
+                    selectedSubtitleTrackId = snapshot.selectedSubtitleTrackId,
+                    subtitleDelayMs = snapshot.subtitleDelayMs,
                 )
             }
         }
@@ -823,7 +916,14 @@ class PlayerSessionViewModel(
         lastHandledErrorToken = null
         Log.d(TAG, "play request engine=$engine playbackUrlHash=${activePlaybackSource.url.hashCode()}")
         playbackController.play(activePlaybackSource, engine)
+        applyPersistedPlaybackSettings()
         syncPlaybackSnapshot(playbackController.snapshot())
+    }
+
+    private fun applyPersistedPlaybackSettings() {
+        val settings = playbackSettingsRepository.settings.value
+        playbackController.setPlaybackSpeed(settings.playbackSpeed)
+        playbackController.setMuted(settings.muted)
     }
 
     private suspend fun pollPlaybackState() {
@@ -876,6 +976,8 @@ class PlayerSessionViewModel(
                 isBuffering = uiStateSnapshot.isBuffering,
                 positionMs = uiStateSnapshot.positionMs,
                 durationMs = uiStateSnapshot.durationMs,
+                playbackSpeed = uiStateSnapshot.playbackSpeed,
+                bufferedPositionMs = uiStateSnapshot.positionMs,
             )
         }
     }

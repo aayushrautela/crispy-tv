@@ -1,5 +1,7 @@
 package com.crispy.tv.nativeengine.playback
 
+import android.net.Uri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import java.net.HttpURLConnection
@@ -12,6 +14,7 @@ internal fun playbackMediaItemFromUrl(
     streamType: String? = null,
     mimeTypeOverride: String? = null,
     mediaId: String = url,
+    externalSubtitles: List<PlaybackExternalSubtitle> = emptyList(),
 ): MediaItem {
     val builder = MediaItem.Builder().setUri(url).setMediaId(mediaId)
     val mime =
@@ -24,7 +27,35 @@ internal fun playbackMediaItemFromUrl(
     if (mime != null) {
         builder.setMimeType(mime)
     }
+    if (externalSubtitles.isNotEmpty()) {
+        builder.setSubtitleConfigurations(externalSubtitles.map(::toSubtitleConfiguration))
+    }
     return builder.build()
+}
+
+private fun toSubtitleConfiguration(subtitle: PlaybackExternalSubtitle): MediaItem.SubtitleConfiguration {
+    val mimeType = inferSubtitleMimeType(subtitle.url)
+    val builder =
+        MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
+            .setMimeType(mimeType)
+            .setRoleFlags(C.ROLE_FLAG_SUBTITLE)
+    subtitle.language?.let(builder::setLanguage)
+    subtitle.name?.let(builder::setLabel)
+    return builder.build()
+}
+
+private fun inferSubtitleMimeType(url: String): String {
+    val lower = url.lowercase(Locale.US)
+    val afterQuery = lower.substringBefore('#')
+    val path = afterQuery.substringBefore('?')
+    val extension = path.substringAfterLast('.', missingDelimiterValue = "")
+    return when (extension) {
+        "vtt", "webvtt" -> MimeTypes.TEXT_VTT
+        "srt" -> MimeTypes.APPLICATION_SUBRIP
+        "ass", "ssa" -> MimeTypes.TEXT_SSA
+        "ttml", "dfxp", "xml" -> MimeTypes.APPLICATION_TTML
+        else -> MimeTypes.TEXT_VTT
+    }
 }
 
 private fun inferPlaybackMimeType(

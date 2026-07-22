@@ -8,6 +8,7 @@ import android.view.SurfaceView
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -68,7 +69,9 @@ class NativePlaybackController(
     private var exoVideoLayout: NativeVideoLayout? = null
     private var exoError: NativePlaybackError? = null
     private var nextExoErrorToken: Long = 1L
-
+    private var exoPlaybackSpeed: Float = 1f
+    private var exoMuted: Boolean = false
+    private var exoSubtitleDelayMs: Int = 0
     private var lastPlaybackSource: PlaybackSource? = null
     private var lastExoPositionMs: Long = 0L
     private var probeAttempted: Boolean = false
@@ -152,10 +155,16 @@ class NativePlaybackController(
                 lastExoPositionMs = 0L
                 mpvRuntime.stop()
                 httpDataSourceFactory.setDefaultRequestProperties(source.headers)
-                val mediaItem = playbackMediaItemFromUrl(url = url, streamType = source.streamType)
+                val mediaItem =
+                    playbackMediaItemFromUrl(
+                        url = url,
+                        streamType = source.streamType,
+                        externalSubtitles = source.externalSubtitles,
+                    )
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
+                applyPersistedExoSettings()
             }
 
             NativePlaybackEngine.MPV -> {
@@ -165,6 +174,103 @@ class NativePlaybackController(
             }
         }
         lastPlaybackSource = source
+    }
+
+    override fun setPlaybackSpeed(speed: Float) {
+        val safeSpeed = if (speed.isFinite() && speed > 0f) speed else 1f
+        when (currentEngine) {
+            NativePlaybackEngine.EXO -> {
+                exoPlaybackSpeed = safeSpeed
+                exoPlayer.setPlaybackSpeed(safeSpeed)
+            }
+            NativePlaybackEngine.MPV -> mpvRuntime.setPlaybackSpeed(safeSpeed)
+        }
+    }
+
+    override fun setMuted(muted: Boolean) {
+        when (currentEngine) {
+            NativePlaybackEngine.EXO -> {
+                exoMuted = muted
+                exoPlayer.volume = if (muted) 0f else 1f
+            }
+            NativePlaybackEngine.MPV -> mpvRuntime.setMuted(muted)
+        }
+    }
+
+    override fun selectAudioTrack(trackId: String?) {
+        if (currentEngine != NativePlaybackEngine.EXO) {
+            mpvRuntime.selectAudioTrack(trackId)
+            return
+        }
+        applyExoTrackOverride(trackType = C.TRACK_TYPE_AUDIO, trackId = trackId)
+    }
+
+    override fun selectSubtitleTrack(trackId: String?) {
+        if (currentEngine != NativePlaybackEngine.EXO) {
+            mpvRuntime.selectSubtitleTrack(trackId)
+            return
+        }
+        applyExoTrackOverride(trackType = C.TRACK_TYPE_TEXT, trackId = trackId)
+    }
+
+    override fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?) {
+        if (currentEngine != NativePlaybackEngine.EXO) {
+            mpvRuntime.setExternalSubtitle(subtitle)
+            return
+        }
+        val source = lastPlaybackSource ?: return
+        val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+        httpDataSourceFactory.setDefaultRequestProperties(source.headers)
+        val mediaItem =
+            playbackMediaItemFromUrl(
+                url = source.url,
+                streamType = source.streamType,
+                externalSubtitles =
+                    listOfNotNull(subtitle) + source.externalSubtitles.distinctBy { it.url },
+            )
+        exoPlayer.setMediaItem(mediaItem, resumeMs)
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
+    }
+
+    override fun setSubtitleDelayMs(delayMs: Int) {
+        exoSubtitleDelayMs = delayMs
+        if (currentEngine == NativePlaybackEngine.MPV) {
+            mpvRuntime.setSubtitleDelayMs(delayMs)
+        }
+    }
+
+    private fun applyPersistedExoSettings() {
+        if (exoPlaybackSpeed != 1f) {
+            exoPlayer.setPlaybackSpeed(exoPlaybackSpeed)
+        }
+        if (exoMuted) {
+            exoPlayer.volume = 0f
+        }
+    }
+
+    private fun applyExoTrackOverride(trackType: Int, trackId: String?) {
+        val current = exoPlayer.currentTracks
+        val group = current.groups.firstOrNull { it.type == trackType } ?: return
+        if (trackId == null) {
+            exoPlayer.trackSelectionParameters =
+                exoPlayer.trackSelectionParameters
+                    .buildUpon()
+                    .setTrackTypeDisabled(trackType, true)
+                    .build()
+            return
+        }
+        val formatIndex =
+            (0 until group.length).firstOrNull { i ->
+                group.getTrackFormat(i).id == trackId
+            } ?: return
+        val override = TrackSelectionOverride(group.mediaTrackGroup, formatIndex)
+        exoPlayer.trackSelectionParameters =
+            exoPlayer.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(trackType, false)
+                .setOverrideForType(override)
+                .build()
     }
 
     override fun setPlaying(isPlaying: Boolean) {
@@ -363,6 +469,11 @@ class NativePlaybackController(
                 else -> NativePlaybackState.IDLE
             }
 
+        val audioTracks = collectExoTracks(C.TRACK_TYPE_AUDIO)
+        val subtitleTracks = collectExoTracks(C.TRACK_TYPE_TEXT)
+        val selectedAudioId = selectedExoTrackId(C.TRACK_TYPE_AUDIO)
+        val selectedSubtitleId = selectedExoTrackId(C.TRACK_TYPE_TEXT)
+
         return NativePlaybackSnapshot(
             engine = NativePlaybackEngine.EXO,
             state = state,
@@ -370,7 +481,51 @@ class NativePlaybackController(
             durationMs = durationMs,
             videoLayout = exoVideoLayout,
             error = exoError,
+            playbackSpeed = exoPlayer.playbackParameters.speed.takeIf { it > 0f } ?: 1f,
+            muted = exoMuted || exoPlayer.volume == 0f,
+            audioTracks = audioTracks,
+            selectedAudioTrackId = selectedAudioId,
+            subtitleTracks = subtitleTracks,
+            selectedSubtitleTrackId = selectedSubtitleId,
+            subtitleDelayMs = exoSubtitleDelayMs,
         )
+    }
+
+    private fun collectExoTracks(trackType: Int): List<NativeTrack> {
+        val groups = exoPlayer.currentTracks.groups.filter { it.type == trackType }
+        if (groups.isEmpty()) return emptyList()
+        val tracks = ArrayList<NativeTrack>(groups.size)
+        for ((groupIndex, group) in groups.withIndex()) {
+            for (formatIndex in 0 until group.length) {
+                if (!group.isTrackSupported(formatIndex)) continue
+                val format = group.getTrackFormat(formatIndex)
+                val id = format.id ?: "${groupIndex}_$formatIndex"
+                val language = format.language?.takeIf { it.isNotBlank() }
+                val label = format.label?.takeIf { it.isNotBlank() }
+                tracks.add(
+                    NativeTrack(
+                        id = id,
+                        index = groupIndex,
+                        language = language,
+                        title = label,
+                        isExternal = false,
+                    )
+                )
+            }
+        }
+        return tracks
+    }
+
+    private fun selectedExoTrackId(trackType: Int): String? {
+        val groups = exoPlayer.currentTracks.groups.filter { it.type == trackType }
+        for (group in groups) {
+            for (formatIndex in 0 until group.length) {
+                if (group.isTrackSelected(formatIndex)) {
+                    return group.getTrackFormat(formatIndex).id ?: "${group.mediaTrackGroup.id}_$formatIndex"
+                }
+            }
+        }
+        return null
     }
 
     private fun exoDurationMs(): Long {

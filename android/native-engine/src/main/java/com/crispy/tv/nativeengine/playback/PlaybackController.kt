@@ -53,6 +53,13 @@ data class NativePlaybackSnapshot(
     val bufferingPercent: Float? = null,
     val videoLayout: NativeVideoLayout? = null,
     val error: NativePlaybackError? = null,
+    val playbackSpeed: Float = 1f,
+    val muted: Boolean = false,
+    val audioTracks: List<NativeTrack> = emptyList(),
+    val selectedAudioTrackId: String? = null,
+    val subtitleTracks: List<NativeTrack> = emptyList(),
+    val selectedSubtitleTrackId: String? = null,
+    val subtitleDelayMs: Int = 0,
 ) {
     val isPlaying: Boolean
         get() = state == NativePlaybackState.PLAYING
@@ -65,6 +72,21 @@ data class PlaybackSource(
     val url: String,
     val headers: Map<String, String> = emptyMap(),
     val streamType: String? = null,
+    val externalSubtitles: List<PlaybackExternalSubtitle> = emptyList(),
+)
+
+data class PlaybackExternalSubtitle(
+    val url: String,
+    val language: String? = null,
+    val name: String? = null,
+)
+
+data class NativeTrack(
+    val id: String,
+    val index: Int,
+    val language: String?,
+    val title: String?,
+    val isExternal: Boolean = false,
 )
 
 fun PlaybackSource.toOkHttpHeaders(): Headers {
@@ -84,6 +106,12 @@ interface PlaybackSessionController {
     fun seekTo(positionMs: Long)
     fun stop()
     fun release()
+    fun setPlaybackSpeed(speed: Float)
+    fun setMuted(muted: Boolean)
+    fun selectAudioTrack(trackId: String?)
+    fun selectSubtitleTrack(trackId: String?)
+    fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?)
+    fun setSubtitleDelayMs(delayMs: Int)
 }
 
 interface PlaybackSurfaceController {

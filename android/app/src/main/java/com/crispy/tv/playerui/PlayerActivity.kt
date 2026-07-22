@@ -10,6 +10,8 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.util.Rational
 import android.view.WindowManager
@@ -29,6 +31,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.MetadataLabMediaType
@@ -41,6 +44,14 @@ class PlayerActivity : ComponentActivity() {
     private var pipEnabled: Boolean = false
     private var pipSourceRect: Rect? = null
     private var pipAspectRatio: Rational? = null
+    private lateinit var sessionViewModel: PlayerSessionViewModel
+    private val pipExitPauseHandler = Handler(Looper.getMainLooper())
+    private val pipExitPauseRunnable = Runnable {
+        if (!isInPictureInPictureModeState && !isFinishing && lifecycle.currentState != Lifecycle.State.STARTED) {
+            Log.d(TAG, "pipExitPause: Activity not resumed; pausing playback")
+            sessionViewModel.onBackgroundStop()
+        }
+    }
 
     private val notificationsPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -84,6 +95,7 @@ class PlayerActivity : ComponentActivity() {
                     restorePlaybackIntent = restorePlaybackIntent,
                 ),
             )[PlayerSessionViewModel::class.java]
+        this.sessionViewModel = sessionViewModel
 
         Log.d(
             TAG,
@@ -114,6 +126,9 @@ class PlayerActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Log.d(TAG, "onStart isInPip=$isInPictureInPictureModeState finishing=$isFinishing")
+        if (!isInPictureInPictureModeState && !isFinishing) {
+            sessionViewModel.onForegroundStart()
+        }
     }
 
     override fun onResume() {
@@ -132,14 +147,9 @@ class PlayerActivity : ComponentActivity() {
             "onStop isInPip=$isInPictureInPictureModeState finishing=$isFinishing changingConfigurations=$isChangingConfigurations",
         )
         super.onStop()
-    }
-
-    override fun onDestroy() {
-        Log.d(
-            TAG,
-            "onDestroy isInPip=$isInPictureInPictureModeState finishing=$isFinishing changingConfigurations=$isChangingConfigurations",
-        )
-        super.onDestroy()
+        if (!isInPictureInPictureModeState && !isFinishing) {
+            sessionViewModel.onBackgroundStop()
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -173,7 +183,16 @@ class PlayerActivity : ComponentActivity() {
         isInPictureInPictureModeState = isInPictureInPictureMode
         if (!isInPictureInPictureMode) {
             applyPlayerWindowPolicy()
+            pipExitPauseHandler.removeCallbacks(pipExitPauseRunnable)
+            pipExitPauseHandler.postDelayed(pipExitPauseRunnable, PIP_EXIT_PAUSE_GUARD_MS)
+        } else {
+            pipExitPauseHandler.removeCallbacks(pipExitPauseRunnable)
         }
+    }
+
+    override fun onDestroy() {
+        pipExitPauseHandler.removeCallbacks(pipExitPauseRunnable)
+        super.onDestroy()
     }
 
     private fun applyPlayerWindowPolicy() {
@@ -267,6 +286,7 @@ class PlayerActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "PlayerActivity"
+        private const val PIP_EXIT_PAUSE_GUARD_MS = 250L
         private const val EXTRA_PLAYBACK_URL = "extra_playback_url"
         private const val EXTRA_TITLE = "extra_title"
         private const val EXTRA_SUBTITLE = "extra_subtitle"

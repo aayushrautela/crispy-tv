@@ -26,6 +26,13 @@ internal class MpvPlaybackRuntime(
     private var positionMs: Long = 0L
     private var durationMs: Long = 0L
     private var playbackSpeed: Float = 1f
+    private var muted: Boolean = false
+    private var subtitleDelayMs: Int = 0
+    private var audioTracks: List<NativeTrack> = emptyList()
+    private var selectedAudioTrackId: String? = null
+    private var subtitleTracks: List<NativeTrack> = emptyList()
+    private var selectedSubtitleTrackId: String? = null
+    private var externalSubtitleUrl: String? = null
     private var hasStartedPlayback: Boolean = false
     private var lastProgressAdvanceAtElapsedMs: Long = 0L
     private var lastObservedPositionMs: Long = 0L
@@ -45,6 +52,26 @@ internal class MpvPlaybackRuntime(
                         }
                     }
                 }
+                "aid" -> {
+                    if (value <= 0L) {
+                        selectedAudioTrackId = null
+                    } else {
+                        selectedAudioTrackId = value.toString()
+                        if (audioTracks.none { it.id == value.toString() }) {
+                            audioTracks = readTrackList(mpv, "audio")
+                        }
+                    }
+                }
+                "sid" -> {
+                    if (value <= 0L) {
+                        selectedSubtitleTrackId = null
+                    } else {
+                        selectedSubtitleTrackId = value.toString()
+                        if (subtitleTracks.none { it.id == value.toString() }) {
+                            subtitleTracks = readTrackList(mpv, "sub")
+                        }
+                    }
+                }
             }
         }
 
@@ -57,6 +84,7 @@ internal class MpvPlaybackRuntime(
                 }
                 "duration" -> durationMs = (value * 1000.0).toLong().coerceAtLeast(0L)
                 "speed" -> playbackSpeed = value.toFloat()
+                "sub-delay" -> subtitleDelayMs = (value * 1000.0).toInt()
             }
         }
 
@@ -67,6 +95,7 @@ internal class MpvPlaybackRuntime(
                         state = if (value) NativePlaybackState.PAUSED else NativePlaybackState.PLAYING
                     }
                 }
+                "mute" -> muted = value
                 "eof-reached" -> {
                     if (value) {
                         playRequested = false
@@ -99,6 +128,7 @@ internal class MpvPlaybackRuntime(
                         lastBufferingPercent = 100f
                         lastProgressAdvanceAtElapsedMs = SystemClock.elapsedRealtime()
                     }
+                    refreshTrackLists()
                 }
                 MPVLib.MpvEvent.MPV_EVENT_END_FILE -> {
                     if (state != NativePlaybackState.ENDED && state != NativePlaybackState.ERROR) {
@@ -224,11 +254,15 @@ internal class MpvPlaybackRuntime(
             "core-idle" to MPVLib.MpvFormat.MPV_FORMAT_FLAG,
             "eof-reached" to MPVLib.MpvFormat.MPV_FORMAT_FLAG,
             "seeking" to MPVLib.MpvFormat.MPV_FORMAT_FLAG,
+            "mute" to MPVLib.MpvFormat.MPV_FORMAT_FLAG,
             "cache-buffering-state" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
             "duration" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
             "time-pos" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
             "demuxer-cache-time" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
             "speed" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
+            "sub-delay" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
+            "aid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
+            "sid" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
     }
@@ -271,6 +305,103 @@ internal class MpvPlaybackRuntime(
         lastBufferingPercent = null
     }
 
+    fun setPlaybackSpeed(speed: Float) {
+        val safeSpeed = if (speed.isFinite() && speed > 0f) speed else 1f
+        playbackSpeed = safeSpeed
+        runCatching { mpv?.setPropertyDouble("speed", safeSpeed.toDouble()) }
+    }
+
+    fun setMuted(muted: Boolean) {
+        this.muted = muted
+        runCatching { mpv?.setPropertyBoolean("mute", muted) }
+    }
+
+    fun selectAudioTrack(trackId: String?) {
+        if (trackId == null) {
+            runCatching { mpv?.setPropertyInt("aid", 0) }
+            selectedAudioTrackId = null
+            return
+        }
+        val id = trackId.toIntOrNull() ?: return
+        runCatching { mpv?.setPropertyInt("aid", id) }
+        selectedAudioTrackId = trackId
+    }
+
+    fun selectSubtitleTrack(trackId: String?) {
+        if (trackId == null) {
+            runCatching { mpv?.setPropertyString("sid", "no") }
+            selectedSubtitleTrackId = null
+            return
+        }
+        val id = trackId.toIntOrNull() ?: return
+        runCatching { mpv?.setPropertyInt("sid", id) }
+        selectedSubtitleTrackId = trackId
+    }
+
+    fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?) {
+        val mpv = mpv
+        if (mpv == null) return
+        runCatching {
+            removeExternalSubtitleTracks(mpv)
+            externalSubtitleUrl = subtitle?.url
+            if (subtitle != null) {
+                mpv.command(arrayOf("sub-add", subtitle.url, "select"))
+            }
+        }
+    }
+
+    private fun removeExternalSubtitleTracks(mpv: MPVLib) {
+        val count = runCatching { mpv.getPropertyString("track-list/count") }.getOrNull()?.toIntOrNull() ?: return
+        if (count <= 0) return
+        for (i in 0 until count) {
+            val type = runCatching { mpv.getPropertyString("track-list/$i/type") }.getOrNull() ?: continue
+            if (type != "sub") continue
+            val isExternal = runCatching { mpv.getPropertyString("track-list/$i/external") }.getOrNull().equals("yes", true)
+            if (!isExternal) continue
+            val id = runCatching { mpv.getPropertyString("track-list/$i/id") }.getOrNull()?.toIntOrNull() ?: continue
+            runCatching { mpv.command(arrayOf("sub-remove", id.toString())) }
+        }
+    }
+
+    fun setSubtitleDelayMs(delayMs: Int) {
+        subtitleDelayMs = delayMs
+        runCatching { mpv?.setPropertyDouble("sub-delay", delayMs / 1000.0) }
+    }
+
+    private fun refreshTrackLists() {
+        val mpv = mpv ?: return
+        audioTracks = readTrackList(mpv, "audio")
+        subtitleTracks = readTrackList(mpv, "sub")
+        val aid = runCatching { mpv.getPropertyString("aid") }.getOrNull()
+        selectedAudioTrackId = aid?.takeIf { it.isNotBlank() && it != "0" }
+        val sid = runCatching { mpv.getPropertyString("sid") }.getOrNull()
+        selectedSubtitleTrackId = sid?.takeIf { it.isNotBlank() && it != "0" }
+    }
+
+    private fun readTrackList(mpv: MPVLib, trackType: String): List<NativeTrack> {
+        val count = runCatching { mpv.getPropertyString("track-list/count") }.getOrNull()?.toIntOrNull() ?: 0
+        if (count <= 0) return emptyList()
+        val tracks = ArrayList<NativeTrack>(count)
+        for (i in 0 until count) {
+            val type = runCatching { mpv.getPropertyString("track-list/$i/type") }.getOrNull() ?: continue
+            if (type != trackType) continue
+            val id = runCatching { mpv.getPropertyString("track-list/$i/id") }.getOrNull()?.toIntOrNull() ?: continue
+            val lang = runCatching { mpv.getPropertyString("track-list/$i/lang") }.getOrNull()?.takeIf { it.isNotBlank() }
+            val title = runCatching { mpv.getPropertyString("track-list/$i/title") }.getOrNull()?.takeIf { it.isNotBlank() }
+            val external = runCatching { mpv.getPropertyString("track-list/$i/external") }.getOrNull().equals("yes", true)
+            tracks.add(
+                NativeTrack(
+                    id = id.toString(),
+                    index = id,
+                    language = lang,
+                    title = title,
+                    isExternal = external,
+                )
+            )
+        }
+        return tracks
+    }
+
     fun snapshot(): NativePlaybackSnapshot {
         val normalizedState = normalizePlaybackState()
         return NativePlaybackSnapshot(
@@ -281,6 +412,13 @@ internal class MpvPlaybackRuntime(
             bufferingPercent = lastBufferingPercent,
             videoLayout = videoLayout,
             error = error,
+            playbackSpeed = playbackSpeed,
+            muted = muted,
+            audioTracks = audioTracks,
+            selectedAudioTrackId = selectedAudioTrackId,
+            subtitleTracks = subtitleTracks,
+            selectedSubtitleTrackId = selectedSubtitleTrackId,
+            subtitleDelayMs = subtitleDelayMs,
         )
     }
 
@@ -306,6 +444,17 @@ internal class MpvPlaybackRuntime(
         runCatching {
             mpv?.setPropertyBoolean("pause", !playRequested)
             mpv?.command(arrayOf("loadfile", url, "replace"))
+        }
+        if (source.externalSubtitles.isNotEmpty()) {
+            val mpv = mpv
+            if (mpv != null) {
+                source.externalSubtitles.forEach { subtitle ->
+                    runCatching {
+                        mpv.command(arrayOf("sub-add", subtitle.url, "select"))
+                    }
+                }
+                externalSubtitleUrl = source.externalSubtitles.firstOrNull()?.url
+            }
         }
     }
 
@@ -361,6 +510,11 @@ internal class MpvPlaybackRuntime(
         hasStartedPlayback = false
         videoLayout = null
         error = null
+        audioTracks = emptyList()
+        subtitleTracks = emptyList()
+        selectedAudioTrackId = null
+        selectedSubtitleTrackId = null
+        externalSubtitleUrl = null
     }
 
     private fun debugUrl(url: String): String {
