@@ -24,5 +24,5 @@ internal fun PlaybackException.isDrmError(): Boolean =
         PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED,
         PlaybackException.ERROR_CODE_DRM_DISALLOWED_OPERATION,
         PlaybackException.ERROR_CODE_DRM_SYSTEM_ERROR,
-        PlaybackException.ERROR_CODE_DRM_CONTENT_NOT_PLAYABLE,
+        PlaybackException.ERROR_CODE_DRM_UNSPECIFIED,
     )

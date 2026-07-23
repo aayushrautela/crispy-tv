@@ -57,8 +57,9 @@ internal class MpvPlaybackRuntime(
                         selectedAudioTrackId = null
                     } else {
                         selectedAudioTrackId = value.toString()
-                        if (audioTracks.none { it.id == value.toString() }) {
-                            audioTracks = readTrackList(mpv, "audio")
+                        val current = mpv
+                        if (current != null && audioTracks.none { it.id == value.toString() }) {
+                            audioTracks = readTrackList(current, "audio")
                         }
                     }
                 }
@@ -67,8 +68,9 @@ internal class MpvPlaybackRuntime(
                         selectedSubtitleTrackId = null
                     } else {
                         selectedSubtitleTrackId = value.toString()
-                        if (subtitleTracks.none { it.id == value.toString() }) {
-                            subtitleTracks = readTrackList(mpv, "sub")
+                        val current = mpv
+                        if (current != null && subtitleTracks.none { it.id == value.toString() }) {
+                            subtitleTracks = readTrackList(current, "sub")
                         }
                     }
                 }
@@ -193,7 +195,7 @@ internal class MpvPlaybackRuntime(
         if (surfaceView === view && surfaceAttached) {
             return
         }
-        Log.d(TAG, "attach replacingViewHash=${surfaceView?.let(System.identityHashCode)} pendingUrl=${pendingSource?.url?.hashCode()}")
+        Log.d(TAG, "attach replacingViewHash=${surfaceView?.let { System.identityHashCode(it) }} pendingUrl=${pendingSource?.url?.hashCode()}")
         if (!created) {
             initialize(view.context)
         }
