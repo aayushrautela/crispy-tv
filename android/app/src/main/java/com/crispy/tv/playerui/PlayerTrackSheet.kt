@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Subtitles
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -73,7 +73,7 @@ internal fun PlayerTrackSheet(
                 label = { Text("Subtitles") },
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Subtitles,
+                        imageVector = Icons.Filled.Subtitles,
                         contentDescription = null,
                         modifier = Modifier.padding(end = 4.dp),
                     )
@@ -142,7 +142,7 @@ private fun SubtitleTrackList(
             subtitle = null,
             isSelected = selectedTrackId == null,
             onClick = { onSelectTrack(null) },
-            leadingIcon = Icons.AutoMirrored.Filled.Subtitles,
+            leadingIcon = Icons.Filled.Subtitles,
         )
         tracks.forEach { track ->
             TrackRow(
@@ -150,7 +150,7 @@ private fun SubtitleTrackList(
                 subtitle = track.language,
                 isSelected = track.id == selectedTrackId,
                 onClick = { onSelectTrack(track.id) },
-                leadingIcon = Icons.AutoMirrored.Filled.Subtitles,
+                leadingIcon = Icons.Filled.Subtitles,
             )
         }
         if (tracks.isEmpty()) {

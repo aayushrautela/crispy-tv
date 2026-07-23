@@ -25,7 +25,7 @@ internal fun Modifier.playerVerticalDragGestures(
     } else {
         Modifier.pointerInput(gestureController) {
             awaitEachGesture {
-                val down = awaitFirstDown(requireUnchangedPosition = false)
+                val down = awaitFirstDown()
                 val width = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
                 val height = size.height.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
 
@@ -35,8 +35,10 @@ internal fun Modifier.playerVerticalDragGestures(
                     else -> return@awaitEachGesture
                 }
 
-                val initialBrightness = if (region == GestureRegion.BRIGHTNESS) gestureController.currentBrightness() else null
-                val initialVolume = if (region == GestureRegion.VOLUME) gestureController.currentVolume() else null
+                val initialBrightness: Float? = if (region == GestureRegion.BRIGHTNESS) gestureController.currentBrightness() else null
+                val initialVolume: PlayerGestureController.AudioLevel? = if (region == GestureRegion.VOLUME) gestureController.currentVolume() else null
+                if (region == GestureRegion.BRIGHTNESS && initialBrightness == null) return@awaitEachGesture
+                if (region == GestureRegion.VOLUME && initialVolume == null) return@awaitEachGesture
 
                 var totalDy = 0f
                 var gestureMode: VerticalGestureMode? = null
@@ -60,11 +62,11 @@ internal fun Modifier.playerVerticalDragGestures(
                                 abs(totalDy) > abs(delta.x) * VERTICAL_GESTURE_DOMINANCE_RATIO
 
                         gestureMode = when {
-                            verticalDominant && region == GestureRegion.BRIGHTNESS && initialBrightness != null -> {
+                            verticalDominant && region == GestureRegion.BRIGHTNESS -> {
                                 verticalActivationDy = totalDy
                                 VerticalGestureMode.BRIGHTNESS
                             }
-                            verticalDominant && region == GestureRegion.VOLUME && initialVolume != null -> {
+                            verticalDominant && region == GestureRegion.VOLUME -> {
                                 verticalActivationDy = totalDy
                                 VerticalGestureMode.VOLUME
                             }
@@ -77,13 +79,15 @@ internal fun Modifier.playerVerticalDragGestures(
                         VerticalGestureMode.BRIGHTNESS -> {
                             val activeDy = totalDy - verticalActivationDy
                             val deltaFraction = (-activeDy / height) * VERTICAL_GESTURE_SENSITIVITY
-                            gestureController.setBrightness(initialBrightness + deltaFraction)
+                            val startBrightness = initialBrightness ?: continue
+                            gestureController.setBrightness(startBrightness + deltaFraction)
                                 .let(onBrightnessChange)
                         }
                         VerticalGestureMode.VOLUME -> {
                             val activeDy = totalDy - verticalActivationDy
                             val deltaFraction = (-activeDy / height) * VERTICAL_GESTURE_SENSITIVITY
-                            gestureController.setVolume(initialVolume.fraction + deltaFraction)
+                            val startVolume = initialVolume ?: continue
+                            gestureController.setVolume(startVolume.fraction + deltaFraction)
                                 .let(onVolumeChange)
                         }
                     }

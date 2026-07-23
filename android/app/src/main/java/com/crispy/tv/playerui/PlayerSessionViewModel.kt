@@ -39,7 +39,7 @@ import com.crispy.tv.nativeengine.playback.NativeVideoLayout
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
-import com.crispy.tv.nativeengine.torrent.TorrentResolver
+import com.crispy.tv.TorrentResolver
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.settings.PlaybackSettingsRepository
@@ -126,7 +126,7 @@ class PlayerSessionViewModel(
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playbackMetrics = PlaybackMetricsHolder()
     private val playbackController: PlaybackController = PlaybackDependencies.playbackControllerFactory(this.appContext)
-    private val torrentResolver: TorrentResolver = PlaybackDependencies.torrentResolverFactory(this.appContext)
+    private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         PlaybackSettingsRepositoryProvider.get(this.appContext)
     private val mediaSessionManager =
