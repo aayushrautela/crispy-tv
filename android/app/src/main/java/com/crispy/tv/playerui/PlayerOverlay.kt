@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.MediaDetails
@@ -47,6 +49,7 @@ internal fun PlayerOverlay(
     onSeekTo: (Long) -> Unit,
     onShowInfo: () -> Unit,
     onShowStreams: () -> Unit,
+    onShowTracks: () -> Unit,
     onCloseSurface: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onEpisodeSelected: (String) -> Unit,
@@ -54,6 +57,12 @@ internal fun PlayerOverlay(
     onRetryProvider: (String) -> Unit,
     onStreamSelected: (AddonStream) -> Unit,
     onRetryPlayback: () -> Unit,
+    onSelectAudioTrack: (String?) -> Unit,
+    onSelectSubtitleTrack: (String?) -> Unit,
+    onAddExternalSubtitle: (String, String?, String?) -> Unit,
+    onCycleSpeed: () -> Unit,
+    onToggleMute: () -> Unit,
+    onDoubleTapSeek: (Long) -> Unit,
 ) {
     val overlayPadding = rememberOverlayPadding(minPadding = 20.dp)
     val effectiveDurationMs = if (uiState.stableDurationMs > 0L) uiState.stableDurationMs else uiState.durationMs
@@ -65,6 +74,7 @@ internal fun PlayerOverlay(
     val latestOnBack by rememberUpdatedState(onBack)
     val latestOnTogglePlayPause by rememberUpdatedState(onTogglePlayPause)
     val latestOnSeekTo by rememberUpdatedState(onSeekTo)
+    val latestOnDoubleTapSeek by rememberUpdatedState(onDoubleTapSeek)
 
     fun resetControlsTimer() {
         controlsResetToken += 1
@@ -82,7 +92,15 @@ internal fun PlayerOverlay(
         resetControlsTimer()
     }
 
+    fun openTracks() {
+        onShowTracks()
+        controlsVisible = true
+        resetControlsTimer()
+    }
+
     val isSurfaceOpen = uiState.activeSurface != PlayerSurface.NONE || uiState.streamSelector.visible
+
+    var layoutWidthPx by remember { mutableIntStateOf(0) }
 
     BackHandler(enabled = isSurfaceOpen) {
         onCloseSurface()
@@ -118,7 +136,13 @@ internal fun PlayerOverlay(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .pointerInput(isSurfaceOpen, controlsVisible) {
+                    .onGloballyPositioned { coordinates ->
+                        val width = coordinates.size.width
+                        if (width > 0 && width != layoutWidthPx) {
+                            layoutWidthPx = width
+                        }
+                    }
+                    .pointerInput(isSurfaceOpen, controlsVisible, layoutWidthPx) {
                         detectTapGestures(
                             onTap = {
                                 if (isSurfaceOpen) {
@@ -130,6 +154,23 @@ internal fun PlayerOverlay(
                                 if (controlsVisible) {
                                     resetControlsTimer()
                                 }
+                            },
+                            onDoubleTap = { offset ->
+                                if (isSurfaceOpen) return@detectTapGestures
+                                if (layoutWidthPx <= 0) return@detectTapGestures
+                                val positionMs = uiState.positionMs.coerceAtLeast(0L)
+                                val maxMs = effectiveDurationMs.takeIf { it > 0L }
+                                val targetMs = when {
+                                    offset.x < layoutWidthPx * LEFT_GESTURE_BOUNDARY ->
+                                        (positionMs - DOUBLE_TAP_SEEK_STEP_MS).coerceAtLeast(0L)
+                                    offset.x > layoutWidthPx * RIGHT_GESTURE_BOUNDARY -> {
+                                        val unclamped = positionMs + DOUBLE_TAP_SEEK_STEP_MS
+                                        maxMs?.let { unclamped.coerceAtMost(it) } ?: unclamped
+                                    }
+                                    else -> return@detectTapGestures
+                                }
+                                latestOnDoubleTapSeek(targetMs)
+                                controlsVisible = false
                             },
                         )
                     },
@@ -189,12 +230,25 @@ internal fun PlayerOverlay(
                     PlayerBottomControls(
                         positionMs = uiState.positionMs,
                         durationMs = effectiveDurationMs,
+                        playbackSpeed = uiState.playbackSpeed,
+                        muted = uiState.muted,
+                        hasAudioTracks = uiState.audioTracks.isNotEmpty(),
+                        hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),
                         onSeekTo = {
                             resetControlsTimer()
                             latestOnSeekTo(it)
                         },
                         onOpenStreams = ::openStreams,
                         onOpenInfo = ::openInfo,
+                        onOpenTracks = ::openTracks,
+                        onCycleSpeed = {
+                            resetControlsTimer()
+                            onCycleSpeed()
+                        },
+                        onToggleMute = {
+                            resetControlsTimer()
+                            onToggleMute()
+                        },
                     )
                 }
             }
@@ -247,6 +301,27 @@ internal fun PlayerOverlay(
                 resetControlsTimer()
                 onStreamSelected(stream)
             },
+        )
+
+        PlayerTrackSheet(
+            visible = uiState.activeSurface == PlayerSurface.TRACKS,
+            audioTracks = uiState.audioTracks,
+            selectedAudioTrackId = uiState.selectedAudioTrackId,
+            subtitleTracks = uiState.subtitleTracks,
+            selectedSubtitleTrackId = uiState.selectedSubtitleTrackId,
+            onSelectAudioTrack = {
+                resetControlsTimer()
+                onSelectAudioTrack(it)
+            },
+            onSelectSubtitleTrack = {
+                resetControlsTimer()
+                onSelectSubtitleTrack(it)
+            },
+            onAddExternalSubtitle = { url, lang, name ->
+                resetControlsTimer()
+                onAddExternalSubtitle(url, lang, name)
+            },
+            onDismiss = onCloseSurface,
         )
     }
 }

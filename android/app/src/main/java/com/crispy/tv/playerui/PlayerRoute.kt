@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,6 +72,16 @@ fun PlayerRoute(
         }
     }
 
+    val gestureController = remember(context) { tryCreateGestureController(context.findActivity()) }
+    val gestureFeedback = rememberGestureFeedback()
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(gestureController) {
+        onDispose {
+            gestureController?.restoreBrightness()
+        }
+    }
+
     DisposableEffect(session) {
         onDispose {
             onPictureInPictureConfigChanged(PictureInPictureConfig())
@@ -112,6 +123,30 @@ fun PlayerRoute(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .playerVerticalDragGestures(
+                                gestureController = gestureController,
+                                onBrightnessChange = { level ->
+                                    gestureFeedback.show(
+                                        scope,
+                                        GestureFeedbackMessage(
+                                            text = formatGestureBrightness(level),
+                                            icon = GestureIcons.Brightness,
+                                        ),
+                                        holdMs = 800,
+                                    )
+                                },
+                                onVolumeChange = { level ->
+                                    gestureFeedback.show(
+                                        scope,
+                                        GestureFeedbackMessage(
+                                            text = if (level.isMuted) "Muted" else formatGestureVolume(level),
+                                            icon = if (level.isMuted) GestureIcons.VolumeMuted else GestureIcons.VolumeUp,
+                                        ),
+                                        holdMs = 800,
+                                    )
+                                },
+                                onGestureEnd = { /* feedback fades on its own */ },
+                            )
                             .onGloballyPositioned { coordinates ->
                                 val bounds = coordinates.boundsInWindow()
                                 updateVideoBounds(
@@ -141,6 +176,30 @@ fun PlayerRoute(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .playerVerticalDragGestures(
+                                gestureController = gestureController,
+                                onBrightnessChange = { level ->
+                                    gestureFeedback.show(
+                                        scope,
+                                        GestureFeedbackMessage(
+                                            text = formatGestureBrightness(level),
+                                            icon = GestureIcons.Brightness,
+                                        ),
+                                        holdMs = 800,
+                                    )
+                                },
+                                onVolumeChange = { level ->
+                                    gestureFeedback.show(
+                                        scope,
+                                        GestureFeedbackMessage(
+                                            text = if (level.isMuted) "Muted" else formatGestureVolume(level),
+                                            icon = if (level.isMuted) GestureIcons.VolumeMuted else GestureIcons.VolumeUp,
+                                        ),
+                                        holdMs = 800,
+                                    )
+                                },
+                                onGestureEnd = { /* feedback fades on its own */ },
+                            )
                             .onGloballyPositioned { coordinates ->
                                 val bounds = coordinates.boundsInWindow()
                                 updateVideoBounds(
@@ -176,6 +235,7 @@ fun PlayerRoute(
                 onSeekTo = session::seekTo,
                 onShowInfo = session::showInfo,
                 onShowStreams = session::showStreams,
+                onShowTracks = session::showTracks,
                 onCloseSurface = session::closeActiveSurface,
                 onSeasonSelected = session::onSeasonSelected,
                 onEpisodeSelected = session::showStreamsForEpisode,
@@ -183,7 +243,29 @@ fun PlayerRoute(
                 onRetryProvider = session::onRetryProvider,
                 onStreamSelected = session::onStreamSelected,
                 onRetryPlayback = session::retryPlayback,
+                onSelectAudioTrack = session::selectAudioTrack,
+                onSelectSubtitleTrack = session::selectSubtitleTrack,
+                onAddExternalSubtitle = session::setExternalSubtitle,
+                onCycleSpeed = {
+                    val next = PLAYBACK_SPEED_CYCLE.firstOrNull { it > uiState.playbackSpeed + 0.01f }
+                        ?: PLAYBACK_SPEED_CYCLE.first()
+                    session.setPlaybackSpeed(next)
+                },
+                onToggleMute = { session.setMuted(!uiState.muted) },
+                onDoubleTapSeek = { targetMs ->
+                    session.seekTo(targetMs)
+                    gestureFeedback.show(
+                        scope,
+                        GestureFeedbackMessage(
+                            text = playbackSeekDeltaLabel(targetMs, uiState.positionMs),
+                            icon = if (targetMs >= uiState.positionMs) GestureIcons.Forward10 else GestureIcons.Backward10,
+                        ),
+                        holdMs = 800,
+                    )
+                },
             )
+
+            GestureFeedbackOverlay(feedback = gestureFeedback)
         }
     }
 }

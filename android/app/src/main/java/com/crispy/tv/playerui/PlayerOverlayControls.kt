@@ -19,7 +19,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Subtitles
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material3.Button
@@ -110,9 +115,16 @@ internal fun PlayerTopBar(
 internal fun PlayerBottomControls(
     positionMs: Long,
     durationMs: Long,
+    playbackSpeed: Float,
+    muted: Boolean,
+    hasAudioTracks: Boolean,
+    hasSubtitleTracks: Boolean,
     onSeekTo: (Long) -> Unit,
     onOpenStreams: () -> Unit,
     onOpenInfo: () -> Unit,
+    onOpenTracks: () -> Unit,
+    onCycleSpeed: () -> Unit,
+    onToggleMute: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -147,8 +159,34 @@ internal fun PlayerBottomControls(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .horizontalScroll(rememberScrollState()),
                 ) {
+                    if (hasAudioTracks) {
+                        PlayerActionButton(
+                            icon = Icons.Filled.GraphicEq,
+                            label = "Audio",
+                            onClick = onOpenTracks,
+                        )
+                    }
+                    if (hasSubtitleTracks) {
+                        PlayerActionButton(
+                            icon = Icons.AutoMirrored.Filled.Subtitles,
+                            label = "Subs",
+                            onClick = onOpenTracks,
+                        )
+                    }
+                    PlayerActionButton(
+                        icon = Icons.Filled.Speed,
+                        label = formatSpeedLabel(playbackSpeed),
+                        onClick = onCycleSpeed,
+                    )
+                    PlayerActionButton(
+                        icon = if (muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                        label = if (muted) "Unmute" else "Mute",
+                        onClick = onToggleMute,
+                    )
                     PlayerActionButton(
                         icon = Icons.Outlined.Layers,
                         label = "Streams",
@@ -164,6 +202,19 @@ internal fun PlayerBottomControls(
         }
     }
 }
+
+internal fun formatSpeedLabel(speed: Float): String {
+    return when {
+        speed == 1f -> "1x"
+        speed == 1.25f -> "1.25x"
+        speed == 1.5f -> "1.5x"
+        speed == 2f -> "2x"
+        speed < 1f -> "${"%.2f".format(speed)}x"
+        else -> "${"%.1f".format(speed)}x"
+    }
+}
+
+internal val PLAYBACK_SPEED_CYCLE = listOf(1f, 1.25f, 1.5f, 2f)
 
 @Composable
 private fun PlayerSeekBar(

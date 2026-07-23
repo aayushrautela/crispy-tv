@@ -68,6 +68,7 @@ enum class PlayerSurface {
     NONE,
     INFO,
     STREAMS,
+    TRACKS,
 }
 
 @Immutable
@@ -285,6 +286,15 @@ class PlayerSessionViewModel(
         _uiState.update { state ->
             state.copy(
                 activeSurface = PlayerSurface.INFO,
+                streamSelector = state.streamSelector.copy(visible = false),
+            )
+        }
+    }
+
+    fun showTracks() {
+        _uiState.update { state ->
+            state.copy(
+                activeSurface = PlayerSurface.TRACKS,
                 streamSelector = state.streamSelector.copy(visible = false),
             )
         }
