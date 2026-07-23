@@ -23,11 +23,14 @@ import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.extractor.ts.TsExtractor
 import androidx.media3.ui.PlayerView
+import io.github.peerless2012.ass.media.widget.AssSubtitleView
 import java.util.concurrent.Executors
 
 @UnstableApi
 class NativePlaybackController(
     context: Context,
+    private val useLibass: Boolean = false,
+    private val libassRenderType: LibassRenderType = LibassRenderType.OVERLAY_OPEN_GL,
 ) : PlaybackController {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(appContext.mainLooper)
@@ -125,18 +128,33 @@ class NativePlaybackController(
                 .setExtensionRendererMode(rendererMode)
                 .setEnableDecoderFallback(true)
 
-        val mediaSourceFactory =
-            DefaultMediaSourceFactory(httpDataSourceFactory, extractorsFactory)
+        return if (useLibass) {
+            ExoPlayer.Builder(appContext)
+                .setTrackSelector(trackSelector)
+                .setLoadControl(loadControl)
+                .buildWithAssSupportCompat(
+                    context = appContext,
+                    renderType = libassRenderType.toAssRenderType(),
+                    dataSourceFactory = httpDataSourceFactory,
+                    extractorsFactory = extractorsFactory,
+                    renderersFactory = renderersFactory,
+                ).apply {
+                    playWhenReady = true
+                }
+        } else {
+            val mediaSourceFactory =
+                DefaultMediaSourceFactory(httpDataSourceFactory, extractorsFactory)
 
-        return ExoPlayer.Builder(appContext)
-            .setRenderersFactory(renderersFactory)
-            .setTrackSelector(trackSelector)
-            .setLoadControl(loadControl)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build()
-            .apply {
-                playWhenReady = true
-            }
+            ExoPlayer.Builder(appContext)
+                .setRenderersFactory(renderersFactory)
+                .setTrackSelector(trackSelector)
+                .setLoadControl(loadControl)
+                .setMediaSourceFactory(mediaSourceFactory)
+                .build()
+                .apply {
+                    playWhenReady = true
+                }
+        }
     }
 
     override fun play(source: PlaybackSource, engine: NativePlaybackEngine) {
@@ -324,6 +342,77 @@ class NativePlaybackController(
         Log.d(TAG, "bindExoPlayerView viewHash=${System.identityHashCode(playerView)}")
         playerView.player = exoPlayer
         currentlyBoundPlayerView = playerView
+        syncLibassOverlay(playerView)
+    }
+
+    override fun syncLibassOverlay(playerView: PlayerView) {
+        val renderType = libassRenderType
+        val containerId = if (renderType == LibassRenderType.OVERLAY_OPEN_GL) {
+            currentlyBoundPlayerView?.context?.resources?.getIdentifier(
+                "libass_overlay_container_gl",
+                "id",
+                currentlyBoundPlayerView?.context?.packageName,
+            )
+        } else {
+            currentlyBoundPlayerView?.context?.resources?.getIdentifier(
+                "libass_overlay_container",
+                "id",
+                currentlyBoundPlayerView?.context?.packageName,
+            )
+        } ?: return
+
+        val overlayContainer = playerView.findViewById<android.widget.FrameLayout>(containerId) ?: return
+        val boundPlayerTagId = playerView.context.resources.getIdentifier(
+            "libass_overlay_bound_player",
+            "id",
+            playerView.context.packageName,
+        )
+        val needsOverlay = useLibass && renderType.usesOverlaySubtitleView
+        val boundPlayer = if (boundPlayerTagId != 0) {
+            playerView.getTag(boundPlayerTagId) as? ExoPlayer
+        } else {
+            null
+        }
+        val hasOverlayChild = hasAssOverlayChild(overlayContainer)
+
+        if (!needsOverlay) {
+            if (hasOverlayChild) removeAssOverlayChildren(overlayContainer)
+            if (boundPlayer != null && boundPlayerTagId != 0) {
+                playerView.setTag(boundPlayerTagId, null)
+            }
+            return
+        }
+
+        val assHandler = exoPlayer.getAssHandlerCompat() ?: return
+        if (boundPlayer === exoPlayer && hasOverlayChild) return
+
+        removeAssOverlayChildren(overlayContainer)
+        val assSubtitleView = AssSubtitleView(overlayContainer.context, assHandler)
+        overlayContainer.addView(
+            assSubtitleView,
+            android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        if (boundPlayerTagId != 0) {
+            playerView.setTag(boundPlayerTagId, exoPlayer)
+        }
+    }
+
+    private fun hasAssOverlayChild(container: android.widget.FrameLayout): Boolean {
+        for (index in 0 until container.childCount) {
+            if (container.getChildAt(index) is AssSubtitleView) return true
+        }
+        return false
+    }
+
+    private fun removeAssOverlayChildren(container: android.widget.FrameLayout) {
+        for (index in container.childCount - 1 downTo 0) {
+            if (container.getChildAt(index) is AssSubtitleView) {
+                container.removeViewAt(index)
+            }
+        }
     }
 
     override fun createMpvSurfaceView(context: Context): SurfaceView {

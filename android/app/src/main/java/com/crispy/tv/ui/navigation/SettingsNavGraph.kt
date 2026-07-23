@@ -88,6 +88,14 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
                 playbackSettingsRepository.setSkipIntroEnabled(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }
             },
+            onUseLibassChanged = { enabled ->
+                playbackSettingsRepository.setUseLibass(enabled)
+                coroutineScope.launch { cloudSync.pushForActiveProfile() }
+            },
+            onLibassRenderTypeChanged = { renderType ->
+                playbackSettingsRepository.setLibassRenderType(renderType)
+                coroutineScope.launch { cloudSync.pushForActiveProfile() }
+            },
             onBack = { navController.popBackStack() }
         )
     }

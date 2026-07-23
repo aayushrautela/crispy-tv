@@ -37,6 +37,8 @@ fun PlaybackSettingsScreen(
     settings: PlaybackSettings,
     onTrailerAutoplayChanged: (Boolean) -> Unit,
     onSkipIntroChanged: (Boolean) -> Unit,
+    onUseLibassChanged: (Boolean) -> Unit,
+    onLibassRenderTypeChanged: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val scrollBehavior = appBarScrollBehavior()
@@ -100,11 +102,103 @@ fun PlaybackSettingsScreen(
                 )
             }
 
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = {
+                        Text("libass Subtitle Rendering")
+                    },
+                    supportingContent = {
+                        Column(modifier = Modifier.padding(top = 4.dp)) {
+                            Text(
+                                "Render ASS/SSA subtitles with libass for full styling and animation support. Takes effect on next playback."
+                            )
+                            if (settings.useLibass) {
+                                Text(
+                                    text = "Render: ${settings.libassRenderType}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 6.dp),
+                                )
+                            }
+                        }
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.useLibass,
+                            onCheckedChange = onUseLibassChanged
+                        )
+                    }
+                )
+            }
+
+            if (settings.useLibass) {
+                LibassRenderTypeChips(
+                    selected = settings.libassRenderType,
+                    onSelect = onLibassRenderTypeChanged,
+                )
+            }
+
             Text(
                 text = "Segment data is fetched from IntroDB first with AniSkip fallback.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+private val LIBASS_RENDER_TYPES = listOf(
+    "OVERLAY_OPEN_GL",
+    "OVERLAY_CANVAS",
+    "EFFECTS_OPEN_GL",
+    "EFFECTS_CANVAS",
+    "CUES",
+)
+
+@Composable
+private fun LibassRenderTypeChips(
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Render type",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LIBASS_RENDER_TYPES.forEach { type ->
+            val isSelected = type == selected
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { if (isSelected) it else it },
+                onClick = { onSelect(type) },
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = type,
+                            style = if (isSelected) MaterialTheme.typography.bodyLarge
+                            else MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
+                        )
+                    },
+                    trailingContent = {
+                        if (isSelected) {
+                            Text(
+                                text = "On",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
+                )
+            }
         }
     }
 }

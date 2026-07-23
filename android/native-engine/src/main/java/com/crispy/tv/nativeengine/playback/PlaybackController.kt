@@ -118,6 +118,7 @@ interface PlaybackSurfaceController {
     fun bindExoPlayerView(playerView: PlayerView)
     fun createMpvSurfaceView(context: Context): SurfaceView
     fun attachMpvSurface(surfaceView: SurfaceView)
+    fun syncLibassOverlay(playerView: PlayerView)
 }
 
 interface PlaybackController : PlaybackSessionController, PlaybackSurfaceController

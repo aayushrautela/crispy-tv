@@ -34,5 +34,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:1.10.1")
     implementation("androidx.media3:media3-extractor:1.10.1")
     api("androidx.media3:media3-ui:1.10.1")
+    implementation("androidx.media3:media3-effect:1.10.1")
     implementation("dev.jdtech.mpv:libmpv:1.0.0")
+    implementation("io.github.peerless2012:ass-media:0.5.0-beta01")
 }

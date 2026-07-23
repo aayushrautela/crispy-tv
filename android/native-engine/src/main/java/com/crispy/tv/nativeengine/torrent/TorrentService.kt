@@ -374,6 +374,8 @@ class TorrentService : Service() {
     private fun startServerProcess() {
         ensureRuntimeDirectories()
 
+        killOrphanedProcess()
+
         val binary = resolveBundledTorrServerBinary()
         check(binary.exists()) {
             "Missing TorrServer binary after fallback lookup. sourceDir=${applicationInfo.sourceDir}, nativeLibraryDir=${applicationInfo.nativeLibraryDir}, supportedAbis=${Build.SUPPORTED_ABIS.joinToString()}"
@@ -415,6 +417,65 @@ class TorrentService : Service() {
                 isDaemon = true
                 start()
             }
+        }
+
+        waitForProcessReady(startedProcess = process, timeoutMs = SERVER_STARTUP_TIMEOUT_MS)
+    }
+
+    private fun killOrphanedProcess() {
+        runCatching {
+            val url = "http://$DEFAULT_HOST:$PORT/shutdown"
+            val request = Request.Builder().url(url).get().build()
+            okHttpClient.newCall(request).execute().use { response ->
+                Log.d(TAG, "Shut down orphaned TorrServer instance (status=${response.code})")
+            }
+        }.onSuccess {
+            Thread.sleep(1_000L)
+        }.onFailure { error ->
+            Log.d(TAG, "No orphaned TorrServer instance to shut down: ${error.message}")
+        }
+    }
+
+    private fun waitForProcessReady(startedProcess: java.lang.Process?, timeoutMs: Long) {
+        if (startedProcess == null) {
+            throw IllegalStateException("TorrServer process is null after start")
+        }
+
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (isProcessRunning()) {
+                Log.d(TAG, "TorrServer process is alive and responding")
+                return
+            }
+
+            if (!isProcessAlive(startedProcess)) {
+                val exitCode = try {
+                    startedProcess.exitValue()
+                } catch (e: IllegalThreadStateException) {
+                    -1
+                }
+                process = null
+                throw IllegalStateException(
+                    "TorrServer process died on startup (exit code $exitCode)",
+                )
+            }
+
+            Thread.sleep(SERVER_HEALTH_CHECK_INTERVAL_MS)
+        }
+
+        stopServerProcess()
+        throw IllegalStateException("TorrServer failed to become ready within ${timeoutMs}ms")
+    }
+
+    private fun isProcessAlive(proc: java.lang.Process?): Boolean {
+        if (proc == null) return false
+        return try {
+            proc.exitValue()
+            false
+        } catch (e: IllegalThreadStateException) {
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -544,6 +605,8 @@ class TorrentService : Service() {
         private const val PORT = 8090
         private const val IDLE_TIMEOUT_MS = 3 * 60 * 1000L
         private const val TORRSERVER_BINARY_NAME = "libtorrserver.so"
+        private const val SERVER_STARTUP_TIMEOUT_MS = 15_000L
+        private const val SERVER_HEALTH_CHECK_INTERVAL_MS = 200L
 
         private val INFO_HASH_PATTERN = Pattern.compile("(?i)(?:btih:)?([a-f0-9]{40})")
         private val VIDEO_EXTENSIONS = setOf(

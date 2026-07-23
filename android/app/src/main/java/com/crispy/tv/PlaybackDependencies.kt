@@ -13,6 +13,7 @@ import com.crispy.tv.network.AppHttp
 import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
+import com.crispy.tv.nativeengine.playback.LibassRenderType
 import com.crispy.tv.nativeengine.playback.NativePlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.torrent.TorrentEngineClient
@@ -21,6 +22,7 @@ import com.crispy.tv.player.EpisodeListProvider
 import com.crispy.tv.player.MetadataLabResolver
 import com.crispy.tv.player.SupabaseSyncLabService
 import com.crispy.tv.player.WatchHistoryService
+import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 
 interface TorrentResolver {
     suspend fun resolveStreamUrl(magnetLink: String, sessionId: String): String
@@ -107,12 +109,39 @@ object PlaybackDependencies {
     @Volatile
     var playbackControllerFactory: (Context) -> PlaybackController =
         { context ->
-            NativePlaybackController(context)
+            val settings = PlaybackSettingsRepositoryProvider.get(context).settings.value
+            NativePlaybackController(
+                context = context,
+                useLibass = settings.useLibass,
+                libassRenderType = LibassRenderType.fromName(settings.libassRenderType),
+            )
         }
 
     @Volatile
     var torrentResolverFactory: (Context) -> TorrentResolver = { context ->
         NativeTorrentResolver(context)
+    }
+
+    @Volatile
+    private var torrentResolverInstance: TorrentResolver? = null
+
+    fun getTorrentResolver(context: Context): TorrentResolver {
+        val existing = torrentResolverInstance
+        if (existing != null) {
+            return existing
+        }
+        return synchronized(this) {
+            torrentResolverInstance ?: run {
+                val created = torrentResolverFactory(context.applicationContext)
+                torrentResolverInstance = created
+                created
+            }
+        }
+    }
+
+    fun resetTorrentResolver() {
+        torrentResolverInstance?.close()
+        torrentResolverInstance = null
     }
 
     @Volatile
@@ -154,9 +183,15 @@ object PlaybackDependencies {
 
     fun reset() {
         playbackControllerFactory = { context ->
-            NativePlaybackController(context)
+            val settings = PlaybackSettingsRepositoryProvider.get(context).settings.value
+            NativePlaybackController(
+                context = context,
+                useLibass = settings.useLibass,
+                libassRenderType = LibassRenderType.fromName(settings.libassRenderType),
+            )
         }
         torrentResolverFactory = { context -> NativeTorrentResolver(context) }
+        resetTorrentResolver()
         metadataResolverFactory = { context ->
             newMetadataResolver(context)
         }

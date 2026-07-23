@@ -14,11 +14,15 @@ internal const val PLAYBACK_SETTINGS_KEY_PLAYBACK_SPEED = "playback_speed"
 internal const val PLAYBACK_SETTINGS_KEY_MUTED = "muted"
 internal const val PLAYBACK_SETTINGS_KEY_DEFAULT_AUDIO_LANGUAGE = "default_audio_language"
 internal const val PLAYBACK_SETTINGS_KEY_DEFAULT_SUBTITLE_LANGUAGE = "default_subtitle_language"
+internal const val PLAYBACK_SETTINGS_KEY_USE_LIBASS = "use_libass"
+internal const val PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE = "libass_render_type"
 private const val DEFAULT_SKIP_INTRO_ENABLED = true
 private const val DEFAULT_TRAILER_AUTOPLAY_ENABLED = true
 private const val DEFAULT_TRAILER_MUTED = false
 private const val DEFAULT_PLAYBACK_SPEED = 1f
 private const val DEFAULT_MUTED = false
+private const val DEFAULT_USE_LIBASS = false
+private const val DEFAULT_LIBASS_RENDER_TYPE = "OVERLAY_OPEN_GL"
 
 data class PlaybackSettings(
     val skipIntroEnabled: Boolean = DEFAULT_SKIP_INTRO_ENABLED,
@@ -28,6 +32,8 @@ data class PlaybackSettings(
     val muted: Boolean = DEFAULT_MUTED,
     val defaultAudioLanguage: String? = null,
     val defaultSubtitleLanguage: String? = null,
+    val useLibass: Boolean = DEFAULT_USE_LIBASS,
+    val libassRenderType: String = DEFAULT_LIBASS_RENDER_TYPE,
 )
 
 interface PlaybackSettingsRepository {
@@ -39,6 +45,8 @@ interface PlaybackSettingsRepository {
     fun setMuted(muted: Boolean)
     fun setDefaultAudioLanguage(language: String?)
     fun setDefaultSubtitleLanguage(language: String?)
+    fun setUseLibass(enabled: Boolean)
+    fun setLibassRenderType(renderType: String)
 }
 
 private class SharedPreferencesPlaybackSettingsRepository(
@@ -132,6 +140,25 @@ private class SharedPreferencesPlaybackSettingsRepository(
         }
     }
 
+    override fun setUseLibass(enabled: Boolean) {
+        if (_settings.value.useLibass == enabled) {
+            return
+        }
+
+        _settings.value = _settings.value.copy(useLibass = enabled)
+        preferences.edit().putBoolean(PLAYBACK_SETTINGS_KEY_USE_LIBASS, enabled).apply()
+    }
+
+    override fun setLibassRenderType(renderType: String) {
+        val normalized = renderType.trim().ifBlank { DEFAULT_LIBASS_RENDER_TYPE }
+        if (_settings.value.libassRenderType == normalized) {
+            return
+        }
+
+        _settings.value = _settings.value.copy(libassRenderType = normalized)
+        preferences.edit().putString(PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE, normalized).apply()
+    }
+
     companion object {
         private val OBSERVED_KEYS =
             setOf(
@@ -142,6 +169,8 @@ private class SharedPreferencesPlaybackSettingsRepository(
                 PLAYBACK_SETTINGS_KEY_MUTED,
                 PLAYBACK_SETTINGS_KEY_DEFAULT_AUDIO_LANGUAGE,
                 PLAYBACK_SETTINGS_KEY_DEFAULT_SUBTITLE_LANGUAGE,
+                PLAYBACK_SETTINGS_KEY_USE_LIBASS,
+                PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE,
             )
 
         fun create(context: Context): PlaybackSettingsRepository {
@@ -186,6 +215,15 @@ private class SharedPreferencesPlaybackSettingsRepository(
                 defaultSubtitleLanguage =
                     preferences.getString(PLAYBACK_SETTINGS_KEY_DEFAULT_SUBTITLE_LANGUAGE, null)
                         ?.takeIf { it.isNotBlank() },
+                useLibass =
+                    preferences.getBoolean(
+                        PLAYBACK_SETTINGS_KEY_USE_LIBASS,
+                        DEFAULT_USE_LIBASS,
+                    ),
+                libassRenderType =
+                    preferences.getString(PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE, DEFAULT_LIBASS_RENDER_TYPE)
+                        ?.takeIf { it.isNotBlank() }
+                        ?: DEFAULT_LIBASS_RENDER_TYPE,
             )
         }
     }

@@ -8,7 +8,9 @@ import android.os.IBinder
 import androidx.core.content.ContextCompat
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -26,6 +28,7 @@ class TorrentEngineClient(context: Context) : Closeable {
 
     private val appContext = context.applicationContext
     private val bindMutex = Mutex()
+    private val streamGeneration = AtomicLong(0L)
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -79,14 +82,28 @@ class TorrentEngineClient(context: Context) : Closeable {
             "Magnet URI must start with magnet:?"
         }
 
+        val generation = streamGeneration.incrementAndGet()
+        ensureCurrentGeneration(generation)
+
         val boundService = ensureConnected()
+        ensureCurrentGeneration(generation)
+
         val started = boundService.startLink(trimmed, sessionId)
         check(started) { "Torrent service did not accept start request" }
+        ensureCurrentGeneration(generation)
 
         val fileIdx = boundService.getLargestFileIndexFromLink(trimmed)
+        ensureCurrentGeneration(generation)
+
         val streamUrl = boundService.getStreamUrlForLink(trimmed, fileIdx)
-        awaitLocalStreamReady(streamUrl)
+        awaitLocalStreamReady(streamUrl, generation)
         streamUrl
+    }
+
+    private fun ensureCurrentGeneration(generation: Long) {
+        if (streamGeneration.get() != generation) {
+            throw CancellationException("Torrent stream start was cancelled (generation mismatch)")
+        }
     }
 
     suspend fun stopAll(clearStorage: Boolean = true) {
@@ -112,12 +129,20 @@ class TorrentEngineClient(context: Context) : Closeable {
         pendingConnection = null
     }
 
-    private suspend fun awaitLocalStreamReady(url: String, timeoutMs: Long = LOCALHOST_POLL_TIMEOUT_MS) {
+    private suspend fun awaitLocalStreamReady(
+        url: String,
+        generation: Long,
+        timeoutMs: Long = LOCALHOST_POLL_TIMEOUT_MS
+    ) {
         val deadlineMs = System.currentTimeMillis() + timeoutMs
         var lastStatusCode: Int? = null
         var lastError: Throwable? = null
 
         while (System.currentTimeMillis() < deadlineMs) {
+            if (streamGeneration.get() != generation) {
+                throw CancellationException("Torrent stream start was cancelled (generation mismatch)")
+            }
+
             val probeResult = runCatching { probeLocalStream(url) }
             if (probeResult.isSuccess) {
                     val statusCode = probeResult.getOrThrow()
