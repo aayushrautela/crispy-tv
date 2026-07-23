@@ -38,7 +38,6 @@ internal fun PlayerTrackSheet(
     selectedSubtitleTrackId: String?,
     onSelectAudioTrack: (String?) -> Unit,
     onSelectSubtitleTrack: (String?) -> Unit,
-    onAddExternalSubtitle: (String, String?, String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     if (!visible) return

@@ -19,7 +19,6 @@ internal fun Modifier.playerVerticalDragGestures(
     gestureController: PlayerGestureController?,
     onBrightnessChange: (Float) -> Unit,
     onVolumeChange: (PlayerGestureController.AudioLevel) -> Unit,
-    onGestureEnd: () -> Unit,
 ): Modifier = this.then(
     if (gestureController == null) {
         Modifier
@@ -90,7 +89,6 @@ internal fun Modifier.playerVerticalDragGestures(
                     }
                     change.consume()
                 }
-                onGestureEnd()
             }
         }
     },

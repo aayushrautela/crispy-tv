@@ -88,6 +88,43 @@ fun PlayerRoute(
         }
     }
 
+    val surfaceModifier = Modifier
+        .fillMaxSize()
+        .playerVerticalDragGestures(
+            gestureController = gestureController,
+            onBrightnessChange = { level ->
+                gestureFeedback.show(
+                    scope,
+                    GestureFeedbackMessage(
+                        text = formatGestureBrightness(level),
+                        icon = GestureIcons.Brightness,
+                    ),
+                    holdMs = 800,
+                )
+            },
+            onVolumeChange = { level ->
+                gestureFeedback.show(
+                    scope,
+                    GestureFeedbackMessage(
+                        text = if (level.isMuted) "Muted" else formatGestureVolume(level),
+                        icon = if (level.isMuted) GestureIcons.VolumeMuted else GestureIcons.VolumeUp,
+                    ),
+                    holdMs = 800,
+                )
+            },
+        )
+        .onGloballyPositioned { coordinates ->
+            val bounds = coordinates.boundsInWindow()
+            updateVideoBounds(
+                Rect(
+                    bounds.left.roundToInt(),
+                    bounds.top.roundToInt(),
+                    bounds.right.roundToInt(),
+                    bounds.bottom.roundToInt(),
+                ),
+            )
+        }
+
     LaunchedEffect(videoBounds, uiState.videoLayout, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
         val aspectRatio =
             uiState.videoLayout.toPictureInPictureAspectRatio()
@@ -120,44 +157,7 @@ fun PlayerRoute(
         when (uiState.activeEngine) {
             NativePlaybackEngine.EXO -> {
                 AndroidView(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .playerVerticalDragGestures(
-                                gestureController = gestureController,
-                                onBrightnessChange = { level ->
-                                    gestureFeedback.show(
-                                        scope,
-                                        GestureFeedbackMessage(
-                                            text = formatGestureBrightness(level),
-                                            icon = GestureIcons.Brightness,
-                                        ),
-                                        holdMs = 800,
-                                    )
-                                },
-                                onVolumeChange = { level ->
-                                    gestureFeedback.show(
-                                        scope,
-                                        GestureFeedbackMessage(
-                                            text = if (level.isMuted) "Muted" else formatGestureVolume(level),
-                                            icon = if (level.isMuted) GestureIcons.VolumeMuted else GestureIcons.VolumeUp,
-                                        ),
-                                        holdMs = 800,
-                                    )
-                                },
-                                onGestureEnd = { /* feedback fades on its own */ },
-                            )
-                            .onGloballyPositioned { coordinates ->
-                                val bounds = coordinates.boundsInWindow()
-                                updateVideoBounds(
-                                    Rect(
-                                        bounds.left.roundToInt(),
-                                        bounds.top.roundToInt(),
-                                        bounds.right.roundToInt(),
-                                        bounds.bottom.roundToInt(),
-                                    ),
-                                )
-                            },
+                    modifier = surfaceModifier,
                     factory = { viewContext ->
                         PlayerView(viewContext).apply {
                             useController = false
@@ -173,44 +173,7 @@ fun PlayerRoute(
 
             NativePlaybackEngine.MPV -> {
                 AndroidView(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .playerVerticalDragGestures(
-                                gestureController = gestureController,
-                                onBrightnessChange = { level ->
-                                    gestureFeedback.show(
-                                        scope,
-                                        GestureFeedbackMessage(
-                                            text = formatGestureBrightness(level),
-                                            icon = GestureIcons.Brightness,
-                                        ),
-                                        holdMs = 800,
-                                    )
-                                },
-                                onVolumeChange = { level ->
-                                    gestureFeedback.show(
-                                        scope,
-                                        GestureFeedbackMessage(
-                                            text = if (level.isMuted) "Muted" else formatGestureVolume(level),
-                                            icon = if (level.isMuted) GestureIcons.VolumeMuted else GestureIcons.VolumeUp,
-                                        ),
-                                        holdMs = 800,
-                                    )
-                                },
-                                onGestureEnd = { /* feedback fades on its own */ },
-                            )
-                            .onGloballyPositioned { coordinates ->
-                                val bounds = coordinates.boundsInWindow()
-                                updateVideoBounds(
-                                    Rect(
-                                        bounds.left.roundToInt(),
-                                        bounds.top.roundToInt(),
-                                        bounds.right.roundToInt(),
-                                        bounds.bottom.roundToInt(),
-                                    ),
-                                )
-                            },
+                    modifier = surfaceModifier,
                     factory = { viewContext -> session.createMpvSurfaceView(viewContext) },
                     update = { surfaceView: SurfaceView ->
                         session.attachMpvSurface(surfaceView)
@@ -245,7 +208,6 @@ fun PlayerRoute(
                 onRetryPlayback = session::retryPlayback,
                 onSelectAudioTrack = session::selectAudioTrack,
                 onSelectSubtitleTrack = session::selectSubtitleTrack,
-                onAddExternalSubtitle = session::setExternalSubtitle,
                 onCycleSpeed = {
                     val next = PLAYBACK_SPEED_CYCLE.firstOrNull { it > uiState.playbackSpeed + 0.01f }
                         ?: PLAYBACK_SPEED_CYCLE.first()

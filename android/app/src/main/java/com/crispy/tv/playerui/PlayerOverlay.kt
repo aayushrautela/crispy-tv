@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,7 +58,6 @@ internal fun PlayerOverlay(
     onRetryPlayback: () -> Unit,
     onSelectAudioTrack: (String?) -> Unit,
     onSelectSubtitleTrack: (String?) -> Unit,
-    onAddExternalSubtitle: (String, String?, String?) -> Unit,
     onCycleSpeed: () -> Unit,
     onToggleMute: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
@@ -80,20 +78,8 @@ internal fun PlayerOverlay(
         controlsResetToken += 1
     }
 
-    fun openInfo() {
-        onShowInfo()
-        controlsVisible = true
-        resetControlsTimer()
-    }
-
-    fun openStreams() {
-        onShowStreams()
-        controlsVisible = true
-        resetControlsTimer()
-    }
-
-    fun openTracks() {
-        onShowTracks()
+    fun openSurface(open: () -> Unit) {
+        open()
         controlsVisible = true
         resetControlsTimer()
     }
@@ -238,9 +224,9 @@ internal fun PlayerOverlay(
                             resetControlsTimer()
                             latestOnSeekTo(it)
                         },
-                        onOpenStreams = ::openStreams,
-                        onOpenInfo = ::openInfo,
-                        onOpenTracks = ::openTracks,
+                        onOpenStreams = { openSurface(onShowStreams) },
+                        onOpenInfo = { openSurface(onShowInfo) },
+                        onOpenTracks = { openSurface(onShowTracks) },
                         onCycleSpeed = {
                             resetControlsTimer()
                             onCycleSpeed()
@@ -316,10 +302,6 @@ internal fun PlayerOverlay(
             onSelectSubtitleTrack = {
                 resetControlsTimer()
                 onSelectSubtitleTrack(it)
-            },
-            onAddExternalSubtitle = { url, lang, name ->
-                resetControlsTimer()
-                onAddExternalSubtitle(url, lang, name)
             },
             onDismiss = onCloseSurface,
         )
