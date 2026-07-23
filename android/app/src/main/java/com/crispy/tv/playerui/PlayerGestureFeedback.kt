@@ -10,11 +10,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -109,8 +109,8 @@ internal data class GestureFeedbackMessage(
 
 internal object GestureIcons {
     val Brightness = Icons.Filled.Brightness6
-    val VolumeUp = Icons.Filled.VolumeUp
-    val VolumeMuted = Icons.Filled.VolumeOff
+    val VolumeUp = Icons.AutoMirrored.Filled.VolumeUp
+    val VolumeMuted = Icons.AutoMirrored.Filled.VolumeOff
     val Forward10 = Icons.Filled.Forward10
     val Backward10 = Icons.Filled.Replay10
 }

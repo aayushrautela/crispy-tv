@@ -19,12 +19,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material3.Button
@@ -183,7 +183,7 @@ internal fun PlayerBottomControls(
                         onClick = onCycleSpeed,
                     )
                     PlayerActionButton(
-                        icon = if (muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                        icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                         label = if (muted) "Unmute" else "Mute",
                         onClick = onToggleMute,
                     )
