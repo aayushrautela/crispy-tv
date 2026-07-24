@@ -37,6 +37,7 @@ import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.ui.theme.CrispyRewriteTheme
+import kotlin.math.roundToInt
 import org.json.JSONObject
 
 class PlayerActivity : ComponentActivity() {
@@ -274,6 +275,7 @@ class PlayerActivity : ComponentActivity() {
         pipSourceRect?.let(builder::setSourceRectHint)
         pipAspectRatio
             ?.takeIf { it.numerator > 0 && it.denominator > 0 }
+            ?.let { clampPictureInPictureAspectRatio(it) }
             ?.let(builder::setAspectRatio)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -293,6 +295,19 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_ARTWORK_URL = "extra_artwork_url"
         private const val EXTRA_LAUNCH_SNAPSHOT = "extra_launch_snapshot"
         private const val EXTRA_PLAYBACK_HEADERS_JSON = "extra_playback_headers_json"
+        private const val PIP_MAX_ASPECT_RATIO = 2.39
+        private const val PIP_MIN_ASPECT_RATIO = 1.0 / PIP_MAX_ASPECT_RATIO
+
+        private fun clampPictureInPictureAspectRatio(rational: Rational): Rational {
+            val ratio = rational.toDouble()
+            return when {
+                ratio > PIP_MAX_ASPECT_RATIO ->
+                    Rational((PIP_MAX_ASPECT_RATIO * 100).roundToInt(), 100)
+                ratio < PIP_MIN_ASPECT_RATIO ->
+                    Rational(100, (PIP_MAX_ASPECT_RATIO * 100).roundToInt())
+                else -> rational
+            }
+        }
 
         private const val EXTRA_IMDB_ID = "extra_imdb_id"
         private const val EXTRA_CONTENT_ID = "extra_content_id"
