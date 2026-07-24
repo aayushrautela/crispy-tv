@@ -52,6 +52,7 @@ import com.crispy.tv.streams.StreamSelectorUiState
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -938,7 +939,7 @@ class PlayerSessionViewModel(
     }
 
     private suspend fun pollPlaybackState() {
-        while (isActive) {
+        while (coroutineContext.isActive) {
             val snapshot = playbackController.snapshot()
 
             val fallbackHandled = maybeHandlePlaybackError(snapshot.error, snapshot.engine)
