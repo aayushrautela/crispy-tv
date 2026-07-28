@@ -259,7 +259,7 @@ internal fun DetailsBody(
         if (cast.isNotEmpty()) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(
-                text = "Cast",
+                text = "Cast & Crew",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = horizontalPadding)
             )
