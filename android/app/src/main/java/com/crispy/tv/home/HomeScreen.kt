@@ -1,39 +1,31 @@
 package com.crispy.tv.home
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.runtime.Composable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -45,6 +37,7 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.brand.CrispyWordmark
+import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
@@ -56,7 +49,7 @@ import kotlinx.coroutines.flow.StateFlow
 private val HomeContentSectionSpacing = 24.dp
 private val HomeTopSectionSpacing = 16.dp
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun HomeRoute(
     onHeroClick: (HomeHeroItem) -> Unit,
@@ -79,19 +72,24 @@ internal fun HomeRoute(
         },
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isRefreshing = uiState.isRefreshing
-    val headerPills = uiState.headerPills
-    val heroState = uiState.heroState
-    val layoutState = uiState.layoutState
-    val wideRailSections = uiState.wideRailSections
-    val catalogSections = uiState.catalogSections
+    val horizontalPadding = responsivePageHorizontalPadding()
+    val pullToRefreshState = rememberPullToRefreshState()
+    val lazyListState = rememberLazyListState()
     val scrollBehavior = appBarScrollBehavior()
+    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
         viewModel.ensureLoaded()
     }
 
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) {
+            lazyListState.animateScrollToItem(0)
+            onScrollToTopConsumed()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, viewModel) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
@@ -104,11 +102,13 @@ internal fun HomeRoute(
         }
     }
 
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    val headerPills = uiState.headerPills
+    val heroState = uiState.heroState
+    val layoutState = uiState.layoutState
+    val wideRailSections = uiState.wideRailSections
+    val catalogSections = uiState.catalogSections
+
+    CrispyScreen(
         topBar = {
             StandardTopAppBar(
                 title = {
@@ -125,167 +125,94 @@ internal fun HomeRoute(
                 colors = topLevelAppBarColors(),
             )
         },
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .consumeWindowInsets(paddingValues),
-        ) {
-            HomeScreen(
-                isRefreshing = isRefreshing,
-                headerPills = headerPills,
-                heroState = heroState,
-                layoutState = layoutState,
-                wideRailSections = wideRailSections,
-                catalogSections = catalogSections,
-                onRefresh = viewModel::refresh,
-                onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
-                onHeroClick = onHeroClick,
-                onContinueWatchingClick = onContinueWatchingClick,
-                onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
-                onThisWeekClick = onThisWeekClick,
-                onThisWeekSeeAllClick = onThisWeekSeeAllClick,
-                onCatalogItemClick = onCatalogItemClick,
-                onCatalogSeeAllClick = onCatalogSeeAllClick,
-                scrollToTopRequests = scrollToTopRequests,
-                onScrollToTopConsumed = onScrollToTopConsumed,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun HomeScreen(
-    isRefreshing: Boolean,
-    headerPills: List<CatalogSectionRef>,
-    heroState: HeroState,
-    layoutState: HomeLayoutState,
-    wideRailSections: Map<String, HomeWideRailSectionUi>,
-    catalogSections: Map<String, HomeCatalogSectionUi>,
-    onRefresh: () -> Unit,
-    onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
-    onHeroClick: (HomeHeroItem) -> Unit,
-    onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
-    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
-    onThisWeekClick: (CalendarEpisodeItem) -> Unit,
-    onThisWeekSeeAllClick: () -> Unit,
-    onCatalogItemClick: (CatalogItem) -> Unit,
-    onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
-    scrollToTopRequests: StateFlow<Int>,
-    onScrollToTopConsumed: () -> Unit,
-) {
-    val horizontalPadding = responsivePageHorizontalPadding()
-    val pullToRefreshState = rememberPullToRefreshState()
-    val lazyListState = rememberLazyListState()
-    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
-
-    LaunchedEffect(scrollToTopRequest) {
-        if (scrollToTopRequest > 0) {
-            lazyListState.animateScrollToItem(0)
-            onScrollToTopConsumed()
-        }
-    }
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize(),
-        state = pullToRefreshState,
-        indicator = {
-            Indicator(
-                state = pullToRefreshState,
-                isRefreshing = isRefreshing,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
-        },
+        nestedScrollConnection = scrollBehavior.nestedScrollConnection,
+        pullToRefreshState = pullToRefreshState,
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = viewModel::refresh,
+        horizontalPadding = 0.dp,
+        topPadding = 0.dp,
+        bottomPaddingExtra = Dimensions.PageBottomPadding,
+        verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
+        listState = lazyListState,
     ) {
-        LazyColumn(
-            state = lazyListState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = horizontalPadding,
-                top = Dimensions.PageTopPadding,
-                end = horizontalPadding,
-                bottom = Dimensions.PageBottomPadding,
-            ),
-            verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
-        ) {
-            item(key = "topHeader", contentType = "topHeader") {
-                Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
+        item(key = "topHeader", contentType = "topHeader") {
+            Column(verticalArrangement = Arrangement.spacedBy(HomeTopSectionSpacing)) {
+                Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
                     HomeHeaderSectionsItem(
                         sections = headerPills,
                         onSectionClick = onCatalogSeeAllClick,
                     )
-                    HomeHeroSection(
-                        state = heroState,
-                        onHeroClick = onHeroClick,
-                    )
                 }
+                HomeHeroSection(
+                    state = heroState,
+                    onHeroClick = onHeroClick,
+                )
             }
+        }
 
-            if (layoutState.blocks.isNotEmpty()) {
-                items(
-                    items = layoutState.blocks,
-                    key = { it.key },
-                    contentType = {
-                        when (it) {
-                            is HomeWideRailLayoutUi -> it.kind.name
-                            is HomeCatalogRowSectionUi -> "catalogSection"
-                            is HomeCollectionShelfSectionUi -> "collectionShelf"
-                            is HomeStatusSectionUi -> "catalogStatus"
+        if (layoutState.blocks.isNotEmpty()) {
+            items(
+                items = layoutState.blocks,
+                key = { it.key },
+                contentType = {
+                    when (it) {
+                        is HomeWideRailLayoutUi -> it.kind.name
+                        is HomeCatalogRowSectionUi -> "catalogSection"
+                        is HomeCollectionShelfSectionUi -> "collectionShelf"
+                        is HomeStatusSectionUi -> "catalogStatus"
+                    }
+                },
+            ) { block ->
+                when (block) {
+                    is HomeCatalogRowSectionUi -> {
+                        val sectionUi = catalogSections[block.sectionKey]
+                        if (sectionUi != null) {
+                            HomeCatalogSectionRow(
+                                sectionUi = sectionUi,
+                                horizontalPadding = horizontalPadding,
+                                onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
+                                onItemClick = onCatalogItemClick,
+                            )
                         }
-                    },
-                ) { block ->
-                    when (block) {
-                        is HomeCatalogRowSectionUi -> {
-                            val sectionUi = catalogSections[block.sectionKey]
-                            if (sectionUi != null) {
-                                HomeCatalogSectionRow(
-                                    sectionUi = sectionUi,
-                                    onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
-                                    onItemClick = onCatalogItemClick,
-                                )
-                            }
-                        }
+                    }
 
-                        is HomeCollectionShelfSectionUi -> {
-                            val sectionUis = remember(block.sectionKeys, catalogSections) {
-                                block.sectionKeys.mapNotNull(catalogSections::get)
-                            }
-                            if (sectionUis.isNotEmpty()) {
-                                HomeCollectionSectionRow(
-                                    sectionUis = sectionUis,
-                                    onCollectionClick = onCatalogSeeAllClick,
-                                    onCollectionPlayClick = onCatalogItemClick,
-                                    onCollectionMovieClick = onCatalogItemClick,
-                                )
-                            }
+                    is HomeCollectionShelfSectionUi -> {
+                        val sectionUis = remember(block.sectionKeys, catalogSections) {
+                            block.sectionKeys.mapNotNull(catalogSections::get)
                         }
-
-                        is HomeStatusSectionUi -> {
-                            HomeCatalogStatusCard(statusMessage = block.statusMessage)
+                        if (sectionUis.isNotEmpty()) {
+                            HomeCollectionSectionRow(
+                                sectionUis = sectionUis,
+                                horizontalPadding = horizontalPadding,
+                                onCollectionClick = onCatalogSeeAllClick,
+                                onCollectionPlayClick = onCatalogItemClick,
+                                onCollectionMovieClick = onCatalogItemClick,
+                            )
                         }
+                    }
 
-                        is HomeWideRailLayoutUi -> {
-                            val section = wideRailSections[block.key]
-                            if (section != null) {
-                                HomeWideRailSection(
-                                    section = section,
-                                    onContinueWatchingClick = onContinueWatchingClick,
-                                    onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
-                                    onRemoveContinueWatchingItem = onRemoveContinueWatchingItem,
-                                    onThisWeekClick = onThisWeekClick,
-                                    onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
-                                )
-                            }
+                    is HomeStatusSectionUi -> {
+                        HomeCatalogStatusCard(statusMessage = block.statusMessage)
+                    }
+
+                    is HomeWideRailLayoutUi -> {
+                        val section = wideRailSections[block.key]
+                        if (section != null) {
+                            HomeWideRailSection(
+                                section = section,
+                                horizontalPadding = horizontalPadding,
+                                onContinueWatchingClick = onContinueWatchingClick,
+                                onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
+                                onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
+                                onThisWeekClick = onThisWeekClick,
+                                onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
+                            )
                         }
                     }
                 }
             }
         }
-}
+    }
 }
 
 @Composable
@@ -368,5 +295,3 @@ private fun HomeHeaderSectionChips(
         }
     }
 }
-
-// End of file

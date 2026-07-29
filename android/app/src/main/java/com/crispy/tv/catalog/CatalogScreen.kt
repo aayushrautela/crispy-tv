@@ -42,7 +42,7 @@ import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.skeletonElement
-import com.crispy.tv.ui.theme.Dimensions
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 
@@ -102,7 +102,7 @@ fun CatalogRoute(
                         start = pageHorizontalPadding,
                         top = innerPadding.calculateTopPadding() + 12.dp,
                         end = pageHorizontalPadding,
-                        bottom = innerPadding.calculateBottomPadding() + 12.dp + Dimensions.PageBottomPadding,
+                        bottom = innerPadding.calculateBottomPadding() + 12.dp + safeBottomPadding(),
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -121,7 +121,6 @@ fun CatalogRoute(
                             rating = item.rating,
                             year = item.year,
                             genre = item.genre,
-                            gradientColorHex = null,
                             onClick = { onItemClick(item) }
                         )
                     }

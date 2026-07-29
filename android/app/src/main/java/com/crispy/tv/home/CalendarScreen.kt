@@ -3,16 +3,12 @@ package com.crispy.tv.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -23,10 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,7 +27,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +38,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
@@ -133,11 +126,10 @@ internal fun CalendarRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val horizontalPadding = responsivePageHorizontalPadding()
     val pullToRefreshState = rememberPullToRefreshState()
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val scrollBehavior = appBarScrollBehavior()
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    CrispyScreen(
         topBar = {
             StandardTopAppBar(
                 title = { Text("Calendar") },
@@ -149,104 +141,81 @@ internal fun CalendarRoute(
                 scrollBehavior = scrollBehavior,
             )
         },
-    ) { innerPadding ->
-        val contentPadding = PaddingValues(
-            start = horizontalPadding,
-            top = innerPadding.calculateTopPadding() + 16.dp,
-            end = horizontalPadding,
-            bottom = innerPadding.calculateBottomPadding() + 16.dp + Dimensions.PageBottomPadding,
-        )
-
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = viewModel::refresh,
-            modifier = Modifier.fillMaxSize(),
-            state = pullToRefreshState,
-            indicator = {
-                Indicator(
-                    state = pullToRefreshState,
-                    isRefreshing = uiState.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = innerPadding.calculateTopPadding()),
-                )
-            },
-        ) {
-            when {
-                uiState.isInitialLoading && uiState.sections.isEmpty() -> {
-                    CalendarLoadingSkeleton(contentPadding = contentPadding)
+        nestedScrollConnection = scrollBehavior.nestedScrollConnection,
+        pullToRefreshState = pullToRefreshState,
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = viewModel::refresh,
+        horizontalPadding = horizontalPadding,
+        topPadding = 16.dp,
+        bottomPaddingExtra = 16.dp,
+        verticalArrangement = Arrangement.spacedBy(22.dp),
+        listState = lazyListState,
+    ) {
+        when {
+            uiState.isInitialLoading && uiState.sections.isEmpty() -> {
+                items(CALENDAR_SKELETON_SECTION_COUNT) { index ->
+                    CalendarSkeletonSection(titleWidthFraction = if (index % 2 == 0) 0.34f else 0.46f)
                 }
+            }
 
-                uiState.sections.isEmpty() -> {
-                    Column(
+            uiState.sections.isEmpty() -> {
+                item {
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(contentPadding),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
+                            .fillParentMaxHeight()
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = uiState.statusMessage.ifBlank { "No calendar items yet." },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = viewModel::refresh) {
-                            Text("Refresh")
-                        }
-                    }
-                }
-
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = contentPadding,
-                        verticalArrangement = Arrangement.spacedBy(22.dp),
-                    ) {
-                        if (uiState.statusMessage.isNotBlank()) {
-                            item {
-                                Text(
-                                    text = uiState.statusMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-
-                        items(uiState.sections, key = { it.key.name }) { section ->
-                            when (section.key) {
-                                CalendarSectionKey.NO_SCHEDULED -> {
-                                    CalendarSeriesSection(
-                                        title = section.title,
-                                        items = section.seriesItems,
-                                        onItemClick = onSeriesClick,
-                                    )
-                                }
-
-                                else -> {
-                                    CalendarEpisodeSection(
-                                        title = section.title,
-                                        items = section.episodeItems,
-                                        onItemClick = onEpisodeClick,
-                                    )
-                                }
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = uiState.statusMessage.ifBlank { "No calendar items yet." },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = viewModel::refresh) {
+                                Text("Refresh")
                             }
                         }
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun CalendarLoadingSkeleton(contentPadding: PaddingValues) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(22.dp),
-    ) {
-        items(CALENDAR_SKELETON_SECTION_COUNT) { index ->
-            CalendarSkeletonSection(titleWidthFraction = if (index % 2 == 0) 0.34f else 0.46f)
+            else -> {
+                if (uiState.statusMessage.isNotBlank()) {
+                    item {
+                        Text(
+                            text = uiState.statusMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                items(uiState.sections, key = { it.key.name }) { section ->
+                    when (section.key) {
+                        CalendarSectionKey.NO_SCHEDULED -> {
+                            CalendarSeriesSection(
+                                title = section.title,
+                                items = section.seriesItems,
+                                onItemClick = onSeriesClick,
+                            )
+                        }
+
+                        else -> {
+                            CalendarEpisodeSection(
+                                title = section.title,
+                                items = section.episodeItems,
+                                onItemClick = onEpisodeClick,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

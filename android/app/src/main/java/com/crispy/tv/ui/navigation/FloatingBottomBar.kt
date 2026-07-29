@@ -31,14 +31,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 // Outer capsule
-private val BarHeight = 60.dp
-private val BarCornerRadius = 30.dp             // BarHeight / 2 → capsule
+internal val FloatingBarHeight = 60.dp
+private val BarCornerRadius = 30.dp             // FloatingBarHeight / 2 → capsule
 private val BarInnerPadding = 6.dp
 private val BarElevation = 6.dp
-private val BarBottomMargin = 16.dp
+internal val FloatingBarBottomMargin = 16.dp
 
 // Inner selected-chip (concentric capsule)
-private val ChipHeight = 48.dp                  // BarHeight − 2 × BarInnerPadding
+private val ChipHeight = 48.dp                  // FloatingBarHeight − 2 × BarInnerPadding
 private val ChipCornerRadius = 24.dp            // ChipHeight / 2 → capsule
 
 // Trailing circle
@@ -60,13 +60,13 @@ internal fun FloatingBottomBar(
     Row(
         modifier = modifier
             .navigationBarsPadding()
-            .padding(bottom = BarBottomMargin),
+            .padding(bottom = FloatingBarBottomMargin),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Navigation capsule pill
         Surface(
-            modifier = Modifier.height(BarHeight),
+            modifier = Modifier.height(FloatingBarHeight),
             shape = RoundedCornerShape(BarCornerRadius),
             color = MaterialTheme.colorScheme.surfaceContainer,
             tonalElevation = BarElevation,

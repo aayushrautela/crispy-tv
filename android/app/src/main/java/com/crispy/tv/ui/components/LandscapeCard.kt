@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -31,8 +32,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.ratings.formatRating
-
-private val PosterGradientFallback = Color(0xFF151515)
 
 @Composable
 fun LandscapeCard(
@@ -46,7 +45,6 @@ fun LandscapeCard(
     year: String? = null,
     maturityRating: String? = null,
     genre: String? = null,
-    gradientColorHex: String? = null,
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val imageUrl = backdropUrl ?: posterUrl
@@ -55,16 +53,12 @@ fun LandscapeCard(
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight)
     val logoModel = crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp)
 
-    val gradientColor = remember(gradientColorHex) {
-        gradientColorHex?.toComposeColorOrNull() ?: PosterGradientFallback
-    }
-    val gradientBrush = remember(gradientColor) {
+    val scrimBrush = remember {
         Brush.verticalGradient(
             colors = listOf(
                 Color.Transparent,
-                gradientColor.copy(alpha = 0.52f),
-                gradientColor.copy(alpha = 0.88f),
-            )
+                Color.Black.copy(alpha = 0.55f),
+            ),
         )
     }
     val formattedRating = remember(rating) { formatRating(rating?.toDoubleOrNull()) }
@@ -74,112 +68,99 @@ fun LandscapeCard(
     val metadataColor = Color.White.copy(alpha = 0.82f)
     val cardShape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp)
 
-    Column(
-        modifier = modifier.width(cardWidth),
+    Box(
+        modifier = modifier
+            .width(cardWidth)
+            .fillMaxWidth()
+            .aspectRatio(CardStyle.LandscapeAspectRatio)
+            .shadow(2.dp, cardShape)
+            .clip(cardShape)
+            .background(fallbackColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.BottomStart,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(CardStyle.LandscapeAspectRatio)
-                .clip(cardShape)
-                .background(fallbackColor)
-                .cardDepth(shape = cardShape)
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.BottomStart,
-        ) {
-            if (imageModel != null) {
-                AsyncImage(
-                    model = imageModel,
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(fallbackColor),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = title.take(1).uppercase(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
+        if (imageModel != null) {
+            AsyncImage(
+                model = imageModel,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.62f)
-                    .background(gradientBrush),
-            )
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.Bottom,
+                    .fillMaxSize()
+                    .background(fallbackColor),
+                contentAlignment = Alignment.Center,
             ) {
-                if (logoModel != null) {
-                    AsyncImage(
-                        model = logoModel,
-                        contentDescription = title,
-                        modifier = Modifier
-                            .fillMaxWidth(0.60f)
-                            .height(30.dp),
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.CenterStart,
-                    )
-                } else {
+                Text(
+                    text = title.take(1).uppercase(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(0.50f)
+                .background(scrimBrush),
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            if (logoModel != null) {
+                AsyncImage(
+                    model = logoModel,
+                    contentDescription = title,
+                    modifier = Modifier
+                        .fillMaxWidth(0.60f)
+                        .height(30.dp),
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                )
+            } else {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.96f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.widthIn(max = 240.dp),
+                )
+            }
+
+            val metadataParts = buildList {
+                yearText?.let { add(it) }
+                maturityText?.let { add(it) }
+                genreText?.let { add(it) }
+                formattedRating?.let { add("★ $it") }
+            }
+            if (metadataParts.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
+                        text = metadataParts.joinToString(separator = " · "),
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.96f),
+                        color = metadataColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Start,
-                        modifier = Modifier.widthIn(max = 240.dp),
                     )
-                }
-
-                val metadataParts = buildList {
-                    yearText?.let { add(it) }
-                    maturityText?.let { add(it) }
-                    genreText?.let { add(it) }
-                    formattedRating?.let { add("★ $it") }
-                }
-                if (metadataParts.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            text = metadataParts.joinToString(separator = " · "),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = metadataColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
                 }
             }
         }
-    }
-}
-
-private fun String.toComposeColorOrNull(): Color? {
-    val normalized = trim().removePrefix("#")
-    val value = normalized.toLongOrNull(16) ?: return null
-    return when (normalized.length) {
-        6 -> Color(0xFF000000 or value)
-        8 -> Color(value)
-        else -> null
     }
 }

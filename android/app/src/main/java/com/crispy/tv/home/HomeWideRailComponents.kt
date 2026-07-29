@@ -6,7 +6,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,11 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
@@ -44,6 +45,7 @@ private const val HOME_WIDE_SKELETON_COUNT = 3
 @Composable
 internal fun HomeWideRailSection(
     section: HomeWideRailSectionUi,
+    horizontalPadding: Dp,
     onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
     onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
     onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
@@ -65,12 +67,13 @@ internal fun HomeWideRailSection(
                     }
                 }
             },
+            modifier = Modifier.padding(horizontal = horizontalPadding),
         )
 
         if (section.isLoading || section.items.isNotEmpty()) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(0.dp)
+                contentPadding = crispyRowHuggingPadding(horizontalPadding),
             ) {
                 if (section.isLoading && section.items.isEmpty()) {
                     items(HOME_WIDE_SKELETON_COUNT, contentType = { "wideSkeleton" }) {
@@ -124,9 +127,13 @@ private fun HomeWideRailSkeletonCard() {
 internal fun HomeRailHeader(
     title: String,
     statusMessage: String,
+    modifier: Modifier = Modifier,
     action: (@Composable () -> Unit)? = null,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -182,50 +189,47 @@ internal fun HomeWideRailCard(
             Modifier.clickable(onClick = onClick)
         }
 
-    Column(
+    LandscapeArtworkFrame(
+        title = item.title,
+        imageModel = artworkModel,
+        onClick = null,
         modifier = Modifier
             .width(Dimensions.WideCardWidth)
+            .aspectRatio(Dimensions.WideCardAspectRatio)
             .then(cardInteractionModifier),
-    ) {
-        LandscapeArtworkFrame(
-            title = item.title,
-            imageModel = artworkModel,
-            onClick = null,
-            modifier = Modifier.aspectRatio(Dimensions.WideCardAspectRatio),
-            badgeLabel = item.badgeLabel,
-            badgeAlignment = Alignment.TopEnd,
-            progressFraction = item.progressFraction,
-            scrimHeightFraction = 0.55f,
-            scrimMaxAlpha = 0.88f,
-            bottomOverlayContent = {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
+        badgeLabel = item.badgeLabel,
+        badgeAlignment = Alignment.TopEnd,
+        progressFraction = item.progressFraction,
+        scrimHeightFraction = 0.55f,
+        scrimMaxAlpha = 0.88f,
+        bottomOverlayContent = {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (item.subtitle.isNotBlank()) {
                     Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        text = item.subtitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.78f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (item.subtitle.isNotBlank()) {
-                        Text(
-                            text = item.subtitle,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.White.copy(alpha = 0.78f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
                 }
-            },
-        )
-    }
+            }
+        },
+    )
 
     val visibleRemoveAction = if (actionSheetVisible) removeAction else null
     if (visibleRemoveAction != null) {

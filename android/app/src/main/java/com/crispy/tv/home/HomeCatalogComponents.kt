@@ -3,11 +3,11 @@ package com.crispy.tv.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,23 +25,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 
 private const val HOME_POSTER_SKELETON_COUNT = 5
 
 @Composable
 internal fun HomeCatalogSectionRow(
     sectionUi: HomeCatalogSectionUi,
+    horizontalPadding: Dp,
     onSeeAllClick: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
@@ -90,13 +95,14 @@ internal fun HomeCatalogSectionRow(
             Text(
                 text = sectionUi.statusMessage,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = horizontalPadding),
             )
         }
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(0.dp)
+            contentPadding = crispyRowHuggingPadding(horizontalPadding),
         ) {
             if (sectionUi.isLoading && sectionUi.items.isEmpty()) {
                 items(HOME_POSTER_SKELETON_COUNT, contentType = { "posterSkeleton" }) {
@@ -133,7 +139,6 @@ internal fun HomeCatalogPosterCard(
         rating = item.rating,
         year = item.year,
         genre = item.genre,
-        gradientColorHex = null,
         modifier = Modifier.width(CardStyle.landscapeCardWidth()),
         onClick = onClick
     )

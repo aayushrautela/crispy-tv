@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -22,8 +24,11 @@ import com.crispy.tv.accounts.AppBootstrapViewModel
 import com.crispy.tv.accounts.AuthRoute
 import com.crispy.tv.accounts.BootstrapState
 import com.crispy.tv.accounts.OnboardingRoute
+import com.crispy.tv.ui.edge_to_edge.LocalBottomBarOverlayPadding
 import com.crispy.tv.ui.navigation.AppNavHost
 import com.crispy.tv.ui.navigation.AppRoutes
+import com.crispy.tv.ui.navigation.FloatingBarBottomMargin
+import com.crispy.tv.ui.navigation.FloatingBarHeight
 import com.crispy.tv.ui.navigation.FloatingBottomBar
 import com.crispy.tv.ui.navigation.TopLevelDestination
 
@@ -66,6 +71,10 @@ private fun MainAppShell(onSignedOut: () -> Unit) {
     val topLevelRoutes = remember(destinations) { destinations.map { it.route }.toSet() }
     val showBar = currentRoute == null || topLevelRoutes.contains(currentRoute)
 
+    val bottomBarOverlayPadding = remember(showBar) {
+        if (showBar) FloatingBarHeight + FloatingBarBottomMargin else 0.dp
+    }
+
     val onDestinationClick: (TopLevelDestination, Boolean) -> Unit = remember(navController) {
         { destination: TopLevelDestination, isSelected: Boolean ->
             if (isSelected) {
@@ -93,29 +102,31 @@ private fun MainAppShell(onSignedOut: () -> Unit) {
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .consumeWindowInsets(paddingValues),
-        ) {
-            AppNavHost(
-                navController = navController,
-                modifier = Modifier.fillMaxSize(),
-                onSignedOut = onSignedOut,
-            )
-            if (showBar) {
-                FloatingBottomBar(
-                    destinations = destinations,
-                    currentRoute = currentRoute,
-                    onDestinationClick = onDestinationClick,
-                    onSearchClick = onSearchClick,
-                    modifier = Modifier.align(Alignment.BottomCenter),
+    CompositionLocalProvider(LocalBottomBarOverlayPadding provides bottomBarOverlayPadding) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .consumeWindowInsets(paddingValues),
+            ) {
+                AppNavHost(
+                    navController = navController,
+                    modifier = Modifier.fillMaxSize(),
+                    onSignedOut = onSignedOut,
                 )
+                if (showBar) {
+                    FloatingBottomBar(
+                        destinations = destinations,
+                        currentRoute = currentRoute,
+                        onDestinationClick = onDestinationClick,
+                        onSearchClick = onSearchClick,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
             }
         }
     }

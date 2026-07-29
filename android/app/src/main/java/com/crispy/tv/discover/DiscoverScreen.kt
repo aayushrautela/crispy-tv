@@ -81,6 +81,7 @@ import com.crispy.tv.ui.components.ProfileIconButton
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.components.topLevelAppBarColors
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -352,7 +353,7 @@ private fun DiscoverScreen(
                 start = pageHorizontalPadding,
                 top = Dimensions.SmallSpacing,
                 end = pageHorizontalPadding,
-                bottom = Dimensions.PageBottomPadding,
+                bottom = safeBottomPadding(),
             ),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -488,7 +489,6 @@ private fun DiscoverScreen(
                             rating = item.rating,
                             year = item.year,
                             genre = item.genre,
-                            gradientColorHex = null,
                             onClick = { onItemClick(item) }
                         )
                     }
@@ -533,7 +533,7 @@ private fun DiscoverScreen(
                 DiscoverSheet.Type -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding)
+                        contentPadding = PaddingValues(bottom = safeBottomPadding())
                     ) {
                             item {
                                 Text(
@@ -569,10 +569,10 @@ private fun DiscoverScreen(
                     }
 
                     DiscoverSheet.Catalog -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(bottom = Dimensions.PageBottomPadding)
-                        ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(bottom = safeBottomPadding())
+                    ) {
                             item {
                                 Text(
                                     text = "Catalog",

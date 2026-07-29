@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
@@ -179,7 +180,7 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .consumeWindowInsets(paddingValues)
                 .verticalScroll(scrollState)
-                .padding(bottom = Dimensions.ListItemPadding),
+                .padding(bottom = safeBottomPadding(Dimensions.ListItemPadding)),
             verticalArrangement = Arrangement.spacedBy(Dimensions.SectionSpacing)
         ) {
             Text(

@@ -65,6 +65,7 @@ import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.CrispyShelfSection
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Locale
@@ -314,7 +315,10 @@ private fun SearchResultsContent(
     LazyColumn(
         modifier = modifier,
         state = listState,
-        contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
+        contentPadding = PaddingValues(
+            horizontal = pageHorizontalPadding,
+            bottom = safeBottomPadding(),
+        ),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         when {
@@ -386,7 +390,6 @@ private fun SearchSectionRow(
                 rating = item.rating,
                 year = item.year,
                 genre = item.genre,
-                gradientColorHex = null,
                 modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                 onClick = { onItemClick(item) },
             )
@@ -542,7 +545,7 @@ private fun SearchGrid(
             start = pageHorizontalPadding,
             top = Dimensions.SmallSpacing,
             end = pageHorizontalPadding,
-            bottom = Dimensions.PageBottomPadding,
+            bottom = safeBottomPadding(),
         ),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

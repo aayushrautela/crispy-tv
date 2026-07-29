@@ -5,42 +5,31 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.runtime.remember
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.paging.LoadState
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import androidx.paging.compose.LazyPagingItems
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.BackendContextResolverProvider
@@ -53,7 +42,6 @@ import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.theme.Dimensions
-import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -383,92 +371,140 @@ private sealed interface WatchlistDisplayRow {
 
 // endregion
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun LibraryRouteContent(
-    uiState: LibraryUiState,
-    pagingItems: LazyPagingItems<LibrarySectionItemUi>,
-    onRefresh: () -> Unit,
+private fun LazyListScope.historyItems(
+    loadedItems: List<LibrarySectionItemUi>,
+    pageHorizontalPadding: Dp,
     onItemClick: (LibrarySectionItemUi) -> Unit,
-    onSelectSection: (String) -> Unit,
-    scrollToTopRequests: StateFlow<Int>,
-    onScrollToTopConsumed: () -> Unit,
 ) {
-    val sections = uiState.sections
-    val selectedSectionId = uiState.selectedSectionId
-    val selectedSection = sections.firstOrNull { it.id == selectedSectionId }
-    val pullToRefreshState = rememberPullToRefreshState()
-    val pageHorizontalPadding = responsivePageHorizontalPadding()
-    val listState = rememberLazyListState()
-    val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
-    val refreshState = pagingItems.loadState.refresh
-    val appendState = pagingItems.loadState.append
-    val isRefreshing = refreshState is LoadState.Loading && pagingItems.itemCount > 0
-    val isHistory = selectedSectionId == LIBRARY_SECTION_HISTORY
-    val isRatings = selectedSectionId == LIBRARY_SECTION_RATINGS
-
-    LaunchedEffect(scrollToTopRequest) {
-        if (scrollToTopRequest > 0) {
-            listState.animateScrollToItem(0)
-            onScrollToTopConsumed()
+    val monthSections = buildHistoryMonthSections(loadedItems)
+    val displayRows = monthSections.flatMap { section ->
+        listOf(
+            HistoryDisplayRow.Header(section.monthKey, section.label),
+            HistoryDisplayRow.Post(section.monthKey, section.items),
+        )
+    }
+    items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
+        when (row) {
+            is HistoryDisplayRow.Header -> {
+                Text(
+                    text = row.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = pageHorizontalPadding, vertical = 8.dp),
+                )
+            }
+            is HistoryDisplayRow.Post -> {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
+                ) {
+                    items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
+                        LandscapeCard(
+                            title = item.title,
+                            backdropUrl = item.backdropUrl,
+                            posterUrl = item.posterUrl,
+                            logoUrl = item.logoUrl,
+                            rating = item.rating?.toString(),
+                            year = item.year?.toString(),
+                            maturityRating = item.maturityRating,
+                            genre = item.genre,
+                            modifier = Modifier.width(CardStyle.landscapeCardWidth()),
+                            onClick = { onItemClick(item) },
+                        )
+                    }
+                }
+            }
         }
     }
+}
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize(),
-        state = pullToRefreshState,
-        indicator = {
-            Indicator(
-                state = pullToRefreshState,
-                isRefreshing = isRefreshing,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
-        },
-    ) {
-        if (isHistory) {
-            HistoryLibraryContent(
-                pagingItems = pagingItems,
-                selectedSection = selectedSection,
-                sections = sections,
-                selectedSectionId = selectedSectionId,
-                refreshState = refreshState,
-                appendState = appendState,
-                pageHorizontalPadding = pageHorizontalPadding,
-                onRefresh = onRefresh,
-                onItemClick = onItemClick,
-                onSelectSection = onSelectSection,
-                listState = listState,
-            )
-        } else if (isRatings) {
-            RatingsLibraryContent(
-                pagingItems = pagingItems,
-                selectedSection = selectedSection,
-                sections = sections,
-                selectedSectionId = selectedSectionId,
-                refreshState = refreshState,
-                appendState = appendState,
-                pageHorizontalPadding = pageHorizontalPadding,
-                onRefresh = onRefresh,
-                onItemClick = onItemClick,
-                onSelectSection = onSelectSection,
-                listState = listState,
-            )
-        } else {
-            WatchlistLibraryContent(
-                pagingItems = pagingItems,
-                selectedSection = selectedSection,
-                sections = sections,
-                selectedSectionId = selectedSectionId,
-                refreshState = refreshState,
-                appendState = appendState,
-                pageHorizontalPadding = pageHorizontalPadding,
-                onRefresh = onRefresh,
-                onItemClick = onItemClick,
-                onSelectSection = onSelectSection,
-                listState = listState,
-            )
+private fun LazyListScope.ratingsItems(
+    loadedItems: List<LibrarySectionItemUi>,
+    pageHorizontalPadding: Dp,
+    onItemClick: (LibrarySectionItemUi) -> Unit,
+) {
+    val bandSections = buildRatingBandSections(loadedItems)
+    val displayRows = bandSections.flatMap { section ->
+        listOf(
+            RatingDisplayRow.Header(section.bandKey, section.label),
+            RatingDisplayRow.Post(section.bandKey, section.items),
+        )
+    }
+    items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
+        when (row) {
+            is RatingDisplayRow.Header -> {
+                Text(
+                    text = row.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = pageHorizontalPadding, vertical = 8.dp),
+                )
+            }
+            is RatingDisplayRow.Post -> {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
+                ) {
+                    items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
+                        LandscapeCard(
+                            title = item.title,
+                            backdropUrl = item.backdropUrl,
+                            posterUrl = item.posterUrl,
+                            logoUrl = item.logoUrl,
+                            rating = item.rating?.toString(),
+                            year = item.year?.toString(),
+                            maturityRating = item.maturityRating,
+                            genre = item.genre,
+                            modifier = Modifier.width(CardStyle.landscapeCardWidth()),
+                            onClick = { onItemClick(item) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun LazyListScope.watchlistItems(
+    loadedItems: List<LibrarySectionItemUi>,
+    pageHorizontalPadding: Dp,
+    onItemClick: (LibrarySectionItemUi) -> Unit,
+) {
+    val dateSections = buildWatchlistDateSections(loadedItems)
+    val displayRows = dateSections.flatMap { section ->
+        listOf(
+            WatchlistDisplayRow.Header(section.groupKey, section.label),
+            WatchlistDisplayRow.Post(section.groupKey, section.items),
+        )
+    }
+    items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
+        when (row) {
+            is WatchlistDisplayRow.Header -> {
+                Text(
+                    text = row.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = pageHorizontalPadding, vertical = 8.dp),
+                )
+            }
+            is WatchlistDisplayRow.Post -> {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
+                ) {
+                    items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
+                        LandscapeCard(
+                            title = item.title,
+                            backdropUrl = item.backdropUrl,
+                            posterUrl = item.posterUrl,
+                            logoUrl = item.logoUrl,
+                            rating = item.rating?.toString(),
+                            year = item.year?.toString(),
+                            maturityRating = item.maturityRating,
+                            genre = item.genre,
+                            modifier = Modifier.width(CardStyle.landscapeCardWidth()),
+                            onClick = { onItemClick(item) },
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -588,341 +624,3 @@ private fun LibraryAppendState(
 
 // endregion
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun HistoryLibraryContent(
-    pagingItems: LazyPagingItems<LibrarySectionItemUi>,
-    selectedSection: LibrarySectionUi?,
-    sections: List<LibrarySectionUi>,
-    selectedSectionId: String,
-    refreshState: LoadState,
-    appendState: LoadState,
-    pageHorizontalPadding: Dp,
-    onRefresh: () -> Unit,
-    onItemClick: (LibrarySectionItemUi) -> Unit,
-    onSelectSection: (String) -> Unit,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-) {
-    val loadedItems = remember(pagingItems.itemCount) { (0 until pagingItems.itemCount).mapNotNull { index -> pagingItems[index] } }
-    val monthSections = buildHistoryMonthSections(loadedItems)
-    val displayRows = remember(monthSections) {
-        monthSections.flatMap { section ->
-            listOf(
-                HistoryDisplayRow.Header(section.monthKey, section.label),
-                HistoryDisplayRow.Post(section.monthKey, section.items),
-            )
-        }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 12.dp + Dimensions.PageBottomPadding),
-    ) {
-        item(key = "filters") {
-            Box(modifier = Modifier.padding(horizontal = pageHorizontalPadding)) {
-                LibraryFiltersRow(
-                    sections = sections,
-                    selectedSectionId = selectedSectionId,
-                    onSelectSection = onSelectSection,
-                )
-            }
-        }
-
-        item(key = "status") {
-            LibraryStatusMessage(
-                refreshState = refreshState,
-                appendState = appendState,
-                hasItems = pagingItems.itemCount > 0,
-                selectedSectionLabel = selectedSection?.label,
-                modifier = Modifier.padding(horizontal = pageHorizontalPadding),
-            )
-        }
-
-        if (refreshState is LoadState.Loading && pagingItems.itemCount == 0) {
-            item(key = "history-loading") {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LoadingIndicator()
-                }
-            }
-        } else if (pagingItems.itemCount == 0) {
-            item(key = "section-empty") {
-                LibraryEmptyState(
-                    refreshState = refreshState,
-                    selectedSectionLabel = selectedSection?.label,
-                    onRefresh = onRefresh,
-                )
-            }
-        } else {
-            items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
-                when (row) {
-                    is HistoryDisplayRow.Header -> {
-                        Text(
-                            text = row.label,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(horizontal = pageHorizontalPadding, vertical = 8.dp),
-                        )
-                    }
-                    is HistoryDisplayRow.Post -> {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
-                        ) {
-                            items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
-                                LandscapeCard(
-                                    title = item.title,
-                                    backdropUrl = item.backdropUrl,
-                                    posterUrl = item.posterUrl,
-                                    logoUrl = item.logoUrl,
-                                    rating = item.rating?.toString(),
-                                    year = item.year?.toString(),
-                                    maturityRating = item.maturityRating,
-                                    genre = item.genre,
-                                    gradientColorHex = null,
-                                    modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-                                    onClick = { onItemClick(item) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "load-more") {
-                LibraryAppendState(
-                    appendState = appendState,
-                    onRetry = { pagingItems.retry() },
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun RatingsLibraryContent(
-    pagingItems: LazyPagingItems<LibrarySectionItemUi>,
-    selectedSection: LibrarySectionUi?,
-    sections: List<LibrarySectionUi>,
-    selectedSectionId: String,
-    refreshState: LoadState,
-    appendState: LoadState,
-    pageHorizontalPadding: Dp,
-    onRefresh: () -> Unit,
-    onItemClick: (LibrarySectionItemUi) -> Unit,
-    onSelectSection: (String) -> Unit,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-) {
-    val loadedItems = remember(pagingItems.itemCount) { (0 until pagingItems.itemCount).mapNotNull { index -> pagingItems[index] } }
-    val bandSections = buildRatingBandSections(loadedItems)
-    val displayRows = remember(bandSections) {
-        bandSections.flatMap { section ->
-            listOf(
-                RatingDisplayRow.Header(section.bandKey, section.label),
-                RatingDisplayRow.Post(section.bandKey, section.items),
-            )
-        }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 12.dp + Dimensions.PageBottomPadding),
-    ) {
-        item(key = "filters") {
-            Box(modifier = Modifier.padding(horizontal = pageHorizontalPadding)) {
-                LibraryFiltersRow(
-                    sections = sections,
-                    selectedSectionId = selectedSectionId,
-                    onSelectSection = onSelectSection,
-                )
-            }
-        }
-
-        item(key = "status") {
-            LibraryStatusMessage(
-                refreshState = refreshState,
-                appendState = appendState,
-                hasItems = pagingItems.itemCount > 0,
-                selectedSectionLabel = selectedSection?.label,
-                modifier = Modifier.padding(horizontal = pageHorizontalPadding),
-            )
-        }
-
-        if (refreshState is LoadState.Loading && pagingItems.itemCount == 0) {
-            item(key = "ratings-loading") {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LoadingIndicator()
-                }
-            }
-        } else if (pagingItems.itemCount == 0) {
-            item(key = "section-empty") {
-                LibraryEmptyState(
-                    refreshState = refreshState,
-                    selectedSectionLabel = selectedSection?.label,
-                    onRefresh = onRefresh,
-                )
-            }
-        } else {
-            items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
-                when (row) {
-                    is RatingDisplayRow.Header -> {
-                        Text(
-                            text = row.label,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(horizontal = pageHorizontalPadding, vertical = 8.dp),
-                        )
-                    }
-                    is RatingDisplayRow.Post -> {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
-                        ) {
-                            items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
-                                LandscapeCard(
-                                    title = item.title,
-                                    backdropUrl = item.backdropUrl,
-                                    posterUrl = item.posterUrl,
-                                    logoUrl = item.logoUrl,
-                                    rating = item.rating?.toString(),
-                                    year = item.year?.toString(),
-                                    maturityRating = item.maturityRating,
-                                    genre = item.genre,
-                                    gradientColorHex = null,
-                                    modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-                                    onClick = { onItemClick(item) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "load-more") {
-                LibraryAppendState(
-                    appendState = appendState,
-                    onRetry = { pagingItems.retry() },
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun WatchlistLibraryContent(
-    pagingItems: LazyPagingItems<LibrarySectionItemUi>,
-    selectedSection: LibrarySectionUi?,
-    sections: List<LibrarySectionUi>,
-    selectedSectionId: String,
-    refreshState: LoadState,
-    appendState: LoadState,
-    pageHorizontalPadding: Dp,
-    onRefresh: () -> Unit,
-    onItemClick: (LibrarySectionItemUi) -> Unit,
-    onSelectSection: (String) -> Unit,
-    listState: androidx.compose.foundation.lazy.LazyListState,
-) {
-    val loadedItems = remember(pagingItems.itemCount) { (0 until pagingItems.itemCount).mapNotNull { index -> pagingItems[index] } }
-    val dateSections = buildWatchlistDateSections(loadedItems)
-    val displayRows = remember(dateSections) {
-        dateSections.flatMap { section ->
-            listOf(
-                WatchlistDisplayRow.Header(section.groupKey, section.label),
-                WatchlistDisplayRow.Post(section.groupKey, section.items),
-            )
-        }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 12.dp + Dimensions.PageBottomPadding),
-    ) {
-        item(key = "filters") {
-            Box(modifier = Modifier.padding(horizontal = pageHorizontalPadding)) {
-                LibraryFiltersRow(
-                    sections = sections,
-                    selectedSectionId = selectedSectionId,
-                    onSelectSection = onSelectSection,
-                )
-            }
-        }
-
-        item(key = "status") {
-            LibraryStatusMessage(
-                refreshState = refreshState,
-                appendState = appendState,
-                hasItems = pagingItems.itemCount > 0,
-                selectedSectionLabel = selectedSection?.label,
-                modifier = Modifier.padding(horizontal = pageHorizontalPadding),
-            )
-        }
-
-        if (refreshState is LoadState.Loading && pagingItems.itemCount == 0) {
-            item(key = "watchlist-loading") {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LoadingIndicator()
-                }
-            }
-        } else if (pagingItems.itemCount == 0) {
-            item(key = "section-empty") {
-                LibraryEmptyState(
-                    refreshState = refreshState,
-                    selectedSectionLabel = selectedSection?.label,
-                    onRefresh = onRefresh,
-                )
-            }
-        } else {
-            items(displayRows, key = { it.stableKey }, contentType = { it.contentType }) { row ->
-                when (row) {
-                    is WatchlistDisplayRow.Header -> {
-                        Text(
-                            text = row.label,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(horizontal = pageHorizontalPadding, vertical = 8.dp),
-                        )
-                    }
-                    is WatchlistDisplayRow.Post -> {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
-                        ) {
-                            items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
-                                LandscapeCard(
-                                    title = item.title,
-                                    backdropUrl = item.backdropUrl,
-                                    posterUrl = item.posterUrl,
-                                    logoUrl = item.logoUrl,
-                                    rating = item.rating?.toString(),
-                                    year = item.year?.toString(),
-                                    maturityRating = item.maturityRating,
-                                    genre = item.genre,
-                                    gradientColorHex = null,
-                                    modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-                                    onClick = { onItemClick(item) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "load-more") {
-                LibraryAppendState(
-                    appendState = appendState,
-                    onRetry = { pagingItems.retry() },
-                )
-            }
-        }
-    }
-}

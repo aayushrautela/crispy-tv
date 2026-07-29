@@ -2,7 +2,6 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,8 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -41,6 +38,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
@@ -48,10 +46,12 @@ import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.ratings.normalizeRatingText
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 
 @Composable
 internal fun HomeCollectionSectionRow(
     sectionUis: List<HomeCatalogSectionUi>,
+    horizontalPadding: Dp,
     onCollectionClick: (CatalogSectionRef) -> Unit,
     onCollectionPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
@@ -81,11 +81,12 @@ internal fun HomeCollectionSectionRow(
         HomeRailHeader(
             title = "Collections",
             statusMessage = sharedSubtitle,
+            modifier = Modifier.padding(horizontal = horizontalPadding),
         )
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+            contentPadding = crispyRowHuggingPadding(horizontalPadding),
         ) {
             items(visibleSections, key = { it.section.key }, contentType = { "collectionCard" }) { sectionUi ->
                 HomeCollectionCard(
@@ -116,16 +117,16 @@ private fun HomeCollectionCard(
     )
     val collectionTitle = remember(sectionUi.section.displayTitle) { collectionDisplayTitle(sectionUi.section.displayTitle) }
 
-    Card(
+    Surface(
+        onClick = onCollectionClick,
         modifier = Modifier
             .width(320.dp),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onCollectionClick)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
