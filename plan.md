@@ -328,6 +328,8 @@ But this means SearchRoute keeps a `Scaffold` for the top bar, and only the inne
 
 **Better decision:** SearchScreen is the most complex case. The `CrispyScreen` wrapper doesn't fit cleanly because the screen branches between list and grid. **Keep SearchScreen as-is** — it already uses `safeBottomPadding()` correctly. The `Scaffold` + `Box.padding/consumeWindowInsets` boilerplate is the cost of the branching. Touching this screen risks breaking search.
 
+**Re-evaluation (post-migration):** Confirmed permanently skipped. CrispyScreen wraps a single Scaffold+LazyColumn; nesting it for one of three branches would create stacked Scaffolds. The search bar Row is rendered inside the same Column as the branch content, so even extracting just the LazyColumn to CrispyScreen would require restructuring the search bar (moving it into CrispyScreen's topBar slot, which would require a custom topBar that renders only in the results branch). The branching cost makes any CrispyScreen migration net-additive, not reductive. Touching this screen risks breaking search.
+
 **Net change: 0 lines.** Mark as "already uses safeBottomPadding, does not benefit from CrispyScreen."
 
 ### Step 5: Settings screens (Category C) — SKIP (already clean)
