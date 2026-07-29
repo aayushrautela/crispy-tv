@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,37 +13,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 
 import com.crispy.tv.backend.CrispyBackendClient
@@ -54,12 +42,10 @@ import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
-import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-internal fun DetailsBody(
+internal fun LazyListScope.detailsBodyContent(
     uiState: DetailsUiState,
+    horizontalPadding: Dp,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
@@ -67,167 +53,52 @@ internal fun DetailsBody(
     onEpisodeClick: (videoId: String) -> Unit = {},
     onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
     onMakingOfVideoClick: (CrispyBackendClient.MetadataVideoView) -> Unit = {},
+    onReviewClick: (CrispyBackendClient.MetadataReviewView) -> Unit = {},
+    onEpisodeLongPress: (MediaVideo) -> Unit = {},
 ) {
     val details = uiState.details
     val titleDetail = uiState.titleDetail
     val titleRatings = uiState.titleRatings?.ratings
-    val horizontalPadding = responsivePageHorizontalPadding()
     val contentPadding = PaddingValues(horizontal = horizontalPadding)
 
-    var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
-    var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
-    val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val episodeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    if (expandedReview != null) {
-        val review = expandedReview!!
-        ModalBottomSheet(
-            onDismissRequest = { expandedReview = null },
-            sheetState = reviewSheetState
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = horizontalPadding)
-                    .padding(top = 6.dp, bottom = 18.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            review.author?.takeIf { it.isNotBlank() } ?: review.username?.takeIf { it.isNotBlank() } ?: "Review",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-
-                        review.rating?.let {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    tint = Color(0xFFFFD54F)
-                                )
-                                Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
-                    }
-                    ReviewProviderBadge(provider = review.provider)
-                }
-
-                Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
-
-                TextButton(
-                    onClick = { expandedReview = null },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Close")
-                }
-            }
-        }
-    }
-
-    if (selectedEpisodeAction != null) {
-        val selectedEpisode = selectedEpisodeAction!!
-        val watchState = uiState.episodeWatchStates[selectedEpisode.id] ?: EpisodeWatchState()
-        val toggleLabel = if (watchState.isWatched) "Mark as unwatched" else "Mark as watched"
-
-        ModalBottomSheet(
-            onDismissRequest = { selectedEpisodeAction = null },
-            sheetState = episodeSheetState,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = horizontalPadding)
-                    .padding(top = 6.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(selectedEpisode.title, style = MaterialTheme.typography.titleMedium)
-                formatLongDate(selectedEpisode.released)?.let { released ->
-                    Text(
-                        text = released,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Button(
-                    onClick = {
-                        selectedEpisodeAction = null
-                        onEpisodeClick(selectedEpisode.id)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Open episode")
-                }
-
-                TextButton(
-                    onClick = {
-                        selectedEpisodeAction = null
-                        onToggleEpisodeWatched(selectedEpisode)
-                    },
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(toggleLabel)
-                }
-            }
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = Dimensions.PageBottomPadding)
-    ) {
+    item(key = "body-top-spacer") {
         Spacer(modifier = Modifier.height(18.dp))
+    }
 
-        if (details == null) {
-            if (uiState.isLoading) {
+    if (details == null) {
+        if (uiState.isLoading) {
+            item(key = "body-loading") {
                 Row(
                     modifier = Modifier.padding(horizontal = horizontalPadding),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Box(
-                        modifier =
-                            Modifier
-                                .size(18.dp)
-                                .skeletonElement(shape = CircleShape, color = DetailsSkeletonColors.Elevated)
+                        modifier = Modifier
+                            .size(18.dp)
+                            .skeletonElement(shape = CircleShape, color = DetailsSkeletonColors.Elevated),
                     )
                     Box(
-                        modifier =
-                            Modifier
-                                .width(170.dp)
-                                .height(12.dp)
-                                .skeletonElement(color = DetailsSkeletonColors.Base)
+                        modifier = Modifier
+                            .width(170.dp)
+                            .height(12.dp)
+                            .skeletonElement(color = DetailsSkeletonColors.Base),
                     )
-                }
-            } else {
-                Text(
-                    text = uiState.statusMessage.ifBlank { "Unable to load details." },
-                    modifier = Modifier.padding(horizontal = horizontalPadding)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.padding(horizontal = horizontalPadding)
-                ) {
-                    Text("Retry")
                 }
             }
-            return
+        } else {
+            item(key = "body-error") {
+                Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                    Text(text = uiState.statusMessage.ifBlank { "Unable to load details." })
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = onRetry) { Text("Retry") }
+                }
+            }
         }
+        return
+    }
 
+    item(key = "ratings") {
         RatingsSection(
             tmdbRating = details.rating,
             titleRatings = titleRatings,
@@ -235,67 +106,75 @@ internal fun DetailsBody(
             horizontalPadding = horizontalPadding,
             contentPadding = contentPadding,
         )
+    }
 
-        if (details.directors.isNotEmpty() || details.creators.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(14.dp))
-            if (details.directors.isNotEmpty()) {
-                Text(
-                    text = "Director: ${details.directors.joinToString()}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = horizontalPadding)
-                )
-            }
-            if (details.creators.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Creator: ${details.creators.joinToString()}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = horizontalPadding)
-                )
-            }
-        }
-
-        val cast = titleDetail?.cast.orEmpty()
-        if (cast.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "Cast & Crew",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            LazyRow(
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(items = cast, key = { it.personId }, contentType = { "cast" }) { member ->
-                    MetadataCastCard(
-                        member = member,
-                        onClick = { onPersonClick(member.personId) }
+    if (details.directors.isNotEmpty() || details.creators.isNotEmpty()) {
+        item(key = "directors-creators") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(14.dp))
+                if (details.directors.isNotEmpty()) {
+                    Text(
+                        text = "Director: ${details.directors.joinToString()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                if (details.creators.isNotEmpty()) {
+                    if (details.directors.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                    Text(
+                        text = "Creator: ${details.creators.joinToString()}",
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
         }
+    }
 
-        val reviews = uiState.titleExtras?.reviews.orEmpty()
-        if (reviews.isNotEmpty() || uiState.extrasIsLoading) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "Reviews",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+    val cast = titleDetail?.cast.orEmpty()
+    if (cast.isNotEmpty()) {
+        item(key = "cast-header") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(text = "Cast & Crew", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
+        item(key = "cast-row") {
             LazyRow(
                 contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                items(items = cast, key = { it.personId }, contentType = { "cast" }) { member ->
+                    MetadataCastCard(
+                        member = member,
+                        onClick = { onPersonClick(member.personId) },
+                    )
+                }
+            }
+        }
+    }
+
+    val reviews = uiState.titleExtras?.reviews.orEmpty()
+    if (reviews.isNotEmpty() || uiState.extrasIsLoading) {
+        item(key = "reviews-header") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(text = "Reviews", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
+        item(key = "reviews-row") {
+            LazyRow(
+                contentPadding = contentPadding,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (reviews.isNotEmpty()) {
                     items(items = reviews, key = { it.id }, contentType = { "review" }) { review ->
                         MetadataReviewCard(
                             review = review,
                             modifier = Modifier.width(Dimensions.WideCardWidth),
-                            onClick = { expandedReview = review }
+                            onClick = { onReviewClick(review) },
                         )
                     }
                 } else {
@@ -305,74 +184,79 @@ internal fun DetailsBody(
                 }
             }
         }
+    }
 
-        val production = remember(titleDetail?.production) {
-            (titleDetail?.production?.companies.orEmpty() + titleDetail?.production?.networks.orEmpty())
-                .distinctBy { it.id }
+    val production = remember(titleDetail?.production) {
+        (titleDetail?.production?.companies.orEmpty() + titleDetail?.production?.networks.orEmpty())
+            .distinctBy { it.id }
+    }
+    if (production.isNotEmpty()) {
+        item(key = "production-header") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(text = "Production", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(10.dp))
+            }
         }
-        if (production.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "Production",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+        item(key = "production-row") {
             LazyRow(
                 contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(items = production, key = { it.id }, contentType = { "production" }) { entity ->
                     MetadataProductionCard(entity = entity)
                 }
             }
         }
+    }
 
-        if (details.itemType != "movie" && (uiState.seasons.isNotEmpty() || uiState.episodesIsLoading)) {
-            Spacer(modifier = Modifier.height(22.dp))
-            Text(
-                text = "Episodes",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
+    if (details.itemType != "movie" && (uiState.seasons.isNotEmpty() || uiState.episodesIsLoading)) {
+        item(key = "episodes-header") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(22.dp))
+                Text(text = "Episodes", style = MaterialTheme.typography.titleMedium)
+            }
+        }
 
-            if (uiState.episodesIsLoading && uiState.seasonEpisodes.isEmpty()) {
+        if (uiState.episodesIsLoading && uiState.seasonEpisodes.isEmpty()) {
+            item(key = "episodes-loading-row") {
                 Spacer(modifier = Modifier.height(10.dp))
                 LazyRow(
                     contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(4, contentType = { "episodeSkeleton" }) {
                         EpisodeCardSkeleton(modifier = Modifier.width(Dimensions.WideCardWidth))
                     }
                 }
-            } else if (uiState.seasons.isNotEmpty()) {
-                val seasons = uiState.seasons
-                val selectedSeason = uiState.selectedSeasonOrFirst
-                if (seasons.isNotEmpty() && selectedSeason != null) {
+            }
+        } else if (uiState.seasons.isNotEmpty()) {
+            val seasons = uiState.seasons
+            val selectedSeason = uiState.selectedSeasonOrFirst
+            if (seasons.isNotEmpty() && selectedSeason != null) {
+                item(key = "seasons-chips-row") {
                     Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(
-                    contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(seasons, key = { it }, contentType = { "seasonChip" }) { season ->
-                        FilterChip(
-                            selected = season == selectedSeason,
-                            onClick = { onSeasonSelected(season) },
-                            label = { Text("Season $season") },
-                            shape = RoundedCornerShape(16.dp),
-                            border = null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                labelColor = MaterialTheme.colorScheme.onSurface,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                        )
+                    LazyRow(
+                        contentPadding = contentPadding,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(seasons, key = { it }, contentType = { "seasonChip" }) { season ->
+                            FilterChip(
+                                selected = season == selectedSeason,
+                                onClick = { onSeasonSelected(season) },
+                                label = { Text("Season $season") },
+                                shape = RoundedCornerShape(16.dp),
+                                border = null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                    labelColor = MaterialTheme.colorScheme.onSurface,
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                            )
+                        }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 val episodes = remember(uiState.seasonEpisodes) {
                     uiState.seasonEpisodes
@@ -382,47 +266,57 @@ internal fun DetailsBody(
 
                 when {
                     uiState.episodesIsLoading && episodes.isEmpty() -> {
-                        LazyRow(
-                            contentPadding = contentPadding,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(4, contentType = { "episodeSkeleton" }) {
-                                EpisodeCardSkeleton(modifier = Modifier.width(Dimensions.WideCardWidth))
+                        item(key = "episodes-skeleton-row") {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            LazyRow(
+                                contentPadding = contentPadding,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(4, contentType = { "episodeSkeleton" }) {
+                                    EpisodeCardSkeleton(modifier = Modifier.width(Dimensions.WideCardWidth))
+                                }
                             }
                         }
                     }
 
                     uiState.episodesStatusMessage.isNotBlank() && episodes.isEmpty() -> {
-                        Text(
-                            text = uiState.episodesStatusMessage,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = horizontalPadding)
-                        )
+                        item(key = "episodes-status") {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = uiState.episodesStatusMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = horizontalPadding),
+                            )
+                        }
                     }
 
                     episodes.isNotEmpty() -> {
-                        LazyRow(
-                            contentPadding = contentPadding,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(items = episodes, key = { it.id }, contentType = { "episode" }) { video ->
-                                EpisodeCard(
-                                    video = video,
-                                    watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
-                                    isHighlighted = video.id == uiState.highlightedEpisodeId,
-                                    modifier = Modifier.width(Dimensions.WideCardWidth),
-                                    onClick = { onEpisodeClick(video.id) },
-                                    onLongPress = { selectedEpisodeAction = video },
-                                )
+                        item(key = "episodes-row") {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            LazyRow(
+                                contentPadding = contentPadding,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(items = episodes, key = { it.id }, contentType = { "episode" }) { video ->
+                                    EpisodeCard(
+                                        video = video,
+                                        watchState = uiState.episodeWatchStates[video.id] ?: EpisodeWatchState(),
+                                        isHighlighted = video.id == uiState.highlightedEpisodeId,
+                                        modifier = Modifier.width(Dimensions.WideCardWidth),
+                                        onClick = { onEpisodeClick(video.id) },
+                                        onLongPress = { onEpisodeLongPress(video) },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-            }
         }
+    }
 
+    item(key = "making-of") {
         MakingOfVideosSection(
             videos = uiState.titleDetail?.videos.orEmpty(),
             baseTitle = details.title.substringBefore(':').trim().ifBlank { details.title },
@@ -430,23 +324,28 @@ internal fun DetailsBody(
             contentPadding = contentPadding,
             onVideoClick = onMakingOfVideoClick,
         )
+    }
 
-        val collection = uiState.titleExtras?.collection
-        collection?.let { col ->
-            val collectionParts = remember(col) { col.parts.mapNotNull { it.toCatalogItem() } }
-            if (collectionParts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(18.dp))
-                Text(
-                    text = col.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = horizontalPadding),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+    val collection = uiState.titleExtras?.collection
+    collection?.let { col ->
+        val collectionParts = remember(col) { col.parts.mapNotNull { it.toCatalogItem() } }
+        if (collectionParts.isNotEmpty()) {
+            item(key = "collection-header") {
+                Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Text(
+                        text = col.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+            item(key = "collection-row") {
                 LazyRow(
                     contentPadding = contentPadding,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(items = collectionParts, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
                         HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
@@ -454,45 +353,48 @@ internal fun DetailsBody(
                 }
             }
         }
+    }
 
-        val similar = remember(uiState.titleExtras?.similar) {
-            (uiState.titleExtras?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
+    val similar = remember(uiState.titleExtras?.similar) {
+        (uiState.titleExtras?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
+    }
+    if (similar.isNotEmpty()) {
+        item(key = "similar-header") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(text = "More like this", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(10.dp))
+            }
         }
-        if (similar.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "More like this",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+        item(key = "similar-row") {
             LazyRow(
                 contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(items = similar, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
                     HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
                 }
             }
         }
+    }
 
-        val detailRows = remember(details, titleDetail, uiState.titleExtras) { buildDetailsRows(details = details, titleDetail = titleDetail, titleExtras = uiState.titleExtras) }
-        if (detailRows.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(22.dp))
-
-            val header = when (details.itemType) {
-                "show" -> "Show Details"
-                "anime" -> "Anime Details"
-                else -> "Movie Details"
+    val detailRows = remember(details, titleDetail, uiState.titleExtras) {
+        buildDetailsRows(details = details, titleDetail = titleDetail, titleExtras = uiState.titleExtras)
+    }
+    if (detailRows.isNotEmpty()) {
+        item(key = "detail-rows-header") {
+            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+                Spacer(modifier = Modifier.height(22.dp))
+                val header = when (details.itemType) {
+                    "show" -> "Show Details"
+                    "anime" -> "Anime Details"
+                    else -> "Movie Details"
+                }
+                Text(text = header, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(12.dp))
             }
-            Text(
-                text = header,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = horizontalPadding)
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
+        }
+        item(key = "detail-rows") {
             Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
                 detailRows.forEach { (label, value) ->
                     Row(
@@ -500,13 +402,13 @@ internal fun DetailsBody(
                             .fillMaxWidth()
                             .padding(vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
+                        verticalAlignment = Alignment.Top,
                     ) {
                         Text(
                             text = label,
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.widthIn(min = 100.dp)
+                            modifier = Modifier.widthIn(min = 100.dp),
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
@@ -514,7 +416,7 @@ internal fun DetailsBody(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -556,5 +458,3 @@ private fun DetailsReviewPlaceholder(modifier: Modifier = Modifier) {
         }
     }
 }
-
-

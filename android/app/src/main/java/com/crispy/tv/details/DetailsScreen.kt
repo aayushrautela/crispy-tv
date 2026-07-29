@@ -7,24 +7,36 @@ package com.crispy.tv.details
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +63,8 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
 
 private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
@@ -238,6 +252,11 @@ internal fun DetailsScreen(
     }
 
     var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
+    var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
+    var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
+    val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val episodeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val bodyHorizontalPadding = responsivePageHorizontalPadding()
 
     MaterialTheme(colorScheme = detailsScheme) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -247,6 +266,7 @@ internal fun DetailsScreen(
                     .background(MaterialTheme.colorScheme.background)
                     .navigationBarsPadding(),
                 state = listState,
+                contentPadding = PaddingValues(bottom = safeBottomPadding()),
             ) {
                 item(key = "hero") {
                     HeroSection(
@@ -300,18 +320,19 @@ internal fun DetailsScreen(
                     )
                 }
 
-                item(key = "body") {
-                    DetailsBody(
-                        uiState = visibleUiState,
-                        onRetry = onRetry,
-                        onSeasonSelected = onSeasonSelected,
-                        onItemClick = onItemClick,
-                        onPersonClick = onPersonClick,
-                        onEpisodeClick = onEpisodeClick,
-                        onToggleEpisodeWatched = onToggleEpisodeWatched,
-                        onMakingOfVideoClick = { selectedMakingOfVideo = it },
-                    )
-                }
+                detailsBodyContent(
+                    uiState = visibleUiState,
+                    horizontalPadding = bodyHorizontalPadding,
+                    onRetry = onRetry,
+                    onSeasonSelected = onSeasonSelected,
+                    onItemClick = onItemClick,
+                    onPersonClick = onPersonClick,
+                    onEpisodeClick = onEpisodeClick,
+                    onToggleEpisodeWatched = onToggleEpisodeWatched,
+                    onMakingOfVideoClick = { selectedMakingOfVideo = it },
+                    onReviewClick = { expandedReview = it },
+                    onEpisodeLongPress = { selectedEpisodeAction = it },
+                )
             }
 
             TopAppBar(
@@ -374,6 +395,105 @@ internal fun DetailsScreen(
                 onRetryProvider = onRetryProvider,
                 onStreamSelected = onStreamSelected,
             )
+
+            if (expandedReview != null) {
+                val review = expandedReview!!
+                ModalBottomSheet(
+                    onDismissRequest = { expandedReview = null },
+                    sheetState = reviewSheetState,
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 6.dp, bottom = 18.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    review.author?.takeIf { it.isNotBlank() }
+                                        ?: review.username?.takeIf { it.isNotBlank() }
+                                        ?: "Review",
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                review.rating?.let {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Star,
+                                            contentDescription = null,
+                                            tint = Color(0xFFFFD54F),
+                                        )
+                                        Text("${it.toInt()}/10", style = MaterialTheme.typography.labelLarge)
+                                    }
+                                }
+                            }
+                            ReviewProviderBadge(provider = review.provider)
+                        }
+
+                        Text(review.content.trim(), style = MaterialTheme.typography.bodyMedium)
+
+                        TextButton(
+                            onClick = { expandedReview = null },
+                            modifier = Modifier.align(Alignment.End),
+                        ) {
+                            Text("Close")
+                        }
+                    }
+                }
+            }
+
+            if (selectedEpisodeAction != null) {
+                val selectedEpisode = selectedEpisodeAction!!
+                val watchState = visibleUiState.episodeWatchStates[selectedEpisode.id] ?: EpisodeWatchState()
+                val toggleLabel = if (watchState.isWatched) "Mark as unwatched" else "Mark as watched"
+                ModalBottomSheet(
+                    onDismissRequest = { selectedEpisodeAction = null },
+                    sheetState = episodeSheetState,
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 6.dp, bottom = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(selectedEpisode.title, style = MaterialTheme.typography.titleMedium)
+                        formatLongDate(selectedEpisode.released)?.let { released ->
+                            Text(
+                                text = released,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                selectedEpisodeAction = null
+                                onEpisodeClick(selectedEpisode.id)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Open episode") }
+                        TextButton(
+                            onClick = {
+                                selectedEpisodeAction = null
+                                onToggleEpisodeWatched(selectedEpisode)
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                        ) { Text(toggleLabel) }
+                    }
+                }
+            }
 
             if (visibleUiState.aiStoryVisible && visibleUiState.aiInsights != null) {
                 val aiOverlayTitle = visibleDetails?.title ?: details?.title
