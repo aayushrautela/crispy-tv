@@ -316,7 +316,8 @@ private fun SearchResultsContent(
         modifier = modifier,
         state = listState,
         contentPadding = PaddingValues(
-            horizontal = pageHorizontalPadding,
+            start = pageHorizontalPadding,
+            end = pageHorizontalPadding,
             bottom = safeBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(24.dp),

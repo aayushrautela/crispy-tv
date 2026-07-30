@@ -371,7 +371,7 @@ private sealed interface WatchlistDisplayRow {
 
 // endregion
 
-private fun LazyListScope.historyItems(
+internal fun LazyListScope.historyItems(
     loadedItems: List<LibrarySectionItemUi>,
     pageHorizontalPadding: Dp,
     onItemClick: (LibrarySectionItemUi) -> Unit,
@@ -417,7 +417,7 @@ private fun LazyListScope.historyItems(
     }
 }
 
-private fun LazyListScope.ratingsItems(
+internal fun LazyListScope.ratingsItems(
     loadedItems: List<LibrarySectionItemUi>,
     pageHorizontalPadding: Dp,
     onItemClick: (LibrarySectionItemUi) -> Unit,
@@ -463,7 +463,7 @@ private fun LazyListScope.ratingsItems(
     }
 }
 
-private fun LazyListScope.watchlistItems(
+internal fun LazyListScope.watchlistItems(
     loadedItems: List<LibrarySectionItemUi>,
     pageHorizontalPadding: Dp,
     onItemClick: (LibrarySectionItemUi) -> Unit,
@@ -512,7 +512,7 @@ private fun LazyListScope.watchlistItems(
 // region Extracted UI components
 
 @Composable
-private fun LibraryFiltersRow(
+internal fun LibraryFiltersRow(
     sections: List<LibrarySectionUi>,
     selectedSectionId: String,
     onSelectSection: (String) -> Unit,
@@ -542,7 +542,7 @@ private fun LibraryFiltersRow(
 }
 
 @Composable
-private fun LibraryStatusMessage(
+internal fun LibraryStatusMessage(
     refreshState: LoadState,
     appendState: LoadState,
     hasItems: Boolean,
@@ -572,7 +572,7 @@ private fun LibraryStatusMessage(
 }
 
 @Composable
-private fun LibraryEmptyState(
+internal fun LibraryEmptyState(
     refreshState: LoadState,
     selectedSectionLabel: String?,
     onRefresh: () -> Unit,
@@ -599,7 +599,7 @@ private fun LibraryEmptyState(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun LibraryAppendState(
+internal fun LibraryAppendState(
     appendState: LoadState,
     onRetry: () -> Unit,
 ) {

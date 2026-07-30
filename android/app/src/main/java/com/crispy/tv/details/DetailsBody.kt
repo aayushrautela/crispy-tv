@@ -43,6 +43,7 @@ import com.crispy.tv.metadata.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 
+@Composable
 internal fun LazyListScope.detailsBodyContent(
     uiState: DetailsUiState,
     horizontalPadding: Dp,
