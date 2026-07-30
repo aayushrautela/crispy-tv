@@ -25,8 +25,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -43,7 +41,6 @@ import com.crispy.tv.metadata.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 
-@Composable
 internal fun LazyListScope.detailsBodyContent(
     uiState: DetailsUiState,
     horizontalPadding: Dp,
@@ -187,10 +184,8 @@ internal fun LazyListScope.detailsBodyContent(
         }
     }
 
-    val production = remember(titleDetail?.production) {
-        (titleDetail?.production?.companies.orEmpty() + titleDetail?.production?.networks.orEmpty())
-            .distinctBy { it.id }
-    }
+    val production = (titleDetail?.production?.companies.orEmpty() + titleDetail?.production?.networks.orEmpty())
+        .distinctBy { it.id }
     if (production.isNotEmpty()) {
         item(key = "production-header") {
             Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
@@ -259,11 +254,9 @@ internal fun LazyListScope.detailsBodyContent(
                     }
                 }
 
-                val episodes = remember(uiState.seasonEpisodes) {
-                    uiState.seasonEpisodes
-                        .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
-                        .take(50)
-                }
+                val episodes = uiState.seasonEpisodes
+                    .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
+                    .take(50)
 
                 when {
                     uiState.episodesIsLoading && episodes.isEmpty() -> {
@@ -329,7 +322,7 @@ internal fun LazyListScope.detailsBodyContent(
 
     val collection = uiState.titleExtras?.collection
     collection?.let { col ->
-        val collectionParts = remember(col) { col.parts.mapNotNull { it.toCatalogItem() } }
+        val collectionParts = col.parts.mapNotNull { it.toCatalogItem() }
         if (collectionParts.isNotEmpty()) {
             item(key = "collection-header") {
                 Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
@@ -356,9 +349,7 @@ internal fun LazyListScope.detailsBodyContent(
         }
     }
 
-    val similar = remember(uiState.titleExtras?.similar) {
-        (uiState.titleExtras?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
-    }
+    val similar = (uiState.titleExtras?.similar.orEmpty()).mapNotNull { it.toCatalogItem() }
     if (similar.isNotEmpty()) {
         item(key = "similar-header") {
             Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
@@ -379,9 +370,7 @@ internal fun LazyListScope.detailsBodyContent(
         }
     }
 
-    val detailRows = remember(details, titleDetail, uiState.titleExtras) {
-        buildDetailsRows(details = details, titleDetail = titleDetail, titleExtras = uiState.titleExtras)
-    }
+    val detailRows = buildDetailsRows(details = details, titleDetail = titleDetail, titleExtras = uiState.titleExtras)
     if (detailRows.isNotEmpty()) {
         item(key = "detail-rows-header") {
             Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
