@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.crispy.tv.playerui
 
 import androidx.compose.foundation.horizontalScroll
@@ -50,7 +52,7 @@ import com.crispy.tv.streams.StreamProviderUiState
 import com.crispy.tv.streams.StreamSelectorUiState
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PlayerStreamsSheet(
     visible: Boolean,
