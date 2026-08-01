@@ -52,6 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -106,9 +107,7 @@ private fun PersonDetailsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             uiState.isLoading && uiState.person == null -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator()
-                }
+                PersonDetailsLoadingSkeleton(modifier = Modifier.fillMaxSize())
             }
 
             uiState.person != null -> {
@@ -177,6 +176,101 @@ private fun PersonDetailsContent(
 
         item(key = "body") {
             PersonBody(person = person, onItemClick = onItemClick)
+        }
+    }
+}
+
+@Composable
+private fun PersonDetailsLoadingSkeleton(modifier: Modifier = Modifier) {
+    val horizontalPadding = responsivePageHorizontalPadding()
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding(),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(450.dp)
+                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                .skeletonElement(
+                    shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
+                    pulse = false,
+                ),
+        ) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = horizontalPadding, vertical = 24.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f)
+                            .height(34.dp)
+                            .skeletonElement(pulse = false),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.32f)
+                            .height(18.dp)
+                            .skeletonElement(pulse = false),
+                    )
+                }
+            }
+        }
+
+        Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
+            Spacer(modifier = Modifier.height(22.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.36f)
+                        .height(20.dp)
+                        .skeletonElement(pulse = false),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.94f)
+                        .height(14.dp)
+                        .skeletonElement(pulse = false),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.86f)
+                        .height(14.dp)
+                        .skeletonElement(pulse = false),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(14.dp)
+                        .skeletonElement(pulse = false),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(22.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.4f)
+                    .height(20.dp)
+                    .skeletonElement(pulse = false),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(count = 4, contentType = { "personKnownForSkeleton" }) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 120.dp, height = 180.dp)
+                            .skeletonElement(pulse = false),
+                    )
+                }
+            }
         }
     }
 }

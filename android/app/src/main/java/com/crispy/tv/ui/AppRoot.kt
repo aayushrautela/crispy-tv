@@ -5,7 +5,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -32,6 +33,7 @@ import com.crispy.tv.ui.navigation.FloatingBarHeight
 import com.crispy.tv.ui.navigation.FloatingBottomBar
 import com.crispy.tv.ui.navigation.TopLevelDestination
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppRoot() {
     val context = LocalContext.current
@@ -43,7 +45,7 @@ fun AppRoot() {
     when (state) {
         BootstrapState.Loading -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                LoadingIndicator()
             }
         }
         BootstrapState.NeedsAuth -> {

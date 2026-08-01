@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package com.crispy.tv.accounts
 
 import androidx.compose.foundation.clickable
@@ -22,11 +24,11 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -230,7 +232,7 @@ private fun AuthScreen(
                         enabled = !uiState.isBusy && uiState.email.isNotBlank() && uiState.password.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        if (uiState.isBusy) CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp)) else Text("Sign in")
+                        if (uiState.isBusy) LoadingIndicator(modifier = Modifier.padding(end = 8.dp)) else Text("Sign in")
                     }
                 }
                 item {
@@ -248,7 +250,7 @@ private fun AuthScreen(
                         enabled = !uiState.isBusy && uiState.email.isNotBlank() && uiState.password.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        if (uiState.isBusy) CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp)) else Text("Create account")
+                        if (uiState.isBusy) LoadingIndicator(modifier = Modifier.padding(end = 8.dp)) else Text("Create account")
                     }
                 }
                 item {
@@ -394,7 +396,7 @@ private fun OnboardingScreen(
             }
             if (uiState.isBusy) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    LoadingIndicator()
                 }
             }
         }
@@ -513,7 +515,7 @@ private fun ProfileManagementScreen(
             if (uiState.isBusy && uiState.profiles.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        LoadingIndicator()
                     }
                 }
             }
