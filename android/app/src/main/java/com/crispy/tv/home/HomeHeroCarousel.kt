@@ -31,9 +31,9 @@ import com.crispy.tv.ui.components.skeletonElement
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun HomeHeroSkeleton() {
+internal fun HomeHeroSkeleton(modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(320.dp)
             .skeletonElement(shape = RoundedCornerShape(28.dp), pulse = false)
@@ -45,7 +45,8 @@ internal fun HomeHeroSkeleton() {
 internal fun HomeHeroCarousel(
     items: List<HomeHeroItem>,
     selectedId: String?,
-    onItemClick: (HomeHeroItem) -> Unit
+    onItemClick: (HomeHeroItem) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) {
         return
@@ -62,7 +63,7 @@ internal fun HomeHeroCarousel(
         state = state,
         preferredItemWidth = 320.dp,
         itemSpacing = 16.dp,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(320.dp)
     ) { index ->

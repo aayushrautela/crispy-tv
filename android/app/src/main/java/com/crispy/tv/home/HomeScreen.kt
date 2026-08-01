@@ -146,6 +146,7 @@ internal fun HomeRoute(
                 HomeHeroSection(
                     state = heroState,
                     onHeroClick = onHeroClick,
+                    modifier = Modifier.padding(horizontal = horizontalPadding),
                 )
             }
         }
@@ -233,14 +234,15 @@ private fun HomeHeaderSectionsItem(
 private fun HomeHeroSection(
     state: HeroState,
     onHeroClick: (HomeHeroItem) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     when {
         state.isLoading && state.items.isEmpty() -> {
-            HomeHeroSkeleton()
+            HomeHeroSkeleton(modifier = modifier)
         }
 
         state.items.isEmpty() -> {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = modifier.fillMaxWidth()) {
                 Text(
                     text = state.statusMessage,
                     modifier = Modifier.padding(Dimensions.CardInternalPadding),
@@ -253,6 +255,7 @@ private fun HomeHeroSection(
                 items = state.items,
                 selectedId = state.selectedId,
                 onItemClick = onHeroClick,
+                modifier = modifier,
             )
         }
     }
