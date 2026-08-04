@@ -17,7 +17,6 @@ import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -74,7 +73,6 @@ internal const val THIS_WEEK_SECTION_KEY = "thisWeek"
 
 @Immutable
 data class HomeUiState(
-    val isRefreshing: Boolean = false,
     val headerPills: List<CatalogSectionRef> = emptyList(),
     val heroState: HeroState = HeroState(),
     val layoutState: HomeLayoutState = HomeLayoutState(),
@@ -89,7 +87,6 @@ class HomeViewModel internal constructor(
 ) : ViewModel() {
     companion object {
         private const val TAG = "HomeViewModel"
-        private const val BACKGROUND_REFRESH_DEBOUNCE_MS = 60_000L
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -129,134 +126,84 @@ class HomeViewModel internal constructor(
     private var catalogStatusMessage: String = ""
 
     private var suppressedItemsByKey: MutableMap<String, Long>? = null
-    @Volatile
-    private var refreshGeneration: Long = 0L
-    private var refreshJob: Job? = null
-    private var backgroundRefreshJob: Job? = null
-    private var refreshPending: Boolean = false
-    private var lastRefreshCompletedAtMs: Long = 0L
+    private var initialLoadJob: Job? = null
+    private var watchActivityJob: Job? = null
 
-    fun ensureLoaded() {
-        if (hasLoadedHomeContent() || refreshJob?.isActive == true) return
-        refresh(forceForegroundLoading = true)
-    }
-
-    fun refresh(forceForegroundLoading: Boolean = false) {
-        backgroundRefreshJob?.cancel()
-        if (refreshJob?.isActive == true) {
-            refreshPending = true
-            return
-        }
-
-        refreshPending = false
-        val currentRefreshGeneration = beginRefresh()
-        val showForegroundLoading = forceForegroundLoading || !hasLoadedHomeContent()
-        prepareForRefresh(showForegroundLoading)
-
-        refreshJob =
-            viewModelScope.launch {
-                val refreshCompletion = CompletableDeferred<Unit>()
-                try {
-                    if (showForegroundLoading) {
-                        val cachedPrimarySnapshot = runCatching { refreshCoordinator.loadCachedPrimarySnapshot() }.getOrNull()
-                        if (cachedPrimarySnapshot != null && isCurrentRefresh(currentRefreshGeneration)) {
-                            applyPrimarySnapshot(cachedPrimarySnapshot)
-                        }
-                    }
-
-                    coroutineScope {
-                        async {
-                            val snapshot = runCatching { refreshCoordinator.loadPrimarySnapshot() }.getOrElse { error ->
-                                if (error is CancellationException) throw error
-                                Log.w(TAG, "Primary home feed refresh failed", error)
-                                HomePrimarySnapshot(
-                                    hero = HeroState(
-                                        items = emptyList(),
-                                        isLoading = false,
-                                        statusMessage = error.message ?: "Failed to load home feed.",
-                                    ),
-                                    catalogStatusMessage = error.message ?: "Failed to load home feed.",
-                                )
-                            }
-                            if (isCurrentRefresh(currentRefreshGeneration)) {
-                                applyPrimarySnapshot(snapshot)
-                            }
-                        }
-                        async {
-                            val snapshot = runCatching { refreshCoordinator.loadWatchActivitySnapshot() }.getOrElse { error ->
-                                if (error is CancellationException) throw error
-                                Log.w(TAG, "Watch activity refresh failed", error)
-                                HomeWatchActivitySnapshot(
-                                    continueWatching = defaultWideRailSection(
-                                        key = CONTINUE_WATCHING_SECTION_KEY,
-                                        title = "Continue Watching",
-                                        kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
-                                    ).copy(
-                                        isLoading = false,
-                                        statusMessage = error.message ?: "Failed to load continue watching.",
-                                    ),
-                                    upNext = defaultWideRailSection(
-                                        key = UP_NEXT_SECTION_KEY,
-                                        title = "Up Next",
-                                        kind = HomeWideRailSectionKind.UP_NEXT,
-                                    ).copy(isLoading = false),
-                                )
-                            }
-                            if (isCurrentRefresh(currentRefreshGeneration)) {
-                                applyWatchActivitySnapshot(snapshot)
-                            }
-                        }
-                        async {
-                            val section = runCatching { refreshCoordinator.loadThisWeekSection() }.getOrElse { error ->
-                                if (error is CancellationException) throw error
-                                Log.w(TAG, "This week refresh failed", error)
-                                defaultWideRailSection(
-                                    key = THIS_WEEK_SECTION_KEY,
-                                    title = "This Week",
-                                    kind = HomeWideRailSectionKind.THIS_WEEK,
-                                ).copy(
-                                    isLoading = false,
-                                    statusMessage = error.message ?: "Failed to load this week.",
-                                )
-                            }
-                            if (isCurrentRefresh(currentRefreshGeneration)) {
-                                applyThisWeekSection(section)
-                            }
-                        }
-                    }
-                } finally {
-                    if (isCurrentRefresh(currentRefreshGeneration)) {
-                        _state.update { it.copy(isRefreshing = false) }
-                        lastRefreshCompletedAtMs = System.currentTimeMillis()
-                    }
-                    refreshCompletion.complete(Unit)
-
-                    refreshJob = null
-                    if (refreshPending) {
-                        refreshPending = false
-                        refresh()
-                    } else if (isCurrentRefresh(currentRefreshGeneration)) {
-                        backgroundRefreshJob =
-                            viewModelScope.launch {
-                                refreshCompletion.await()
-                                val refreshedSnapshot = runCatching { refreshCoordinator.loadAll() }.getOrNull() ?: return@launch
-                                if (!isCurrentRefresh(currentRefreshGeneration)) return@launch
-
-                                applyPrimarySnapshot(refreshedSnapshot.primary)
-                                applyWatchActivitySnapshot(refreshedSnapshot.watchActivity)
-                                applyThisWeekSection(refreshedSnapshot.thisWeek)
-                            }
+    init {
+        viewModelScope.launch {
+            HomeRefreshBus.events.collect { event ->
+                when (event) {
+                    HomeRefreshEvent.PlaybackEnded, HomeRefreshEvent.WatchlistChanged -> {
+                        refreshWatchActivityAndThisWeek()
                     }
                 }
             }
+        }
     }
 
-    fun refreshIfStale() {
-        if (refreshJob?.isActive == true) return
-        val now = System.currentTimeMillis()
-        if (lastRefreshCompletedAtMs <= 0L) return
-        if (now - lastRefreshCompletedAtMs < BACKGROUND_REFRESH_DEBOUNCE_MS) return
-        refresh(forceForegroundLoading = false)
+    fun ensureLoaded() {
+        if (hasLoadedHomeContent() || initialLoadJob?.isActive == true) return
+        initialLoadJob =
+            viewModelScope.launch {
+                val cachedPrimarySnapshot = runCatching { refreshCoordinator.loadCachedPrimarySnapshot() }.getOrNull()
+                if (cachedPrimarySnapshot != null) {
+                    applyPrimarySnapshot(cachedPrimarySnapshot)
+                }
+
+                coroutineScope {
+                    async {
+                        val snapshot = runCatching { refreshCoordinator.loadPrimarySnapshot() }.getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            Log.w(TAG, "Primary home feed load failed", error)
+                            primaryErrorFallback(error)
+                        }
+                        applyPrimarySnapshot(snapshot)
+                    }
+                    async {
+                        val snapshot = runCatching { refreshCoordinator.loadWatchActivitySnapshot() }.getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            Log.w(TAG, "Watch activity load failed", error)
+                            watchActivityErrorFallback(error)
+                        }
+                        applyWatchActivitySnapshot(snapshot)
+                    }
+                    async {
+                        val section = runCatching { refreshCoordinator.loadThisWeekSection() }.getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            Log.w(TAG, "This week load failed", error)
+                            thisWeekErrorFallback(error)
+                        }
+                        applyThisWeekSection(section)
+                    }
+                }
+                initialLoadJob = null
+            }
+    }
+
+    private fun refreshWatchActivityAndThisWeek() {
+        watchActivityJob?.cancel()
+        watchActivityJob =
+            viewModelScope.launch {
+                coroutineScope {
+                    async {
+                        val snapshot = runCatching { refreshCoordinator.loadWatchActivitySnapshot() }.getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            Log.w(TAG, "Watch activity refresh failed", error)
+                            watchActivityErrorFallback(error)
+                        }
+                        applyWatchActivitySnapshot(snapshot)
+                    }
+                    async {
+                        val section = runCatching { refreshCoordinator.loadThisWeekSection() }.getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            Log.w(TAG, "This week refresh failed", error)
+                            thisWeekErrorFallback(error)
+                        }
+                        applyThisWeekSection(section)
+                    }
+                }
+                watchActivityJob = null
+            }
     }
 
     fun removeContinueWatchingItem(item: CanonicalContinueWatchingItem) {
@@ -293,51 +240,47 @@ class HomeViewModel internal constructor(
         }
     }
 
-    private fun beginRefresh(): Long {
-        val nextGeneration = refreshGeneration + 1L
-        refreshGeneration = nextGeneration
-        return nextGeneration
-    }
+    private fun primaryErrorFallback(error: Throwable): HomePrimarySnapshot =
+        HomePrimarySnapshot(
+            hero = HeroState(
+                items = emptyList(),
+                isLoading = false,
+                statusMessage = error.message ?: "Failed to load home feed.",
+            ),
+            catalogStatusMessage = error.message ?: "Failed to load home feed.",
+        )
 
-    private fun prepareForRefresh(showForegroundLoading: Boolean) {
-        if (!showForegroundLoading) {
-            _state.update { it.copy(isRefreshing = true) }
-            return
-        }
-        _state.update { current ->
-            val updatedWideRails = current.wideRailSections.mapValues { (_, section) ->
-                section.copy(isLoading = true)
-            }
-            current.copy(
-                isRefreshing = true,
-                heroState = current.heroState.copy(
-                    isLoading = true,
-                    statusMessage = current.heroState.statusMessage.ifBlank { "Loading featured content..." },
-                ),
-                wideRailSections = updatedWideRails,
-                catalogSections = current.catalogSections.mapValues { (_, sectionUi) ->
-                    sectionUi.copy(
-                        items = sectionUi.items.ifEmpty { sectionUi.section.previewItems },
-                        isLoading = true,
-                    )
-                },
-                layoutState = buildHomeLayoutState(
-                    wideRails = updatedWideRails,
-                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
-                    catalogStatusMessage = catalogStatusMessage,
-                ),
-            )
-        }
-    }
+    private fun watchActivityErrorFallback(error: Throwable): HomeWatchActivitySnapshot =
+        HomeWatchActivitySnapshot(
+            continueWatching = defaultWideRailSection(
+                key = CONTINUE_WATCHING_SECTION_KEY,
+                title = "Continue Watching",
+                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+            ).copy(
+                isLoading = false,
+                statusMessage = error.message ?: "Failed to load continue watching.",
+            ),
+            upNext = defaultWideRailSection(
+                key = UP_NEXT_SECTION_KEY,
+                title = "Up Next",
+                kind = HomeWideRailSectionKind.UP_NEXT,
+            ).copy(isLoading = false),
+        )
+
+    private fun thisWeekErrorFallback(error: Throwable): HomeWideRailSectionUi =
+        defaultWideRailSection(
+            key = THIS_WEEK_SECTION_KEY,
+            title = "This Week",
+            kind = HomeWideRailSectionKind.THIS_WEEK,
+        ).copy(
+            isLoading = false,
+            statusMessage = error.message ?: "Failed to load this week.",
+        )
 
     private fun hasLoadedHomeContent(): Boolean {
         return _state.value.heroState.items.isNotEmpty() ||
             _state.value.headerPills.isNotEmpty() ||
             _state.value.layoutState.blocks.isNotEmpty()
-    }
-
-    private fun isCurrentRefresh(generation: Long): Boolean {
-        return refreshGeneration == generation
     }
 
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {

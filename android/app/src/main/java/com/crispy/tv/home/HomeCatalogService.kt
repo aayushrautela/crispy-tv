@@ -345,18 +345,20 @@ class HomeCatalogService internal constructor(
     }
 
     private fun String.toPresentation(): HomeCatalogPresentation {
-        return if (equals("hero", ignoreCase = true) || equals("landscape", ignoreCase = true)) {
-            HomeCatalogPresentation.HERO
-        } else {
-            HomeCatalogPresentation.RAIL
+        return when (trim().lowercase(Locale.US)) {
+            "herocarousel", "hero", "landscape" -> HomeCatalogPresentation.HERO
+            "categorytabs" -> HomeCatalogPresentation.PILL
+            "collectionrail", "collection" -> HomeCatalogPresentation.COLLECTION_SHELF
+            else -> HomeCatalogPresentation.RAIL
         }
     }
 
     private fun String.normalizedBackendLayout(): String {
         return when (trim().lowercase(Locale.US)) {
-            "hero" -> "hero"
+            "herocarousel", "hero" -> "hero"
             "landscape" -> "landscape"
-            "collection" -> "collection"
+            "categorytabs" -> "categoryTabs"
+            "collectionrail", "collection" -> "collection"
             else -> "regular"
         }
     }

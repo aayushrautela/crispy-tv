@@ -55,7 +55,8 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - Section metadata is preserved end-to-end: `source`, `presentation`, `variant_key`, `name`, `heading`, `title`, and `subtitle`.
   - Hero selection prefers the first `presentation = hero` list; otherwise it falls back to the first list.
   - Hero items require `backdrop_url` or `poster_url`; fallback description is `subtitle`, then `heading`, then non-blank `title`, then `Recommended for you.`
-  - Non-hero sections remain in feed order; `presentation` drives downstream `hero | pill | rail` UI decisions and unknown values normalize to `rail`.
+  - Non-hero sections remain in feed order; `presentation` drives downstream `hero | pill | collection_shelf | rail` UI decisions and unknown values normalize to `rail`.
+  - Wire-level `sectionType` ∈ {`categoryTabs`, `heroCarousel`, `contentRail`, `collectionRail`} is mapped to `presentation` deterministically: `categoryTabs` → `pill`, `heroCarousel` → `hero`, `collectionRail` → `collection_shelf`, else → `rail`.
   - Discover filtering accepts only `movie` and `show`, includes only `presentation = rail` sections, and page results use canonical attempted-url keys with source + kind + variant.
 - `catalog_url_building`
   - Build deterministic addon catalog request URL variants from addon `base_url`, preserved manifest query params, media type, catalog id, pagination, and filters.

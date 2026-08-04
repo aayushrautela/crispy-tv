@@ -17,9 +17,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -28,9 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
@@ -65,7 +60,6 @@ internal fun HomeRoute(
 ) {
     val context = LocalContext.current
     val appContext = remember(context) { context.applicationContext }
-    val lifecycleOwner = LocalLifecycleOwner.current
     val viewModel: HomeViewModel = viewModel(
         factory = remember(appContext) {
             HomeViewModel.factory(appContext)
@@ -73,7 +67,6 @@ internal fun HomeRoute(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val horizontalPadding = responsivePageHorizontalPadding()
-    val pullToRefreshState = rememberPullToRefreshState()
     val lazyListState = rememberLazyListState()
     val scrollBehavior = appBarScrollBehavior()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
@@ -86,19 +79,6 @@ internal fun HomeRoute(
         if (scrollToTopRequest > 0) {
             lazyListState.animateScrollToItem(0)
             onScrollToTopConsumed()
-        }
-    }
-
-    DisposableEffect(lifecycleOwner, viewModel) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    viewModel.refreshIfStale()
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -126,9 +106,6 @@ internal fun HomeRoute(
             )
         },
         nestedScrollConnection = scrollBehavior.nestedScrollConnection,
-        pullToRefreshState = pullToRefreshState,
-        isRefreshing = uiState.isRefreshing,
-        onRefresh = viewModel::refresh,
         horizontalPadding = 0.dp,
         topPadding = 0.dp,
         bottomPaddingExtra = Dimensions.PageBottomPadding,

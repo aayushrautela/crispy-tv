@@ -1,16 +1,7 @@
 package com.crispy.tv.home
 
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import com.crispy.tv.player.CanonicalContinueWatchingResult
 import com.crispy.tv.player.WatchHistoryService
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-
-internal data class HomeRefreshSnapshot(
-    val primary: HomePrimarySnapshot,
-    val watchActivity: HomeWatchActivitySnapshot,
-    val thisWeek: HomeWideRailSectionUi,
-)
 
 internal class HomeRefreshCoordinator(
     private val homeCatalogService: HomeCatalogService,
@@ -145,18 +136,6 @@ internal class HomeRefreshCoordinator(
             statusMessage = thisWeekResult.statusMessage.takeIf {
                 thisWeekResult.items.isNotEmpty() || thisWeekResult.isError
             }.orEmpty(),
-        )
-    }
-
-    suspend fun loadAll(): HomeRefreshSnapshot = coroutineScope {
-        val primaryDeferred = async { loadPrimarySnapshot() }
-        val watchActivityDeferred = async { loadWatchActivitySnapshot() }
-        val thisWeekDeferred = async { loadThisWeekSection() }
-
-        HomeRefreshSnapshot(
-            primary = primaryDeferred.await(),
-            watchActivity = watchActivityDeferred.await(),
-            thisWeek = thisWeekDeferred.await(),
         )
     }
 

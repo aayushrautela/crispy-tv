@@ -4,6 +4,8 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.crispy.tv.home.HomeRefreshBus
+import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMediaVideo
@@ -951,6 +953,9 @@ val identity =
                     isInWatchlist = if (result.success) desired else it.isInWatchlist
                 )
             }
+            if (result.success) {
+                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
+            }
         }
     }
 
@@ -995,6 +1000,9 @@ val identity =
                     watchCta = ctaResolution.watchCta,
                     continueVideoId = ctaResolution.continueVideoId,
                 )
+            }
+            if (result.success) {
+                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
             }
         }
     }
@@ -1063,6 +1071,9 @@ val identity =
                     statusMessage = result.statusMessage,
                 )
             }
+            if (result.success) {
+                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
+            }
         }
     }
 
@@ -1083,6 +1094,9 @@ val identity =
                     isRated = if (result.success) rating != null else it.isRated,
                     userRating = if (result.success) rating else it.userRating
                 )
+            }
+            if (result.success) {
+                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
             }
         }
     }

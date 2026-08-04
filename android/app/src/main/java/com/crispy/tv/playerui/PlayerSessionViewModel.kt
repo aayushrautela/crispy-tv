@@ -28,6 +28,8 @@ import com.crispy.tv.playback.matchesTarget
 import com.crispy.tv.playback.resolveStreamLookupTarget
 import com.crispy.tv.playback.toLoadingUiState
 import com.crispy.tv.playback.toUiState
+import com.crispy.tv.home.HomeRefreshBus
+import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
@@ -1121,6 +1123,7 @@ class PlayerSessionViewModel(
                 positionMs = playbackMetrics.positionMs,
                 durationMs = lastDurationMs,
             )
+            HomeRefreshBus.emit(HomeRefreshEvent.PlaybackEnded)
         }
     }
 

@@ -377,11 +377,14 @@ internal fun CrispyBackendClient.parseProfileHomeSection(json: JSONObject): Prof
     if (listKey.isNullOrBlank() || title.isNullOrBlank()) {
         throw IllegalStateException("ProfileHomeSection is missing required fields.")
     }
+    val sectionType = json.optNullableString("sectionType")
+    val layout = json.optNullableString("layout")
+    val presentation = sectionType ?: layout ?: "contentRail"
     return ProfileHomeSection(
         listKey = listKey,
         title = title,
         subtitle = json.optNullableString("subtitle"),
-        layout = json.optNullableString("layout") ?: "regular",
+        layout = presentation,
         items = parseClientMediaCards(json.optJSONArray("items")),
         meta = json.optJSONObject("meta")?.toStringMap() ?: emptyMap(),
     )
