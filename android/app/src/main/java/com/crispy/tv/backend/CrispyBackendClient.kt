@@ -137,7 +137,6 @@ class CrispyBackendClient(
         val seriesName: String?,
         val seasonId: String?,
         val seasonName: String?,
-        val userData: UserItemData?,
     ) {
         val posterUrl: String?
             get() = poster.medium
@@ -151,19 +150,6 @@ class CrispyBackendClient(
         val stillUrl: String?
             get() = still.medium
     }
-
-    data class UserItemData(
-        val itemId: String?,
-        val isFavorite: Boolean?,
-        val played: Boolean?,
-        val playCount: Int?,
-        val playbackPositionSeconds: Double?,
-        val runtimeSeconds: Double?,
-        val playedPercentage: Double?,
-        val lastPlayedDate: String?,
-        val rating: Double?,
-        val dismissedFromContinueWatching: Boolean?,
-    )
 
     data class ResponsiveImageSet(
         val small: String?,

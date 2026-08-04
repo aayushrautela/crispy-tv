@@ -35,7 +35,6 @@ import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionItem
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.User
-import com.crispy.tv.backend.CrispyBackendClient.UserItemData
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateEnvelope
 import com.crispy.tv.backend.CrispyBackendClient.WatchStateResponse
@@ -298,7 +297,6 @@ internal fun CrispyBackendClient.parseMediaItem(json: JSONObject): MediaItem {
         seriesName = json.optNullableString("SeriesName"),
         seasonId = json.optNullableString("SeasonId"),
         seasonName = json.optNullableString("SeasonName"),
-        userData = parseUserItemData(json.optJSONObject("UserData")),
     )
 }
 
@@ -308,23 +306,6 @@ internal fun CrispyBackendClient.parseProviderIds(json: JSONObject?): MediaExter
         tmdb = safe.optString("Tmdb").trim().toIntOrNull(),
         imdb = safe.optString("Imdb").trim().ifBlank { null },
         tvdb = safe.optString("Tvdb").trim().toIntOrNull(),
-    )
-}
-
-internal fun CrispyBackendClient.parseUserItemData(json: JSONObject?): UserItemData? {
-    val safe = json ?: return null
-    if (safe.length() == 0) return null
-    return UserItemData(
-        itemId = safe.optString("ItemId").trim().ifBlank { null },
-        isFavorite = if (safe.has("IsFavorite") && !safe.isNull("IsFavorite")) safe.optBoolean("IsFavorite") else null,
-        played = if (safe.has("Played") && !safe.isNull("Played")) safe.optBoolean("Played") else null,
-        playCount = safe.optIntOrNull("PlayCount"),
-        playbackPositionSeconds = safe.optDoubleOrNull("PlaybackPositionTicks")?.let { it / 10_000_000.0 },
-        runtimeSeconds = safe.optDoubleOrNull("RuntimeTicks")?.let { it / 10_000_000.0 },
-        playedPercentage = safe.optDoubleOrNull("PlayedPercentage"),
-        lastPlayedDate = safe.optNullableString("LastPlayedDate"),
-        rating = safe.optDoubleOrNull("Rating"),
-        dismissedFromContinueWatching = if (safe.has("DismissedFromContinueWatching") && !safe.isNull("DismissedFromContinueWatching")) safe.optBoolean("DismissedFromContinueWatching") else null,
     )
 }
 
@@ -476,13 +457,17 @@ internal fun CrispyBackendClient.parseCalendarItems(array: JSONArray?): List<Med
 // --- Watch State parsers ---
 
 internal fun CrispyBackendClient.parseWatchStateResponse(json: JSONObject): WatchStateResponse {
-    val userData = json.optJSONObject("UserData")
-    val played = userData?.optBoolean("Played") ?: false
-    val playCount = userData?.optInt("PlayCount") ?: 0
-    val lastPlayedDate = userData?.optNullableString("LastPlayedDate")
+    val card = parseClientMediaCard(json)
+    return clientMediaCardToWatchStateResponse(card)
+}
+
+private fun clientMediaCardToWatchStateResponse(card: ClientMediaCard): WatchStateResponse {
+    val progress = card.progress
+    val lastPlayedAt = progress?.lastPlayedAt
+    val played = progress?.played == true
     return WatchStateResponse(
-        watched = if (played && lastPlayedDate != null) WatchedStateView(watchedAt = lastPlayedDate) else null,
-        playCount = playCount,
+        watched = if (played && lastPlayedAt != null) WatchedStateView(watchedAt = lastPlayedAt) else null,
+        playCount = progress?.playCount ?: 0,
         watchedEpisodeKeys = emptyList(),
     )
 }
@@ -501,13 +486,7 @@ internal fun CrispyBackendClient.parseWatchStatesEnvelope(json: JSONObject, prof
         profileId = profileId,
         source = "server",
         generatedAt = null,
-        items = buildList {
-            val array = json.optJSONArray("items") ?: JSONArray()
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                add(parseWatchStateResponse(item))
-            }
-        },
+        items = parseClientMediaCards(json.optJSONArray("items")).map(::clientMediaCardToWatchStateResponse),
     )
 }
 
