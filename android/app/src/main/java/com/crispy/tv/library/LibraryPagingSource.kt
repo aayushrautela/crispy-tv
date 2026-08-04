@@ -4,7 +4,8 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.backend.CrispyBackendClient.BaseItemDtoQueryResult
+import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
+import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
 import com.crispy.tv.images.toUiResponsiveImageSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -89,92 +90,66 @@ private suspend fun loadLibrarySectionPage(
     }
 }
 
-private fun CrispyBackendClient.MediaItem.toLibrarySectionItemUi(
-    id: String?,
-    addedAt: String?,
+private fun ClientMediaCard.toLibrarySectionItemUi(
     watchedAt: String?,
-    ratedAt: String?,
     ratingValue: Int?,
     lastActivityAt: String?,
-    origins: List<String>,
 ): LibrarySectionItemUi {
     return LibrarySectionItemUi(
-        id = id ?: itemId,
+        id = itemId,
         itemId = itemId,
-        itemType = itemType,
+        itemType = mediaType,
         title = title,
-        posterUrl = posterUrl,
-        backdropUrl = backdropUrl,
-        logoUrl = logoUrl,
-        poster = poster.toUiResponsiveImageSet(),
-        backdrop = backdrop.toUiResponsiveImageSet(),
-        logo = logo.toUiResponsiveImageSet(),
+        posterUrl = images.poster.medium,
+        backdropUrl = images.backdrop.medium,
+        logoUrl = images.logo.medium,
+        poster = images.poster.toUiResponsiveImageSet(),
+        backdrop = images.backdrop.toUiResponsiveImageSet(),
+        logo = images.logo.toUiResponsiveImageSet(),
         rating = rating,
-        year = releaseYear,
+        year = year,
         genre = genres.firstOrNull(),
         maturityRating = maturityRating,
-        addedAt = addedAt,
+        addedAt = null,
         watchedAt = watchedAt,
-        ratedAt = ratedAt,
+        ratedAt = null,
         ratingValue = ratingValue,
         lastActivityAt = lastActivityAt,
-        origins = origins,
+        origins = emptyList(),
     )
 }
 
-private fun CrispyBackendClient.BaseItemDtoQueryResult.toHistorySectionPageUi(): LibrarySectionPageUi {
+private fun ClientMediaCard.librarySectionItemFromProgress(): LibrarySectionItemUi {
+    val progress = progress
+    val lastActivityAt = progress?.lastPlayedAt
+    val watchedAt = lastActivityAt?.takeIf { progress?.played == true }
+    val ratingValue = progress?.userRating?.toInt()?.takeIf { it in 1..10 }
+    return toLibrarySectionItemUi(
+        watchedAt = watchedAt,
+        ratingValue = ratingValue,
+        lastActivityAt = lastActivityAt,
+    )
+}
+
+private fun ClientMediaCardQueryResult.toHistorySectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
-        items = items.map { item ->
-            val userData = item.userData
-            val watchedAt = userData?.lastPlayedDate?.takeIf { userData.played == true }
-            item.toLibrarySectionItemUi(
-                id = item.itemId,
-                addedAt = null,
-                watchedAt = watchedAt,
-                ratedAt = null,
-                ratingValue = null,
-                lastActivityAt = watchedAt,
-                origins = emptyList(),
-            )
-        },
+        items = items.map { card -> card.librarySectionItemFromProgress() },
         nextCursor = nextCursor,
         hasMore = hasMore,
     )
 }
 
-private fun CrispyBackendClient.BaseItemDtoQueryResult.toWatchlistSectionPageUi(): LibrarySectionPageUi {
+private fun ClientMediaCardQueryResult.toWatchlistSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
-        items = items.map { item ->
-            item.toLibrarySectionItemUi(
-                id = item.itemId,
-                addedAt = null,
-                watchedAt = null,
-                ratedAt = null,
-                ratingValue = null,
-                lastActivityAt = null,
-                origins = emptyList(),
-            )
-        },
+        items = items.map { card -> card.librarySectionItemFromProgress() },
         nextCursor = nextCursor,
         hasMore = hasMore,
     )
 }
 
-private fun CrispyBackendClient.BaseItemDtoQueryResult.toRatingsSectionPageUi(): LibrarySectionPageUi {
+private fun ClientMediaCardQueryResult.toRatingsSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
-        items = items.map { item ->
-            val userData = item.userData
-            val ratingValue = userData?.rating?.toInt()?.takeIf { it in 1..10 }
-            item.toLibrarySectionItemUi(
-                id = item.itemId,
-                addedAt = null,
-                watchedAt = null,
-                ratedAt = null,
-                ratingValue = ratingValue,
-                lastActivityAt = null,
-                origins = emptyList(),
-            )
-        },
+        items = items.map { card -> card.librarySectionItemFromProgress() },
         nextCursor = nextCursor,
         hasMore = hasMore,
     )

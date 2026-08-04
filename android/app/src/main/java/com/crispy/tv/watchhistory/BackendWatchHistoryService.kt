@@ -537,7 +537,7 @@ class BackendWatchHistoryService(
         )
     }
 
-    private fun List<CrispyBackendClient.MediaItem>.toCanonicalContinueWatchingItems(
+    private fun List<CrispyBackendClient.ClientMediaCard>.toCanonicalContinueWatchingItems(
         nowMs: Long,
         limit: Int,
     ): List<CanonicalContinueWatchingItem> {
@@ -548,17 +548,20 @@ class BackendWatchHistoryService(
             .toList()
     }
 
-    private fun CrispyBackendClient.MediaItem.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
-        val userData = userData ?: return null
-        val progressPercent = userData.playedPercentage
-            ?: progressPercent(userData.playbackPositionSeconds, userData.runtimeSeconds)
+    private fun CrispyBackendClient.ClientMediaCard.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
+        val progress = progress ?: return null
+        val progressPercent = progress.percent
+            ?: progressPercent(progress.positionSeconds?.toDouble(), progress.durationSeconds?.toDouble())
             ?: return null
         if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) return null
-        if (userData.dismissedFromContinueWatching == true) return null
-        val titleId = seriesId?.trim()?.takeIf { it.isNotBlank() } ?: itemId.trim().takeIf { it.isNotBlank() } ?: return null
-        val playbackId = userData.itemId?.trim()?.takeIf { it.isNotBlank() } ?: itemId.trim().takeIf { it.isNotBlank() } ?: return null
-        val type = itemType.toMetadataLabMediaType()
-        val updatedAt = parseIsoToEpochMs(userData.lastPlayedDate) ?: nowMs
+        val parentData = parent
+        val seasonNumber = parentData?.seasonNumber
+        val episodeNumber = parentData?.episodeNumber
+        val titleId = parentData?.seriesItemId?.trim()?.takeIf { it.isNotBlank() } ?: itemId.trim().takeIf { it.isNotBlank() } ?: return null
+        val playbackId = itemId.trim().takeIf { it.isNotBlank() } ?: return null
+        val type = mediaType.toMetadataLabMediaType()
+        val updatedAt = parseIsoToEpochMs(progress.lastPlayedAt) ?: nowMs
+        val seriesName = parentData?.seriesTitle?.trim()?.takeIf { it.isNotBlank() }
         return CanonicalContinueWatchingItem(
             id = playbackId,
             titleItemId = titleId,
@@ -572,19 +575,19 @@ class BackendWatchHistoryService(
                     append(episodeNumber)
                 }
             },
-            itemType = itemType,
-            title = seriesName?.trim()?.takeIf { it.isNotBlank() } ?: title,
-            episodeTitle = episodeTitle?.trim()?.takeIf { it.isNotBlank() } ?: title.takeIf { type != MetadataLabMediaType.MOVIE },
+            itemType = mediaType,
+            title = seriesName ?: title,
+            episodeTitle = title.takeIf { type != MetadataLabMediaType.MOVIE },
             season = seasonNumber,
             episode = episodeNumber,
             progressPercent = progressPercent.coerceIn(0.0, 100.0),
             lastUpdatedEpochMs = updatedAt,
-            posterUrl = posterUrl,
-            backdropUrl = backdropUrl,
-            logoUrl = logoUrl,
-            stillUrl = stillUrl,
+            posterUrl = images.poster.medium,
+            backdropUrl = images.backdrop.medium,
+            logoUrl = images.logo.medium,
+            stillUrl = images.still.medium,
             subtitle = buildContinueWatchingSubtitle(type, seasonNumber, episodeNumber),
-            absoluteEpisodeNumber = absoluteEpisodeNumber,
+            absoluteEpisodeNumber = null,
         )
     }
 

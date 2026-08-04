@@ -1,7 +1,7 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.backend.CrispyBackendClient.BaseItemDtoQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
+import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.ProfileHomeResponse
 import com.crispy.tv.backend.PlaybackEventInput
 import com.crispy.tv.backend.CrispyBackendClient.WatchActionResponse
@@ -98,8 +98,8 @@ internal suspend fun CrispyBackendClient.listContinueWatchingApi(
     profileId: String,
     limit: Int = 20,
     cursor: String? = null,
-): BaseItemDtoQueryResult {
-    return listBaseItemDtoQueryResultApi(
+): ClientMediaCardQueryResult {
+    return listClientMediaCardQueryResultApi(
         accessToken, profileId, path = "continue-watching", limit = limit, cursor = cursor,
     )
 }
@@ -123,8 +123,8 @@ internal suspend fun CrispyBackendClient.listWatchHistoryApi(
     profileId: String,
     limit: Int = 50,
     cursor: String? = null,
-): BaseItemDtoQueryResult {
-    return listBaseItemDtoQueryResultApi(
+): ClientMediaCardQueryResult {
+    return listClientMediaCardQueryResultApi(
         accessToken, profileId, path = "history", limit = limit, cursor = cursor,
     )
 }
@@ -134,8 +134,8 @@ internal suspend fun CrispyBackendClient.listWatchlistApi(
     profileId: String,
     limit: Int = 50,
     cursor: String? = null,
-): BaseItemDtoQueryResult {
-    return listBaseItemDtoQueryResultApi(
+): ClientMediaCardQueryResult {
+    return listClientMediaCardQueryResultApi(
         accessToken, profileId, path = "watchlist", limit = limit, cursor = cursor,
     )
 }
@@ -145,8 +145,8 @@ internal suspend fun CrispyBackendClient.listRatingsApi(
     profileId: String,
     limit: Int = 50,
     cursor: String? = null,
-): BaseItemDtoQueryResult {
-    return listBaseItemDtoQueryResultApi(
+): ClientMediaCardQueryResult {
+    return listClientMediaCardQueryResultApi(
         accessToken, profileId, path = "ratings", limit = limit, cursor = cursor,
     )
 }
@@ -289,13 +289,13 @@ internal suspend fun CrispyBackendClient.deleteRatingApi(
     return parseWatchActionResponse(requireSuccess(response))
 }
 
-private suspend fun CrispyBackendClient.listBaseItemDtoQueryResultApi(
+private suspend fun CrispyBackendClient.listClientMediaCardQueryResultApi(
     accessToken: String,
     profileId: String,
     path: String,
     limit: Int,
     cursor: String?,
-): BaseItemDtoQueryResult {
+): ClientMediaCardQueryResult {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl().newBuilder()
@@ -311,7 +311,7 @@ private suspend fun CrispyBackendClient.listBaseItemDtoQueryResultApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return parseBaseItemDtoQueryResult(json)
+    return parseClientMediaCardQueryResult(json)
 }
 
 private suspend fun CrispyBackendClient.postWatchMutationApi(

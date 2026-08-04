@@ -1,9 +1,9 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.AiInsightsCard
-import com.crispy.tv.backend.CrispyBackendClient.BaseItemDtoQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.ClientImages
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
+import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.ClientParentRef
 import com.crispy.tv.backend.CrispyBackendClient.ClientProgress
 import com.crispy.tv.backend.CrispyBackendClient.MediaExternalIds
@@ -511,11 +511,11 @@ internal fun CrispyBackendClient.parseWatchStatesEnvelope(json: JSONObject, prof
     )
 }
 
-// --- BaseItemDtoQueryResult parser ---
+// --- ClientMediaCardQueryResult parser ---
 
-internal fun CrispyBackendClient.parseBaseItemDtoQueryResult(json: JSONObject): BaseItemDtoQueryResult {
-    return BaseItemDtoQueryResult(
-        items = parseMediaItems(json.optJSONArray("Items")),
+internal fun CrispyBackendClient.parseClientMediaCardQueryResult(json: JSONObject): ClientMediaCardQueryResult {
+    return ClientMediaCardQueryResult(
+        items = parseClientMediaCards(json.optJSONArray("Items")),
         startIndex = json.optInt("StartIndex", 0),
         totalRecordCount = json.optInt("TotalRecordCount", 0),
         nextCursor = json.optNullableString("NextCursor"),

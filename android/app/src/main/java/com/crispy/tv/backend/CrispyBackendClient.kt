@@ -315,10 +315,10 @@ class CrispyBackendClient(
         val items: List<WatchStateResponse>,
     )
 
-    // --- Paged media lists (BaseItemDtoQueryResult) ---
+    // --- Paged watch collections (ClientMediaCardQueryResult) ---
 
-    data class BaseItemDtoQueryResult(
-        val items: List<MediaItem>,
+    data class ClientMediaCardQueryResult(
+        val items: List<ClientMediaCard>,
         val startIndex: Int,
         val totalRecordCount: Int,
         val nextCursor: String?,
@@ -817,7 +817,7 @@ class CrispyBackendClient(
         profileId: String,
         limit: Int = 20,
         cursor: String? = null,
-    ): BaseItemDtoQueryResult {
+    ): ClientMediaCardQueryResult {
         return listContinueWatchingApi(accessToken, profileId, limit, cursor)
     }
 
@@ -830,7 +830,7 @@ class CrispyBackendClient(
         profileId: String,
         limit: Int = 50,
         cursor: String? = null,
-    ): BaseItemDtoQueryResult {
+    ): ClientMediaCardQueryResult {
         return listWatchHistoryApi(accessToken, profileId, limit, cursor)
     }
 
@@ -839,7 +839,7 @@ class CrispyBackendClient(
         profileId: String,
         limit: Int = 50,
         cursor: String? = null,
-    ): BaseItemDtoQueryResult {
+    ): ClientMediaCardQueryResult {
         return listWatchlistApi(accessToken, profileId, limit, cursor)
     }
 
@@ -848,7 +848,7 @@ class CrispyBackendClient(
         profileId: String,
         limit: Int = 50,
         cursor: String? = null,
-    ): BaseItemDtoQueryResult {
+    ): ClientMediaCardQueryResult {
         return listRatingsApi(accessToken, profileId, limit, cursor)
     }
 
