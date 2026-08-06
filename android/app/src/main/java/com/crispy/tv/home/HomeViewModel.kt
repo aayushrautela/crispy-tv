@@ -128,6 +128,7 @@ class HomeViewModel internal constructor(
     private var suppressedItemsByKey: MutableMap<String, Long>? = null
     private var initialLoadJob: Job? = null
     private var watchActivityJob: Job? = null
+    private var hasAttemptedInitialLoad = false
 
     init {
         viewModelScope.launch {
@@ -142,7 +143,8 @@ class HomeViewModel internal constructor(
     }
 
     fun ensureLoaded() {
-        if (hasLoadedHomeContent() || initialLoadJob?.isActive == true) return
+        if (hasAttemptedInitialLoad || initialLoadJob?.isActive == true) return
+        hasAttemptedInitialLoad = true
         initialLoadJob =
             viewModelScope.launch {
                 val cachedPrimarySnapshot = runCatching { refreshCoordinator.loadCachedPrimarySnapshot() }.getOrNull()
@@ -277,12 +279,6 @@ class HomeViewModel internal constructor(
             statusMessage = error.message ?: "Failed to load this week.",
         )
 
-    private fun hasLoadedHomeContent(): Boolean {
-        return _state.value.heroState.items.isNotEmpty() ||
-            _state.value.headerPills.isNotEmpty() ||
-            _state.value.layoutState.blocks.isNotEmpty()
-    }
-
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {
         catalogSectionLayoutMeta = snapshot.catalogSections.map { sectionUi ->
             CatalogSectionLayoutMeta(key = sectionUi.section.key, layout = sectionUi.section.layout)
@@ -304,16 +300,10 @@ class HomeViewModel internal constructor(
 
     private fun applyWatchActivitySnapshot(snapshot: HomeWatchActivitySnapshot) {
         _state.update { current ->
-            val updatedWideRails = current.wideRailSections + mapOf(
-                snapshot.continueWatching.key to snapshot.continueWatching,
-                snapshot.upNext.key to snapshot.upNext,
-            )
             current.copy(
-                wideRailSections = updatedWideRails,
-                layoutState = buildHomeLayoutState(
-                    wideRails = updatedWideRails,
-                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
-                    catalogStatusMessage = catalogStatusMessage,
+                wideRailSections = current.wideRailSections + mapOf(
+                    snapshot.continueWatching.key to snapshot.continueWatching,
+                    snapshot.upNext.key to snapshot.upNext,
                 ),
             )
         }
@@ -321,14 +311,8 @@ class HomeViewModel internal constructor(
 
     private fun applyThisWeekSection(section: HomeWideRailSectionUi) {
         _state.update { current ->
-            val updatedWideRails = current.wideRailSections + (section.key to section)
             current.copy(
-                wideRailSections = updatedWideRails,
-                layoutState = buildHomeLayoutState(
-                    wideRails = updatedWideRails,
-                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
-                    catalogStatusMessage = catalogStatusMessage,
-                ),
+                wideRailSections = current.wideRailSections + (section.key to section),
             )
         }
     }
@@ -339,15 +323,7 @@ class HomeViewModel internal constructor(
     ) {
         _state.update { current ->
             val existing = current.wideRailSections[key] ?: return@update current
-            val updatedWideRails = current.wideRailSections + (key to transform(existing))
-            current.copy(
-                wideRailSections = updatedWideRails,
-                layoutState = buildHomeLayoutState(
-                    wideRails = updatedWideRails,
-                    catalogSectionLayoutMeta = catalogSectionLayoutMeta,
-                    catalogStatusMessage = catalogStatusMessage,
-                ),
-            )
+            current.copy(wideRailSections = current.wideRailSections + (key to transform(existing)))
         }
     }
 

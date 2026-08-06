@@ -2,6 +2,7 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -42,6 +43,8 @@ internal fun HomeCatalogSectionRow(
     onSeeAllClick: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
 ) {
+    val sectionSkeleton = sectionUi.isLoading && sectionUi.items.isEmpty()
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier
@@ -53,23 +56,32 @@ internal fun HomeCatalogSectionRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Text(
-                    text = sectionUi.section.displayTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                if (sectionUi.section.subtitle.isNotBlank()) {
+                if (sectionSkeleton) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.45f)
+                            .height(20.dp)
+                            .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
+                    )
+                } else {
                     Text(
-                        text = sectionUi.section.subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = sectionUi.section.displayTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    if (sectionUi.section.subtitle.isNotBlank()) {
+                        Text(
+                            text = sectionUi.section.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
             FilledIconButton(

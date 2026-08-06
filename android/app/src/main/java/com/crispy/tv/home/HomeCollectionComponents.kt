@@ -81,10 +81,15 @@ internal fun HomeCollectionSectionRow(
         }
     }
 
+    val collectionsLoading = remember(visibleSections) {
+        visibleSections.all { it.isLoading && it.items.isEmpty() }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = "Collections",
             statusMessage = sharedSubtitle,
+            skeleton = collectionsLoading,
             modifier = Modifier.padding(horizontal = horizontalPadding),
         )
 

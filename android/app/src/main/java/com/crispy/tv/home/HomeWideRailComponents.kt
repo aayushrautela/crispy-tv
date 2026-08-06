@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -63,7 +64,8 @@ internal fun HomeWideRailSection(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = section.title,
-            statusMessage = if (section.isLoading) "" else section.statusMessage,
+            statusMessage = section.statusMessage,
+            skeleton = section.isLoading && section.items.isEmpty(),
             action = onViewAllClick?.let { action ->
                 {
                     TextButton(onClick = action) {
@@ -160,6 +162,7 @@ internal fun HomeRailHeader(
     title: String,
     statusMessage: String,
     modifier: Modifier = Modifier,
+    skeleton: Boolean = false,
     action: (@Composable () -> Unit)? = null,
 ) {
     Column(
@@ -171,17 +174,26 @@ internal fun HomeRailHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            if (skeleton) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(20.dp)
+                        .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
+                )
+            } else {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             action?.invoke()
         }
 
-        if (statusMessage.isNotBlank()) {
+        if (!skeleton && statusMessage.isNotBlank()) {
             Text(
                 text = statusMessage,
                 style = MaterialTheme.typography.bodyMedium,

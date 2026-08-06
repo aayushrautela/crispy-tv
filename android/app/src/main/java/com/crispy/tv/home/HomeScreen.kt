@@ -207,13 +207,19 @@ private fun HomeHeaderSectionsItem(
     onSectionClick: (CatalogSectionRef) -> Unit,
 ) {
     if (sections.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(36.dp)
-                .padding(vertical = 2.dp)
-                .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            repeat(4) {
+                Box(
+                    modifier = Modifier
+                        .width(80.dp)
+                        .height(32.dp)
+                        .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false),
+                )
+            }
+        }
         return
     }
     HomeHeaderSectionChips(
