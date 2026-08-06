@@ -146,10 +146,13 @@ internal fun HomeRoute(
                     is HomeCatalogRowSectionUi -> {
                         val sectionUi = catalogSections[block.sectionKey]
                         if (sectionUi != null) {
+                            val onSeeAll = remember(sectionUi.section) {
+                                { onCatalogSeeAllClick(sectionUi.section) }
+                            }
                             HomeCatalogSectionRow(
                                 sectionUi = sectionUi,
                                 horizontalPadding = horizontalPadding,
-                                onSeeAllClick = { onCatalogSeeAllClick(sectionUi.section) },
+                                onSeeAllClick = onSeeAll,
                                 onItemClick = onCatalogItemClick,
                             )
                         }
@@ -177,6 +180,9 @@ internal fun HomeRoute(
                     is HomeWideRailLayoutUi -> {
                         val section = wideRailSections[block.key]
                         if (section != null) {
+                            val onViewAll = remember(block.kind) {
+                                if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null
+                            }
                             HomeWideRailSection(
                                 section = section,
                                 horizontalPadding = horizontalPadding,
@@ -184,7 +190,7 @@ internal fun HomeRoute(
                                 onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
                                 onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
                                 onThisWeekClick = onThisWeekClick,
-                                onViewAllClick = if (block.kind == HomeWideRailSectionKind.THIS_WEEK) onThisWeekSeeAllClick else null,
+                                onViewAllClick = onViewAll,
                             )
                         }
                     }
@@ -266,7 +272,7 @@ private fun HomeHeaderSectionChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(vertical = 2.dp),
     ) {
-        items(sections, key = { it.key }) { section ->
+        items(sections, key = { it.key }, contentType = { "headerPill" }) { section ->
             FilterChip(
                 selected = false,
                 onClick = { onSectionClick(section) },

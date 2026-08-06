@@ -2,6 +2,7 @@ package com.crispy.tv.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,19 +57,20 @@ internal fun HomeCollectionSectionRow(
     onCollectionPlayClick: (CatalogItem) -> Unit,
     onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
-    val visibleSections =
-        remember(sectionUis) {
+    val visibleSections by remember(sectionUis) {
+        derivedStateOf {
             sectionUis.filter {
                 it.isLoading || it.items.isNotEmpty() || it.statusMessage.isNotBlank()
             }
         }
+    }
 
     if (visibleSections.isEmpty()) {
         return
     }
 
-    val sharedSubtitle =
-        remember(visibleSections) {
+    val sharedSubtitle by remember(visibleSections) {
+        derivedStateOf {
             visibleSections
                 .map { it.section.subtitle.trim() }
                 .filter { it.isNotBlank() }
@@ -75,6 +78,7 @@ internal fun HomeCollectionSectionRow(
                 .singleOrNull()
                 .orEmpty()
         }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
@@ -116,19 +120,15 @@ private fun HomeCollectionCard(
     )
     val collectionTitle = remember(sectionUi.section.displayTitle) { collectionDisplayTitle(sectionUi.section.displayTitle) }
 
-    Surface(
-        onClick = onCollectionClick,
+    Column(
         modifier = Modifier
-            .width(320.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+            .width(320.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clickable(onClick = onCollectionClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -166,9 +166,12 @@ private fun HomeCollectionCard(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         previewMovies.forEach { item ->
+                            val onMovieClick = remember(item.id) {
+                                { onCollectionMovieClick(item) }
+                            }
                             HomeCollectionMovieRow(
                                 item = item,
-                                onClick = { onCollectionMovieClick(item) },
+                                onClick = onMovieClick,
                             )
                         }
                     }
@@ -236,7 +239,6 @@ private fun HomeCollectionCard(
                     )
                 }
             }
-        }
     }
 }
 
@@ -292,7 +294,7 @@ private fun HomeCollectionMovieRow(
             if (detailText.isNotBlank() || ratingText != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (detailText.isNotBlank()) {
@@ -304,8 +306,6 @@ private fun HomeCollectionMovieRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
                     }
 
                     ratingText?.let { rating ->

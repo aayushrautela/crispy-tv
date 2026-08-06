@@ -114,7 +114,7 @@ internal fun HomeCatalogSectionRow(
                     )
                 }
             } else {
-                items(sectionUi.items, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
+                items(sectionUi.items, key = { "${it.type}:${it.id}" }, contentType = { "catalogPoster" }) { item ->
                     HomeCatalogPosterCard(
                         item = item,
                         onClick = { onItemClick(item) }

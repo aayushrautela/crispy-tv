@@ -42,6 +42,7 @@ import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeWideRailSection(
     section: HomeWideRailSectionUi,
@@ -73,46 +74,44 @@ internal fun HomeWideRailSection(
             modifier = Modifier.padding(horizontal = horizontalPadding),
         )
 
-        if (section.isLoading || section.items.isNotEmpty()) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = crispyRowHuggingPadding(horizontalPadding),
-            ) {
-                if (section.isLoading && section.items.isEmpty()) {
-                    items(HOME_WIDE_SKELETON_COUNT, contentType = { "wideSkeleton" }) {
-                        HomeWideRailSkeletonCard()
-                    }
-                } else {
-                    items(section.items, key = { it.key }, contentType = { "wideRailCard" }) { item ->
-                        HomeWideRailCard(
-                            item = item,
-                            showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,
-                            actionsVisible = actionsItemKey == item.key,
-                            onToggleActions = { key ->
-                                actionsItemKey = if (actionsItemKey == key) null else key
-                            },
-                            onClick = {
-                                when (item.kind) {
-                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
-                                    HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = crispyRowHuggingPadding(horizontalPadding),
+        ) {
+            if (section.isLoading && section.items.isEmpty()) {
+                items(HOME_WIDE_SKELETON_COUNT, contentType = { "wideSkeleton" }) {
+                    HomeWideRailSkeletonCard()
+                }
+            } else {
+                items(section.items, key = { it.key }, contentType = { "wideRailCard" }) { item ->
+                    HomeWideRailCard(
+                        item = item,
+                        showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,
+                        actionsVisible = actionsItemKey == item.key,
+                        onToggleActions = { key ->
+                            actionsItemKey = if (actionsItemKey == key) null else key
+                        },
+                        onClick = {
+                            when (item.kind) {
+                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
+                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
+                            }
+                        },
+                        onDetailsClick = {
+                            when (item.kind) {
+                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingOpenDetails)
+                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
+                            }
+                        },
+                        onRemoveClick =
+                            if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
+                                item.continueWatchingItem?.let { continueWatchingItem ->
+                                    { onRemoveContinueWatchingItem(continueWatchingItem) }
                                 }
+                            } else {
+                                null
                             },
-                            onDetailsClick = {
-                                when (item.kind) {
-                                    HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingOpenDetails)
-                                    HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
-                                }
-                            },
-                            onRemoveClick =
-                                if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
-                                    item.continueWatchingItem?.let { continueWatchingItem ->
-                                        { onRemoveContinueWatchingItem(continueWatchingItem) }
-                                    }
-                                } else {
-                                    null
-                                },
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -267,7 +266,6 @@ internal fun HomeWideRailCard(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun WideRailActionSheet(
     item: HomeWideRailItemUi,
     onDetailsClick: () -> Unit,

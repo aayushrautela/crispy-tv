@@ -17,22 +17,23 @@ fun crispyImageRequest(
 ): Any? {
     if (url.isNullOrBlank()) return null
     val context = LocalContext.current
+    val appContext = context.applicationContext
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    return rememberCrispyImageModel(url, widthPx, heightPx, enableCrossfade)
+    return rememberCrispyImageModel(appContext, url, widthPx, heightPx, enableCrossfade)
 }
 
 @Composable
 private fun rememberCrispyImageModel(
+    appContext: android.content.Context,
     url: String,
     widthPx: Int,
     heightPx: Int,
     enableCrossfade: Boolean = true,
 ): ImageRequest {
-    val context = LocalContext.current
-    return androidx.compose.runtime.remember(context, url, widthPx, heightPx, enableCrossfade) {
-        ImageRequest.Builder(context)
+    return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade) {
+        ImageRequest.Builder(appContext)
             .data(url)
             .size(widthPx, heightPx)
             .apply { if (enableCrossfade) crossfade(true) }
