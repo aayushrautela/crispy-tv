@@ -34,6 +34,7 @@ import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.ProfileIconButton
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.components.topLevelAppBarColors
 import com.crispy.tv.ui.theme.Dimensions
@@ -199,6 +200,13 @@ private fun HomeHeaderSectionsItem(
     onSectionClick: (CatalogSectionRef) -> Unit,
 ) {
     if (sections.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .padding(vertical = 2.dp)
+                .skeletonElement(shape = RoundedCornerShape(16.dp), pulse = false),
+        )
         return
     }
     HomeHeaderSectionChips(

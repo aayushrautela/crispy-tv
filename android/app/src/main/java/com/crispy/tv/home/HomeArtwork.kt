@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -92,20 +93,21 @@ internal fun LandscapeArtworkFrame(
         bottomOverlayContent()
 
         if (progressFraction != null && progressFraction > 0f) {
+            val progressWidth = progressFraction.coerceIn(0f, 1f)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .height(4.dp)
-                    .background(Color.White.copy(alpha = 0.25f)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progressFraction.coerceIn(0f, 1f))
-                        .background(MaterialTheme.colorScheme.tertiary),
-                )
-            }
+                    .background(Color.White.copy(alpha = 0.25f))
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            color = MaterialTheme.colorScheme.tertiary,
+                            size = size.copy(width = size.width * progressWidth),
+                        )
+                    },
+            )
         }
     }
 }

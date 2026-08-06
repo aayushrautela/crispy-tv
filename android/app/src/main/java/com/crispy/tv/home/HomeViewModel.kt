@@ -75,7 +75,7 @@ internal const val THIS_WEEK_SECTION_KEY = "thisWeek"
 data class HomeUiState(
     val headerPills: List<CatalogSectionRef> = emptyList(),
     val heroState: HeroState = HeroState(),
-    val layoutState: HomeLayoutState = HomeLayoutState(),
+    val layoutState: HomeLayoutState = defaultHomeLayoutState(),
     val wideRailSections: Map<String, HomeWideRailSectionUi> = defaultWideRailSections(),
     val catalogSections: Map<String, HomeCatalogSectionUi> = emptyMap(),
 )
@@ -383,6 +383,15 @@ private fun defaultWideRailSections(): Map<String, HomeWideRailSectionUi> {
                 kind = HomeWideRailSectionKind.THIS_WEEK,
             ),
     )
+}
+
+private fun defaultHomeLayoutState(): HomeLayoutState {
+    val blocks = listOf(
+        HomeWideRailLayoutUi(key = CONTINUE_WATCHING_SECTION_KEY, kind = HomeWideRailSectionKind.CONTINUE_WATCHING),
+        HomeWideRailLayoutUi(key = UP_NEXT_SECTION_KEY, kind = HomeWideRailSectionKind.UP_NEXT),
+        HomeWideRailLayoutUi(key = THIS_WEEK_SECTION_KEY, kind = HomeWideRailSectionKind.THIS_WEEK),
+    )
+    return HomeLayoutState(blocks = blocks)
 }
 
 internal fun defaultWideRailSection(

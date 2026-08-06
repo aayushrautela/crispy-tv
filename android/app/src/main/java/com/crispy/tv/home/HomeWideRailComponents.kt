@@ -56,6 +56,9 @@ internal fun HomeWideRailSection(
         return
     }
 
+    var actionsItemKey by remember { mutableStateOf<String?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = section.title,
@@ -84,6 +87,10 @@ internal fun HomeWideRailSection(
                         HomeWideRailCard(
                             item = item,
                             showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,
+                            actionsVisible = actionsItemKey == item.key,
+                            onToggleActions = { key ->
+                                actionsItemKey = if (actionsItemKey == key) null else key
+                            },
                             onClick = {
                                 when (item.kind) {
                                     HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
@@ -111,6 +118,32 @@ internal fun HomeWideRailSection(
         }
     }
 
+    actionsItemKey?.let { key ->
+        val actionItem = section.items.firstOrNull { it.key == key }
+        if (actionItem != null) {
+            ModalBottomSheet(
+                onDismissRequest = { actionsItemKey = null },
+                sheetState = sheetState,
+            ) {
+                WideRailActionSheet(
+                    item = actionItem,
+                    onDetailsClick = {
+                        actionsItemKey = null
+                        when (actionItem.kind) {
+                            HomeWideRailItemKind.WATCH_ACTIVITY -> actionItem.continueWatchingItem?.let(onContinueWatchingOpenDetails)
+                            HomeWideRailItemKind.CALENDAR_EPISODE -> actionItem.calendarEpisodeItem?.let(onThisWeekClick)
+                        }
+                    },
+                    onRemoveClick = actionItem.continueWatchingItem?.let { cwItem ->
+                        {
+                            actionsItemKey = null
+                            onRemoveContinueWatchingItem(cwItem)
+                        }
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -161,15 +194,16 @@ internal fun HomeRailHeader(
 }
 
 @Composable
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 internal fun HomeWideRailCard(
     item: HomeWideRailItemUi,
     showActions: Boolean,
+    actionsVisible: Boolean,
+    onToggleActions: (String) -> Unit,
     onClick: () -> Unit,
     onDetailsClick: () -> Unit = onClick,
     onRemoveClick: (() -> Unit)? = null,
 ) {
-    var actionSheetVisible by remember { mutableStateOf(false) }
     val removeAction = onRemoveClick
     val hasItemActions = showActions && removeAction != null
     val artworkModel = rememberCrispyImageModel(
@@ -183,7 +217,7 @@ internal fun HomeWideRailCard(
             Modifier.combinedClickable(
                 onClick = onClick,
                 onLongClickLabel = "Item actions",
-                onLongClick = { actionSheetVisible = true },
+                onLongClick = { onToggleActions(item.key) },
             )
         } else {
             Modifier.clickable(onClick = onClick)
@@ -230,53 +264,47 @@ internal fun HomeWideRailCard(
             }
         },
     )
+}
 
-    val visibleRemoveAction = if (actionSheetVisible) removeAction else null
-    if (visibleRemoveAction != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { actionSheetVisible = false },
-            sheetState = sheetState,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(bottom = 12.dp),
-            ) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
-                ListItem(
-                    headlineContent = { Text("Open details") },
-                    supportingContent = {
-                        if (item.subtitle.isNotBlank()) {
-                            Text(
-                                text = item.subtitle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    },
-                    modifier = Modifier.clickable {
-                        actionSheetVisible = false
-                        onDetailsClick()
-                    },
-                )
-                ListItem(
-                    headlineContent = { Text("Remove") },
-                    modifier = Modifier.clickable {
-                        actionSheetVisible = false
-                        visibleRemoveAction()
-                    },
-                )
-            }
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun WideRailActionSheet(
+    item: HomeWideRailItemUi,
+    onDetailsClick: () -> Unit,
+    onRemoveClick: (() -> Unit)?,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(bottom = 12.dp),
+    ) {
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        ListItem(
+            headlineContent = { Text("Open details") },
+            supportingContent = {
+                if (item.subtitle.isNotBlank()) {
+                    Text(
+                        text = item.subtitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            },
+            modifier = Modifier.clickable { onDetailsClick() },
+        )
+        if (onRemoveClick != null) {
+            ListItem(
+                headlineContent = { Text("Remove") },
+                modifier = Modifier.clickable { onRemoveClick() },
+            )
         }
     }
-
 }

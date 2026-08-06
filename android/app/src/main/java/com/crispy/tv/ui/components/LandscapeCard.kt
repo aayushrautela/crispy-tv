@@ -87,18 +87,12 @@ fun LandscapeCard(
                 contentScale = ContentScale.Crop,
             )
         } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(fallbackColor),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = title.take(1).uppercase(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                text = title.take(1).uppercase(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
 
         Box(

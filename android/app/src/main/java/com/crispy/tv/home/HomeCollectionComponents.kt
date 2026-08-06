@@ -26,7 +26,6 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -281,21 +280,14 @@ private fun HomeCollectionMovieRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
 
             if (detailText.isNotBlank() || ratingText != null) {
                 Row(
@@ -380,27 +372,24 @@ private fun HomeCollectionRatingBadge(
     rating: String,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = Color.Black.copy(alpha = 0.7f),
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.Black.copy(alpha = 0.7f))
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Star,
-                contentDescription = null,
-                modifier = Modifier.size(12.dp),
-                tint = Color.White,
-            )
-            Text(
-                text = rating,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-            )
-        }
+        Icon(
+            imageVector = Icons.Outlined.Star,
+            contentDescription = null,
+            modifier = Modifier.size(12.dp),
+            tint = Color.White,
+        )
+        Text(
+            text = rating,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+        )
     }
 }
