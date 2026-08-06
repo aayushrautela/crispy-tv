@@ -282,9 +282,10 @@ class CrispyBackendClient(
     )
 
     data class WatchStateResponse(
+        val itemId: String,
+        val played: Boolean,
         val watched: WatchedStateView?,
         val playCount: Int,
-        val watchedEpisodeKeys: List<String>,
     )
 
     data class WatchStateEnvelope(
@@ -848,6 +849,17 @@ class CrispyBackendClient(
         itemIds: List<String>,
     ): WatchStatesEnvelope {
         return getWatchStatesApi(accessToken, profileId, itemIds)
+    }
+
+    suspend fun getWatchStateMap(
+        accessToken: String,
+        profileId: String,
+        itemIds: List<String>,
+    ): Map<String, WatchStateResponse> {
+        if (itemIds.isEmpty()) return emptyMap()
+        return getWatchStatesApi(accessToken, profileId, itemIds)
+            .items
+            .associateBy { it.itemId }
     }
 
     suspend fun markWatched(accessToken: String, profileId: String, input: WatchMutationInput): WatchActionResponse {

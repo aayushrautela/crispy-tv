@@ -59,6 +59,7 @@ class AppGraph(
             sessionRepository = sessionRepository,
             catalogRepository = catalogRepository,
             userMediaRepository = userMediaRepository,
+            crispyBackendClient = BackendServicesProvider.backendClient(appContext),
             aiRepository = aiInsightsRepository,
             addonStreamsService = addonStreamsService,
             backendContextResolver = BackendContextResolverProvider.get(appContext),
