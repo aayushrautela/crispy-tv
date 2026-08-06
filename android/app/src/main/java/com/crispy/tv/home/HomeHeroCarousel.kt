@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.align
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -37,7 +39,34 @@ internal fun HomeHeroSkeleton(modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .height(320.dp)
             .skeletonElement(shape = RoundedCornerShape(28.dp), pulse = false)
-    )
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(0.72f)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .height(22.dp)
+                    .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.5f)
+                    .height(14.dp)
+                    .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(12.dp)
+                    .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)

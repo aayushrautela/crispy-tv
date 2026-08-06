@@ -27,6 +27,11 @@ object Dimensions {
     val SearchBarPillHeight: Dp = 56.dp
     val AvatarSize: Dp = 30.dp
     val IconSize: Dp = 24.dp
+
+    val SectionTitleSkeletonHeight: Dp = 28.dp
+    val SectionSubtitleSkeletonHeight: Dp = 16.dp
+    val SectionTitleSkeletonWidthFraction: Float = 0.45f
+    val SectionSubtitleSkeletonWidthFraction: Float = 0.3f
 }
 
 @ReadOnlyComposable

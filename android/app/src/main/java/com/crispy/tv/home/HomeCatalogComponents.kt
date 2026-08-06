@@ -59,10 +59,18 @@ internal fun HomeCatalogSectionRow(
                 if (sectionSkeleton) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.45f)
-                            .height(20.dp)
+                            .fillMaxWidth(Dimensions.SectionTitleSkeletonWidthFraction)
+                            .height(Dimensions.SectionTitleSkeletonHeight)
                             .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
                     )
+                    if (sectionUi.section.subtitle.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(Dimensions.SectionSubtitleSkeletonWidthFraction)
+                                .height(Dimensions.SectionSubtitleSkeletonHeight)
+                                .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
+                        )
+                    }
                 } else {
                     Text(
                         text = sectionUi.section.displayTitle,

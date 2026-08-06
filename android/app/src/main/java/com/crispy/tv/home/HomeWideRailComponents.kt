@@ -175,12 +175,14 @@ internal fun HomeRailHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (skeleton) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(20.dp)
-                        .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
-                )
+                Box(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(Dimensions.SectionTitleSkeletonWidthFraction)
+                            .height(Dimensions.SectionTitleSkeletonHeight)
+                            .skeletonElement(shape = RoundedCornerShape(4.dp), pulse = false)
+                    )
+                }
             } else {
                 Text(
                     text = title,
