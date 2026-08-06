@@ -1,6 +1,5 @@
 package com.crispy.tv.watchhistory
 
-import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.player.MetadataLabMediaType
 import java.util.Locale
 
@@ -10,23 +9,4 @@ fun matchesMediaType(expected: MetadataLabMediaType?, actual: MetadataLabMediaTy
 
 fun matchesContentId(candidate: String, targetNormalizedId: String): Boolean {
     return candidate.trim().lowercase(Locale.US) == targetNormalizedId
-}
-
-fun episodeWatchKeyCandidates(
-    details: MediaDetails,
-    season: Int,
-    episode: Int,
-): Set<String> {
-    return buildSet {
-        addEpisodeKey(details.id, season, episode)?.let(::add)
-    }
-}
-
-fun addEpisodeKey(
-    contentId: String,
-    season: Int,
-    episode: Int,
-): String? {
-    val normalized = contentId.trim().takeIf { it.isNotBlank() } ?: return null
-    return "${normalized.lowercase(Locale.US)}:$season:$episode"
 }

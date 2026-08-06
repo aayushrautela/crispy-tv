@@ -515,7 +515,6 @@ class BackendWatchHistoryService(
             isInWatchlist = false,
             isRated = false,
             userRating = null,
-            watchedEpisodeKeys = watchedEpisodeKeys.toSet(),
             playCount = playCount,
         )
     }

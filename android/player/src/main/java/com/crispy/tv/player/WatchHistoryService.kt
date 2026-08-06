@@ -57,7 +57,6 @@ data class CanonicalWatchStateSnapshot(
     val isInWatchlist: Boolean,
     val isRated: Boolean,
     val userRating: Int?,
-    val watchedEpisodeKeys: Set<String> = emptySet(),
     val playCount: Int = 0,
 )
 

@@ -1,31 +1,27 @@
 package com.crispy.tv.details
 
+import com.crispy.tv.backend.BackendContextResolver
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.watchhistory.episodeWatchKeyCandidates
-import java.util.Locale
 
 internal class EpisodeWatchStateResolver(
+    private val crispyBackendClient: CrispyBackendClient,
+    private val backendContextResolver: BackendContextResolver,
     private val userMediaRepository: UserMediaRepository,
     private val completionPercent: Double = 85.0,
 ) {
-    private var cachedEpisodeWatchKeys: Set<String>? = null
-
-    fun clearCache() {
-        cachedEpisodeWatchKeys = null
-    }
-
     suspend fun resolve(
         details: MediaDetails,
         videos: List<MediaVideo>,
     ): Map<String, EpisodeWatchState> {
         if (videos.isEmpty()) return emptyMap()
 
-        val watchedKeys = resolveWatchKeys(details)
+        val watchedEpisodeIds = resolveWatchedEpisodeIds(videos)
         val yearInt = details.year?.trim()?.toIntOrNull()
         val contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES
         val parentMediaType =
@@ -40,8 +36,7 @@ internal class EpisodeWatchStateResolver(
             if (season == null || episode == null) {
                 video.id to EpisodeWatchState()
             } else {
-                val watchedByHistory =
-                    episodeWatchKeyCandidates(details, season, episode).any { key -> watchedKeys.contains(key) }
+                val watchedByHistory = watchedEpisodeIds.contains(video.id)
                 val localProgress =
                     userMediaRepository.getLocalWatchProgress(
                         PlaybackIdentity(
@@ -68,28 +63,17 @@ internal class EpisodeWatchStateResolver(
         }
     }
 
-    private suspend fun resolveWatchKeys(details: MediaDetails): Set<String> {
-        cachedEpisodeWatchKeys?.let { return it }
-
-        val itemId = details.itemId?.trim()?.ifBlank { null }
-        val canonical =
-            if (itemId == null) {
-                null
-            } else {
-                userMediaRepository.getTitleWatchState(
-                    itemId = itemId,
-                    contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.SERIES,
+    private suspend fun resolveWatchedEpisodeIds(videos: List<MediaVideo>): Set<String> {
+        val backendContext =
+            runCatching { backendContextResolver.resolve() }.getOrNull() ?: return emptySet()
+        val states =
+            runCatching {
+                crispyBackendClient.getWatchStateMap(
+                    accessToken = backendContext.accessToken,
+                    profileId = backendContext.profileId,
+                    itemIds = videos.map { it.id },
                 )
-            }
-        val canonicalKeys =
-            canonical?.watchedEpisodeKeys.orEmpty()
-                .mapNotNull(::normalizeWatchKey)
-                .toSet()
-        return canonicalKeys.also { cachedEpisodeWatchKeys = it }
-    }
-
-    private fun normalizeWatchKey(value: String): String? {
-        val normalized = value.trim().lowercase(Locale.US)
-        return normalized.takeIf { it.isNotBlank() }
+            }.getOrNull() ?: return emptySet()
+        return states.filterValues { it.played }.keys
     }
 }
