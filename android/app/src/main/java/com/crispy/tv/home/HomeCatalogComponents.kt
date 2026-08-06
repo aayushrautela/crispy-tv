@@ -33,6 +33,7 @@ import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
+import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_POSTER_SKELETON_COUNT = 5
 
