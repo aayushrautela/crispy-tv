@@ -92,6 +92,7 @@ internal fun LandscapeArtworkFrame(
 
         if (progressFraction != null && progressFraction > 0f) {
             val progressWidth = progressFraction.coerceIn(0f, 1f)
+            val progressColor = MaterialTheme.colorScheme.tertiary
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -101,7 +102,7 @@ internal fun LandscapeArtworkFrame(
                     .drawWithContent {
                         drawContent()
                         drawRect(
-                            color = MaterialTheme.colorScheme.tertiary,
+                            color = progressColor,
                             size = size.copy(width = size.width * progressWidth),
                         )
                     },

@@ -75,7 +75,6 @@ fun CrispyScreen(
                         end = horizontalPadding,
                         bottom = safeBottomPadding(bottomPaddingExtra),
                     ),
-                    beyondBoundsPageCount = 1,
                     verticalArrangement = verticalArrangement,
                     content = content,
                 )
