@@ -4,7 +4,6 @@ import android.util.Log
 import com.crispy.tv.ai.AiInsightsRepository
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.BackendContextResolver
-import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
@@ -76,14 +75,13 @@ internal class DetailsUseCases(
     private val crispyBackendClient: CrispyBackendClient,
 ) {
     private val episodeWatchStateResolver = EpisodeWatchStateResolver(
-        crispyBackendClient = BackendServicesProvider.backendClient(appContext),
+        crispyBackendClient = crispyBackendClient,
         backendContextResolver = backendContextResolver,
         userMediaRepository = userMediaRepository,
     )
     private val cachedBaseResults = ConcurrentHashMap<String, DetailsScreenLoadResult>()
 
     fun clearEpisodeWatchStateCache() {
-        episodeWatchStateResolver.clearCache()
     }
 
     suspend fun loadScreen(

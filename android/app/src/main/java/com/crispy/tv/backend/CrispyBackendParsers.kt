@@ -466,7 +466,7 @@ private fun clientMediaCardToWatchStateResponse(card: ClientMediaCard): WatchSta
     val lastPlayedAt = progress?.lastPlayedAt
     val played = progress?.played == true
     return WatchStateResponse(
-        itemId = card.id,
+        itemId = card.itemId,
         played = played,
         watched = if (played && lastPlayedAt != null) WatchedStateView(watchedAt = lastPlayedAt) else null,
         playCount = progress?.playCount ?: 0,
