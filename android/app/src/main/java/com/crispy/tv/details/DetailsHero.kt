@@ -10,9 +10,11 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +78,8 @@ internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
     return details?.backdropUrl ?: details?.posterUrl
 }
 
+private const val SharedElementDuration = 300
+
 @Composable
 internal fun HeroSection(
     details: MediaDetails?,
@@ -103,6 +107,7 @@ internal fun HeroSection(
         modifier = Modifier
             .fillMaxWidth()
             .height(heroHeight)
+            .background(Color.Black)
     ) {
         val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
@@ -149,6 +154,11 @@ internal fun HeroSection(
                         .sharedBounds(
                             rememberSharedContentState(key = backdropKey),
                             animatedVisibilityScope = animatedVisibilityScope,
+                            enter = fadeIn(tween(SharedElementDuration)),
+                            exit = fadeOut(tween(SharedElementDuration)),
+                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
+                            renderInOverlayDuringTransition = true,
+                            zIndexInOverlay = 1f,
                         )
                 }
             } else {
@@ -288,6 +298,11 @@ internal fun HeroSection(
                             .sharedBounds(
                                 rememberSharedContentState(key = logoKey),
                                 animatedVisibilityScope = animatedVisibilityScope,
+                                enter = fadeIn(tween(SharedElementDuration)),
+                                exit = fadeOut(tween(SharedElementDuration)),
+                                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
+                                renderInOverlayDuringTransition = true,
+                                zIndexInOverlay = 2f,
                             )
                     }
                 } else {

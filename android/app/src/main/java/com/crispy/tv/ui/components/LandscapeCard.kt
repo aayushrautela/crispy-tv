@@ -1,7 +1,9 @@
 package com.crispy.tv.ui.components
 
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +38,8 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+
+private const val SharedElementDuration = 300
 
 @Composable
 fun LandscapeCard(
@@ -98,6 +102,12 @@ fun LandscapeCard(
                         .sharedBounds(
                             rememberSharedContentState(key = backdropKey),
                             animatedVisibilityScope = animatedVisibilityScope,
+                            enter = fadeIn(tween(SharedElementDuration)),
+                            exit = fadeOut(tween(SharedElementDuration)),
+                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
+                            renderInOverlayDuringTransition = true,
+                            zIndexInOverlay = 1f,
+                            clipInOverlayDuringTransition = { cardShape },
                         )
                 }
             } else {
@@ -142,6 +152,11 @@ fun LandscapeCard(
                             .sharedBounds(
                                 rememberSharedContentState(key = logoKey),
                                 animatedVisibilityScope = animatedVisibilityScope,
+                                enter = fadeIn(tween(SharedElementDuration)),
+                                exit = fadeOut(tween(SharedElementDuration)),
+                                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
+                                renderInOverlayDuringTransition = true,
+                                zIndexInOverlay = 2f,
                             )
                     }
                 } else {
