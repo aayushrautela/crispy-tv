@@ -15,6 +15,7 @@ data class HomeCatalogItem(
     val type: String,
     val rating: String? = null,
     val year: String? = null,
+    val genre: String? = null,
     val description: String? = null,
 )
 

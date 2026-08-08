@@ -17,7 +17,7 @@ import com.crispy.tv.domain.home.HomeCatalogSource
 import com.crispy.tv.domain.home.buildCatalogPage
 import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
-import com.crispy.tv.ratings.formatRatingOutOfTen
+import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.images.responsiveImageSetFromDomainMap
 import com.crispy.tv.images.toDomainMap
@@ -301,8 +301,9 @@ class HomeCatalogService internal constructor(
             logo = logo.toDomainMap(),
             addonId = "backend",
             type = mediaType.toCatalogType(),
-            rating = formatRatingOutOfTen(rating?.toString()),
+            rating = formatRating(rating),
             year = year?.toString(),
+            genre = genres.firstOrNull(),
             description = subtitle ?: overview,
         )
     }
@@ -323,6 +324,7 @@ class HomeCatalogService internal constructor(
             type = type,
             rating = rating,
             year = year,
+            genre = genre,
             description = description,
         )
     }
@@ -401,6 +403,7 @@ class HomeCatalogService internal constructor(
                                                             .put("type", item.type)
                                                             .put("rating", item.rating)
                                                             .put("year", item.year)
+                                                            .put("genre", item.genre)
                                                             .put("description", item.description)
                                             )
                                         }
@@ -481,6 +484,7 @@ class HomeCatalogService internal constructor(
             type = type,
             rating = json.optString("rating").trim().ifBlank { null },
             year = json.optString("year").trim().ifBlank { null },
+            genre = json.optString("genre").trim().ifBlank { null },
             description = json.optString("description").trim().ifBlank { null },
         )
     }
