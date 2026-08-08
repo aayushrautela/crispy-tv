@@ -33,6 +33,7 @@ data class CanonicalContinueWatchingItem(
     val addonId: String? = null,
     val subtitle: String? = null,
     val absoluteEpisodeNumber: Int? = null,
+    val genre: String? = null,
 ) {
     val type: String
     get() = when (itemType.lowercase()) {

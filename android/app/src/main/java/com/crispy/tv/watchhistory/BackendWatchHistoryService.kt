@@ -587,6 +587,7 @@ class BackendWatchHistoryService(
             stillUrl = images.still.medium,
             subtitle = buildContinueWatchingSubtitle(type, seasonNumber, episodeNumber),
             absoluteEpisodeNumber = null,
+            genre = genres.firstOrNull(),
         )
     }
 

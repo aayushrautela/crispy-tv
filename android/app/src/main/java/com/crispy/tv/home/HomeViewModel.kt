@@ -2,7 +2,6 @@ package com.crispy.tv.home
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.text.format.DateUtils
 import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
@@ -403,7 +402,7 @@ internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWide
     return HomeWideRailItemUi(
         key = "${type}:${localKey}",
         title = displayTitle,
-        subtitle = buildHomeWatchActivitySubtitle(nowMs),
+        subtitle = buildHomeWatchActivitySubtitle(),
         imageUrl = stillUrl ?: backdropUrl ?: posterUrl,
         logoUrl = logoUrl,
         progressFraction = progressPercent.takeIf { it > 0.0 }?.let { (it / 100.0).coerceIn(0.0, 1.0).toFloat() },
@@ -500,22 +499,17 @@ internal fun continueWatchingContentKey(entry: CanonicalContinueWatchingItem): S
     return entry.titleItemId.trim().ifBlank { entry.id.trim().lowercase(Locale.US) }
 }
 
-private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(nowMs: Long): String {
-    val isEpisode = itemType.equals("episode", ignoreCase = true)
-    val showName = if (isEpisode) title.takeIf { it.isNotBlank() } else null
-    val seasonEpisode =
-        if (!isEpisode && (type.equals("show", ignoreCase = true) || type.equals("anime", ignoreCase = true)) && season != null && episode != null) {
-            String.format(Locale.US, "S%02d:E%02d", season, episode)
+private fun CanonicalContinueWatchingItem.buildHomeWatchActivitySubtitle(): String {
+    val isShow = type.equals("show", ignoreCase = true) || type.equals("anime", ignoreCase = true)
+    return if (isShow) {
+        val seasonEpisode = if (season != null && episode != null) {
+            String.format(Locale.US, "S%02dE%02d", season, episode)
         } else {
             null
         }
-    val episodeName = episodeTitle?.takeIf { it.isNotBlank() }
-    val relativeWatched =
-        DateUtils.getRelativeTimeSpanString(
-            watchedAtEpochMs,
-            nowMs,
-            DateUtils.MINUTE_IN_MILLIS,
-        ).toString()
-
-    return listOfNotNull(showName, seasonEpisode, episodeName, relativeWatched).joinToString(separator = " • ")
+        val episodeName = episodeTitle?.takeIf { it.isNotBlank() }
+        listOfNotNull(seasonEpisode, episodeName).joinToString(separator = ": ")
+    } else {
+        genre.orEmpty()
+    }
 }
