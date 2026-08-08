@@ -107,8 +107,8 @@ fun LandscapeCard(
                             resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
                             renderInOverlayDuringTransition = true,
                             zIndexInOverlay = 1f,
-                            clipInOverlayDuringTransition = { cardShape },
                         )
+                        .clip(cardShape)
                 }
             } else {
                 Modifier.fillMaxSize()

@@ -249,8 +249,7 @@ internal fun HomeWideRailCard(
                 resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
                 renderInOverlayDuringTransition = true,
                 zIndexInOverlay = 1f,
-                clipInOverlayDuringTransition = { RoundedCornerShape(20.dp) },
-            )
+            ).clip(RoundedCornerShape(20.dp))
         }
     } else {
         Modifier
