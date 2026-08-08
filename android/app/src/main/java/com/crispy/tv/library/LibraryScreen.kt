@@ -35,12 +35,12 @@ import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
-import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ui.theme.Dimensions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -80,33 +80,6 @@ private val LIBRARY_SECTIONS =
     )
 
 @Immutable
-data class LibrarySectionItemUi(
-    val id: String,
-    val itemId: String,
-    val itemType: String,
-    val title: String,
-    val posterUrl: String?,
-    val backdropUrl: String?,
-    val logoUrl: String?,
-    val poster: ResponsiveImageSet = ResponsiveImageSet.fromSingle(posterUrl),
-    val backdrop: ResponsiveImageSet = ResponsiveImageSet.fromSingle(backdropUrl),
-    val logo: ResponsiveImageSet = ResponsiveImageSet.fromSingle(logoUrl),
-    val rating: Double?,
-    val year: Int?,
-    val genre: String?,
-    val maturityRating: String?,
-    val addedAt: String?,
-    val watchedAt: String?,
-    val ratedAt: String?,
-    val ratingValue: Int?,
-    val lastActivityAt: String?,
-    val origins: List<String>,
-) {
-    val stableKey: String
-        get() = id
-}
-
-@Immutable
 data class LibrarySectionUi(
     val id: String,
     val label: String,
@@ -126,7 +99,7 @@ class LibraryViewModel internal constructor(
     val uiState: StateFlow<LibraryUiState> = _uiState
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val items: Flow<PagingData<LibrarySectionItemUi>> =
+    val items: Flow<PagingData<CatalogItem>> =
         _uiState
             .map { it.selectedSectionId }
             .distinctUntilChanged()
@@ -187,14 +160,14 @@ class LibraryViewModel internal constructor(
 private data class HistoryMonthSectionUi(
     val monthKey: String,
     val label: String,
-    val items: List<LibrarySectionItemUi>,
+    val items: List<CatalogItem>,
 )
 
-private fun buildHistoryMonthSections(items: List<LibrarySectionItemUi>): List<HistoryMonthSectionUi> {
+private fun buildHistoryMonthSections(items: List<CatalogItem>): List<HistoryMonthSectionUi> {
     if (items.isEmpty()) return emptyList()
     val result = mutableListOf<HistoryMonthSectionUi>()
     var currentKey: String? = null
-    var currentItems = mutableListOf<LibrarySectionItemUi>()
+    var currentItems = mutableListOf<CatalogItem>()
     for (item in items) {
         val key = historyMonthKey(item.lastActivityAt ?: item.watchedAt)
         if (key != currentKey && currentKey != null && currentItems.isNotEmpty()) {
@@ -242,7 +215,7 @@ private sealed interface HistoryDisplayRow {
         override val stableKey get() = "history-month-$monthKey"
         override val contentType get() = "sectionHeader"
     }
-    data class Post(val monthKey: String, val items: List<LibrarySectionItemUi>) : HistoryDisplayRow {
+    data class Post(val monthKey: String, val items: List<CatalogItem>) : HistoryDisplayRow {
         override val stableKey get() = "history-row-$monthKey"
         override val contentType get() = "posterRow"
     }
@@ -256,10 +229,10 @@ private sealed interface HistoryDisplayRow {
 private data class RatingBandUi(
     val bandKey: String,
     val label: String,
-    val items: List<LibrarySectionItemUi>,
+    val items: List<CatalogItem>,
 )
 
-private fun buildRatingBandSections(items: List<LibrarySectionItemUi>): List<RatingBandUi> {
+private fun buildRatingBandSections(items: List<CatalogItem>): List<RatingBandUi> {
     val bands =
         listOf(
             RATING_BAND_TOP to "Top Rated",
@@ -287,7 +260,7 @@ private sealed interface RatingDisplayRow {
         override val stableKey get() = "rating-band-$bandKey"
         override val contentType get() = "sectionHeader"
     }
-    data class Post(val bandKey: String, val items: List<LibrarySectionItemUi>) : RatingDisplayRow {
+    data class Post(val bandKey: String, val items: List<CatalogItem>) : RatingDisplayRow {
         override val stableKey get() = "rating-row-$bandKey"
         override val contentType get() = "posterRow"
     }
@@ -333,14 +306,14 @@ private fun watchlistGroupLabel(groupKey: String): String =
 private data class WatchlistDateSectionUi(
     val groupKey: String,
     val label: String,
-    val items: List<LibrarySectionItemUi>,
+    val items: List<CatalogItem>,
 )
 
-private fun buildWatchlistDateSections(items: List<LibrarySectionItemUi>): List<WatchlistDateSectionUi> {
+private fun buildWatchlistDateSections(items: List<CatalogItem>): List<WatchlistDateSectionUi> {
     if (items.isEmpty()) return emptyList()
     val result = mutableListOf<WatchlistDateSectionUi>()
     var currentKey: String? = null
-    var currentItems = mutableListOf<LibrarySectionItemUi>()
+    var currentItems = mutableListOf<CatalogItem>()
     for (item in items) {
         val key = watchlistGroupKey(item.addedAt)
         if (key != currentKey && currentKey != null && currentItems.isNotEmpty()) {
@@ -363,7 +336,7 @@ private sealed interface WatchlistDisplayRow {
         override val stableKey get() = "watchlist-group-$groupKey"
         override val contentType get() = "sectionHeader"
     }
-    data class Post(val groupKey: String, val items: List<LibrarySectionItemUi>) : WatchlistDisplayRow {
+    data class Post(val groupKey: String, val items: List<CatalogItem>) : WatchlistDisplayRow {
         override val stableKey get() = "watchlist-row-$groupKey"
         override val contentType get() = "posterRow"
     }
@@ -372,9 +345,9 @@ private sealed interface WatchlistDisplayRow {
 // endregion
 
 internal fun LazyListScope.historyItems(
-    loadedItems: List<LibrarySectionItemUi>,
+    loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
-    onItemClick: (LibrarySectionItemUi) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
 ) {
     val monthSections = buildHistoryMonthSections(loadedItems)
     val displayRows = monthSections.flatMap { section ->
@@ -397,14 +370,14 @@ internal fun LazyListScope.historyItems(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                 ) {
-                    items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
+                    items(row.items, key = { it.id }, contentType = { "poster" }) { item ->
                         LandscapeCard(
                             title = item.title,
                             backdropUrl = item.backdropUrl,
                             posterUrl = item.posterUrl,
                             logoUrl = item.logoUrl,
-                            rating = item.rating?.toString(),
-                            year = item.year?.toString(),
+                            rating = item.rating,
+                            year = item.year,
                             maturityRating = item.maturityRating,
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
@@ -418,9 +391,9 @@ internal fun LazyListScope.historyItems(
 }
 
 internal fun LazyListScope.ratingsItems(
-    loadedItems: List<LibrarySectionItemUi>,
+    loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
-    onItemClick: (LibrarySectionItemUi) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
 ) {
     val bandSections = buildRatingBandSections(loadedItems)
     val displayRows = bandSections.flatMap { section ->
@@ -443,14 +416,14 @@ internal fun LazyListScope.ratingsItems(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                 ) {
-                    items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
+                    items(row.items, key = { it.id }, contentType = { "poster" }) { item ->
                         LandscapeCard(
                             title = item.title,
                             backdropUrl = item.backdropUrl,
                             posterUrl = item.posterUrl,
                             logoUrl = item.logoUrl,
-                            rating = item.rating?.toString(),
-                            year = item.year?.toString(),
+                            rating = item.rating,
+                            year = item.year,
                             maturityRating = item.maturityRating,
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
@@ -464,9 +437,9 @@ internal fun LazyListScope.ratingsItems(
 }
 
 internal fun LazyListScope.watchlistItems(
-    loadedItems: List<LibrarySectionItemUi>,
+    loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
-    onItemClick: (LibrarySectionItemUi) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
 ) {
     val dateSections = buildWatchlistDateSections(loadedItems)
     val displayRows = dateSections.flatMap { section ->
@@ -489,14 +462,14 @@ internal fun LazyListScope.watchlistItems(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                 ) {
-                    items(row.items, key = { it.stableKey }, contentType = { "poster" }) { item ->
+                    items(row.items, key = { it.id }, contentType = { "poster" }) { item ->
                         LandscapeCard(
                             title = item.title,
                             backdropUrl = item.backdropUrl,
                             posterUrl = item.posterUrl,
                             logoUrl = item.logoUrl,
-                            rating = item.rating?.toString(),
-                            year = item.year?.toString(),
+                            rating = item.rating,
+                            year = item.year,
                             maturityRating = item.maturityRating,
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),

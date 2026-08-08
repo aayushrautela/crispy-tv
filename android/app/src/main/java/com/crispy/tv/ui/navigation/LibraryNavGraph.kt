@@ -12,7 +12,7 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
                         itemId = item.itemId,
-                        itemType = item.itemType,
+                        itemType = item.type,
                     )
                 )
             },

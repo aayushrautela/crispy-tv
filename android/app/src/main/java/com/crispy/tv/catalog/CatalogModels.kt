@@ -42,6 +42,12 @@ data class CatalogItem(
     val year: String? = null,
     val genre: String? = null,
     val description: String? = null,
+    val maturityRating: String? = null,
+    val ratingValue: Int? = null,
+    val addedAt: String? = null,
+    val watchedAt: String? = null,
+    val ratedAt: String? = null,
+    val lastActivityAt: String? = null,
 )
 
 @Immutable

@@ -36,7 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LibraryRoute(
-    onItemClick: (LibrarySectionItemUi) -> Unit,
+    onItemClick: (CatalogItem) -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,

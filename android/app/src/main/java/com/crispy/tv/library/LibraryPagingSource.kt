@@ -6,7 +6,9 @@ import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.images.toUiResponsiveImageSet
+import com.crispy.tv.ratings.formatRating
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -14,10 +16,10 @@ class LibraryPagingSource(
     private val backend: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
     private val sectionId: String,
-) : PagingSource<String, LibrarySectionItemUi>() {
-    override fun getRefreshKey(state: PagingState<String, LibrarySectionItemUi>): String? = null
+) : PagingSource<String, CatalogItem>() {
+    override fun getRefreshKey(state: PagingState<String, CatalogItem>): String? = null
 
-    override suspend fun load(params: LoadParams<String>): LoadResult<String, LibrarySectionItemUi> {
+    override suspend fun load(params: LoadParams<String>): LoadResult<String, CatalogItem> {
         return runCatching {
             val backendContext =
                 if (backend.isConfigured()) {
@@ -90,15 +92,14 @@ private suspend fun loadLibrarySectionPage(
     }
 }
 
-private fun ClientMediaCard.toLibrarySectionItemUi(
+private fun ClientMediaCard.toCatalogItem(
     watchedAt: String?,
     ratingValue: Int?,
     lastActivityAt: String?,
-): LibrarySectionItemUi {
-    return LibrarySectionItemUi(
+): CatalogItem {
+    return CatalogItem(
         id = itemId,
         itemId = itemId,
-        itemType = mediaType,
         title = title,
         posterUrl = images.poster.medium,
         backdropUrl = images.backdrop.medium,
@@ -106,25 +107,24 @@ private fun ClientMediaCard.toLibrarySectionItemUi(
         poster = images.poster.toUiResponsiveImageSet(),
         backdrop = images.backdrop.toUiResponsiveImageSet(),
         logo = images.logo.toUiResponsiveImageSet(),
-        rating = rating,
-        year = year,
+        addonId = "backend",
+        type = mediaType.toCatalogType(),
+        rating = formatRating(rating),
+        year = year?.toString(),
         genre = genres.firstOrNull(),
         maturityRating = maturityRating,
-        addedAt = null,
         watchedAt = watchedAt,
-        ratedAt = null,
         ratingValue = ratingValue,
         lastActivityAt = lastActivityAt,
-        origins = emptyList(),
     )
 }
 
-private fun ClientMediaCard.librarySectionItemFromProgress(): LibrarySectionItemUi {
+private fun ClientMediaCard.libraryCatalogItemFromProgress(): CatalogItem {
     val progress = progress
     val lastActivityAt = progress?.lastPlayedAt
     val watchedAt = lastActivityAt?.takeIf { progress?.played == true }
     val ratingValue = progress?.userRating?.toInt()?.takeIf { it in 1..10 }
-    return toLibrarySectionItemUi(
+    return toCatalogItem(
         watchedAt = watchedAt,
         ratingValue = ratingValue,
         lastActivityAt = lastActivityAt,
@@ -133,7 +133,7 @@ private fun ClientMediaCard.librarySectionItemFromProgress(): LibrarySectionItem
 
 private fun ClientMediaCardQueryResult.toHistorySectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
-        items = items.map { card -> card.librarySectionItemFromProgress() },
+        items = items.map { card -> card.libraryCatalogItemFromProgress() },
         nextCursor = nextCursor,
         hasMore = hasMore,
     )
@@ -141,7 +141,7 @@ private fun ClientMediaCardQueryResult.toHistorySectionPageUi(): LibrarySectionP
 
 private fun ClientMediaCardQueryResult.toWatchlistSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
-        items = items.map { card -> card.librarySectionItemFromProgress() },
+        items = items.map { card -> card.libraryCatalogItemFromProgress() },
         nextCursor = nextCursor,
         hasMore = hasMore,
     )
@@ -149,14 +149,22 @@ private fun ClientMediaCardQueryResult.toWatchlistSectionPageUi(): LibrarySectio
 
 private fun ClientMediaCardQueryResult.toRatingsSectionPageUi(): LibrarySectionPageUi {
     return LibrarySectionPageUi(
-        items = items.map { card -> card.librarySectionItemFromProgress() },
+        items = items.map { card -> card.libraryCatalogItemFromProgress() },
         nextCursor = nextCursor,
         hasMore = hasMore,
     )
 }
 
+private fun String.toCatalogType(): String {
+    return when (trim().lowercase()) {
+        "anime" -> "anime"
+        "episode", "show", "tv", "series" -> "show"
+        else -> "movie"
+    }
+}
+
 internal data class LibrarySectionPageUi(
-    val items: List<LibrarySectionItemUi> = emptyList(),
+    val items: List<CatalogItem> = emptyList(),
     val nextCursor: String? = null,
     val hasMore: Boolean = false,
 )
