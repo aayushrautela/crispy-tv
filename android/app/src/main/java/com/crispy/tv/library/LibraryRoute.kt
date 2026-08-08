@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
