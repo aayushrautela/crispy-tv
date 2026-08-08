@@ -68,7 +68,6 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
 
 private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
-private const val HERO_SEED_GATE_TIMEOUT_MS = 1800L
 
 @Composable
 internal fun DetailsScreen(
@@ -116,36 +115,17 @@ internal fun DetailsScreen(
     var isSeedColorResolved by remember(imageUrl, fallbackSeed) {
         mutableStateOf(details == null || imageUrl.isNullOrBlank() || cachedSeed != null)
     }
-    var heroImageLoaded by remember(imageUrl) { mutableStateOf(false) }
-    var heroImageLoadFailed by remember(imageUrl) { mutableStateOf(false) }
-    var heroSeedGateTimedOut by remember(imageUrl) { mutableStateOf(false) }
 
-    LaunchedEffect(details, imageUrl, cachedSeed) {
-        heroSeedGateTimedOut = false
-        if (details == null || imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
-        delay(HERO_SEED_GATE_TIMEOUT_MS)
-        if (!isSeedColorResolved) {
-            heroSeedGateTimedOut = true
-        }
-    }
-
-    LaunchedEffect(details, imageUrl, cachedSeed, fallbackSeed, heroImageLoaded, heroImageLoadFailed, heroSeedGateTimedOut) {
+    LaunchedEffect(details, imageUrl, cachedSeed, fallbackSeed) {
         seedColor = cachedSeed ?: fallbackSeed
-        isSeedColorResolved = details == null || imageUrl.isNullOrBlank() || cachedSeed != null || heroSeedGateTimedOut
+        isSeedColorResolved = details == null || imageUrl.isNullOrBlank() || cachedSeed != null
         if (details == null || imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
-        if (heroSeedGateTimedOut) return@LaunchedEffect
-        if (!heroImageLoaded && !heroImageLoadFailed) return@LaunchedEffect
 
-        val resolvedSeed =
-            if (heroImageLoaded) {
-                loadDetailsSeedColor(
-                    context = context,
-                    imageUrl = imageUrl,
-                    fallbackSeed = fallbackSeed,
-                )
-            } else {
-                null
-            }
+        val resolvedSeed = loadDetailsSeedColor(
+            context = context,
+            imageUrl = imageUrl,
+            fallbackSeed = fallbackSeed,
+        )
         seedColor = resolvedSeed ?: fallbackSeed
         isSeedColorResolved = true
     }
@@ -277,17 +257,8 @@ internal fun DetailsScreen(
                         showTrailer = showTrailer,
                         isTrailerPlaying = isTrailerPlaying,
                         isTrailerMuted = userMutedTrailer,
-                        onHeroImageLoaded = {
-                            if (cachedSeed == null && !heroImageLoaded && !heroSeedGateTimedOut) {
-                                heroImageLoaded = true
-                                heroImageLoadFailed = false
-                            }
-                        },
-                        onHeroImageLoadFailed = {
-                            if (cachedSeed == null && !heroImageLoaded && !heroSeedGateTimedOut) {
-                                heroImageLoadFailed = true
-                            }
-                        },
+                        onHeroImageLoaded = {},
+                        onHeroImageLoadFailed = {},
                         onToggleTrailer = {
                             if (!trailerKey.isNullOrBlank()) {
                                 if (!showTrailer) {
@@ -298,6 +269,7 @@ internal fun DetailsScreen(
                                 }
                             }
                         },
+                        itemId = uiState.itemId,
                     )
                 }
 

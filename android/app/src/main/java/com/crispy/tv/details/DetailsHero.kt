@@ -10,6 +10,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,6 +66,8 @@ import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
+import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -84,7 +88,12 @@ internal fun HeroSection(
     onHeroImageLoaded: () -> Unit,
     onHeroImageLoadFailed: () -> Unit,
     onToggleTrailer: () -> Unit,
+    itemId: String? = null,
 ) {
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+    val backdropKey = itemId?.let { "backdrop-$it" }
+    val logoKey = itemId?.let { "logo-$it" }
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -133,10 +142,22 @@ internal fun HeroSection(
         }
 
         if (!imageUrl.isNullOrBlank()) {
+            val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
+                with(sharedTransitionScope) {
+                    Modifier
+                        .fillMaxSize()
+                        .sharedBounds(
+                            rememberSharedContentState(key = backdropKey),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                }
+            } else {
+                Modifier.fillMaxSize()
+            }
             AsyncImage(
                 model = imageUrl,
                 contentDescription = details?.title,
-                modifier = Modifier.fillMaxSize(),
+                modifier = backdropModifier,
                 contentScale = ContentScale.Crop,
                 onSuccess = { result ->
                     onHeroImageLoaded()
@@ -259,12 +280,25 @@ internal fun HeroSection(
             val logoUrl = details.logoUrl?.trim().orEmpty()
             if (logoUrl.isNotBlank()) {
                 val logoModel = rememberCrispyImageModel(url = logoUrl, width = 320.dp, height = 104.dp)
+                val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
+                    with(sharedTransitionScope) {
+                        Modifier
+                            .fillMaxWidth(0.81f)
+                            .height(104.dp)
+                            .sharedBounds(
+                                rememberSharedContentState(key = logoKey),
+                                animatedVisibilityScope = animatedVisibilityScope,
+                            )
+                    }
+                } else {
+                    Modifier
+                        .fillMaxWidth(0.81f)
+                        .height(104.dp)
+                }
                 AsyncImage(
                     model = logoModel ?: logoUrl,
                     contentDescription = details.title,
-                    modifier = Modifier
-                        .fillMaxWidth(0.81f)
-                        .height(104.dp),
+                    modifier = logoModifier,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.Center
                 )

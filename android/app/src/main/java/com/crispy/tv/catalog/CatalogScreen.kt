@@ -121,7 +121,8 @@ fun CatalogRoute(
                             rating = item.rating,
                             year = item.year,
                             genre = item.genre,
-                            onClick = { onItemClick(item) }
+                            onClick = { onItemClick(item) },
+                            itemId = item.itemId,
                         )
                     }
                 }

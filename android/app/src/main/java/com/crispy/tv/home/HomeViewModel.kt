@@ -408,6 +408,7 @@ internal fun CanonicalContinueWatchingItem.toWideRailItem(nowMs: Long): HomeWide
         progressFraction = progressPercent.takeIf { it > 0.0 }?.let { (it / 100.0).coerceIn(0.0, 1.0).toFloat() },
         kind = HomeWideRailItemKind.WATCH_ACTIVITY,
         continueWatchingItem = this,
+        detailsItemId = titleItemId,
     )
 }
 
@@ -420,6 +421,7 @@ internal fun CalendarEpisodeItem.toWideRailItem(): HomeWideRailItemUi {
         badgeLabel = buildCalendarBadgeLabel(),
         kind = HomeWideRailItemKind.CALENDAR_EPISODE,
         calendarEpisodeItem = this,
+        detailsItemId = titleItemId,
     )
 }
 

@@ -1,5 +1,7 @@
 package com.crispy.tv.ui.components
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +34,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.ratings.formatRating
+import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
+import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 
 @Composable
 fun LandscapeCard(
@@ -45,6 +49,7 @@ fun LandscapeCard(
     year: String? = null,
     maturityRating: String? = null,
     genre: String? = null,
+    itemId: String? = null,
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val imageUrl = backdropUrl ?: posterUrl
@@ -52,6 +57,12 @@ fun LandscapeCard(
     val cardHeight = (cardWidth.value * 9f / 16f).dp
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight)
     val logoModel = crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp)
+
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+
+    val backdropKey = itemId?.let { "backdrop-$it" }
+    val logoKey = itemId?.let { "logo-$it" }
 
     val scrimBrush = remember {
         Brush.verticalGradient(
@@ -80,10 +91,22 @@ fun LandscapeCard(
         contentAlignment = Alignment.BottomStart,
     ) {
         if (imageModel != null) {
+            val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
+                with(sharedTransitionScope) {
+                    Modifier
+                        .fillMaxSize()
+                        .sharedBounds(
+                            rememberSharedContentState(key = backdropKey),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                }
+            } else {
+                Modifier.fillMaxSize()
+            }
             AsyncImage(
                 model = imageModel,
                 contentDescription = title,
-                modifier = Modifier.fillMaxSize(),
+                modifier = backdropModifier,
                 contentScale = ContentScale.Crop,
             )
         } else {
@@ -111,12 +134,25 @@ fun LandscapeCard(
             verticalArrangement = Arrangement.Bottom,
         ) {
             if (logoModel != null) {
+                val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
+                    with(sharedTransitionScope) {
+                        Modifier
+                            .fillMaxWidth(0.60f)
+                            .height(30.dp)
+                            .sharedBounds(
+                                rememberSharedContentState(key = logoKey),
+                                animatedVisibilityScope = animatedVisibilityScope,
+                            )
+                    }
+                } else {
+                    Modifier
+                        .fillMaxWidth(0.60f)
+                        .height(30.dp)
+                }
                 AsyncImage(
                     model = logoModel,
                     contentDescription = title,
-                    modifier = Modifier
-                        .fillMaxWidth(0.60f)
-                        .height(30.dp),
+                    modifier = logoModifier,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
                 )

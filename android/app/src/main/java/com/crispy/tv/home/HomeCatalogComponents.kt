@@ -161,6 +161,7 @@ internal fun HomeCatalogPosterCard(
         year = item.year,
         genre = item.genre,
         modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-        onClick = onClick
+        onClick = onClick,
+        itemId = item.itemId,
     )
 }

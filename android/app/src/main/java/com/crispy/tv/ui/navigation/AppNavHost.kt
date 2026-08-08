@@ -3,12 +3,14 @@ package com.crispy.tv.ui.navigation
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
@@ -25,88 +27,92 @@ fun AppNavHost(
     modifier: Modifier = Modifier,
     onSignedOut: () -> Unit = {},
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = TopLevelDestination.Home.route,
-        modifier = modifier,
-        enterTransition = {
-            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                EnterTransition.None
-            } else if (targetRouteIndex > initialRouteIndex) {
-                slideInHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
-            } else {
-                slideInHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+    SharedTransitionLayout {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
+            NavHost(
+                navController = navController,
+                startDestination = TopLevelDestination.Home.route,
+                modifier = modifier,
+                enterTransition = {
+                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                        EnterTransition.None
+                    } else if (targetRouteIndex > initialRouteIndex) {
+                        slideInHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    } else {
+                        slideInHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    }
+                },
+                exitTransition = {
+                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                        ExitTransition.None
+                    } else if (targetRouteIndex > initialRouteIndex) {
+                        slideOutHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    }
+                },
+                popEnterTransition = {
+                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                        EnterTransition.None
+                    } else if (initialRouteIndex < targetRouteIndex) {
+                        slideInHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    } else {
+                        slideInHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    }
+                },
+                popExitTransition = {
+                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
+                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
+                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
+                        ExitTransition.None
+                    } else if (initialRouteIndex < targetRouteIndex) {
+                        slideOutHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    } else {
+                        slideOutHorizontally(
+                            animationSpec = tween(TopLevelNavigationDurationMillis),
+                            targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    }
+                },
+            ) {
+                addHomeNavGraph(navController)
+                addSearchNavGraph(navController)
+                addDiscoverNavGraph(navController)
+                addLibraryNavGraph(navController)
+                addSettingsNavGraph(navController)
+                addAccountNavGraph(
+                    navController = navController,
+                    onSignedOut = onSignedOut,
+                )
             }
-        },
-        exitTransition = {
-            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                ExitTransition.None
-            } else if (targetRouteIndex > initialRouteIndex) {
-                slideOutHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
-            } else {
-                slideOutHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
-            }
-        },
-        popEnterTransition = {
-            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                EnterTransition.None
-            } else if (initialRouteIndex < targetRouteIndex) {
-                slideInHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
-            } else {
-                slideInHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
-            }
-        },
-        popExitTransition = {
-            val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-            val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-            if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                ExitTransition.None
-            } else if (initialRouteIndex < targetRouteIndex) {
-                slideOutHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
-            } else {
-                slideOutHorizontally(
-                    animationSpec = tween(TopLevelNavigationDurationMillis),
-                    targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
-            }
-        },
-    ) {
-        addHomeNavGraph(navController)
-        addSearchNavGraph(navController)
-        addDiscoverNavGraph(navController)
-        addLibraryNavGraph(navController)
-        addSettingsNavGraph(navController)
-        addAccountNavGraph(
-            navController = navController,
-            onSignedOut = onSignedOut,
-        )
+        }
     }
 }
 

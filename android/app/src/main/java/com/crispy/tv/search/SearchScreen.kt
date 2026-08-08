@@ -396,6 +396,7 @@ private fun SearchSectionRow(
                 genre = item.genre,
                 modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                 onClick = { onItemClick(item) },
+                itemId = item.itemId,
             )
         },
     )

@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
@@ -20,82 +21,86 @@ import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) { entry ->
-        HomeRoute(
-            onHeroClick = { hero ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = hero.id,
-                        itemType = hero.type,
+        CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            HomeRoute(
+                onHeroClick = { hero ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = hero.id,
+                            itemType = hero.type,
+                        )
                     )
-                )
-            },
-            onContinueWatchingClick = { item ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.titleItemId,
-                        itemType = item.type,
-                        seasonNumber = item.season,
-                        episodeNumber = item.episode,
-                        absoluteEpisodeNumber = item.absoluteEpisodeNumber,
-                        autoOpenEpisode = true,
+                },
+                onContinueWatchingClick = { item ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.titleItemId,
+                            itemType = item.type,
+                            seasonNumber = item.season,
+                            episodeNumber = item.episode,
+                            absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+                            autoOpenEpisode = true,
+                        )
                     )
-                )
-            },
-            onContinueWatchingOpenDetails = { item ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.titleItemId,
-                        itemType = item.type,
-                        seasonNumber = item.season,
-                        episodeNumber = item.episode,
-                        absoluteEpisodeNumber = item.absoluteEpisodeNumber,
-                        highlightEpisodeId = "${item.season}:${item.episode}",
-                        autoOpenEpisode = false,
+                },
+                onContinueWatchingOpenDetails = { item ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.titleItemId,
+                            itemType = item.type,
+                            seasonNumber = item.season,
+                            episodeNumber = item.episode,
+                            absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+                            highlightEpisodeId = "${item.season}:${item.episode}",
+                            autoOpenEpisode = false,
+                        )
                     )
-                )
-            },
-            onThisWeekClick = { item ->
-                navController.navigateToCalendarEpisode(item)
-            },
-            onThisWeekSeeAllClick = {
-                navController.navigate(AppRoutes.CalendarRoute)
-            },
-            onCatalogItemClick = { item ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.itemId,
-                        itemType = item.type,
+                },
+                onThisWeekClick = { item ->
+                    navController.navigateToCalendarEpisode(item)
+                },
+                onThisWeekSeeAllClick = {
+                    navController.navigate(AppRoutes.CalendarRoute)
+                },
+                onCatalogItemClick = { item ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.itemId,
+                            itemType = item.type,
+                        )
                     )
-                )
-            },
-            onCatalogSeeAllClick = { section ->
-                navController.navigate(AppRoutes.catalogListRoute(section))
-            },
-            onOpenAccountsProfiles = {
-                navController.navigate(AppRoutes.AccountsProfilesRoute) {
-                    launchSingleTop = true
-                }
-            },
-            scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
-            onScrollToTopConsumed = {
-                entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
-            },
-        )
+                },
+                onCatalogSeeAllClick = { section ->
+                    navController.navigate(AppRoutes.catalogListRoute(section))
+                },
+                onOpenAccountsProfiles = {
+                    navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                        launchSingleTop = true
+                    }
+                },
+                scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
+                onScrollToTopConsumed = {
+                    entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
+                },
+            )
+        }
     }
 
     composable(AppRoutes.CalendarRoute) {
-        CalendarRoute(
-            onBack = { navController.popBackStack() },
-            onEpisodeClick = { item -> navController.navigateToCalendarEpisode(item) },
-            onSeriesClick = { item ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.itemId,
-                        itemType = item.type,
+        CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            CalendarRoute(
+                onBack = { navController.popBackStack() },
+                onEpisodeClick = { item -> navController.navigateToCalendarEpisode(item) },
+                onSeriesClick = { item ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.itemId,
+                            itemType = item.type,
+                        )
                     )
-                )
-            },
-        )
+                },
+            )
+        }
     }
 
     composable(
@@ -114,18 +119,20 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 presentation = com.crispy.tv.domain.home.HomeCatalogPresentation.RAIL,
                 title = args?.getString(AppRoutes.CatalogTitleArg).orEmpty(),
             )
-        CatalogRoute(
-            section = section,
-            onBack = { navController.popBackStack() },
-            onItemClick = { item ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.itemId,
-                        itemType = item.type,
+        CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            CatalogRoute(
+                section = section,
+                onBack = { navController.popBackStack() },
+                onItemClick = { item ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.itemId,
+                            itemType = item.type,
+                        )
                     )
-                )
-            }
-        )
+                }
+            )
+        }
     }
 
     composable(
@@ -152,37 +159,39 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             it.seasonNumber != null || it.episodeNumber != null || it.absoluteEpisodeNumber != null
         }
         val context = LocalContext.current
-        DetailsRoute(
-            itemId = itemId,
-            itemType = itemType,
-            runtimeEntry = runtimeEntry,
-            highlightEpisodeId = highlightEpisodeId,
-            autoOpenEpisode = autoOpenEpisode,
-            onBack = { navController.popBackStack() },
-            onItemClick = { item ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.itemId,
-                        itemType = item.type,
+        CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            DetailsRoute(
+                itemId = itemId,
+                itemType = itemType,
+                runtimeEntry = runtimeEntry,
+                highlightEpisodeId = highlightEpisodeId,
+                autoOpenEpisode = autoOpenEpisode,
+                onBack = { navController.popBackStack() },
+                onItemClick = { item ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.itemId,
+                            itemType = item.type,
+                        )
                     )
-                )
-            },
-            onPersonClick = { personId -> navController.navigate(AppRoutes.personDetailsRoute(personId)) },
-            onOpenPlayer = { playbackUrl, playbackHeaders, title, identity, subtitle, artworkUrl, launchSnapshot ->
-                context.startActivity(
-                    PlayerActivity.intent(
-                        context = context,
-                        playbackUrl = playbackUrl,
-                        playbackHeaders = playbackHeaders,
-                        title = title,
-                        identity = identity,
-                        subtitle = subtitle,
-                        artworkUrl = artworkUrl,
-                        launchSnapshot = launchSnapshot,
+                },
+                onPersonClick = { personId -> navController.navigate(AppRoutes.personDetailsRoute(personId)) },
+                onOpenPlayer = { playbackUrl, playbackHeaders, title, identity, subtitle, artworkUrl, launchSnapshot ->
+                    context.startActivity(
+                        PlayerActivity.intent(
+                            context = context,
+                            playbackUrl = playbackUrl,
+                            playbackHeaders = playbackHeaders,
+                            title = title,
+                            identity = identity,
+                            subtitle = subtitle,
+                            artworkUrl = artworkUrl,
+                            launchSnapshot = launchSnapshot,
+                        )
                     )
-                )
-            },
-        )
+                },
+            )
+        }
     }
 
     composable(
@@ -192,18 +201,20 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         )
     ) { entry ->
         val personId = entry.arguments?.getString(AppRoutes.PersonDetailsPersonIdArg).orEmpty()
-        PersonDetailsRoute(
-            personId = personId,
-            onBack = { navController.popBackStack() },
-            onItemClick = { item ->
-                navController.navigate(
-                    AppRoutes.homeDetailsRoute(
-                        itemId = item.itemId,
-                        itemType = item.type,
+        CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
+            PersonDetailsRoute(
+                personId = personId,
+                onBack = { navController.popBackStack() },
+                onItemClick = { item ->
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.itemId,
+                            itemType = item.type,
+                        )
                     )
-                )
-            }
-        )
+                }
+            )
+        }
     }
 }
 

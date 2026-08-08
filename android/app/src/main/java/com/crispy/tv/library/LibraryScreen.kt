@@ -382,6 +382,7 @@ internal fun LazyListScope.historyItems(
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                             onClick = { onItemClick(item) },
+                            itemId = item.itemId,
                         )
                     }
                 }
@@ -428,6 +429,7 @@ internal fun LazyListScope.ratingsItems(
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                             onClick = { onItemClick(item) },
+                            itemId = item.itemId,
                         )
                     }
                 }
@@ -474,6 +476,7 @@ internal fun LazyListScope.watchlistItems(
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                             onClick = { onItemClick(item) },
+                            itemId = item.itemId,
                         )
                     }
                 }

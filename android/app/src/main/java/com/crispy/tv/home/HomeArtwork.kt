@@ -41,6 +41,7 @@ internal fun LandscapeArtworkFrame(
     scrimMaxAlpha: Float = 0.82f,
     topEndContent: (@Composable BoxScope.() -> Unit)? = null,
     bottomOverlayContent: @Composable BoxScope.() -> Unit = {},
+    imageModifier: Modifier = Modifier,
 ) {
     Box(
         modifier =
@@ -59,7 +60,7 @@ internal fun LandscapeArtworkFrame(
             AsyncImage(
                 model = imageModel,
                 contentDescription = title,
-                modifier = Modifier.fillMaxSize(),
+                modifier = imageModifier.then(Modifier.fillMaxSize()),
                 contentScale = ContentScale.Crop,
             )
         }

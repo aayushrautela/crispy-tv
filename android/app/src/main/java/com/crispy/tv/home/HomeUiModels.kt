@@ -42,6 +42,7 @@ data class HomeWideRailItemUi(
     val kind: HomeWideRailItemKind,
     val continueWatchingItem: CanonicalContinueWatchingItem? = null,
     val calendarEpisodeItem: CalendarEpisodeItem? = null,
+    val detailsItemId: String? = null,
 )
 
 @Immutable

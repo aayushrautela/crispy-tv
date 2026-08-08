@@ -1,5 +1,7 @@
 package com.crispy.tv.home
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -41,6 +43,8 @@ import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
+import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
+import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
@@ -227,6 +231,22 @@ internal fun HomeWideRailCard(
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
     )
 
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+    val backdropKey = item.detailsItemId?.let { "backdrop-$it" }
+    val logoKey = item.detailsItemId?.let { "logo-$it" }
+
+    val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                rememberSharedContentState(key = backdropKey),
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+        }
+    } else {
+        Modifier
+    }
+
     val cardInteractionModifier =
         if (hasItemActions) {
             Modifier.combinedClickable(
@@ -251,6 +271,7 @@ internal fun HomeWideRailCard(
         progressFraction = item.progressFraction,
         scrimHeightFraction = 0.55f,
         scrimMaxAlpha = 0.88f,
+        imageModifier = backdropModifier,
         bottomOverlayContent = {
             val logoModel = rememberCrispyImageModel(
                 url = item.logoUrl,
@@ -265,12 +286,25 @@ internal fun HomeWideRailCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 if (logoModel != null) {
+                    val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
+                        with(sharedTransitionScope) {
+                            Modifier
+                                .fillMaxWidth(0.60f)
+                                .height(30.dp)
+                                .sharedBounds(
+                                    rememberSharedContentState(key = logoKey),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                )
+                        }
+                    } else {
+                        Modifier
+                            .fillMaxWidth(0.60f)
+                            .height(30.dp)
+                    }
                     AsyncImage(
                         model = logoModel,
                         contentDescription = item.title,
-                        modifier = Modifier
-                            .fillMaxWidth(0.60f)
-                            .height(30.dp),
+                        modifier = logoModifier,
                         contentScale = ContentScale.Fit,
                         alignment = Alignment.CenterStart,
                     )
