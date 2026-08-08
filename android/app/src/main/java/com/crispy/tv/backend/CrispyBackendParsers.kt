@@ -588,6 +588,7 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject):
         runtimeMinutes = item.runtimeMinutes,
         rating = item.rating,
         status = item.status,
+        genre = item.genres.firstOrNull(),
     )
 }
 

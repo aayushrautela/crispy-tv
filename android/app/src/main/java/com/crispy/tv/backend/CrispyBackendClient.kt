@@ -460,6 +460,7 @@ class CrispyBackendClient(
         val runtimeMinutes: Int?,
         val rating: Double?,
         val status: String?,
+        val genre: String? = null,
     )
 
     data class MetadataVideoView(
