@@ -10,11 +10,9 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +29,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -66,6 +63,7 @@ import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.ui.components.crispyImageRequest
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
@@ -77,8 +75,6 @@ import kotlinx.coroutines.withContext
 internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
     return details?.backdropUrl ?: details?.posterUrl
 }
-
-private const val SharedElementDuration = 300
 
 @Composable
 internal fun HeroSection(
@@ -107,7 +103,6 @@ internal fun HeroSection(
         modifier = Modifier
             .fillMaxWidth()
             .height(heroHeight)
-            .background(Color.Black)
     ) {
         val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
@@ -147,25 +142,26 @@ internal fun HeroSection(
         }
 
         if (!imageUrl.isNullOrBlank()) {
+            val heroRequest = crispyImageRequest(
+                url = imageUrl,
+                width = with(density) { maxWidth.toDp() },
+                height = heroHeight,
+                memoryCacheKey = backdropKey,
+            )
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
                 with(sharedTransitionScope) {
                     Modifier
-                        .fillMaxSize()
-                        .sharedBounds(
+                        .sharedElement(
                             rememberSharedContentState(key = backdropKey),
                             animatedVisibilityScope = animatedVisibilityScope,
-                            enter = fadeIn(tween(SharedElementDuration)),
-                            exit = fadeOut(tween(SharedElementDuration)),
-                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
-                            renderInOverlayDuringTransition = true,
-                            zIndexInOverlay = 1f,
                         )
+                        .fillMaxSize()
                 }
             } else {
                 Modifier.fillMaxSize()
             }
             AsyncImage(
-                model = imageUrl,
+                model = heroRequest ?: imageUrl,
                 contentDescription = details?.title,
                 modifier = backdropModifier,
                 contentScale = ContentScale.Crop,
@@ -289,21 +285,16 @@ internal fun HeroSection(
         ) {
             val logoUrl = details.logoUrl?.trim().orEmpty()
             if (logoUrl.isNotBlank()) {
-                val logoModel = rememberCrispyImageModel(url = logoUrl, width = 320.dp, height = 104.dp)
+                val logoModel = rememberCrispyImageModel(url = logoUrl, width = 320.dp, height = 104.dp, memoryCacheKey = logoKey)
                 val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
                     with(sharedTransitionScope) {
                         Modifier
-                            .fillMaxWidth(0.81f)
-                            .height(104.dp)
-                            .sharedBounds(
+                            .sharedElement(
                                 rememberSharedContentState(key = logoKey),
                                 animatedVisibilityScope = animatedVisibilityScope,
-                                enter = fadeIn(tween(SharedElementDuration)),
-                                exit = fadeOut(tween(SharedElementDuration)),
-                                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
-                                renderInOverlayDuringTransition = true,
-                                zIndexInOverlay = 2f,
                             )
+                            .fillMaxWidth(0.81f)
+                            .height(104.dp)
                     }
                 } else {
                     Modifier

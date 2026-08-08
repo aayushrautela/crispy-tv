@@ -1,9 +1,5 @@
 package com.crispy.tv.ui.components
 
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,8 +35,6 @@ import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 
-private const val SharedElementDuration = 300
-
 @Composable
 fun LandscapeCard(
     title: String,
@@ -59,14 +53,12 @@ fun LandscapeCard(
     val imageUrl = backdropUrl ?: posterUrl
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
-    val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight)
-    val logoModel = crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp)
-
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-
     val backdropKey = itemId?.let { "backdrop-$it" }
     val logoKey = itemId?.let { "logo-$it" }
+    val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight, memoryCacheKey = backdropKey)
+    val logoModel = crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
 
     val scrimBrush = remember {
         Brush.verticalGradient(
@@ -98,17 +90,11 @@ fun LandscapeCard(
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
                 with(sharedTransitionScope) {
                     Modifier
-                        .fillMaxSize()
-                        .sharedBounds(
+                        .sharedElement(
                             rememberSharedContentState(key = backdropKey),
                             animatedVisibilityScope = animatedVisibilityScope,
-                            enter = fadeIn(tween(SharedElementDuration)),
-                            exit = fadeOut(tween(SharedElementDuration)),
-                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
-                            renderInOverlayDuringTransition = true,
-                            zIndexInOverlay = 1f,
                         )
-                        .clip(cardShape)
+                        .fillMaxSize()
                 }
             } else {
                 Modifier.fillMaxSize()
@@ -147,17 +133,12 @@ fun LandscapeCard(
                 val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
                     with(sharedTransitionScope) {
                         Modifier
-                            .fillMaxWidth(0.60f)
-                            .height(30.dp)
-                            .sharedBounds(
+                            .sharedElement(
                                 rememberSharedContentState(key = logoKey),
                                 animatedVisibilityScope = animatedVisibilityScope,
-                                enter = fadeIn(tween(SharedElementDuration)),
-                                exit = fadeOut(tween(SharedElementDuration)),
-                                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
-                                renderInOverlayDuringTransition = true,
-                                zIndexInOverlay = 2f,
                             )
+                            .fillMaxWidth(0.60f)
+                            .height(30.dp)
                     }
                 } else {
                     Modifier

@@ -14,6 +14,7 @@ fun crispyImageRequest(
     width: Dp,
     height: Dp,
     enableCrossfade: Boolean = true,
+    memoryCacheKey: String? = null,
 ): Any? {
     if (url.isNullOrBlank()) return null
     val context = LocalContext.current
@@ -21,7 +22,7 @@ fun crispyImageRequest(
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    return rememberCrispyImageModel(appContext, url, widthPx, heightPx, enableCrossfade)
+    return rememberCrispyImageModel(appContext, url, widthPx, heightPx, enableCrossfade, memoryCacheKey)
 }
 
 @Composable
@@ -31,13 +32,20 @@ private fun rememberCrispyImageModel(
     widthPx: Int,
     heightPx: Int,
     enableCrossfade: Boolean = true,
+    memoryCacheKey: String? = null,
 ): ImageRequest {
-    return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade) {
+    return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade, memoryCacheKey) {
         ImageRequest.Builder(appContext)
             .data(url)
             .size(widthPx, heightPx)
             .apply { if (enableCrossfade) crossfade(true) }
             .diskCacheKey(url)
+            .apply {
+                if (memoryCacheKey != null) {
+                    memoryCacheKey(memoryCacheKey)
+                    placeholderMemoryCacheKey(memoryCacheKey)
+                }
+            }
             .build()
     }
 }
@@ -48,7 +56,8 @@ fun rememberCrispyImageModel(
     width: Dp,
     height: Dp,
     enableCrossfade: Boolean = true,
-): Any? = crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade)
+    memoryCacheKey: String? = null,
+): Any? = crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade, memoryCacheKey = memoryCacheKey)
 
 @Composable
 fun rememberCrispyImageModel(
@@ -56,8 +65,9 @@ fun rememberCrispyImageModel(
     width: Dp,
     height: Dp,
     enableCrossfade: Boolean = true,
+    memoryCacheKey: String? = null,
 ): Any? {
     if (image == null || image.isEmpty) return null
     val url = image.medium ?: image.high ?: image.low
-    return crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade)
+    return crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade, memoryCacheKey = memoryCacheKey)
 }

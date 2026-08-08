@@ -1,9 +1,5 @@
 package com.crispy.tv.home
 
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -34,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,7 +46,6 @@ import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
-private const val SharedElementDuration = 300
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -233,6 +227,7 @@ internal fun HomeWideRailCard(
         url = item.imageUrl,
         width = Dimensions.WideCardWidth,
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
+        memoryCacheKey = backdropKey,
     )
 
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -242,15 +237,10 @@ internal fun HomeWideRailCard(
 
     val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
         with(sharedTransitionScope) {
-            Modifier.sharedBounds(
+            Modifier.sharedElement(
                 rememberSharedContentState(key = backdropKey),
                 animatedVisibilityScope = animatedVisibilityScope,
-                enter = fadeIn(tween(SharedElementDuration)),
-                exit = fadeOut(tween(SharedElementDuration)),
-                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
-                renderInOverlayDuringTransition = true,
-                zIndexInOverlay = 1f,
-            ).clip(RoundedCornerShape(20.dp))
+            )
         }
     } else {
         Modifier
@@ -286,6 +276,7 @@ internal fun HomeWideRailCard(
                 url = item.logoUrl,
                 width = 112.dp,
                 height = 30.dp,
+                memoryCacheKey = logoKey,
             )
             Column(
                 modifier = Modifier
@@ -298,17 +289,12 @@ internal fun HomeWideRailCard(
                     val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
                         with(sharedTransitionScope) {
                             Modifier
-                                .fillMaxWidth(0.60f)
-                                .height(30.dp)
-                                .sharedBounds(
+                                .sharedElement(
                                     rememberSharedContentState(key = logoKey),
                                     animatedVisibilityScope = animatedVisibilityScope,
-                                    enter = fadeIn(tween(SharedElementDuration)),
-                                    exit = fadeOut(tween(SharedElementDuration)),
-                                    resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
-                                    renderInOverlayDuringTransition = true,
-                                    zIndexInOverlay = 2f,
                                 )
+                                .fillMaxWidth(0.60f)
+                                .height(30.dp)
                         }
                     } else {
                         Modifier
