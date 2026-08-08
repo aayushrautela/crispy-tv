@@ -30,11 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import coil3.compose.AsyncImage
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
@@ -250,6 +252,11 @@ internal fun HomeWideRailCard(
         scrimHeightFraction = 0.55f,
         scrimMaxAlpha = 0.88f,
         bottomOverlayContent = {
+            val logoModel = rememberCrispyImageModel(
+                url = item.logoUrl,
+                width = 112.dp,
+                height = 30.dp,
+            )
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -257,14 +264,26 @@ internal fun HomeWideRailCard(
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (logoModel != null) {
+                    AsyncImage(
+                        model = logoModel,
+                        contentDescription = item.title,
+                        modifier = Modifier
+                            .fillMaxWidth(0.60f)
+                            .height(30.dp),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
+                    )
+                } else {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 if (item.subtitle.isNotBlank()) {
                     Text(
                         text = item.subtitle,
