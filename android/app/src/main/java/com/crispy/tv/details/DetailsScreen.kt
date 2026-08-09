@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -64,6 +65,8 @@ import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
+import com.crispy.tv.ui.navigation.animateContentAlpha
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
 
@@ -244,7 +247,14 @@ internal fun DetailsScreen(
     val bodyHorizontalPadding = responsivePageHorizontalPadding()
 
     MaterialTheme(colorScheme = detailsScheme) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+        val contentAlpha = animatedVisibilityScope?.let { scope ->
+            with(scope) { animateContentAlpha() }
+        } ?: 1f
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer(alpha = contentAlpha)
+        ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()

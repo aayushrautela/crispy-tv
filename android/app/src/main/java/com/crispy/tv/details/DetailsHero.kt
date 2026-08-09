@@ -69,7 +69,6 @@ import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateHeroCornerRadius
-import com.crispy.tv.ui.navigation.animateHeroOverlayAlpha
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -97,9 +96,6 @@ internal fun HeroSection(
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
     val backdropKey = itemId?.let { "backdrop-$it" }
     val logoKey = itemId?.let { "logo-$it" }
-    val overlayAlpha = animatedVisibilityScope?.let { scope ->
-        with(scope) { animateHeroOverlayAlpha() }
-    } ?: 1f
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -243,7 +239,6 @@ internal fun HeroSection(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer(alpha = overlayAlpha)
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Black.copy(alpha = 0.55f),
@@ -256,7 +251,6 @@ internal fun HeroSection(
         HeroBottomFade(
             pageBackground = palette.pageBackground,
             heightPx = heightPx,
-            alpha = overlayAlpha,
         )
 
         if (hasTrailer) {
@@ -338,12 +332,10 @@ internal fun HeroSection(
 private fun HeroBottomFade(
     pageBackground: Color,
     heightPx: Float,
-    alpha: Float = 1f,
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer(alpha = alpha)
             .background(
                 Brush.verticalGradient(
                     colorStops =
