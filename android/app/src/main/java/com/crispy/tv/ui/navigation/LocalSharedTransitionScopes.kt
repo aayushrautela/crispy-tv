@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,4 +44,18 @@ fun AnimatedContentScope.animateHeroCornerRadius(cardRadius: Dp): Dp {
         }
     }
     return corner
+}
+
+@Composable
+fun AnimatedContentScope.animateContentAlpha(): Float {
+    val alpha by transition.animateFloat(
+        transitionSpec = { tween(SharedElementDurationMillis) },
+        label = "sharedContentAlpha",
+    ) { state ->
+        when (state) {
+            EnterExitState.Visible -> 1f
+            else -> 0f
+        }
+    }
+    return alpha
 }
