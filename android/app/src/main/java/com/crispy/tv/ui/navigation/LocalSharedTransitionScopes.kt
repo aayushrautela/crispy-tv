@@ -47,10 +47,10 @@ fun AnimatedContentScope.animateHeroCornerRadius(cardRadius: Dp): Dp {
 }
 
 @Composable
-fun AnimatedContentScope.animateContentAlpha(): Float {
+fun AnimatedContentScope.animateHeroOverlayAlpha(): Float {
     val alpha by transition.animateFloat(
         transitionSpec = { tween(SharedElementDurationMillis) },
-        label = "sharedContentAlpha",
+        label = "sharedHeroOverlayAlpha",
     ) { state ->
         when (state) {
             EnterExitState.Visible -> 1f
