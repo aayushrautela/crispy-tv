@@ -28,6 +28,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         AppRoutes.homeDetailsRoute(
                             itemId = hero.id,
                             itemType = hero.type,
+                            backdropUrl = hero.backdropUrl,
                         )
                     )
                 },
@@ -40,6 +41,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             episodeNumber = item.episode,
                             absoluteEpisodeNumber = item.absoluteEpisodeNumber,
                             autoOpenEpisode = true,
+                            backdropUrl = item.backdropUrl,
+                            logoUrl = item.logoUrl,
                         )
                     )
                 },
@@ -53,6 +56,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             absoluteEpisodeNumber = item.absoluteEpisodeNumber,
                             highlightEpisodeId = "${item.season}:${item.episode}",
                             autoOpenEpisode = false,
+                            backdropUrl = item.backdropUrl,
+                            logoUrl = item.logoUrl,
                         )
                     )
                 },
@@ -67,6 +72,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
+                            backdropUrl = item.backdropUrl,
+                            logoUrl = item.logoUrl,
                         )
                     )
                 },
@@ -96,6 +103,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
+                            backdropUrl = item.backdropUrl,
                         )
                     )
                 },
@@ -128,6 +136,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
+                            backdropUrl = item.backdropUrl,
+                            logoUrl = item.logoUrl,
                         )
                     )
                 }
@@ -145,6 +155,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navArgument(AppRoutes.HomeDetailsRuntimeSeasonNumberArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsRuntimeEpisodeNumberArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg) { type = NavType.StringType; defaultValue = "" },
+                navArgument(AppRoutes.HomeDetailsBackdropUrlArg) { type = NavType.StringType; defaultValue = "" },
+                navArgument(AppRoutes.HomeDetailsLogoUrlArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
@@ -158,6 +170,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         ).takeIf {
             it.seasonNumber != null || it.episodeNumber != null || it.absoluteEpisodeNumber != null
         }
+        val initialBackdropUrl = entry.arguments?.getString(AppRoutes.HomeDetailsBackdropUrlArg)?.ifBlank { null }
+        val initialLogoUrl = entry.arguments?.getString(AppRoutes.HomeDetailsLogoUrlArg)?.ifBlank { null }
         val context = LocalContext.current
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             DetailsRoute(
@@ -166,12 +180,16 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 runtimeEntry = runtimeEntry,
                 highlightEpisodeId = highlightEpisodeId,
                 autoOpenEpisode = autoOpenEpisode,
+                initialBackdropUrl = initialBackdropUrl,
+                initialLogoUrl = initialLogoUrl,
                 onBack = { navController.popBackStack() },
                 onItemClick = { item ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
+                            backdropUrl = item.backdropUrl,
+                            logoUrl = item.logoUrl,
                         )
                     )
                 },
@@ -210,6 +228,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
+                            backdropUrl = item.backdropUrl,
+                            logoUrl = item.logoUrl,
                         )
                     )
                 }
@@ -228,6 +248,7 @@ private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeIte
             absoluteEpisodeNumber = item.absoluteEpisodeNumber,
             highlightEpisodeId = item.highlightEpisodeId.takeIf { !item.isGroup },
             autoOpenEpisode = false,
+            backdropUrl = item.backdropUrl,
         )
     )
 }

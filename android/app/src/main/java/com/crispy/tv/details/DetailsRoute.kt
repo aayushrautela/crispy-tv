@@ -23,6 +23,8 @@ fun DetailsRoute(
     runtimeEntry: RuntimeDetailsEntry? = null,
     highlightEpisodeId: String? = null,
     autoOpenEpisode: Boolean = false,
+    initialBackdropUrl: String? = null,
+    initialLogoUrl: String? = null,
     onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit = {},
     onPersonClick: (String) -> Unit = {},
@@ -89,6 +91,8 @@ fun DetailsRoute(
     DetailsScreen(
         uiState = uiState,
         playbackSettings = playbackSettings,
+        initialBackdropUrl = initialBackdropUrl,
+        initialLogoUrl = initialLogoUrl,
         onBack = onBack,
         onItemClick = onItemClick,
         onPersonClick = onPersonClick,

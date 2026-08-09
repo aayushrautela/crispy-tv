@@ -11,14 +11,16 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
     composable(AppRoutes.LibraryRoute) { entry ->
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             LibraryRoute(
-                onItemClick = { item ->
-                    navController.navigate(
-                        AppRoutes.homeDetailsRoute(
-                            itemId = item.itemId,
-                            itemType = item.type,
-                        )
+            onItemClick = { item ->
+                navController.navigate(
+                    AppRoutes.homeDetailsRoute(
+                        itemId = item.itemId,
+                        itemType = item.type,
+                        backdropUrl = item.backdropUrl,
+                        logoUrl = item.logoUrl,
                     )
-                },
+                )
+            },
                 onOpenCalendar = {
                     navController.navigate(AppRoutes.CalendarRoute) {
                         launchSingleTop = true

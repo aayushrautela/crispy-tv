@@ -73,6 +73,8 @@ private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
 internal fun DetailsScreen(
     uiState: DetailsUiState,
     playbackSettings: PlaybackSettings,
+    initialBackdropUrl: String? = null,
+    initialLogoUrl: String? = null,
     onBack: () -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     onPersonClick: (String) -> Unit,
@@ -105,8 +107,11 @@ internal fun DetailsScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val imageUrl = remember(details) {
-        detailsHeroImageUrl(details = details)
+    val imageUrl = remember(details, initialBackdropUrl) {
+        detailsHeroImageUrl(details = details) ?: initialBackdropUrl
+    }
+    val logoUrl = remember(details, initialLogoUrl) {
+        details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: initialLogoUrl
     }
     val baseScheme = MaterialTheme.colorScheme
     val fallbackSeed = baseScheme.primary
@@ -252,6 +257,7 @@ internal fun DetailsScreen(
                     HeroSection(
                         details = visibleDetails,
                         imageUrl = imageUrl,
+                        logoUrl = logoUrl,
                         palette = palette,
                         trailerKey = trailerKey,
                         showTrailer = showTrailer,

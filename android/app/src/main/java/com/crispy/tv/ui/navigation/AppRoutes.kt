@@ -21,6 +21,8 @@ object AppRoutes {
     const val HomeDetailsRuntimeSeasonNumberArg = "runtimeSeasonNumber"
     const val HomeDetailsRuntimeEpisodeNumberArg = "runtimeEpisodeNumber"
     const val HomeDetailsRuntimeAbsoluteEpisodeArg = "runtimeAbsoluteEpisodeNumber"
+    const val HomeDetailsBackdropUrlArg = "backdropUrl"
+    const val HomeDetailsLogoUrlArg = "logoUrl"
 
     const val PersonDetailsRoute = "person/details"
     const val PersonDetailsPersonIdArg = "personId"
@@ -45,7 +47,9 @@ object AppRoutes {
             "&$HomeDetailsAutoOpenEpisodeArg={$HomeDetailsAutoOpenEpisodeArg}" +
             "&$HomeDetailsRuntimeSeasonNumberArg={$HomeDetailsRuntimeSeasonNumberArg}" +
             "&$HomeDetailsRuntimeEpisodeNumberArg={$HomeDetailsRuntimeEpisodeNumberArg}" +
-            "&$HomeDetailsRuntimeAbsoluteEpisodeArg={$HomeDetailsRuntimeAbsoluteEpisodeArg}"
+            "&$HomeDetailsRuntimeAbsoluteEpisodeArg={$HomeDetailsRuntimeAbsoluteEpisodeArg}" +
+            "&$HomeDetailsBackdropUrlArg={$HomeDetailsBackdropUrlArg}" +
+            "&$HomeDetailsLogoUrlArg={$HomeDetailsLogoUrlArg}"
     val PersonDetailsRoutePattern: String =
         "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}"
     val CatalogListRoutePattern: String =
@@ -60,13 +64,17 @@ object AppRoutes {
         absoluteEpisodeNumber: Int? = null,
         highlightEpisodeId: String? = null,
         autoOpenEpisode: Boolean = false,
+        backdropUrl: String? = null,
+        logoUrl: String? = null,
     ): String {
         return "$HomeDetailsRoute/${Uri.encode(itemType.trim())}/${Uri.encode(itemId.trim())}" +
             "?$HomeDetailsHighlightEpisodeIdArg=${Uri.encode(highlightEpisodeId.orEmpty())}" +
             "&$HomeDetailsAutoOpenEpisodeArg=${autoOpenEpisode}" +
             "&$HomeDetailsRuntimeSeasonNumberArg=${seasonNumber?.toString().orEmpty()}" +
             "&$HomeDetailsRuntimeEpisodeNumberArg=${episodeNumber?.toString().orEmpty()}" +
-            "&$HomeDetailsRuntimeAbsoluteEpisodeArg=${absoluteEpisodeNumber?.toString().orEmpty()}"
+            "&$HomeDetailsRuntimeAbsoluteEpisodeArg=${absoluteEpisodeNumber?.toString().orEmpty()}" +
+            "&$HomeDetailsBackdropUrlArg=${Uri.encode(backdropUrl.orEmpty())}" +
+            "&$HomeDetailsLogoUrlArg=${Uri.encode(logoUrl.orEmpty())}"
     }
 
     fun catalogListRoute(section: CatalogSectionRef): String {

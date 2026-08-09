@@ -10,18 +10,20 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
     composable(AppRoutes.SearchRoute) { entry ->
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             SearchRoute(
-                onItemClick = { item ->
-                    if (item.type.equals("person", ignoreCase = true)) {
-                        navController.navigate(AppRoutes.personDetailsRoute(item.id))
-                    } else {
-                        navController.navigate(
-                            AppRoutes.homeDetailsRoute(
-                                itemId = item.itemId,
-                                itemType = item.type,
-                            )
+            onItemClick = { item ->
+                if (item.type.equals("person", ignoreCase = true)) {
+                    navController.navigate(AppRoutes.personDetailsRoute(item.id))
+                } else {
+                    navController.navigate(
+                        AppRoutes.homeDetailsRoute(
+                            itemId = item.itemId,
+                            itemType = item.type,
+                            backdropUrl = item.backdropUrl,
+                            logoUrl = item.logoUrl,
                         )
-                    }
-                },
+                    )
+                }
+            },
                 onOpenAccountsProfiles = {
                     navController.navigate(AppRoutes.AccountsProfilesRoute) {
                         launchSingleTop = true

@@ -80,6 +80,7 @@ internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
 internal fun HeroSection(
     details: MediaDetails?,
     imageUrl: String?,
+    logoUrl: String? = null,
     palette: DetailsPaletteColors,
     trailerKey: String?,
     showTrailer: Boolean,
@@ -177,7 +178,7 @@ internal fun HeroSection(
             ) {}
         }
 
-        if (details == null) {
+        if (details == null && logoUrl.isNullOrBlank()) {
             HeroBottomFade(
                 pageBackground = palette.pageBackground,
                 heightPx = heightPx,
@@ -283,9 +284,9 @@ internal fun HeroSection(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val logoUrl = details.logoUrl?.trim().orEmpty()
-            if (logoUrl.isNotBlank()) {
-                val logoModel = rememberCrispyImageModel(url = logoUrl, width = 320.dp, height = 104.dp, memoryCacheKey = logoKey)
+            val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: logoUrl
+            if (!resolvedLogoUrl.isNullOrBlank()) {
+                val logoModel = rememberCrispyImageModel(url = resolvedLogoUrl, width = 320.dp, height = 104.dp, memoryCacheKey = logoKey)
                 val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
                     with(sharedTransitionScope) {
                         Modifier
@@ -302,8 +303,8 @@ internal fun HeroSection(
                         .height(104.dp)
                 }
                 AsyncImage(
-                    model = logoModel ?: logoUrl,
-                    contentDescription = details.title,
+                    model = logoModel ?: resolvedLogoUrl,
+                    contentDescription = details?.title,
                     modifier = logoModifier,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.Center
