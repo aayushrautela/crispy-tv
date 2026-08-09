@@ -59,3 +59,17 @@ fun AnimatedContentScope.animateContentAlpha(): Float {
     }
     return alpha
 }
+
+@Composable
+fun AnimatedContentScope.animateCardOverlayAlpha(): Float {
+    val alpha by transition.animateFloat(
+        transitionSpec = { tween(SharedElementDurationMillis) },
+        label = "sharedCardOverlayAlpha",
+    ) { state ->
+        when (state) {
+            EnterExitState.Visible -> 0f
+            else -> 1f
+        }
+    }
+    return alpha
+}

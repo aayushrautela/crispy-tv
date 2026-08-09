@@ -31,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +47,7 @@ import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
+import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
@@ -240,6 +243,19 @@ internal fun HomeWideRailCard(
         val cornerRadius = with(animatedVisibilityScope) {
             animateCardCornerRadius(20.dp)
         }
+        val overlayAlpha = with(animatedVisibilityScope) {
+            animateCardOverlayAlpha()
+        }
+        val screenBackground = MaterialTheme.colorScheme.background
+        val bottomFadeBrush = remember(screenBackground) {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to Color.Transparent,
+                    0.66f to Color.Transparent,
+                    1f to screenBackground,
+                ),
+            )
+        }
         with(sharedTransitionScope) {
             Modifier
                 .sharedElement(
@@ -247,6 +263,12 @@ internal fun HomeWideRailCard(
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
                 .clip(RoundedCornerShape(cornerRadius))
+                .drawWithContent {
+                    drawContent()
+                    if (overlayAlpha > 0.001f) {
+                        drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                    }
+                }
         }
     } else {
         Modifier

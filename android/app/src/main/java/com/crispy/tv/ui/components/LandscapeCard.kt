@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -35,6 +36,7 @@ import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
+import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 
 @Composable
 fun LandscapeCard(
@@ -51,6 +53,7 @@ fun LandscapeCard(
     itemId: String? = null,
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
+    val screenBackground = MaterialTheme.colorScheme.background
     val imageUrl = backdropUrl ?: posterUrl
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
@@ -66,6 +69,15 @@ fun LandscapeCard(
             colors = listOf(
                 Color.Transparent,
                 Color.Black.copy(alpha = 0.55f),
+            ),
+        )
+    }
+    val bottomFadeBrush = remember(screenBackground) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                0.66f to Color.Transparent,
+                1f to screenBackground,
             ),
         )
     }
@@ -92,6 +104,9 @@ fun LandscapeCard(
                 val cornerRadius = with(animatedVisibilityScope) {
                     animateCardCornerRadius(CardStyle.CardCornerRadiusDp.dp)
                 }
+                val overlayAlpha = with(animatedVisibilityScope) {
+                    animateCardOverlayAlpha()
+                }
                 with(sharedTransitionScope) {
                     Modifier
                         .sharedElement(
@@ -100,6 +115,12 @@ fun LandscapeCard(
                         )
                         .clip(RoundedCornerShape(cornerRadius))
                         .fillMaxSize()
+                        .drawWithContent {
+                            drawContent()
+                            if (overlayAlpha > 0.001f) {
+                                drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                            }
+                        }
                 }
             } else {
                 Modifier.fillMaxSize()
