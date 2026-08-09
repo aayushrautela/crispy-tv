@@ -1,8 +1,5 @@
 package com.crispy.tv.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,6 +15,7 @@ import androidx.navigation.compose.NavHost
 
 private const val TopLevelNavigationDurationMillis = 200
 private const val TopLevelNavigationOffsetDivisor = 8
+private const val SharedElementDurationMillis = 300
 
 private val topLevelRouteIndices = TopLevelDestination.entries.mapIndexed { index, destination -> destination.route to index }.toMap()
 
@@ -37,7 +35,7 @@ fun AppNavHost(
                     val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
                     val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
                     if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        EnterTransition.None
+                        fadeIn(animationSpec = tween(SharedElementDurationMillis))
                     } else if (targetRouteIndex > initialRouteIndex) {
                         slideInHorizontally(
                             animationSpec = tween(TopLevelNavigationDurationMillis),
@@ -54,7 +52,7 @@ fun AppNavHost(
                     val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
                     val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
                     if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        ExitTransition.None
+                        fadeOut(animationSpec = tween(SharedElementDurationMillis))
                     } else if (targetRouteIndex > initialRouteIndex) {
                         slideOutHorizontally(
                             animationSpec = tween(TopLevelNavigationDurationMillis),
@@ -71,7 +69,7 @@ fun AppNavHost(
                     val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
                     val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
                     if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        EnterTransition.None
+                        fadeIn(animationSpec = tween(SharedElementDurationMillis))
                     } else if (initialRouteIndex < targetRouteIndex) {
                         slideInHorizontally(
                             animationSpec = tween(TopLevelNavigationDurationMillis),
@@ -88,7 +86,7 @@ fun AppNavHost(
                     val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
                     val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
                     if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        ExitTransition.None
+                        fadeOut(animationSpec = tween(SharedElementDurationMillis))
                     } else if (initialRouteIndex < targetRouteIndex) {
                         slideOutHorizontally(
                             animationSpec = tween(TopLevelNavigationDurationMillis),
