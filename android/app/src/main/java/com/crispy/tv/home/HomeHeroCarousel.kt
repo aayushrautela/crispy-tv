@@ -20,6 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +31,10 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
+import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
+import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+import com.crispy.tv.ui.navigation.animateCardCornerRadius
+import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -79,6 +86,9 @@ internal fun HomeHeroCarousel(
         return
     }
 
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+
     val initialIndex = remember(selectedId, items) {
         selectedId?.let { id ->
             items.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: 0
@@ -95,11 +105,50 @@ internal fun HomeHeroCarousel(
             .height(320.dp)
     ) { index ->
         val item = items[index]
+        val backdropKey = "backdrop-${item.id}"
         val heroImageModel = rememberCrispyImageModel(
             image = item.backdrop,
             width = 320.dp,
             height = 320.dp,
+            memoryCacheKey = backdropKey,
         )
+
+        val screenBackground = MaterialTheme.colorScheme.background
+        val bottomFadeBrush = remember(screenBackground) {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to Color.Transparent,
+                    0.66f to Color.Transparent,
+                    1f to screenBackground,
+                ),
+            )
+        }
+
+        val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+            val cornerRadius = with(animatedVisibilityScope) {
+                animateCardCornerRadius(28.dp)
+            }
+            val overlayAlpha = with(animatedVisibilityScope) {
+                animateCardOverlayAlpha()
+            }
+            with(sharedTransitionScope) {
+                Modifier
+                    .sharedElement(
+                        rememberSharedContentState(key = backdropKey),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        if (overlayAlpha > 0.001f) {
+                            drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                        }
+                    }
+            }
+        } else {
+            Modifier.fillMaxSize()
+        }
 
         Box(
             modifier = Modifier
@@ -111,7 +160,7 @@ internal fun HomeHeroCarousel(
                 AsyncImage(
                     model = heroImageModel,
                     contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = backdropModifier,
                     contentScale = ContentScale.Crop
                 )
             } else {
