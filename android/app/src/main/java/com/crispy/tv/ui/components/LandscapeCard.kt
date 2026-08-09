@@ -34,6 +34,7 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+import com.crispy.tv.ui.navigation.animateCardCornerRadius
 
 @Composable
 fun LandscapeCard(
@@ -88,12 +89,16 @@ fun LandscapeCard(
     ) {
         if (imageModel != null) {
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
+                val cornerRadius = with(animatedVisibilityScope) {
+                    animateCardCornerRadius(CardStyle.CardCornerRadiusDp.dp)
+                }
                 with(sharedTransitionScope) {
                     Modifier
                         .sharedElement(
                             rememberSharedContentState(key = backdropKey),
                             animatedVisibilityScope = animatedVisibilityScope,
                         )
+                        .clip(RoundedCornerShape(cornerRadius))
                         .fillMaxSize()
                 }
             } else {

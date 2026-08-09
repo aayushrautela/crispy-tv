@@ -6,6 +6,10 @@
 package com.crispy.tv.details
 
 import android.content.Intent
+import androidx.compose.animation.animateEnterExit
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +68,8 @@ import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
+import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
+import com.crispy.tv.ui.navigation.SharedElementDurationMillis
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
 
@@ -244,7 +250,23 @@ internal fun DetailsScreen(
     val bodyHorizontalPadding = responsivePageHorizontalPadding()
 
     MaterialTheme(colorScheme = detailsScheme) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+        val enterFadeIn = fadeIn(animationSpec = tween(SharedElementDurationMillis))
+        val exitFadeOut = fadeOut(animationSpec = tween(SharedElementDurationMillis))
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .then(
+                if (animatedVisibilityScope != null) {
+                    Modifier.animateEnterExit(
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        enter = enterFadeIn,
+                        exit = exitFadeOut,
+                    )
+                } else {
+                    Modifier
+                }
+            )
+        ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
