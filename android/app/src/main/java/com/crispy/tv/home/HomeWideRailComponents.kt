@@ -223,17 +223,16 @@ internal fun HomeWideRailCard(
 ) {
     val removeAction = onRemoveClick
     val hasItemActions = showActions && removeAction != null
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+    val backdropKey = item.detailsItemId?.let { "backdrop-$it" }
+    val logoKey = item.detailsItemId?.let { "logo-$it" }
     val artworkModel = rememberCrispyImageModel(
         url = item.imageUrl,
         width = Dimensions.WideCardWidth,
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
         memoryCacheKey = backdropKey,
     )
-
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-    val backdropKey = item.detailsItemId?.let { "backdrop-$it" }
-    val logoKey = item.detailsItemId?.let { "logo-$it" }
 
     val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
         with(sharedTransitionScope) {

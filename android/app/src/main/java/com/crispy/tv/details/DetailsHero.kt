@@ -144,7 +144,7 @@ internal fun HeroSection(
         if (!imageUrl.isNullOrBlank()) {
             val heroRequest = crispyImageRequest(
                 url = imageUrl,
-                width = with(density) { maxWidth.toDp() },
+                width = maxWidth,
                 height = heroHeight,
                 memoryCacheKey = backdropKey,
             )
