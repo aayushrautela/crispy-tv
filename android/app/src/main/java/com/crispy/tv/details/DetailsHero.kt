@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -108,6 +109,15 @@ internal fun HeroSection(
     ) {
         val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
+        val bottomFadeBrush = remember(palette.pageBackground) {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to Color.Transparent,
+                    0.66f to Color.Transparent,
+                    1f to palette.pageBackground,
+                ),
+            )
+        }
 
         if (details == null && imageUrl.isNullOrBlank()) {
             Box(
@@ -162,9 +172,18 @@ internal fun HeroSection(
                         )
                         .clip(RoundedCornerShape(cornerRadius))
                         .fillMaxSize()
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(brush = bottomFadeBrush)
+                        }
                 }
             } else {
-                Modifier.fillMaxSize()
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(brush = bottomFadeBrush)
+                    }
             }
             AsyncImage(
                 model = heroRequest ?: imageUrl,
@@ -178,16 +197,17 @@ internal fun HeroSection(
             )
         } else {
             Surface(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(brush = bottomFadeBrush)
+                    },
                 color = palette.pillBackground
             ) {}
         }
 
         if (details == null && logoUrl.isNullOrBlank()) {
-            HeroBottomFade(
-                pageBackground = palette.pageBackground,
-                heightPx = heightPx,
-            )
             return@BoxWithConstraints
         }
 
@@ -222,36 +242,26 @@ internal fun HeroSection(
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer(alpha = coverAlpha),
+                        .graphicsLayer(alpha = coverAlpha)
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(brush = bottomFadeBrush)
+                        },
                     contentScale = ContentScale.Crop,
                 )
             } else {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer(alpha = coverAlpha),
+                        .graphicsLayer(alpha = coverAlpha)
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(brush = bottomFadeBrush)
+                        },
                     color = palette.pillBackground,
                 ) {}
             }
         }
-
-        // Top scrim for app bar/buttons readability.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.55f),
-                        0.38f to Color.Transparent
-                    )
-                )
-        )
-
-        // Bottom fade to merge hero into the page background.
-        HeroBottomFade(
-            pageBackground = palette.pageBackground,
-            heightPx = heightPx,
-        )
 
         if (hasTrailer) {
             val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
