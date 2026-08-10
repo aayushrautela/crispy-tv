@@ -371,6 +371,7 @@ internal fun LazyListScope.historyItems(
                     contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                 ) {
                     items(row.items, key = { it.id }, contentType = { "poster" }) { item ->
+                        val sharedElementKey = "library-history-${row.monthKey}-${item.itemId}"
                         LandscapeCard(
                             title = item.title,
                             backdropUrl = item.backdropUrl,
@@ -381,8 +382,9 @@ internal fun LazyListScope.historyItems(
                             maturityRating = item.maturityRating,
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-                            onClick = { onItemClick(item) },
+                            onClick = { onItemClick(item, sharedElementKey) },
                             itemId = item.itemId,
+                            sharedElementKey = sharedElementKey,
                         )
                     }
                 }
@@ -418,6 +420,7 @@ internal fun LazyListScope.ratingsItems(
                     contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                 ) {
                     items(row.items, key = { it.id }, contentType = { "poster" }) { item ->
+                        val sharedElementKey = "library-ratings-${row.bandKey}-${item.itemId}"
                         LandscapeCard(
                             title = item.title,
                             backdropUrl = item.backdropUrl,
@@ -428,8 +431,9 @@ internal fun LazyListScope.ratingsItems(
                             maturityRating = item.maturityRating,
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-                            onClick = { onItemClick(item) },
+                            onClick = { onItemClick(item, sharedElementKey) },
                             itemId = item.itemId,
+                            sharedElementKey = sharedElementKey,
                         )
                     }
                 }
@@ -465,6 +469,7 @@ internal fun LazyListScope.watchlistItems(
                     contentPadding = PaddingValues(horizontal = pageHorizontalPadding),
                 ) {
                     items(row.items, key = { it.id }, contentType = { "poster" }) { item ->
+                        val sharedElementKey = "library-watchlist-${row.groupKey}-${item.itemId}"
                         LandscapeCard(
                             title = item.title,
                             backdropUrl = item.backdropUrl,
@@ -475,8 +480,9 @@ internal fun LazyListScope.watchlistItems(
                             maturityRating = item.maturityRating,
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-                            onClick = { onItemClick(item) },
+                            onClick = { onItemClick(item, sharedElementKey) },
                             itemId = item.itemId,
+                            sharedElementKey = sharedElementKey,
                         )
                     }
                 }

@@ -51,7 +51,7 @@ import com.crispy.tv.ui.utils.appBarScrollBehavior
 fun CatalogRoute(
     section: CatalogSectionRef,
     onBack: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem, String?) -> Unit
 ) {
     val viewModel: CatalogViewModel = viewModel(
         factory = CatalogViewModel.factory(context = androidx.compose.ui.platform.LocalContext.current, section = section)
@@ -113,6 +113,7 @@ fun CatalogRoute(
                         contentType = { "poster" }
                     ) { index ->
                         val item = pagingItems[index] ?: return@items
+                        val sharedElementKey = "catalog-${section.key}-${item.itemId}-${index}"
                         LandscapeCard(
                             title = item.title,
                             backdropUrl = item.backdropUrl,
@@ -121,8 +122,9 @@ fun CatalogRoute(
                             rating = item.rating,
                             year = item.year,
                             genre = item.genre,
-                            onClick = { onItemClick(item) },
+                            onClick = { onItemClick(item, sharedElementKey) },
                             itemId = item.itemId,
+                            sharedElementKey = sharedElementKey,
                         )
                     }
                 }

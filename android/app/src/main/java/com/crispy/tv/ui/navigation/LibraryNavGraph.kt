@@ -11,13 +11,14 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
     composable(AppRoutes.LibraryRoute) { entry ->
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             LibraryRoute(
-            onItemClick = { item ->
+            onItemClick = { item, sharedElementKey ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
                         itemId = item.itemId,
                         itemType = item.type,
                         backdropUrl = item.backdropUrl,
                         logoUrl = item.logoUrl,
+                        sharedElementKey = sharedElementKey,
                     )
                 )
             },
