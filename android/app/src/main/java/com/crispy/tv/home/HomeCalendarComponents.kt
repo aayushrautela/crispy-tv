@@ -6,28 +6,78 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.components.rememberCrispyImageModel
+import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
+import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+import com.crispy.tv.ui.navigation.animateCardCornerRadius
+import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
+import com.crispy.tv.ui.theme.Dimensions
 
 @Composable
 internal fun CalendarEpisodeCard(
     item: CalendarEpisodeItem,
     onClick: () -> Unit,
 ) {
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+    val backdropKey = "backdrop-${item.titleItemId}"
     val imageModel = rememberCrispyImageModel(
         url = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
         width = Dimensions.WideCardWidth,
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
+        memoryCacheKey = backdropKey,
     )
+
+    val screenBackground = MaterialTheme.colorScheme.background
+    val bottomFadeBrush = remember(screenBackground) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                0.66f to Color.Transparent,
+                1f to screenBackground,
+            ),
+        )
+    }
+
+    val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        val cornerRadius = with(animatedVisibilityScope) {
+            animateCardCornerRadius(20.dp)
+        }
+        val overlayAlpha = with(animatedVisibilityScope) {
+            animateCardOverlayAlpha()
+        }
+        with(sharedTransitionScope) {
+            Modifier
+                .sharedElement(
+                    rememberSharedContentState(key = backdropKey),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+                .clip(RoundedCornerShape(cornerRadius))
+                .drawWithContent {
+                    drawContent()
+                    if (overlayAlpha > 0.001f) {
+                        drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                    }
+                }
+        }
+    } else {
+        Modifier
+    }
+
     LandscapeArtworkFrame(
         title = item.seriesName,
         imageModel = imageModel,
@@ -39,6 +89,7 @@ internal fun CalendarEpisodeCard(
         badgeAlignment = Alignment.TopEnd,
         scrimHeightFraction = 0.68f,
         scrimMaxAlpha = 0.92f,
+        imageModifier = backdropModifier,
         bottomOverlayContent = {
             Column(
                 modifier = Modifier
@@ -72,11 +123,52 @@ internal fun CalendarSeriesCard(
     item: CalendarSeriesItem,
     onClick: () -> Unit,
 ) {
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+    val backdropKey = "backdrop-${item.itemId}"
     val imageModel = rememberCrispyImageModel(
         url = item.backdropUrl ?: item.posterUrl,
         width = Dimensions.WideCardWidth,
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
+        memoryCacheKey = backdropKey,
     )
+
+    val screenBackground = MaterialTheme.colorScheme.background
+    val bottomFadeBrush = remember(screenBackground) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                0.66f to Color.Transparent,
+                1f to screenBackground,
+            ),
+        )
+    }
+
+    val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        val cornerRadius = with(animatedVisibilityScope) {
+            animateCardCornerRadius(20.dp)
+        }
+        val overlayAlpha = with(animatedVisibilityScope) {
+            animateCardOverlayAlpha()
+        }
+        with(sharedTransitionScope) {
+            Modifier
+                .sharedElement(
+                    rememberSharedContentState(key = backdropKey),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+                .clip(RoundedCornerShape(cornerRadius))
+                .drawWithContent {
+                    drawContent()
+                    if (overlayAlpha > 0.001f) {
+                        drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                    }
+                }
+        }
+    } else {
+        Modifier
+    }
+
     LandscapeArtworkFrame(
         title = item.title,
         imageModel = imageModel,
@@ -85,6 +177,7 @@ internal fun CalendarSeriesCard(
             .width(Dimensions.WideCardWidth)
             .aspectRatio(Dimensions.WideCardAspectRatio),
         badgeLabel = "No schedule",
+        imageModifier = backdropModifier,
         bottomOverlayContent = {
             Column(
                 modifier = Modifier
