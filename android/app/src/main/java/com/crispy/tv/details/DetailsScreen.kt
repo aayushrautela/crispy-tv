@@ -156,9 +156,8 @@ internal fun DetailsScreen(
     }
 
     val showPalettePlaceholder =
-        details != null &&
-            !imageUrl.isNullOrBlank() &&
-            !isSeedColorResolved
+        !imageUrl.isNullOrBlank() &&
+            (details == null || !isSeedColorResolved)
 
     val visibleDetails = if (showPalettePlaceholder) null else details
     val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
