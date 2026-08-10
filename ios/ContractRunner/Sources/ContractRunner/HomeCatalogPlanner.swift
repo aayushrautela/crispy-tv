@@ -263,7 +263,6 @@ public struct HomeCatalogIdentifier: Equatable {
 
 public func planHomeFeed(
     snapshot: HomeCatalogSnapshot,
-    heroLimit: Int = 10,
     sectionLimit: Int = .max
 ) -> HomeCatalogFeedPlan {
     guard !snapshot.lists.isEmpty else {
@@ -275,7 +274,7 @@ public func planHomeFeed(
     }
 
     return HomeCatalogFeedPlan(
-        heroResult: buildHeroResult(snapshot: snapshot, limit: heroLimit),
+        heroResult: buildHeroResult(snapshot: snapshot),
         sections: buildHomeCatalogSections(lists: snapshot.lists, limit: sectionLimit),
         sectionsStatusMessage: ""
     )
@@ -283,10 +282,9 @@ public func planHomeFeed(
 
 public func planPersonalHomeFeed(
     snapshot: HomeCatalogSnapshot,
-    heroLimit: Int = 10,
     sectionLimit: Int = .max
 ) -> HomeCatalogFeedPlan {
-    planHomeFeed(snapshot: snapshot, heroLimit: heroLimit, sectionLimit: sectionLimit)
+    planHomeFeed(snapshot: snapshot, sectionLimit: sectionLimit)
 }
 
 public func listDiscoverCatalogs(
@@ -408,8 +406,7 @@ public func resolveHomeCatalogSource(catalogId: String) -> HomeCatalogSource {
     parseHomeCatalogId(catalogId)?.source ?? .personal
 }
 
-private func buildHeroResult(snapshot: HomeCatalogSnapshot, limit: Int) -> HomeCatalogHeroResult {
-    let targetCount = max(limit, 1)
+private func buildHeroResult(snapshot: HomeCatalogSnapshot) -> HomeCatalogHeroResult {
     let heroList = snapshot.lists.first(where: { $0.presentation == .hero }) ?? snapshot.lists[0]
     let fallbackDescription = firstNonBlank(
         heroList.subtitle,
@@ -435,7 +432,7 @@ private func buildHeroResult(snapshot: HomeCatalogSnapshot, limit: Int) -> HomeC
             type: item.type
         )
     }
-    let limitedItems = Array(heroItems.prefix(targetCount))
+    let limitedItems = heroItems
 
     if limitedItems.isEmpty {
         return HomeCatalogHeroResult(

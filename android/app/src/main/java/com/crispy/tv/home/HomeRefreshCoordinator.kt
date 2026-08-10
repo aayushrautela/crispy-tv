@@ -13,7 +13,7 @@ internal class HomeRefreshCoordinator(
     private val continueWatchingLimit = 30
 
     suspend fun loadCachedPrimarySnapshot(): HomePrimarySnapshot? {
-        val primaryFeedResult = homeCatalogService.loadCachedPrimaryHomeFeed(heroLimit = 10)
+        val primaryFeedResult = homeCatalogService.loadCachedPrimaryHomeFeed()
             ?: return null
 
         val heroItems = primaryFeedResult.heroResult.items
@@ -51,7 +51,7 @@ internal class HomeRefreshCoordinator(
     }
 
     suspend fun loadPrimarySnapshot(): HomePrimarySnapshot {
-        val primaryFeedResult = homeCatalogService.loadPrimaryHomeFeed(heroLimit = 10)
+        val primaryFeedResult = homeCatalogService.loadPrimaryHomeFeed()
 
         val heroItems = primaryFeedResult.heroResult.items
         val allSections = primaryFeedResult.sections

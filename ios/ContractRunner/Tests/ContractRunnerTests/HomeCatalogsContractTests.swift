@@ -20,7 +20,6 @@ final class HomeCatalogsContractTests: XCTestCase {
 
             let actualPersonalFeed = planPersonalHomeFeed(
                 snapshot: snapshot,
-                heroLimit: try requireInt(input, "hero_limit", fixture: fixtureURL),
                 sectionLimit: try requireInt(input, "section_limit", fixture: fixtureURL)
             )
             let actualDiscover = listDiscoverCatalogs(

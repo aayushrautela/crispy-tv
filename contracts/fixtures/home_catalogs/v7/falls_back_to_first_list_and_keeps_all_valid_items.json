@@ -1,7 +1,7 @@
 {
-  "contract_version": 6,
+  "contract_version": 7,
   "suite": "home_catalogs",
-  "case_id": "falls_back_to_first_list_and_coerces_minimum_limits",
+  "case_id": "falls_back_to_first_list_and_keeps_all_valid_items",
   "input": {
     "snapshot": {
       "profile_id": "p1",
@@ -72,7 +72,6 @@
         }
       ]
     },
-    "hero_limit": 0,
     "section_limit": 0,
     "discover": {
       "media_type": null,
@@ -96,6 +95,17 @@
             "year": "2022",
             "genres": [],
             "backdrop_url": "https://img/severance.jpg",
+            "addon_id": "supabase",
+            "type": "series"
+          },
+          {
+            "item_id": "show:tmdb:125988",
+            "title": "Silo",
+            "description": "Staff picks",
+            "rating": null,
+            "year": "2023",
+            "genres": [],
+            "backdrop_url": "https://img/silo.jpg",
             "addon_id": "supabase",
             "type": "series"
           }

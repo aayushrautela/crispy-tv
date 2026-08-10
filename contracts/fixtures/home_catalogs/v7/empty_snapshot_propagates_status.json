@@ -1,5 +1,5 @@
 {
-  "contract_version": 6,
+  "contract_version": 7,
   "suite": "home_catalogs",
   "case_id": "empty_snapshot_propagates_status",
   "input": {
@@ -8,7 +8,6 @@
       "status_message": "Sign in to Supabase to load catalogs.",
       "lists": []
     },
-    "hero_limit": 10,
     "section_limit": 10,
     "discover": {
       "media_type": "show",

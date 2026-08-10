@@ -1,5 +1,5 @@
 {
-  "contract_version": 6,
+  "contract_version": 7,
   "suite": "home_catalogs",
   "case_id": "plans_hero_sections_discover_and_global_page",
   "input": {
@@ -120,7 +120,6 @@
         }
       ]
     },
-    "hero_limit": 2,
     "section_limit": 2,
     "discover": {
       "media_type": "show",

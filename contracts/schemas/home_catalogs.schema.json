@@ -12,7 +12,7 @@
   "properties": {
     "contract_version": {
       "type": "integer",
-      "minimum": 5
+      "minimum": 7
     },
     "suite": {
       "const": "home_catalogs"
@@ -25,7 +25,6 @@
       "type": "object",
       "required": [
         "snapshot",
-        "hero_limit",
         "section_limit",
         "discover",
         "page"
@@ -34,9 +33,6 @@
       "properties": {
         "snapshot": {
           "$ref": "#/$defs/snapshot"
-        },
-        "hero_limit": {
-          "type": "integer"
         },
         "section_limit": {
           "type": "integer"

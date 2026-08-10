@@ -143,7 +143,6 @@ data class HomeCatalogIdentifier(
 
 fun planHomeFeed(
     snapshot: HomeCatalogSnapshot,
-    heroLimit: Int = 10,
     sectionLimit: Int = Int.MAX_VALUE,
 ): HomeCatalogFeedPlan {
     if (snapshot.lists.isEmpty()) {
@@ -155,7 +154,7 @@ fun planHomeFeed(
     }
 
     return HomeCatalogFeedPlan(
-        heroResult = buildHeroResult(snapshot, heroLimit),
+        heroResult = buildHeroResult(snapshot),
         sections = buildHomeCatalogSections(snapshot.lists, sectionLimit),
         sectionsStatusMessage = "",
     )
@@ -163,12 +162,10 @@ fun planHomeFeed(
 
 fun planPersonalHomeFeed(
     snapshot: HomeCatalogSnapshot,
-    heroLimit: Int = 10,
     sectionLimit: Int = Int.MAX_VALUE,
 ): HomeCatalogFeedPlan {
     return planHomeFeed(
         snapshot = snapshot,
-        heroLimit = heroLimit,
         sectionLimit = sectionLimit,
     )
 }
@@ -303,9 +300,7 @@ fun resolveHomeCatalogSource(catalogId: String): HomeCatalogSource {
 
 private fun buildHeroResult(
     snapshot: HomeCatalogSnapshot,
-    limit: Int,
 ): HomeCatalogHeroResult {
-    val targetCount = limit.coerceAtLeast(1)
     val heroList = snapshot.lists.firstOrNull { it.presentation == HomeCatalogPresentation.HERO } ?: snapshot.lists.first()
     val fallbackDescription =
         heroList.subtitle.ifBlank {
@@ -334,7 +329,6 @@ private fun buildHeroResult(
                     type = item.type,
                 )
             }
-            .take(targetCount)
             .toList()
 
     if (heroItems.isEmpty()) {

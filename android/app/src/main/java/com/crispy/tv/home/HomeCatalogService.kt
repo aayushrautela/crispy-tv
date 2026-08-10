@@ -114,21 +114,19 @@ class HomeCatalogService internal constructor(
     private val inFlightMutex = Mutex()
     private val inFlightSnapshots = mutableMapOf<String, Deferred<HomeCatalogSnapshot>>()
     suspend fun loadPrimaryHomeFeed(
-        heroLimit: Int = 10,
         sectionLimit: Int = Int.MAX_VALUE,
     ): HomePrimaryFeedLoadResult {
         val snapshot = loadSnapshot()
-        return snapshot.toPrimaryHomeFeedLoadResult(heroLimit = heroLimit, sectionLimit = sectionLimit)
+        return snapshot.toPrimaryHomeFeedLoadResult(sectionLimit = sectionLimit)
     }
 
     suspend fun loadCachedPrimaryHomeFeed(
-        heroLimit: Int = 10,
         sectionLimit: Int = Int.MAX_VALUE,
     ): HomePrimaryFeedLoadResult? {
         val backendContext = getBackendContext()
         val snapshot = readCachedSnapshot(profileId = backendContext?.profileId, maxAgeMs = HOME_CACHE_MAX_AGE_MS)
             ?: return null
-        return snapshot.toPrimaryHomeFeedLoadResult(heroLimit = heroLimit, sectionLimit = sectionLimit)
+        return snapshot.toPrimaryHomeFeedLoadResult(sectionLimit = sectionLimit)
     }
 
     suspend fun listDiscoverCatalogs(
@@ -499,10 +497,9 @@ class HomeCatalogService internal constructor(
     }
 
     private fun HomeCatalogSnapshot.toPrimaryHomeFeedLoadResult(
-        heroLimit: Int,
         sectionLimit: Int,
     ): HomePrimaryFeedLoadResult {
-        val feedPlan = planPersonalHomeFeed(this, heroLimit = heroLimit, sectionLimit = sectionLimit)
+        val feedPlan = planPersonalHomeFeed(this, sectionLimit = sectionLimit)
         return HomePrimaryFeedLoadResult(
             heroResult =
                 HomeHeroLoadResult(

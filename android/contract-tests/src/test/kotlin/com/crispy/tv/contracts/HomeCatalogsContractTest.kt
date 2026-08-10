@@ -40,7 +40,6 @@ class HomeCatalogsContractTest {
 
             val actualPersonalFeed = planPersonalHomeFeed(
                 snapshot = snapshot,
-                heroLimit = input.requireInt("hero_limit", path),
                 sectionLimit = input.requireInt("section_limit", path),
             )
             val actualDiscover = listDiscoverCatalogs(
