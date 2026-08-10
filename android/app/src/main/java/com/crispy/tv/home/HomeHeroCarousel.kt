@@ -79,7 +79,7 @@ internal fun HomeHeroSkeleton(modifier: Modifier = Modifier) {
 internal fun HomeHeroCarousel(
     items: List<HomeHeroItem>,
     selectedId: String?,
-    onItemClick: (HomeHeroItem) -> Unit,
+    onItemClick: (HomeHeroItem, String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) {
@@ -105,7 +105,8 @@ internal fun HomeHeroCarousel(
             .height(320.dp)
     ) { index ->
         val item = items[index]
-        val backdropKey = "backdrop-${item.id}"
+        val sharedElementKey = "homehero-${item.id}"
+        val backdropKey = "backdrop-$sharedElementKey"
         val heroImageModel = rememberCrispyImageModel(
             image = item.backdrop,
             width = 320.dp,
@@ -154,7 +155,7 @@ internal fun HomeHeroCarousel(
             modifier = Modifier
                 .fillMaxSize()
                 .maskClip(RoundedCornerShape(28.dp))
-                .clickable { onItemClick(item) }
+                .clickable { onItemClick(item, sharedElementKey) }
         ) {
             if (heroImageModel != null) {
                 AsyncImage(

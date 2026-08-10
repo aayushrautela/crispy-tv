@@ -47,8 +47,8 @@ internal fun LazyListScope.detailsBodyContent(
     horizontalPadding: Dp,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
-    onPersonClick: (String) -> Unit = {},
+    onItemClick: (CatalogItem, String?) -> Unit,
+    onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
     onEpisodeClick: (videoId: String) -> Unit = {},
     onToggleEpisodeWatched: (MediaVideo) -> Unit = {},
     onMakingOfVideoClick: (CrispyBackendClient.MetadataVideoView) -> Unit = {},
@@ -147,7 +147,7 @@ internal fun LazyListScope.detailsBodyContent(
                 items(items = cast, key = { it.personId }, contentType = { "cast" }) { member ->
                     MetadataCastCard(
                         member = member,
-                        onClick = { onPersonClick(member.personId) },
+                        onClick = { onPersonClick(member.personId, member.profileUrl) },
                     )
                 }
             }
@@ -343,7 +343,12 @@ internal fun LazyListScope.detailsBodyContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(items = collectionParts, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
-                        HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
+                        val key = "details-collection-${item.itemId}"
+                        HomeCatalogPosterCard(
+                            item = item,
+                            sharedElementKey = key,
+                            onClick = { onItemClick(item, key) },
+                        )
                     }
                 }
             }
@@ -365,7 +370,12 @@ internal fun LazyListScope.detailsBodyContent(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(items = similar, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
-                    HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
+                    val key = "details-similar-${item.itemId}"
+                    HomeCatalogPosterCard(
+                        item = item,
+                        sharedElementKey = key,
+                        onClick = { onItemClick(item, key) },
+                    )
                 }
             }
         }

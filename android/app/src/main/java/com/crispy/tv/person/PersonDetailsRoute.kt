@@ -62,7 +62,8 @@ import java.util.Locale
 fun PersonDetailsRoute(
     personId: String,
     onBack: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem, String?) -> Unit,
+    initialProfileUrl: String? = null,
 ) {
     val context = LocalContext.current
     val viewModel: PersonDetailsViewModel =
@@ -74,6 +75,8 @@ fun PersonDetailsRoute(
 
     PersonDetailsScreen(
         uiState = uiState,
+        personId = personId,
+        initialProfileUrl = initialProfileUrl,
         onBack = onBack,
         onItemClick = onItemClick,
     )
@@ -82,8 +85,10 @@ fun PersonDetailsRoute(
 @Composable
 private fun PersonDetailsScreen(
     uiState: PersonDetailsUiState,
+    personId: String,
+    initialProfileUrl: String?,
     onBack: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
 ) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val scrollTopBarAlpha by remember {
@@ -113,6 +118,8 @@ private fun PersonDetailsScreen(
             uiState.person != null -> {
                 PersonDetailsContent(
                     person = uiState.person,
+                    personId = personId,
+                    initialProfileUrl = initialProfileUrl,
                     onItemClick = onItemClick,
                     listState = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -157,7 +164,9 @@ private fun PersonDetailsScreen(
 @Composable
 private fun PersonDetailsContent(
     person: PersonDetails,
-    onItemClick: (CatalogItem) -> Unit,
+    personId: String,
+    initialProfileUrl: String?,
+    onItemClick: (CatalogItem, String?) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
     modifier: Modifier = Modifier
 ) {
@@ -171,7 +180,7 @@ private fun PersonDetailsContent(
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
         item(key = "hero") {
-            PersonHero(person = person)
+            PersonHero(person = person, personId = personId, initialProfileUrl = initialProfileUrl)
         }
 
         item(key = "body") {
@@ -276,9 +285,20 @@ private fun PersonDetailsLoadingSkeleton(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PersonHero(person: PersonDetails) {
+private fun PersonHero(person: PersonDetails, personId: String, initialProfileUrl: String?) {
     val heroShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
     val horizontalPadding = responsivePageHorizontalPadding()
+    val sharedTransitionScope = com.crispy.tv.ui.navigation.LocalSharedTransitionScope.current
+    val animatedVisibilityScope = com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope.current
+    val profileKey = "backdrop-personProfile-$personId"
+
+    val displayProfileUrl = person.profileUrl?.takeIf { it.isNotBlank() } ?: initialProfileUrl
+    val profileModel = com.crispy.tv.ui.components.rememberCrispyImageModel(
+        url = displayProfileUrl,
+        width = 450.dp,
+        height = 450.dp,
+        memoryCacheKey = profileKey,
+    )
 
     Box(
         modifier =
@@ -287,19 +307,31 @@ private fun PersonHero(person: PersonDetails) {
                 .height(450.dp)
                 .clip(heroShape)
     ) {
-        if (person.profileUrl.isNullOrBlank()) {
+        if (profileModel != null) {
+            val imageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                with(sharedTransitionScope) {
+                    Modifier
+                        .sharedElement(
+                            rememberSharedContentState(key = profileKey),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                        .fillMaxSize()
+                }
+            } else {
+                Modifier.fillMaxSize()
+            }
+            AsyncImage(
+                model = profileModel,
+                contentDescription = person.name,
+                contentScale = ContentScale.Crop,
+                modifier = imageModifier,
+            )
+        } else {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-        } else {
-            AsyncImage(
-                model = person.profileUrl,
-                contentDescription = person.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
             )
         }
 
@@ -349,7 +381,7 @@ private fun PersonHero(person: PersonDetails) {
 @Composable
 private fun PersonBody(
     person: PersonDetails,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem, String?) -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = responsivePageHorizontalPadding())) {
         Spacer(modifier = Modifier.height(18.dp))
@@ -412,7 +444,12 @@ private fun PersonBody(
             contentPadding = PaddingValues(horizontal = responsivePageHorizontalPadding())
         ) {
             items(items = person.knownFor, key = { "${it.type}:${it.id}" }, contentType = { "poster" }) { item ->
-                HomeCatalogPosterCard(item = item, onClick = { onItemClick(item) })
+                val key = "person-knownFor-${item.itemId}"
+                HomeCatalogPosterCard(
+                    item = item,
+                    sharedElementKey = key,
+                    onClick = { onItemClick(item, key) },
+                )
             }
         }
     }

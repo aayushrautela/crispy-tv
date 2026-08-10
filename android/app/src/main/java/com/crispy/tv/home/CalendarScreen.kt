@@ -118,8 +118,8 @@ private class CalendarViewModel(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 internal fun CalendarRoute(
     onBack: () -> Unit,
-    onEpisodeClick: (CalendarEpisodeItem) -> Unit,
-    onSeriesClick: (CalendarSeriesItem) -> Unit,
+    onEpisodeClick: (CalendarEpisodeItem, String?) -> Unit,
+    onSeriesClick: (CalendarSeriesItem, String?) -> Unit,
 ) {
     val context = LocalContext.current.applicationContext
     val viewModel: CalendarViewModel = viewModel(factory = remember(context) { CalendarViewModel.factory(context) })
@@ -268,7 +268,7 @@ private fun CalendarSkeletonCard() {
 private fun CalendarEpisodeSection(
     title: String,
     items: List<CalendarEpisodeItem>,
-    onItemClick: (CalendarEpisodeItem) -> Unit,
+    onItemClick: (CalendarEpisodeItem, String?) -> Unit,
 ) {
     if (items.isEmpty()) return
 
@@ -276,7 +276,12 @@ private fun CalendarEpisodeSection(
         HomeRailHeader(title = title, statusMessage = "")
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items, key = { it.id }) { item ->
-                CalendarEpisodeCard(item = item, onClick = { onItemClick(item) })
+                val key = "calendar-episode-${item.titleItemId}-${item.id}"
+                CalendarEpisodeCard(
+                    item = item,
+                    sharedElementKey = key,
+                    onClick = { onItemClick(item, key) },
+                )
             }
         }
     }
@@ -286,7 +291,7 @@ private fun CalendarEpisodeSection(
 private fun CalendarSeriesSection(
     title: String,
     items: List<CalendarSeriesItem>,
-    onItemClick: (CalendarSeriesItem) -> Unit,
+    onItemClick: (CalendarSeriesItem, String?) -> Unit,
 ) {
     if (items.isEmpty()) return
 
@@ -294,7 +299,12 @@ private fun CalendarSeriesSection(
         HomeRailHeader(title = title, statusMessage = "")
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items, key = { it.id }) { item ->
-                CalendarSeriesCard(item = item, onClick = { onItemClick(item) })
+                val key = "calendar-series-${item.itemId}-${item.id}"
+                CalendarSeriesCard(
+                    item = item,
+                    sharedElementKey = key,
+                    onClick = { onItemClick(item, key) },
+                )
             }
         }
     }

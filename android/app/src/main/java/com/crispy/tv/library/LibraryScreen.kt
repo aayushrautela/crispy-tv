@@ -347,7 +347,7 @@ private sealed interface WatchlistDisplayRow {
 internal fun LazyListScope.historyItems(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
 ) {
     val monthSections = buildHistoryMonthSections(loadedItems)
     val displayRows = monthSections.flatMap { section ->
@@ -394,7 +394,7 @@ internal fun LazyListScope.historyItems(
 internal fun LazyListScope.ratingsItems(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
 ) {
     val bandSections = buildRatingBandSections(loadedItems)
     val displayRows = bandSections.flatMap { section ->
@@ -441,7 +441,7 @@ internal fun LazyListScope.ratingsItems(
 internal fun LazyListScope.watchlistItems(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
 ) {
     val dateSections = buildWatchlistDateSections(loadedItems)
     val displayRows = dateSections.flatMap { section ->

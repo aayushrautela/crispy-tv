@@ -231,7 +231,7 @@ fun DiscoverRoute(
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
     onOpenAccountsProfiles: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit
+    onItemClick: (CatalogItem, String?) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val appContext = remember(context) { context.applicationContext }
@@ -299,7 +299,7 @@ private fun DiscoverScreen(
     onRefresh: () -> Unit,
     onTypeFilterClick: (DiscoverTypeFilter) -> Unit,
     onCatalogClick: (DiscoverCatalogRef) -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
@@ -481,6 +481,7 @@ private fun DiscoverScreen(
                         contentType = { "poster" }
                     ) { index ->
                         val item = pagingItems[index] ?: return@items
+                        val key = "discover-${item.itemId}-${index}"
                          LandscapeCard(
                              title = item.title,
                              backdropUrl = item.backdropUrl,
@@ -489,8 +490,9 @@ private fun DiscoverScreen(
                              rating = item.rating,
                              year = item.year,
                              genre = item.genre,
-                             onClick = { onItemClick(item) },
+                             onClick = { onItemClick(item, key) },
                              itemId = item.itemId,
+                             sharedElementKey = key,
                          )
                     }
                 }

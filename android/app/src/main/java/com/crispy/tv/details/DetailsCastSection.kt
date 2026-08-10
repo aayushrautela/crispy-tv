@@ -101,18 +101,34 @@ internal fun MetadataCastCard(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val profileUrl = member.profileUrl?.trim().orEmpty()
+        val sharedTransitionScope = com.crispy.tv.ui.navigation.LocalSharedTransitionScope.current
+        val animatedVisibilityScope = com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope.current
+        val profileKey = "backdrop-personProfile-${member.personId}"
+
         Surface(
             modifier = Modifier.size(80.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             if (profileUrl.isNotBlank()) {
-                val profileModel = rememberCrispyImageModel(url = profileUrl, width = 80.dp, height = 80.dp)
+                val profileModel = rememberCrispyImageModel(url = profileUrl, width = 80.dp, height = 80.dp, memoryCacheKey = profileKey)
                 if (profileModel != null) {
+                    val imageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                        with(sharedTransitionScope) {
+                            Modifier
+                                .sharedElement(
+                                    rememberSharedContentState(key = profileKey),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                )
+                                .fillMaxSize()
+                        }
+                    } else {
+                        Modifier.fillMaxSize()
+                    }
                     AsyncImage(
                         model = profileModel,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = imageModifier,
                         contentScale = ContentScale.Crop,
                     )
                 }

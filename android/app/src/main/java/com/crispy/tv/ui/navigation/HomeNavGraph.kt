@@ -23,16 +23,17 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) { entry ->
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             HomeRoute(
-                onHeroClick = { hero ->
+                onHeroClick = { hero, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = hero.id,
                             itemType = hero.type,
                             backdropUrl = hero.backdropUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 },
-                onContinueWatchingClick = { item ->
+                onContinueWatchingClick = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.titleItemId,
@@ -43,10 +44,11 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             autoOpenEpisode = true,
                             backdropUrl = item.backdropUrl,
                             logoUrl = item.logoUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 },
-                onContinueWatchingOpenDetails = { item ->
+                onContinueWatchingOpenDetails = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.titleItemId,
@@ -58,22 +60,27 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             autoOpenEpisode = false,
                             backdropUrl = item.backdropUrl,
                             logoUrl = item.logoUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 },
-                onThisWeekClick = { item ->
-                    navController.navigateToCalendarEpisode(item)
+                onThisWeekClick = { item, sharedElementKey ->
+                    navController.navigateToCalendarEpisode(
+                        item = item,
+                        sharedElementKey = sharedElementKey,
+                    )
                 },
                 onThisWeekSeeAllClick = {
                     navController.navigate(AppRoutes.CalendarRoute)
                 },
-                onCatalogItemClick = { item ->
+                onCatalogItemClick = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
                             backdropUrl = item.backdropUrl,
                             logoUrl = item.logoUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 },
@@ -97,13 +104,16 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             CalendarRoute(
                 onBack = { navController.popBackStack() },
-                onEpisodeClick = { item -> navController.navigateToCalendarEpisode(item) },
-                onSeriesClick = { item ->
+                onEpisodeClick = { item, sharedElementKey ->
+                    navController.navigateToCalendarEpisode(item = item, sharedElementKey = sharedElementKey)
+                },
+                onSeriesClick = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
                             backdropUrl = item.backdropUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 },
@@ -131,13 +141,14 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
             CatalogRoute(
                 section = section,
                 onBack = { navController.popBackStack() },
-                onItemClick = { item ->
+                onItemClick = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
                             backdropUrl = item.backdropUrl,
                             logoUrl = item.logoUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 }
@@ -157,6 +168,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 navArgument(AppRoutes.HomeDetailsRuntimeAbsoluteEpisodeArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsBackdropUrlArg) { type = NavType.StringType; defaultValue = "" },
                 navArgument(AppRoutes.HomeDetailsLogoUrlArg) { type = NavType.StringType; defaultValue = "" },
+                navArgument(AppRoutes.HomeDetailsSharedElementKeyArg) { type = NavType.StringType; defaultValue = "" },
             )
     ) { entry ->
         val itemId = entry.arguments?.getString(AppRoutes.HomeDetailsItemIdArg).orEmpty()
@@ -172,6 +184,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         }
         val initialBackdropUrl = entry.arguments?.getString(AppRoutes.HomeDetailsBackdropUrlArg)?.ifBlank { null }
         val initialLogoUrl = entry.arguments?.getString(AppRoutes.HomeDetailsLogoUrlArg)?.ifBlank { null }
+        val sharedElementKey = entry.arguments?.getString(AppRoutes.HomeDetailsSharedElementKeyArg)?.ifBlank { null }
         val context = LocalContext.current
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             DetailsRoute(
@@ -182,18 +195,20 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 autoOpenEpisode = autoOpenEpisode,
                 initialBackdropUrl = initialBackdropUrl,
                 initialLogoUrl = initialLogoUrl,
+                sharedElementKey = sharedElementKey,
                 onBack = { navController.popBackStack() },
-                onItemClick = { item ->
+                onItemClick = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
                             backdropUrl = item.backdropUrl,
                             logoUrl = item.logoUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 },
-                onPersonClick = { personId -> navController.navigate(AppRoutes.personDetailsRoute(personId)) },
+                onPersonClick = { personId, profileUrl -> navController.navigate(AppRoutes.personDetailsRoute(personId, profileUrl)) },
                 onOpenPlayer = { playbackUrl, playbackHeaders, title, identity, subtitle, artworkUrl, launchSnapshot ->
                     context.startActivity(
                         PlayerActivity.intent(
@@ -215,21 +230,29 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(
         route = AppRoutes.PersonDetailsRoutePattern,
         arguments = listOf(
-            navArgument(AppRoutes.PersonDetailsPersonIdArg) { type = NavType.StringType }
+            navArgument(AppRoutes.PersonDetailsPersonIdArg) { type = NavType.StringType },
+            navArgument(AppRoutes.PersonDetailsProfileUrlArg) {
+                type = NavType.StringType
+                defaultValue = ""
+            }
         )
     ) { entry ->
         val personId = entry.arguments?.getString(AppRoutes.PersonDetailsPersonIdArg).orEmpty()
+        val profileUrl = entry.arguments?.getString(AppRoutes.PersonDetailsProfileUrlArg).orEmpty()
+            .takeIf { it.isNotBlank() }
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             PersonDetailsRoute(
                 personId = personId,
+                initialProfileUrl = profileUrl,
                 onBack = { navController.popBackStack() },
-                onItemClick = { item ->
+                onItemClick = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(
                             itemId = item.itemId,
                             itemType = item.type,
                             backdropUrl = item.backdropUrl,
                             logoUrl = item.logoUrl,
+                            sharedElementKey = sharedElementKey,
                         )
                     )
                 }
@@ -238,7 +261,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     }
 }
 
-private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeItem) {
+private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeItem, sharedElementKey: String? = null) {
     navigate(
         AppRoutes.homeDetailsRoute(
             itemId = item.titleItemId,
@@ -249,6 +272,7 @@ private fun NavHostController.navigateToCalendarEpisode(item: CalendarEpisodeIte
             highlightEpisodeId = item.highlightEpisodeId.takeIf { !item.isGroup },
             autoOpenEpisode = false,
             backdropUrl = item.backdropUrl,
+            sharedElementKey = sharedElementKey,
         )
     )
 }

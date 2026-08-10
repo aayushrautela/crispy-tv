@@ -23,9 +23,11 @@ object AppRoutes {
     const val HomeDetailsRuntimeAbsoluteEpisodeArg = "runtimeAbsoluteEpisodeNumber"
     const val HomeDetailsBackdropUrlArg = "backdropUrl"
     const val HomeDetailsLogoUrlArg = "logoUrl"
+    const val HomeDetailsSharedElementKeyArg = "sharedElementKey"
 
     const val PersonDetailsRoute = "person/details"
     const val PersonDetailsPersonIdArg = "personId"
+    const val PersonDetailsProfileUrlArg = "profileUrl"
 
     const val PlaybackSettingsRoute = "settings/playback"
     const val ImageSettingsRoute = "settings/image"
@@ -49,9 +51,11 @@ object AppRoutes {
             "&$HomeDetailsRuntimeEpisodeNumberArg={$HomeDetailsRuntimeEpisodeNumberArg}" +
             "&$HomeDetailsRuntimeAbsoluteEpisodeArg={$HomeDetailsRuntimeAbsoluteEpisodeArg}" +
             "&$HomeDetailsBackdropUrlArg={$HomeDetailsBackdropUrlArg}" +
-            "&$HomeDetailsLogoUrlArg={$HomeDetailsLogoUrlArg}"
+            "&$HomeDetailsLogoUrlArg={$HomeDetailsLogoUrlArg}" +
+            "&$HomeDetailsSharedElementKeyArg={$HomeDetailsSharedElementKeyArg}"
     val PersonDetailsRoutePattern: String =
-        "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}"
+        "$PersonDetailsRoute/{$PersonDetailsPersonIdArg}" +
+            "?$PersonDetailsProfileUrlArg={$PersonDetailsProfileUrlArg}"
     val CatalogListRoutePattern: String =
         "$CatalogListRoute/{$CatalogIdArg}" +
             "?$CatalogTitleArg={$CatalogTitleArg}"
@@ -66,6 +70,7 @@ object AppRoutes {
         autoOpenEpisode: Boolean = false,
         backdropUrl: String? = null,
         logoUrl: String? = null,
+        sharedElementKey: String? = null,
     ): String {
         return "$HomeDetailsRoute/${Uri.encode(itemType.trim())}/${Uri.encode(itemId.trim())}" +
             "?$HomeDetailsHighlightEpisodeIdArg=${Uri.encode(highlightEpisodeId.orEmpty())}" +
@@ -74,7 +79,8 @@ object AppRoutes {
             "&$HomeDetailsRuntimeEpisodeNumberArg=${episodeNumber?.toString().orEmpty()}" +
             "&$HomeDetailsRuntimeAbsoluteEpisodeArg=${absoluteEpisodeNumber?.toString().orEmpty()}" +
             "&$HomeDetailsBackdropUrlArg=${Uri.encode(backdropUrl.orEmpty())}" +
-            "&$HomeDetailsLogoUrlArg=${Uri.encode(logoUrl.orEmpty())}"
+            "&$HomeDetailsLogoUrlArg=${Uri.encode(logoUrl.orEmpty())}" +
+            "&$HomeDetailsSharedElementKeyArg=${Uri.encode(sharedElementKey.orEmpty())}"
     }
 
     fun catalogListRoute(section: CatalogSectionRef): String {
@@ -82,7 +88,8 @@ object AppRoutes {
             "?$CatalogTitleArg=${Uri.encode(section.displayTitle)}"
     }
 
-    fun personDetailsRoute(personId: String): String {
-        return "$PersonDetailsRoute/${Uri.encode(personId.trim())}"
+    fun personDetailsRoute(personId: String, profileUrl: String? = null): String {
+        return "$PersonDetailsRoute/${Uri.encode(personId.trim())}" +
+            "?$PersonDetailsProfileUrlArg=${Uri.encode(profileUrl.orEmpty())}"
     }
 }

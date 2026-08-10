@@ -31,10 +31,12 @@ import com.crispy.tv.ui.theme.Dimensions
 internal fun CalendarEpisodeCard(
     item: CalendarEpisodeItem,
     onClick: () -> Unit,
+    sharedElementKey: String? = null,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-    val backdropKey = "backdrop-${item.titleItemId}"
+    val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.titleItemId
+    val backdropKey = "backdrop-$resolvedKey"
     val imageModel = rememberCrispyImageModel(
         url = item.thumbnailUrl ?: item.backdropUrl ?: item.posterUrl,
         width = Dimensions.WideCardWidth,
@@ -122,10 +124,12 @@ internal fun CalendarEpisodeCard(
 internal fun CalendarSeriesCard(
     item: CalendarSeriesItem,
     onClick: () -> Unit,
+    sharedElementKey: String? = null,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-    val backdropKey = "backdrop-${item.itemId}"
+    val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.itemId
+    val backdropKey = "backdrop-$resolvedKey"
     val imageModel = rememberCrispyImageModel(
         url = item.backdropUrl ?: item.posterUrl,
         width = Dimensions.WideCardWidth,

@@ -92,11 +92,13 @@ internal fun HeroSection(
     onHeroImageLoadFailed: () -> Unit,
     onToggleTrailer: () -> Unit,
     itemId: String? = null,
+    sharedElementKey: String? = null,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-    val backdropKey = itemId?.let { "backdrop-$it" }
-    val logoKey = itemId?.let { "logo-$it" }
+    val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
+    val backdropKey = resolvedKey?.let { "backdrop-$it" }
+    val logoKey = resolvedKey?.let { "logo-$it" }
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()

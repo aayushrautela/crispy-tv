@@ -76,7 +76,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun SearchRoute(
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
@@ -146,7 +146,7 @@ private fun SearchContent(
     onGenreClick: (SearchGenreSuggestion) -> Unit,
     onRecentSearchClick: (String) -> Unit,
     onRemoveRecentSearch: (String) -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isAiMode = uiState.searchMode == SearchMode.AI
@@ -308,7 +308,7 @@ private fun SearchResultsContent(
     uiState: SearchUiState,
     listState: LazyListState,
     pageHorizontalPadding: Dp,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
     emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -366,7 +366,7 @@ private fun SearchResultsContent(
                 }
                 if (buckets.people.isNotEmpty()) {
                     item(key = "people") {
-                        SearchSectionRow(title = "People", items = buckets.people, onItemClick = onItemClick)
+                        SearchSectionRow(title = "People", items = buckets.people, onItemClick = onItemClick, isPersonRow = true)
                     }
                 }
             }
@@ -378,7 +378,8 @@ private fun SearchResultsContent(
 private fun SearchSectionRow(
     title: String,
     items: List<CatalogItem>,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
+    isPersonRow: Boolean = false,
 ) {
     CrispyShelfSection(
         title = title,
@@ -386,6 +387,11 @@ private fun SearchSectionRow(
         itemSpacing = 12.dp,
         key = { "${it.type}:${it.id}" },
         itemContent = { item ->
+            val sharedElementKey = if (isPersonRow) {
+                "personProfile-${item.itemId}"
+            } else {
+                "search-${title}-${item.itemId}"
+            }
             LandscapeCard(
                 title = item.title,
                 backdropUrl = item.backdropUrl,
@@ -395,8 +401,9 @@ private fun SearchSectionRow(
                 year = item.year,
                 genre = item.genre,
                 modifier = Modifier.width(CardStyle.landscapeCardWidth()),
-                onClick = { onItemClick(item) },
+                onClick = { onItemClick(item, sharedElementKey) },
                 itemId = item.itemId,
+                sharedElementKey = sharedElementKey,
             )
         },
     )

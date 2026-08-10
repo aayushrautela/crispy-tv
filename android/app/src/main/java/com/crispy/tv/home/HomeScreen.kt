@@ -50,12 +50,12 @@ private val HomeTopSectionSpacing = 16.dp
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun HomeRoute(
-    onHeroClick: (HomeHeroItem) -> Unit,
-    onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
-    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
-    onThisWeekClick: (CalendarEpisodeItem) -> Unit,
+    onHeroClick: (HomeHeroItem, String?) -> Unit,
+    onContinueWatchingClick: (CanonicalContinueWatchingItem, String?) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem, String?) -> Unit,
+    onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
-    onCatalogItemClick: (CatalogItem) -> Unit,
+    onCatalogItemClick: (CatalogItem, String?) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
     scrollToTopRequests: StateFlow<Int>,
@@ -169,8 +169,8 @@ internal fun HomeRoute(
                                 sectionUis = sectionUis,
                                 horizontalPadding = horizontalPadding,
                                 onCollectionClick = onCatalogSeeAllClick,
-                                onCollectionPlayClick = onCatalogItemClick,
-                                onCollectionMovieClick = onCatalogItemClick,
+                                onCollectionPlayClick = { onCatalogItemClick(it, null) },
+                                onCollectionMovieClick = { onCatalogItemClick(it, null) },
                             )
                         }
                     }
@@ -232,7 +232,7 @@ private fun HomeHeaderSectionsItem(
 @Composable
 private fun HomeHeroSection(
     state: HeroState,
-    onHeroClick: (HomeHeroItem) -> Unit,
+    onHeroClick: (HomeHeroItem, String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {

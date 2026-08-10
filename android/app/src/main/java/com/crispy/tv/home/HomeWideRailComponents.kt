@@ -57,10 +57,10 @@ private const val HOME_WIDE_SKELETON_COUNT = 3
 internal fun HomeWideRailSection(
     section: HomeWideRailSectionUi,
     horizontalPadding: Dp,
-    onContinueWatchingClick: (CanonicalContinueWatchingItem) -> Unit,
-    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem) -> Unit,
+    onContinueWatchingClick: (CanonicalContinueWatchingItem, String?) -> Unit,
+    onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem, String?) -> Unit,
     onRemoveContinueWatchingItem: (CanonicalContinueWatchingItem) -> Unit,
-    onThisWeekClick: (CalendarEpisodeItem) -> Unit,
+    onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
 ) {
     if (section.items.isEmpty() && !section.isLoading && section.statusMessage.isBlank()) {
@@ -95,25 +95,27 @@ internal fun HomeWideRailSection(
                 }
             } else {
                 items(section.items, key = { it.key }, contentType = { "wideRailCard" }) { item ->
+                    val key = "homerail-${section.kind.name.lowercase()}-${item.key}"
                     HomeWideRailCard(
                         item = item,
                         showActions = section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING,
                         actionsVisible = actionsItemKey == item.key,
-                        onToggleActions = { key ->
-                            actionsItemKey = if (actionsItemKey == key) null else key
+                        onToggleActions = { key2 ->
+                            actionsItemKey = if (actionsItemKey == key2) null else key2
                         },
                         onClick = {
                             when (item.kind) {
-                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingClick)
-                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
+                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let { onContinueWatchingClick(it, key) }
+                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let { onThisWeekClick(it, key) }
                             }
                         },
                         onDetailsClick = {
                             when (item.kind) {
-                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let(onContinueWatchingOpenDetails)
-                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let(onThisWeekClick)
+                                HomeWideRailItemKind.WATCH_ACTIVITY -> item.continueWatchingItem?.let { onContinueWatchingOpenDetails(it, key) }
+                                HomeWideRailItemKind.CALENDAR_EPISODE -> item.calendarEpisodeItem?.let { onThisWeekClick(it, key) }
                             }
                         },
+                        sharedElementKey = key,
                         onRemoveClick =
                             if (section.kind == HomeWideRailSectionKind.CONTINUE_WATCHING) {
                                 item.continueWatchingItem?.let { continueWatchingItem ->
@@ -131,6 +133,7 @@ internal fun HomeWideRailSection(
     actionsItemKey?.let { key ->
         val actionItem = section.items.firstOrNull { it.key == key }
         if (actionItem != null) {
+            val actionSharedKey = "homerail-${section.kind.name.lowercase()}-${actionItem.key}"
             ModalBottomSheet(
                 onDismissRequest = { actionsItemKey = null },
                 sheetState = sheetState,
@@ -140,8 +143,8 @@ internal fun HomeWideRailSection(
                     onDetailsClick = {
                         actionsItemKey = null
                         when (actionItem.kind) {
-                            HomeWideRailItemKind.WATCH_ACTIVITY -> actionItem.continueWatchingItem?.let(onContinueWatchingOpenDetails)
-                            HomeWideRailItemKind.CALENDAR_EPISODE -> actionItem.calendarEpisodeItem?.let(onThisWeekClick)
+                            HomeWideRailItemKind.WATCH_ACTIVITY -> actionItem.continueWatchingItem?.let { onContinueWatchingOpenDetails(it, actionSharedKey) }
+                            HomeWideRailItemKind.CALENDAR_EPISODE -> actionItem.calendarEpisodeItem?.let { onThisWeekClick(it, actionSharedKey) }
                         }
                     },
                     onRemoveClick = actionItem.continueWatchingItem?.let { cwItem ->
@@ -225,13 +228,15 @@ internal fun HomeWideRailCard(
     onClick: () -> Unit,
     onDetailsClick: () -> Unit = onClick,
     onRemoveClick: (() -> Unit)? = null,
+    sharedElementKey: String? = null,
 ) {
     val removeAction = onRemoveClick
     val hasItemActions = showActions && removeAction != null
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-    val backdropKey = item.detailsItemId?.let { "backdrop-$it" }
-    val logoKey = item.detailsItemId?.let { "logo-$it" }
+    val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: item.detailsItemId
+    val backdropKey = resolvedKey?.let { "backdrop-$it" }
+    val logoKey = resolvedKey?.let { "logo-$it" }
     val artworkModel = rememberCrispyImageModel(
         url = item.imageUrl,
         width = Dimensions.WideCardWidth,

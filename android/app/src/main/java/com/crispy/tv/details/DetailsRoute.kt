@@ -25,9 +25,10 @@ fun DetailsRoute(
     autoOpenEpisode: Boolean = false,
     initialBackdropUrl: String? = null,
     initialLogoUrl: String? = null,
+    sharedElementKey: String? = null,
     onBack: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit = {},
-    onPersonClick: (String) -> Unit = {},
+    onItemClick: (CatalogItem, String?) -> Unit = { _, _ -> },
+    onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
     onOpenPlayer: (String, Map<String, String>, String, PlaybackIdentity, String?, String?, PlayerLaunchSnapshot?) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
@@ -93,6 +94,7 @@ fun DetailsRoute(
         playbackSettings = playbackSettings,
         initialBackdropUrl = initialBackdropUrl,
         initialLogoUrl = initialLogoUrl,
+        sharedElementKey = sharedElementKey,
         onBack = onBack,
         onItemClick = onItemClick,
         onPersonClick = onPersonClick,

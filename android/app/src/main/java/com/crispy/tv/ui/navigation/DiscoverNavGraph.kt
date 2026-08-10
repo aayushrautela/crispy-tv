@@ -19,13 +19,14 @@ internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostControlle
                         launchSingleTop = true
                     }
                 },
-            onItemClick = { item ->
+            onItemClick = { item, sharedElementKey ->
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
                         itemId = item.itemId,
                         itemType = item.type,
                         backdropUrl = item.backdropUrl,
                         logoUrl = item.logoUrl,
+                        sharedElementKey = sharedElementKey,
                     )
                 )
             }

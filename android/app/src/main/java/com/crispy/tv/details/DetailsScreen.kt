@@ -78,9 +78,10 @@ internal fun DetailsScreen(
     playbackSettings: PlaybackSettings,
     initialBackdropUrl: String? = null,
     initialLogoUrl: String? = null,
+    sharedElementKey: String? = null,
     onBack: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
-    onPersonClick: (String) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
+    onPersonClick: (personId: String, profileUrl: String?) -> Unit,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onOpenStreamSelector: () -> Unit,
@@ -285,6 +286,7 @@ internal fun DetailsScreen(
                             }
                         },
                         itemId = uiState.itemId,
+                        sharedElementKey = sharedElementKey,
                     )
                 }
 

@@ -51,6 +51,7 @@ fun LandscapeCard(
     maturityRating: String? = null,
     genre: String? = null,
     itemId: String? = null,
+    sharedElementKey: String? = null,
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val screenBackground = MaterialTheme.colorScheme.background
@@ -59,8 +60,9 @@ fun LandscapeCard(
     val cardHeight = (cardWidth.value * 9f / 16f).dp
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-    val backdropKey = itemId?.let { "backdrop-$it" }
-    val logoKey = itemId?.let { "logo-$it" }
+    val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
+    val backdropKey = resolvedKey?.let { "backdrop-$it" }
+    val logoKey = resolvedKey?.let { "logo-$it" }
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight, memoryCacheKey = backdropKey)
     val logoModel = crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
 

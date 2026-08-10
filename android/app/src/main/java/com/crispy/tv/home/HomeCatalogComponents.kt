@@ -42,7 +42,7 @@ internal fun HomeCatalogSectionRow(
     sectionUi: HomeCatalogSectionUi,
     horizontalPadding: Dp,
     onSeeAllClick: () -> Unit,
-    onItemClick: (CatalogItem) -> Unit,
+    onItemClick: (CatalogItem, String?) -> Unit,
 ) {
     val sectionSkeleton = sectionUi.isLoading && sectionUi.items.isEmpty()
 
@@ -136,9 +136,11 @@ internal fun HomeCatalogSectionRow(
                 }
             } else {
                 items(sectionUi.items, key = { "${it.type}:${it.id}" }, contentType = { "catalogPoster" }) { item ->
+                    val key = "homecatalog-${sectionUi.section.key}-${item.itemId}"
                     HomeCatalogPosterCard(
                         item = item,
-                        onClick = { onItemClick(item) }
+                        sharedElementKey = key,
+                        onClick = { onItemClick(item, key) }
                     )
                 }
             }
@@ -150,7 +152,8 @@ internal fun HomeCatalogSectionRow(
 @Composable
 internal fun HomeCatalogPosterCard(
     item: CatalogItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedElementKey: String? = null,
 ) {
     LandscapeCard(
         title = item.title,
@@ -163,5 +166,6 @@ internal fun HomeCatalogPosterCard(
         modifier = Modifier.width(CardStyle.landscapeCardWidth()),
         onClick = onClick,
         itemId = item.itemId,
+        sharedElementKey = sharedElementKey,
     )
 }
