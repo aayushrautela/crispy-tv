@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -126,9 +126,9 @@ internal suspend fun loadDetailsSeedColor(
 internal fun rememberSeedColor(
     imageUrl: String?,
     fallbackSeed: Color,
-): Color? {
+): State<Color?> {
     val context = LocalContext.current
-    val state by produceState<Color?>(
+    return produceState<Color?>(
         initialValue = null,
         keys = arrayOf(imageUrl, fallbackSeed),
     ) {
@@ -149,7 +149,6 @@ internal fun rememberSeedColor(
         )
         value = loaded ?: Color.Unspecified
     }
-    return state.value
 }
 
 @Composable
