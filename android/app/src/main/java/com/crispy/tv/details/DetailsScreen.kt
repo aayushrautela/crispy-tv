@@ -6,7 +6,6 @@
 package com.crispy.tv.details
 
 import android.content.Intent
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,7 +71,6 @@ import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.delay
 
 private val HERO_TRAILER_STOP_SCROLL_THRESHOLD = 120.dp
-private const val TAG = "DetailsScreen"
 
 @Composable
 internal fun DetailsScreen(
@@ -121,33 +119,12 @@ internal fun DetailsScreen(
     }
     val baseScheme = MaterialTheme.colorScheme
     val fallbackSeed = baseScheme.primary
-    val cachedSeed = remember(imageUrl) { cachedDetailsSeedColor(imageUrl) }
-    var seedColor by remember(imageUrl, fallbackSeed) { mutableStateOf(cachedSeed ?: fallbackSeed) }
-    var isSeedColorResolved by remember(imageUrl, fallbackSeed) {
-        mutableStateOf(details == null || imageUrl.isNullOrBlank() || cachedSeed != null)
-    }
-
-    LaunchedEffect(details, imageUrl, cachedSeed, fallbackSeed) {
-        Log.d(TAG, "LaunchedEffect: details=${details?.title}, imageUrl=$imageUrl, cachedSeed=$cachedSeed, fallbackSeed=$fallbackSeed")
-        seedColor = cachedSeed ?: fallbackSeed
-        isSeedColorResolved = details == null || imageUrl.isNullOrBlank() || cachedSeed != null
-        Log.d(TAG, "LaunchedEffect: isSeedColorResolved=$isSeedColorResolved (details!=null=${details != null}, imageUrlBlank=${imageUrl.isNullOrBlank()}, cachedSeed!=null=${cachedSeed != null})")
-        if (details == null || imageUrl.isNullOrBlank() || cachedSeed != null) {
-            Log.d(TAG, "LaunchedEffect: skipping extraction (already resolved or unavailable)")
-            return@LaunchedEffect
-        }
-
-        Log.d(TAG, "LaunchedEffect: starting seed color extraction...")
-        val resolvedSeed = loadDetailsSeedColor(
-            context = context,
-            imageUrl = imageUrl,
-            fallbackSeed = fallbackSeed,
-        )
-        Log.d(TAG, "LaunchedEffect: extraction complete, resolvedSeed=$resolvedSeed")
-        seedColor = resolvedSeed ?: fallbackSeed
-        isSeedColorResolved = true
-        Log.d(TAG, "LaunchedEffect: isSeedColorResolved set to true")
-    }
+    val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)
+    val seedColor = rawSeed ?: fallbackSeed
+    val detailsScheme = rememberDetailsColorScheme(seedColor = seedColor)
+    val detailsSchemeAnimated = rememberAnimatedColorScheme(target = detailsScheme)
+    val palette = remember(detailsSchemeAnimated) { detailsPaletteFromScheme(detailsSchemeAnimated) }
+    val showPalettePlaceholder = details == null || rawSeed == null
 
     var isScreenResumed by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
@@ -166,18 +143,8 @@ internal fun DetailsScreen(
         }
     }
 
-    val showPalettePlaceholder =
-        !imageUrl.isNullOrBlank() &&
-            (details == null || !isSeedColorResolved)
-
-    Log.d(TAG, "showPalettePlaceholder=$showPalettePlaceholder (imageUrl=${imageUrl?.takeLast(20) ?: "blank"}, details!=null=${details != null}, isSeedColorResolved=$isSeedColorResolved)")
-
     val visibleDetails = if (showPalettePlaceholder) null else details
     val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
-
-    val detailsScheme = rememberDetailsColorScheme(seedColor = seedColor)
-    Log.d(TAG, "seedColor=$seedColor")
-    val palette = remember(detailsScheme) { detailsPaletteFromScheme(detailsScheme) }
 
     val selectedTrailer =
         uiState.titleDetail

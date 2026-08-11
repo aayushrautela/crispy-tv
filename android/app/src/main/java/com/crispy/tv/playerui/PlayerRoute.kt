@@ -27,7 +27,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.crispy.tv.details.cachedDetailsSeedColor
+import com.crispy.tv.details.rememberSeedColor
 import com.crispy.tv.details.detailsPaletteFromScheme
 import com.crispy.tv.details.rememberDetailsColorScheme
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
@@ -46,18 +46,8 @@ fun PlayerRoute(
     val imageUrl = uiState.backdropUrl ?: uiState.artworkUrl
     val baseScheme = MaterialTheme.colorScheme
     val fallbackSeed = baseScheme.primary
-    val cachedSeed = remember(imageUrl) { cachedDetailsSeedColor(imageUrl) }
-    var seedColor by remember(imageUrl, fallbackSeed) { mutableStateOf(cachedSeed ?: fallbackSeed) }
-
-    LaunchedEffect(imageUrl, cachedSeed, fallbackSeed) {
-        seedColor = cachedSeed ?: fallbackSeed
-        if (imageUrl.isNullOrBlank() || cachedSeed != null) return@LaunchedEffect
-        seedColor = com.crispy.tv.details.loadDetailsSeedColor(
-            context = context,
-            imageUrl = imageUrl,
-            fallbackSeed = fallbackSeed,
-        ) ?: fallbackSeed
-    }
+    val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)
+    val seedColor = rawSeed ?: fallbackSeed
 
     val colorScheme = rememberDetailsColorScheme(seedColor = seedColor)
     val palette = remember(colorScheme) { detailsPaletteFromScheme(colorScheme) }

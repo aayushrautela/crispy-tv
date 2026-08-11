@@ -2,12 +2,14 @@ package com.crispy.tv.details
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.util.Log
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -23,7 +25,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 private const val SEED_COLOR_CACHE_MAX_ENTRIES = 96
 private const val SEED_COLOR_EXTRACTION_TIMEOUT_MS = 500L
-private const val TAG = "DetailsPalette"
 
 private object DetailsSeedColorCache {
     private val cache =
@@ -80,14 +81,12 @@ internal suspend fun computeDetailsSeedColor(
     bitmap: Bitmap,
     fallbackSeed: Color,
 ): Color? {
-    val startMs = System.currentTimeMillis()
     return runCatching {
         withTimeoutOrNull(SEED_COLOR_EXTRACTION_TIMEOUT_MS) {
             withContext(Dispatchers.Default) {
                 bitmap
                     .asImageBitmap()
                     .themeColor(fallback = fallbackSeed, filter = true, maxColors = 128)
-                    .also { Log.d(TAG, "computeDetailsSeedColor: quantization took ${System.currentTimeMillis() - startMs}ms") }
             }
         }
     }.getOrNull()
@@ -98,8 +97,6 @@ internal suspend fun loadDetailsSeedColor(
     imageUrl: String,
     fallbackSeed: Color,
 ): Color? {
-    Log.d(TAG, "loadDetailsSeedColor: starting, imageUrl=${imageUrl.takeLast(30)}")
-    val startMs = System.currentTimeMillis()
     val imageLoader = context.imageLoader
     val computedSeed =
         runCatching {
@@ -111,23 +108,48 @@ internal suspend fun loadDetailsSeedColor(
                     .allowHardware(false)
                     .build()
 
-            Log.d(TAG, "loadDetailsSeedColor: Coil request with size(128)")
             val result = imageLoader.execute(request)
             val image = (result as? SuccessResult)?.image ?: return@runCatching null
-            val fromCacheMs = System.currentTimeMillis()
-            Log.d(TAG, "loadDetailsSeedColor: Coil fetch took ${fromCacheMs - startMs}ms, image=${image.width}x${image.height}")
             computeDetailsSeedColor(
                 bitmap = image.toBitmap(),
                 fallbackSeed = fallbackSeed,
             )
         }.getOrNull()
 
-    val totalMs = System.currentTimeMillis() - startMs
-    Log.d(TAG, "loadDetailsSeedColor: total ${totalMs}ms, computedSeed=$computedSeed")
     if (computedSeed != null) {
         cacheDetailsSeedColor(imageUrl, computedSeed)
     }
     return computedSeed
+}
+
+@Composable
+internal fun rememberSeedColor(
+    imageUrl: String?,
+    fallbackSeed: Color,
+): Color? {
+    val context = LocalContext.current
+    val state by produceState<Color?>(
+        initialValue = null,
+        keys = arrayOf(imageUrl, fallbackSeed),
+    ) {
+        val url = imageUrl?.trim()?.takeIf { it.isNotEmpty() }
+        if (url == null) {
+            value = Color.Unspecified
+            return@produceState
+        }
+        val cached = cachedDetailsSeedColor(url)
+        if (cached != null) {
+            value = cached
+            return@produceState
+        }
+        val loaded = loadDetailsSeedColor(
+            context = context,
+            imageUrl = url,
+            fallbackSeed = fallbackSeed,
+        )
+        value = loaded ?: Color.Unspecified
+    }
+    return state.value
 }
 
 @Composable
