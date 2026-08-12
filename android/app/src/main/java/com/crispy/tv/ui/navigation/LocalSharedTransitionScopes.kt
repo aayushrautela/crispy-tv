@@ -33,6 +33,20 @@ fun AnimatedContentScope.animateContentAlpha(): Float {
 }
 
 @Composable
+fun AnimatedContentScope.animateCardCornerRadius(cardRadius: Dp): Dp {
+    val corner by transition.animateDp(
+        transitionSpec = { tween(SharedElementDurationMillis) },
+        label = "sharedCardCornerRadius",
+    ) { state ->
+        when (state) {
+            EnterExitState.Visible -> cardRadius
+            else -> 0.dp
+        }
+    }
+    return corner
+}
+
+@Composable
 fun AnimatedContentScope.animateHeroCornerRadius(cardRadius: Dp): Dp {
     val corner by transition.animateDp(
         transitionSpec = { tween(SharedElementDurationMillis) },

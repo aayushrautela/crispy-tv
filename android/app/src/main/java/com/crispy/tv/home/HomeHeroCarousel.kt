@@ -33,6 +33,7 @@ import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+import com.crispy.tv.ui.navigation.animateCardCornerRadius
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -124,13 +125,16 @@ internal fun HomeHeroCarousel(
         }
 
         val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+            val cornerRadius = with(animatedVisibilityScope) {
+                animateCardCornerRadius(28.dp)
+            }
             with(sharedTransitionScope) {
                 Modifier
                     .sharedElement(
                         rememberSharedContentState(key = backdropKey),
                         animatedVisibilityScope = animatedVisibilityScope,
                     )
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(cornerRadius))
                     .fillMaxSize()
                     .drawWithContent {
                         drawContent()

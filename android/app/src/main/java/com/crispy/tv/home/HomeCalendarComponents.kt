@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+import com.crispy.tv.ui.navigation.animateCardCornerRadius
 import com.crispy.tv.ui.theme.Dimensions
 
 @Composable
@@ -54,13 +55,16 @@ internal fun CalendarEpisodeCard(
     }
 
     val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        val cornerRadius = with(animatedVisibilityScope) {
+            animateCardCornerRadius(20.dp)
+        }
         with(sharedTransitionScope) {
             Modifier
                 .sharedElement(
                     rememberSharedContentState(key = backdropKey),
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(cornerRadius))
                 .drawWithContent {
                     drawContent()
                     drawRect(brush = bottomFadeBrush)
@@ -139,13 +143,16 @@ internal fun CalendarSeriesCard(
     }
 
     val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        val cornerRadius = with(animatedVisibilityScope) {
+            animateCardCornerRadius(20.dp)
+        }
         with(sharedTransitionScope) {
             Modifier
                 .sharedElement(
                     rememberSharedContentState(key = backdropKey),
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(cornerRadius))
                 .drawWithContent {
                     drawContent()
                     drawRect(brush = bottomFadeBrush)
