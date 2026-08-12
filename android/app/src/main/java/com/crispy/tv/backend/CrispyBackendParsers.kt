@@ -776,7 +776,7 @@ internal fun CrispyBackendClient.parseMetadataReviewViews(array: JSONArray?): Li
                 )
             )
         }
-    }
+    }.distinctBy { it.id }
 }
 
 internal fun CrispyBackendClient.parseMetadataCompanyViews(array: JSONArray?): List<MetadataCompanyView> {
