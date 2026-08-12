@@ -1,12 +1,10 @@
 package com.crispy.tv.watchhistory.sync
 
-import android.content.Context
 import com.crispy.tv.domain.watch.WatchSyncEffect
 import com.crispy.tv.domain.watch.WatchSyncEvent
 import com.crispy.tv.domain.watch.WatchSyncState
 import com.crispy.tv.domain.watch.createWatchSyncState
 import com.crispy.tv.domain.watch.reduceWatchSync
-import com.crispy.tv.network.AppHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,6 +15,7 @@ import kotlinx.coroutines.launch
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okio.BufferedSource
@@ -28,9 +27,12 @@ import java.io.IOException
  * the max-duration timer, but all policy lives in the pure [reduceWatchSync]
  * reducer: the adapter only translates socket lifecycle and streamed
  * `watch_changed` events into reducer events, then applies the emitted effects.
+ *
+ * The [httpClient] is injected so this module never depends on the app's
+ * [com.crispy.tv.network.AppHttp] singleton.
  */
 class WatchSyncSource(
-    private val context: Context,
+    private val httpClient: OkHttpClient,
     private val baseUrl: String,
     private val accessToken: String,
     private val profileId: String,
@@ -77,7 +79,7 @@ class WatchSyncSource(
                 .url(url)
                 .header("Authorization", "Bearer $accessToken")
                 .build()
-        call = AppHttp.okHttp(context).newCall(request)
+        call = httpClient.newCall(request)
         call?.enqueue(
             object : Callback {
                 override fun onResponse(
