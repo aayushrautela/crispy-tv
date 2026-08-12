@@ -34,6 +34,7 @@ import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
+import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -128,6 +129,9 @@ internal fun HomeHeroCarousel(
             val cornerRadius = with(animatedVisibilityScope) {
                 animateCardCornerRadius(28.dp)
             }
+            val overlayAlpha = with(animatedVisibilityScope) {
+                animateCardOverlayAlpha()
+            }
             with(sharedTransitionScope) {
                 Modifier
                     .sharedElement(
@@ -138,7 +142,9 @@ internal fun HomeHeroCarousel(
                     .fillMaxSize()
                     .drawWithContent {
                         drawContent()
-                        drawRect(brush = bottomFadeBrush)
+                        if (overlayAlpha > 0.001f) {
+                            drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                        }
                     }
             }
         } else {

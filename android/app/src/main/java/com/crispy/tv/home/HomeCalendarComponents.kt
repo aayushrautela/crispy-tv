@@ -24,6 +24,7 @@ import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
+import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 import com.crispy.tv.ui.theme.Dimensions
 
 @Composable
@@ -58,6 +59,9 @@ internal fun CalendarEpisodeCard(
         val cornerRadius = with(animatedVisibilityScope) {
             animateCardCornerRadius(20.dp)
         }
+        val overlayAlpha = with(animatedVisibilityScope) {
+            animateCardOverlayAlpha()
+        }
         with(sharedTransitionScope) {
             Modifier
                 .sharedElement(
@@ -67,7 +71,9 @@ internal fun CalendarEpisodeCard(
                 .clip(RoundedCornerShape(cornerRadius))
                 .drawWithContent {
                     drawContent()
-                    drawRect(brush = bottomFadeBrush)
+                    if (overlayAlpha > 0.001f) {
+                        drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                    }
                 }
         }
     } else {
@@ -146,6 +152,9 @@ internal fun CalendarSeriesCard(
         val cornerRadius = with(animatedVisibilityScope) {
             animateCardCornerRadius(20.dp)
         }
+        val overlayAlpha = with(animatedVisibilityScope) {
+            animateCardOverlayAlpha()
+        }
         with(sharedTransitionScope) {
             Modifier
                 .sharedElement(
@@ -155,7 +164,9 @@ internal fun CalendarSeriesCard(
                 .clip(RoundedCornerShape(cornerRadius))
                 .drawWithContent {
                     drawContent()
-                    drawRect(brush = bottomFadeBrush)
+                    if (overlayAlpha > 0.001f) {
+                        drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
+                    }
                 }
         }
     } else {
