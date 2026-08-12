@@ -1,7 +1,7 @@
 {
   "contract_version": 7,
   "suite": "home_catalogs",
-  "case_id": "falls_back_to_first_list_and_keeps_all_valid_items",
+  "case_id": "no_hero_list_yields_empty_hero_result",
   "input": {
     "snapshot": {
       "profile_id": "p1",
@@ -86,30 +86,7 @@
   "expected": {
     "personal_feed": {
       "hero_result": {
-        "items": [
-          {
-            "item_id": "show:tmdb:95396",
-            "title": "Severance",
-            "description": "Staff picks",
-            "rating": null,
-            "year": "2022",
-            "genres": [],
-            "backdrop_url": "https://img/severance.jpg",
-            "addon_id": "supabase",
-            "type": "series"
-          },
-          {
-            "item_id": "show:tmdb:125988",
-            "title": "Silo",
-            "description": "Staff picks",
-            "rating": null,
-            "year": "2023",
-            "genres": [],
-            "backdrop_url": "https://img/silo.jpg",
-            "addon_id": "supabase",
-            "type": "series"
-          }
-        ],
+        "items": [],
         "status_message": ""
       },
       "sections": [
