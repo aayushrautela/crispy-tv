@@ -109,7 +109,8 @@ internal fun HeroSection(
             .fillMaxWidth()
             .height(heroHeight)
     ) {
-        val widthPx = with(density) { maxWidth.roundToPx() }
+        val heroMaxWidth = maxWidth
+        val widthPx = with(density) { heroMaxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
         val bottomFadeBrush = remember(palette.pageBackground) {
             Brush.verticalGradient(
@@ -158,7 +159,7 @@ internal fun HeroSection(
         if (!imageUrl.isNullOrBlank()) {
             val heroRequest = crispyImageRequest(
                 url = imageUrl,
-                width = maxWidth,
+                width = heroMaxWidth,
                 height = heroHeight,
                 memoryCacheKey = backdropKey,
             )
@@ -303,7 +304,7 @@ internal fun HeroSection(
         ) {
             val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: logoUrl
             if (!resolvedLogoUrl.isNullOrBlank()) {
-                val logoWidth = maxWidth * 0.81f
+                val logoWidth = heroMaxWidth * 0.81f
                 val logoModel = rememberCrispyImageModel(
                     url = resolvedLogoUrl,
                     width = logoWidth,
