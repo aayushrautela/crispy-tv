@@ -302,7 +302,7 @@ class HomeCatalogService internal constructor(
             rating = formatRating(rating),
             year = year?.toString(),
             genre = genres.firstOrNull(),
-            description = subtitle ?: overview,
+            description = overview,
         )
     }
 

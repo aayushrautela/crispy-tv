@@ -236,7 +236,6 @@ class CrispyBackendClient(
         val itemId: String,
         val mediaType: String,
         val title: String,
-        val subtitle: String?,
         val overview: String?,
         val year: Int?,
         val releaseDate: String?,
