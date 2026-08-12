@@ -301,7 +301,12 @@ fun resolveHomeCatalogSource(catalogId: String): HomeCatalogSource {
 private fun buildHeroResult(
     snapshot: HomeCatalogSnapshot,
 ): HomeCatalogHeroResult {
-    val heroList = snapshot.lists.firstOrNull { it.presentation == HomeCatalogPresentation.HERO } ?: snapshot.lists.first()
+    val heroList =
+        snapshot.lists.firstOrNull { it.presentation == HomeCatalogPresentation.HERO }
+            ?: return HomeCatalogHeroResult(
+                items = emptyList(),
+                statusMessage = snapshot.statusMessage.ifBlank { "No featured items available." },
+            )
     val fallbackDescription =
         heroList.subtitle.ifBlank {
             heroList.heading.ifBlank {

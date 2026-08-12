@@ -407,7 +407,12 @@ public func resolveHomeCatalogSource(catalogId: String) -> HomeCatalogSource {
 }
 
 private func buildHeroResult(snapshot: HomeCatalogSnapshot) -> HomeCatalogHeroResult {
-    let heroList = snapshot.lists.first(where: { $0.presentation == .hero }) ?? snapshot.lists[0]
+    guard let heroList = snapshot.lists.first(where: { $0.presentation == .hero }) else {
+        return HomeCatalogHeroResult(
+            items: [],
+            statusMessage: snapshot.statusMessage.nilIfBlank() ?? "No featured items available."
+        )
+    }
     let fallbackDescription = firstNonBlank(
         heroList.subtitle,
         heroList.heading,
