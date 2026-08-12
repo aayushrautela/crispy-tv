@@ -161,6 +161,7 @@ internal suspend fun CrispyBackendClient.getWatchStateApi(
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/state".toHttpUrl().newBuilder()
             .addQueryParameter("itemId", normalizedItemId)
+            .addQueryParameter("extended", "true")
             .build(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
@@ -300,6 +301,7 @@ private suspend fun CrispyBackendClient.listClientMediaCardQueryResultApi(
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/$path".toHttpUrl().newBuilder()
             .addQueryParameter("limit", limit.coerceAtLeast(1).toString())
+            .addQueryParameter("extended", "true")
             .apply {
                 val nextCursor = cursor?.trim()?.takeIf { it.isNotEmpty() }
                 if (nextCursor != null) {
