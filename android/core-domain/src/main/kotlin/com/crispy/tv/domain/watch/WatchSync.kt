@@ -92,7 +92,7 @@ fun reduceWatchSync(state: WatchSyncState, event: WatchSyncEvent): WatchSyncResu
 
         WatchSyncEvent.MaxDurationElapsed -> {
             if (state.connection != WatchSyncConnection.DISCONNECTED) {
-                val effects = mutableListOf(WatchSyncEffect.CloseConnection)
+                val effects = mutableListOf<WatchSyncEffect>(WatchSyncEffect.CloseConnection)
                 if (state.isSurfaceVisible) {
                     effects += WatchSyncEffect.OpenConnection
                     WatchSyncResult(state.copy(connection = WatchSyncConnection.CONNECTING), effects)
