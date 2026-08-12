@@ -1,0 +1,18 @@
+{
+  "contract_version": 1,
+  "suite": "watch_sync",
+  "case_id": "visible_then_invalidation_refetches",
+  "now_ms": 1739923200000,
+  "input": {
+    "profile_id": "p1",
+    "events": [
+      { "at_ms": 1739923200000, "type": "surface_visible" },
+      { "at_ms": 1739923201000, "type": "connection_opened" },
+      { "at_ms": 1739923205000, "type": "invalidation", "profile_id": "p1" },
+      { "at_ms": 1739923210000, "type": "surface_hidden" }
+    ]
+  },
+  "expected": {
+    "effects": ["open_connection", "refetch_continue_watching", "refetch_continue_watching", "close_connection"]
+  }
+}

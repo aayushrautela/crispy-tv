@@ -26,6 +26,7 @@ SUITE_TO_SCHEMA = {
     "media_state_contract": "media_state_contract.schema.json",
     "watch_collections_contract": "watch_collections_contract.schema.json",
     "calendar_contract": "calendar_contract.schema.json",
+    "watch_sync": "watch_sync.schema.json",
 }
 
 

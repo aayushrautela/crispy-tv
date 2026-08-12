@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "suite", "case_id", "input", "expected"],
+  "properties": {
+    "contract_version": { "type": "integer" },
+    "suite": { "type": "string", "enum": ["watch_sync"] },
+    "case_id": { "type": "string" },
+    "now_ms": { "type": "integer" },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "events"],
+      "properties": {
+        "profile_id": { "type": "string" },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["at_ms", "type"],
+            "properties": {
+              "at_ms": { "type": "integer" },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "surface_visible",
+                  "surface_hidden",
+                  "connection_opened",
+                  "connection_closed",
+                  "invalidation",
+                  "max_duration_elapsed"
+                ]
+              },
+              "profile_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effects"],
+      "properties": {
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["open_connection", "close_connection", "refetch_continue_watching"]
+          }
+        }
+      }
+    }
+  }
+}

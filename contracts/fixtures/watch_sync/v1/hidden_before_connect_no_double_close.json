@@ -1,0 +1,17 @@
+{
+  "contract_version": 1,
+  "suite": "watch_sync",
+  "case_id": "hidden_before_connect_no_double_close",
+  "now_ms": 1739923200000,
+  "input": {
+    "profile_id": "p1",
+    "events": [
+      { "at_ms": 1739923200000, "type": "surface_visible" },
+      { "at_ms": 1739923201000, "type": "connection_closed" },
+      { "at_ms": 1739923202000, "type": "surface_hidden" }
+    ]
+  },
+  "expected": {
+    "effects": ["open_connection"]
+  }
+}

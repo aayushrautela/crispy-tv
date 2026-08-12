@@ -79,6 +79,13 @@ provider-key strings for planning purposes, but these are never sent to the serv
     `BaseItemDto.Id`, `SeriesId`, `SeasonId`, and `UserData.ItemId` are all public item IDs.
     Provider-derived strings like `movie:tmdb:550` are no longer public route identity.
   - Continue-watching items derive state from `UserData.PlayedPercentage` (progress), `UserData.LastPlayedDate` (activity), and `UserData.DismissedFromContinueWatching` (dismissible).
+- `watch_sync`
+  - Real-time cross-device sync for continue-watching: a server-pushed invalidation channel plus deterministic client connection/refetch policy.
+  - Server transport: `GET /v1/profiles/:profileId/watch/stream` (SSE), guarded by the same auth + profile-unlock guard as other watch routes.
+  - Channel: Redis pub/sub `cw:{accountId}`; server filters messages by `profileId` before writing to the client.
+  - Message envelope: `id`, `event: watch_changed`, `data: { profileId, kind, at_ms }`, `retry`.
+  - Server coalescing: progress ticks are debounced per profile (`cw-dirty:{accountId}:{profileId}`, ~5s window); `playback_completed` and dismiss bypass the debounce (force publish). Reconnect + refetch covers any gap.
+  - Client policy (deterministic reducer, mirrored in `android/core-domain` and Swift ContractRunner): open the stream when the continue-watching surface is visible/foreground; close it when hidden/backgrounded; on any `watch_changed` while connected (or on (re)connect) → refetch the continue-watching page; force reconnect on `max_duration_elapsed`. DB is the source of truth; the stream is an invalidation trigger only.
   - Watched items derive state from `UserData.LastPlayedDate`.
   - Search results, recommendations, and other card-like title metadata items are raw `BaseItemDto`.
   - Title metadata routes use `/v1/metadata/items/:itemId`.
