@@ -303,7 +303,13 @@ internal fun HeroSection(
         ) {
             val resolvedLogoUrl = details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: logoUrl
             if (!resolvedLogoUrl.isNullOrBlank()) {
-                val logoModel = rememberCrispyImageModel(url = resolvedLogoUrl, width = 320.dp, height = 104.dp, memoryCacheKey = logoKey)
+                val logoWidth = maxWidth * 0.81f
+                val logoModel = rememberCrispyImageModel(
+                    url = resolvedLogoUrl,
+                    width = logoWidth,
+                    height = 104.dp,
+                    memoryCacheKey = logoKey?.let { "${it}-hero" },
+                )
                 val logoModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && logoKey != null) {
                     with(sharedTransitionScope) {
                         Modifier
