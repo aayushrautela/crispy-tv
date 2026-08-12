@@ -749,7 +749,7 @@ internal fun CrispyBackendClient.parseMetadataPersonRefViews(array: JSONArray?):
                 )
             )
         }
-    }
+    }.distinctBy { it.personId }
 }
 
 internal fun CrispyBackendClient.parseMetadataReviewViews(array: JSONArray?): List<MetadataReviewView> {
