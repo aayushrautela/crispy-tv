@@ -87,7 +87,7 @@
     "personal_feed": {
       "hero_result": {
         "items": [],
-        "status_message": ""
+        "status_message": "No featured items available."
       },
       "sections": [
         {
