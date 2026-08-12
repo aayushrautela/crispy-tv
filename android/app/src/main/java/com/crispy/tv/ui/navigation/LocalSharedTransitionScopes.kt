@@ -19,34 +19,6 @@ val LocalSharedTransitionScope = staticCompositionLocalOf<SharedTransitionScope?
 val LocalNavAnimatedContentScope = staticCompositionLocalOf<AnimatedContentScope?> { null }
 
 @Composable
-fun AnimatedContentScope.animateCardCornerRadius(cardRadius: Dp): Dp {
-    val corner by transition.animateDp(
-        transitionSpec = { tween(SharedElementDurationMillis) },
-        label = "sharedCardCornerRadius",
-    ) { state ->
-        when (state) {
-            EnterExitState.Visible -> cardRadius
-            else -> 0.dp
-        }
-    }
-    return corner
-}
-
-@Composable
-fun AnimatedContentScope.animateHeroCornerRadius(cardRadius: Dp): Dp {
-    val corner by transition.animateDp(
-        transitionSpec = { tween(SharedElementDurationMillis) },
-        label = "sharedHeroCornerRadius",
-    ) { state ->
-        when (state) {
-            EnterExitState.Visible -> 0.dp
-            else -> cardRadius
-        }
-    }
-    return corner
-}
-
-@Composable
 fun AnimatedContentScope.animateContentAlpha(): Float {
     val alpha by transition.animateFloat(
         transitionSpec = { tween(SharedElementDurationMillis) },
@@ -61,15 +33,15 @@ fun AnimatedContentScope.animateContentAlpha(): Float {
 }
 
 @Composable
-fun AnimatedContentScope.animateCardOverlayAlpha(): Float {
-    val alpha by transition.animateFloat(
+fun AnimatedContentScope.animateHeroCornerRadius(cardRadius: Dp): Dp {
+    val corner by transition.animateDp(
         transitionSpec = { tween(SharedElementDurationMillis) },
-        label = "sharedCardOverlayAlpha",
+        label = "sharedHeroCornerRadius",
     ) { state ->
         when (state) {
-            EnterExitState.Visible -> 0f
-            else -> 1f
+            EnterExitState.Visible -> 0.dp
+            else -> cardRadius
         }
     }
-    return alpha
+    return corner
 }

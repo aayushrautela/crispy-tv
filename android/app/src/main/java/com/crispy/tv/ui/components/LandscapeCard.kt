@@ -32,11 +32,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
-import com.crispy.tv.ui.navigation.animateCardCornerRadius
-import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 
 @Composable
 fun LandscapeCard(
@@ -46,6 +45,9 @@ fun LandscapeCard(
     modifier: Modifier = Modifier,
     posterUrl: String? = null,
     logoUrl: String? = null,
+    backdrop: ResponsiveImageSet? = null,
+    poster: ResponsiveImageSet? = null,
+    logo: ResponsiveImageSet? = null,
     rating: String? = null,
     year: String? = null,
     maturityRating: String? = null,
@@ -55,7 +57,8 @@ fun LandscapeCard(
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val screenBackground = MaterialTheme.colorScheme.background
-    val imageUrl = backdropUrl ?: posterUrl
+    val imageUrl = backdrop?.low ?: poster?.low ?: backdropUrl ?: posterUrl
+    val resolvedLogoUrl = logo?.low ?: logoUrl
     val cardWidth = CardStyle.landscapeCardWidth()
     val cardHeight = (cardWidth.value * 9f / 16f).dp
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -64,7 +67,7 @@ fun LandscapeCard(
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
     val logoKey = resolvedKey?.let { "logo-$it" }
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight, memoryCacheKey = backdropKey)
-    val logoModel = crispyImageRequest(url = logoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
+    val logoModel = crispyImageRequest(url = resolvedLogoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
 
     val scrimBrush = remember {
         Brush.verticalGradient(
@@ -103,25 +106,16 @@ fun LandscapeCard(
     ) {
         if (imageModel != null) {
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
-                val cornerRadius = with(animatedVisibilityScope) {
-                    animateCardCornerRadius(CardStyle.CardCornerRadiusDp.dp)
-                }
-                val overlayAlpha = with(animatedVisibilityScope) {
-                    animateCardOverlayAlpha()
-                }
                 with(sharedTransitionScope) {
                     Modifier
                         .sharedElement(
                             rememberSharedContentState(key = backdropKey),
                             animatedVisibilityScope = animatedVisibilityScope,
                         )
-                        .clip(RoundedCornerShape(cornerRadius))
                         .fillMaxSize()
                         .drawWithContent {
                             drawContent()
-                            if (overlayAlpha > 0.001f) {
-                                drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
-                            }
+                            drawRect(brush = bottomFadeBrush)
                         }
                 }
             } else {

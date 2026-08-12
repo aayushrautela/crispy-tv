@@ -13,7 +13,7 @@ fun crispyImageRequest(
     url: String?,
     width: Dp,
     height: Dp,
-    enableCrossfade: Boolean = true,
+    enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
 ): Any? {
     if (url.isNullOrBlank()) return null
@@ -31,7 +31,7 @@ private fun rememberCrispyImageModel(
     url: String,
     widthPx: Int,
     heightPx: Int,
-    enableCrossfade: Boolean = true,
+    enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
 ): ImageRequest {
     return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade, memoryCacheKey) {
@@ -55,7 +55,7 @@ fun rememberCrispyImageModel(
     url: String?,
     width: Dp,
     height: Dp,
-    enableCrossfade: Boolean = true,
+    enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
 ): Any? = crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade, memoryCacheKey = memoryCacheKey)
 
@@ -64,7 +64,7 @@ fun rememberCrispyImageModel(
     image: ResponsiveImageSet?,
     width: Dp,
     height: Dp,
-    enableCrossfade: Boolean = true,
+    enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
 ): Any? {
     if (image == null || image.isEmpty) return null

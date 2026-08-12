@@ -46,8 +46,6 @@ import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
-import com.crispy.tv.ui.navigation.animateCardCornerRadius
-import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 import com.crispy.tv.ui.theme.Dimensions
 
 private const val HOME_WIDE_SKELETON_COUNT = 3
@@ -245,12 +243,6 @@ internal fun HomeWideRailCard(
     )
 
     val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
-        val cornerRadius = with(animatedVisibilityScope) {
-            animateCardCornerRadius(20.dp)
-        }
-        val overlayAlpha = with(animatedVisibilityScope) {
-            animateCardOverlayAlpha()
-        }
         val screenBackground = MaterialTheme.colorScheme.background
         val bottomFadeBrush = remember(screenBackground) {
             Brush.verticalGradient(
@@ -267,12 +259,10 @@ internal fun HomeWideRailCard(
                     rememberSharedContentState(key = backdropKey),
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
-                .clip(RoundedCornerShape(cornerRadius))
+                .clip(RoundedCornerShape(20.dp))
                 .drawWithContent {
                     drawContent()
-                    if (overlayAlpha > 0.001f) {
-                        drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
-                    }
+                    drawRect(brush = bottomFadeBrush)
                 }
         }
     } else {

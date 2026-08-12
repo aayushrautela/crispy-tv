@@ -9,6 +9,8 @@ import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 
@@ -164,7 +166,7 @@ internal suspend fun CrispyBackendClient.resolveMetadataApi(
 internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(
     accessToken: String,
     itemId: String,
-): MetadataTitleDetailResponse {
+): MetadataTitleDetailResponse = withContext(Dispatchers.Default) {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/metadata/items/${itemId.trim()}".toHttpUrl(),
@@ -172,7 +174,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return MetadataTitleDetailResponse(
+    MetadataTitleDetailResponse(
         item = parseMetadataView(json.optJSONObject("Item") ?: throw IllegalStateException("Backend item detail is missing Item.")),
         nextEpisode = json.optJSONObject("NextEpisode")?.let(::parseMetadataEpisodeView),
         videos = parseMetadataVideoViews(json.optJSONArray("Videos")),
@@ -186,7 +188,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(
 internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
     accessToken: String,
     itemId: String,
-): MetadataTitleExtrasResponse {
+): MetadataTitleExtrasResponse = withContext(Dispatchers.Default) {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/metadata/items/${itemId.trim()}/extras".toHttpUrl(),
@@ -194,7 +196,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return MetadataTitleExtrasResponse(
+    MetadataTitleExtrasResponse(
         seasons = parseMetadataSeasonViews(json.optJSONArray("Seasons")),
         episodes = parseMetadataEpisodeViews(json.optJSONArray("Episodes")),
         reviews = parseMetadataReviewViews(json.optJSONArray("Reviews")),
@@ -207,7 +209,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemRatingsApi(
     accessToken: String,
     profileId: String,
     itemId: String,
-): MetadataTitleRatingsResponse {
+): MetadataTitleRatingsResponse = withContext(Dispatchers.Default) {
     checkConfigured()
     val response = httpClient.get(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/metadata/items/${itemId.trim()}/ratings".toHttpUrl(),
@@ -215,7 +217,7 @@ internal suspend fun CrispyBackendClient.getMetadataItemRatingsApi(
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return MetadataTitleRatingsResponse(
+    MetadataTitleRatingsResponse(
         ratings = parseMetadataTitleRatings(json.optJSONObject("Ratings")),
     )
 }
