@@ -1,31 +1,17 @@
 package com.crispy.tv.home
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +21,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Offset
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,11 +34,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.ratings.normalizeRatingText
+import com.crispy.tv.ui.components.DuotoneGrayContrastColorFilter
+import com.crispy.tv.ui.components.duotoneHighlightColor
+import com.crispy.tv.ui.components.duotoneShadowColor
 import com.crispy.tv.ui.components.rememberCrispyImageModel
-import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 
 @Composable
@@ -55,8 +46,6 @@ internal fun HomeCollectionSectionRow(
     sectionUis: List<HomeCatalogSectionUi>,
     horizontalPadding: Dp,
     onCollectionClick: (CatalogSectionRef) -> Unit,
-    onCollectionPlayClick: (CatalogItem) -> Unit,
-    onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
     val visibleSections by remember(sectionUis) {
         derivedStateOf {
@@ -101,8 +90,6 @@ internal fun HomeCollectionSectionRow(
                 HomeCollectionCard(
                     sectionUi = sectionUi,
                     onCollectionClick = { onCollectionClick(sectionUi.section) },
-                    onPlayClick = { onCollectionPlayClick(it) },
-                    onCollectionMovieClick = onCollectionMovieClick,
                 )
             }
         }
@@ -113,248 +100,80 @@ internal fun HomeCollectionSectionRow(
 private fun HomeCollectionCard(
     sectionUi: HomeCatalogSectionUi,
     onCollectionClick: () -> Unit,
-    onPlayClick: (CatalogItem) -> Unit,
-    onCollectionMovieClick: (CatalogItem) -> Unit,
 ) {
-    val previewMovies = remember(sectionUi.items) { sectionUi.items.take(3) }
-    val featuredMovie = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
-    val logo = featuredMovie?.logo
-    val logoModel = rememberCrispyImageModel(
-        image = logo,
-        width = 256.dp,
-        height = 80.dp,
+    val featured = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
+    val backdropModel = rememberCrispyImageModel(
+        image = featured?.backdrop,
+        width = 640.dp,
+        height = 760.dp,
     )
-    val collectionTitle = remember(sectionUi.section.displayTitle) { collectionDisplayTitle(sectionUi.section.displayTitle) }
+    val highlight = remember(sectionUi.section.key) { duotoneHighlightColor(sectionUi.section.key) }
+    val shadow = remember(sectionUi.section.key) { duotoneShadowColor(sectionUi.section.key) }
+    val title = remember(sectionUi.section.displayTitle) {
+        collectionDisplayTitle(sectionUi.section.displayTitle)
+    }
 
-    Column(
+    Box(
         modifier = Modifier
             .width(320.dp)
+            .height(380.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable(onClick = onCollectionClick)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .background(highlight)
+            .clickable(onClick = onCollectionClick),
     ) {
+        if (backdropModel != null) {
+            AsyncImage(
+                model = backdropModel,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        colorFilter = DuotoneGrayContrastColorFilter
+                        blendMode = BlendMode.Multiply
+                    },
+                contentScale = ContentScale.Crop,
+            )
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (logoModel != null) {
-                    AsyncImage(
-                        model = logoModel,
-                        contentDescription = sectionUi.section.displayTitle,
-                        modifier = Modifier
-                            .fillMaxWidth(0.82f)
-                            .height(72.dp)
-                            .padding(vertical = 4.dp),
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.Center,
-                    )
-                } else {
-                    Text(
-                        text = collectionTitle,
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            when {
-                previewMovies.isNotEmpty() -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        previewMovies.forEach { item ->
-                            val onMovieClick = remember(item.id) {
-                                { onCollectionMovieClick(item) }
-                            }
-                            HomeCollectionMovieRow(
-                                item = item,
-                                onClick = onMovieClick,
-                            )
-                        }
-                    }
-                }
-
-                sectionUi.isLoading -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        HomeCollectionMovieSkeletonRow()
-                        HomeCollectionMovieSkeletonRow()
-                        HomeCollectionMovieSkeletonRow()
-                    }
-                }
-
-                else -> {
-                    Text(
-                        text = sectionUi.statusMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FilledIconButton(
-                    onClick = { featuredMovie?.let(onPlayClick) },
-                    enabled = featuredMovie != null,
-                    modifier = Modifier.size(52.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = "Play collection",
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                FilledIconButton(
-                    onClick = onCollectionClick,
-                    modifier = Modifier.size(52.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    ),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = "Collection info",
-                    )
-                }
-            }
-    }
-}
-
-@Composable
-private fun HomeCollectionMovieRow(
-    item: CatalogItem,
-    onClick: () -> Unit,
-) {
-    val image = item.poster?.takeUnless { it.isEmpty } ?: item.backdrop
-    val imageModel = rememberCrispyImageModel(image, width = 56.dp, height = 56.dp)
-    val detailText = collectionMovieMetaText(item)
-    val ratingText = normalizeRatingText(item.rating)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .combinedClickable(onClick = onClick)
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (imageModel != null) {
-                AsyncImage(
-                    model = imageModel,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+                    .fillMaxSize()
+                    .graphicsLayer { blendMode = BlendMode.Lighten }
+                    .background(shadow),
             )
-
-            if (detailText.isNotBlank() || ratingText != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (detailText.isNotBlank()) {
-                        Text(
-                            text = detailText,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-
-                    ratingText?.let { rating ->
-                        HomeCollectionRatingBadge(
-                            rating = rating,
-                        )
-                    }
-                }
-            }
         }
-    }
-}
 
-@Composable
-private fun HomeCollectionMovieSkeletonRow() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .skeletonElement(shape = RoundedCornerShape(12.dp), pulse = false)
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Black.copy(alpha = 0.55f),
+                            0.6f to Color.Black.copy(alpha = 0.12f),
+                            1f to Color.Transparent,
+                        ),
+                    )
+                ),
         )
 
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.72f)
-                    .height(16.dp)
-                    .skeletonElement(pulse = false)
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.45f)
-                    .height(12.dp)
-                    .skeletonElement(pulse = false)
+            Text(
+                text = title,
+                modifier = Modifier.padding(horizontal = 24.dp),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        offset = Offset(0f, 2f),
+                        blurRadius = 8f,
+                    ),
+                ),
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -364,38 +183,4 @@ private fun collectionDisplayTitle(title: String): String {
     val trimmedTitle = title.trim()
     val simplifiedTitle = trimmedTitle.replace(Regex("\\s+collection$", RegexOption.IGNORE_CASE), "")
     return simplifiedTitle.ifBlank { trimmedTitle }
-}
-
-private fun collectionMovieMetaText(item: CatalogItem): String {
-    return buildList {
-        item.year?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
-        item.genre?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
-    }.joinToString(separator = " • ")
-}
-
-@Composable
-private fun HomeCollectionRatingBadge(
-    rating: String,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.Black.copy(alpha = 0.7f))
-            .padding(horizontal = 6.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Star,
-            contentDescription = null,
-            modifier = Modifier.size(12.dp),
-            tint = Color.White,
-        )
-        Text(
-            text = rating,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-        )
-    }
 }

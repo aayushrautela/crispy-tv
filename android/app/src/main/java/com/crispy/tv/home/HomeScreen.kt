@@ -169,8 +169,6 @@ internal fun HomeRoute(
                                 sectionUis = sectionUis,
                                 horizontalPadding = horizontalPadding,
                                 onCollectionClick = onCatalogSeeAllClick,
-                                onCollectionPlayClick = { onCatalogItemClick(it, null) },
-                                onCollectionMovieClick = { onCatalogItemClick(it, null) },
                             )
                         }
                     }
