@@ -6,14 +6,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,7 +21,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Subtitles
-import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Info
@@ -47,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -165,35 +162,35 @@ internal fun PlayerBottomControls(
                     if (hasAudioTracks) {
                         PlayerActionButton(
                             icon = Icons.Filled.GraphicEq,
-                            label = "Audio",
+                            contentDescription = "Audio tracks",
                             onClick = onOpenTracks,
                         )
                     }
                     if (hasSubtitleTracks) {
                         PlayerActionButton(
                             icon = Icons.Filled.Subtitles,
-                            label = "Subs",
+                            contentDescription = "Subtitles",
                             onClick = onOpenTracks,
                         )
                     }
                     PlayerActionButton(
                         icon = Icons.Filled.Speed,
-                        label = formatSpeedLabel(playbackSpeed),
+                        contentDescription = "Playback speed, ${formatSpeedLabel(playbackSpeed)}",
                         onClick = onCycleSpeed,
                     )
                     PlayerActionButton(
                         icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                        label = if (muted) "Unmute" else "Mute",
+                        contentDescription = if (muted) "Unmute" else "Mute",
                         onClick = onToggleMute,
                     )
                     PlayerActionButton(
                         icon = Icons.Outlined.Layers,
-                        label = "Streams",
+                        contentDescription = "Streams",
                         onClick = onOpenStreams,
                     )
                     PlayerActionButton(
                         icon = Icons.Outlined.Info,
-                        label = "Info",
+                        contentDescription = "Info",
                         onClick = onOpenInfo,
                     )
                 }
@@ -281,13 +278,24 @@ internal fun PlayerPill(
 @Composable
 internal fun PlayerActionButton(
     icon: ImageVector,
-    label: String,
+    contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Button(onClick = onClick) {
-        Icon(imageVector = icon, contentDescription = label)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(label)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.size(44.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 
