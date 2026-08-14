@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.transform.BlurTransformation
 import com.crispy.tv.catalog.CatalogSectionRef
 import kotlin.text.RegexOption
 import com.crispy.tv.ui.components.CardStyle
@@ -106,10 +108,15 @@ private fun HomeCollectionCard(
     onCollectionClick: () -> Unit,
 ) {
     val featured = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
+    val context = LocalContext.current
+    val blurTransformations = remember {
+        listOf(BlurTransformation(context, 3f))
+    }
     val backdropModel = rememberCrispyImageModel(
         image = featured?.backdrop,
         width = 200.dp,
         height = 200.dp,
+        transformations = blurTransformations,
     )
     val shape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp)
     val scrim = remember {

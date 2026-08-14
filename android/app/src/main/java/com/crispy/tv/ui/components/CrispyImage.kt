@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.transform.Transformation
 import com.crispy.tv.images.ResponsiveImageSet
 
 @Composable
@@ -15,6 +16,7 @@ fun crispyImageRequest(
     height: Dp,
     enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
+    transformations: List<Transformation<*>> = emptyList(),
 ): Any? {
     if (url.isNullOrBlank()) return null
     val context = LocalContext.current
@@ -22,7 +24,7 @@ fun crispyImageRequest(
     val density = LocalDensity.current
     val widthPx = with(density) { width.roundToPx() }.coerceAtLeast(1)
     val heightPx = with(density) { height.roundToPx() }.coerceAtLeast(1)
-    return rememberCrispyImageModel(appContext, url, widthPx, heightPx, enableCrossfade, memoryCacheKey)
+    return rememberCrispyImageModel(appContext, url, widthPx, heightPx, enableCrossfade, memoryCacheKey, transformations)
 }
 
 @Composable
@@ -33,8 +35,9 @@ private fun rememberCrispyImageModel(
     heightPx: Int,
     enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
+    transformations: List<Transformation<*>> = emptyList(),
 ): ImageRequest {
-    return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade, memoryCacheKey) {
+    return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade, memoryCacheKey, transformations) {
         ImageRequest.Builder(appContext)
             .data(url)
             .size(widthPx, heightPx)
@@ -46,6 +49,7 @@ private fun rememberCrispyImageModel(
                     placeholderMemoryCacheKey(memoryCacheKey)
                 }
             }
+            .transformations(transformations)
             .build()
     }
 }
@@ -57,7 +61,15 @@ fun rememberCrispyImageModel(
     height: Dp,
     enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
-): Any? = crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade, memoryCacheKey = memoryCacheKey)
+    transformations: List<Transformation<*>> = emptyList(),
+): Any? = crispyImageRequest(
+    url = url,
+    width = width,
+    height = height,
+    enableCrossfade = enableCrossfade,
+    memoryCacheKey = memoryCacheKey,
+    transformations = transformations,
+)
 
 @Composable
 fun rememberCrispyImageModel(
@@ -66,8 +78,16 @@ fun rememberCrispyImageModel(
     height: Dp,
     enableCrossfade: Boolean = false,
     memoryCacheKey: String? = null,
+    transformations: List<Transformation<*>> = emptyList(),
 ): Any? {
     if (image == null || image.isEmpty) return null
     val url = image.medium ?: image.high ?: image.low
-    return crispyImageRequest(url = url, width = width, height = height, enableCrossfade = enableCrossfade, memoryCacheKey = memoryCacheKey)
+    return crispyImageRequest(
+        url = url,
+        width = width,
+        height = height,
+        enableCrossfade = enableCrossfade,
+        memoryCacheKey = memoryCacheKey,
+        transformations = transformations,
+    )
 }
