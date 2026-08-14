@@ -211,7 +211,7 @@ private fun StretchedWord(word: String, availableWidth: Dp) {
 private val COLLECTION_STOPWORDS = setOf("the", "a", "an", "of", "and", "&")
 
 private fun collectionDisplayWords(title: String): List<String> {
-    val cleaned = title.replace(Regex("\\s+collection$", RegexOption.IGNORECASE), "").trim()
+    val cleaned = title.replace(Regex("\\s+collection$", RegexOption.IGNORE_CASE), "").trim()
     val split = cleaned.split(Regex("\\s+")).filter { it.isNotBlank() }
     val filtered = split.filter { it.lowercase() !in COLLECTION_STOPWORDS }
     val source = if (filtered.isNotEmpty()) filtered else split
