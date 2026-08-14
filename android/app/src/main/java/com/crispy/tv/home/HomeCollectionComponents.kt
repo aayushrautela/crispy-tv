@@ -4,40 +4,42 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogSectionRef
-import com.crispy.tv.ui.components.DuotoneGrayContrastColorFilter
-import com.crispy.tv.ui.components.duotoneHighlightColor
-import com.crispy.tv.ui.components.duotoneShadowColor
+import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
 
@@ -104,21 +106,26 @@ private fun HomeCollectionCard(
     val featured = remember(sectionUi.items) { sectionUi.items.firstOrNull() }
     val backdropModel = rememberCrispyImageModel(
         image = featured?.backdrop,
-        width = 640.dp,
-        height = 760.dp,
+        width = 200.dp,
+        height = 200.dp,
     )
-    val highlight = remember(sectionUi.section.key) { duotoneHighlightColor(sectionUi.section.key) }
-    val shadow = remember(sectionUi.section.key) { duotoneShadowColor(sectionUi.section.key) }
-    val title = remember(sectionUi.section.displayTitle) {
-        collectionDisplayTitle(sectionUi.section.displayTitle)
+    val shape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp)
+    val scrim = remember {
+        Brush.radialGradient(
+            colorStops = arrayOf(
+                0f to Color.Black.copy(alpha = 0.25f),
+                0.7f to Color.Black.copy(alpha = 0.30f),
+                1f to Color.Black.copy(alpha = 0.45f),
+            ),
+        )
     }
 
     Box(
         modifier = Modifier
-            .width(320.dp)
-            .height(380.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(highlight)
+            .width(CardStyle.landscapeCardWidth())
+            .aspectRatio(1f)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onCollectionClick),
     ) {
         if (backdropModel != null) {
@@ -127,60 +134,83 @@ private fun HomeCollectionCard(
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        colorFilter = DuotoneGrayContrastColorFilter
-                        blendMode = BlendMode.Multiply
-                    },
+                    .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f },
                 contentScale = ContentScale.Crop,
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { blendMode = BlendMode.Lighten }
-                    .background(shadow),
-            )
+            Box(modifier = Modifier.fillMaxSize().background(scrim))
         }
 
-        Box(
+        CollectionTitle(
+            title = sectionUi.section.displayTitle,
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to Color.Black.copy(alpha = 0.55f),
-                            0.6f to Color.Black.copy(alpha = 0.12f),
-                            1f to Color.Transparent,
-                        ),
-                    )
-                ),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         )
+    }
+}
 
-        Box(
+@Composable
+private fun CollectionTitle(title: String, modifier: Modifier = Modifier) {
+    val words = remember(title) { collectionDisplayWords(title) }
+
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Text(
-                text = title,
-                modifier = Modifier.padding(horizontal = 24.dp),
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        offset = Offset(0f, 2f),
-                        blurRadius = 8f,
-                    ),
-                ),
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-            )
+            words.forEach { word ->
+                StretchedWord(word = word, availableWidth = maxWidth)
+            }
         }
     }
 }
 
-private fun collectionDisplayTitle(title: String): String {
-    val trimmedTitle = title.trim()
-    val simplifiedTitle = trimmedTitle.replace(Regex("\\s+collection$", RegexOption.IGNORE_CASE), "")
-    return simplifiedTitle.ifBlank { trimmedTitle }
+@Composable
+private fun StretchedWord(word: String, availableWidth: Dp) {
+    val density = LocalDensity.current
+    var scaleX by remember(word) { mutableFloatStateOf(1f) }
+
+    BasicText(
+        text = word,
+        onTextLayout = { result ->
+            val natural = result.size.width.toFloat()
+            if (natural > 0f) {
+                val availablePx = with(density) { availableWidth.roundToPx() }
+                val target = (availablePx / natural).coerceIn(1f, 1.6f)
+                if (kotlin.math.abs(target - scaleX) > 0.01f) {
+                    scaleX = target
+                }
+            }
+        },
+        style = TextStyle(
+            fontWeight = FontWeight.Black,
+            fontSize = 38.sp,
+            lineHeight = 35.sp,
+            textAlign = TextAlign.Center,
+            color = Color(0xFFB4B4B4),
+            shadow = Shadow(
+                color = Color.Black.copy(alpha = 0.45f),
+                offset = Offset(0f, 1f),
+                blurRadius = 6f,
+            ),
+        ),
+        modifier = Modifier.graphicsLayer {
+            this.scaleX = scaleX
+            transformOrigin = TransformOrigin.Center
+        },
+    )
+}
+
+private val COLLECTION_STOPWORDS = setOf("the", "a", "an", "of", "and", "&")
+
+private fun collectionDisplayWords(title: String): List<String> {
+    val cleaned = title.replace(Regex("\\s+collection$", RegexOption.IGNORECASE), "").trim()
+    val split = cleaned.split(Regex("\\s+")).filter { it.isNotBlank() }
+    val filtered = split.filter { it.lowercase() !in COLLECTION_STOPWORDS }
+    val source = if (filtered.isNotEmpty()) filtered else split
+    return source.take(5)
 }
