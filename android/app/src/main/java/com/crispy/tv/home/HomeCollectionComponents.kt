@@ -20,12 +20,13 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Offset
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.catalog.CatalogSectionRef
+import kotlin.text.RegexOption
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
@@ -157,13 +159,14 @@ private fun CollectionTitle(title: String, modifier: Modifier = Modifier) {
         modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
+        val availableWidth = maxWidth
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             words.forEach { word ->
-                StretchedWord(word = word, availableWidth = maxWidth)
+                StretchedWord(word = word, availableWidth = availableWidth)
             }
         }
     }
