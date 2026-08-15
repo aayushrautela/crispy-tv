@@ -10,6 +10,8 @@ import com.crispy.tv.backend.CrispyBackendClient.AddonCloudRow
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAccountsResponse
 import com.crispy.tv.backend.CrispyBackendClient.StartImportResult
 import com.crispy.tv.backend.CrispyBackendClient.UpdateProfileInput
+import com.crispy.tv.backend.CrispyBackendClient.Avatar
+import okhttp3.Headers
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody

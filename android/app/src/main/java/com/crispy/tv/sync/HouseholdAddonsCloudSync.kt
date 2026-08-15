@@ -11,7 +11,7 @@ import com.crispy.tv.metadata.MetadataAddonRegistry
  * the household shares them), so they are read/written through the account
  * settings surface rather than per-profile.
  */
-class HouseholdAddonsCloudSync(
+internal class HouseholdAddonsCloudSync(
     private val supabase: SupabaseAccountClient,
     private val backend: CrispyBackendClient,
     private val addonRegistry: MetadataAddonRegistry,
