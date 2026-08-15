@@ -88,7 +88,7 @@ class WatchSyncSource(
                 ) {
                     handle(WatchSyncEvent.ConnectionOpened)
                     scheduleMaxDuration()
-                    val source = response.body?.source()
+                    val source = response.body.source()
                     if (source == null) {
                         handle(WatchSyncEvent.ConnectionClosed)
                         return
@@ -100,7 +100,7 @@ class WatchSyncSource(
                     } finally {
                         opened = false
                         maxDurationJob?.cancel()
-                        response.body?.close()
+                        response.body.close()
                         if (!call.isCanceled()) handle(WatchSyncEvent.ConnectionClosed)
                     }
                 }

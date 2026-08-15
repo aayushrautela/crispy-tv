@@ -122,7 +122,7 @@ private fun ClientMediaCard.toCatalogItem(
 private fun ClientMediaCard.libraryCatalogItemFromProgress(): CatalogItem {
     val progress = progress
     val lastActivityAt = progress?.lastPlayedAt
-    val watchedAt = lastActivityAt?.takeIf { progress?.played == true }
+    val watchedAt = lastActivityAt?.takeIf { progress.played == true }
     val ratingValue = progress?.userRating?.toInt()?.takeIf { it in 1..10 }
     return toCatalogItem(
         watchedAt = watchedAt,

@@ -320,7 +320,7 @@ internal suspend fun CrispyBackendClient.putAddonsApi(
     )
     val json = requireSuccess(response)
     val settings = json.optJSONObject("settings") ?: return rows
-    return parseAddonCloudRows(settings.opt("addons")) ?: rows
+    return parseAddonCloudRows(settings.opt("addons"))
 }
 
 internal suspend fun CrispyBackendClient.getAvatarsApi(): List<Avatar> {
