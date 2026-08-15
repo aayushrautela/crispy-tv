@@ -2,14 +2,12 @@ package com.crispy.tv.nativeengine.playback
 
 enum class PlayerResizeMode {
     Fit,
-    Fill,
     Zoom,
     ;
 
     fun next(): PlayerResizeMode =
         when (this) {
-            Fit -> Fill
-            Fill -> Zoom
+            Fit -> Zoom
             Zoom -> Fit
         }
 
@@ -17,7 +15,6 @@ enum class PlayerResizeMode {
         get() =
             when (this) {
                 Fit -> "Fit"
-                Fill -> "Fill"
                 Zoom -> "Zoom"
             }
 }

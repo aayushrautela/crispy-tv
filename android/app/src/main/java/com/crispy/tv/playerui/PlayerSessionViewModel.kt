@@ -102,8 +102,6 @@ data class PlayerUiState(
     val episodesStatusMessage: String = "",
     val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
     val currentPlaybackUrl: String? = null,
-    val playbackSpeed: Float = 1f,
-    val muted: Boolean = false,
     val audioTracks: List<NativeTrack> = emptyList(),
     val selectedAudioTrackId: String? = null,
     val subtitleTracks: List<NativeTrack> = emptyList(),
@@ -204,6 +202,9 @@ class PlayerSessionViewModel(
             subtitle = uiState.value.subtitle,
             artworkUrl = uiState.value.artworkUrl,
         )
+        launchSnapshotState?.resumePositionMs?.takeIf { it > 0L }?.let { resumeMs ->
+            pendingInitialSeekMs = resumeMs
+        }
         requestPlayback(engine = uiState.value.activeEngine)
         viewModelScope.launch {
             loadInitialMetadata()
@@ -265,21 +266,6 @@ class PlayerSessionViewModel(
     fun seekTo(positionMs: Long) {
         playbackController.seekTo(positionMs)
         syncPlaybackSnapshot(playbackController.snapshot())
-    }
-
-    fun setPlaybackSpeed(speed: Float) {
-        val safeSpeed = if (speed.isFinite() && speed > 0f) speed else 1f
-        playbackSettingsRepository.setPlaybackSpeed(safeSpeed)
-        playbackController.setPlaybackSpeed(safeSpeed)
-        _uiState.update { it.copy(playbackSpeed = safeSpeed) }
-        publishMediaSessionFromUiState()
-    }
-
-    fun setMuted(muted: Boolean) {
-        playbackSettingsRepository.setMuted(muted)
-        playbackController.setMuted(muted)
-        _uiState.update { it.copy(muted = muted) }
-        publishMediaSessionFromUiState()
     }
 
     fun setResizeMode(mode: PlayerResizeMode) {
@@ -951,12 +937,9 @@ class PlayerSessionViewModel(
                     snapshot.subtitleTracks != state.subtitleTracks ||
                     snapshot.selectedAudioTrackId != state.selectedAudioTrackId ||
                     snapshot.selectedSubtitleTrackId != state.selectedSubtitleTrackId
-            val shouldUpdateSpeedOrMute =
-                snapshot.playbackSpeed != state.playbackSpeed ||
-                    snapshot.muted != state.muted ||
-                    snapshot.subtitleDelayMs != state.subtitleDelayMs
+            val shouldUpdateSubtitleDelay = snapshot.subtitleDelayMs != state.subtitleDelayMs
 
-            if (!(shouldUpdatePosition || shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSpeedOrMute)) {
+            if (!(shouldUpdatePosition || shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay)) {
                 state
             } else {
                 state.copy(
@@ -969,8 +952,6 @@ class PlayerSessionViewModel(
                     statusMessage = nextStatusMessage,
                     errorMessage = nextErrorMessage,
                     videoLayout = snapshot.videoLayout,
-                    playbackSpeed = snapshot.playbackSpeed,
-                    muted = snapshot.muted,
                     audioTracks = snapshot.audioTracks,
                     selectedAudioTrackId = snapshot.selectedAudioTrackId,
                     subtitleTracks = snapshot.subtitleTracks,
@@ -1049,7 +1030,6 @@ class PlayerSessionViewModel(
                 isBuffering = uiStateSnapshot.isBuffering,
                 positionMs = uiStateSnapshot.positionMs,
                 durationMs = uiStateSnapshot.durationMs,
-                playbackSpeed = uiStateSnapshot.playbackSpeed,
                 bufferedPositionMs = uiStateSnapshot.positionMs,
             )
         }

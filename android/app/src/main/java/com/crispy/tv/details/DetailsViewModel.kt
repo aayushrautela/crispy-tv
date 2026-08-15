@@ -884,6 +884,14 @@ val identity =
                 episode = episode,
             )
 
+            val resumePositionMs = withContext(Dispatchers.IO) {
+                detailsUseCases.userMediaRepository
+                    .getLocalWatchProgress(identity)
+                    ?.takeIf { it.progressPercent in 1.0..95.0 }
+                    ?.let { (it.currentTimeSeconds * 1000.0).toLong() }
+                    ?: 0L
+            }
+
             _navigationEvents.tryEmit(
                 DetailsNavigationEvent.OpenPlayer(
                     playbackUrl = playbackUrl,
@@ -902,6 +910,7 @@ val identity =
                             itemType = enriched.itemType,
                             parentMediaType = enriched.parentMediaType ?: parentMediaType,
                             absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
+                            resumePositionMs = resumePositionMs,
                             title = enriched.title,
                             posterUrl = enriched.posterUrl,
                             backdropUrl = enriched.backdropUrl,

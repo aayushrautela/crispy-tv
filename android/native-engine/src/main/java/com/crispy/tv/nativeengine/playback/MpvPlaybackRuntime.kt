@@ -348,6 +348,7 @@ internal class MpvPlaybackRuntime(
             externalSubtitleUrl = subtitle?.url
             if (subtitle != null) {
                 mpv.command(arrayOf("sub-add", subtitle.url, "select"))
+                applySubtitleStyle()
             }
         }
     }
@@ -378,15 +379,20 @@ internal class MpvPlaybackRuntime(
                     mpv.setPropertyDouble("panscan", 0.0)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
-                PlayerResizeMode.Fill -> {
-                    mpv.setPropertyDouble("panscan", 1.0)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
                 PlayerResizeMode.Zoom -> {
                     mpv.setPropertyDouble("panscan", 0.5)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
             }
+        }
+    }
+
+    private fun applySubtitleStyle() {
+        val mpv = mpv ?: return
+        runCatching {
+            mpv.setPropertyString("sub-ass-override", "no")
+            mpv.setPropertyString("sub-use-margins", "no")
+            mpv.setPropertyInt("sub-pos", 92)
         }
     }
 
@@ -476,6 +482,7 @@ internal class MpvPlaybackRuntime(
                     }
                 }
                 externalSubtitleUrl = source.externalSubtitles.firstOrNull()?.url
+                applySubtitleStyle()
             }
         }
     }

@@ -19,11 +19,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.ui.res.painterResource
@@ -45,14 +43,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
+import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
@@ -62,14 +63,16 @@ internal fun PlayerTopBar(
     title: String,
     subtitle: String?,
     errorMessage: String?,
+    palette: DetailsPaletteColors,
     onBack: () -> Unit,
+    onShowInfo: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(shape = CircleShape, color = palette.pillBackground, contentColor = palette.onPillBackground) {
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -106,6 +109,14 @@ internal fun PlayerTopBar(
                 )
             }
         }
+
+        IconButton(onClick = onShowInfo) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = "Info",
+                tint = palette.onPillBackground,
+            )
+        }
     }
 }
 
@@ -113,18 +124,14 @@ internal fun PlayerTopBar(
 internal fun PlayerBottomControls(
     positionMs: Long,
     durationMs: Long,
-    playbackSpeed: Float,
-    muted: Boolean,
     hasAudioTracks: Boolean,
     hasSubtitleTracks: Boolean,
+    palette: DetailsPaletteColors,
     onSeekTo: (Long) -> Unit,
     onOpenStreams: () -> Unit,
-    onOpenInfo: () -> Unit,
     onOpenTracks: () -> Unit,
-    onCycleSpeed: () -> Unit,
-    onToggleMute: () -> Unit,
     onCycleResizeMode: () -> Unit,
-    resizeModeLabel: String,
+    resizeMode: PlayerResizeMode,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -142,8 +149,8 @@ internal fun PlayerBottomControls(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             PlayerPill(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                containerColor = palette.pillBackground,
+                contentColor = palette.onPillBackground,
             ) {
                 Text(
                     text = buildTimePillText(positionMs = positionMs, durationMs = durationMs),
@@ -153,8 +160,8 @@ internal fun PlayerBottomControls(
             }
 
             PlayerPill(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                containerColor = palette.pillBackground,
+                contentColor = palette.onPillBackground,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -167,6 +174,7 @@ internal fun PlayerBottomControls(
                         PlayerActionButton(
                             icon = Icons.Filled.GraphicEq,
                             contentDescription = "Audio tracks",
+                            palette = palette,
                             onClick = onOpenTracks,
                         )
                     }
@@ -174,70 +182,33 @@ internal fun PlayerBottomControls(
                         PlayerActionButton(
                             icon = Icons.Filled.Subtitles,
                             contentDescription = "Subtitles",
+                            palette = palette,
                             onClick = onOpenTracks,
                         )
                     }
                     PlayerActionButton(
-                        icon = Icons.Filled.Speed,
-                        contentDescription = "Playback speed, ${formatSpeedLabel(playbackSpeed)}",
-                        onClick = onCycleSpeed,
-                    )
-                    PlayerActionButton(
-                        icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                        contentDescription = if (muted) "Unmute" else "Mute",
-                        onClick = onToggleMute,
-                    )
-                    PlayerActionButton(
                         icon = Icons.Outlined.Layers,
                         contentDescription = "Streams",
+                        palette = palette,
                         onClick = onOpenStreams,
                     )
-                    PlayerPill(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier =
-                                Modifier
-                                    .clickable(onClick = onCycleResizeMode)
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                        ) {
-                            Icon(
-                                painter = painterResource(com.crispy.tv.R.drawable.ic_player_aspect_ratio),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Text(
-                                text = resizeModeLabel,
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
-                    }
                     PlayerActionButton(
-                        icon = Icons.Outlined.Info,
-                        contentDescription = "Info",
-                        onClick = onOpenInfo,
+                        icon = Icons.Filled.Crop,
+                        contentDescription = "Resize: ${resizeMode.label}",
+                        palette = palette,
+                        onClick = onCycleResizeMode,
+                        painter =
+                            if (resizeMode == PlayerResizeMode.Zoom) {
+                                painterResource(com.crispy.tv.R.drawable.ic_player_aspect_ratio)
+                            } else {
+                                null
+                            },
                     )
                 }
             }
         }
     }
 }
-
-internal fun formatSpeedLabel(speed: Float): String {
-    return when {
-        speed == 1f -> "1x"
-        speed == 1.25f -> "1.25x"
-        speed == 1.5f -> "1.5x"
-        speed == 2f -> "2x"
-        speed < 1f -> "${"%.2f".format(speed)}x"
-        else -> "${"%.1f".format(speed)}x"
-    }
-}
-
-internal val PLAYBACK_SPEED_CYCLE = listOf(1f, 1.25f, 1.5f, 2f)
 
 @Composable
 private fun PlayerSeekBar(
@@ -307,21 +278,31 @@ internal fun PlayerActionButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    palette: DetailsPaletteColors,
     modifier: Modifier = Modifier,
+    painter: Painter? = null,
 ) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        color = palette.pillBackground,
+        contentColor = palette.onPillBackground,
         modifier = modifier.size(44.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(20.dp),
-            )
+            if (painter != null) {
+                Icon(
+                    painter = painter,
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }

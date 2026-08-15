@@ -43,6 +43,7 @@ data class PlayerLaunchSnapshot(
     val currentEpisodeId: String? = null,
     val parentMediaType: String? = null,
     val absoluteEpisodeNumber: Int? = null,
+    val resumePositionMs: Long = 0L,
 ) {
     fun toJsonString(): String {
         return JSONObject()
@@ -53,8 +54,9 @@ data class PlayerLaunchSnapshot(
             .put("episode_number", episodeNumber)
             .put("item_type", itemType)
             .put("parent_media_type", parentMediaType)
-            .put("absolute_episode_number", absoluteEpisodeNumber)
-            .put("title", title)
+                .put("absolute_episode_number", absoluteEpisodeNumber)
+                .put("resume_position_ms", resumePositionMs)
+                .put("title", title)
             .put("poster_url", posterUrl)
             .put("backdrop_url", backdropUrl)
             .put("description", description)
@@ -133,6 +135,7 @@ data class PlayerLaunchSnapshot(
                     itemType = json.optString("item_type").trim(),
                     parentMediaType = json.optString("parent_media_type").trim().ifBlank { null },
                     absoluteEpisodeNumber = json.optInt("absolute_episode_number").takeIf { it > 0 },
+                    resumePositionMs = json.optLong("resume_position_ms").takeIf { it > 0L } ?: 0L,
                     title = json.optString("title").trim(),
                     posterUrl = json.optString("poster_url").trim().ifBlank { null },
                     backdropUrl = json.optString("backdrop_url").trim().ifBlank { null },

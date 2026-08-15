@@ -208,12 +208,6 @@ fun PlayerRoute(
                 onSelectSubtitleTrack = session::selectSubtitleTrack,
                 onFetchAddonSubtitles = session::fetchAddonSubtitles,
                 onSelectAddonSubtitle = session::selectAddonSubtitle,
-                onCycleSpeed = {
-                    val next = PLAYBACK_SPEED_CYCLE.firstOrNull { it > uiState.playbackSpeed + 0.01f }
-                        ?: PLAYBACK_SPEED_CYCLE.first()
-                    session.setPlaybackSpeed(next)
-                },
-                onToggleMute = { session.setMuted(!uiState.muted) },
                 onCycleResizeMode = {
                     val next = uiState.resizeMode.next()
                     session.setResizeMode(next)
@@ -259,7 +253,6 @@ private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): Rational? {
 private fun PlayerResizeMode.toExoResizeMode(): Int =
     when (this) {
         PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
 

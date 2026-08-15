@@ -61,8 +61,6 @@ internal fun PlayerOverlay(
     onSelectSubtitleTrack: (String?) -> Unit,
     onFetchAddonSubtitles: () -> Unit,
     onSelectAddonSubtitle: (AddonSubtitle) -> Unit,
-    onCycleSpeed: () -> Unit,
-    onToggleMute: () -> Unit,
     onCycleResizeMode: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
 ) {
@@ -114,7 +112,8 @@ internal fun PlayerOverlay(
         }
 
         if (uiState.isBuffering) {
-            showLoadingCurtain = true
+            delay(250)
+            if (uiState.isBuffering) showLoadingCurtain = true
         } else {
             delay(300)
             showLoadingCurtain = false
@@ -168,6 +167,7 @@ internal fun PlayerOverlay(
 
         PlayerLoadingCurtain(
             visible = showLoadingCurtain,
+            palette = palette,
             modifier = Modifier.align(Alignment.Center),
         )
 
@@ -188,10 +188,12 @@ internal fun PlayerOverlay(
                         title = uiState.title,
                         subtitle = uiState.subtitle ?: uiState.statusMessage.takeIf { it.isNotBlank() && it != "Playing" },
                         errorMessage = uiState.errorMessage,
+                        palette = palette,
                         onBack = {
                             resetControlsTimer()
                             latestOnBack()
                         },
+                        onShowInfo = { openSurface(onShowInfo) },
                     )
 
                     if (!uiState.isBuffering) {
@@ -216,30 +218,20 @@ internal fun PlayerOverlay(
                     PlayerBottomControls(
                         positionMs = uiState.positionMs,
                         durationMs = effectiveDurationMs,
-                        playbackSpeed = uiState.playbackSpeed,
-                        muted = uiState.muted,
                         hasAudioTracks = uiState.audioTracks.isNotEmpty(),
                         hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),
+                        palette = palette,
                         onSeekTo = {
                             resetControlsTimer()
                             latestOnSeekTo(it)
                         },
                         onOpenStreams = { openSurface(onShowStreams) },
-                        onOpenInfo = { openSurface(onShowInfo) },
                         onOpenTracks = { openSurface(onShowTracks) },
-                        onCycleSpeed = {
-                            resetControlsTimer()
-                            onCycleSpeed()
-                        },
-                        onToggleMute = {
-                            resetControlsTimer()
-                            onToggleMute()
-                        },
                         onCycleResizeMode = {
                             resetControlsTimer()
                             onCycleResizeMode()
                         },
-                        resizeModeLabel = uiState.resizeMode.label,
+                        resizeMode = uiState.resizeMode,
                     )
                 }
             }

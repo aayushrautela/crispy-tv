@@ -101,8 +101,8 @@ internal fun PlayerInfoSheet(
                         Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
-                            .fillMaxWidth(0.88f)
-                            .widthIn(max = 400.dp),
+                            .fillMaxWidth(0.85f)
+                            .widthIn(max = 360.dp),
                     color = palette.pageBackground,
                     contentColor = palette.onPageBackground,
                 ) {
