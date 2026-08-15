@@ -1214,4 +1214,4 @@ private class PlaybackMetricsHolder {
 }
 
 private const val TAG = "PlayerSessionViewModel"
-private const val PROGRESS_SYNC_INTERVAL_MS = 5_000L
+private const val PROGRESS_SYNC_INTERVAL_MS = 15_000L

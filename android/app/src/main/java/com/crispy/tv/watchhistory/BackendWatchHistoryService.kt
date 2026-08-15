@@ -1,6 +1,7 @@
 package com.crispy.tv.watchhistory
 
 import android.content.Context
+import android.util.Log
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
@@ -449,7 +450,8 @@ class BackendWatchHistoryService(
                 profileId = backendContext.profileId,
                 input = playbackInput,
             )
-        } catch (_: Throwable) {
+        } catch (error: Throwable) {
+            Log.w("WatchEvent", "Failed to send playback event ($eventType) for ${identity.itemId}", error)
         }
     }
 
