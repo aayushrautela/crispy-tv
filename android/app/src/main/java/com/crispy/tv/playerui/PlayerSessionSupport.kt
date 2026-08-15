@@ -1,6 +1,7 @@
 package com.crispy.tv.playerui
 
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.streams.AddonStream
