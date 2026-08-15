@@ -15,7 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -55,6 +60,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -62,6 +70,11 @@ import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.ui.utils.appBarScrollBehavior
+
+private val NetflixProfileBackground = Color(0xFF141414)
+private val NetflixTileFallback = Color(0xFF333333)
+private val NetflixTileShape = RoundedCornerShape(6.dp)
+private val NetflixTileSize = 120.dp
 
 @Composable
 fun AuthRoute(
@@ -325,43 +338,52 @@ private fun ProfileSelectorScreen(
     onOpenCreateDialog: () -> Unit,
     onDismissDialog: () -> Unit,
 ) {
-    val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            StandardTopAppBar(
-                title = "Who's watching?",
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(NetflixProfileBackground),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = pageHorizontalPadding),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = pageHorizontalPadding)
+                .padding(top = 64.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text(
+                text = "Who's watching?",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+
             uiState.error?.let { error ->
                 Text(text = error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             }
+
             if (uiState.isBusy && uiState.profiles.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LoadingIndicator()
-                }
+                LoadingIndicator(color = Color.White)
+            } else {
+                ProfileGrid(
+                    profiles = uiState.profiles,
+                    onSelectProfile = onSelectProfile,
+                    onAddProfile = onOpenCreateDialog,
+                )
             }
-            ProfileGrid(
-                profiles = uiState.profiles,
-                onSelectProfile = onSelectProfile,
-                onAddProfile = onOpenCreateDialog,
-            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            TextButton(onClick = onBack) {
+                Text(
+                    text = "Sign out",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
         }
     }
 
@@ -412,54 +434,61 @@ private fun ProfileGrid(
     onSelectProfile: (String) -> Unit,
     onAddProfile: () -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        item {
-            androidx.compose.foundation.layout.FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                profiles.forEach { profile ->
-                    ProfileCard(
-                        name = profile.name,
-                        avatarUrl = profile.avatarUrl,
-                        isKids = profile.isKids,
-                        onClick = { onSelectProfile(profile.id) },
-                    )
-                }
-                ProfileAddCard(onClick = onAddProfile)
-            }
+        profiles.forEach { profile ->
+            ProfileCard(
+                name = profile.name,
+                avatarUrl = profile.avatarUrl,
+                onClick = { onSelectProfile(profile.id) },
+            )
         }
+        ProfileAddCard(onClick = onAddProfile)
     }
 }
 
 @Composable
-private fun ProfileCard(name: String, avatarUrl: String?, isKids: Boolean, onClick: () -> Unit) {
+private fun ProfileCard(name: String, avatarUrl: String?, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
-            .width(96.dp)
+            .width(NetflixTileSize + 8.dp)
             .clickable(onClick = onClick)
             .padding(4.dp),
     ) {
-        ProfileAvatar(url = avatarUrl, sizeDp = 88)
+        Box(
+            modifier = Modifier
+                .size(NetflixTileSize)
+                .clip(NetflixTileShape)
+                .background(NetflixTileFallback),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (avatarUrl != null) {
+                coil3.compose.AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = name,
+                    modifier = Modifier.fillMaxSize().clip(NetflixTileShape),
+                )
+            } else {
+                Icon(
+                    Icons.Outlined.AccountCircle,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(72.dp),
+                )
+            }
+        }
         Text(
             text = name,
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
         )
-        if (isKids) {
-            Text(
-                text = "Kids",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
@@ -469,23 +498,29 @@ private fun ProfileAddCard(onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
-            .width(96.dp)
+            .width(NetflixTileSize + 8.dp)
             .clickable(onClick = onClick)
             .padding(4.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(88.dp)
-                .clip(CircleShape)
-                .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                .size(NetflixTileSize)
+                .clip(NetflixTileShape)
+                .border(2.dp, Color.White.copy(alpha = 0.5f), NetflixTileShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Outlined.Add, contentDescription = "Add profile", modifier = Modifier.size(40.dp))
+            Icon(
+                Icons.Outlined.Add,
+                contentDescription = "Add profile",
+                tint = Color.White,
+                modifier = Modifier.size(56.dp),
+            )
         }
         Text(
             text = "Add profile",
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = Color.White,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -649,22 +684,6 @@ private fun AvatarImage(url: String, contentDescription: String) {
             .fillMaxWidth()
             .padding(Dimensions.ListItemPadding),
     )
-}
-
-@Composable
-private fun ProfileAvatar(url: String?, sizeDp: Int, contentDescription: String? = null) {
-    val size = sizeDp.dp
-    if (url != null) {
-        coil3.compose.AsyncImage(
-            model = url,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(size).clip(CircleShape),
-        )
-    } else {
-        Box(modifier = Modifier.size(size).clip(CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.AccountCircle, contentDescription = contentDescription, modifier = Modifier.size(size))
-        }
-    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
