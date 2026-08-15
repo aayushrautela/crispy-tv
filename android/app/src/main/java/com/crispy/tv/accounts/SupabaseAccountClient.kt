@@ -15,22 +15,10 @@ class SupabaseAccountClient(
     private val httpClient: CrispyHttpClient,
     supabaseUrl: String,
     private val supabasePublishableKey: String,
+    private val tokenStore: SecureTokenStore,
 ) {
     private val baseUrl: String = supabaseUrl.trim().trimEnd('/')
-    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val sessionMutex = Mutex()
-
-    @Volatile
-    private var cachedSession: Session? = null
-
-    data class Session(
-        val accessToken: String,
-        val refreshToken: String,
-        val expiresAtEpochSec: Long?,
-        val userId: String?,
-        val email: String?,
-        val anonymous: Boolean,
-    )
 
     data class SignUpResult(
         val session: Session?,
@@ -41,12 +29,8 @@ class SupabaseAccountClient(
         return baseUrl.isNotBlank() && supabasePublishableKey.isNotBlank()
     }
 
-    fun clearLocalSession() {
-        saveSession(null)
-    }
-
     fun currentSession(): Session? {
-        return loadSession()
+        return tokenStore.current()
     }
 
     suspend fun ensureValidSession(): Session? {
@@ -134,18 +118,21 @@ class SupabaseAccountClient(
     }
 
     suspend fun signOut() {
-        if (!isConfigured()) {
-            saveSession(null)
-            return
-        }
-        val session = loadSession()
+        if (!isConfigured()) return
+        val session = tokenStore.current()
         if (session != null && !session.accessToken.startsWith("cp_pat_")) {
             runCatching {
                 val url = "$baseUrl/auth/v1/logout".toHttpUrl()
-                httpClient.postJson(url, "{}", authHeaders(session.accessToken), callTimeoutMs = CALL_TIMEOUT_MS)
+                httpClient.postJson(
+                    url,
+                    JSONObject().put("scope", "global").toString(),
+                    authHeaders(session.accessToken),
+                    callTimeoutMs = CALL_TIMEOUT_MS,
+                )
             }
         }
-        saveSession(null)
+        // Local clearing is performed by the caller (AccountBootstrapRepository.signOut) so that
+        // server-side revocation and local wipes run under a single lock.
     }
 
     private fun checkConfigured() {
@@ -259,48 +246,10 @@ class SupabaseAccountClient(
         return null
     }
 
-    private fun loadSession(): Session? {
-        cachedSession?.let { return it }
-        val raw = prefs.getString(KEY_SESSION, null) ?: return null
-        val parsed = runCatching {
-            val json = JSONObject(raw)
-            val accessToken = json.optString("access_token").trim()
-            if (accessToken.isBlank()) return null
-            val refreshToken = json.optString("refresh_token").trim()
-            val expiresAt = json.optLong("expires_at", -1L).takeIf { it > 0L }
-            val userId = json.optString("user_id").trim().ifBlank { null }
-            val email = json.optString("email").trim().ifBlank { null }
-            val anonymous = json.optBoolean("anonymous", false)
-            Session(
-                accessToken = accessToken,
-                refreshToken = refreshToken,
-                expiresAtEpochSec = expiresAt,
-                userId = userId,
-                email = email,
-                anonymous = anonymous
-            )
-        }.getOrNull()
-        cachedSession = parsed
-        return parsed
-    }
+    private fun loadSession(): Session? = tokenStore.current()
 
-    private fun saveSession(session: Session?) {
-        cachedSession = session
-        if (session == null) {
-            prefs.edit().remove(KEY_SESSION).apply()
-            return
-        }
-        val json =
-            JSONObject()
-                .put("access_token", session.accessToken)
-                .put("refresh_token", session.refreshToken)
-                .put("expires_at", session.expiresAtEpochSec ?: JSONObject.NULL)
-                .put("user_id", session.userId ?: JSONObject.NULL)
-                .put("email", session.email ?: JSONObject.NULL)
-                .put("anonymous", session.anonymous)
-                .toString()
-
-        prefs.edit().putString(KEY_SESSION, json).apply()
+    private suspend fun saveSession(session: Session?) {
+        if (session == null) tokenStore.clear() else tokenStore.save(session)
     }
 
     private fun shouldRefresh(session: Session): Boolean {
@@ -333,9 +282,6 @@ class SupabaseAccountClient(
     }
 
     private companion object {
-        private const val PREFS_NAME = "supabase_sync_lab"
-        private const val KEY_SESSION = "@supabase:session"
-
         private const val CALL_TIMEOUT_MS = 10_000L
         private const val SESSION_EXPIRY_SKEW_SEC = 30L
     }

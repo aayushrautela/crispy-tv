@@ -1,7 +1,6 @@
 package com.crispy.tv.accounts
 
 import android.content.Context
-import com.crispy.tv.accounts.SupabaseAccountClient.Session
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.images.clearImageCache
@@ -19,6 +18,7 @@ class AccountBootstrapRepository(
     private val backendContextResolver: BackendContextResolver,
     private val backendClient: CrispyBackendClient,
     private val activeProfileStore: ActiveProfileStore,
+    private val tokenStore: SecureTokenStore,
 ) {
     suspend fun bootstrap(): BootstrapResult {
         val session = supabase.ensureValidSession()
@@ -57,14 +57,20 @@ class AccountBootstrapRepository(
         return profile
     }
 
+    private val signOutMutex = Mutex()
+
     suspend fun signOut() {
-        val userId = supabase.currentSession()?.userId?.takeIf { it.isNotBlank() }
-        supabase.signOut()
-        // Drop account-scoped caches so the next sign-in starts clean: the active profile
-        // selection, the resolved backend context, and every cached image (avatars, art).
-        SupabaseServicesProvider.activeProfileStore(appContext).clear(userId)
-        backendContextResolver.clear()
-        clearImageCache(appContext)
+        // One locked sequence: revoke server-side first, then always wipe local state.
+        // Running un-awaited (e.g. fire-and-forget) before re-bootstrapping is what previously
+        // let a stale session survive and kept the old home mounted.
+        signOutMutex.withLock {
+            val userId = supabase.currentSession()?.userId?.takeIf { it.isNotBlank() }
+            runCatching { supabase.signOut() }
+            tokenStore.clear()
+            userId?.let { SupabaseServicesProvider.activeProfileStore(appContext).clear(it) }
+            backendContextResolver.clear()
+            clearImageCache(appContext)
+        }
     }
 }
 

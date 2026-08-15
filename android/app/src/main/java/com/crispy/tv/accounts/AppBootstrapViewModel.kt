@@ -71,7 +71,9 @@ class AppBootstrapViewModel internal constructor(
      * so the root gate flips back to Auth without races.
      */
     fun onSignedOut() {
-        viewModelScope.launch { runCatching { bootstrapRepository.signOut() } }
-        refresh()
+        viewModelScope.launch {
+            runCatching { bootstrapRepository.signOut() }
+            _state.value = BootstrapState.NeedsAuth
+        }
     }
 }

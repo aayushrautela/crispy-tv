@@ -179,6 +179,9 @@ dependencies {
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
+    // Encrypted, Keystore-backed token storage (access + refresh tokens).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     implementation("androidx.work:work-runtime-ktx:2.11.2")
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.04.01"))

@@ -20,7 +20,20 @@ object SupabaseServicesProvider {
     private var activeProfileStore: ActiveProfileStore? = null
 
     @Volatile
+    private var secureTokenStore: SecureTokenStore? = null
+
+    @Volatile
     private var homeCatalogService: HomeCatalogService? = null
+
+    fun secureTokenStore(context: Context): SecureTokenStore {
+        secureTokenStore?.let { return it }
+        synchronized(this) {
+            secureTokenStore?.let { return it }
+            val created = SecureTokenStore(context.applicationContext)
+            secureTokenStore = created
+            return created
+        }
+    }
 
     fun accountClient(context: Context): SupabaseAccountClient {
         supabaseAccountClient?.let { return it }
@@ -33,6 +46,7 @@ object SupabaseServicesProvider {
                     httpClient = AppHttp.client(appContext),
                     supabaseUrl = BuildConfig.SUPABASE_URL,
                     supabasePublishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY,
+                    tokenStore = secureTokenStore(appContext),
                 )
             supabaseAccountClient = created
             return created
@@ -76,6 +90,7 @@ object SupabaseServicesProvider {
             backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
             backendClient = BackendServicesProvider.backendClient(context.applicationContext),
             activeProfileStore = activeProfileStore(context.applicationContext),
+            tokenStore = secureTokenStore(context.applicationContext),
         )
     }
 
