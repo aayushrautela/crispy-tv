@@ -18,7 +18,7 @@ object AccountContracts {
  * src/modules/profiles/avatars.ts.
  */
 val SUPPORTED_AVATAR_IDS: List<String> =
-    (1..AVATAR_COUNT).map { "avatar_%02d".format(it) }
+    (1..AccountContracts.AVATAR_COUNT).map { "avatar_%02d".format(it) }
 
 fun isSupportedAvatarId(value: String?): Boolean {
     if (value == null) return false
@@ -29,7 +29,7 @@ fun isSupportedAvatarId(value: String?): Boolean {
 fun builtInAvatarUrl(baseUrl: String, id: String): String {
     val trimmedBase = baseUrl.trim().trimEnd('/')
     val trimmedId = id.trim().trimStart('/')
-    return "$trimmedBase$AVATAR_CATALOG_PATH/$trimmedId"
+    return "$trimmedBase${AccountContracts.AVATAR_CATALOG_PATH}/$trimmedId"
 }
 
 data class SupportedLanguage(
