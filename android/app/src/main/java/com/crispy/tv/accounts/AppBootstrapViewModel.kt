@@ -70,5 +70,8 @@ class AppBootstrapViewModel internal constructor(
      * Called by [AccountSettingsViewModel] after a successful account deletion / sign-out
      * so the root gate flips back to Auth without races.
      */
-    fun onSignedOut() = refresh()
+    fun onSignedOut() {
+        viewModelScope.launch { runCatching { bootstrapRepository.signOut() } }
+        refresh()
+    }
 }

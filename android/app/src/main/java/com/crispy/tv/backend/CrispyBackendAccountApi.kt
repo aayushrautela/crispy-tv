@@ -46,7 +46,7 @@ internal suspend fun CrispyBackendClient.createProfileApi(
             put("sortOrder", sortOrder)
         }
         if (!avatarKey.isNullOrBlank()) {
-            put("avatarKey", avatarKey.trim())
+            put("avatarUrl", avatarKey.trim())
         }
     }.toString()
     val response = httpClient.postJson(
