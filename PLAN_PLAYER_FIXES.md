@@ -145,3 +145,86 @@ Crispy's addon model differs from the reference (no generic `AddonRepository` wi
 enumerate subtitle-capable addons. If only the immediate stream-subtitle fix is
 wanted, 4A alone resolves "addons not fetching subtitles" for the common Stremio
 case and is much smaller.
+
+---
+
+## Status
+Round 1 (loading mutual-exclusion, seek top-center, zoom enum/engine/persistence,
+stream + addon subtitles) is **implemented and committed**. The plan below is the
+**Round 2 polish** pass, agreed but **not yet coded**.
+
+## Round 2 — polish (agreed, not coded)
+
+### R2.0 Pills semi-transparent
+Solid `SurfaceContainerHigh` pills look bad. Make player control pills semi-transparent.
+- Reuse the details-page palette colors: `DetailsPaletteColors.pillBackground`
+  (`surfaceContainerHigh.copy(alpha = 0.72f)`) + `onPillBackground`.
+- Pass `palette` into `PlayerTopBar` / `PlayerBottomControls` (currently use
+  `MaterialTheme.colorScheme.surfaceContainerHigh` directly).
+- Apply `palette.pillBackground` / `palette.onPillBackground` to:
+  - `PlayerPill` (`PlayerOverlayControls.kt:290`)
+  - `PlayerActionButton` (`PlayerOverlayControls.kt:305`)
+  - top-bar back `Surface` (`PlayerOverlayControls.kt:72`)
+  - resize `PlayerPill` (`:195`)
+- Leave `GestureFeedbackOverlay` (already `Color.Black.copy(0.68f)`) as-is.
+  (`PlayerErrorCard`/`ElevatedCard` is optional; out of scope unless asked.)
+
+### R2.1 Loading curtain
+- `PlayerLoadingCurtain.kt`: drop `Surface`+`Box` wrapper; single
+  `LoadingIndicator(size ~64dp)` centered. Tint with `palette.accent`
+  (backdrop-derived). Pass `palette` from `PlayerOverlay.kt:169`.
+- `PlayerOverlay.kt:110`: debounce the *show* by ~250ms (keep ~300ms hide delay)
+  so it never flashes for microseconds.
+
+### R2.2 Remove mute/unmute
+- Remove bottom-controls mute `PlayerActionButton`, `uiState.muted`, `setMuted` (VM),
+  `onToggleMute` wiring, `PlaybackSettingsRepository.setMuted`.
+- Hardware-volume gesture popup stays (speaker icons); drop only the mute toggle.
+  `GestureIcons.VolumeMuted` mapping can be removed.
+
+### R2.3 Remove playback speed
+- Remove speed `PlayerActionButton`, `uiState.playbackSpeed`, `setPlaybackSpeed`,
+  `PLAYBACK_SPEED_CYCLE`, `formatSpeedLabel`. Engine `setPlaybackSpeed` left as
+  harmless API (delete on request).
+
+### R2.4 Info button -> top-right, no pill
+- Remove from bottom controls; add plain `IconButton` at end of `PlayerTopBar`
+  (`Icons.Filled.Info`). Back button stays as-is.
+
+### R2.5 Resize = icon-only, Fit/Zoom
+- `PlayerResizeMode.kt`: drop `Fill`; keep `Fit`/`Zoom`, `next()` toggles, `label`
+  only for a11y.
+- `PlayerRoute.kt:262` `toExoResizeMode`: remove `Fill` branch.
+- `PlayerOverlayControls.kt`: resize becomes icon-only `PlayerActionButton` ->
+  **Fit = `Icons.Filled.Crop` (inward arrows), Zoom = `ic_player_aspect_ratio`
+  drawable (outward arrows)**. Drop `resizeModeLabel` param + nested `PlayerPill`.
+
+### R2.6 Info side panel: narrower + details-page look
+- `PlayerInfoSheet.kt:99`: `fillMaxWidth(0.88f).widthIn(max=400.dp)` ->
+  narrower (e.g. `widthIn(min=320,max=360).fillMaxWidth(0.78f)`).
+- Restyle header to mirror `DetailsScreen` (hero backdrop, metadata + rating row,
+  genre chips, cast, description). Mirror styling in `playerui` (no cross-module import).
+
+### R2.7 Resume progress from details
+- Add `resumePositionMs` to `PlayerLaunchSnapshot` (+ JSON round-trip).
+- `DetailsViewModel.kt:896`: populate from
+  `WatchProgressStore.getWatchProgress(id,type,epId)?.currentTimeSeconds * 1000`
+  (skip if >=~95% / <=0). Confirm VM can reach `WatchProgressStore`.
+- `PlayerSessionViewModel.kt:198` init:
+  `pendingInitialSeekMs = launchSnapshot?.resumePositionMs?.takeIf { it > 0L }`
+  before first `requestPlayback`.
+
+### R2.8 Subtitle placement (MPV) — safe-area margins
+- `MpvPlaybackRuntime.kt`: add `applySubtitleStyle` mirroring Nuvio
+  (`sub-ass-override=no`, `sub-pos`) **plus** `sub-use-margins=no` + a `sub-pos`
+  leaving a safe bottom margin (e.g. ~92) so panscan-zoom (0.5) doesn't clip it.
+  Nuvio itself does NOT do this, so it still clips on zoom.
+- EXO uses its own `SubtitleView` (surface-anchored) — leave as-is unless parity wanted.
+
+### Round 2 files
+Modify: `PlayerLoadingCurtain.kt`, `PlayerOverlay.kt`, `PlayerOverlayControls.kt`,
+`PlayerGestureFeedback.kt`, `PlayerRoute.kt`, `PlayerSessionViewModel.kt`,
+`PlayerInfoSheet.kt`, `PlayerResizeMode.kt`, `PlaybackSettingsRepository.kt`,
+`PlayerLaunchSnapshot.kt`, `DetailsViewModel.kt`, `MpvPlaybackRuntime.kt`.
+Confirm reach: `WatchProgressStore` from `DetailsViewModel`.
+
