@@ -92,7 +92,7 @@ fun ProfileIconButton(onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .size(ProfileIconButtonSize)
-            .semantics { contentDescription = "Open profiles" },
+            .semantics { contentDescription = "Open profile menu" },
     ) {
         Surface(
             modifier = Modifier.size(ProfileIconContainerSize),

@@ -26,7 +26,7 @@ internal fun NavGraphBuilder.addSearchNavGraph(navController: NavHostController)
                 }
             },
                 onOpenAccountsProfiles = {
-                    navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    navController.navigate(AppRoutes.ProfileMenuRoute) {
                         launchSingleTop = true
                     }
                 },

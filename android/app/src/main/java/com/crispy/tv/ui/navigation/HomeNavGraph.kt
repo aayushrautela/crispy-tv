@@ -88,7 +88,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                     navController.navigate(AppRoutes.catalogListRoute(section))
                 },
                 onOpenAccountsProfiles = {
-                    navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    navController.navigate(AppRoutes.ProfileMenuRoute) {
                         launchSingleTop = true
                     }
                 },

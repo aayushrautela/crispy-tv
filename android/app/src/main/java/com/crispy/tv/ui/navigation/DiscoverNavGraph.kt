@@ -15,7 +15,7 @@ internal fun NavGraphBuilder.addDiscoverNavGraph(navController: NavHostControlle
                     entry.savedStateHandle[AppRoutes.TopLevelScrollToTopRequestKey] = 0
                 },
                 onOpenAccountsProfiles = {
-                    navController.navigate(AppRoutes.AccountsProfilesRoute) {
+                    navController.navigate(AppRoutes.ProfileMenuRoute) {
                         launchSingleTop = true
                     }
                 },
