@@ -6,47 +6,28 @@ public enum AccountContracts {
     public static let oauthCallbackScheme = "crispytv"
     public static let oauthCallbackHost = "oauth-callback"
 
-    public static let dicebearHost = "api.dicebear.com"
-    public static let dicebearVersion = "v9"
-    public static let dicebearFormats: Set<String> = ["svg", "png", "webp", "avif"]
+    public static let avatarCatalogPath = "/v1/avatars"
+    public static let avatarCount = 20
 }
 
-public enum DicebearStyle: String, CaseIterable {
-    case adventurer
-    case adventurerNeutral = "adventurer-neutral"
-    case avataaars
-    case avataaarsNeutral = "avataaars-neutral"
-    case bigEars = "big-ears"
-    case bigEarsNeutral = "big-ears-neutral"
-    case bigSmile = "big-smile"
-    case bottts
-    case botttsNeutral = "bottts-neutral"
-    case croodles
-    case croodlesNeutral = "croodles-neutral"
-    case dylan
-    case funEmoji = "fun-emoji"
-    case glass
-    case icons
-    case identicon
-    case initials
-    case lorelei
-    case loreleiNeutral = "lorelei-neutral"
-    case micah
-    case miniavs
-    case notionists
-    case notionistsNeutral = "notionists-neutral"
-    case openPeeps = "open-peeps"
-    case personas
-    case pixelArt = "pixel-art"
-    case pixelArtNeutral = "pixel-art-neutral"
-    case rings
-    case shapes
-    case thumbs
-
-    public var apiValue: String { rawValue }
+/// Built-in avatar catalog. Profiles select one of these ids (e.g. "avatar_03");
+/// the PNG is served at GET /v1/avatars/:id. Avatars are never remote URLs.
+public let SUPPORTED_AVATAR_IDS: [String] = (1...AccountContracts.avatarCount).map {
+    String(format: "avatar_%02d", $0)
 }
 
-public let SUPPORTED_DICEBEAR_STYLES: [DicebearStyle] = Array(DicebearStyle.allCases)
+public func isSupportedAvatarId(_ value: String?) -> Bool {
+    guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+        return false
+    }
+    return SUPPORTED_AVATAR_IDS.contains(value)
+}
+
+public func builtInAvatarUrl(baseUrl: String, id: String) -> String {
+    let trimmedBase = baseUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/")).trimmingCharacters(in: .whitespaces)
+    let trimmedId = id.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    return "\(trimmedBase)\(AccountContracts.avatarCatalogPath)/\(trimmedId)"
+}
 
 public struct SupportedLanguage: Equatable {
     public let code: String

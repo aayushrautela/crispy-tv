@@ -1,5 +1,7 @@
 package com.crispy.tv.backend
 
+import com.crispy.tv.BuildConfig
+import com.crispy.tv.domain.account.builtInAvatarUrl
 import com.crispy.tv.backend.CrispyBackendClient.AiInsightsCard
 import com.crispy.tv.backend.CrispyBackendClient.ClientImages
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
@@ -29,7 +31,8 @@ import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileHomeSection
 import com.crispy.tv.backend.CrispyBackendClient.ProviderState
 import com.crispy.tv.backend.CrispyBackendClient.AccountSettings
-import com.crispy.tv.backend.CrispyBackendClient.AddonSetting
+import com.crispy.tv.backend.CrispyBackendClient.AddonCloudRow
+import com.crispy.tv.backend.CrispyBackendClient.Avatar
 import com.crispy.tv.backend.CrispyBackendClient.ResponsiveImageSet
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionItem
@@ -143,29 +146,45 @@ internal fun CrispyBackendClient.parseAccountSettings(json: JSONObject): Account
     )
 }
 
-internal fun CrispyBackendClient.parseAddonSettings(array: JSONArray?): List<AddonSetting> {
-    val safeArray = array ?: JSONArray()
+internal fun CrispyBackendClient.parseAddonCloudRows(value: Any?): List<AddonCloudRow> {
+    val safeArray = when (value) {
+        is JSONArray -> value
+        is List<*> -> JSONArray(value)
+        else -> null
+    } ?: return emptyList()
     return buildList {
         for (index in 0 until safeArray.length()) {
-            val addon = safeArray.optJSONObject(index) ?: continue
-            add(parseAddonSetting(addon))
+            val obj = safeArray.optJSONObject(index) ?: continue
+            val manifestUrl = obj.optString("manifestUrl").trim()
+            if (manifestUrl.isBlank()) continue
+            add(
+                AddonCloudRow(
+                    manifestUrl = manifestUrl,
+                    sortOrder = obj.optInt("sortOrder", index),
+                    name = obj.optString("name").trim().ifBlank { null },
+                    enabled = obj.optBoolean("enabled", true),
+                ),
+            )
         }
     }
 }
 
-internal fun CrispyBackendClient.parseAddonSetting(json: JSONObject): AddonSetting {
-    val id = json.optString("id").trim()
-    val manifestUrl = json.optString("manifestUrl").trim()
-    if (id.isBlank() || manifestUrl.isBlank()) {
-        throw IllegalStateException("Backend addon setting is missing required fields.")
+internal fun CrispyBackendClient.parseAvatars(array: JSONArray?): List<Avatar> {
+    val safeArray = array ?: JSONArray()
+    return buildList {
+        for (index in 0 until safeArray.length()) {
+            val obj = safeArray.optJSONObject(index) ?: continue
+            val id = obj.optString("id").trim()
+            if (id.isBlank()) continue
+            add(
+                Avatar(
+                    id = id,
+                    url = obj.optString("url").trim().ifBlank { null }
+                        ?: com.crispy.tv.domain.account.builtInAvatarUrl(BuildConfig.CRISPY_BACKEND_URL, id),
+                ),
+            )
+        }
     }
-    return AddonSetting(
-        id = id,
-        manifestUrl = manifestUrl,
-        name = json.optString("name").trim().ifBlank { null },
-        type = json.optString("type").trim().ifBlank { null },
-        enabled = json.optBoolean("enabled", true),
-    )
 }
 
 // --- Search parsers ---

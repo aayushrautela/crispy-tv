@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 sealed interface BootstrapState {
     data object Loading : BootstrapState
     data object NeedsAuth : BootstrapState
-    data object NeedsOnboarding : BootstrapState
+    data object NeedsProfileSelection : BootstrapState
     data object Ready : BootstrapState
 }
 
@@ -60,7 +60,7 @@ class AppBootstrapViewModel internal constructor(
             val result = runCatching { bootstrapRepository.bootstrap() }.getOrNull()
             _state.value = when {
                 result == null || !result.signedIn -> BootstrapState.NeedsAuth
-                !result.onboardingComplete -> BootstrapState.NeedsOnboarding
+                !result.onboardingComplete -> BootstrapState.NeedsProfileSelection
                 else -> BootstrapState.Ready
             }
         }

@@ -6,13 +6,14 @@ import com.crispy.tv.backend.CrispyBackendClient.MeResponse
 import com.crispy.tv.backend.CrispyBackendClient.Profile
 import com.crispy.tv.backend.CrispyBackendClient.ProfileSettings
 import com.crispy.tv.backend.CrispyBackendClient.AccountSettings
-import com.crispy.tv.backend.CrispyBackendClient.AddonSetting
+import com.crispy.tv.backend.CrispyBackendClient.AddonCloudRow
 import com.crispy.tv.backend.CrispyBackendClient.ProviderAccountsResponse
 import com.crispy.tv.backend.CrispyBackendClient.StartImportResult
 import com.crispy.tv.backend.CrispyBackendClient.UpdateProfileInput
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 
 internal suspend fun CrispyBackendClient.getMeApi(accessToken: String): MeResponse {
@@ -249,16 +250,54 @@ internal suspend fun CrispyBackendClient.deleteAccountApi(accessToken: String): 
     return response.code in 200..299
 }
 
-internal suspend fun CrispyBackendClient.listProfileAddonsApi(
-    accessToken: String,
-    profileId: String,
-): List<AddonSetting> {
+internal suspend fun CrispyBackendClient.getAddonsApi(accessToken: String): List<AddonCloudRow> {
     checkConfigured()
     val response = httpClient.get(
-        url = "$baseUrl/v1/profiles/${profileId.trim()}/addons".toHttpUrl(),
+        url = "$baseUrl/v1/account/settings".toHttpUrl(),
         headers = authHeaders(accessToken),
         callTimeoutMs = callTimeoutMs,
     )
     val json = requireSuccess(response)
-    return parseAddonSettings(json.optJSONArray("addons"))
+    val settings = json.optJSONObject("settings") ?: return emptyList()
+    return parseAddonCloudRows(settings.opt("addons"))
+}
+
+internal suspend fun CrispyBackendClient.putAddonsApi(
+    accessToken: String,
+    rows: List<AddonCloudRow>,
+): List<AddonCloudRow> {
+    checkConfigured()
+    val array = JSONArray()
+    rows.forEach { row ->
+        array.put(
+            JSONObject()
+                .put("manifestUrl", row.manifestUrl)
+                .put("sortOrder", row.sortOrder)
+                .put("name", row.name ?: JSONObject.NULL)
+                .put("enabled", row.enabled),
+        )
+    }
+    val payload = JSONObject().put("addons", array).toString()
+    val response = httpClient.execute(
+        request = Request.Builder()
+            .url("$baseUrl/v1/account/settings".toHttpUrl())
+            .headers(authHeaders(accessToken))
+            .patch(payload.toRequestBody(jsonMediaType))
+            .build(),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    val settings = json.optJSONObject("settings") ?: return rows
+    return parseAddonCloudRows(settings.opt("addons")) ?: rows
+}
+
+internal suspend fun CrispyBackendClient.getAvatarsApi(): List<Avatar> {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/avatars".toHttpUrl(),
+        headers = Headers.headersOf("Accept", "application/json"),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return parseAvatars(json.optJSONArray("avatars"))
 }

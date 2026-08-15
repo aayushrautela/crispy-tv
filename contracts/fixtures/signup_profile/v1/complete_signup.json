@@ -6,7 +6,7 @@
     "raw_name": "  Alex  ",
     "raw_language": "en",
     "raw_region": "US",
-    "raw_avatar_url": "https://api.dicebear.com/v9/thumbs/svg?seed=Alex"
+    "raw_avatar_url": "avatar_03"
   },
   "expected": {
     "is_complete": true,
@@ -14,6 +14,6 @@
     "normalized_name": "Alex",
     "normalized_language": "en",
     "normalized_region": "US",
-    "normalized_avatar_url": "https://api.dicebear.com/v9/thumbs/svg?seed=Alex"
+    "normalized_avatar_url": "avatar_03"
   }
 }

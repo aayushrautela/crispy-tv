@@ -34,7 +34,6 @@ object AppRoutes {
     const val AddonsSettingsRoute = "settings/addons"
     const val AccountsProfilesRoute = "settings/accounts"
     const val AuthRoute = "auth"
-    const val OnboardingRoute = "onboarding"
     const val ProfileManagementRoute = "settings/profiles"
     const val AccountSettingsRoute = "settings/account"
 

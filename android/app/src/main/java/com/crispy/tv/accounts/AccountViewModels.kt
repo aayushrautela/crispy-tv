@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.avatar.AvatarUrlResolver
-import com.crispy.tv.domain.account.DicebearStyle
 import com.crispy.tv.domain.account.normalizeLanguageCode
 import com.crispy.tv.domain.account.validateProfileName
 import com.crispy.tv.domain.account.validateSignupMetadata
@@ -22,16 +21,13 @@ data class AuthUiState(
     val password: String = "",
     val displayName: String = "",
     val interfaceLanguage: String = "en",
-    val avatarStyle: String = DicebearStyle.THUMBS.apiValue,
+    val avatarId: String = "avatar_01",
     val referralCode: String = "",
     val error: String? = null,
     val signedIn: Boolean = false,
 ) {
     val avatarUrl: String
-        get() = AvatarUrlResolver.dicebearUrl(
-            style = DicebearStyle.fromApiValue(avatarStyle) ?: DicebearStyle.THUMBS,
-            seed = displayName.ifBlank { email },
-        )
+        get() = AvatarUrlResolver.builtInAvatarUrl(avatarId)
 }
 
 class AuthViewModel internal constructor(
@@ -59,7 +55,7 @@ class AuthViewModel internal constructor(
     fun onPasswordChange(value: String) = _state.update { it.copy(password = value, error = null) }
     fun onNameChange(value: String) = _state.update { it.copy(displayName = value, error = null) }
     fun onLanguageChange(value: String) = _state.update { it.copy(interfaceLanguage = value, error = null) }
-    fun onAvatarStyleChange(value: String) = _state.update { it.copy(avatarStyle = value) }
+    fun onAvatarIdChange(value: String) = _state.update { it.copy(avatarId = value) }
     fun onReferralChange(value: String) = _state.update { it.copy(referralCode = value, error = null) }
 
     fun signIn() {
@@ -84,13 +80,13 @@ class AuthViewModel internal constructor(
         }
         val name = _state.value.displayName.trim().ifBlank { email.substringBefore('@') }
         val language = normalizeLanguageCode(_state.value.interfaceLanguage) ?: "en"
-        val avatarUrl = _state.value.avatarUrl
+        val avatarId = _state.value.avatarId
         val referralCode = _state.value.referralCode.trim().ifBlank { null }
         val metadata = SignupMetadata(
             name = name,
             interfaceLanguage = language,
             region = null,
-            avatarUrl = avatarUrl,
+            avatarUrl = avatarId,
             referralCode = referralCode,
         )
         val validation = validateSignupMetadata(metadata)
@@ -138,8 +134,9 @@ data class ProfileListUiState(
     val dialogOpen: Boolean = false,
     val dialogName: String = "",
     val dialogIsKids: Boolean = false,
+    val dialogAvatarId: String = "avatar_01",
     val dialogError: String? = null,
-    val justSaved: Boolean = false,
+    val justSelected: Boolean = false,
 )
 
 class ProfileListViewModel internal constructor(
@@ -170,7 +167,7 @@ class ProfileListViewModel internal constructor(
     val uiState: StateFlow<ProfileListUiState> = _state.asStateFlow()
 
     fun load() {
-        _state.update { it.copy(isBusy = true, error = null) }
+        _state.update { it.copy(isBusy = true, error = null, justSelected = false) }
         viewModelScope.launch {
             runCatching {
                 val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
@@ -185,12 +182,13 @@ class ProfileListViewModel internal constructor(
         }
     }
 
-    fun openCreateDialog() = _state.update { it.copy(dialogOpen = true, dialogName = "", dialogIsKids = false, dialogError = null, justSaved = false) }
+    fun openCreateDialog() = _state.update { it.copy(dialogOpen = true, dialogName = "", dialogIsKids = false, dialogAvatarId = "avatar_01", dialogError = null) }
     fun dismissDialog() = _state.update { it.copy(dialogOpen = false, dialogError = null) }
     fun onNameChange(value: String) = _state.update { it.copy(dialogName = value, dialogError = null) }
     fun onKidsToggle(value: Boolean) = _state.update { it.copy(dialogIsKids = value) }
+    fun onAvatarIdChange(value: String) = _state.update { it.copy(dialogAvatarId = value) }
 
-    fun createProfile(name: String, isKids: Boolean) {
+    fun createProfile(name: String, isKids: Boolean, avatarId: String) {
         val normalized = when (val result = validateProfileName(name)) {
             is com.crispy.tv.domain.account.ProfileNameResult.Valid -> result.normalized
             is com.crispy.tv.domain.account.ProfileNameResult.Invalid -> {
@@ -198,18 +196,37 @@ class ProfileListViewModel internal constructor(
                 return
             }
         }
-        val avatarKey = AvatarUrlResolver.dicebearUrl(seed = normalized)
+        val avatarKey = avatarId.trim().ifBlank { "avatar_01" }
         _state.update { it.copy(isBusy = true, dialogError = null) }
         viewModelScope.launch {
             runCatching {
                 val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                val newProfile = profileRepository.createProfile(session.accessToken, normalized, isKids, avatarKey)
-                session.userId?.let { userId -> activeProfileStore.setActiveProfileId(userId, newProfile.id) }
-            }.onSuccess {
-                _state.update { it.copy(isBusy = false, dialogOpen = false, justSaved = true) }
+                profileRepository.createProfile(session.accessToken, normalized, isKids, avatarKey)
+            }            .onSuccess {
+                _state.update { it.copy(isBusy = false, dialogOpen = false) }
                 load()
             }.onFailure { error ->
                 _state.update { it.copy(isBusy = false, dialogError = error.message ?: "Failed to create profile.") }
+            }
+        }
+    }
+
+    /**
+     * Activates an existing profile and signals the bootstrap gate to enter the app.
+     * Used by the post-signup profile selector ("Who's watching?").
+     */
+    fun selectProfile(id: String) {
+        if (id.isBlank()) return
+        _state.update { it.copy(isBusy = true, error = null) }
+        viewModelScope.launch {
+            runCatching {
+                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
+                session.userId?.let { userId -> activeProfileStore.setActiveProfileId(userId, id) }
+                    ?: throw IllegalStateException("Missing user id.")
+            }.onSuccess {
+                _state.update { it.copy(isBusy = false, justSelected = true) }
+            }.onFailure { error ->
+                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to select profile.") }
             }
         }
     }

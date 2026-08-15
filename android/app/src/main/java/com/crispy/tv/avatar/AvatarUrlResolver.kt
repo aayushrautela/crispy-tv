@@ -1,40 +1,32 @@
 package com.crispy.tv.avatar
 
-import com.crispy.tv.domain.account.DicebearStyle
+import com.crispy.tv.BuildConfig
+import com.crispy.tv.domain.account.builtInAvatarUrl
+import com.crispy.tv.domain.account.isSupportedAvatarId
 
 object AvatarUrlResolver {
-    private const val DICEBEAR_HOST = "api.dicebear.com"
-    private const val DICEBEAR_VERSION = "v9"
-    private const val DICEBEAR_FORMAT = "svg"
-    private val DICEBEAR_BASE = "https://$DICEBEAR_HOST/$DICEBEAR_VERSION"
+    private val backendBaseUrl: String
+        get() = BuildConfig.CRISPY_BACKEND_URL.trim().trimEnd('/')
 
-    fun dicebearUrl(style: DicebearStyle = DicebearStyle.THUMBS, seed: String? = null): String {
-        val styleValue = style.apiValue
-        val base = "$DICEBEAR_BASE/$styleValue/$DICEBEAR_FORMAT"
-        val safeSeed = seed?.trim()?.ifBlank { null }
-            ?.replace("[^A-Za-z0-9._~-]".toRegex(), "-")
-            ?.take(64)
-        return if (safeSeed != null) "$base?seed=$safeSeed" else base
-    }
+    fun isBuiltInAvatarId(raw: String?): Boolean = isSupportedAvatarId(raw)
 
+    fun builtInAvatarUrl(id: String): String = builtInAvatarUrl(backendBaseUrl, id)
+
+    /**
+     * Resolves a stored avatar value to a loadable image URL.
+     * - Absolute http(s) URLs are passed through unchanged (legacy/remote avatars).
+     * - Built-in avatar ids (e.g. "avatar_03") resolve to the server-served PNG.
+     * - Anything else returns null.
+     */
     fun resolveAvatarUrl(raw: String?): String? {
         val trimmed = raw?.trim().orEmpty()
         if (trimmed.isBlank()) return null
-        if (trimmed.startsWith("https://", ignoreCase = true) && isDicebearUrl(trimmed)) {
+        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
             return trimmed
         }
+        if (isSupportedAvatarId(trimmed)) {
+            return builtInAvatarUrl(trimmed)
+        }
         return null
-    }
-
-    fun isDicebearUrl(url: String): Boolean {
-        if (!url.startsWith("https://", ignoreCase = true)) return false
-        val parsed = runCatching { java.net.URI(url) }.getOrNull() ?: return false
-        if (!parsed.host.equals(DICEBEAR_HOST, ignoreCase = true)) return false
-        val segments = parsed.path?.split("/")?.filter { it.isNotBlank() } ?: return false
-        if (segments.size != 3) return false
-        val (version, style, format) = segments
-        if (!version.equals(DICEBEAR_VERSION, ignoreCase = true)) return false
-        if (format.lowercase() !in listOf("svg", "png", "webp", "avif")) return false
-        return DicebearStyle.SUPPORTED_DICEBEAR_STYLES.any { it.apiValue.equals(style, ignoreCase = true) }
     }
 }

@@ -114,6 +114,7 @@ object SupabaseServicesProvider {
     ): HouseholdAddonsCloudSync {
         return HouseholdAddonsCloudSync(
             supabase = accountClient(context.applicationContext),
+            backend = BackendServicesProvider.backendClient(context.applicationContext),
             addonRegistry = addonRegistry,
         )
     }

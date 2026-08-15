@@ -3,18 +3,23 @@
 package com.crispy.tv.accounts
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -49,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -76,7 +82,7 @@ fun AuthRoute(
         onPasswordChange = viewModel::onPasswordChange,
         onNameChange = viewModel::onNameChange,
         onLanguageChange = viewModel::onLanguageChange,
-        onAvatarStyleChange = viewModel::onAvatarStyleChange,
+        onAvatarIdChange = viewModel::onAvatarIdChange,
         onReferralChange = viewModel::onReferralChange,
         onSignIn = viewModel::signIn,
         onSignUp = viewModel::signUp,
@@ -91,7 +97,7 @@ private fun AuthScreen(
     onPasswordChange: (String) -> Unit,
     onNameChange: (String) -> Unit,
     onLanguageChange: (String) -> Unit,
-    onAvatarStyleChange: (String) -> Unit,
+    onAvatarIdChange: (String) -> Unit,
     onReferralChange: (String) -> Unit,
     onSignIn: () -> Unit,
     onSignUp: () -> Unit,
@@ -100,7 +106,6 @@ private fun AuthScreen(
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val languages = remember { com.crispy.tv.domain.account.SUPPORTED_LANGUAGES }
-    val avatarStyles = remember { com.crispy.tv.domain.account.DicebearStyle.SUPPORTED_DICEBEAR_STYLES }
     var languageMenuOpen by remember { mutableStateOf(false) }
     var avatarDialogOpen by remember { mutableStateOf(false) }
 
@@ -271,37 +276,14 @@ private fun AuthScreen(
             confirmButton = {
                 TextButton(onClick = { avatarDialogOpen = false }) { Text("Done") }
             },
-            title = { Text("Pick avatar style") },
-            text = {
-                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-                androidx.compose.foundation.layout.FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    avatarStyles.forEach { style ->
-                        val url = com.crispy.tv.avatar.AvatarUrlResolver.dicebearUrl(style = style, seed = uiState.displayName.ifBlank { uiState.email })
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clickable { onAvatarStyleChange(style.apiValue) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            coil3.compose.AsyncImage(
-                                model = url,
-                                contentDescription = style.apiValue,
-                                modifier = Modifier.size(56.dp),
-                            )
-                        }
-                    }
-                }
-            },
+            title = { Text("Pick avatar") },
+            text = { AvatarPickerGrid(selectedId = uiState.avatarId, onAvatarIdChange = onAvatarIdChange) },
         )
     }
 }
 
 @Composable
-fun OnboardingRoute(
+fun ProfileSelectorRoute(
     onComplete: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -311,18 +293,20 @@ fun OnboardingRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.load() }
-    // Onboarding completes once the user has created a profile. The Trakt/Simkl sync
-    // provider is chosen later from Account Settings.
-    LaunchedEffect(uiState.justSaved) {
-        if (uiState.justSaved) onComplete()
+    // Selecting a profile (tapping it) is what enters the app; adding profiles keeps
+    // you on this hub. The Trakt/Simkl sync provider is configured later in Account Settings.
+    LaunchedEffect(uiState.justSelected) {
+        if (uiState.justSelected) onComplete()
     }
 
-    OnboardingScreen(
+    ProfileSelectorScreen(
         uiState = uiState,
         onBack = onBack,
+        onSelectProfile = viewModel::selectProfile,
         onCreateProfile = viewModel::createProfile,
         onDialogNameChange = viewModel::onNameChange,
         onDialogKidsToggle = viewModel::onKidsToggle,
+        onDialogAvatarIdChange = viewModel::onAvatarIdChange,
         onOpenCreateDialog = viewModel::openCreateDialog,
         onDismissDialog = viewModel::dismissDialog,
     )
@@ -330,12 +314,14 @@ fun OnboardingRoute(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OnboardingScreen(
+private fun ProfileSelectorScreen(
     uiState: ProfileListUiState,
     onBack: () -> Unit,
-    onCreateProfile: (String, Boolean) -> Unit,
+    onSelectProfile: (String) -> Unit,
+    onCreateProfile: (String, Boolean, String) -> Unit,
     onDialogNameChange: (String) -> Unit,
     onDialogKidsToggle: (Boolean) -> Unit,
+    onDialogAvatarIdChange: (String) -> Unit,
     onOpenCreateDialog: () -> Unit,
     onDismissDialog: () -> Unit,
 ) {
@@ -346,7 +332,7 @@ private fun OnboardingScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             StandardTopAppBar(
-                title = "Set up Crispy",
+                title = "Who's watching?",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
@@ -363,42 +349,19 @@ private fun OnboardingScreen(
                 .padding(horizontal = pageHorizontalPadding),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Create a profile to finish setup.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             uiState.error?.let { error ->
                 Text(text = error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             }
-            if (uiState.profiles.isEmpty()) {
-                OutlinedButton(
-                    onClick = onOpenCreateDialog,
-                    enabled = !uiState.isBusy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Create profile")
-                }
-            } else {
-                uiState.profiles.forEach { profile ->
-                    ListItem(
-                        headlineContent = { Text(text = profile.name) },
-                        supportingContent = if (profile.isKids) ({ Text(text = "Kids") }) else null,
-                    )
-                }
-                OutlinedButton(
-                    onClick = onOpenCreateDialog,
-                    enabled = !uiState.isBusy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Add another profile")
-                }
-            }
-            if (uiState.isBusy) {
+            if (uiState.isBusy && uiState.profiles.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     LoadingIndicator()
                 }
             }
+            ProfileGrid(
+                profiles = uiState.profiles,
+                onSelectProfile = onSelectProfile,
+                onAddProfile = onOpenCreateDialog,
+            )
         }
     }
 
@@ -406,7 +369,10 @@ private fun OnboardingScreen(
         AlertDialog(
             onDismissRequest = onDismissDialog,
             confirmButton = {
-                TextButton(onClick = { onCreateProfile(uiState.dialogName, uiState.dialogIsKids) }) {
+                TextButton(
+                    onClick = { onCreateProfile(uiState.dialogName, uiState.dialogIsKids, uiState.dialogAvatarId) },
+                    enabled = uiState.dialogName.isNotBlank(),
+                ) {
                     Text("Create")
                 }
             },
@@ -415,7 +381,7 @@ private fun OnboardingScreen(
             },
             title = { Text("New profile") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = uiState.dialogName,
                         onValueChange = onDialogNameChange,
@@ -430,11 +396,96 @@ private fun OnboardingScreen(
                         Text(text = "Kids profile")
                         Switch(checked = uiState.dialogIsKids, onCheckedChange = onDialogKidsToggle)
                     }
+                    AvatarPickerGrid(selectedId = uiState.dialogAvatarId, onAvatarIdChange = onDialogAvatarIdChange)
                     uiState.dialogError?.let { error ->
                         Text(text = error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                 }
             },
+        )
+    }
+}
+
+@Composable
+private fun ProfileGrid(
+    profiles: List<ProfileListItem>,
+    onSelectProfile: (String) -> Unit,
+    onAddProfile: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        item {
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                profiles.forEach { profile ->
+                    ProfileCard(
+                        name = profile.name,
+                        avatarUrl = profile.avatarUrl,
+                        isKids = profile.isKids,
+                        onClick = { onSelectProfile(profile.id) },
+                    )
+                }
+                ProfileAddCard(onClick = onAddProfile)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileCard(name: String, avatarUrl: String?, isKids: Boolean, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .width(96.dp)
+            .clickable(onClick = onClick)
+            .padding(4.dp),
+    ) {
+        ProfileAvatar(url = avatarUrl, sizeDp = 88)
+        Text(
+            text = name,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (isKids) {
+            Text(
+                text = "Kids",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileAddCard(onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .width(96.dp)
+            .clickable(onClick = onClick)
+            .padding(4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .clip(CircleShape)
+                .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.Add, contentDescription = "Add profile", modifier = Modifier.size(40.dp))
+        }
+        Text(
+            text = "Add profile",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -458,6 +509,7 @@ fun ProfileManagementRoute(
         onCreateProfile = viewModel::createProfile,
         onDialogNameChange = viewModel::onNameChange,
         onDialogKidsToggle = viewModel::onKidsToggle,
+        onDialogAvatarIdChange = viewModel::onAvatarIdChange,
         onOpenCreateDialog = viewModel::openCreateDialog,
         onDismissDialog = viewModel::dismissDialog,
     )
@@ -469,9 +521,10 @@ private fun ProfileManagementScreen(
     uiState: ProfileListUiState,
     onBack: () -> Unit,
     onOpenAccountSettings: () -> Unit,
-    onCreateProfile: (String, Boolean) -> Unit,
+    onCreateProfile: (String, Boolean, String) -> Unit,
     onDialogNameChange: (String) -> Unit,
     onDialogKidsToggle: (Boolean) -> Unit,
+    onDialogAvatarIdChange: (String) -> Unit,
     onOpenCreateDialog: () -> Unit,
     onDismissDialog: () -> Unit,
 ) {
@@ -535,7 +588,10 @@ private fun ProfileManagementScreen(
         AlertDialog(
             onDismissRequest = onDismissDialog,
             confirmButton = {
-                TextButton(onClick = { onCreateProfile(uiState.dialogName, uiState.dialogIsKids) }) {
+                TextButton(
+                    onClick = { onCreateProfile(uiState.dialogName, uiState.dialogIsKids, uiState.dialogAvatarId) },
+                    enabled = uiState.dialogName.isNotBlank(),
+                ) {
                     Text("Create")
                 }
             },
@@ -544,7 +600,7 @@ private fun ProfileManagementScreen(
             },
             title = { Text("New profile") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = uiState.dialogName,
                         onValueChange = onDialogNameChange,
@@ -559,6 +615,7 @@ private fun ProfileManagementScreen(
                         Text(text = "Kids profile")
                         Switch(checked = uiState.dialogIsKids, onCheckedChange = onDialogKidsToggle)
                     }
+                    AvatarPickerGrid(selectedId = uiState.dialogAvatarId, onAvatarIdChange = onDialogAvatarIdChange)
                     uiState.dialogError?.let { error ->
                         Text(text = error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
@@ -592,6 +649,52 @@ private fun AvatarImage(url: String, contentDescription: String) {
             .fillMaxWidth()
             .padding(Dimensions.ListItemPadding),
     )
+}
+
+@Composable
+private fun ProfileAvatar(url: String?, sizeDp: Int, contentDescription: String? = null) {
+    val size = sizeDp.dp
+    if (url != null) {
+        coil3.compose.AsyncImage(
+            model = url,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(size).clip(CircleShape),
+        )
+    } else {
+        Box(modifier = Modifier.size(size).clip(CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.AccountCircle, contentDescription = contentDescription, modifier = Modifier.size(size))
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AvatarPickerGrid(selectedId: String, onAvatarIdChange: (String) -> Unit) {
+    val avatarIds = remember { com.crispy.tv.domain.account.SUPPORTED_AVATAR_IDS }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        avatarIds.forEach { id ->
+            val url = com.crispy.tv.avatar.AvatarUrlResolver.builtInAvatarUrl(id)
+            val selected = id == selectedId
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
+                    .clickable { onAvatarIdChange(id) },
+                contentAlignment = Alignment.Center,
+            ) {
+                coil3.compose.AsyncImage(
+                    model = url,
+                    contentDescription = id,
+                    modifier = Modifier.size(56.dp).clip(CircleShape),
+                )
+            }
+        }
+    }
 }
 
 @Composable

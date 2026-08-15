@@ -48,7 +48,7 @@ public func validateSignupProfile(
 
     let trimmedAvatar = rawAvatarUrl?.trimmingCharacters(in: .whitespacesAndNewlines)
     let normalizedAvatarUrl = trimmedAvatar?.isEmpty == false ? trimmedAvatar! : nil
-    if let url = normalizedAvatarUrl, !isValidSignupAvatarUrl(url) {
+    if let id = normalizedAvatarUrl, !isSupportedAvatarId(id) {
         missing.append("avatarUrl")
     }
 
@@ -62,18 +62,4 @@ public func validateSignupProfile(
         normalizedRegion: normalizedRegion,
         normalizedAvatarUrl: avatarResult
     )
-}
-
-public func isValidSignupAvatarUrl(_ url: String) -> Bool {
-    guard url.lowercased().hasPrefix("https://") else { return false }
-    guard let parsed = URL(string: url) else { return false }
-    guard let host = parsed.host, host.lowercased() == "api.dicebear.com" else { return false }
-    let segments = parsed.path.split(separator: "/").filter { !$0.isEmpty }
-    guard segments.count == 3 else { return false }
-    let version = String(segments[0])
-    let style = String(segments[1])
-    let format = String(segments[2]).lowercased()
-    guard version.lowercased() == "v9" else { return false }
-    guard ["svg", "png", "webp", "avif"].contains(format) else { return false }
-    return SUPPORTED_DICEBEAR_STYLES.contains { $0.apiValue.lowercased() == style.lowercased() }
 }

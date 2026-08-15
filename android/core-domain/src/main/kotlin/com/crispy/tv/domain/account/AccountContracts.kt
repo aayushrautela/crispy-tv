@@ -7,49 +7,29 @@ object AccountContracts {
 
     val SUPPORTED_SYNC_PROVIDERS = setOf("trakt", "simkl")
 
-    const val DICEBEAR_HOST = "api.dicebear.com"
-    const val DICEBEAR_VERSION = "v9"
-    val DICEBEAR_FORMATS = setOf("svg", "png", "webp", "avif")
+    const val AVATAR_CATALOG_PATH = "/v1/avatars"
+    const val AVATAR_COUNT = 20
 }
 
-enum class DicebearStyle(val apiValue: String) {
-    ADVENTURER("adventurer"),
-    ADVENTURER_NEUTRAL("adventurer-neutral"),
-    AVATAAARS("avataaars"),
-    AVATAAARS_NEUTRAL("avataaars-neutral"),
-    BIG_EARS("big-ears"),
-    BIG_EARS_NEUTRAL("big-ears-neutral"),
-    BIG_SMILE("big-smile"),
-    BOTTTS("bottts"),
-    BOTTTS_NEUTRAL("bottts-neutral"),
-    CROODLES("croodles"),
-    CROODLES_NEUTRAL("croodles-neutral"),
-    DYLAN("dylan"),
-    FUN_EMOJI("fun-emoji"),
-    GLASS("glass"),
-    ICONS("icons"),
-    IDENTICON("identicon"),
-    INITIALS("initials"),
-    LORELEI("lorelei"),
-    LORELEI_NEUTRAL("lorelei-neutral"),
-    MICAH("micah"),
-    MINIAVS("miniavs"),
-    NOTIONISTS("notionists"),
-    NOTIONISTS_NEUTRAL("notionists-neutral"),
-    OPEN_PEEPS("open-peeps"),
-    PERSONAS("personas"),
-    PIXEL_ART("pixel-art"),
-    PIXEL_ART_NEUTRAL("pixel-art-neutral"),
-    RINGS("rings"),
-    SHAPES("shapes"),
-    THUMBS("thumbs"),
-    ;
+/**
+ * Built-in avatar catalog. Profile avatars are selected from this fixed set and
+ * stored as an id (e.g. "avatar_03"); the PNG is served at
+ * GET /v1/avatars/:id. Avatars are never remote URLs — see server
+ * src/modules/profiles/avatars.ts.
+ */
+val SUPPORTED_AVATAR_IDS: List<String> =
+    (1..AVATAR_COUNT).map { "avatar_%02d".format(it) }
 
-    companion object {
-        val SUPPORTED_DICEBEAR_STYLES: List<DicebearStyle> = entries
-        fun fromApiValue(value: String): DicebearStyle? =
-            entries.firstOrNull { it.apiValue.equals(value, ignoreCase = true) }
-    }
+fun isSupportedAvatarId(value: String?): Boolean {
+    if (value == null) return false
+    val candidate = value.trim()
+    return candidate.isNotEmpty() && SUPPORTED_AVATAR_IDS.contains(candidate)
+}
+
+fun builtInAvatarUrl(baseUrl: String, id: String): String {
+    val trimmedBase = baseUrl.trim().trimEnd('/')
+    val trimmedId = id.trim().trimStart('/')
+    return "$trimmedBase$AVATAR_CATALOG_PATH/$trimmedId"
 }
 
 data class SupportedLanguage(
@@ -200,6 +180,7 @@ fun validateSignupMetadata(metadata: SignupMetadata): SignupValidation {
     if (metadata.name.isBlank()) missing.add("name")
     if (normalizeLanguageCode(metadata.interfaceLanguage) == null) missing.add("interfaceLanguage")
     if (metadata.region != null && normalizeCountryCode(metadata.region) == null) missing.add("region")
+    if (!isSupportedAvatarId(metadata.avatarUrl)) missing.add("avatarUrl")
     return SignupValidation(
         isComplete = missing.isEmpty(),
         missing = missing.toList(),
@@ -233,7 +214,7 @@ fun validateSignupProfile(
 
     val trimmedAvatar = rawAvatarUrl?.trim()?.ifBlank { null }
     var avatarUrl: String? = trimmedAvatar
-    if (trimmedAvatar != null && !isValidSignupAvatarUrl(trimmedAvatar)) {
+    if (trimmedAvatar != null && !isSupportedAvatarId(trimmedAvatar)) {
         missing.add("avatarUrl")
         avatarUrl = null
     }
@@ -246,16 +227,4 @@ fun validateSignupProfile(
         normalizedRegion = region,
         normalizedAvatarUrl = avatarUrl,
     )
-}
-
-fun isValidSignupAvatarUrl(url: String): Boolean {
-    if (!url.startsWith("https://", ignoreCase = true)) return false
-    val parsed = runCatching { java.net.URI(url) }.getOrNull() ?: return false
-    if (!parsed.host.equals(AccountContracts.DICEBEAR_HOST, ignoreCase = true)) return false
-    val segments = parsed.path?.split("/")?.filter { it.isNotBlank() } ?: return false
-    if (segments.size != 3) return false
-    val (version, style, format) = segments
-    if (!version.equals(AccountContracts.DICEBEAR_VERSION, ignoreCase = true)) return false
-    if (format.lowercase() !in AccountContracts.DICEBEAR_FORMATS) return false
-    return DicebearStyle.SUPPORTED_DICEBEAR_STYLES.any { it.apiValue.equals(style, ignoreCase = true) }
 }

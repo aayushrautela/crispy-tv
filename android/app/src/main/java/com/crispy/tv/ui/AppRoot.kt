@@ -24,7 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import com.crispy.tv.accounts.AppBootstrapViewModel
 import com.crispy.tv.accounts.AuthRoute
 import com.crispy.tv.accounts.BootstrapState
-import com.crispy.tv.accounts.OnboardingRoute
+import com.crispy.tv.accounts.ProfileSelectorRoute
 import com.crispy.tv.ui.edge_to_edge.LocalBottomBarOverlayPadding
 import com.crispy.tv.ui.navigation.AppNavHost
 import com.crispy.tv.ui.navigation.AppRoutes
@@ -51,10 +51,10 @@ fun AppRoot() {
         BootstrapState.NeedsAuth -> {
             AuthRoute(onSignedIn = { bootstrapViewModel.refresh() })
         }
-        BootstrapState.NeedsOnboarding -> {
-            OnboardingRoute(
+        BootstrapState.NeedsProfileSelection -> {
+            ProfileSelectorRoute(
                 onComplete = { bootstrapViewModel.refresh() },
-                onBack = { bootstrapViewModel.refresh() },
+                onBack = { bootstrapViewModel.onSignedOut() },
             )
         }
         BootstrapState.Ready -> {

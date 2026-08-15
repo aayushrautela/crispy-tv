@@ -36,16 +36,10 @@ class BackendContextResolver(
                 return@withLock BackendContext(accessToken = it.accessToken, profileId = it.profileId)
             }
 
-            var profileId = activeProfileStore.getActiveProfileId(userId).orEmpty().trim()
-            if (profileId.isBlank()) {
-                profileId = runCatching {
-                    backendClient.getMe(accessToken).profiles.firstOrNull()?.id.orEmpty().trim()
-                }.getOrDefault("")
-                if (profileId.isNotBlank()) {
-                    activeProfileStore.setActiveProfileId(userId, profileId)
-                }
-            }
-
+            // The active profile is chosen explicitly by the user on the profile selector
+            // (see ProfileSelectorRoute). We never auto-select a profile here, so a fresh
+            // account lands on the selector instead of silently entering the first profile.
+            val profileId = activeProfileStore.getActiveProfileId(userId).orEmpty().trim()
             if (profileId.isBlank()) {
                 cachedContext = null
                 return@withLock null
