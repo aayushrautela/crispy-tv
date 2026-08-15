@@ -74,6 +74,8 @@ object SupabaseServicesProvider {
             appContext = context.applicationContext,
             supabase = accountClient(context.applicationContext),
             backendContextResolver = BackendContextResolverProvider.get(context.applicationContext),
+            backendClient = BackendServicesProvider.backendClient(context.applicationContext),
+            activeProfileStore = activeProfileStore(context.applicationContext),
         )
     }
 

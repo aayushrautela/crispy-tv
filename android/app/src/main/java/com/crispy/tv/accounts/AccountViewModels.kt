@@ -7,8 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.avatar.AvatarUrlResolver
 import com.crispy.tv.domain.account.normalizeLanguageCode
 import com.crispy.tv.domain.account.validateProfileName
-import com.crispy.tv.domain.account.validateSignupMetadata
-import com.crispy.tv.domain.account.SignupMetadata
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,8 +20,8 @@ data class AuthUiState(
     val displayName: String = "",
     val interfaceLanguage: String = "en",
     val avatarId: String = "avatar_01",
-    val referralCode: String = "",
     val error: String? = null,
+    val info: String? = null,
     val signedIn: Boolean = false,
 ) {
     val avatarUrl: String
@@ -32,6 +30,7 @@ data class AuthUiState(
 
 class AuthViewModel internal constructor(
     private val supabase: SupabaseAccountClient,
+    private val bootstrapRepository: AccountBootstrapRepository,
 ) : ViewModel() {
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {
@@ -40,7 +39,10 @@ class AuthViewModel internal constructor(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
-                        return AuthViewModel(supabase = SupabaseServicesProvider.accountClient(appContext)) as T
+                        return AuthViewModel(
+                            supabase = SupabaseServicesProvider.accountClient(appContext),
+                            bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
+                        ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
@@ -56,7 +58,6 @@ class AuthViewModel internal constructor(
     fun onNameChange(value: String) = _state.update { it.copy(displayName = value, error = null) }
     fun onLanguageChange(value: String) = _state.update { it.copy(interfaceLanguage = value, error = null) }
     fun onAvatarIdChange(value: String) = _state.update { it.copy(avatarId = value) }
-    fun onReferralChange(value: String) = _state.update { it.copy(referralCode = value, error = null) }
 
     fun signIn() {
         val email = _state.value.email.trim()
@@ -78,31 +79,24 @@ class AuthViewModel internal constructor(
             _state.update { it.copy(error = "Enter email and password.") }
             return
         }
-        val name = _state.value.displayName.trim().ifBlank { email.substringBefore('@') }
-        val language = normalizeLanguageCode(_state.value.interfaceLanguage) ?: "en"
-        val avatarId = _state.value.avatarId
-        val referralCode = _state.value.referralCode.trim().ifBlank { null }
-        val metadata = SignupMetadata(
-            name = name,
-            interfaceLanguage = language,
-            region = null,
-            avatarUrl = avatarId,
-            referralCode = referralCode,
-        )
-        val validation = validateSignupMetadata(metadata)
-        if (!validation.isComplete) {
-            _state.update { it.copy(error = "Missing: ${validation.missing.joinToString()}") }
-            return
+        val rawName = _state.value.displayName.trim().ifBlank { email.substringBefore('@') }
+        val name = when (val result = validateProfileName(rawName)) {
+            is com.crispy.tv.domain.account.ProfileNameResult.Valid -> result.normalized
+            is com.crispy.tv.domain.account.ProfileNameResult.Invalid -> {
+                _state.update { it.copy(error = result.reason) }
+                return
+            }
         }
-        val metadataMap = mapOf(
-            "full_name" to metadata.name,
-            "interfaceLanguage" to metadata.interfaceLanguage,
-            "avatarUrl" to metadata.avatarUrl,
-            "referralCode" to metadata.referralCode,
-        )
+        val interfaceLanguage = normalizeLanguageCode(_state.value.interfaceLanguage) ?: "en"
+        val avatarId = _state.value.avatarId
         runAccountCall {
-            supabase.signUpWithEmail(email, password, metadataMap)
-            _state.update { it.copy(signedIn = true, error = null) }
+            val signUpResult = supabase.signUpWithEmail(email, password)
+            if (signUpResult.session != null) {
+                bootstrapRepository.bootstrapPrimaryProfile(name, interfaceLanguage, avatarId, region = null)
+                _state.update { it.copy(signedIn = true, error = null, info = null) }
+            } else {
+                _state.update { it.copy(signedIn = false, info = signUpResult.message, error = null) }
+            }
         }
     }
 
@@ -151,11 +145,11 @@ class ProfileListViewModel internal constructor(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     if (modelClass.isAssignableFrom(ProfileListViewModel::class.java)) {
                         @Suppress("UNCHECKED_CAST")
-                        return ProfileListViewModel(
-                            bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
-                            profileRepository = SupabaseServicesProvider.profileRepository(appContext),
-                            activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
-                        ) as T
+                    return ProfileListViewModel(
+                        bootstrapRepository = SupabaseServicesProvider.bootstrapRepository(appContext),
+                        profileRepository = SupabaseServicesProvider.profileRepository(appContext),
+                        activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
+                    ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
@@ -252,16 +246,9 @@ class ProfileListViewModel internal constructor(
         _state.update { it.copy(isBusy = true, error = null) }
         viewModelScope.launch {
             runCatching {
-                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
-                val created = profileRepository.createProfile(
-                    accessToken = session.accessToken,
-                    name = normalized,
-                    isKids = false,
-                    avatarKey = avatarKey,
-                    interfaceLanguage = interfaceLanguage,
-                )
-                session.userId?.let { userId -> activeProfileStore.setActiveProfileId(userId, created.id) }
-                    ?: throw IllegalStateException("Missing user id.")
+                val session = bootstrapRepository.bootstrap().session
+                    ?: throw IllegalStateException("Not signed in.")
+                bootstrapRepository.bootstrapPrimaryProfile(normalized, interfaceLanguage, avatarKey, region = null)
             }.onSuccess {
                 _state.update { it.copy(isBusy = false, justSelected = true) }
             }.onFailure { error ->

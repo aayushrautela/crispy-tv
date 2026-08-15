@@ -64,6 +64,32 @@ internal suspend fun CrispyBackendClient.createProfileApi(
     return parseProfile(profileJson)
 }
 
+internal suspend fun CrispyBackendClient.bootstrapAccountApi(
+    accessToken: String,
+    name: String,
+    interfaceLanguage: String,
+    avatarUrl: String,
+    region: String? = null,
+): Profile {
+    checkConfigured()
+    val payload = JSONObject()
+        .put("name", name.trim())
+        .put("interfaceLanguage", interfaceLanguage.trim())
+        .put("avatarUrl", avatarUrl.trim())
+        .apply { if (!region.isNullOrBlank()) put("region", region.trim()) }
+        .toString()
+    val response = httpClient.postJson(
+        url = "$baseUrl/v1/account/bootstrap".toHttpUrl(),
+        jsonBody = payload,
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    val profileJson = json.optJSONObject("profile")
+        ?: throw IllegalStateException("Backend did not return a created profile.")
+    return parseProfile(profileJson)
+}
+
 internal suspend fun CrispyBackendClient.listImportConnectionsApi(
     accessToken: String,
     profileId: String,

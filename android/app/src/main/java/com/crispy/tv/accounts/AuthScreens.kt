@@ -96,7 +96,6 @@ fun AuthRoute(
         onNameChange = viewModel::onNameChange,
         onLanguageChange = viewModel::onLanguageChange,
         onAvatarIdChange = viewModel::onAvatarIdChange,
-        onReferralChange = viewModel::onReferralChange,
         onSignIn = viewModel::signIn,
         onSignUp = viewModel::signUp,
     )
@@ -111,11 +110,10 @@ private fun AuthScreen(
     onNameChange: (String) -> Unit,
     onLanguageChange: (String) -> Unit,
     onAvatarIdChange: (String) -> Unit,
-    onReferralChange: (String) -> Unit,
     onSignIn: () -> Unit,
     onSignUp: () -> Unit,
 ) {
-    var mode by remember { mutableStateOf(0) }
+    var mode by remember { mutableStateOf(1) }
     val scrollBehavior = appBarScrollBehavior()
     val pageHorizontalPadding = responsivePageHorizontalPadding()
     val languages = remember { com.crispy.tv.domain.account.SUPPORTED_LANGUAGES }
@@ -147,6 +145,16 @@ private fun AuthScreen(
                         text = uiState.error,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            if (uiState.info != null) {
+                item {
+                    Text(
+                        text = uiState.info,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -231,16 +239,6 @@ private fun AuthScreen(
                         }
                     }
                 }
-            }
-
-            item {
-                OutlinedTextField(
-                    value = uiState.referralCode,
-                    onValueChange = onReferralChange,
-                    label = { Text("Referral code (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
 
             if (mode == 0) {

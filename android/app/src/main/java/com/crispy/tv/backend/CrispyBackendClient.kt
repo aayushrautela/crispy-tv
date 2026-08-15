@@ -624,6 +624,22 @@ class CrispyBackendClient(
         )
     }
 
+    suspend fun bootstrapAccount(
+        accessToken: String,
+        name: String,
+        interfaceLanguage: String,
+        avatarUrl: String,
+        region: String? = null,
+    ): Profile {
+        return bootstrapAccountApi(
+            accessToken = accessToken,
+            name = name,
+            interfaceLanguage = interfaceLanguage,
+            avatarUrl = avatarUrl,
+            region = region,
+        )
+    }
+
     suspend fun listImportConnections(accessToken: String, profileId: String): ProviderAccountsResponse {
         return listImportConnectionsApi(accessToken, profileId)
     }

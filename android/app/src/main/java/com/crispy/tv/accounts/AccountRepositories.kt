@@ -3,6 +3,7 @@ package com.crispy.tv.accounts
 import android.content.Context
 import com.crispy.tv.accounts.SupabaseAccountClient.Session
 import com.crispy.tv.backend.BackendContextResolver
+import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.images.clearImageCache
 
 data class BootstrapResult(
@@ -16,6 +17,8 @@ class AccountBootstrapRepository(
     private val appContext: Context,
     private val supabase: SupabaseAccountClient,
     private val backendContextResolver: BackendContextResolver,
+    private val backendClient: CrispyBackendClient,
+    private val activeProfileStore: ActiveProfileStore,
 ) {
     suspend fun bootstrap(): BootstrapResult {
         val session = supabase.ensureValidSession()
@@ -32,6 +35,26 @@ class AccountBootstrapRepository(
             onboardingComplete = onboardingComplete,
             session = session,
         )
+    }
+
+    /**
+     * Creates the account's first (primary/admin) profile via POST /v1/account/bootstrap and
+     * marks it active. Idempotent server-side, so retrying is safe. Used both by the signup
+     * wizard (right after Supabase sign-up) and by the "Finish setting up" gate (sign-in of an
+     * account that has no profile yet).
+     */
+    suspend fun bootstrapPrimaryProfile(
+        name: String,
+        interfaceLanguage: String,
+        avatarUrl: String,
+        region: String? = null,
+    ): CrispyBackendClient.Profile {
+        val session = supabase.ensureValidSession() ?: throw IllegalStateException("Not signed in.")
+        val profile = backendClient.bootstrapAccount(session.accessToken, name, interfaceLanguage, avatarUrl, region)
+        session.userId?.takeIf { it.isNotBlank() }?.let { userId ->
+            activeProfileStore.setActiveProfileId(userId, profile.id)
+        }
+        return profile
     }
 
     suspend fun signOut() {
