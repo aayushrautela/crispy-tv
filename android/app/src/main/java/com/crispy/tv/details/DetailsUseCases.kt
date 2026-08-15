@@ -68,7 +68,7 @@ internal data class DetailsMutationResult(
 internal class DetailsUseCases(
     private val sessionRepository: SessionRepository,
     private val catalogRepository: CatalogRepository,
-    private val userMediaRepository: UserMediaRepository,
+    internal val userMediaRepository: UserMediaRepository,
     private val aiRepository: AiInsightsRepository,
     private val addonStreamsService: AddonStreamsService,
     private val backendContextResolver: BackendContextResolver,

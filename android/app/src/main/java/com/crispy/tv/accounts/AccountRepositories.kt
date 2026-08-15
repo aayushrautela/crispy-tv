@@ -4,6 +4,8 @@ import android.content.Context
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.images.clearImageCache
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class BootstrapResult(
     val signedIn: Boolean,
