@@ -7,9 +7,16 @@ import com.crispy.tv.streams.AddonStream
 
 internal fun AddonStream.toPlaybackSource(): PlaybackSource? {
     val playbackUrl = playbackUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val externalSubtitles =
+        subtitles.mapNotNull { subtitle ->
+            subtitle.url.trim().takeIf { it.isNotBlank() }?.let { url ->
+                PlaybackExternalSubtitle(url = url, language = subtitle.lang, name = subtitle.name)
+            }
+        }
     return PlaybackSource(
         url = playbackUrl,
         headers = requestHeaders,
+        externalSubtitles = externalSubtitles,
     )
 }
 

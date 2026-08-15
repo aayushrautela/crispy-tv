@@ -38,6 +38,7 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import com.crispy.tv.nativeengine.playback.NativeTrack
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
+import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import com.crispy.tv.nativeengine.playback.PlaybackController
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
@@ -48,6 +49,7 @@ import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonStreamsService
+import com.crispy.tv.streams.AddonSubtitle
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
 import com.crispy.tv.streams.StreamSelectorUiState
@@ -107,6 +109,11 @@ data class PlayerUiState(
     val subtitleTracks: List<NativeTrack> = emptyList(),
     val selectedSubtitleTrackId: String? = null,
     val subtitleDelayMs: Int = 0,
+    val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
+    val addonSubtitles: List<AddonSubtitle> = emptyList(),
+    val addonSubtitlesLoading: Boolean = false,
+    val addonSubtitlesError: String? = null,
+    val selectedAddonSubtitleId: String? = null,
 )
 
 class PlayerSessionViewModel(
@@ -131,6 +138,9 @@ class PlayerSessionViewModel(
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         PlaybackSettingsRepositoryProvider.get(this.appContext)
+    private val subtitleRepository: SubtitleRepository = SubtitleRepository(addonStreamsService)
+    private var activeSubtitleLookupId: String? = null
+    private var activeSubtitleMediaType: MetadataLabMediaType? = null
     private val mediaSessionManager =
         PlayerMediaSessionManager(
             context = this.appContext,
@@ -180,6 +190,7 @@ class PlayerSessionViewModel(
                 seasonEpisodes = initialSeasonEpisodes,
                 currentEpisodeId = launchSnapshot?.currentEpisodeId,
                 currentPlaybackUrl = playbackSource.url,
+                resizeMode = playbackSettingsRepository.settings.value.resizeMode,
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -199,6 +210,21 @@ class PlayerSessionViewModel(
         }
         viewModelScope.launch {
             pollPlaybackState()
+        }
+        viewModelScope.launch {
+            subtitleRepository.addonSubtitles.collect { subtitles ->
+                _uiState.update { it.copy(addonSubtitles = subtitles) }
+            }
+        }
+        viewModelScope.launch {
+            subtitleRepository.isLoading.collect { loading ->
+                _uiState.update { it.copy(addonSubtitlesLoading = loading) }
+            }
+        }
+        viewModelScope.launch {
+            subtitleRepository.error.collect { error ->
+                _uiState.update { it.copy(addonSubtitlesError = error) }
+            }
         }
     }
 
@@ -256,6 +282,15 @@ class PlayerSessionViewModel(
         publishMediaSessionFromUiState()
     }
 
+    fun setResizeMode(mode: PlayerResizeMode) {
+        playbackSettingsRepository.setResizeMode(mode)
+        _uiState.update { it.copy(resizeMode = mode) }
+    }
+
+    fun applyResizeMode(mode: PlayerResizeMode) {
+        playbackController.applyResizeMode(mode)
+    }
+
     fun selectAudioTrack(trackId: String?) {
         playbackController.selectAudioTrack(trackId)
         trackId?.let { playbackSettingsRepository.setDefaultAudioLanguage(languageFromTrack(trackId) ?: return@let) }
@@ -280,6 +315,27 @@ class PlayerSessionViewModel(
         _uiState.update { it.copy(subtitleDelayMs = delayMs) }
     }
 
+    fun fetchAddonSubtitles() {
+        val lookupId = activeSubtitleLookupId ?: return
+        val mediaType = activeSubtitleMediaType ?: return
+        subtitleRepository.fetchAddonSubtitles(mediaType, lookupId)
+    }
+
+    fun selectAddonSubtitle(subtitle: AddonSubtitle) {
+        clearSelectedAddonSubtitle()
+        playbackController.setExternalSubtitle(
+            PlaybackExternalSubtitle(url = subtitle.url, language = subtitle.language, name = subtitle.display),
+        )
+        _uiState.update { it.copy(selectedAddonSubtitleId = subtitle.id) }
+        syncPlaybackSnapshot(playbackController.snapshot())
+    }
+
+    fun clearSelectedAddonSubtitle() {
+        if (uiState.value.selectedAddonSubtitleId != null) {
+            _uiState.update { it.copy(selectedAddonSubtitleId = null) }
+        }
+    }
+
     private fun languageFromTrack(trackId: String): String? {
         val audio = uiState.value.audioTracks.firstOrNull { it.id == trackId }
         val sub = uiState.value.subtitleTracks.firstOrNull { it.id == trackId }
@@ -302,6 +358,7 @@ class PlayerSessionViewModel(
                 streamSelector = state.streamSelector.copy(visible = false),
             )
         }
+        fetchAddonSubtitles()
     }
 
     fun closeActiveSurface() {
@@ -477,6 +534,8 @@ class PlayerSessionViewModel(
                 ).lookupId
         val parsedLookupId = com.crispy.tv.playback.parseLookupId(lookupId)
         val nextMediaType = state.streamSelector.mediaType ?: activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE
+        activeSubtitleLookupId = lookupId
+        activeSubtitleMediaType = nextMediaType
         val nextEpisode =
             selectedEpisode
         val isEpisodic = nextMediaType != MetadataLabMediaType.MOVIE

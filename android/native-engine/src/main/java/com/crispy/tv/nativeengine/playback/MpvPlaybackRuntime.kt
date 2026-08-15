@@ -370,6 +370,26 @@ internal class MpvPlaybackRuntime(
         runCatching { mpv?.setPropertyDouble("sub-delay", delayMs / 1000.0) }
     }
 
+    fun applyResizeMode(mode: PlayerResizeMode) {
+        val mpv = mpv ?: return
+        runCatching {
+            when (mode) {
+                PlayerResizeMode.Fit -> {
+                    mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
+                PlayerResizeMode.Fill -> {
+                    mpv.setPropertyDouble("panscan", 1.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
+                PlayerResizeMode.Zoom -> {
+                    mpv.setPropertyDouble("panscan", 0.5)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
+            }
+        }
+    }
+
     private fun refreshTrackLists() {
         val mpv = mpv ?: return
         audioTracks = readTrackList(mpv, "audio")

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -121,6 +123,8 @@ internal fun PlayerBottomControls(
     onOpenTracks: () -> Unit,
     onCycleSpeed: () -> Unit,
     onToggleMute: () -> Unit,
+    onCycleResizeMode: () -> Unit,
+    resizeModeLabel: String,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -188,6 +192,29 @@ internal fun PlayerBottomControls(
                         contentDescription = "Streams",
                         onClick = onOpenStreams,
                     )
+                    PlayerPill(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier =
+                                Modifier
+                                    .clickable(onClick = onCycleResizeMode)
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Icon(
+                                painter = painterResource(com.crispy.tv.R.drawable.ic_player_aspect_ratio),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                text = resizeModeLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
                     PlayerActionButton(
                         icon = Icons.Outlined.Info,
                         contentDescription = "Info",

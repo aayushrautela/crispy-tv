@@ -32,6 +32,7 @@ import com.crispy.tv.details.detailsPaletteFromScheme
 import com.crispy.tv.details.rememberDetailsColorScheme
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativeVideoLayout
+import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import kotlin.math.roundToInt
 
 @Composable
@@ -138,6 +139,12 @@ fun PlayerRoute(
         )
     }
 
+    LaunchedEffect(uiState.resizeMode) {
+        if (uiState.activeEngine == NativePlaybackEngine.MPV) {
+            session.applyResizeMode(uiState.resizeMode)
+        }
+    }
+
     Box(
         modifier =
             Modifier
@@ -157,6 +164,7 @@ fun PlayerRoute(
                     },
                     update = { playerView ->
                         session.bindExoPlayerView(playerView)
+                        playerView.resizeMode = uiState.resizeMode.toExoResizeMode()
                     },
                 )
             }
@@ -198,12 +206,26 @@ fun PlayerRoute(
                 onRetryPlayback = session::retryPlayback,
                 onSelectAudioTrack = session::selectAudioTrack,
                 onSelectSubtitleTrack = session::selectSubtitleTrack,
+                onFetchAddonSubtitles = session::fetchAddonSubtitles,
+                onSelectAddonSubtitle = session::selectAddonSubtitle,
                 onCycleSpeed = {
                     val next = PLAYBACK_SPEED_CYCLE.firstOrNull { it > uiState.playbackSpeed + 0.01f }
                         ?: PLAYBACK_SPEED_CYCLE.first()
                     session.setPlaybackSpeed(next)
                 },
                 onToggleMute = { session.setMuted(!uiState.muted) },
+                onCycleResizeMode = {
+                    val next = uiState.resizeMode.next()
+                    session.setResizeMode(next)
+                    gestureFeedback.show(
+                        scope,
+                        GestureFeedbackMessage(
+                            text = next.label,
+                            icon = GestureIcons.Resize,
+                        ),
+                        holdMs = 900,
+                    )
+                },
                 onDoubleTapSeek = { targetMs ->
                     session.seekTo(targetMs)
                     gestureFeedback.show(
@@ -233,5 +255,12 @@ private fun NativeVideoLayout?.toPictureInPictureAspectRatio(): Rational? {
         null
     }
 }
+
+private fun PlayerResizeMode.toExoResizeMode(): Int =
+    when (this) {
+        PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+    }
 
 private const val TAG = "PlayerRoute"

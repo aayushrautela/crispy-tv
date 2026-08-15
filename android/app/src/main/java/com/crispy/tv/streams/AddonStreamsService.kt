@@ -36,10 +36,28 @@ data class AddonStream(
     val requestHeaders: Map<String, String> = emptyMap(),
     val cached: Boolean,
     val stableKey: String,
+    val subtitles: List<StreamSubtitle> = emptyList(),
 ) {
     val playbackUrl: String?
         get() = url ?: externalUrl
 }
+
+@Immutable
+data class StreamSubtitle(
+    val url: String,
+    val lang: String?,
+    val name: String?,
+)
+
+@Immutable
+data class AddonSubtitle(
+    val id: String,
+    val url: String,
+    val language: String,
+    val display: String,
+    val addonName: String? = null,
+    val isSelected: Boolean = false,
+)
 
 @Immutable
 data class ProviderStreamsResult(
@@ -323,6 +341,7 @@ class AddonStreamsService(
             val cached = behaviorHints?.optBoolean("cached", false) ?: false
             val requestHeaders = parseRequestHeaders(behaviorHints?.optJSONObject("headers"))
             val stableKey = buildStableKey(providerId, dedupeKey)
+            val subtitles = parseStreamSubtitles(streamObject.optJSONArray("subtitles"))
 
             out +=
                 AddonStream(
@@ -336,6 +355,7 @@ class AddonStreamsService(
                     requestHeaders = requestHeaders,
                     cached = cached,
                     stableKey = stableKey,
+                    subtitles = subtitles,
                 )
         }
 
@@ -401,6 +421,22 @@ class AddonStreamsService(
             val value = headersObject.optString(key).trim()
             if (value.isBlank()) continue
             out[key] = value
+        }
+        return out
+    }
+
+    private fun parseStreamSubtitles(subtitlesArray: org.json.JSONArray?): List<StreamSubtitle> {
+        if (subtitlesArray == null || subtitlesArray.length() == 0) return emptyList()
+        val out = ArrayList<StreamSubtitle>(subtitlesArray.length())
+        for (i in 0 until subtitlesArray.length()) {
+            val item = subtitlesArray.optJSONObject(i) ?: continue
+            val url = nonBlank(item.optString("url")) ?: continue
+            val lang =
+                nonBlank(item.optString("lang"))
+                    ?: nonBlank(item.optString("language"))
+                    ?: nonBlank(item.optString("languageCode"))
+            val name = nonBlank(item.optString("name")) ?: nonBlank(item.optString("title"))
+            out += StreamSubtitle(url = url, lang = lang, name = name)
         }
         return out
     }
@@ -493,6 +529,113 @@ class AddonStreamsService(
         }
     }
 
+    suspend fun fetchAddonSubtitles(
+        mediaType: MetadataLabMediaType,
+        lookupId: String,
+    ): List<AddonSubtitle> {
+        val normalizedId = lookupId.trim()
+        if (normalizedId.isBlank()) return emptyList()
+
+        val endpoints = resolveSubtitleEndpoints()
+        if (endpoints.isEmpty()) return emptyList()
+
+        val out = ArrayList<AddonSubtitle>()
+        val seen = LinkedHashSet<String>()
+        withContext(Dispatchers.IO) {
+            for (endpoint in endpoints) {
+                val url = buildSubtitleResourceUrl(endpoint, mediaType, normalizedId)
+                val json = httpClient.getJsonObject(url, SUBTITLE_REQUEST_POLICY) ?: continue
+                val subtitles = parseAddonSubtitles(json, endpoint.providerId, endpoint.providerName)
+                for (subtitle in subtitles) {
+                    if (seen.add(subtitle.id)) out += subtitle
+                }
+            }
+        }
+        return out
+    }
+
+    private suspend fun resolveSubtitleEndpoints(): List<SubtitleEndpoint> {
+        val seeds = addonRegistry.orderedSeeds()
+        return coroutineScope {
+            seeds
+                .map { seed ->
+                    async(Dispatchers.IO) {
+                        val manifest = resolveManifest(seed) ?: return@async null
+                        if (!manifestHasSubtitleResource(manifest)) return@async null
+                        val providerId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
+                        val providerName = nonBlank(manifest.optString("name")) ?: providerId
+                        SubtitleEndpoint(
+                            providerId = providerId,
+                            providerName = providerName,
+                            baseUrl = seed.baseUrl,
+                            encodedQuery = seed.encodedQuery.orEmpty(),
+                        )
+                    }
+                }.awaitAll()
+        }.filterNotNull()
+    }
+
+    private fun manifestHasSubtitleResource(manifest: JSONObject): Boolean {
+        val resources = manifest.optJSONArray("resources") ?: return false
+        for (index in 0 until resources.length()) {
+            when (val resource = resources.opt(index)) {
+                is String -> if (resource.equals("subtitles", ignoreCase = true) || resource.equals("subtitle", ignoreCase = true)) return true
+                is JSONObject -> {
+                    val name = nonBlank(resource.optString("name")) ?: continue
+                    if (name.equals("subtitles", ignoreCase = true) || name.equals("subtitle", ignoreCase = true)) return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun buildSubtitleResourceUrl(
+        endpoint: SubtitleEndpoint,
+        mediaType: MetadataLabMediaType,
+        lookupId: String,
+    ): String {
+        val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
+        val base = "${endpoint.baseUrl}/subtitles/${mediaType.asApiPath()}/$encodedId.json"
+        return if (endpoint.encodedQuery.isBlank()) base else "$base?${endpoint.encodedQuery}"
+    }
+
+    private fun parseAddonSubtitles(
+        json: JSONObject,
+        providerId: String,
+        providerName: String,
+    ): List<AddonSubtitle> {
+        val array = json.optJSONArray("subtitles") ?: return emptyList()
+        if (array.length() == 0) return emptyList()
+        val out = ArrayList<AddonSubtitle>(array.length())
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val url = nonBlank(item.optString("url")) ?: continue
+            val language =
+                nonBlank(item.optString("lang"))
+                    ?: nonBlank(item.optString("language"))
+                    ?: nonBlank(item.optString("languageCode"))
+                    ?: nonBlank(item.optString("locale"))
+                    ?: "und"
+            val name = nonBlank(item.optString("label")) ?: nonBlank(item.optString("name")) ?: language
+            out +=
+                AddonSubtitle(
+                    id = "$providerId-${nonBlank(item.optString("id")) ?: index}",
+                    url = url,
+                    language = language,
+                    display = "$language - $providerName",
+                    addonName = providerName,
+                )
+        }
+        return out
+    }
+
+    private data class SubtitleEndpoint(
+        val providerId: String,
+        val providerName: String,
+        val baseUrl: String,
+        val encodedQuery: String,
+    )
+
     private data class EndpointsCache(
         val fingerprint: String,
         val endpoints: List<AddonEndpoint>,
@@ -571,6 +714,14 @@ class AddonStreamsService(
             )
 
         private val STREAM_REQUEST_POLICY =
+            JsonRequestPolicy(
+                callTimeoutMs = STREAM_TIMEOUT_MS,
+                maxRetries = STREAM_MAX_RETRIES,
+                initialBackoffMs = INITIAL_RETRY_BACKOFF_MS,
+                headers = JSON_HEADERS,
+            )
+
+        private val SUBTITLE_REQUEST_POLICY =
             JsonRequestPolicy(
                 callTimeoutMs = STREAM_TIMEOUT_MS,
                 maxRetries = STREAM_MAX_RETRIES,

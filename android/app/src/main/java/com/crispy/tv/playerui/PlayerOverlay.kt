@@ -37,6 +37,7 @@ import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.AddonSubtitle
 import kotlinx.coroutines.delay
 
 @Composable
@@ -58,8 +59,11 @@ internal fun PlayerOverlay(
     onRetryPlayback: () -> Unit,
     onSelectAudioTrack: (String?) -> Unit,
     onSelectSubtitleTrack: (String?) -> Unit,
+    onFetchAddonSubtitles: () -> Unit,
+    onSelectAddonSubtitle: (AddonSubtitle) -> Unit,
     onCycleSpeed: () -> Unit,
     onToggleMute: () -> Unit,
+    onCycleResizeMode: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
 ) {
     val overlayPadding = rememberOverlayPadding(minPadding = 20.dp)
@@ -164,12 +168,6 @@ internal fun PlayerOverlay(
 
         PlayerLoadingCurtain(
             visible = showLoadingCurtain,
-            text =
-                when {
-                    uiState.errorMessage != null -> uiState.errorMessage
-                    uiState.statusMessage.isNotBlank() -> uiState.statusMessage
-                    else -> "Loading..."
-                },
             modifier = Modifier.align(Alignment.Center),
         )
 
@@ -196,21 +194,23 @@ internal fun PlayerOverlay(
                         },
                     )
 
-                    FilledIconButton(
-                        onClick = {
-                            resetControlsTimer()
-                            latestOnTogglePlayPause()
-                        },
-                        modifier =
-                            Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .size(84.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (uiState.isPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(44.dp),
-                        )
+                    if (!uiState.isBuffering) {
+                        FilledIconButton(
+                            onClick = {
+                                resetControlsTimer()
+                                latestOnTogglePlayPause()
+                            },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .size(84.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                                modifier = Modifier.size(44.dp),
+                            )
+                        }
                     }
 
                     PlayerBottomControls(
@@ -235,6 +235,11 @@ internal fun PlayerOverlay(
                             resetControlsTimer()
                             onToggleMute()
                         },
+                        onCycleResizeMode = {
+                            resetControlsTimer()
+                            onCycleResizeMode()
+                        },
+                        resizeModeLabel = uiState.resizeMode.label,
                     )
                 }
             }
@@ -295,6 +300,10 @@ internal fun PlayerOverlay(
             selectedAudioTrackId = uiState.selectedAudioTrackId,
             subtitleTracks = uiState.subtitleTracks,
             selectedSubtitleTrackId = uiState.selectedSubtitleTrackId,
+            addonSubtitles = uiState.addonSubtitles,
+            addonSubtitlesLoading = uiState.addonSubtitlesLoading,
+            addonSubtitlesError = uiState.addonSubtitlesError,
+            selectedAddonSubtitleId = uiState.selectedAddonSubtitleId,
             onSelectAudioTrack = {
                 resetControlsTimer()
                 onSelectAudioTrack(it)
@@ -302,6 +311,14 @@ internal fun PlayerOverlay(
             onSelectSubtitleTrack = {
                 resetControlsTimer()
                 onSelectSubtitleTrack(it)
+            },
+            onFetchAddonSubtitles = {
+                resetControlsTimer()
+                onFetchAddonSubtitles()
+            },
+            onSelectAddonSubtitle = { subtitle ->
+                resetControlsTimer()
+                onSelectAddonSubtitle(subtitle)
             },
             onDismiss = onCloseSurface,
         )

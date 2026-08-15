@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material3.Icon
@@ -70,8 +71,11 @@ internal fun GestureFeedbackOverlay(
         modifier = modifier,
     ) {
         if (message != null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 40.dp, start = 16.dp, end = 16.dp),
                     shape = RoundedCornerShape(20.dp),
                     color = Color.Black.copy(alpha = 0.68f),
                     contentColor = Color.White,
@@ -113,5 +117,6 @@ internal object GestureIcons {
     val VolumeMuted = Icons.AutoMirrored.Filled.VolumeOff
     val Forward10 = Icons.Filled.Forward10
     val Backward10 = Icons.Filled.Replay10
+    val Resize = Icons.Filled.Crop
 }
 

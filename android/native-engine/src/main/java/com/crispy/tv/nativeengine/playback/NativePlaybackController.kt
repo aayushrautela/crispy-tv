@@ -180,6 +180,13 @@ class NativePlaybackController(
                         externalSubtitles = source.externalSubtitles,
                     )
                 exoPlayer.setMediaItem(mediaItem)
+                source.externalSubtitles.firstOrNull()?.language?.let { language ->
+                    exoPlayer.trackSelectionParameters =
+                        exoPlayer.trackSelectionParameters
+                            .buildUpon()
+                            .setPreferredTextLanguage(language)
+                            .build()
+                }
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
                 applyPersistedExoSettings()
@@ -247,6 +254,13 @@ class NativePlaybackController(
                     listOfNotNull(subtitle) + source.externalSubtitles.distinctBy { it.url },
             )
         exoPlayer.setMediaItem(mediaItem, resumeMs)
+        subtitle?.language?.let { language ->
+            exoPlayer.trackSelectionParameters =
+                exoPlayer.trackSelectionParameters
+                    .buildUpon()
+                    .setPreferredTextLanguage(language)
+                    .build()
+        }
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
@@ -255,6 +269,12 @@ class NativePlaybackController(
         exoSubtitleDelayMs = delayMs
         if (currentEngine == NativePlaybackEngine.MPV) {
             mpvRuntime.setSubtitleDelayMs(delayMs)
+        }
+    }
+
+    override fun applyResizeMode(mode: PlayerResizeMode) {
+        if (currentEngine == NativePlaybackEngine.MPV) {
+            mpvRuntime.applyResizeMode(mode)
         }
     }
 

@@ -112,6 +112,7 @@ interface PlaybackSessionController {
     fun selectSubtitleTrack(trackId: String?)
     fun setExternalSubtitle(subtitle: PlaybackExternalSubtitle?)
     fun setSubtitleDelayMs(delayMs: Int)
+    fun applyResizeMode(mode: PlayerResizeMode)
 }
 
 interface PlaybackSurfaceController {
