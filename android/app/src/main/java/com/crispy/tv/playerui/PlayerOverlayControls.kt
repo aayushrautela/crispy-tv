@@ -4,10 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,13 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import coil3.compose.AsyncImage
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
@@ -66,9 +60,10 @@ internal fun PlayerTopBar(
     palette: DetailsPaletteColors,
     onBack: () -> Unit,
     onShowInfo: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -85,6 +80,7 @@ internal fun PlayerTopBar(
             Text(
                 text = title.ifBlank { "Player" },
                 style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -93,7 +89,7 @@ internal fun PlayerTopBar(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.75f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -132,14 +128,16 @@ internal fun PlayerBottomControls(
     onOpenTracks: () -> Unit,
     onCycleResizeMode: () -> Unit,
     resizeMode: PlayerResizeMode,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         PlayerSeekBar(
             positionMs = positionMs,
             durationMs = durationMs,
+            palette = palette,
             onSeekTo = onSeekTo,
         )
 
@@ -171,39 +169,62 @@ internal fun PlayerBottomControls(
                         .horizontalScroll(rememberScrollState()),
                 ) {
                     if (hasAudioTracks) {
-                        PlayerActionButton(
-                            icon = Icons.Filled.GraphicEq,
-                            contentDescription = "Audio tracks",
-                            palette = palette,
+                        IconButton(
                             onClick = onOpenTracks,
-                        )
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.GraphicEq,
+                                contentDescription = "Audio tracks",
+                                tint = palette.onPillBackground,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                     if (hasSubtitleTracks) {
-                        PlayerActionButton(
-                            icon = Icons.Filled.Subtitles,
-                            contentDescription = "Subtitles",
-                            palette = palette,
+                        IconButton(
                             onClick = onOpenTracks,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Subtitles,
+                                contentDescription = "Subtitles",
+                                tint = palette.onPillBackground,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onOpenStreams,
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Layers,
+                            contentDescription = "Streams",
+                            tint = palette.onPillBackground,
+                            modifier = Modifier.size(20.dp),
                         )
                     }
-                    PlayerActionButton(
-                        icon = Icons.Outlined.Layers,
-                        contentDescription = "Streams",
-                        palette = palette,
-                        onClick = onOpenStreams,
-                    )
-                    PlayerActionButton(
-                        icon = Icons.Filled.Crop,
-                        contentDescription = "Resize: ${resizeMode.label}",
-                        palette = palette,
+                    IconButton(
                         onClick = onCycleResizeMode,
-                        painter =
-                            if (resizeMode == PlayerResizeMode.Zoom) {
-                                painterResource(com.crispy.tv.R.drawable.ic_player_aspect_ratio)
-                            } else {
-                                null
-                            },
-                    )
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        if (resizeMode == PlayerResizeMode.Zoom) {
+                            Icon(
+                                painter = painterResource(com.crispy.tv.R.drawable.ic_player_aspect_ratio),
+                                contentDescription = "Resize: ${resizeMode.label}",
+                                tint = palette.onPillBackground,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Crop,
+                                contentDescription = "Resize: ${resizeMode.label}",
+                                tint = palette.onPillBackground,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -214,6 +235,7 @@ internal fun PlayerBottomControls(
 private fun PlayerSeekBar(
     positionMs: Long,
     durationMs: Long,
+    palette: DetailsPaletteColors,
     onSeekTo: (Long) -> Unit,
 ) {
     val canSeek = durationMs > 0L
@@ -251,9 +273,9 @@ private fun PlayerSeekBar(
         modifier = Modifier.fillMaxWidth(),
         colors =
             SliderDefaults.colors(
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = palette.accent,
+                inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+                thumbColor = palette.accent,
             ),
     )
 }
@@ -270,40 +292,6 @@ internal fun PlayerPill(
         contentColor = contentColor,
     ) {
         content()
-    }
-}
-
-@Composable
-internal fun PlayerActionButton(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    palette: DetailsPaletteColors,
-    modifier: Modifier = Modifier,
-    painter: Painter? = null,
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(999.dp),
-        color = palette.pillBackground,
-        contentColor = palette.onPillBackground,
-        modifier = modifier.size(44.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (painter != null) {
-                Icon(
-                    painter = painter,
-                    contentDescription = contentDescription,
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = contentDescription,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
     }
 }
 

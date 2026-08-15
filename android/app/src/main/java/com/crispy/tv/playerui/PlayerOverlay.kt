@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -176,64 +177,63 @@ internal fun PlayerOverlay(
             enter = fadeIn(animationSpec = tween(200)),
             exit = fadeOut(animationSpec = tween(200)),
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(overlayPadding),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    PlayerTopBar(
-                        title = uiState.title,
-                        subtitle = uiState.subtitle ?: uiState.statusMessage.takeIf { it.isNotBlank() && it != "Playing" },
-                        errorMessage = uiState.errorMessage,
-                        palette = palette,
-                        onBack = {
-                            resetControlsTimer()
-                            latestOnBack()
-                        },
-                        onShowInfo = { openSurface(onShowInfo) },
-                    )
+            Box(modifier = Modifier.fillMaxSize().padding(overlayPadding)) {
+                PlayerTopBar(
+                    title = uiState.title,
+                    subtitle = uiState.subtitle ?: uiState.statusMessage.takeIf { it.isNotBlank() && it != "Playing" },
+                    errorMessage = uiState.errorMessage,
+                    palette = palette,
+                    onBack = {
+                        resetControlsTimer()
+                        latestOnBack()
+                    },
+                    onShowInfo = { openSurface(onShowInfo) },
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
 
-                    if (!uiState.isBuffering) {
-                        FilledIconButton(
-                            onClick = {
-                                resetControlsTimer()
-                                latestOnTogglePlayPause()
-                            },
-                            modifier =
-                                Modifier
-                                    .align(Alignment.CenterHorizontally)
-                                    .size(84.dp),
-                        ) {
-                            Icon(
-                                imageVector = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (uiState.isPlaying) "Pause" else "Play",
-                                modifier = Modifier.size(44.dp),
-                            )
-                        }
+                if (!uiState.isBuffering) {
+                    FilledIconButton(
+                        onClick = {
+                            resetControlsTimer()
+                            latestOnTogglePlayPause()
+                        },
+                        colors =
+                            IconButtonDefaults.filledIconButtonColors(
+                                containerColor = palette.accent,
+                                contentColor = palette.onAccent,
+                            ),
+                        modifier =
+                            Modifier
+                                .align(Alignment.Center)
+                                .size(84.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                            modifier = Modifier.size(44.dp),
+                        )
                     }
-
-                    PlayerBottomControls(
-                        positionMs = uiState.positionMs,
-                        durationMs = effectiveDurationMs,
-                        hasAudioTracks = uiState.audioTracks.isNotEmpty(),
-                        hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),
-                        palette = palette,
-                        onSeekTo = {
-                            resetControlsTimer()
-                            latestOnSeekTo(it)
-                        },
-                        onOpenStreams = { openSurface(onShowStreams) },
-                        onOpenTracks = { openSurface(onShowTracks) },
-                        onCycleResizeMode = {
-                            resetControlsTimer()
-                            onCycleResizeMode()
-                        },
-                        resizeMode = uiState.resizeMode,
-                    )
                 }
+
+                PlayerBottomControls(
+                    positionMs = uiState.positionMs,
+                    durationMs = effectiveDurationMs,
+                    hasAudioTracks = uiState.audioTracks.isNotEmpty(),
+                    hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),
+                    palette = palette,
+                    onSeekTo = {
+                        resetControlsTimer()
+                        latestOnSeekTo(it)
+                    },
+                    onOpenStreams = { openSurface(onShowStreams) },
+                    onOpenTracks = { openSurface(onShowTracks) },
+                    onCycleResizeMode = {
+                        resetControlsTimer()
+                        onCycleResizeMode()
+                    },
+                    resizeMode = uiState.resizeMode,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
 

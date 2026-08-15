@@ -63,7 +63,7 @@ internal fun detailsPaletteFromScheme(scheme: ColorScheme): DetailsPaletteColors
         onPageBackground = scheme.onBackground,
         accent = scheme.primary,
         onAccent = scheme.onPrimary,
-        pillBackground = scheme.surfaceContainerHigh.copy(alpha = 0.72f),
+        pillBackground = scheme.surfaceContainerHigh.copy(alpha = 0.55f),
         onPillBackground = scheme.onSurface,
     )
 }
