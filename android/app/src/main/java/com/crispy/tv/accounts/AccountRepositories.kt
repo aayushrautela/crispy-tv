@@ -1,7 +1,9 @@
 package com.crispy.tv.accounts
 
+import android.content.Context
 import com.crispy.tv.accounts.SupabaseAccountClient.Session
 import com.crispy.tv.backend.BackendContextResolver
+import com.crispy.tv.images.clearImageCache
 
 data class BootstrapResult(
     val signedIn: Boolean,
@@ -11,6 +13,7 @@ data class BootstrapResult(
 )
 
 class AccountBootstrapRepository(
+    private val appContext: Context,
     private val supabase: SupabaseAccountClient,
     private val backendContextResolver: BackendContextResolver,
 ) {
@@ -32,8 +35,13 @@ class AccountBootstrapRepository(
     }
 
     suspend fun signOut() {
+        val userId = supabase.currentSession()?.userId?.takeIf { it.isNotBlank() }
         supabase.signOut()
+        // Drop account-scoped caches so the next sign-in starts clean: the active profile
+        // selection, the resolved backend context, and every cached image (avatars, art).
+        SupabaseServicesProvider.activeProfileStore(appContext).clear(userId)
         backendContextResolver.clear()
+        clearImageCache(appContext)
     }
 }
 
@@ -103,12 +111,14 @@ class ProfileRepository(
         name: String,
         isKids: Boolean,
         avatarKey: String?,
+        interfaceLanguage: String? = null,
     ): com.crispy.tv.backend.CrispyBackendClient.Profile {
         return backendClient.createProfile(
             accessToken = accessToken,
             name = name,
             isKids = isKids,
             avatarKey = avatarKey,
+            interfaceLanguage = interfaceLanguage,
         )
     }
 

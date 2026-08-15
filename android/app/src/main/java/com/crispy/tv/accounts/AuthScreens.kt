@@ -316,6 +316,7 @@ fun ProfileSelectorRoute(
         uiState = uiState,
         onBack = onBack,
         onSelectProfile = viewModel::selectProfile,
+        onFinishSetup = viewModel::finishSetup,
         onCreateProfile = viewModel::createProfile,
         onDialogNameChange = viewModel::onNameChange,
         onDialogKidsToggle = viewModel::onKidsToggle,
@@ -331,6 +332,7 @@ private fun ProfileSelectorScreen(
     uiState: ProfileListUiState,
     onBack: () -> Unit,
     onSelectProfile: (String) -> Unit,
+    onFinishSetup: (name: String, language: String, avatarId: String) -> Unit,
     onCreateProfile: (String, Boolean, String) -> Unit,
     onDialogNameChange: (String) -> Unit,
     onDialogKidsToggle: (Boolean) -> Unit,
@@ -354,8 +356,9 @@ private fun ProfileSelectorScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val isSetup = uiState.profiles.isEmpty()
             Text(
-                text = "Who's watching?",
+                text = if (isSetup) "Finish setting up" else "Who's watching?",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
@@ -365,24 +368,32 @@ private fun ProfileSelectorScreen(
                 Text(text = error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             }
 
-            if (uiState.isBusy && uiState.profiles.isEmpty()) {
-                LoadingIndicator(color = Color.White)
+            if (isSetup) {
+                if (uiState.isBusy) {
+                    LoadingIndicator(color = Color.White)
+                } else {
+                    ProfileSetupScreen(onFinishSetup = onFinishSetup)
+                }
             } else {
-                ProfileGrid(
-                    profiles = uiState.profiles,
-                    onSelectProfile = onSelectProfile,
-                    onAddProfile = onOpenCreateDialog,
-                )
-            }
+                if (uiState.isBusy && uiState.profiles.isEmpty()) {
+                    LoadingIndicator(color = Color.White)
+                } else {
+                    ProfileGrid(
+                        profiles = uiState.profiles,
+                        onSelectProfile = onSelectProfile,
+                        onAddProfile = onOpenCreateDialog,
+                    )
+                }
 
-            Spacer(modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.size(24.dp))
 
-            TextButton(onClick = onBack) {
-                Text(
-                    text = "Sign out",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                )
+                TextButton(onClick = onBack) {
+                    Text(
+                        text = "Sign out",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                }
             }
         }
     }
@@ -425,6 +436,75 @@ private fun ProfileSelectorScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun ProfileSetupScreen(onFinishSetup: (name: String, language: String, avatarId: String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var language by remember { mutableStateOf("en") }
+    var avatarId by remember { mutableStateOf("avatar_01") }
+    val languages = remember { com.crispy.tv.domain.account.SUPPORTED_LANGUAGES }
+    var languageMenuOpen by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "Tell us a bit about your profile.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.7f),
+        )
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Display name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = languages.firstOrNull { it.code == language }?.name ?: language,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Language") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    IconButton(onClick = { languageMenuOpen = true }) {
+                        Icon(Icons.Outlined.ArrowDropDown, contentDescription = "Select language")
+                    }
+                },
+            )
+            androidx.compose.material3.DropdownMenu(
+                expanded = languageMenuOpen,
+                onDismissRequest = { languageMenuOpen = false },
+            ) {
+                languages.forEach { lang ->
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(lang.name) },
+                        onClick = {
+                            language = lang.code
+                            languageMenuOpen = false
+                        },
+                    )
+                }
+            }
+        }
+
+        AvatarPickerGrid(selectedId = avatarId, onAvatarIdChange = { avatarId = it })
+
+        Button(
+            onClick = { onFinishSetup(name.trim(), language, avatarId) },
+            enabled = name.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Finish")
+        }
     }
 }
 

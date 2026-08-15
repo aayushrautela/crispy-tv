@@ -234,6 +234,41 @@ class ProfileListViewModel internal constructor(
     private fun resolveAvatar(avatarKey: String?): String? {
         return AvatarUrlResolver.resolveAvatarUrl(avatarKey)
     }
+
+    /**
+     * First-run "Finish setting up your profile" flow (mirrors the web's ProfileSetup gate):
+     * creates the initial profile, activates it, and signals the bootstrap gate to enter the app.
+     */
+    fun finishSetup(name: String, language: String, avatarId: String) {
+        val normalized = when (val result = validateProfileName(name)) {
+            is com.crispy.tv.domain.account.ProfileNameResult.Valid -> result.normalized
+            is com.crispy.tv.domain.account.ProfileNameResult.Invalid -> {
+                _state.update { it.copy(error = result.reason) }
+                return
+            }
+        }
+        val avatarKey = avatarId.trim().ifBlank { "avatar_01" }
+        val interfaceLanguage = normalizeLanguageCode(language) ?: "en"
+        _state.update { it.copy(isBusy = true, error = null) }
+        viewModelScope.launch {
+            runCatching {
+                val session = bootstrapRepository.bootstrap().session ?: throw IllegalStateException("Not signed in.")
+                val created = profileRepository.createProfile(
+                    accessToken = session.accessToken,
+                    name = normalized,
+                    isKids = false,
+                    avatarKey = avatarKey,
+                    interfaceLanguage = interfaceLanguage,
+                )
+                session.userId?.let { userId -> activeProfileStore.setActiveProfileId(userId, created.id) }
+                    ?: throw IllegalStateException("Missing user id.")
+            }.onSuccess {
+                _state.update { it.copy(isBusy = false, justSelected = true) }
+            }.onFailure { error ->
+                _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to create profile.") }
+            }
+        }
+    }
 }
 
 data class AccountSettingsUiState(

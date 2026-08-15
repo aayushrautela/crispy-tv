@@ -612,6 +612,7 @@ class CrispyBackendClient(
         sortOrder: Int? = null,
         isKids: Boolean = false,
         avatarKey: String? = null,
+        interfaceLanguage: String? = null,
     ): Profile {
         return createProfileApi(
             accessToken = accessToken,
@@ -619,6 +620,7 @@ class CrispyBackendClient(
             sortOrder = sortOrder,
             isKids = isKids,
             avatarKey = avatarKey,
+            interfaceLanguage = interfaceLanguage,
         )
     }
 

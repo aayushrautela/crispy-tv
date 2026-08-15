@@ -39,6 +39,7 @@ internal suspend fun CrispyBackendClient.createProfileApi(
     sortOrder: Int? = null,
     isKids: Boolean = false,
     avatarKey: String? = null,
+    interfaceLanguage: String? = null,
 ): Profile {
     checkConfigured()
     val payload = JSONObject().put("name", name.trim()).put("isKids", isKids).apply {
@@ -47,6 +48,9 @@ internal suspend fun CrispyBackendClient.createProfileApi(
         }
         if (!avatarKey.isNullOrBlank()) {
             put("avatarUrl", avatarKey.trim())
+        }
+        if (!interfaceLanguage.isNullOrBlank()) {
+            put("interfaceLanguage", interfaceLanguage.trim())
         }
     }.toString()
     val response = httpClient.postJson(
