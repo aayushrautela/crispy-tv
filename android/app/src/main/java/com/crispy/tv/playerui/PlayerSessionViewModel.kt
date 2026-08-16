@@ -18,7 +18,6 @@ import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.PlayerStreamLookupTarget
-import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.applyProviderResult
 import com.crispy.tv.playback.buildPlayerSubtitle
 import com.crispy.tv.playback.buildStreamStatusMessage
@@ -26,6 +25,7 @@ import com.crispy.tv.playback.finalizeFrom
 import com.crispy.tv.playback.findEpisodeForLookupId
 import com.crispy.tv.playback.matchesTarget
 import com.crispy.tv.playback.resolveStreamLookupTarget
+import com.crispy.tv.playback.resolveStreamLookupTargetFromIdentity
 import com.crispy.tv.playback.toLoadingUiState
 import com.crispy.tv.playback.toUiState
 import com.crispy.tv.home.HomeRefreshBus
@@ -48,7 +48,6 @@ import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.streams.AddonStream
-import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.AddonSubtitle
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
@@ -116,16 +115,19 @@ data class PlayerUiState(
 
 class PlayerSessionViewModel(
     appContext: Context,
-    playbackSource: PlaybackSource,
     title: String,
     subtitle: String?,
     artworkUrl: String?,
     identity: PlaybackIdentity?,
-    launchSnapshot: PlayerLaunchSnapshot?,
+    resumePositionMs: Long = 0L,
+    chosenStreamStableKey: String? = null,
+    chosenProviderId: String? = null,
     restorePlaybackIntent: Intent,
 ) : ViewModel() {
     private val appContext = appContext.applicationContext
-    private val launchSnapshotState = launchSnapshot
+    private val resumePositionMs = resumePositionMs
+    private val chosenStreamStableKey = chosenStreamStableKey?.trim()?.takeIf { it.isNotBlank() }
+    private val chosenProviderId = chosenProviderId?.trim()?.takeIf { it.isNotBlank() }
     private val supabase = SupabaseServicesProvider.accountClient(this.appContext)
     private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(this.appContext)
     private val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(this.appContext)
@@ -146,9 +148,9 @@ class PlayerSessionViewModel(
             restorePlaybackIntent = restorePlaybackIntent,
         )
 
-    private val rawPlaybackId = buildPlaybackRawId(identity = identity, snapshot = launchSnapshot)
+    private val rawPlaybackId = buildPlaybackRawId(identity = identity)
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
-    private var activePlaybackSource = playbackSource
+    private var activePlaybackSource = PlaybackSource(url = "")
     private var activeIdentity: PlaybackIdentity? = identity
     private var activeSubtitle: String? = subtitle?.trim()?.ifBlank { null }
     private var activeArtworkUrl: String? = artworkUrl?.trim()?.ifBlank { null }
@@ -159,20 +161,14 @@ class PlayerSessionViewModel(
     private var pendingInitialSeekMs: Long? = null
 
     private val initialDetails =
-        launchSnapshot?.toMediaDetails() ?: buildFallbackDetails(
+        buildFallbackDetails(
             rawId = rawPlaybackId,
             title = title,
             artworkUrl = artworkUrl,
             identity = identity,
         )
-    private val initialSelectedSeason =
-        launchSnapshot?.selectedSeason
-            ?: identity?.season
-            ?: launchSnapshot?.seasonEpisodes?.firstOrNull()?.season
-    private val initialSeasonEpisodes =
-        launchSnapshot?.seasonEpisodes
-            ?.map(PlayerEpisodeSnapshot::toMediaVideo)
-            .orEmpty()
+    private val initialSelectedSeason = identity?.season
+    private val initialSeasonEpisodes = emptyList<MediaVideo>()
 
     private val _uiState =
         MutableStateFlow(
@@ -183,29 +179,25 @@ class PlayerSessionViewModel(
                 backdropUrl = initialDetails?.backdropUrl,
                 details = initialDetails,
                 activeIdentity = activeIdentity,
-                seasons = launchSnapshot?.seasons.orEmpty(),
+                seasons = emptyList(),
                 selectedSeason = initialSelectedSeason,
                 seasonEpisodes = initialSeasonEpisodes,
-                currentEpisodeId = launchSnapshot?.currentEpisodeId,
-                currentPlaybackUrl = playbackSource.url,
+                currentEpisodeId = null,
+                currentPlaybackUrl = null,
                 resizeMode = playbackSettingsRepository.settings.value.resizeMode,
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     init {
-        initialSelectedSeason?.takeIf { initialSeasonEpisodes.isNotEmpty() }?.let { season ->
-            seasonEpisodesCache[season] = initialSeasonEpisodes
-        }
         mediaSessionManager.updateMetadata(
             title = uiState.value.title,
             subtitle = uiState.value.subtitle,
             artworkUrl = uiState.value.artworkUrl,
         )
-        launchSnapshotState?.resumePositionMs?.takeIf { it > 0L }?.let { resumeMs ->
-            pendingInitialSeekMs = resumeMs
+        if (resumePositionMs > 0L) {
+            pendingInitialSeekMs = resumePositionMs
         }
-        requestPlayback(engine = uiState.value.activeEngine)
         viewModelScope.launch {
             loadInitialMetadata()
         }
@@ -226,6 +218,9 @@ class PlayerSessionViewModel(
             subtitleRepository.error.collect { error ->
                 _uiState.update { it.copy(addonSubtitlesError = error) }
             }
+        }
+        viewModelScope.launch {
+            startPlayback()
         }
     }
 
@@ -376,33 +371,132 @@ class PlayerSessionViewModel(
         }
     }
 
-    fun showStreams() {
-        val details = uiState.value.details
-        if (details == null) {
-            _uiState.update { it.copy(statusMessage = "Title details are still loading.") }
+    private suspend fun startPlayback() {
+        val identity = activeIdentity ?: run {
+            _uiState.update { it.copy(statusMessage = "Unable to resolve playback identity.") }
+            return
+        }
+        val target = resolveStreamLookupTargetFromIdentity(identity)
+        if (target.lookupId.isBlank()) {
+            _uiState.update { it.copy(statusMessage = "Unable to resolve stream lookup id for this title.") }
             return
         }
 
-        val target =
-            resolveStreamLookupTarget(
-                details = details,
-                selectedSeason = uiState.value.selectedSeason,
-                seasonEpisodes = uiState.value.seasonEpisodes,
-                fallbackMediaType = activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE,
+        activeSubtitleLookupId = target.lookupId
+        activeSubtitleMediaType = target.mediaType
+
+        val results =
+            runCatching {
+                streamResolver.resolve(
+                    target = target,
+                    onProvidersResolved = { providers ->
+                        _uiState.update { previous ->
+                            if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                            previous.copy(
+                                streamSelector =
+                                    previous.streamSelector.copy(
+                                        visible = true,
+                                        mediaType = target.mediaType,
+                                        lookupId = target.lookupId,
+                                        providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
+                                        isLoading = providers.isNotEmpty(),
+                                    ),
+                                statusMessage =
+                                    if (providers.isEmpty()) {
+                                        "No stream providers are available for this title."
+                                    } else {
+                                        "Fetching streams..."
+                                    },
+                            )
+                        }
+                    },
+                    onProviderResult = { result ->
+                        _uiState.update { previous ->
+                            if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                            val updatedProviders = previous.streamSelector.providers.applyProviderResult(result)
+                            val stillLoading = updatedProviders.any { provider -> provider.isLoading }
+                            previous.copy(
+                                streamSelector = previous.streamSelector.copy(
+                                    providers = updatedProviders,
+                                    isLoading = stillLoading,
+                                ),
+                                statusMessage = buildStreamStatusMessage(updatedProviders, stillLoading),
+                            )
+                        }
+                    },
+                )
+            }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                _uiState.update { it.copy(statusMessage = error.message ?: "Failed to fetch streams.") }
+                return
+            }
+
+        val chosen =
+            chosenStreamStableKey?.let { key ->
+                results.firstNotNullOfOrNull { provider ->
+                    provider.streams.firstOrNull { stream ->
+                        stream.stableKey == key &&
+                            (chosenProviderId == null || stream.providerId.equals(chosenProviderId, ignoreCase = true))
+                    }
+                }
+            }
+        when {
+            chosen != null -> playResolvedStream(chosen, target)
+            playbackSettingsRepository.settings.value.autoSelectStream -> {
+                val top = results.firstNotNullOfOrNull { it.streams.firstOrNull() }
+                if (top != null) {
+                    playResolvedStream(top, target)
+                } else {
+                    openStreamSelector(target = target, headerEpisode = null)
+                }
+            }
+            else -> openStreamSelector(target = target, headerEpisode = null)
+        }
+    }
+
+    private fun playResolvedStream(stream: AddonStream, target: PlayerStreamLookupTarget) {
+        val source = stream.toPlaybackSource() ?: run {
+            _uiState.update { it.copy(statusMessage = "Selected stream has no playable URL.") }
+            return
+        }
+        activePlaybackSource = source
+        activeSubtitleLookupId = target.lookupId
+        activeSubtitleMediaType = target.mediaType
+        pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
+        _uiState.update { state ->
+            state.copy(
+                currentPlaybackUrl = source.url,
+                isBuffering = true,
+                isPlaying = false,
+                positionMs = 0L,
+                durationMs = 0L,
+                stableDurationMs = 0L,
+                statusMessage = "Loading...",
+                errorMessage = null,
+                videoLayout = null,
+                activeSurface = PlayerSurface.NONE,
+                streamSelector = state.streamSelector.copy(visible = false),
             )
-        val headerEpisode =
-            findEpisodeForLookupId(
-                lookupId = target.lookupId,
-                currentEpisodes = uiState.value.seasonEpisodes,
-                cachedEpisodes = seasonEpisodesCache.values,
-            )
-        openStreamSelector(target = target, headerEpisode = headerEpisode)
+        }
+        requestPlayback(engine = uiState.value.activeEngine)
+    }
+
+    fun showStreams() {
+        val identity = activeIdentity ?: run {
+            _uiState.update { it.copy(statusMessage = "Playback identity is unavailable.") }
+            return
+        }
+        val target = resolveStreamLookupTargetFromIdentity(identity)
+        if (target.lookupId.isBlank()) {
+            _uiState.update { it.copy(statusMessage = "Unable to resolve stream lookup id for this title.") }
+            return
+        }
+        openStreamSelector(target = target, headerEpisode = null)
     }
 
     fun showStreamsForEpisode(videoId: String) {
-        val details = uiState.value.details
-        if (details == null) {
-            _uiState.update { it.copy(statusMessage = "Title details are still loading.") }
+        val identity = activeIdentity ?: run {
+            _uiState.update { it.copy(statusMessage = "Playback identity is unavailable.") }
             return
         }
         val episode =
@@ -410,7 +504,7 @@ class PlayerSessionViewModel(
                 ?: seasonEpisodesCache.values.asSequence().flatten().firstOrNull { it.id.equals(videoId.trim(), ignoreCase = true) }
         val target =
             PlayerStreamLookupTarget(
-                mediaType = activeIdentity?.contentType ?: MetadataLabMediaType.SERIES,
+                mediaType = identity.contentType,
                 lookupId = episode?.lookupId?.trim().orEmpty(),
             )
         val headerEpisode =
@@ -592,8 +686,7 @@ class PlayerSessionViewModel(
         val rawId = rawPlaybackId ?: return
         val snapshotDetails = _uiState.value.details
         val itemId =
-            launchSnapshotState?.itemId?.trim()?.takeIf { it.isNotBlank() }
-                ?: activeIdentity?.itemId?.trim()?.takeIf { it.isNotBlank() }
+            activeIdentity?.itemId?.trim()?.takeIf { it.isNotBlank() }
                 ?: snapshotDetails?.itemId?.trim()?.takeIf { it.isNotBlank() }
         val session = withContext(Dispatchers.IO) { runCatching { supabase.ensureValidSession() }.getOrNull() }
         val backendDetail =
@@ -1182,12 +1275,13 @@ class PlayerSessionViewModel(
     companion object {
         fun factory(
             appContext: Context,
-            playbackSource: PlaybackSource,
             title: String,
             subtitle: String?,
             artworkUrl: String?,
             identity: PlaybackIdentity?,
-            launchSnapshot: PlayerLaunchSnapshot?,
+            resumePositionMs: Long = 0L,
+            chosenStreamStableKey: String? = null,
+            chosenProviderId: String? = null,
             restorePlaybackIntent: Intent,
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
@@ -1195,12 +1289,13 @@ class PlayerSessionViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     return PlayerSessionViewModel(
                         appContext = appContext,
-                        playbackSource = playbackSource,
                         title = title,
                         subtitle = subtitle,
                         artworkUrl = artworkUrl,
                         identity = identity,
-                        launchSnapshot = launchSnapshot,
+                        resumePositionMs = resumePositionMs,
+                        chosenStreamStableKey = chosenStreamStableKey,
+                        chosenProviderId = chosenProviderId,
                         restorePlaybackIntent = restorePlaybackIntent,
                     ) as T
                 }

@@ -95,6 +95,7 @@ data class ProviderCommentResult(
 
 data class PlaybackIdentity(
     val itemId: String?,
+    val imdbId: String? = null,
     val contentType: MetadataLabMediaType,
     val season: Int? = null,
     val episode: Int? = null,

@@ -11,7 +11,7 @@ import com.crispy.tv.app.appGraph
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.playerui.PlayerLaunchSnapshot
+import com.crispy.tv.playerui.PlayerActivity
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import kotlinx.coroutines.flow.collectLatest
 import java.util.Locale
@@ -29,7 +29,7 @@ fun DetailsRoute(
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit = { _, _ -> },
     onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
-    onOpenPlayer: (String, Map<String, String>, String, PlaybackIdentity, String?, String?, PlayerLaunchSnapshot?) -> Unit = { _, _, _, _, _, _, _ -> },
+        onOpenPlayer: (PlaybackIdentity, String, String?, String?, Long, String?, String?) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
 
@@ -69,13 +69,13 @@ fun DetailsRoute(
             when (event) {
                 is DetailsNavigationEvent.OpenPlayer -> {
                     onOpenPlayer(
-                        event.playbackUrl,
-                        event.playbackHeaders,
-                        event.title,
                         event.identity,
+                        event.title,
                         event.subtitle,
                         event.artworkUrl,
-                        event.launchSnapshot,
+                        event.resumePositionMs,
+                        event.chosenStreamStableKey,
+                        event.chosenProviderId,
                     )
                 }
             }

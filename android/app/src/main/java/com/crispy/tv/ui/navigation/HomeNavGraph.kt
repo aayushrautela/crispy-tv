@@ -209,17 +209,17 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                     )
                 },
                 onPersonClick = { personId, profileUrl -> navController.navigate(AppRoutes.personDetailsRoute(personId, profileUrl)) },
-                onOpenPlayer = { playbackUrl, playbackHeaders, title, identity, subtitle, artworkUrl, launchSnapshot ->
+                onOpenPlayer = { identity, title, subtitle, artworkUrl, resumePositionMs, chosenStreamStableKey, chosenProviderId ->
                     context.startActivity(
                         PlayerActivity.intent(
                             context = context,
-                            playbackUrl = playbackUrl,
-                            playbackHeaders = playbackHeaders,
-                            title = title,
                             identity = identity,
+                            title = title,
                             subtitle = subtitle,
                             artworkUrl = artworkUrl,
-                            launchSnapshot = launchSnapshot,
+                            resumePositionMs = resumePositionMs,
+                            chosenStreamStableKey = chosenStreamStableKey,
+                            chosenProviderId = chosenProviderId,
                         )
                     )
                 },

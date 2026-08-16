@@ -18,6 +18,7 @@ internal const val PLAYBACK_SETTINGS_KEY_DEFAULT_SUBTITLE_LANGUAGE = "default_su
 internal const val PLAYBACK_SETTINGS_KEY_USE_LIBASS = "use_libass"
 internal const val PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE = "libass_render_type"
 internal const val PLAYBACK_SETTINGS_KEY_RESIZE_MODE = "resize_mode"
+internal const val PLAYBACK_SETTINGS_KEY_AUTO_SELECT_STREAM = "auto_select_stream"
 private const val DEFAULT_SKIP_INTRO_ENABLED = true
 private const val DEFAULT_TRAILER_AUTOPLAY_ENABLED = true
 private const val DEFAULT_TRAILER_MUTED = false
@@ -26,6 +27,7 @@ private const val DEFAULT_MUTED = false
 private const val DEFAULT_USE_LIBASS = false
 private const val DEFAULT_LIBASS_RENDER_TYPE = "OVERLAY_OPEN_GL"
 private const val DEFAULT_RESIZE_MODE = "Fit"
+private const val DEFAULT_AUTO_SELECT_STREAM = false
 
 data class PlaybackSettings(
     val skipIntroEnabled: Boolean = DEFAULT_SKIP_INTRO_ENABLED,
@@ -38,6 +40,7 @@ data class PlaybackSettings(
     val useLibass: Boolean = DEFAULT_USE_LIBASS,
     val libassRenderType: String = DEFAULT_LIBASS_RENDER_TYPE,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
+    val autoSelectStream: Boolean = DEFAULT_AUTO_SELECT_STREAM,
 )
 
 interface PlaybackSettingsRepository {
@@ -51,6 +54,7 @@ interface PlaybackSettingsRepository {
     fun setDefaultSubtitleLanguage(language: String?)
     fun setUseLibass(enabled: Boolean)
     fun setLibassRenderType(renderType: String)
+    fun setAutoSelectStream(enabled: Boolean)
     fun setResizeMode(mode: PlayerResizeMode)
 }
 
@@ -164,6 +168,15 @@ private class SharedPreferencesPlaybackSettingsRepository(
         preferences.edit().putString(PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE, normalized).apply()
     }
 
+    override fun setAutoSelectStream(enabled: Boolean) {
+        if (_settings.value.autoSelectStream == enabled) {
+            return
+        }
+
+        _settings.value = _settings.value.copy(autoSelectStream = enabled)
+        preferences.edit().putBoolean(PLAYBACK_SETTINGS_KEY_AUTO_SELECT_STREAM, enabled).apply()
+    }
+
     override fun setResizeMode(mode: PlayerResizeMode) {
         if (_settings.value.resizeMode == mode) {
             return
@@ -186,6 +199,7 @@ private class SharedPreferencesPlaybackSettingsRepository(
                 PLAYBACK_SETTINGS_KEY_USE_LIBASS,
                 PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE,
                 PLAYBACK_SETTINGS_KEY_RESIZE_MODE,
+                PLAYBACK_SETTINGS_KEY_AUTO_SELECT_STREAM,
             )
 
         fun create(context: Context): PlaybackSettingsRepository {
@@ -243,6 +257,11 @@ private class SharedPreferencesPlaybackSettingsRepository(
                     preferences.getString(PLAYBACK_SETTINGS_KEY_RESIZE_MODE, DEFAULT_RESIZE_MODE)
                         ?.let { runCatching { PlayerResizeMode.valueOf(it) }.getOrNull() }
                         ?: PlayerResizeMode.Fit,
+                autoSelectStream =
+                    preferences.getBoolean(
+                        PLAYBACK_SETTINGS_KEY_AUTO_SELECT_STREAM,
+                        DEFAULT_AUTO_SELECT_STREAM,
+                    ),
             )
         }
     }

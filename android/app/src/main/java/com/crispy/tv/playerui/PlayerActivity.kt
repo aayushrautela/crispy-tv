@@ -33,12 +33,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
-import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.ui.theme.CrispyRewriteTheme
 import kotlin.math.roundToInt
-import org.json.JSONObject
 
 class PlayerActivity : ComponentActivity() {
     private var isInPictureInPictureModeState by mutableStateOf(false)
@@ -66,18 +64,17 @@ class PlayerActivity : ComponentActivity() {
 
         isInPictureInPictureModeState = isInPictureInPictureMode
 
-        val playbackUrl = intent.getStringExtra(EXTRA_PLAYBACK_URL).orEmpty()
-        if (playbackUrl.isBlank()) {
-            finish()
-            return
-        }
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val subtitle = intent.getStringExtra(EXTRA_SUBTITLE)?.trim()?.ifBlank { null }
         val artworkUrl = intent.getStringExtra(EXTRA_ARTWORK_URL)?.trim()?.ifBlank { null }
-        val launchSnapshot = PlayerLaunchSnapshot.fromJsonString(intent.getStringExtra(EXTRA_LAUNCH_SNAPSHOT))
-        val playbackSource = parsePlaybackSourceFromIntent(intent)
-
         val identity = parseIdentityFromIntent(intent, title)
+        if (identity == null) {
+            finish()
+            return
+        }
+        val resumePositionMs = intent.getLongExtra(EXTRA_RESUME_POSITION_MS, 0L)
+        val chosenStreamStableKey = intent.getStringExtra(EXTRA_CHOSEN_STREAM_KEY)?.trim()?.ifBlank { null }
+        val chosenProviderId = intent.getStringExtra(EXTRA_CHOSEN_PROVIDER_ID)?.trim()?.ifBlank { null }
         val restorePlaybackIntent =
             Intent(intent).addFlags(
                 Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
@@ -87,12 +84,13 @@ class PlayerActivity : ComponentActivity() {
                 this,
                 PlayerSessionViewModel.factory(
                     appContext = applicationContext,
-                    playbackSource = playbackSource,
                     title = title,
                     subtitle = subtitle,
                     artworkUrl = artworkUrl,
                     identity = identity,
-                    launchSnapshot = launchSnapshot,
+                    resumePositionMs = resumePositionMs,
+                    chosenStreamStableKey = chosenStreamStableKey,
+                    chosenProviderId = chosenProviderId,
                     restorePlaybackIntent = restorePlaybackIntent,
                 ),
             )[PlayerSessionViewModel::class.java]
@@ -289,12 +287,12 @@ class PlayerActivity : ComponentActivity() {
     companion object {
         private const val TAG = "PlayerActivity"
         private const val PIP_EXIT_PAUSE_GUARD_MS = 250L
-        private const val EXTRA_PLAYBACK_URL = "extra_playback_url"
         private const val EXTRA_TITLE = "extra_title"
         private const val EXTRA_SUBTITLE = "extra_subtitle"
         private const val EXTRA_ARTWORK_URL = "extra_artwork_url"
-        private const val EXTRA_LAUNCH_SNAPSHOT = "extra_launch_snapshot"
-        private const val EXTRA_PLAYBACK_HEADERS_JSON = "extra_playback_headers_json"
+        private const val EXTRA_RESUME_POSITION_MS = "extra_resume_position_ms"
+        private const val EXTRA_CHOSEN_STREAM_KEY = "extra_chosen_stream_key"
+        private const val EXTRA_CHOSEN_PROVIDER_ID = "extra_chosen_provider_id"
         private const val PIP_MAX_ASPECT_RATIO = 2.39
         private const val PIP_MIN_ASPECT_RATIO = 1.0 / PIP_MAX_ASPECT_RATIO
 
@@ -327,31 +325,32 @@ class PlayerActivity : ComponentActivity() {
 
         fun intent(
             context: Context,
-            playbackUrl: String,
-            playbackHeaders: Map<String, String> = emptyMap(),
-            title: String,
             identity: PlaybackIdentity,
+            title: String,
             subtitle: String? = null,
             artworkUrl: String? = null,
-            launchSnapshot: PlayerLaunchSnapshot? = null,
+            resumePositionMs: Long = 0L,
+            chosenStreamStableKey: String? = null,
+            chosenProviderId: String? = null,
         ): Intent {
             return Intent(context, PlayerActivity::class.java)
-                .putExtra(EXTRA_PLAYBACK_URL, playbackUrl)
-                .putExtra(EXTRA_PLAYBACK_HEADERS_JSON, headersToJson(playbackHeaders))
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_SUBTITLE, subtitle)
                 .putExtra(EXTRA_ARTWORK_URL, artworkUrl)
-.putExtra(EXTRA_LAUNCH_SNAPSHOT, launchSnapshot?.toJsonString())
-        .putExtra(EXTRA_ITEM_ID, identity.itemId)
-        .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
-        .putExtra(EXTRA_SEASON, identity.season ?: -1)
-        .putExtra(EXTRA_EPISODE, identity.episode ?: -1)
-        .putExtra(EXTRA_YEAR, identity.year ?: -1)
-        .putExtra(EXTRA_SHOW_TITLE, identity.showTitle)
-        .putExtra(EXTRA_SHOW_YEAR, identity.showYear ?: -1)
-        .putExtra(EXTRA_PARENT_MEDIA_TYPE, identity.parentMediaType)
-        .putExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, identity.absoluteEpisodeNumber ?: -1)
-    }
+                .putExtra(EXTRA_ITEM_ID, identity.itemId)
+                .putExtra(EXTRA_IMDB_ID, identity.imdbId)
+                .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
+                .putExtra(EXTRA_SEASON, identity.season ?: -1)
+                .putExtra(EXTRA_EPISODE, identity.episode ?: -1)
+                .putExtra(EXTRA_YEAR, identity.year ?: -1)
+                .putExtra(EXTRA_SHOW_TITLE, identity.showTitle)
+                .putExtra(EXTRA_SHOW_YEAR, identity.showYear ?: -1)
+                .putExtra(EXTRA_PARENT_MEDIA_TYPE, identity.parentMediaType)
+                .putExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, identity.absoluteEpisodeNumber ?: -1)
+                .putExtra(EXTRA_RESUME_POSITION_MS, resumePositionMs)
+                .putExtra(EXTRA_CHOSEN_STREAM_KEY, chosenStreamStableKey)
+                .putExtra(EXTRA_CHOSEN_PROVIDER_ID, chosenProviderId)
+        }
 
         private fun parseIdentityFromIntent(intent: Intent, title: String): PlaybackIdentity? {
             val mediaTypeName = intent.getStringExtra(EXTRA_MEDIA_TYPE).orEmpty().trim()
@@ -373,8 +372,9 @@ class PlayerActivity : ComponentActivity() {
             val parentProviderId = intent.getStringExtra(EXTRA_PARENT_PROVIDER_ID)?.trim()?.ifBlank { null }
             val absoluteEpisodeNumber = intent.getIntExtra(EXTRA_ABSOLUTE_EPISODE_NUMBER, -1).takeIf { it > 0 }
 
-return PlaybackIdentity(
+        return PlaybackIdentity(
             itemId = itemId,
+            imdbId = imdbId,
             contentType = contentType,
             season = season,
             episode = episode,
@@ -385,41 +385,6 @@ return PlaybackIdentity(
             parentMediaType = parentMediaType,
             absoluteEpisodeNumber = absoluteEpisodeNumber,
         )
-        }
-
-        private fun parsePlaybackSourceFromIntent(intent: Intent): PlaybackSource {
-            val url = intent.getStringExtra(EXTRA_PLAYBACK_URL).orEmpty()
-            val headersJson = intent.getStringExtra(EXTRA_PLAYBACK_HEADERS_JSON).orEmpty().trim()
-            if (headersJson.isBlank()) {
-                return PlaybackSource(url = url)
-            }
-
-            val headers =
-                runCatching {
-                    val json = JSONObject(headersJson)
-                    buildMap {
-                        val iterator = json.keys()
-                        while (iterator.hasNext()) {
-                            val key = iterator.next()?.trim().orEmpty()
-                            if (key.isBlank()) continue
-                            val value = json.optString(key).trim()
-                            if (value.isBlank()) continue
-                            put(key, value)
-                        }
-                    }
-                }.getOrDefault(emptyMap())
-            return PlaybackSource(url = url, headers = headers)
-        }
-
-        private fun headersToJson(headers: Map<String, String>): String? {
-            if (headers.isEmpty()) return null
-            return JSONObject().apply {
-                headers.forEach { (key, value) ->
-                    if (key.isNotBlank() && value.isNotBlank()) {
-                        put(key, value)
-                    }
-                }
-            }.takeIf { it.length() > 0 }?.toString()
         }
     }
 }

@@ -7,7 +7,7 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.playerui.PlayerLaunchSnapshot
+import com.crispy.tv.playerui.PlayerActivity
 import com.crispy.tv.streams.StreamSelectorUiState
 
 @Immutable
@@ -54,12 +54,12 @@ data class DetailsUiState(
 
 sealed interface DetailsNavigationEvent {
     data class OpenPlayer(
-        val playbackUrl: String,
-        val playbackHeaders: Map<String, String> = emptyMap(),
         val title: String,
         val identity: PlaybackIdentity,
         val subtitle: String?,
         val artworkUrl: String?,
-        val launchSnapshot: PlayerLaunchSnapshot?,
+        val resumePositionMs: Long = 0L,
+        val chosenStreamStableKey: String? = null,
+        val chosenProviderId: String? = null,
     ) : DetailsNavigationEvent
 }

@@ -11,8 +11,6 @@ import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.playerui.PlayerEpisodeSnapshot
-import com.crispy.tv.playerui.PlayerLaunchSnapshot
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.StreamSelectorUiState
 import com.crispy.tv.streams.StreamProviderDescriptor
@@ -862,9 +860,10 @@ class DetailsViewModel internal constructor(
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
             val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
-val identity =
+            val identity =
             PlaybackIdentity(
                 itemId = enriched.itemId,
+                imdbId = enriched.imdbId,
                 contentType = resolvedMediaType,
                 season = season,
                 episode = episode,
@@ -894,51 +893,13 @@ val identity =
 
             _navigationEvents.tryEmit(
                 DetailsNavigationEvent.OpenPlayer(
-                    playbackUrl = playbackUrl,
-                    playbackHeaders = stream.requestHeaders,
                     title = title,
                     identity = identity,
                     subtitle = subtitle,
                     artworkUrl = artworkUrl,
-                    launchSnapshot =
-                        PlayerLaunchSnapshot(
-                            contentId = enriched.id,
-                            itemId = enriched.itemId,
-                            imdbId = enriched.imdbId,
-                            seasonNumber = season,
-                            episodeNumber = episode,
-                            itemType = enriched.itemType,
-                            parentMediaType = enriched.parentMediaType ?: parentMediaType,
-                            absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
-                            resumePositionMs = resumePositionMs,
-                            title = enriched.title,
-                            posterUrl = enriched.posterUrl,
-                            backdropUrl = enriched.backdropUrl,
-                            description = enriched.description,
-                            genres = enriched.genres,
-                            year = enriched.year,
-                            runtime = enriched.runtime,
-                            certification = enriched.certification,
-                            rating = enriched.rating,
-                            cast = enriched.cast,
-                            seasons = currentState.seasons,
-                            selectedSeason = currentState.selectedSeasonOrFirst,
-                            seasonEpisodes =
-                                currentState.seasonEpisodes.map { episodeItem ->
-                                    PlayerEpisodeSnapshot(
-                                        id = episodeItem.id,
-                                        title = episodeItem.title,
-                                        season = episodeItem.season,
-                                        episode = episodeItem.episode,
-                                        released = episodeItem.released,
-                                        overview = episodeItem.overview,
-                                        thumbnailUrl = episodeItem.thumbnailUrl,
-                                        lookupId = episodeItem.lookupId,
-                                        absoluteEpisodeNumber = episodeItem.absoluteEpisodeNumber,
-                                    )
-                                },
-                            currentEpisodeId = targetEpisode?.id,
-                        ),
+                    resumePositionMs = resumePositionMs,
+                    chosenStreamStableKey = stream.stableKey,
+                    chosenProviderId = stream.providerId,
                 )
             )
         }

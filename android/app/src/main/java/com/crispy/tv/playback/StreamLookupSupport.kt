@@ -2,9 +2,11 @@ package com.crispy.tv.playback
 
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.metadata.buildAddonEpisodeLookupId
 import com.crispy.tv.metadata.toAddonLookupId
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
@@ -40,6 +42,21 @@ fun resolveStreamLookupTarget(
             }
         }
 
+    return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
+}
+
+fun resolveStreamLookupTargetFromIdentity(identity: PlaybackIdentity): StreamLookupTarget {
+    val mediaType = identity.contentType
+    val baseId =
+        identity.imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) }
+            ?: identity.itemId?.trim()?.takeIf { it.isNotBlank() }
+    val lookupId =
+        when (mediaType) {
+            MetadataLabMediaType.MOVIE -> baseId.orEmpty()
+            MetadataLabMediaType.SERIES,
+            MetadataLabMediaType.ANIME ->
+                buildAddonEpisodeLookupId(baseId, identity.season, identity.episode) ?: baseId.orEmpty()
+        }
     return StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
 }
 
