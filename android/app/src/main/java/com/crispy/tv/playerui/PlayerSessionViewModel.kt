@@ -51,6 +51,7 @@ import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonSubtitle
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
+import com.crispy.tv.streams.StreamResolver
 import com.crispy.tv.streams.StreamSelectorUiState
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException

@@ -13,6 +13,7 @@ import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
