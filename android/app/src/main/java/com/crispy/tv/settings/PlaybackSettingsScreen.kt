@@ -33,6 +33,7 @@ fun PlaybackSettingsScreen(
     settings: PlaybackSettings,
     onTrailerAutoplayChanged: (Boolean) -> Unit,
     onSkipIntroChanged: (Boolean) -> Unit,
+    onAutoSelectStreamChanged: (Boolean) -> Unit,
     onUseLibassChanged: (Boolean) -> Unit,
     onLibassRenderTypeChanged: (String) -> Unit,
     onBack: () -> Unit
@@ -93,6 +94,23 @@ fun PlaybackSettingsScreen(
                         Switch(
                             checked = settings.skipIntroEnabled,
                             onCheckedChange = onSkipIntroChanged
+                        )
+                    }
+                )
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = {
+                        Text("Auto-select Stream")
+                    },
+                    supportingContent = {
+                        Text("When a source is picked from details, start playback automatically instead of opening the stream sheet.")
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.autoSelectStream,
+                            onCheckedChange = onAutoSelectStreamChanged
                         )
                     }
                 )

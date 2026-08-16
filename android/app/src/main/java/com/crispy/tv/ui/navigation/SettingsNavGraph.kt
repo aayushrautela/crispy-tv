@@ -88,6 +88,10 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
                 playbackSettingsRepository.setSkipIntroEnabled(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }
             },
+            onAutoSelectStreamChanged = { enabled ->
+                playbackSettingsRepository.setAutoSelectStream(enabled)
+                coroutineScope.launch { cloudSync.pushForActiveProfile() }
+            },
             onUseLibassChanged = { enabled ->
                 playbackSettingsRepository.setUseLibass(enabled)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }
