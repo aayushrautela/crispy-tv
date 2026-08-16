@@ -10,7 +10,8 @@ import com.crispy.tv.introskip.RemoteIntroSkipService
 import com.crispy.tv.metadata.RemoteMetadataLabDataSource
 import com.crispy.tv.metadata.RemoteSupabaseSyncLabService
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.streams.AddonStreamsService
+import com.crispy.tv.streams.StreamResolver
+import com.crispy.tv.streams.StreamResolverProvider
 import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.nativeengine.playback.LibassRenderType
@@ -72,15 +73,6 @@ private fun newWatchHistoryService(context: Context): WatchHistoryService {
             WatchHistoryConfig(
                 appVersion = BuildConfig.VERSION_NAME,
             ),
-    )
-}
-
-private fun newAddonStreamsService(context: Context): AddonStreamsService {
-    val appContext = context.applicationContext
-    return AddonStreamsService(
-        context = appContext,
-        addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-        httpClient = AppHttp.client(appContext),
     )
 }
 
@@ -172,8 +164,8 @@ object PlaybackDependencies {
     }
 
     @Volatile
-    var addonStreamsServiceFactory: (Context) -> AddonStreamsService = { context ->
-        newAddonStreamsService(context)
+    var streamResolverFactory: (Context) -> StreamResolver = { context ->
+        StreamResolverProvider.get(context)
     }
 
     @Volatile
@@ -211,7 +203,7 @@ object PlaybackDependencies {
                 introDbBaseUrl = BuildConfig.INTRODB_API_URL,
             )
         }
-        addonStreamsServiceFactory = { context -> newAddonStreamsService(context) }
+        streamResolverFactory = { context -> StreamResolverProvider.get(context) }
         episodeListProviderFactory = { context -> newEpisodeListProvider(context) }
     }
 }

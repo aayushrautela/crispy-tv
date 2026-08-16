@@ -129,14 +129,14 @@ class PlayerSessionViewModel(
     private val supabase = SupabaseServicesProvider.accountClient(this.appContext)
     private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(this.appContext)
     private val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(this.appContext)
-    private val addonStreamsService: AddonStreamsService = PlaybackDependencies.addonStreamsServiceFactory(this.appContext)
+    private val streamResolver: StreamResolver = PlaybackDependencies.streamResolverFactory(this.appContext)
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playbackMetrics = PlaybackMetricsHolder()
     private val playbackController: PlaybackController = PlaybackDependencies.playbackControllerFactory(this.appContext)
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         PlaybackSettingsRepositoryProvider.get(this.appContext)
-    private val subtitleRepository: SubtitleRepository = SubtitleRepository(addonStreamsService)
+    private val subtitleRepository: SubtitleRepository = SubtitleRepository(streamResolver)
     private var activeSubtitleLookupId: String? = null
     private var activeSubtitleMediaType: MetadataLabMediaType? = null
     private val mediaSessionManager =
@@ -458,7 +458,7 @@ class PlayerSessionViewModel(
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    addonStreamsService.loadProviderStreams(
+                    streamResolver.loadProviderStreams(
                         mediaType = mediaType,
                         lookupId = lookupId,
                         providerId = normalizedProviderId,
@@ -788,9 +788,8 @@ class PlayerSessionViewModel(
 
         viewModelScope.launch {
             runCatching {
-                addonStreamsService.loadStreams(
-                    mediaType = target.mediaType,
-                    lookupId = target.lookupId,
+                streamResolver.resolve(
+                    target = target,
                     onProvidersResolved = { providers ->
                         _uiState.update { previous ->
                             if (!previous.streamSelector.matchesTarget(target)) return@update previous

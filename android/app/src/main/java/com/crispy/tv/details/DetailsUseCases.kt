@@ -16,7 +16,7 @@ import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
-import com.crispy.tv.streams.AddonStreamsService
+import com.crispy.tv.streams.StreamResolver
 import com.crispy.tv.streams.ProviderStreamsResult
 import com.crispy.tv.streams.StreamProviderDescriptor
 import java.util.Locale
@@ -70,7 +70,7 @@ internal class DetailsUseCases(
     private val catalogRepository: CatalogRepository,
     internal val userMediaRepository: UserMediaRepository,
     private val aiRepository: AiInsightsRepository,
-    private val addonStreamsService: AddonStreamsService,
+    private val streamResolver: StreamResolver,
     private val backendContextResolver: BackendContextResolver,
     private val crispyBackendClient: CrispyBackendClient,
 ) {
@@ -325,9 +325,8 @@ internal class DetailsUseCases(
         onProvidersResolved: (List<StreamProviderDescriptor>) -> Unit,
         onProviderResult: (ProviderStreamsResult) -> Unit,
     ): List<ProviderStreamsResult> {
-        return addonStreamsService.loadStreams(
-            mediaType = mediaType,
-            lookupId = lookupId,
+        return streamResolver.resolve(
+            target = StreamLookupTarget(mediaType = mediaType, lookupId = lookupId),
             onProvidersResolved = onProvidersResolved,
             onProviderResult = onProviderResult,
         )
@@ -338,7 +337,7 @@ internal class DetailsUseCases(
         lookupId: String,
         providerId: String,
     ): ProviderStreamsResult? {
-        return addonStreamsService.loadProviderStreams(
+        return streamResolver.loadProviderStreams(
             mediaType = mediaType,
             lookupId = lookupId,
             providerId = providerId,

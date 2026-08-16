@@ -19,7 +19,7 @@ import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.network.AppHttp
-import com.crispy.tv.streams.AddonStreamsService
+import com.crispy.tv.streams.StreamResolverProvider
 
 class AppGraph(
     context: Context,
@@ -46,12 +46,8 @@ class AppGraph(
         AiInsightsRepository.create(appContext, httpClient)
     }
 
-    private val addonStreamsService by lazy {
-        AddonStreamsService(
-            context = appContext,
-            addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-            httpClient = httpClient,
-        )
+    private val streamResolver by lazy {
+        StreamResolverProvider.get(appContext)
     }
 
     private val detailsUseCases: DetailsUseCases by lazy {
@@ -61,7 +57,7 @@ class AppGraph(
             userMediaRepository = userMediaRepository,
             crispyBackendClient = BackendServicesProvider.backendClient(appContext),
             aiRepository = aiInsightsRepository,
-            addonStreamsService = addonStreamsService,
+            streamResolver = streamResolver,
             backendContextResolver = BackendContextResolverProvider.get(appContext),
         )
     }

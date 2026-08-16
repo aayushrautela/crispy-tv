@@ -2,8 +2,8 @@ package com.crispy.tv.playerui
 
 import android.util.Log
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.streams.AddonStreamsService
 import com.crispy.tv.streams.AddonSubtitle
+import com.crispy.tv.streams.StreamResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 private const val TAG = "CrispySubtitles"
 
 class SubtitleRepository(
-    private val addonStreamsService: AddonStreamsService,
+    private val streamResolver: StreamResolver,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -35,7 +35,7 @@ class SubtitleRepository(
             _isLoading.value = true
             _error.value = null
             runCatching {
-                addonStreamsService.fetchAddonSubtitles(mediaType, lookupId)
+                streamResolver.fetchAddonSubtitles(mediaType, lookupId)
             }.onSuccess { subtitles ->
                 Log.d(TAG, "success count=${subtitles.size}")
                 _addonSubtitles.value = subtitles
