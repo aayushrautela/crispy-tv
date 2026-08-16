@@ -563,6 +563,8 @@ class CrispyBackendClient(
         val mediaType: String,
         val title: String,
         val poster: ResponsiveImageSet,
+        val backdrop: ResponsiveImageSet,
+        val logo: ResponsiveImageSet,
         val rating: Double?,
         val releaseYear: Int?,
     ) {

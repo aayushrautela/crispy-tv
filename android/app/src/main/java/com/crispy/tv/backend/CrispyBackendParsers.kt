@@ -717,6 +717,8 @@ internal fun CrispyBackendClient.parseMetadataPersonKnownForItems(array: JSONArr
                     mediaType = mediaType,
                     title = title,
                     poster = parseResponsiveImageSet(item.optJSONObject("poster")),
+                    backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop")),
+                    logo = parseResponsiveImageSet(item.optJSONObject("logo")),
                     rating = item.optDoubleOrNull("rating"),
                     releaseYear = item.optIntOrNull("releaseYear"),
                 )

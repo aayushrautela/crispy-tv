@@ -134,12 +134,19 @@ private fun CrispyBackendClient.MetadataPersonKnownForItem.toCatalogItem(): Cata
         ?: poster.large?.trim()?.takeIf { it.isNotBlank() }
         ?: poster.small?.trim()?.takeIf { it.isNotBlank() }
         ?: return null
+    val normalizedBackdropUrl = backdrop.medium?.trim()?.takeIf { it.isNotBlank() }
+        ?: backdrop.large?.trim()?.takeIf { it.isNotBlank() }
+        ?: backdrop.small?.trim()?.takeIf { it.isNotBlank() }
+    val normalizedLogoUrl = logo.medium?.trim()?.takeIf { it.isNotBlank() }
+        ?: logo.large?.trim()?.takeIf { it.isNotBlank() }
+        ?: logo.small?.trim()?.takeIf { it.isNotBlank() }
     return CatalogItem(
         id = normalizedItemId,
         itemId = normalizedItemId,
         title = title,
         posterUrl = normalizedPosterUrl,
-        backdropUrl = null,
+        backdropUrl = normalizedBackdropUrl,
+        logoUrl = normalizedLogoUrl,
         addonId = "backend",
         type = type,
         rating = formatRating(rating),
