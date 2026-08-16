@@ -1,6 +1,7 @@
 package com.crispy.tv.streams
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.metadata.AddonManifestSeed
 import com.crispy.tv.metadata.MetadataAddonRegistry
@@ -23,6 +24,8 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+
+private const val TAG = "CrispyAddonSubs"
 
 @Immutable
 data class AddonStream(
@@ -537,6 +540,7 @@ class AddonStreamsService(
         if (normalizedId.isBlank()) return emptyList()
 
         val endpoints = resolveSubtitleEndpoints()
+        Log.d(TAG, "fetchAddonSubtitles mediaType=$mediaType id=$normalizedId endpoints=${endpoints.size}")
         if (endpoints.isEmpty()) return emptyList()
 
         val out = ArrayList<AddonSubtitle>()
@@ -544,13 +548,21 @@ class AddonStreamsService(
         withContext(Dispatchers.IO) {
             for (endpoint in endpoints) {
                 val url = buildSubtitleResourceUrl(endpoint, mediaType, normalizedId)
-                val json = httpClient.getJsonObject(url, SUBTITLE_REQUEST_POLICY) ?: continue
+                Log.d(TAG, "subtitle GET ${endpoint.providerName} -> $url")
+                val json = httpClient.getJsonObject(url, SUBTITLE_REQUEST_POLICY)
+                if (json == null) {
+                    Log.d(TAG, "subtitle GET ${endpoint.providerName} -> null (failed/empty)")
+                    continue
+                }
+                Log.d(TAG, "subtitle GET ${endpoint.providerName} -> ok(${json.length()})")
                 val subtitles = parseAddonSubtitles(json, endpoint.providerId, endpoint.providerName)
+                Log.d(TAG, "subtitle parsed ${endpoint.providerName} count=${subtitles.size}")
                 for (subtitle in subtitles) {
                     if (seen.add(subtitle.id)) out += subtitle
                 }
             }
         }
+        Log.d(TAG, "fetchAddonSubtitles total=${out.size}")
         return out
     }
 
@@ -561,9 +573,13 @@ class AddonStreamsService(
                 .map { seed ->
                     async(Dispatchers.IO) {
                         val manifest = resolveManifest(seed) ?: return@async null
-                        if (!manifestHasSubtitleResource(manifest)) return@async null
+                        if (!manifestHasSubtitleResource(manifest)) {
+                            Log.d(TAG, "subtitle endpoint dropped (no 'subtitles' resource): ${seed.addonIdHint}")
+                            return@async null
+                        }
                         val providerId = nonBlank(manifest.optString("id")) ?: seed.addonIdHint
                         val providerName = nonBlank(manifest.optString("name")) ?: providerId
+                        Log.d(TAG, "subtitle endpoint kept: $providerName")
                         SubtitleEndpoint(
                             providerId = providerId,
                             providerName = providerName,

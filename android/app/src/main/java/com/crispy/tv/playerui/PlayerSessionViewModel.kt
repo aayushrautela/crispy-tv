@@ -302,9 +302,12 @@ class PlayerSessionViewModel(
     }
 
     fun fetchAddonSubtitles() {
-        val lookupId = activeSubtitleLookupId ?: return
-        val mediaType = activeSubtitleMediaType ?: return
-        subtitleRepository.fetchAddonSubtitles(mediaType, lookupId)
+        if (activeSubtitleLookupId == null || activeSubtitleMediaType == null) {
+            Log.d(TAG, "fetchAddonSubtitles skipped: activeSubtitleLookupId=$activeSubtitleLookupId mediaType=$activeSubtitleMediaType")
+            return
+        }
+        Log.d(TAG, "fetchAddonSubtitles lookupId=$activeSubtitleLookupId mediaType=$activeSubtitleMediaType")
+        subtitleRepository.fetchAddonSubtitles(activeSubtitleMediaType, activeSubtitleLookupId)
     }
 
     fun selectAddonSubtitle(subtitle: AddonSubtitle) {
