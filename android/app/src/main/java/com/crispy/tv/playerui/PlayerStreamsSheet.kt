@@ -101,10 +101,11 @@ internal fun PlayerStreamsSheet(
                 }
 
                 item {
-                    ProviderChipsRow(
-                        state = state,
-                        onProviderSelected = onProviderSelected,
-                    )
+                ProviderChipsRow(
+                    state = state,
+                    palette = palette,
+                    onProviderSelected = onProviderSelected,
+                )
                 }
 
                 if (
@@ -252,6 +253,7 @@ private fun episodeHeaderMetadata(
 @Composable
 private fun ProviderChipsRow(
     state: StreamSelectorUiState,
+    palette: DetailsPaletteColors,
     onProviderSelected: (String?) -> Unit,
 ) {
     Row(
