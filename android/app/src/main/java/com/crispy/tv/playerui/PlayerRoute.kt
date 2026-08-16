@@ -163,7 +163,6 @@ fun PlayerRoute(
                         }
                     },
                     update = { playerView ->
-                        session.bindExoPlayerView(playerView)
                         playerView.resizeMode = uiState.resizeMode.toExoResizeMode()
                     },
                 )
