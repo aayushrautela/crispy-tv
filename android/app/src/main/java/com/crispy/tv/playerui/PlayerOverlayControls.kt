@@ -125,14 +125,15 @@ internal fun PlayerBottomControls(
     palette: DetailsPaletteColors,
     onSeekTo: (Long) -> Unit,
     onOpenStreams: () -> Unit,
-    onOpenTracks: () -> Unit,
+    onOpenAudio: () -> Unit,
+    onOpenSubtitles: () -> Unit,
     onCycleResizeMode: () -> Unit,
     resizeMode: PlayerResizeMode,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         PlayerSeekBar(
             positionMs = positionMs,
@@ -150,11 +151,11 @@ internal fun PlayerBottomControls(
                 containerColor = palette.pillBackground,
                 contentColor = palette.onPillBackground,
             ) {
-                Text(
-                    text = buildTimePillText(positionMs = positionMs, durationMs = durationMs),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                )
+                    Text(
+                        text = buildTimePillText(positionMs = positionMs, durationMs = durationMs),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
             }
 
             PlayerPill(
@@ -165,12 +166,12 @@ internal fun PlayerBottomControls(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
                         .horizontalScroll(rememberScrollState()),
                 ) {
                     if (hasAudioTracks) {
                         IconButton(
-                            onClick = onOpenTracks,
+                            onClick = onOpenAudio,
                             modifier = Modifier.size(40.dp),
                         ) {
                             Icon(
@@ -183,7 +184,7 @@ internal fun PlayerBottomControls(
                     }
                     if (hasSubtitleTracks) {
                         IconButton(
-                            onClick = onOpenTracks,
+                            onClick = onOpenSubtitles,
                             modifier = Modifier.size(40.dp),
                         ) {
                             Icon(

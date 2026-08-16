@@ -73,7 +73,8 @@ enum class PlayerSurface {
     NONE,
     INFO,
     STREAMS,
-    TRACKS,
+    AUDIO,
+    SUBTITLES,
 }
 
 @Immutable
@@ -338,10 +339,19 @@ class PlayerSessionViewModel(
         }
     }
 
-    fun showTracks() {
+    fun showAudioTracks() {
         _uiState.update { state ->
             state.copy(
-                activeSurface = PlayerSurface.TRACKS,
+                activeSurface = PlayerSurface.AUDIO,
+                streamSelector = state.streamSelector.copy(visible = false),
+            )
+        }
+    }
+
+    fun showSubtitles() {
+        _uiState.update { state ->
+            state.copy(
+                activeSurface = PlayerSurface.SUBTITLES,
                 streamSelector = state.streamSelector.copy(visible = false),
             )
         }

@@ -50,6 +50,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,11 +110,9 @@ internal fun PlayerInfoSheet(
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.End,
                         ) {
-                            Text("Info", style = MaterialTheme.typography.titleLarge)
                             IconButton(onClick = onClose) {
                                 Icon(imageVector = Icons.Filled.Close, contentDescription = "Close")
                             }
@@ -124,7 +124,7 @@ internal fun PlayerInfoSheet(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             item {
-                                PlayerInfoHeader(details = details)
+                                PlayerInfoHeader(details = details, palette = palette)
                             }
 
                             details?.description?.trim()?.takeIf { it.isNotBlank() }?.let { description ->
@@ -216,7 +216,10 @@ internal fun PlayerInfoSheet(
 }
 
 @Composable
-private fun PlayerInfoHeader(details: MediaDetails?) {
+private fun PlayerInfoHeader(
+    details: MediaDetails?,
+    palette: DetailsPaletteColors,
+) {
     if (details == null) {
         ElevatedCard {
             Text(
@@ -228,39 +231,62 @@ private fun PlayerInfoHeader(details: MediaDetails?) {
         return
     }
 
-    val imageUrl = details.backdropUrl?.trim()?.takeIf { it.isNotBlank() } ?: details.posterUrl?.trim()?.takeIf { it.isNotBlank() }
+    val imageUrl =
+        details.backdropUrl?.trim()?.takeIf { it.isNotBlank() }
+            ?: details.posterUrl?.trim()?.takeIf { it.isNotBlank() }
     val metadata = buildHeaderMetadata(details)
 
-    ElevatedCard {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (imageUrl != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+            ) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colorStops =
+                                        arrayOf(
+                                            0f to Color.Transparent,
+                                            0.55f to Color.Transparent,
+                                            1f to palette.pageBackground,
+                                        ),
+                                ),
+                            ),
+                )
+            }
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .background(palette.pageBackground),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.BrokenImage,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 14.dp, bottom = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-            ) {
-                if (imageUrl != null) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth().height(168.dp),
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().height(168.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.BrokenImage,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
             Text(
                 text = details.title,
                 style = MaterialTheme.typography.headlineSmall,

@@ -50,6 +50,7 @@ import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.StreamProviderUiState
 import com.crispy.tv.streams.StreamSelectorUiState
+import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +59,7 @@ internal fun PlayerStreamsSheet(
     visible: Boolean,
     details: MediaDetails?,
     state: StreamSelectorUiState,
+    palette: DetailsPaletteColors,
     onDismiss: () -> Unit,
     onProviderSelected: (String?) -> Unit,
     onRetryProvider: (String) -> Unit,
@@ -265,8 +267,8 @@ private fun ProviderChipsRow(
             colors = FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 labelColor = MaterialTheme.colorScheme.onSurface,
-                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedContainerColor = palette.accent,
+                selectedLabelColor = palette.onAccent,
             ),
         )
 
@@ -280,8 +282,8 @@ private fun ProviderChipsRow(
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     labelColor = MaterialTheme.colorScheme.onSurface,
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedContainerColor = palette.accent,
+                    selectedLabelColor = palette.onAccent,
                 ),
             )
         }

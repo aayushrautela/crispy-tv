@@ -50,7 +50,8 @@ internal fun PlayerOverlay(
     onSeekTo: (Long) -> Unit,
     onShowInfo: () -> Unit,
     onShowStreams: () -> Unit,
-    onShowTracks: () -> Unit,
+    onShowAudio: () -> Unit,
+    onShowSubtitles: () -> Unit,
     onCloseSurface: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onEpisodeSelected: (String) -> Unit,
@@ -65,7 +66,7 @@ internal fun PlayerOverlay(
     onCycleResizeMode: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
 ) {
-    val overlayPadding = rememberOverlayPadding(minPadding = 20.dp)
+    val overlayPadding = rememberOverlayPadding(minPadding = 12.dp)
     val effectiveDurationMs = if (uiState.stableDurationMs > 0L) uiState.stableDurationMs else uiState.durationMs
 
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
@@ -226,7 +227,8 @@ internal fun PlayerOverlay(
                         latestOnSeekTo(it)
                     },
                     onOpenStreams = { openSurface(onShowStreams) },
-                    onOpenTracks = { openSurface(onShowTracks) },
+                    onOpenAudio = { openSurface(onShowAudio) },
+                    onOpenSubtitles = { openSurface(onShowSubtitles) },
                     onCycleResizeMode = {
                         resetControlsTimer()
                         onCycleResizeMode()
@@ -271,6 +273,7 @@ internal fun PlayerOverlay(
             visible = uiState.streamSelector.visible,
             details = uiState.details,
             state = uiState.streamSelector,
+            palette = palette,
             onDismiss = onCloseSurface,
             onProviderSelected = {
                 resetControlsTimer()
@@ -286,20 +289,27 @@ internal fun PlayerOverlay(
             },
         )
 
-        PlayerTrackSheet(
-            visible = uiState.activeSurface == PlayerSurface.TRACKS,
+        PlayerAudioSheet(
+            visible = uiState.activeSurface == PlayerSurface.AUDIO,
             audioTracks = uiState.audioTracks,
             selectedAudioTrackId = uiState.selectedAudioTrackId,
+            palette = palette,
+            onSelectAudioTrack = {
+                resetControlsTimer()
+                onSelectAudioTrack(it)
+            },
+            onDismiss = onCloseSurface,
+        )
+
+        PlayerSubtitleSheet(
+            visible = uiState.activeSurface == PlayerSurface.SUBTITLES,
             subtitleTracks = uiState.subtitleTracks,
             selectedSubtitleTrackId = uiState.selectedSubtitleTrackId,
             addonSubtitles = uiState.addonSubtitles,
             addonSubtitlesLoading = uiState.addonSubtitlesLoading,
             addonSubtitlesError = uiState.addonSubtitlesError,
             selectedAddonSubtitleId = uiState.selectedAddonSubtitleId,
-            onSelectAudioTrack = {
-                resetControlsTimer()
-                onSelectAudioTrack(it)
-            },
+            palette = palette,
             onSelectSubtitleTrack = {
                 resetControlsTimer()
                 onSelectSubtitleTrack(it)
