@@ -421,6 +421,16 @@ internal fun CrispyBackendClient.parseClientMediaCard(json: JSONObject): ClientM
         images = parseClientImages(json.optJSONObject("images")),
         progress = parseClientProgress(json.optJSONObject("progress")),
         parent = parseClientParentRef(json.optJSONObject("parent")),
+        providerIds = parseClientProviderIds(json.optJSONObject("providerIds")),
+    )
+}
+
+internal fun CrispyBackendClient.parseClientProviderIds(json: JSONObject?): MediaExternalIds {
+    val safe = json ?: JSONObject()
+    return MediaExternalIds(
+        tmdb = safe.optString("tmdb").toIntOrNull(),
+        imdb = safe.optString("imdb").ifBlank { null },
+        tvdb = safe.optString("tvdb").toIntOrNull(),
     )
 }
 
@@ -607,6 +617,7 @@ internal fun CrispyBackendClient.parseMetadataRelatedItemView(json: JSONObject):
         rating = item.rating,
         status = item.status,
         genre = item.genres.firstOrNull(),
+        providerIds = item.externalIds,
     )
 }
 

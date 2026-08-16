@@ -21,6 +21,7 @@ data class CanonicalContinueWatchingItem(
     val localKey: String = titleItemId,
     val itemType: String,
     val title: String,
+    val imdbId: String? = null,
     val episodeTitle: String? = null,
     val season: Int?,
     val episode: Int?,

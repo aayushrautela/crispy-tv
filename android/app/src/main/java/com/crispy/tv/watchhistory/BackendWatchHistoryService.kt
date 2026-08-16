@@ -578,6 +578,7 @@ class BackendWatchHistoryService(
             },
             itemType = mediaType,
             title = seriesName ?: title,
+            imdbId = providerIds?.imdb,
             episodeTitle = title.takeIf { type != MetadataLabMediaType.MOVIE },
             season = seasonNumber,
             episode = episodeNumber,

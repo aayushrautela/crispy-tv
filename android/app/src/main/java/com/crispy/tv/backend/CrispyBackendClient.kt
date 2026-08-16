@@ -254,6 +254,7 @@ class CrispyBackendClient(
         val images: ClientImages,
         val progress: ClientProgress?,
         val parent: ClientParentRef?,
+        val providerIds: MediaExternalIds? = null,
     )
 
     data class ProfileHomeSection(
@@ -358,6 +359,7 @@ class CrispyBackendClient(
         val runtimeMinutes: Int?,
         val rating: Double?,
         val images: MetadataImages,
+        val providerIds: MediaExternalIds? = null,
     ) {
         val id: String
             get() = itemId
@@ -468,6 +470,7 @@ class CrispyBackendClient(
         val rating: Double?,
         val status: String?,
         val genre: String? = null,
+        val providerIds: MediaExternalIds? = null,
     )
 
     data class MetadataVideoView(
