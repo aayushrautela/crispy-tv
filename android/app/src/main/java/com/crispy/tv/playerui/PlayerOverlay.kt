@@ -53,8 +53,6 @@ internal fun PlayerOverlay(
     onShowAudio: () -> Unit,
     onShowSubtitles: () -> Unit,
     onCloseSurface: () -> Unit,
-    onSeasonSelected: (Int) -> Unit,
-    onEpisodeSelected: (String) -> Unit,
     onProviderSelected: (String?) -> Unit,
     onRetryProvider: (String) -> Unit,
     onStreamSelected: (AddonStream) -> Unit,
@@ -251,22 +249,9 @@ internal fun PlayerOverlay(
         PlayerInfoSheet(
             visible = uiState.activeSurface == PlayerSurface.INFO,
             details = uiState.details,
-            seasons = uiState.seasons,
-            selectedSeason = uiState.selectedSeason,
-            seasonEpisodes = uiState.seasonEpisodes,
-            currentEpisodeId = uiState.currentEpisodeId,
-            episodesIsLoading = uiState.episodesIsLoading,
-            episodesStatusMessage = uiState.episodesStatusMessage,
             palette = palette,
             onClose = onCloseSurface,
-            onSeasonSelected = {
-                resetControlsTimer()
-                onSeasonSelected(it)
-            },
-            onEpisodeSelected = { episodeId ->
-                resetControlsTimer()
-                onEpisodeSelected(episodeId)
-            },
+            currentEpisodeId = uiState.currentEpisodeId,
         )
 
         PlayerStreamsSheet(

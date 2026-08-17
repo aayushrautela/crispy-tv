@@ -198,8 +198,6 @@ fun PlayerRoute(
                 onShowAudio = session::showAudioTracks,
                 onShowSubtitles = session::showSubtitles,
                 onCloseSurface = session::closeActiveSurface,
-                onSeasonSelected = session::onSeasonSelected,
-                onEpisodeSelected = session::showStreamsForEpisode,
                 onProviderSelected = session::onProviderSelected,
                 onRetryProvider = session::onRetryProvider,
                 onStreamSelected = session::onStreamSelected,
