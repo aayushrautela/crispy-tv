@@ -330,18 +330,19 @@ private fun LoadingMoreStreamsRow() {
 internal fun StaticTag(
     text: String,
     emphasized: Boolean = false,
+    palette: DetailsPaletteColors,
 ) {
     val containerColor =
         if (emphasized) {
-            MaterialTheme.colorScheme.secondaryContainer
+            palette.accent
         } else {
-            MaterialTheme.colorScheme.surfaceContainerHighest
+            palette.pillBackground
         }
     val contentColor =
         if (emphasized) {
-            MaterialTheme.colorScheme.onSecondaryContainer
+            palette.onAccent
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            palette.onPillBackground
         }
 
     Surface(

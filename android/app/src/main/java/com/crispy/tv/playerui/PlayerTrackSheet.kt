@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -221,6 +225,14 @@ internal fun PlayerSubtitleSheet(
             }
         }
     val groups = groupSubtitlesByLanguage(options)
+    val languagePills = groups.map { LanguagePill(key = it.key, label = it.label, count = it.items.size) }
+    var selectedLang by remember { mutableStateOf<String?>(null) }
+    val visibleOptions =
+        if (selectedLang == null) {
+            options
+        } else {
+            options.filter { normalizeLang(it.language) == selectedLang }
+        }
     val offSelected = selectedSubtitleTrackId == null && addonSubtitles.none { it.id == selectedAddonSubtitleId }
 
     ModalBottomSheet(
@@ -266,6 +278,15 @@ internal fun PlayerSubtitleSheet(
             }
 
             item {
+                LanguagePillsRow(
+                    languages = languagePills,
+                    selectedKey = selectedLang,
+                    palette = palette,
+                    onSelect = { selectedLang = it },
+                )
+            }
+
+            item {
                 TrackRow(
                     label = "Off",
                     subtitle = null,
@@ -276,42 +297,91 @@ internal fun PlayerSubtitleSheet(
                 )
             }
 
-            if (subtitleTracks.isEmpty() && addonSubtitles.isEmpty() && !addonSubtitlesLoading) {
+            if (visibleOptions.isEmpty() && !addonSubtitlesLoading) {
                 item { EmptyHint("No subtitle tracks available") }
             }
 
-            groups.forEach { group ->
-                item(key = "sub_header_${group.key}") {
-                    LanguageGroupHeader(label = group.label, count = group.items.size)
-                }
-                items(group.items, key = { it.key }) { option ->
-                    when (option) {
-                        is EmbeddedSubtitleOption -> {
-                            TrackRow(
-                                label = option.label,
-                                subtitle = option.track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(option.track.language) },
-                                isSelected = option.isSelected,
-                                palette = palette,
-                                leadingIcon = Icons.Filled.Subtitles,
-                                onClick = { onSelectSubtitleTrack(option.track.id) },
-                            )
-                        }
-                        is AddonSubtitleOption -> {
-                            TrackRow(
-                                label = option.label,
-                                subtitle = option.subtitle.addonName?.takeIf { it.isNotBlank() },
-                                isSelected = option.isSelected,
-                                palette = palette,
-                                leadingIcon = Icons.Filled.Subtitles,
-                                onClick = { onSelectAddonSubtitle(option.subtitle) },
-                            )
-                        }
+            items(visibleOptions, key = { it.key }) { option ->
+                when (option) {
+                    is EmbeddedSubtitleOption -> {
+                        TrackRow(
+                            label = option.label,
+                            subtitle = option.track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(option.track.language) },
+                            isSelected = option.isSelected,
+                            palette = palette,
+                            leadingIcon = Icons.Filled.Subtitles,
+                            onClick = { onSelectSubtitleTrack(option.track.id) },
+                        )
+                    }
+                    is AddonSubtitleOption -> {
+                        TrackRow(
+                            label = option.label,
+                            subtitle = option.subtitle.addonName?.takeIf { it.isNotBlank() },
+                            isSelected = option.isSelected,
+                            palette = palette,
+                            leadingIcon = Icons.Filled.Subtitles,
+                            onClick = { onSelectAddonSubtitle(option.subtitle) },
+                        )
                     }
                 }
             }
         }
     }
 }
+
+private data class LanguagePill(
+    val key: String,
+    val label: String,
+    val count: Int,
+)
+
+@Composable
+private fun LanguagePillsRow(
+    languages: List<LanguagePill>,
+    selectedKey: String?,
+    palette: DetailsPaletteColors,
+    onSelect: (String?) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = selectedKey == null,
+            onClick = { onSelect(null) },
+            label = { Text("All") },
+            shape = RoundedCornerShape(16.dp),
+            border = null,
+            colors = LanguagePillColors(palette, selectedKey == null),
+        )
+        languages.forEach { lang ->
+            FilterChip(
+                selected = selectedKey == lang.key,
+                onClick = { onSelect(lang.key) },
+                label = {
+                    Text(if (lang.count > 1) "${lang.label} (${lang.count})" else lang.label)
+                },
+                shape = RoundedCornerShape(16.dp),
+                border = null,
+                colors = LanguagePillColors(palette, selectedKey == lang.key),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguagePillColors(
+    palette: DetailsPaletteColors,
+    selected: Boolean,
+) = FilterChipDefaults.filterChipColors(
+    containerColor = palette.pillBackground,
+    labelColor = palette.onPillBackground,
+    selectedContainerColor = palette.accent,
+    selectedLabelColor = palette.onAccent,
+)
 
 @Composable
 private fun SheetTitle(text: String) {
