@@ -26,10 +26,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.BorderStroke
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -328,7 +328,7 @@ private fun OverviewBlock(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
 ) {
-    val description = details?.description?.trim().takeIf { it.isNotBlank() } ?: return
+    val description = details?.description?.trim()?.takeIf { it.isNotBlank() } ?: return
     ExpandableDescription(
         text = description,
         textAlign = TextAlign.Center,
