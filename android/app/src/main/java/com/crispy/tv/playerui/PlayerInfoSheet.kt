@@ -48,6 +48,7 @@ import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.details.formatRuntimeForHeader
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.ratings.normalizeRatingText
 
 @Composable
@@ -61,22 +62,28 @@ internal fun PlayerInfoSheet(
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = visible,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(180)),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
+                            onClick = onClose,
+                        ),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = visible,
             enter = fadeIn(animationSpec = tween(200)) + slideInHorizontally(animationSpec = tween(200)) { fullWidth -> fullWidth },
             exit = fadeOut(animationSpec = tween(180)) + slideOutHorizontally(animationSpec = tween(180)) { fullWidth -> fullWidth },
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f))
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() },
-                                onClick = onClose,
-                            ),
-                )
-
                 Surface(
                     modifier =
                         Modifier
@@ -137,9 +144,7 @@ private fun InfoSheetContent(
         if (showEpisode) {
             item { EpisodeContextBlock(details = details, currentEpisodeId = currentEpisodeId, palette = palette) }
         }
-        if (!details?.description.isNullOrBlank()) {
-            item { OverviewBlock(details = details, palette = palette) }
-        }
+        item { OverviewBlock(details = details, currentEpisodeId = currentEpisodeId, palette = palette) }
         if (showCast) {
             item { CastBlock(details = details, palette = palette) }
         }
@@ -286,46 +291,35 @@ private fun EpisodeContextBlock(
     val season = details?.seasonNumber ?: return
     val episode = details.episodeNumber ?: return
     val prefix = "S${season}E${episode}"
-    val current =
-        details.videos.firstOrNull { it.id == currentEpisodeId }
-            ?: details.videos.firstOrNull { it.season == season && it.episode == episode }
+    val current = resolveCurrentEpisode(details, currentEpisodeId)
     val title = current?.title?.trim()?.takeIf { it.isNotBlank() }
-    val overview = current?.overview?.trim()?.takeIf { it.isNotBlank() }
 
-    Column(
+    Text(
+        text =
+            buildString {
+                append("Now Playing · $prefix")
+                if (title != null) append(" — $title")
+            },
+        style = MaterialTheme.typography.bodyMedium,
+        color = palette.onPageBackground.copy(alpha = 0.8f),
+        textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text =
-                buildString {
-                    append("Now Playing · $prefix")
-                    if (title != null) append(" — $title")
-                },
-            style = MaterialTheme.typography.bodyMedium,
-            color = palette.onPageBackground.copy(alpha = 0.8f),
-            textAlign = TextAlign.Center,
-        )
-        if (overview != null) {
-            Text(
-                text = overview,
-                style = MaterialTheme.typography.bodySmall,
-                color = palette.onPageBackground.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    )
 }
 
 @Composable
 private fun OverviewBlock(
     details: MediaDetails?,
+    currentEpisodeId: String?,
     palette: DetailsPaletteColors,
 ) {
-    val description = details?.description?.trim()?.takeIf { it.isNotBlank() } ?: return
+    val baseDescription = details?.description?.trim()?.takeIf { it.isNotBlank() }
+    val episodeDescription =
+        resolveCurrentEpisode(details, currentEpisodeId)
+            ?.overview
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    val description = episodeDescription ?: baseDescription ?: return
     ExpandableDescription(
         text = description,
         textAlign = TextAlign.Center,
@@ -342,21 +336,58 @@ private fun CastBlock(
     if (cast.isEmpty()) return
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "Cast",
             style = MaterialTheme.typography.titleSmall,
             color = palette.accent,
         )
-        cast.forEach { name ->
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = palette.onPageBackground,
-            )
+        cast.forEach { entry ->
+            val (name, character) = parseCastEntry(entry)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = palette.onPageBackground,
+                )
+                if (character != null) {
+                    Text(
+                        text = "as $character",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = palette.onPageBackground.copy(alpha = 0.7f),
+                    )
+                }
+            }
         }
     }
+}
+
+private fun resolveCurrentEpisode(
+    details: MediaDetails?,
+    currentEpisodeId: String?,
+): MediaVideo? {
+    val videos = details?.videos ?: return null
+    if (!currentEpisodeId.isNullOrBlank()) {
+        videos.firstOrNull { it.id == currentEpisodeId }?.let { return it }
+    }
+    val season = details.seasonNumber
+    val episode = details.episodeNumber
+    if (season != null && episode != null) {
+        videos.firstOrNull { it.season == season && it.episode == episode }?.let { return it }
+    }
+    return null
+}
+
+private fun parseCastEntry(entry: String): Pair<String, String?> {
+    val separator = entry.indexOf(" as ")
+    if (separator < 0) return entry to null
+    val name = entry.substring(0, separator).trim()
+    val character = entry.substring(separator + 4).trim().takeIf { it.isNotBlank() }
+    return name to character
 }
 
 private fun buildCreditLine(details: MediaDetails?): String? {
