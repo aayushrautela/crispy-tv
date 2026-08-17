@@ -69,6 +69,7 @@ internal fun PlayerInfoSheet(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f))
                             .clickable(
                                 indication = null,
                                 interactionSource = remember { MutableInteractionSource() },
@@ -81,10 +82,11 @@ internal fun PlayerInfoSheet(
                         Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
-                            .fillMaxWidth(0.5f)
-                            .widthIn(max = 460.dp),
+                            .fillMaxWidth(0.4f)
+                            .widthIn(max = 400.dp),
                     color = palette.pageBackground,
                     contentColor = palette.onPageBackground,
+                    shadowElevation = 0.dp,
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         InfoSheetContent(
@@ -121,7 +123,6 @@ private fun InfoSheetContent(
     palette: DetailsPaletteColors,
     currentEpisodeId: String?,
 ) {
-    val showGenres = details?.genres?.any { it.isNotBlank() } == true
     val showCast = details?.cast?.any { it.isNotBlank() } == true
     val showEpisode = details?.seasonNumber != null && details?.episodeNumber != null
     val creditLine = buildCreditLine(details)
@@ -133,9 +134,6 @@ private fun InfoSheetContent(
     ) {
         item { TitleArea(details = details, palette = palette) }
         item { MetaRow(details = details, palette = palette) }
-        if (showGenres) {
-            item { GenresRow(details = details, palette = palette) }
-        }
         if (showEpisode) {
             item { EpisodeContextBlock(details = details, currentEpisodeId = currentEpisodeId, palette = palette) }
         }
@@ -204,8 +202,9 @@ private fun MetaRow(
     val certification = details?.certification?.trim()?.takeIf { it.isNotBlank() }
     val year = details?.year?.trim()?.takeIf { it.isNotBlank() }
     val runtime = formatRuntimeForHeader(details?.runtime)
+    val genres = details?.genres?.filter { it.isNotBlank() }.orEmpty().take(2)
 
-    if (rating == null && certification == null && year == null && runtime == null) return
+    if (rating == null && certification == null && year == null && runtime == null && genres.isEmpty()) return
 
     Row(
         modifier =
@@ -254,30 +253,6 @@ private fun MetaRow(
                 )
             }
         }
-        if (runtime != null) {
-            Text(
-                text = runtime,
-                style = MaterialTheme.typography.labelLarge,
-                color = palette.onPageBackground.copy(alpha = 0.86f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun GenresRow(
-    details: MediaDetails?,
-    palette: DetailsPaletteColors,
-) {
-    val genres = details?.genres?.filter { it.isNotBlank() }.orEmpty()
-    if (genres.isEmpty()) return
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-    ) {
         genres.forEach { genre ->
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -292,6 +267,13 @@ private fun GenresRow(
                 )
             }
         }
+        if (runtime != null) {
+            Text(
+                text = runtime,
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.onPageBackground.copy(alpha = 0.86f),
+            )
+        }
     }
 }
 
@@ -304,23 +286,38 @@ private fun EpisodeContextBlock(
     val season = details?.seasonNumber ?: return
     val episode = details.episodeNumber ?: return
     val prefix = "S${season}E${episode}"
-    val title =
-        details.videos
-            .firstOrNull { it.id == currentEpisodeId }
-            ?.title
-            ?: details.videos.firstOrNull { it.season == season && it.episode == episode }?.title
-    val text =
-        buildString {
-            append("Now Playing · $prefix")
-            if (!title.isNullOrBlank()) append(" — $title")
-        }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = palette.onPageBackground.copy(alpha = 0.8f),
-        textAlign = TextAlign.Center,
+    val current =
+        details.videos.firstOrNull { it.id == currentEpisodeId }
+            ?: details.videos.firstOrNull { it.season == season && it.episode == episode }
+    val title = current?.title?.trim()?.takeIf { it.isNotBlank() }
+    val overview = current?.overview?.trim()?.takeIf { it.isNotBlank() }
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-    )
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text =
+                buildString {
+                    append("Now Playing · $prefix")
+                    if (title != null) append(" — $title")
+                },
+            style = MaterialTheme.typography.bodyMedium,
+            color = palette.onPageBackground.copy(alpha = 0.8f),
+            textAlign = TextAlign.Center,
+        )
+        if (overview != null) {
+            Text(
+                text = overview,
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.onPageBackground.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 @Composable

@@ -14,7 +14,9 @@ internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): M
     val episodeVideos = listOfNotNull(nextEpisode?.toMediaVideo())
     val mergedVideos = (episodeVideos + videos.mapNotNull { it.toMediaVideo() }).distinctBy { it.id }
     return itemDetails.copy(
-        cast = cast.map { it.name },
+        cast = cast.map { member ->
+            if (!member.role.isNullOrBlank()) "${member.name} as ${member.role}" else member.name
+        },
         directors = directors.map { it.name },
         creators = creators.map { it.name },
         videos = mergedVideos,
