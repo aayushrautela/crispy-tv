@@ -458,10 +458,10 @@ class PlayerSessionViewModel(
                 if (top != null) {
                     playResolvedStream(top, target)
                 } else {
-                    openStreamSelector(target = target, headerEpisode = currentEpisodeForHeader(target.lookupId))
+                    openStreamSelector(target = target, headerEpisode = null)
                 }
             }
-            else -> openStreamSelector(target = target, headerEpisode = currentEpisodeForHeader(target.lookupId))
+            else -> openStreamSelector(target = target, headerEpisode = null)
         }
     }
 
@@ -852,19 +852,6 @@ class PlayerSessionViewModel(
                 }
             }
         }
-    }
-
-    private fun currentEpisodeForHeader(lookupId: String): MediaVideo? {
-        val details = uiState.value.details ?: return null
-        val videos = details.videos
-        if (videos.isEmpty()) return null
-        findEpisodeForLookupId(lookupId, videos)?.let { return it }
-        val season = uiState.value.seasonNumber
-        val episode = uiState.value.episodeNumber
-        if (season != null && episode != null) {
-            videos.firstOrNull { it.season == season && it.episode == episode }?.let { return it }
-        }
-        return null
     }
 
     private fun openStreamSelector(

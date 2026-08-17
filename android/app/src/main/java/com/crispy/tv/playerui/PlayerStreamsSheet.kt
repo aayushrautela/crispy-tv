@@ -67,6 +67,19 @@ internal fun PlayerStreamsSheet(
 ) {
     if (!visible) return
 
+    val headerEpisode =
+        state.headerEpisode
+            ?: details?.videos?.firstOrNull { it.lookupId?.equals(state.lookupId, ignoreCase = true) == true }
+            ?: run {
+                val season = details?.seasonNumber
+                val episode = details?.episodeNumber
+                if (season != null && episode != null) {
+                    details.videos.firstOrNull { it.season == season && it.episode == episode }
+                } else {
+                    null
+                }
+            }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val filteredProviders =
         remember(state.providers, state.selectedProviderId) {
@@ -97,7 +110,7 @@ internal fun PlayerStreamsSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    StreamSheetHeader(details = details, episode = state.headerEpisode)
+                    StreamSheetHeader(details = details, episode = headerEpisode)
                 }
 
                 item {
