@@ -446,6 +446,12 @@ class BackendWatchHistoryService(
             ),
         )
 
+        Log.d(
+            "WatchEvent",
+            "sendPlaybackEvent: eventType=$eventType itemId=${identity.itemId} season=${identity.season} episode=${identity.episode} " +
+                "posSec=$positionSeconds durSec=$durationSeconds payload=${playbackInput.payload}",
+        )
+
         try {
             backend.sendWatchEvent(
                 accessToken = backendContext.accessToken,
@@ -525,9 +531,15 @@ class BackendWatchHistoryService(
 
     private fun buildWatchMutationInput(request: WatchHistoryRequest): WatchMutationInput? {
         val itemId = request.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        Log.d(
+            "WatchMutation",
+            "buildWatchMutationInput: itemId=$itemId season=${request.season} episode=${request.episode} contentType=${request.contentType.label}",
+        )
         return WatchMutationInput(
             itemId = itemId,
             occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
+            seasonNumber = request.season,
+            episodeNumber = request.episode,
             payload = mapOf(
                 "source" to "android",
                 "appVersion" to appVersion,
@@ -552,11 +564,21 @@ class BackendWatchHistoryService(
     }
 
     private fun CrispyBackendClient.ClientMediaCard.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
-        val progress = progress ?: return null
+        val progress = progress
+        if (progress == null) {
+            Log.d("CWParse", "drop(itemId=${itemId}, name=${name}): progress null")
+            return null
+        }
         val progressPercent = progress.percent
             ?: progressPercent(progress.positionSeconds?.toDouble(), progress.durationSeconds?.toDouble())
-            ?: return null
-        if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) return null
+        if (progressPercent == null) {
+            Log.d("CWParse", "drop(itemId=${itemId}, name=${name}): progressPercent null (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")
+            return null
+        }
+        if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+            Log.d("CWParse", "drop(itemId=${itemId}, name=${name}): percent=$progressPercent out of [0, $CONTINUE_WATCHING_COMPLETION_PERCENT]")
+            return null
+        }
         val parentData = parent
         val seasonNumber = parentData?.seasonNumber
         val episodeNumber = parentData?.episodeNumber

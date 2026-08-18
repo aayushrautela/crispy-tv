@@ -383,6 +383,8 @@ private suspend fun CrispyBackendClient.postWatchMutationApi(
         put("itemId", input.itemId.trim())
         if (!input.occurredAt.isNullOrBlank()) put("occurredAt", input.occurredAt.trim())
         if (input.rating != null) put("rating", input.rating)
+        if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
+        if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
         put("payload", input.payload.toJsonObject())
     }.toString()
     val response = httpClient.postJson(

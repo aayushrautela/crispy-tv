@@ -1052,6 +1052,8 @@ data class WatchMutationInput(
     val itemId: String,
     val occurredAt: String? = null,
     val rating: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
     val payload: Map<String, Any?> = emptyMap(),
 )
 
