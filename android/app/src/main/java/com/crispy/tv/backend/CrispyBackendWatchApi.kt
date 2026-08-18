@@ -1,6 +1,8 @@
 package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.CalendarResponse
+import com.crispy.tv.backend.CrispyBackendClient.UpNextResponse
+import com.crispy.tv.backend.CrispyBackendClient.UpNextItem
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
 import com.crispy.tv.backend.CrispyBackendClient.ProfileHomeResponse
 import com.crispy.tv.backend.PlaybackEventInput
@@ -67,6 +69,58 @@ internal suspend fun CrispyBackendClient.getCalendarThisWeekApi(accessToken: Str
         generatedAt = json.optNullableString("generatedAt"),
         items = parseCalendarItems(json.optJSONArray("items")),
     )
+}
+
+internal suspend fun CrispyBackendClient.getUpNextApi(
+    accessToken: String,
+    profileId: String,
+    limit: Int,
+): UpNextResponse {
+    checkConfigured()
+    val response = httpClient.get(
+        url = "$baseUrl/v1/profiles/${profileId.trim()}/watch/episodic-follow".toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    return UpNextResponse(
+        profileId = json.optString("profileId").trim(),
+        source = json.optNullableString("source"),
+        kind = json.optNullableString("kind"),
+        generatedAt = json.optNullableString("generatedAt"),
+        items = parseUpNextItems(json.optJSONArray("items")),
+    )
+}
+
+internal fun CrispyBackendClient.parseUpNextItems(array: JSONArray?): List<UpNextItem> {
+    val safe = array ?: JSONArray()
+    return buildList {
+        for (i in 0 until safe.length()) {
+            val item = safe.optJSONObject(i) ?: continue
+            val show = item.optJSONObject("show")
+            val images = show?.optJSONObject("images")
+            val poster = images?.optJSONObject("poster")
+            val backdrop = images?.optJSONObject("backdrop")
+            add(
+                UpNextItem(
+                    showItemId = show?.optNullableString("itemId"),
+                    showTitle = show?.optNullableString("title"),
+                    showPosterUrl = poster?.optNullableString("medium")
+                        ?: poster?.optNullableString("large")
+                        ?: poster?.optNullableString("small"),
+                    showBackdropUrl = backdrop?.optNullableString("medium")
+                        ?: backdrop?.optNullableString("large"),
+                    nextEpisodeItemId = item.optNullableString("nextEpisodeItemId"),
+                    nextEpisodeSeasonNumber = item.optIntOrNull("nextEpisodeSeasonNumber"),
+                    nextEpisodeEpisodeNumber = item.optIntOrNull("nextEpisodeEpisodeNumber"),
+                    nextEpisodeTitle = item.optNullableString("nextEpisodeTitle"),
+                    nextEpisodeAirDate = item.optNullableString("nextEpisodeAirDate"),
+                    lastInteractedAt = item.optNullableString("lastInteractedAt"),
+                    reason = item.optNullableString("reason"),
+                ),
+            )
+        }
+    }
 }
 
 internal suspend fun CrispyBackendClient.sendWatchEventApi(

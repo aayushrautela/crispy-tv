@@ -8,6 +8,7 @@ internal class HomeRefreshCoordinator(
     private val homeWatchActivityService: HomeWatchActivityService,
     private val watchHistoryService: WatchHistoryService,
     private val calendarService: CalendarService,
+    private val upNextService: UpNextService,
     private val suppressionStore: ContinueWatchingSuppressionStore,
 ) {
     private val continueWatchingLimit = 30
@@ -115,11 +116,7 @@ internal class HomeRefreshCoordinator(
                     continueWatchingItems.isNotEmpty() || continueWatchingResult.isError
                 }.orEmpty(),
             ),
-            upNext = defaultWideRailSection(
-                key = UP_NEXT_SECTION_KEY,
-                title = "Up Next",
-                kind = HomeWideRailSectionKind.UP_NEXT,
-            ).copy(isLoading = false),
+            upNext = upNextService.loadUpNext(nowMs),
         )
     }
 

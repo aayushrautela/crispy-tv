@@ -283,6 +283,28 @@ class CrispyBackendClient(
         val items: List<MediaItem>,
     )
 
+    data class UpNextItem(
+        val showItemId: String?,
+        val showTitle: String?,
+        val showPosterUrl: String?,
+        val showBackdropUrl: String?,
+        val nextEpisodeItemId: String?,
+        val nextEpisodeSeasonNumber: Int?,
+        val nextEpisodeEpisodeNumber: Int?,
+        val nextEpisodeTitle: String?,
+        val nextEpisodeAirDate: String?,
+        val lastInteractedAt: String?,
+        val reason: String?,
+    )
+
+    data class UpNextResponse(
+        val profileId: String,
+        val source: String?,
+        val kind: String?,
+        val generatedAt: String?,
+        val items: List<UpNextItem>,
+    )
+
     // --- Watch State ---
 
     data class WatchedStateView(
@@ -832,6 +854,10 @@ class CrispyBackendClient(
 
     suspend fun getCalendarThisWeek(accessToken: String, profileId: String): CalendarResponse {
         return getCalendarThisWeekApi(accessToken, profileId)
+    }
+
+    suspend fun getUpNext(accessToken: String, profileId: String, limit: Int = 20): UpNextResponse {
+        return getUpNextApi(accessToken, profileId, limit)
     }
 
     suspend fun sendWatchEvent(accessToken: String, profileId: String, input: PlaybackEventInput): WatchActionResponse {

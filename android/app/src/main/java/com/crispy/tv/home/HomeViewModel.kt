@@ -105,6 +105,11 @@ class HomeViewModel internal constructor(
                                         backendClient = BackendServicesProvider.backendClient(appContext),
                                         backendContextResolver = BackendContextResolverProvider.get(appContext),
                                     ),
+                                upNextService =
+                                    UpNextService(
+                                        backendClient = BackendServicesProvider.backendClient(appContext),
+                                        backendContextResolver = BackendContextResolverProvider.get(appContext),
+                                    ),
                                 suppressionStore = suppressionStore,
                             ),
                             watchHistoryService = watchHistoryService,
