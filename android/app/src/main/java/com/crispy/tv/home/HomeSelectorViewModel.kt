@@ -111,7 +111,7 @@ internal class HomeSelectorViewModel(
     ) {
         val identity =
             PlaybackIdentity(
-                itemId = item.titleItemId,
+                itemId = item.id,
                 imdbId = item.imdbId,
                 contentType = mediaType,
                 season = item.season,
