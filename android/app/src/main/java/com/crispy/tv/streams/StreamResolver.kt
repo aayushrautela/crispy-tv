@@ -31,10 +31,6 @@ class StreamResolver(
     private fun cacheKey(target: StreamLookupTarget): String =
         "${target.mediaType.name.lowercase(Locale.US)}:${target.lookupId.trim()}"
 
-    private companion object {
-        private const val TAG = "StreamResolver"
-    }
-
     suspend fun resolve(
         target: StreamLookupTarget,
         onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)? = null,
@@ -99,6 +95,7 @@ class StreamResolver(
     ): List<AddonSubtitle> = addonStreamsService.fetchAddonSubtitles(mediaType, lookupId)
 
     companion object {
+        private const val TAG = "StreamResolver"
         private const val RESOLVE_TTL_MS = 5 * 60 * 1000L
     }
 }
