@@ -449,7 +449,7 @@ class BackendWatchHistoryService(
         Log.d(
             "WatchEvent",
             "sendPlaybackEvent: eventType=$eventType itemId=${identity.itemId} season=${identity.season} episode=${identity.episode} " +
-                "posSec=$positionSeconds durSec=$durationSeconds payload=${playbackInput.payload}",
+                "posSec=${playbackInput.positionSeconds} durSec=${playbackInput.durationSeconds} payload=${playbackInput.payload}",
         )
 
         try {
@@ -566,17 +566,17 @@ class BackendWatchHistoryService(
     private fun CrispyBackendClient.ClientMediaCard.toCanonicalContinueWatchingItem(nowMs: Long): CanonicalContinueWatchingItem? {
         val progress = progress
         if (progress == null) {
-            Log.d("CWParse", "drop(itemId=${itemId}, name=${name}): progress null")
+            Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): progress null")
             return null
         }
         val progressPercent = progress.percent
             ?: progressPercent(progress.positionSeconds?.toDouble(), progress.durationSeconds?.toDouble())
         if (progressPercent == null) {
-            Log.d("CWParse", "drop(itemId=${itemId}, name=${name}): progressPercent null (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")
+            Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): progressPercent null (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")
             return null
         }
         if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
-            Log.d("CWParse", "drop(itemId=${itemId}, name=${name}): percent=$progressPercent out of [0, $CONTINUE_WATCHING_COMPLETION_PERCENT]")
+            Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): percent=$progressPercent out of [0, $CONTINUE_WATCHING_COMPLETION_PERCENT]")
             return null
         }
         val parentData = parent
