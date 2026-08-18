@@ -44,7 +44,6 @@ import com.crispy.tv.metadata.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 
-@Composable
 internal fun LazyListScope.detailsBodyContent(
     uiState: DetailsUiState,
     horizontalPadding: Dp,
@@ -261,7 +260,6 @@ internal fun LazyListScope.detailsBodyContent(
                 val episodes = uiState.seasonEpisodes
                     .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
                     .take(50)
-                val episodeListState = rememberLazyListState()
 
                 when {
                     uiState.episodesIsLoading && episodes.isEmpty() -> {
@@ -292,6 +290,7 @@ internal fun LazyListScope.detailsBodyContent(
 
                     episodes.isNotEmpty() -> {
                         item(key = "episodes-row") {
+                            val episodeListState = rememberLazyListState()
                             Spacer(modifier = Modifier.height(10.dp))
                             LaunchedEffect(uiState.highlightedEpisodeId, episodes.firstOrNull()?.id) {
                                 val target = uiState.highlightedEpisodeId ?: return@LaunchedEffect
