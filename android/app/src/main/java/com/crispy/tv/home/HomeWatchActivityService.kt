@@ -44,25 +44,6 @@ class HomeWatchActivityService {
     }
 
 private fun buildContinueWatchingItem(entry: CanonicalContinueWatchingItem): CanonicalContinueWatchingItem {
-  return CanonicalContinueWatchingItem(
-    id = entry.id.trim(),
-    titleItemId = entry.titleItemId,
-    playbackItemId = entry.playbackItemId,
-    localKey = entry.localKey,
-    itemType = entry.itemType,
-    title = entry.title,
-    episodeTitle = entry.episodeTitle,
-    season = entry.season,
-    episode = entry.episode,
-    lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
-    progressPercent = entry.progressPercent,
-    backdropUrl = entry.backdropUrl,
-    posterUrl = entry.posterUrl,
-    logoUrl = entry.logoUrl,
-    stillUrl = entry.stillUrl,
-    addonId = entry.addonId,
-    subtitle = entry.subtitle,
-    absoluteEpisodeNumber = entry.absoluteEpisodeNumber,
-  )
+  return entry.copy(id = entry.id.trim())
 }
 }
