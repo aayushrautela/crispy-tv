@@ -4,6 +4,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.compose.runtime.CompositionLocalProvider
+import android.util.Log
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.library.LibraryRoute
 
@@ -12,6 +13,10 @@ internal fun NavGraphBuilder.addLibraryNavGraph(navController: NavHostController
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             LibraryRoute(
             onItemClick = { item, sharedElementKey ->
+                Log.d(
+                    "LibraryNav",
+                    "onItemClick title=${item.title} itemId=${item.itemId} type=${item.type} sharedElementKey=$sharedElementKey",
+                )
                 navController.navigate(
                     AppRoutes.homeDetailsRoute(
                         itemId = item.itemId,

@@ -115,6 +115,10 @@ internal class DetailsUseCases(
         val titleDetail = titleDetailResult?.getOrNull()
         val titleDetailError = titleDetailResult?.exceptionOrNull()
         val details = titleDetail?.toMediaDetails()?.let { ensureImdbId(it, requestedMediaType) }
+        Log.d(
+            TAG,
+            "loadScreen requestedItemId=$itemId requestedType=$requestedMediaType -> responseItemId=${details?.itemId} responseTitle=${details?.title} logoUrl=${details?.logoUrl}",
+        )
         val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
         val providerState = watchCtaResolver.resolveProviderState(details, itemId)
         val ctaResolution = watchCtaResolver.resolveWatchCta(details, providerState, nowMs)
