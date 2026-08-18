@@ -33,21 +33,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                         )
                     )
                 },
-                onContinueWatchingClick = { item, sharedElementKey ->
-                    navController.navigate(
-                        AppRoutes.homeDetailsRoute(
-                            itemId = item.titleItemId,
-                            itemType = item.type,
-                            seasonNumber = item.season,
-                            episodeNumber = item.episode,
-                            absoluteEpisodeNumber = item.absoluteEpisodeNumber,
-                            autoOpenEpisode = true,
-                            backdropUrl = item.backdropUrl,
-                            logoUrl = item.logoUrl,
-                            sharedElementKey = sharedElementKey,
-                        )
-                    )
-                },
                 onContinueWatchingOpenDetails = { item, sharedElementKey ->
                     navController.navigate(
                         AppRoutes.homeDetailsRoute(

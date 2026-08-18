@@ -33,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.playerui.PlayerActivity
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -51,7 +52,6 @@ private val HomeTopSectionSpacing = 16.dp
 @Composable
 internal fun HomeRoute(
     onHeroClick: (HomeHeroItem, String?) -> Unit,
-    onContinueWatchingClick: (CanonicalContinueWatchingItem, String?) -> Unit,
     onContinueWatchingOpenDetails: (CanonicalContinueWatchingItem, String?) -> Unit,
     onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onThisWeekSeeAllClick: () -> Unit,
@@ -68,6 +68,29 @@ internal fun HomeRoute(
             HomeViewModel.factory(appContext)
         },
     )
+    val selectorViewModel: HomeSelectorViewModel = viewModel(
+        factory = remember(appContext) {
+            HomeSelectorViewModel.factory(appContext)
+        },
+    )
+
+    LaunchedEffect(selectorViewModel) {
+        selectorViewModel.playStream.collect { selection ->
+            context.startActivity(
+                PlayerActivity.intent(
+                    context = context,
+                    identity = selection.identity,
+                    title = selection.title,
+                    subtitle = selection.subtitle,
+                    artworkUrl = selection.artworkUrl,
+                    resumePositionMs = selection.resumePositionMs,
+                    chosenStreamStableKey = selection.chosenStreamStableKey,
+                    chosenProviderId = selection.chosenProviderId,
+                )
+            )
+            selectorViewModel.dismiss()
+        }
+    }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val horizontalPadding = responsivePageHorizontalPadding()
     val lazyListState = rememberLazyListState()
@@ -186,7 +209,7 @@ internal fun HomeRoute(
                             HomeWideRailSection(
                                 section = section,
                                 horizontalPadding = horizontalPadding,
-                                onContinueWatchingClick = onContinueWatchingClick,
+                                onContinueWatchingClick = { item, _ -> selectorViewModel.openFor(item) },
                                 onContinueWatchingOpenDetails = onContinueWatchingOpenDetails,
                                 onRemoveContinueWatchingItem = viewModel::removeContinueWatchingItem,
                                 onThisWeekClick = onThisWeekClick,
@@ -198,6 +221,8 @@ internal fun HomeRoute(
             }
         }
     }
+
+    HomeStreamSelector(viewModel = selectorViewModel)
 }
 
 @Composable

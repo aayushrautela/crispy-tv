@@ -2,10 +2,14 @@ package com.crispy.tv.playerui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -14,9 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.MediaVideo
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.crispy.tv.streams.formatEpisodeReleaseDate
 
 @Composable
 internal fun EpisodeRow(
@@ -85,18 +87,28 @@ internal fun episodeRowMeta(episode: MediaVideo): String? {
     if (season != null && episodeNumber != null) {
         parts += "S$season E$episodeNumber"
     }
-    formatEpisodeDate(episode.released)?.let(parts::add)
+    formatEpisodeReleaseDate(episode.released)?.let(parts::add)
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 
-internal fun formatEpisodeDate(date: String?): String? {
-    val raw = date?.trim().orEmpty()
-    if (raw.isBlank()) return null
-    val iso = if (raw.length >= 10) raw.take(10) else raw
-    return try {
-        val parsed = LocalDate.parse(iso)
-        parsed.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
-    } catch (_: Throwable) {
-        raw
+@Composable
+internal fun StaticTag(
+    text: String,
+    emphasized: Boolean = false,
+    palette: DetailsPaletteColors,
+) {
+    val containerColor = if (emphasized) palette.accent else palette.pillBackground
+    val contentColor = if (emphasized) palette.onAccent else palette.onPillBackground
+
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = containerColor,
+        contentColor = contentColor,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+        )
     }
 }

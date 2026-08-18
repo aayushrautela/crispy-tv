@@ -1,0 +1,144 @@
+package com.crispy.tv.home
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.backend.BackendServicesProvider
+import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.metadata.buildAddonEpisodeLookupId
+import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.playback.StreamLookupTarget
+import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.streams.SelectorCoordinator
+import com.crispy.tv.streams.StreamResolverProvider
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+
+data class HomeStreamSelection(
+    val identity: PlaybackIdentity,
+    val title: String,
+    val subtitle: String?,
+    val artworkUrl: String?,
+    val resumePositionMs: Long,
+    val chosenStreamStableKey: String?,
+    val chosenProviderId: String?,
+)
+
+internal class HomeSelectorViewModel(
+    private val appContext: Context,
+) : ViewModel() {
+    private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(appContext)
+    private val supabase = SupabaseServicesProvider.accountClient(appContext)
+    private val streamResolver = StreamResolverProvider.get(appContext)
+
+    val coordinator =
+        SelectorCoordinator(
+            scope = viewModelScope,
+            streamResolver = streamResolver,
+            getMetadataItemDetail = { token, itemId ->
+                backendClient.getMetadataItemDetail(accessToken = token, itemId = itemId)
+            },
+            sessionTokenProvider = { supabase.ensureValidSession()?.accessToken },
+        )
+
+    private val _playStream = MutableSharedFlow<HomeStreamSelection>(extraBufferCapacity = 1)
+    val playStream: SharedFlow<HomeStreamSelection> = _playStream.asSharedFlow()
+
+    fun openFor(item: CanonicalContinueWatchingItem) {
+        val mediaType = item.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        val lookupId =
+            when (mediaType) {
+                MetadataLabMediaType.MOVIE -> item.imdbId ?: item.titleItemId
+                else ->
+                    buildAddonEpisodeLookupId(item.imdbId, item.season, item.episode)
+                        ?: item.titleItemId
+            }
+        val target = StreamLookupTarget(mediaType = mediaType, lookupId = lookupId)
+
+        val headerEpisode =
+            MediaVideo(
+                id = item.id,
+                title = item.episodeTitle ?: "",
+                season = item.season,
+                episode = item.episode,
+                released = null,
+                overview = item.subtitle,
+                thumbnailUrl = item.stillUrl,
+                lookupId = lookupId,
+                absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+            )
+
+        val fallbackDetails =
+            MediaDetails(
+                id = item.id,
+                itemId = item.titleItemId,
+                imdbId = item.imdbId,
+                itemType = item.itemType,
+                title = item.title,
+                posterUrl = item.posterUrl,
+                backdropUrl = item.backdropUrl,
+                logoUrl = item.logoUrl,
+                year = null,
+                description = item.subtitle,
+                addonId = item.addonId,
+                seasonNumber = item.season,
+                episodeNumber = item.episode,
+                absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+            )
+
+        coordinator.open(
+            target = target,
+            headerEpisode = headerEpisode,
+            fallbackDetails = fallbackDetails,
+            itemIdForMetadata = item.titleItemId,
+            onStreamSelected = { stream -> emitPlay(item, mediaType, stream) },
+        )
+    }
+
+    private fun emitPlay(
+        item: CanonicalContinueWatchingItem,
+        mediaType: MetadataLabMediaType,
+        stream: AddonStream,
+    ) {
+        val identity =
+            PlaybackIdentity(
+                itemId = item.titleItemId,
+                imdbId = item.imdbId,
+                contentType = mediaType,
+                season = item.season,
+                episode = item.episode,
+                title = item.title,
+                showTitle = if (mediaType != MetadataLabMediaType.MOVIE) item.title else null,
+                absoluteEpisodeNumber = item.absoluteEpisodeNumber,
+            )
+        _playStream.tryEmit(
+            HomeStreamSelection(
+                identity = identity,
+                title = item.title,
+                subtitle = item.subtitle,
+                artworkUrl = item.backdropUrl ?: item.posterUrl,
+                resumePositionMs = 0L,
+                chosenStreamStableKey = stream.stableKey,
+                chosenProviderId = stream.providerId,
+            ),
+        )
+    }
+
+    fun dismiss() = coordinator.dismiss()
+
+    companion object {
+        fun factory(context: Context): ViewModelProvider.Factory {
+            val appContext = context.applicationContext
+            return object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = HomeSelectorViewModel(appContext) as T
+            }
+        }
+    }
+}
