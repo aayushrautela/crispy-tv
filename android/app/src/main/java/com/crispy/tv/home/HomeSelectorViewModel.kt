@@ -51,7 +51,7 @@ internal class HomeSelectorViewModel(
     val playStream: SharedFlow<HomeStreamSelection> = _playStream.asSharedFlow()
 
     fun openFor(item: CanonicalContinueWatchingItem) {
-        val mediaType = item.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        val mediaType = item.type.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
         val lookupId =
             when (mediaType) {
                 MetadataLabMediaType.MOVIE -> item.imdbId ?: item.titleItemId
