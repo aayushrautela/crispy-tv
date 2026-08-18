@@ -97,6 +97,10 @@ internal class DetailsUseCases(
         val accessToken = backendContext?.accessToken ?: session?.accessToken
         val profileId = backendContext?.profileId
         cachedBaseResults[cacheKey]?.takeIf { cached -> cached.details != null && accessToken != null }?.let { cached ->
+            Log.d(
+                TAG,
+                "loadScreen CACHE HIT requestedItemId=$itemId -> cachedItemId=${cached.details?.itemId} cachedTitle=${cached.details?.title}",
+            )
             val watchCtaResolver = WatchCtaResolver(userMediaRepository, requestedMediaType)
             val providerState = watchCtaResolver.resolveProviderState(cached.details, itemId)
             val ctaResolution = watchCtaResolver.resolveWatchCta(cached.details, providerState, nowMs)

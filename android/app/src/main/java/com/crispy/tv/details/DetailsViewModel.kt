@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.home.MediaDetails
@@ -122,6 +123,10 @@ class DetailsViewModel internal constructor(
             if (!isCurrentGeneration(generation)) return@launch
 
             val enrichedDetails = result.details
+            Log.d(
+                "DetailsViewModel",
+                "rendered details itemId=${enrichedDetails?.itemId} title=${enrichedDetails?.title} logoUrl=${enrichedDetails?.logoUrl}",
+            )
 
             _uiState.update { state ->
                 val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId
