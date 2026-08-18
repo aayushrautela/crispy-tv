@@ -1061,6 +1061,8 @@ data class PlaybackEventInput(
     val itemId: String,
     val positionSeconds: Double? = null,
     val durationSeconds: Double? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
     val occurredAt: String? = null,
     val payload: Map<String, Any?> = emptyMap(),
 )

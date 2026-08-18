@@ -135,6 +135,8 @@ internal suspend fun CrispyBackendClient.sendWatchEventApi(
         put("itemId", input.itemId.trim())
         if (input.positionSeconds != null) put("positionSeconds", input.positionSeconds)
         if (input.durationSeconds != null) put("durationSeconds", input.durationSeconds)
+        if (input.seasonNumber != null) put("seasonNumber", input.seasonNumber)
+        if (input.episodeNumber != null) put("episodeNumber", input.episodeNumber)
         if (!input.occurredAt.isNullOrBlank()) put("occurredAt", input.occurredAt.trim())
         put("payload", input.payload.toJsonObject())
     }.toString()

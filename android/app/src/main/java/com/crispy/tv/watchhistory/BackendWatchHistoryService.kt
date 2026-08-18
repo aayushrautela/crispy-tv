@@ -435,6 +435,8 @@ class BackendWatchHistoryService(
             itemId = itemId,
             positionSeconds = positionMs.coerceAtLeast(0L).toDouble() / 1000.0,
             durationSeconds = durationMs.coerceAtLeast(0L).toDouble() / 1000.0,
+            seasonNumber = identity.season,
+            episodeNumber = identity.episode,
             occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
             payload = mapOf(
                 "source" to "android",
