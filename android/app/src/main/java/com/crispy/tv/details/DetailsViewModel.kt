@@ -1037,6 +1037,7 @@ class DetailsViewModel internal constructor(
                     userRating = providerState.userRating,
                     watchCta = ctaResolution.watchCta,
                     continueVideoId = ctaResolution.continueVideoId,
+                    highlightedEpisodeId = ctaResolution.continueVideoId ?: it.highlightedEpisodeId,
                     episodeWatchStates = refreshedWatchStates,
                     statusMessage = result.statusMessage,
                 )

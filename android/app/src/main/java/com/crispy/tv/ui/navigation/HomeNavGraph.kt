@@ -41,7 +41,7 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                             seasonNumber = item.season,
                             episodeNumber = item.episode,
                             absoluteEpisodeNumber = item.absoluteEpisodeNumber,
-                            highlightEpisodeId = "${item.season}:${item.episode}",
+                            highlightEpisodeId = item.playbackItemId,
                             autoOpenEpisode = false,
                             backdropUrl = item.backdropUrl,
                             logoUrl = item.logoUrl,

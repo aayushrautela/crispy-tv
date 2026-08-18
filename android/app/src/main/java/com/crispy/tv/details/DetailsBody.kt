@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -26,6 +27,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -258,6 +260,7 @@ internal fun LazyListScope.detailsBodyContent(
                 val episodes = uiState.seasonEpisodes
                     .sortedWith(compareBy<MediaVideo> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
                     .take(50)
+                val episodeListState = rememberLazyListState()
 
                 when {
                     uiState.episodesIsLoading && episodes.isEmpty() -> {
@@ -289,7 +292,13 @@ internal fun LazyListScope.detailsBodyContent(
                     episodes.isNotEmpty() -> {
                         item(key = "episodes-row") {
                             Spacer(modifier = Modifier.height(10.dp))
+                            LaunchedEffect(uiState.highlightedEpisodeId, episodes.firstOrNull()?.id) {
+                                val target = uiState.highlightedEpisodeId ?: return@LaunchedEffect
+                                val index = episodes.indexOfFirst { it.id == target }
+                                if (index >= 0) episodeListState.animateScrollToItem(index)
+                            }
                             LazyRow(
+                                state = episodeListState,
                                 contentPadding = contentPadding,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
