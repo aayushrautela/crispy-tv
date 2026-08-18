@@ -19,7 +19,6 @@ class UpNextService internal constructor(
             ).copy(
                 isLoading = false,
                 statusMessage = "Sign in and select a profile to load Up Next.",
-                isError = true,
             )
 
         val result = try {
@@ -37,7 +36,6 @@ class UpNextService internal constructor(
             ).copy(
                 isLoading = false,
                 statusMessage = "Unable to load Up Next right now.",
-                isError = true,
             )
         }
 
@@ -50,7 +48,7 @@ class UpNextService internal constructor(
         ).copy(
             items = items.map { item -> item.toWideRailItem(nowMs) },
             isLoading = false,
-            statusMessage = if (items.isEmpty()) "No episodes to watch next right now." else null,
+            statusMessage = if (items.isEmpty()) "No episodes to watch next right now." else "",
         )
     }
 
