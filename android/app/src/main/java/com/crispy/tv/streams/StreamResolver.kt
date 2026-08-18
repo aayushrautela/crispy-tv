@@ -1,6 +1,7 @@
 package com.crispy.tv.streams
 
 import android.content.Context
+import android.util.Log
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.MetadataLabMediaType
@@ -30,18 +31,29 @@ class StreamResolver(
     private fun cacheKey(target: StreamLookupTarget): String =
         "${target.mediaType.name.lowercase(Locale.US)}:${target.lookupId.trim()}"
 
+    private companion object {
+        private const val TAG = "StreamResolver"
+    }
+
     suspend fun resolve(
         target: StreamLookupTarget,
         onProvidersResolved: ((List<StreamProviderDescriptor>) -> Unit)? = null,
         onProviderResult: ((ProviderStreamsResult) -> Unit)? = null,
     ): List<ProviderStreamsResult> {
+        Log.d(TAG, "resolve() start mediaType=${target.mediaType} lookupId='${target.lookupId}'")
         val results =
-            addonStreamsService.loadStreams(
-                mediaType = target.mediaType,
-                lookupId = target.lookupId,
-                onProvidersResolved = onProvidersResolved,
-                onProviderResult = onProviderResult,
-            )
+            try {
+                addonStreamsService.loadStreams(
+                    mediaType = target.mediaType,
+                    lookupId = target.lookupId,
+                    onProvidersResolved = onProvidersResolved,
+                    onProviderResult = onProviderResult,
+                )
+            } catch (e: Throwable) {
+                Log.e(TAG, "resolve() failed mediaType=${target.mediaType} lookupId='${target.lookupId}'", e)
+                throw e
+            }
+        Log.d(TAG, "resolve() done mediaType=${target.mediaType} lookupId='${target.lookupId}' count=${results.size}")
         cacheLock.withLock {
             cache[cacheKey(target)] =
                 CacheEntry(results, System.currentTimeMillis() + RESOLVE_TTL_MS)
@@ -64,12 +76,22 @@ class StreamResolver(
         mediaType: MetadataLabMediaType,
         lookupId: String,
         providerId: String,
-    ): ProviderStreamsResult? =
-        addonStreamsService.loadProviderStreams(
-            mediaType = mediaType,
-            lookupId = lookupId,
-            providerId = providerId,
-        )
+    ): ProviderStreamsResult? {
+        Log.d(TAG, "loadProviderStreams() start mediaType=$mediaType lookupId='$lookupId' providerId='$providerId'")
+        return try {
+            addonStreamsService
+                .loadProviderStreams(
+                    mediaType = mediaType,
+                    lookupId = lookupId,
+                    providerId = providerId,
+                ).also {
+                    Log.d(TAG, "loadProviderStreams() done providerId='$providerId' found=${it != null}")
+                }
+        } catch (e: Throwable) {
+            Log.e(TAG, "loadProviderStreams() failed providerId='$providerId'", e)
+            throw e
+        }
+    }
 
     suspend fun fetchAddonSubtitles(
         mediaType: MetadataLabMediaType,
