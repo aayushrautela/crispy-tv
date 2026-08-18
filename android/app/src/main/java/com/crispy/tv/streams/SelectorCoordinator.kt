@@ -8,6 +8,7 @@ import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.applyProviderResult
 import com.crispy.tv.playback.finalizeFrom
 import com.crispy.tv.playback.matchesTarget
+import com.crispy.tv.playback.toLoadingUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,12 +84,14 @@ class SelectorCoordinator(
         streamResolver.resolve(
             target = target,
             onProvidersResolved = { descriptors ->
-                if (currentTarget != target) return@onProvidersResolved
-                _state.update { it.copy(providers = descriptors.map { d -> d.toLoadingUiState() }, isLoading = true) }
+                if (currentTarget == target) {
+                    _state.update { it.copy(providers = descriptors.map { d -> d.toLoadingUiState() }, isLoading = true) }
+                }
             },
             onProviderResult = { result ->
-                if (currentTarget != target) return@onProviderResult
-                _state.update { it.copy(providers = it.providers.applyProviderResult(result)) }
+                if (currentTarget == target) {
+                    _state.update { it.copy(providers = it.providers.applyProviderResult(result)) }
+                }
             },
         ).also { results ->
             if (currentTarget == target) {
