@@ -58,7 +58,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1253,18 +1256,18 @@ class PlayerSessionViewModel(
         }
     }
 
-    private fun reportPlaybackStopped(playbackIdentity: PlaybackIdentity) {
+    private fun reportPlaybackStopped(playbackIdentity: PlaybackIdentity): Job {
         if (hasReportedPlaybackStop) {
-            return
+            return CompletableDeferred(Unit)
         }
         hasReportedPlaybackStop = true
 
         val lastDurationMs = playbackMetrics.durationMs
         if (lastDurationMs <= 0L) {
-            return
+            return CompletableDeferred(Unit)
         }
 
-        backgroundScope.launch {
+        return backgroundScope.launch {
             watchHistoryService.onPlaybackStopped(
                 identity = playbackIdentity,
                 positionMs = playbackMetrics.positionMs,
@@ -1275,7 +1278,10 @@ class PlayerSessionViewModel(
     }
 
     override fun onCleared() {
-        activeIdentity?.let(::reportPlaybackStopped)
+        val stopJob = activeIdentity?.let(::reportPlaybackStopped)
+        if (stopJob != null) {
+            runBlocking { stopJob.join() }
+        }
         backgroundScope.cancel()
         mediaSessionManager.release()
         playbackController.release()
