@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.animation.EnterExitState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +70,7 @@ import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
+import com.crispy.tv.ui.navigation.SharedElementDurationMillis
 import com.crispy.tv.ui.navigation.animateHeroCornerRadius
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import kotlinx.coroutines.Dispatchers
@@ -112,15 +114,31 @@ internal fun HeroSection(
         val heroMaxWidth = maxWidth
         val widthPx = with(density) { heroMaxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.toPx() }
-        val bottomFadeBrush = remember(palette.pageBackground) {
-            Brush.verticalGradient(
-                colorStops = arrayOf(
-                    0f to Color.Transparent,
-                    0.66f to Color.Transparent,
-                    1f to palette.pageBackground,
-                ),
-            )
+        val heroFadeStop = 0.85f
+        val cardFadeStop = 0.66f
+        val fadeStop by if (animatedVisibilityScope != null) {
+            with(animatedVisibilityScope) {
+                transition.animateFloat(
+                    transitionSpec = { tween(SharedElementDurationMillis) },
+                    label = "hero_fade_stop",
+                ) { state ->
+                    when (state) {
+                        EnterExitState.Visible -> heroFadeStop
+                        else -> cardFadeStop
+                    }
+                }
+            }
+        } else {
+            remember { mutableStateOf(heroFadeStop) }
         }
+
+        val bottomFadeBrush = Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                fadeStop to Color.Transparent,
+                1f to palette.pageBackground,
+            ),
+        )
 
         if (details == null && imageUrl.isNullOrBlank()) {
             Box(
