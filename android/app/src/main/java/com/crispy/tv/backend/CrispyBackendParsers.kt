@@ -577,7 +577,25 @@ internal fun CrispyBackendClient.parseMetadataView(json: JSONObject): MetadataVi
         seasonCount = null,
         episodeCount = null,
         nextEpisode = null,
+        remoteTrailers = parseRemoteTrailers(json),
     )
+}
+
+private fun CrispyBackendClient.parseRemoteTrailers(json: JSONObject): List<RemoteTrailerDto> {
+    val array = json.optJSONArray("RemoteTrailers") ?: return emptyList()
+    return buildList {
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val url = item.optNullableString("Url") ?: continue
+            if (url.isBlank()) continue
+            add(
+                RemoteTrailerDto(
+                    url = url,
+                    thumbnailUrl = item.optNullableString("ThumbnailUrl"),
+                ),
+            )
+        }
+    }
 }
 
 internal fun CrispyBackendClient.parseMetadataRelatedItemViews(array: JSONArray?): List<MetadataCardView> {

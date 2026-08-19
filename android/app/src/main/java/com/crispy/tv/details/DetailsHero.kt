@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -73,6 +74,7 @@ import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.SharedElementDurationMillis
 import com.crispy.tv.ui.navigation.animateHeroCornerRadius
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
+import com.crispy.tv.home.TrailerSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -80,13 +82,18 @@ internal fun detailsHeroImageUrl(details: MediaDetails?): String? {
     return details?.backdropUrl ?: details?.posterUrl
 }
 
+internal data class HeroTrailerSource(
+    val id: String,
+    val source: TrailerSource,
+)
+
 @Composable
 internal fun HeroSection(
     details: MediaDetails?,
     imageUrl: String?,
     logoUrl: String? = null,
     palette: DetailsPaletteColors,
-    trailerKey: String?,
+    trailer: List<HeroTrailerSource> = emptyList(),
     showTrailer: Boolean,
     isTrailerPlaying: Boolean,
     isTrailerMuted: Boolean,
@@ -232,16 +239,16 @@ internal fun HeroSection(
             return@BoxWithConstraints
         }
 
-        val hasTrailer = !trailerKey.isNullOrBlank()
-        var trailerIsPlaying by remember(trailerKey) { mutableStateOf(false) }
-        var trailerHasRenderedFirstFrame by remember(trailerKey) { mutableStateOf(false) }
+        val hasTrailer = trailer.isNotEmpty()
+        var trailerIsPlaying by remember(trailer) { mutableStateOf(false) }
+        var trailerHasRenderedFirstFrame by remember(trailer) { mutableStateOf(false) }
         val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying
         val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
 
         if (showTrailer && hasTrailer) {
-            HeroYouTubeTrailerLayer(
+            HeroTrailerLayer(
                 modifier = Modifier.fillMaxSize(),
-                trailerKey = trailerKey,
+                trailer = trailer,
                 viewportWidthPx = widthPx,
                 viewportHeightPx = heightPx.toInt(),
                 shouldPlay = shouldAttemptPlayback,
@@ -390,9 +397,9 @@ private fun HeroBottomFade(
 }
 
 @Composable
-private fun HeroYouTubeTrailerLayer(
+private fun HeroTrailerLayer(
     modifier: Modifier,
-    trailerKey: String,
+    trailer: List<HeroTrailerSource>,
     viewportWidthPx: Int,
     viewportHeightPx: Int,
     shouldPlay: Boolean,
@@ -407,21 +414,41 @@ private fun HeroYouTubeTrailerLayer(
     val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
     val latestShouldPlay = rememberUpdatedState(shouldPlay)
 
-    var source by remember(trailerKey) { mutableStateOf<TrailerPlaybackSource?>(null) }
+    var currentIndex by remember(trailer) { mutableStateOf(0) }
+    var source by remember(trailer) { mutableStateOf<TrailerPlaybackSource?>(null) }
+    var advanceRequests by remember(trailer) { mutableStateOf(0) }
 
-    LaunchedEffect(trailerKey) {
+    LaunchedEffect(trailer) {
+        currentIndex = 0
         source = null
+        advanceRequests = 0
     }
 
-    LaunchedEffect(trailerKey, shouldPlay) {
+    val currentEntry = trailer.getOrNull(currentIndex)
+
+    LaunchedEffect(currentEntry, shouldPlay) {
         if (!shouldPlay) return@LaunchedEffect
         if (source != null) return@LaunchedEffect
-        source = withContext(Dispatchers.IO) {
-            YouTubeTrailerExtractor.resolve(
-                videoId = trailerKey,
-                viewportWidthPx = viewportWidthPx,
-                viewportHeightPx = viewportHeightPx,
-            )
+        val entry = currentEntry ?: return@LaunchedEffect
+        source = when (entry.source) {
+            TrailerSource.DIRECT -> TrailerPlaybackSource(videoUrl = entry.id)
+            TrailerSource.YOUTUBE -> withContext(Dispatchers.IO) {
+                YouTubeTrailerExtractor.resolve(
+                    videoId = entry.id,
+                    viewportWidthPx = viewportWidthPx,
+                    viewportHeightPx = viewportHeightPx,
+                )
+            }
+        }
+        if (source == null) advanceRequests++
+    }
+
+    LaunchedEffect(advanceRequests) {
+        if (advanceRequests <= 0) return@LaunchedEffect
+        val next = currentIndex + 1
+        if (next < trailer.size) {
+            currentIndex = next
+            source = null
         }
     }
 
@@ -454,6 +481,7 @@ private fun HeroYouTubeTrailerLayer(
     }
 
     DisposableEffect(exoPlayer) {
+        var errored = false
         val listener =
             object : Player.Listener {
                 override fun onRenderedFirstFrame() {
@@ -461,6 +489,13 @@ private fun HeroYouTubeTrailerLayer(
                     latestOnFirstFrameRendered.value()
                     if (latestShouldPlay.value) {
                         sendState(1)
+                    }
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    if (!errored) {
+                        errored = true
+                        advanceRequests++
                     }
                 }
 

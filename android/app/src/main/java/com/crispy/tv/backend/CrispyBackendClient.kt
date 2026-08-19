@@ -410,6 +410,7 @@ class CrispyBackendClient(
         val seasonCount: Int?,
         val episodeCount: Int?,
         val nextEpisode: MetadataEpisodePreview?,
+        val remoteTrailers: List<RemoteTrailerDto> = emptyList(),
     ) {
         val id: String
             get() = itemId
@@ -504,6 +505,11 @@ class CrispyBackendClient(
         val official: Boolean,
         val publishedAt: String?,
         val url: String?,
+        val thumbnailUrl: String?,
+    )
+
+    data class RemoteTrailerDto(
+        val url: String,
         val thumbnailUrl: String?,
     )
 

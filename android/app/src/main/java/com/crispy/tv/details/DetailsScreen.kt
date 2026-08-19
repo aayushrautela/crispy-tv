@@ -64,6 +64,8 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.home.TrailerSource
+import com.crispy.tv.home.classifyTrailerSource
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.animateContentAlpha
@@ -146,18 +148,25 @@ internal fun DetailsScreen(
     val visibleDetails = if (showPalettePlaceholder) null else details
     val visibleUiState = if (showPalettePlaceholder) uiState.copy(details = null, isLoading = true) else uiState
 
-    val selectedTrailer =
-        uiState.titleDetail
-            ?.videos
-            ?.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }
-            ?: uiState.titleDetail
-                ?.videos
-                ?.firstOrNull { it.key.isNotBlank() && it.type.equals("Trailer", true) }
-            ?: uiState.titleDetail
-                ?.videos
-                ?.firstOrNull { it.key.isNotBlank() }
+    val heroTrailerSources = remember(uiState.titleDetail) {
+        val remote = uiState.titleDetail?.item?.remoteTrailers
+        if (!remote.isNullOrEmpty()) {
+            remote.mapNotNull { dto ->
+                val url = dto.url.trim()
+                if (url.isBlank()) null else HeroTrailerSource(id = url, source = classifyTrailerSource(url))
+            }
+        } else {
+            val videos = uiState.titleDetail?.videos
+            val yt = videos?.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }
+                ?: videos?.firstOrNull { it.key.isNotBlank() && it.type.equals("Trailer", true) }
+                ?: videos?.firstOrNull { it.key.isNotBlank() }
+            yt?.key?.trim()?.takeIf { it.isNotBlank() }
+                ?.let { listOf(HeroTrailerSource(id = it, source = TrailerSource.YOUTUBE)) }
+                .orEmpty()
+        }
+    }
 
-    val trailerKey = selectedTrailer?.key?.trim().takeIf { !it.isNullOrBlank() }
+    val trailerKey = heroTrailerSources.firstOrNull()?.id
 
     val trailerStopScrollThresholdPx = remember(density) {
         with(density) { HERO_TRAILER_STOP_SCROLL_THRESHOLD.roundToPx() }
@@ -249,7 +258,7 @@ internal fun DetailsScreen(
                         imageUrl = imageUrl,
                         logoUrl = logoUrl,
                         palette = palette,
-                        trailerKey = trailerKey,
+                        trailer = heroTrailerSources,
                         showTrailer = showTrailer,
                         isTrailerPlaying = isTrailerPlaying,
                         isTrailerMuted = userMutedTrailer,

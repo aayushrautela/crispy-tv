@@ -105,6 +105,17 @@ data class MediaVideo(
     val absoluteEpisodeNumber: Int? = null,
 )
 
+enum class TrailerSource { DIRECT, YOUTUBE }
+
+fun classifyTrailerSource(url: String): TrailerSource {
+    val lower = url.lowercase()
+    return if (lower.contains("youtube.com/watch") || lower.contains("youtu.be/")) {
+        TrailerSource.YOUTUBE
+    } else {
+        TrailerSource.DIRECT
+    }
+}
+
 class HomeCatalogService internal constructor(
     private val backendClient: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
