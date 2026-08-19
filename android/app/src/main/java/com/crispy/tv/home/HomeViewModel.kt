@@ -15,6 +15,8 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.WatchHistoryService
+import com.crispy.tv.watchhistory.sync.WatchSyncSource
+import com.crispy.tv.network.AppHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -80,6 +82,7 @@ data class HomeUiState(
 )
 
 class HomeViewModel internal constructor(
+    private val appContext: Context,
     private val refreshCoordinator: HomeRefreshCoordinator,
     private val watchHistoryService: WatchHistoryService,
     private val suppressionStore: ContinueWatchingSuppressionStore,
@@ -96,6 +99,7 @@ class HomeViewModel internal constructor(
                         val suppressionStore = ContinueWatchingSuppressionStore(appContext)
                         @Suppress("UNCHECKED_CAST")
                         return HomeViewModel(
+                            appContext = appContext,
                             refreshCoordinator = HomeRefreshCoordinator(
                                 homeCatalogService = SupabaseServicesProvider.homeCatalogService(appContext),
                                 homeWatchActivityService = HomeWatchActivityService(),
@@ -133,6 +137,10 @@ class HomeViewModel internal constructor(
     private var initialLoadJob: Job? = null
     private var watchActivityJob: Job? = null
     private var hasAttemptedInitialLoad = false
+
+    private var watchSyncSource: WatchSyncSource? = null
+    private val backendResolver by lazy { BackendContextResolverProvider.get(appContext) }
+    private val backendClient by lazy { BackendServicesProvider.backendClient(appContext) }
 
     init {
         viewModelScope.launch {
@@ -184,6 +192,32 @@ class HomeViewModel internal constructor(
                 }
                 initialLoadJob = null
             }
+    }
+
+    fun onHomeVisible() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = backendResolver.resolve() ?: return@launch
+            watchSyncSource?.close()
+            watchSyncSource =
+                WatchSyncSource(
+                    httpClient = AppHttp.okHttp(appContext),
+                    baseUrl = backendClient.baseUrl,
+                    accessToken = context.accessToken,
+                    profileId = context.profileId,
+                    onRefetch = { refreshWatchActivityAndThisWeek() },
+                )
+            watchSyncSource?.onSurfaceVisible()
+        }
+    }
+
+    fun onHomeHidden() {
+        watchSyncSource?.onSurfaceHidden()
+    }
+
+    override fun onCleared() {
+        watchSyncSource?.close()
+        watchSyncSource = null
+        super.onCleared()
     }
 
     private fun refreshWatchActivityAndThisWeek() {
