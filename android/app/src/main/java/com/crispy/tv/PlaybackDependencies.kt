@@ -2,6 +2,7 @@ package com.crispy.tv
 
 import android.content.Context
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.metadata.BackendEpisodeListProvider
@@ -137,6 +138,27 @@ object PlaybackDependencies {
     }
 
     @Volatile
+    private var audioFocusManagerInstance: AudioFocusManager? = null
+
+    fun getAudioFocusManager(context: Context): AudioFocusManager {
+        val existing = audioFocusManagerInstance
+        if (existing != null) {
+            return existing
+        }
+        return synchronized(this) {
+            audioFocusManagerInstance ?: run {
+                val created = AudioFocusManager(context.applicationContext)
+                audioFocusManagerInstance = created
+                created
+            }
+        }
+    }
+
+    fun resetAudioFocusManager() {
+        audioFocusManagerInstance = null
+    }
+
+    @Volatile
     var metadataResolverFactory: (Context) -> MetadataLabResolver = { context ->
         newMetadataResolver(context)
     }
@@ -184,6 +206,7 @@ object PlaybackDependencies {
         }
         torrentResolverFactory = { context -> NativeTorrentResolver(context) }
         resetTorrentResolver()
+        resetAudioFocusManager()
         metadataResolverFactory = { context ->
             newMetadataResolver(context)
         }

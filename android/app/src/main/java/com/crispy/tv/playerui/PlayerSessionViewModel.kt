@@ -140,6 +140,7 @@ class PlayerSessionViewModel(
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playbackMetrics = PlaybackMetricsHolder()
     private val playbackController: PlaybackController = PlaybackDependencies.playbackControllerFactory(this.appContext)
+    private val audioFocusManager = PlaybackDependencies.getAudioFocusManager(this.appContext)
     private val torrentResolver: TorrentResolver = PlaybackDependencies.getTorrentResolver(this.appContext)
     private val playbackSettingsRepository: PlaybackSettingsRepository =
         PlaybackSettingsRepositoryProvider.get(this.appContext)
@@ -195,6 +196,7 @@ class PlayerSessionViewModel(
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     init {
+        audioFocusManager.registerSource("main") { setPlaying(false) }
         mediaSessionManager.updateMetadata(
             title = uiState.value.title,
             subtitle = uiState.value.subtitle,
@@ -1110,6 +1112,11 @@ class PlayerSessionViewModel(
             onPlaybackMetrics(snapshot)
 
             publishMediaSessionFromUiState()
+            if (uiState.value.isPlaying) {
+                audioFocusManager.acquire("main")
+            } else {
+                audioFocusManager.release("main")
+            }
             syncWatchHistory(
                 positionMs = uiState.value.positionMs,
                 durationMs = uiState.value.durationMs,
@@ -1283,6 +1290,8 @@ class PlayerSessionViewModel(
             runBlocking { stopJob.join() }
         }
         backgroundScope.cancel()
+        audioFocusManager.release("main")
+        audioFocusManager.unregisterSource("main")
         mediaSessionManager.release()
         playbackController.release()
         torrentResolver.stopAndClear()

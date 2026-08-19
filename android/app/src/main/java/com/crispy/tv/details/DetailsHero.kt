@@ -74,6 +74,7 @@ import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateHeroCornerRadius
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import com.crispy.tv.home.TrailerSource
+import com.crispy.tv.PlaybackDependencies
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -99,6 +100,7 @@ internal fun HeroSection(
     onHeroImageLoaded: () -> Unit,
     onHeroImageLoadFailed: () -> Unit,
     onToggleTrailer: () -> Unit,
+    onFocusLossPause: () -> Unit,
     itemId: String? = null,
     sharedElementKey: String? = null,
 ) {
@@ -239,6 +241,7 @@ internal fun HeroSection(
                 bottomFadeBrush = bottomFadeBrush,
                 onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
                 onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
+                onFocusLossPause = onFocusLossPause,
             )
         }
 
@@ -390,8 +393,10 @@ private fun HeroTrailerLayer(
     bottomFadeBrush: Brush,
     onFirstFrameRendered: () -> Unit,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
+    onFocusLossPause: () -> Unit,
 ) {
     val context = LocalContext.current
+    val audioFocusManager = PlaybackDependencies.getAudioFocusManager(context)
 
     val latestOnFirstFrameRendered = rememberUpdatedState(onFirstFrameRendered)
     val latestOnPlaybackState = rememberUpdatedState(onPlaybackState)
@@ -449,7 +454,10 @@ private fun HeroTrailerLayer(
     }
 
     DisposableEffect(exoPlayer) {
+        audioFocusManager.registerSource("trailer", pauseHandler = onFocusLossPause)
         onDispose {
+            audioFocusManager.unregisterSource("trailer")
+            audioFocusManager.release("trailer")
             runCatching { exoPlayer.release() }
         }
     }
@@ -536,8 +544,10 @@ private fun HeroTrailerLayer(
         exoPlayer.playWhenReady = shouldPlay
         if (shouldPlay) {
             exoPlayer.play()
+            audioFocusManager.acquire("trailer")
         } else {
             exoPlayer.pause()
+            audioFocusManager.release("trailer")
         }
     }
 

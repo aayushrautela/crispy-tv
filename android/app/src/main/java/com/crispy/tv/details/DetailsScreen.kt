@@ -274,6 +274,7 @@ internal fun DetailsScreen(
                                 }
                             }
                         },
+                        onFocusLossPause = { userPausedTrailer = true },
                         itemId = uiState.itemId,
                         sharedElementKey = sharedElementKey,
                     )

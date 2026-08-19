@@ -45,6 +45,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.ui.components.skeletonElement
 
 private const val YOUTUBE_WATCH_URL = "https://www.youtube.com/watch?v="
@@ -59,8 +60,18 @@ internal fun YouTubeExtraVideoDialog(
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val audioFocusManager = PlaybackDependencies.getAudioFocusManager(context)
+    var youTubePlayerRef by remember { mutableStateOf<YouTubePlayer?>(null) }
     var isPlayerReady by remember { mutableStateOf(false) }
     var hasError by remember { mutableStateOf(false) }
+
+    DisposableEffect(audioFocusManager) {
+        audioFocusManager.registerSource("youtube") { youTubePlayerRef?.pause() }
+        onDispose {
+            audioFocusManager.unregisterSource("youtube")
+            audioFocusManager.release("youtube")
+        }
+    }
 
     BackHandler(onBack = onDismiss)
 
@@ -117,7 +128,9 @@ internal fun YouTubeExtraVideoDialog(
                                     object : AbstractYouTubePlayerListener() {
                                         override fun onReady(youTubePlayer: YouTubePlayer) {
                                             isPlayerReady = true
+                                            youTubePlayerRef = youTubePlayer
                                             youTubePlayer.loadVideo(videoKey, 0f)
+                                            audioFocusManager.acquire("youtube")
                                         }
 
                                         override fun onError(
@@ -135,7 +148,10 @@ internal fun YouTubeExtraVideoDialog(
                                 )
                             }
                         },
-                        onRelease = { it.release() },
+                        onRelease = {
+                            audioFocusManager.release("youtube")
+                            it.release()
+                        },
                     )
 
                     if (hasError) {
