@@ -8,6 +8,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.transformations
 import coil3.transform.Transformation
+import android.util.Log
 import com.crispy.tv.images.ResponsiveImageSet
 
 @Composable
@@ -39,6 +40,13 @@ private fun rememberCrispyImageModel(
     transformations: List<Transformation> = emptyList(),
 ): ImageRequest {
     return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade, memoryCacheKey, transformations) {
+        if (memoryCacheKey != null) {
+            Log.d(
+                "CrispySharedEl",
+                "ImageModel build: t=${System.currentTimeMillis()} memoryCacheKey=$memoryCacheKey " +
+                    "urlBlank=${url.isBlank()} size=${widthPx}x${heightPx} hasPlaceholderKey=${memoryCacheKey != null}",
+            )
+        }
         ImageRequest.Builder(appContext)
             .data(url)
             .size(widthPx, heightPx)
