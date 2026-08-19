@@ -37,7 +37,6 @@ import com.crispy.tv.ratings.formatRating
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
-import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 
 @Composable
 fun LandscapeCard(
@@ -111,9 +110,6 @@ fun LandscapeCard(
             val cornerRadius = with(animatedVisibilityScope) {
                 animateCardCornerRadius(CardStyle.CardCornerRadiusDp.dp)
             }
-            val overlayAlpha = with(animatedVisibilityScope) {
-                animateCardOverlayAlpha()
-            }
             with(sharedTransitionScope) {
                 Modifier
                     .sharedElement(
@@ -124,9 +120,7 @@ fun LandscapeCard(
                     .fillMaxSize()
                     .drawWithContent {
                         drawContent()
-                        if (overlayAlpha > 0.001f) {
-                            drawRect(brush = bottomFadeBrush, alpha = overlayAlpha)
-                        }
+                        drawRect(brush = bottomFadeBrush)
                     }
             }
             } else {

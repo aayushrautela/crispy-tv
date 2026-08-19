@@ -218,6 +218,7 @@ internal fun HeroSection(
         var trailerIsPlaying by remember(trailerKey) { mutableStateOf(false) }
         var trailerHasRenderedFirstFrame by remember(trailerKey) { mutableStateOf(false) }
         val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying
+        val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
 
         if (showTrailer && hasTrailer) {
             HeroYouTubeTrailerLayer(
@@ -227,13 +228,14 @@ internal fun HeroSection(
                 viewportHeightPx = heightPx.toInt(),
                 shouldPlay = shouldAttemptPlayback,
                 isMuted = isTrailerMuted,
+                bottomFadeBrush = bottomFadeBrush,
                 onFirstFrameRendered = { trailerHasRenderedFirstFrame = true },
                 onPlaybackState = { state, _ -> trailerIsPlaying = state == 1 || state == 3 },
             )
         }
 
         val coverAlpha by animateFloatAsState(
-            targetValue = if (showTrailer && hasTrailer && trailerHasRenderedFirstFrame) 0f else 1f,
+            targetValue = if (showTrailer && hasTrailer && trailerHasRenderedFirstFrame && !isActuallyPlaying) 1f else 0f,
             animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
             label = "hero_trailer_cover_alpha",
         )
@@ -267,7 +269,6 @@ internal fun HeroSection(
         }
 
         if (hasTrailer) {
-            val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
             val icon = if (isActuallyPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
             val label = if (isActuallyPlaying) "Pause" else "Trailer"
             Surface(
@@ -378,6 +379,7 @@ private fun HeroYouTubeTrailerLayer(
     viewportHeightPx: Int,
     shouldPlay: Boolean,
     isMuted: Boolean,
+    bottomFadeBrush: Brush,
     onFirstFrameRendered: () -> Unit,
     onPlaybackState: (state: Int, timeSeconds: Double) -> Unit,
 ) {
@@ -503,7 +505,14 @@ private fun HeroYouTubeTrailerLayer(
         }
     }
 
-    Box(modifier = modifier.clipToBounds()) {
+    Box(
+        modifier = modifier
+            .clipToBounds()
+            .drawWithContent {
+                drawContent()
+                drawRect(brush = bottomFadeBrush)
+            }
+    ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
