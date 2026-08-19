@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -111,10 +112,16 @@ internal fun HeroSection(
     val horizontalPadding = responsivePageHorizontalPadding()
     val heroHeight = (configuration.screenHeightDp.dp * 0.43f).coerceIn(300.dp, 440.dp)
 
+    val hasTrailer = trailer.isNotEmpty()
+    var trailerIsPlaying by remember(trailer) { mutableStateOf(false) }
+    var trailerHasRenderedFirstFrame by remember(trailer) { mutableStateOf(false) }
+    val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(heroHeight)
+            .then(if (isActuallyPlaying) Modifier.keepScreenOn() else Modifier)
     ) {
         val heroMaxWidth = maxWidth
         val widthPx = with(density) { heroMaxWidth.roundToPx() }
@@ -219,11 +226,7 @@ internal fun HeroSection(
             return@BoxWithConstraints
         }
 
-        val hasTrailer = trailer.isNotEmpty()
-        var trailerIsPlaying by remember(trailer) { mutableStateOf(false) }
-        var trailerHasRenderedFirstFrame by remember(trailer) { mutableStateOf(false) }
         val shouldAttemptPlayback = showTrailer && hasTrailer && isTrailerPlaying
-        val isActuallyPlaying = isTrailerPlaying && trailerIsPlaying
 
         if (showTrailer && hasTrailer) {
             HeroTrailerLayer(
