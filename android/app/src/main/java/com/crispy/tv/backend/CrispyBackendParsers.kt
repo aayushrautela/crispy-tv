@@ -493,11 +493,23 @@ private fun clientMediaCardToWatchStateResponse(card: ClientMediaCard): WatchSta
     val progress = card.progress
     val lastPlayedAt = progress?.lastPlayedAt
     val played = progress?.played == true
+    val positionSeconds = progress?.positionSeconds?.toDouble()
+    val durationSeconds = progress?.durationSeconds?.toDouble()
+    val progressPercent = progress?.percent
+        ?: if (positionSeconds != null && durationSeconds != null && durationSeconds > 0.0) {
+            ((positionSeconds / durationSeconds) * 100.0).coerceIn(0.0, 100.0)
+        } else {
+            null
+        }
     return WatchStateResponse(
         itemId = card.itemId,
         played = played,
         watched = if (played && lastPlayedAt != null) WatchedStateView(watchedAt = lastPlayedAt) else null,
         playCount = progress?.playCount ?: 0,
+        resumePositionSeconds = positionSeconds,
+        durationSeconds = durationSeconds,
+        progressPercent = progressPercent,
+        lastPlayedAt = lastPlayedAt,
     )
 }
 

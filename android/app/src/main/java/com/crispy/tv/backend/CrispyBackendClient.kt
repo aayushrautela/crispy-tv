@@ -321,6 +321,10 @@ class CrispyBackendClient(
         val played: Boolean,
         val watched: WatchedStateView?,
         val playCount: Int,
+        val resumePositionSeconds: Double? = null,
+        val durationSeconds: Double? = null,
+        val progressPercent: Double? = null,
+        val lastPlayedAt: String? = null,
     )
 
     data class WatchStateEnvelope(

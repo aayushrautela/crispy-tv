@@ -60,6 +60,10 @@ data class CanonicalWatchStateSnapshot(
     val isRated: Boolean,
     val userRating: Int?,
     val playCount: Int = 0,
+    val resumePositionSeconds: Double? = null,
+    val durationSeconds: Double? = null,
+    val progressPercent: Double? = null,
+    val lastPlayedAtEpochMs: Long? = null,
 )
 
 enum class ProviderCommentScope {

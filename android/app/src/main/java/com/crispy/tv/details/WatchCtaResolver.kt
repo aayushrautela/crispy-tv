@@ -15,6 +15,10 @@ internal data class ProviderState(
     val isInWatchlist: Boolean,
     val isRated: Boolean,
     val userRating: Int?,
+    val progressPercent: Double? = null,
+    val resumePositionSeconds: Double? = null,
+    val durationSeconds: Double? = null,
+    val lastPlayedAtEpochMs: Long? = null,
 )
 
 internal class WatchCtaResolver(
@@ -64,6 +68,10 @@ internal class WatchCtaResolver(
                 isInWatchlist = snapshot.isInWatchlist,
                 isRated = snapshot.isRated,
                 userRating = snapshot.userRating,
+                progressPercent = snapshot.progressPercent,
+                resumePositionSeconds = snapshot.resumePositionSeconds,
+                durationSeconds = snapshot.durationSeconds,
+                lastPlayedAtEpochMs = snapshot.lastPlayedAtEpochMs,
             )
         }
     }
@@ -110,15 +118,31 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
         val isSeries = requestedMediaType != MetadataLabMediaType.MOVIE
         val expectedType = requestedMediaType
 
-        val continueEntry = resolveContinueWatchingEntry(details, expectedType, nowMs)
-        val canContinue =
+        // Title-level resume progress comes from the authoritative per-profile
+        // server watch state (GET /watch/state), which already carries position.
+        // Series still resolve the specific continue target (season/episode) from
+        // the canonical continue-watching list; movies use the title progress.
+        val titleProgressPercent = providerState.progressPercent
+        val continueEntry = if (isSeries) {
+            resolveContinueWatchingEntry(details, expectedType, nowMs)
+        } else {
+            null
+        }
+
+        val canContinue = if (isSeries) {
             continueEntry != null &&
                 continueEntry.progressPercent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
                 continueEntry.progressPercent < CTA_CONTINUE_COMPLETION_PERCENT
+        } else {
+            titleProgressPercent != null &&
+                titleProgressPercent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
+                titleProgressPercent < CTA_CONTINUE_COMPLETION_PERCENT
+        }
 
         if (canContinue) {
-            val continueSeason = continueEntry.season
-            val continueEpisode = continueEntry.episode
+            val progress = if (isSeries) continueEntry!!.progressPercent else titleProgressPercent!!
+            val continueSeason = continueEntry?.season
+            val continueEpisode = continueEntry?.episode
             val label =
                 if (isSeries) {
                     if (continueSeason != null && continueEpisode != null) {
@@ -132,7 +156,6 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
 
             val remainingMinutes =
                 parseRuntimeMinutes(details.runtime)?.let { runtimeMinutes ->
-                    val progress = continueEntry.progressPercent
                     val remaining = runtimeMinutes.toDouble() * (1.0 - (progress / 100.0))
                     remaining.roundToInt().coerceAtLeast(0)
                 }

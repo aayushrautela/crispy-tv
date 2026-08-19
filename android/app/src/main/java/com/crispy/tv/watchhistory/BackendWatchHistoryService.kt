@@ -526,6 +526,10 @@ class BackendWatchHistoryService(
             isRated = false,
             userRating = null,
             playCount = playCount,
+            resumePositionSeconds = resumePositionSeconds,
+            durationSeconds = durationSeconds,
+            progressPercent = progressPercent,
+            lastPlayedAtEpochMs = parseIsoToEpochMs(lastPlayedAt),
         )
     }
 
