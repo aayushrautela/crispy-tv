@@ -7,6 +7,11 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 
+data class RemoteTrailerDto(
+    val url: String,
+    val thumbnailUrl: String?,
+)
+
 class CrispyBackendClient(
     internal val httpClient: CrispyHttpClient,
     backendUrl: String,
@@ -505,11 +510,6 @@ class CrispyBackendClient(
         val official: Boolean,
         val publishedAt: String?,
         val url: String?,
-        val thumbnailUrl: String?,
-    )
-
-    data class RemoteTrailerDto(
-        val url: String,
         val thumbnailUrl: String?,
     )
 
