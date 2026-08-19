@@ -109,30 +109,14 @@ internal fun LazyListScope.detailsBodyContent(
         )
     }
 
-    if (details.directors.isNotEmpty() || details.creators.isNotEmpty()) {
-        item(key = "directors-creators") {
-            Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                Spacer(modifier = Modifier.height(14.dp))
-                if (details.directors.isNotEmpty()) {
-                    Text(
-                        text = "Director: ${details.directors.joinToString()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                if (details.creators.isNotEmpty()) {
-                    if (details.directors.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
-                    Text(
-                        text = "Creator: ${details.creators.joinToString()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
+    val isShow = details.itemType.equals("show", ignoreCase = true) ||
+        details.itemType.equals("anime", ignoreCase = true)
+    val leadingPeople = if (isShow) {
+        titleDetail?.creators.orEmpty()
+    } else {
+        titleDetail?.directors.orEmpty()
     }
-
-    val cast = titleDetail?.cast.orEmpty()
+    val cast = (leadingPeople + titleDetail?.cast.orEmpty()).distinctBy { it.personId }
     if (cast.isNotEmpty()) {
         item(key = "cast-header") {
             Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {

@@ -53,10 +53,6 @@ internal fun buildDetailsRows(
         production?.originalLanguage?.takeIf { it.isNotBlank() }?.let {
             rows += "ORIGINAL LANGUAGE" to it.uppercase()
         }
-
-        if (details.creators.isNotEmpty()) {
-            rows += "CREATED BY" to details.creators.joinToString(", ")
-        }
     } else {
         item?.overview?.takeIf { it.isNotBlank() && !it.equals(details.description, ignoreCase = true) }?.let {
             rows += "PLOT" to it
