@@ -5,6 +5,8 @@
 
 package com.crispy.tv.details
 
+import android.util.Log
+
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -119,6 +121,13 @@ internal fun DetailsScreen(
     val logoUrl = remember(details, initialLogoUrl) {
         details?.logoUrl?.trim()?.takeIf { it.isNotEmpty() } ?: initialLogoUrl
     }
+    Log.d(
+        "CrispySharedEl",
+        "DetailsScreen imageState: t=${System.currentTimeMillis()} detailsNull=${details == null} " +
+            "detailsBackdropBlank=${details?.backdropUrl.isNullOrBlank()} detailsPosterBlank=${details?.posterUrl.isNullOrBlank()} " +
+            "initialBackdropBlank=${initialBackdropUrl.isNullOrBlank()} resolvedImageUrlBlank=${imageUrl.isNullOrBlank()} " +
+            "showPalettePlaceholder=${details == null}",
+    )
     val baseScheme = MaterialTheme.colorScheme
     val fallbackSeed = baseScheme.primary
     val rawSeed by rememberSeedColor(imageUrl = imageUrl, fallbackSeed = fallbackSeed)

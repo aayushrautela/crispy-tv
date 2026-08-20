@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import android.util.Log
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -64,6 +65,13 @@ fun DetailsRoute(
     }
     val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Log.d(
+        "CrispySharedEl",
+        "DetailsRoute enter: t=${System.currentTimeMillis()} itemId=$itemId itemType=$itemType " +
+            "initialBackdropBlank=${initialBackdropUrl.isNullOrBlank()} initialLogoBlank=${initialLogoUrl.isNullOrBlank()} " +
+            "sharedElementKey=$sharedElementKey uiStateDetailsNull=${uiState.details == null}",
+    )
 
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
     preloadCrispyImage(

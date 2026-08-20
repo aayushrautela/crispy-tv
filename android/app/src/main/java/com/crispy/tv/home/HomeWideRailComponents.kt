@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.util.Log
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -242,6 +243,11 @@ internal fun HomeWideRailCard(
         width = Dimensions.WideCardWidth,
         height = Dimensions.WideCardWidth / Dimensions.WideCardAspectRatio,
         memoryCacheKey = backdropKey,
+    )
+    Log.d(
+        "CrispySharedEl",
+        "RailCard model: t=${System.currentTimeMillis()} resolvedKey=$resolvedKey backdropKey=$backdropKey " +
+            "imageUrlBlank=${item.imageUrl.isNullOrBlank()} logoUrlBlank=${item.logoUrl.isNullOrBlank()}",
     )
 
     val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {

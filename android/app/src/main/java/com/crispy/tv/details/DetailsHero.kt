@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import android.util.Log
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -109,6 +110,13 @@ internal fun HeroSection(
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
     val logoKey = resolvedKey?.let { "logo-$it" }
+    Log.d(
+        "CrispySharedEl",
+        "HeroSection enter: t=${System.currentTimeMillis()} sharedElementKey=$sharedElementKey resolvedKey=$resolvedKey " +
+            "backdropKey=$backdropKey logoKey=$logoKey detailsNull=${details == null} " +
+            "imageUrlBlank=${imageUrl.isNullOrBlank()} logoUrlBlank=${logoUrl.isNullOrBlank()} " +
+            "sharedScope=${sharedTransitionScope != null} animScope=${animatedVisibilityScope != null}",
+    )
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val horizontalPadding = responsivePageHorizontalPadding()
@@ -137,6 +145,7 @@ internal fun HeroSection(
         )
 
         if (details == null && imageUrl.isNullOrBlank()) {
+            Log.d("CrispySharedEl", "HeroSection SKELETON branch: no image -> sharedElement SKIPPED")
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -182,6 +191,7 @@ internal fun HeroSection(
                     animateHeroCornerRadius(CardStyle.CardCornerRadiusDp.dp)
                 }
                 with(sharedTransitionScope) {
+                    Log.d("CrispySharedEl", "HeroSection sharedElement ATTACHED: backdropKey=$backdropKey t=${System.currentTimeMillis()}")
                     Modifier
                         .sharedElement(
                             rememberSharedContentState(key = backdropKey),
@@ -195,6 +205,7 @@ internal fun HeroSection(
                         }
                 }
             } else {
+                Log.d("CrispySharedEl", "HeroSection sharedElement NOT attached (scope/key null): backdropKey=$backdropKey sharedScope=${sharedTransitionScope != null} animScope=${animatedVisibilityScope != null}")
                 Modifier
                     .fillMaxSize()
                     .drawWithContent {
@@ -208,9 +219,11 @@ internal fun HeroSection(
                 modifier = backdropModifier,
                 contentScale = ContentScale.Crop,
                 onSuccess = { result ->
+                    Log.d("CrispySharedEl", "HeroSection IMAGE SUCCESS: backdropKey=$backdropKey t=${System.currentTimeMillis()} dataSource=${result.result.dataSource}")
                     onHeroImageLoaded()
                 },
                 onError = { error ->
+                    Log.d("CrispySharedEl", "HeroSection IMAGE ERROR: backdropKey=$backdropKey t=${System.currentTimeMillis()} ${error.result.throwable.message}")
                     onHeroImageLoadFailed()
                 },
             )

@@ -1,6 +1,7 @@
 package com.crispy.tv.ui.components
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -66,6 +67,13 @@ private fun rememberCrispyImageModel(
     transformations: List<Transformation> = emptyList(),
 ): ImageRequest {
     return androidx.compose.runtime.remember(url, widthPx, heightPx, enableCrossfade, memoryCacheKey, transformations) {
+        if (memoryCacheKey != null) {
+            Log.d(
+                "CrispySharedEl",
+                "ImageModel build: t=${System.currentTimeMillis()} memoryCacheKey=$memoryCacheKey " +
+                    "urlBlank=${url.isBlank()} size=${widthPx}x${heightPx} hasPlaceholderKey=${memoryCacheKey != null}",
+            )
+        }
         buildCrispyImageRequest(appContext, url, widthPx, heightPx, enableCrossfade, memoryCacheKey, transformations)
     }
 }
@@ -88,6 +96,10 @@ fun preloadCrispyImage(
         widthPx = widthPx,
         heightPx = heightPx,
         memoryCacheKey = memoryCacheKey,
+    )
+    Log.d(
+        "CrispySharedEl",
+        "Preload enqueue: t=${System.currentTimeMillis()} memoryCacheKey=$memoryCacheKey urlBlank=${url.isNullOrBlank()} size=${widthPx}x${heightPx}",
     )
     SingletonImageLoader.get(appContext).enqueue(request)
 }
