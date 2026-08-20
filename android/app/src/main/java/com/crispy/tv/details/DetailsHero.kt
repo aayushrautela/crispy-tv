@@ -64,6 +64,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.memory.MemoryCache
+import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
@@ -184,19 +185,22 @@ internal fun HeroSection(
 
         if (!imageUrl.isNullOrBlank()) {
             val ctx = LocalContext.current
+            val cardCacheKey = backdropKey?.let { SharedImageMemoryKeys.getCardKey(it) }
             val memCached = runCatching {
-                SingletonImageLoader.get(ctx).memoryCache?.get(MemoryCache.Key(backdropKey ?: "")) != null
+                val key = cardCacheKey ?: MemoryCache.Key(backdropKey ?: "")
+                SingletonImageLoader.get(ctx).memoryCache?.get(key) != null
             }.getOrElse { false }
             Log.d(
                 "CrispySharedEl",
                 "HeroSection cache PROBE: backdropKey=$backdropKey t=${System.currentTimeMillis()} " +
-                    "memCached=$memCached heroSize=${widthPx}x$heightPx",
+                    "cardKeyPresent=${cardCacheKey != null} memCached=$memCached heroSize=${widthPx}x$heightPx",
             )
             val heroRequest = crispyImageRequest(
                 url = imageUrl,
                 width = heroMaxWidth,
                 height = heroHeight,
                 memoryCacheKey = backdropKey,
+                placeholderMemoryCacheKey = cardCacheKey,
             )
             val backdropModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && backdropKey != null) {
                 val cornerRadius = with(animatedVisibilityScope) {

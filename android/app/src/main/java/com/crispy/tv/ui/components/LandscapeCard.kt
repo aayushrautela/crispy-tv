@@ -150,6 +150,10 @@ fun LandscapeCard(
                         "Card IMAGE SUCCESS: t=${System.currentTimeMillis()} backdropKey=$backdropKey " +
                             "dataSource=${result.result.dataSource}",
                     )
+                    if (backdropKey != null && result.result.memoryCacheKey != null) {
+                        SharedImageMemoryKeys.putCardKey(backdropKey, result.result.memoryCacheKey!!)
+                        Log.d("CrispySharedEl", "Card PUBLISH key: backdropKey=$backdropKey published=${result.result.memoryCacheKey}")
+                    }
                 },
             )
         } else {
