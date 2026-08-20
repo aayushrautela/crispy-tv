@@ -809,9 +809,8 @@ class DetailsViewModel internal constructor(
     }
 
     fun onStreamSelected(stream: AddonStream) {
-        val playbackUrl = stream.playbackUrl
-        if (playbackUrl.isNullOrBlank()) {
-            _uiState.update { it.copy(statusMessage = "Selected stream has no playable URL.") }
+        if (!stream.hasPlayableSource()) {
+            _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
             return
         }
 

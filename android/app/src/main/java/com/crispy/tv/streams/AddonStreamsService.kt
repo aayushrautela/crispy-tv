@@ -21,8 +21,6 @@ import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.util.Locale
 
 private const val TAG = "CrispyAddonSubs"
@@ -31,18 +29,42 @@ private const val TAG = "CrispyAddonSubs"
 data class AddonStream(
     val providerId: String,
     val providerName: String,
-    val name: String?,
-    val title: String?,
-    val description: String?,
-    val url: String?,
-    val externalUrl: String?,
+    val name: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val url: String? = null,
+    val infoHash: String? = null,
+    val fileIdx: Int? = null,
+    val externalUrl: String? = null,
+    val sources: List<String> = emptyList(),
     val requestHeaders: Map<String, String> = emptyMap(),
-    val cached: Boolean,
+    val cached: Boolean = false,
     val stableKey: String,
     val subtitles: List<StreamSubtitle> = emptyList(),
+    val behaviorHints: StreamBehaviorHints = StreamBehaviorHints(),
+    val clientResolve: StreamClientResolve? = null,
 ) {
     val playbackUrl: String?
         get() = url ?: externalUrl
+
+    val directPlaybackUrl: String?
+        get() = playbackUrl?.trim()?.takeIf { it.isNotEmpty() && !it.isMagnetLink() && !it.isTorrentSchemeUrl() }
+
+    val p2pInfoHash: String?
+        get() = infoHash.normalizedInfoHash()
+            ?: (url ?: externalUrl)?.extractBtihInfoHash()
+            ?: (url ?: externalUrl)?.extractTorrentSchemeInfoHash()
+
+    val p2pFileIdx: Int?
+        get() = fileIdx ?: (url ?: externalUrl)?.extractTorrentSchemeFileIdx()
+
+    val isTorrentStream: Boolean
+        get() = !infoHash.isNullOrBlank() ||
+            url.isMagnetLink() || externalUrl.isMagnetLink() ||
+            url.isTorrentSchemeUrl() || externalUrl.isTorrentSchemeUrl()
+
+    val hasPlayableSource: Boolean
+        get() = url != null || infoHash != null || externalUrl != null || clientResolve != null
 }
 
 @Immutable
@@ -51,6 +73,152 @@ data class StreamSubtitle(
     val lang: String?,
     val name: String?,
 )
+
+@Immutable
+data class StreamBehaviorHints(
+    val bingeGroup: String? = null,
+    val notWebReady: Boolean = false,
+    val videoHash: String? = null,
+    val videoSize: Long? = null,
+    val filename: String? = null,
+    val proxyRequestHeaders: Map<String, String>? = null,
+)
+
+@Immutable
+data class StreamClientResolve(
+    val type: String? = null,
+    val infoHash: String? = null,
+    val fileIdx: Int? = null,
+    val magnetUri: String? = null,
+    val sources: List<String> = emptyList(),
+    val torrentName: String? = null,
+    val filename: String? = null,
+    val mediaType: String? = null,
+    val mediaId: String? = null,
+    val mediaOnlyId: String? = null,
+    val title: String? = null,
+    val season: Int? = null,
+    val episode: Int? = null,
+    val service: String? = null,
+    val serviceIndex: Int? = null,
+    val serviceExtension: String? = null,
+    val isCached: Boolean? = null,
+    val stream: StreamClientResolveStream? = null,
+) {
+    val isDirectDebridCandidate: Boolean
+        get() = type.equals("debrid", ignoreCase = true) &&
+            !service.isNullOrBlank() &&
+            isCached == true
+}
+
+@Immutable
+data class StreamClientResolveStream(
+    val raw: StreamClientResolveRaw? = null,
+)
+
+@Immutable
+data class StreamClientResolveRaw(
+    val torrentName: String? = null,
+    val filename: String? = null,
+    val size: Long? = null,
+    val folderSize: Long? = null,
+    val tracker: String? = null,
+    val indexer: String? = null,
+    val network: String? = null,
+    val parsed: StreamClientResolveParsed? = null,
+)
+
+@Immutable
+data class StreamClientResolveParsed(
+    val rawTitle: String? = null,
+    val parsedTitle: String? = null,
+    val year: Int? = null,
+    val resolution: String? = null,
+    val seasons: List<Int> = emptyList(),
+    val episodes: List<Int> = emptyList(),
+    val quality: String? = null,
+    val hdr: List<String> = emptyList(),
+    val codec: String? = null,
+    val audio: List<String> = emptyList(),
+    val channels: List<String> = emptyList(),
+    val languages: List<String> = emptyList(),
+    val group: String? = null,
+    val network: String? = null,
+    val edition: String? = null,
+    val duration: Long? = null,
+    val bitDepth: String? = null,
+    val extended: Boolean? = null,
+    val theatrical: Boolean? = null,
+    val remastered: Boolean? = null,
+    val unrated: Boolean? = null,
+)
+
+private fun String?.isMagnetLink(): Boolean =
+    this?.trimStart()?.startsWith("magnet:", ignoreCase = true) == true
+
+private fun String?.isTorrentSchemeUrl(): Boolean =
+    this?.trimStart()?.startsWith("torrent://", ignoreCase = true) == true
+
+private fun String?.extractTorrentSchemeInfoHash(): String? {
+    val raw = this?.trimStart()?.takeIf { it.isTorrentSchemeUrl() } ?: return null
+    return raw.removeRange(0, "torrent://".length)
+        .substringBefore('/')
+        .substringBefore('?')
+        .trim()
+        .takeIf { it.isValidInfoHash() }
+}
+
+private fun String?.extractTorrentSchemeFileIdx(): Int? {
+    val raw = this?.trimStart()?.takeIf { it.isTorrentSchemeUrl() } ?: return null
+    val path = raw.removeRange(0, "torrent://".length).substringBefore('?')
+    if ('/' !in path) return null
+    return path.substringAfter('/')
+        .trim()
+        .takeIf { it.isNotEmpty() && it.all { c -> c.isDigit() } }
+        ?.toIntOrNull()
+}
+
+private fun String.isValidInfoHash(): Boolean =
+    (length == 40 && all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }) ||
+        (length == 32 && all { it in '2'..'7' || it.lowercaseChar() in 'a'..'z' })
+
+private fun String?.normalizedInfoHash(): String? =
+    this?.trim()?.takeIf { it.isNotEmpty() }
+
+private fun String?.extractBtihInfoHash(): String? {
+    val raw = this?.trim()?.takeIf { it.startsWith("magnet:", ignoreCase = true) } ?: return null
+    val marker = "btih:"
+    val markerIndex = raw.indexOf(marker, ignoreCase = true)
+    if (markerIndex < 0) return null
+    val start = markerIndex + marker.length
+    val end = raw.indexOf('&', start).takeIf { it >= 0 } ?: raw.length
+    return raw.substring(start, end).trim().takeIf { it.isNotEmpty() }
+}
+
+private val ADDON_URL_HEX = "0123456789ABCDEF"
+
+private fun String.encodeAddonPathSegment(): String =
+    buildString {
+        encodeToByteArray().forEach { byte ->
+            val value = byte.toInt() and 0xFF
+            val char = value.toChar()
+            if (
+                char in 'a'..'z' ||
+                char in 'A'..'Z' ||
+                char in '0'..'9' ||
+                char == '-' ||
+                char == '_' ||
+                char == '.' ||
+                char == '~'
+            ) {
+                append(char)
+            } else {
+                append('%')
+                append(ADDON_URL_HEX[value shr 4])
+                append(ADDON_URL_HEX[value and 0x0F])
+            }
+        }
+    }
 
 @Immutable
 data class AddonSubtitle(
@@ -101,7 +269,7 @@ class AddonStreamsService(
 
         val candidates =
             orderedEndpoints(resolveEndpoints(), preferredProviderId)
-                .filter { endpoint -> endpoint.supports(mediaType) }
+                .filter { endpoint -> endpoint.supports(mediaType, normalizedLookupId) }
         onProvidersResolved?.invoke(
             candidates.map { endpoint ->
                 StreamProviderDescriptor(
@@ -148,7 +316,7 @@ class AddonStreamsService(
             resolveEndpoints().firstOrNull { candidate ->
                 candidate.providerId.equals(providerId, ignoreCase = true)
             } ?: return null
-        if (!endpoint.supports(mediaType)) {
+        if (!endpoint.supports(mediaType, normalizedLookupId)) {
             return ProviderStreamsResult(
                 providerId = endpoint.providerId,
                 providerName = endpoint.providerName,
@@ -214,6 +382,7 @@ class AddonStreamsService(
             baseUrl = seed.baseUrl,
             encodedQuery = seed.encodedQuery.orEmpty(),
             supportedTypes = streamSupport.types,
+            idPrefixes = streamSupport.idPrefixes,
         )
     }
 
@@ -233,18 +402,22 @@ class AddonStreamsService(
     }
 
     private fun parseStreamSupport(manifest: JSONObject?): StreamSupport {
-        val defaultTypes = setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME)
+        val defaultTypes =
+            parseMediaTypes(manifest?.optJSONArray("types"))
+                .ifEmpty { setOf(MetadataLabMediaType.MOVIE, MetadataLabMediaType.SERIES, MetadataLabMediaType.ANIME) }
+        val defaultPrefixes = parseStringList(manifest?.optJSONArray("idPrefixes"))
         if (manifest == null) {
-            return StreamSupport(supported = true, types = defaultTypes)
+            return StreamSupport(supported = true, types = defaultTypes, idPrefixes = defaultPrefixes.toSet())
         }
 
         val resources = manifest.optJSONArray("resources")
         if (resources == null || resources.length() == 0) {
-            return StreamSupport(supported = true, types = defaultTypes)
+            return StreamSupport(supported = true, types = defaultTypes, idPrefixes = defaultPrefixes.toSet())
         }
 
         var streamDeclared = false
         val supportedTypes = linkedSetOf<MetadataLabMediaType>()
+        val idPrefixes = linkedSetOf<String>()
 
         for (index in 0 until resources.length()) {
             when (val resource = resources.opt(index)) {
@@ -252,6 +425,7 @@ class AddonStreamsService(
                     if (resource.equals("stream", ignoreCase = true)) {
                         streamDeclared = true
                         supportedTypes += defaultTypes
+                        idPrefixes += defaultPrefixes
                     }
                 }
 
@@ -260,23 +434,19 @@ class AddonStreamsService(
                     if (!name.equals("stream", ignoreCase = true)) continue
                     streamDeclared = true
 
-                    val types =
-                        parseMediaTypes(resource.optJSONArray("types")).ifEmpty {
-                            defaultTypes
-                        }
-                    for (type in types) {
-                        supportedTypes += type
-                    }
+                    val types = parseMediaTypes(resource.optJSONArray("types")).ifEmpty { defaultTypes }
+                    supportedTypes += types
+                    idPrefixes += parseStringList(resource.optJSONArray("idPrefixes")).ifEmpty { defaultPrefixes }
                 }
             }
         }
 
         if (!streamDeclared) {
-            return StreamSupport(supported = false, types = emptySet())
+            return StreamSupport(supported = false, types = emptySet(), idPrefixes = emptySet())
         }
 
         val finalTypes = if (supportedTypes.isEmpty()) defaultTypes else supportedTypes
-        return StreamSupport(supported = true, types = finalTypes)
+        return StreamSupport(supported = true, types = finalTypes, idPrefixes = idPrefixes)
     }
 
     private suspend fun fetchProviderStreams(
@@ -332,19 +502,40 @@ class AddonStreamsService(
             val streamObject = array.optJSONObject(index) ?: continue
             val name = nonBlank(streamObject.optString("name"))
             val title = nonBlank(streamObject.optString("title"))
-            val description = nonBlank(streamObject.optString("description"))
+            val description = nonBlank(streamObject.optString("description")) ?: title
             val url = nonBlank(streamObject.optString("url"))
+            val infoHash = nonBlank(streamObject.optString("infoHash"))
             val externalUrl = nonBlank(streamObject.optString("externalUrl"))
-            if (url == null && externalUrl == null) continue
+            val fileIdx = parseIntOrNull(streamObject, "fileIdx")
+            val sources = parseStringList(streamObject.optJSONArray("sources"))
+            val clientResolveObject = streamObject.optJSONObject("clientResolve")
+            if (url == null && infoHash == null && externalUrl == null && clientResolveObject == null) continue
 
-            val dedupeKey = listOf(url.orEmpty(), externalUrl.orEmpty(), name.orEmpty(), title.orEmpty()).joinToString("|")
+            val dedupeKey =
+                listOf(
+                    url.orEmpty(),
+                    externalUrl.orEmpty(),
+                    infoHash.orEmpty(),
+                    name.orEmpty(),
+                    title.orEmpty(),
+                ).joinToString("|")
             if (!dedupe.add(dedupeKey)) continue
 
-            val behaviorHints = streamObject.optJSONObject("behaviorHints")
-            val cached = behaviorHints?.optBoolean("cached", false) ?: false
-            val requestHeaders = parseRequestHeaders(behaviorHints?.optJSONObject("headers"))
+            val hintsObj = streamObject.optJSONObject("behaviorHints")
+            val proxyHeaders = hintsObj?.optJSONObject("proxyHeaders")?.optJSONObject("request")
+            val requestHeaders = parseRequestHeaders(proxyHeaders)
+            val behaviorHints =
+                StreamBehaviorHints(
+                    bingeGroup = nonBlank(hintsObj?.optString("bingeGroup")),
+                    notWebReady = (hintsObj?.optBoolean("notWebReady") ?: false) || proxyHeaders != null,
+                    videoHash = nonBlank(hintsObj?.optString("videoHash")),
+                    videoSize = hintsObj?.optLong("videoSize")?.takeIf { it > 0L },
+                    filename = nonBlank(hintsObj?.optString("filename")),
+                    proxyRequestHeaders = requestHeaders.ifEmpty { null },
+                )
             val stableKey = buildStableKey(providerId, dedupeKey)
             val subtitles = parseStreamSubtitles(streamObject.optJSONArray("subtitles"))
+            val clientResolve = parseClientResolve(clientResolveObject)
 
             out +=
                 AddonStream(
@@ -354,14 +545,124 @@ class AddonStreamsService(
                     title = title,
                     description = description,
                     url = url,
+                    infoHash = infoHash,
+                    fileIdx = fileIdx,
                     externalUrl = externalUrl,
+                    sources = sources,
                     requestHeaders = requestHeaders,
-                    cached = cached,
+                    cached = hintsObj?.optBoolean("cached", false) ?: false,
                     stableKey = stableKey,
                     subtitles = subtitles,
+                    behaviorHints = behaviorHints,
+                    clientResolve = clientResolve,
                 )
         }
 
+        return out
+    }
+
+    private fun parseClientResolve(obj: JSONObject?): StreamClientResolve? {
+        if (obj == null) return null
+        return StreamClientResolve(
+            type = nonBlank(obj.optString("type")),
+            infoHash = nonBlank(obj.optString("infoHash")),
+            fileIdx = parseIntOrNull(obj, "fileIdx"),
+            magnetUri = nonBlank(obj.optString("magnetUri")),
+            sources = parseStringList(obj.optJSONArray("sources")),
+            torrentName = nonBlank(obj.optString("torrentName")),
+            filename = nonBlank(obj.optString("filename")),
+            mediaType = nonBlank(obj.optString("mediaType")),
+            mediaId = nonBlank(obj.optString("mediaId")),
+            mediaOnlyId = nonBlank(obj.optString("mediaOnlyId")),
+            title = nonBlank(obj.optString("title")),
+            season = parseIntOrNull(obj, "season"),
+            episode = parseIntOrNull(obj, "episode"),
+            service = nonBlank(obj.optString("service")),
+            serviceIndex = parseIntOrNull(obj, "serviceIndex"),
+            serviceExtension = nonBlank(obj.optString("serviceExtension")),
+            isCached = if (obj.has("isCached")) obj.optBoolean("isCached") else null,
+            stream = parseClientResolveStream(obj.optJSONObject("stream")),
+        )
+    }
+
+    private fun parseClientResolveStream(obj: JSONObject?): StreamClientResolveStream? {
+        if (obj == null) return null
+        return StreamClientResolveStream(raw = parseClientResolveRaw(obj.optJSONObject("raw")))
+    }
+
+    private fun parseClientResolveRaw(obj: JSONObject?): StreamClientResolveRaw? {
+        if (obj == null) return null
+        return StreamClientResolveRaw(
+            torrentName = nonBlank(obj.optString("torrentName")),
+            filename = nonBlank(obj.optString("filename")),
+            size = obj.optLong("size").takeIf { it > 0L },
+            folderSize = obj.optLong("folderSize").takeIf { it > 0L },
+            tracker = nonBlank(obj.optString("tracker")),
+            indexer = nonBlank(obj.optString("indexer")),
+            network = nonBlank(obj.optString("network")),
+            parsed = parseClientResolveParsed(obj.optJSONObject("parsed")),
+        )
+    }
+
+    private fun parseClientResolveParsed(obj: JSONObject?): StreamClientResolveParsed? {
+        if (obj == null) return null
+        return StreamClientResolveParsed(
+            rawTitle = nonBlank(obj.optString("raw_title")),
+            parsedTitle = nonBlank(obj.optString("parsed_title")),
+            year = parseIntOrNull(obj, "year"),
+            resolution = nonBlank(obj.optString("resolution")),
+            seasons = parseIntList(obj.optJSONArray("seasons")),
+            episodes = parseIntList(obj.optJSONArray("episodes")),
+            quality = nonBlank(obj.optString("quality")),
+            hdr = parseStringList(obj.optJSONArray("hdr")),
+            codec = nonBlank(obj.optString("codec")),
+            audio = parseStringList(obj.optJSONArray("audio")),
+            channels = parseStringList(obj.optJSONArray("channels")),
+            languages = parseStringList(obj.optJSONArray("languages")),
+            group = nonBlank(obj.optString("group")),
+            network = nonBlank(obj.optString("network")),
+            edition = nonBlank(obj.optString("edition")),
+            duration = obj.optLong("duration").takeIf { it > 0L },
+            bitDepth = nonBlank(obj.optString("bit_depth")),
+            extended = if (obj.has("extended")) obj.optBoolean("extended") else null,
+            theatrical = if (obj.has("theatrical")) obj.optBoolean("theatrical") else null,
+            remastered = if (obj.has("remastered")) obj.optBoolean("remastered") else null,
+            unrated = if (obj.has("unrated")) obj.optBoolean("unrated") else null,
+        )
+    }
+
+    private fun parseIntOrNull(obj: JSONObject, name: String): Int? {
+        val raw = obj.opt(name) ?: return null
+        return when (raw) {
+            is Int -> raw.takeIf { it >= 0 }
+            is String -> raw.toIntOrNull()?.takeIf { it >= 0 }
+            else -> null
+        }
+    }
+
+    private fun parseStringList(array: JSONArray?): List<String> {
+        if (array == null || array.length() == 0) return emptyList()
+        val out = ArrayList<String>(array.length())
+        for (index in 0 until array.length()) {
+            val value = nonBlank(array.optString(index)) ?: continue
+            out += value
+        }
+        return out
+    }
+
+    private fun parseIntList(array: JSONArray?): List<Int> {
+        if (array == null || array.length() == 0) return emptyList()
+        val out = ArrayList<Int>(array.length())
+        for (index in 0 until array.length()) {
+            val raw = array.opt(index) ?: continue
+            val value =
+                when (raw) {
+                    is Int -> raw
+                    is String -> raw.toIntOrNull()
+                    else -> null
+                } ?: continue
+            out += value
+        }
         return out
     }
 
@@ -382,7 +683,7 @@ class AddonStreamsService(
         mediaType: MetadataLabMediaType,
         formattedLookupId: String,
     ): String {
-        val encodedId = URLEncoder.encode(formattedLookupId, StandardCharsets.UTF_8.name())
+        val encodedId = formattedLookupId.encodeAddonPathSegment()
         val base = "${endpoint.baseUrl}/stream/${mediaType.asApiPath()}/$encodedId.json"
         return if (endpoint.encodedQuery.isBlank()) base else "$base?${endpoint.encodedQuery}"
     }
@@ -547,6 +848,10 @@ class AddonStreamsService(
         val seen = LinkedHashSet<String>()
         withContext(Dispatchers.IO) {
             for (endpoint in endpoints) {
+                if (!endpoint.supports(mediaType, normalizedId)) {
+                    Log.d(TAG, "subtitle endpoint skipped (type/prefix mismatch): ${endpoint.providerName}")
+                    continue
+                }
                 val url = buildSubtitleResourceUrl(endpoint, mediaType, normalizedId)
                 Log.d(TAG, "subtitle GET ${endpoint.providerName} -> $url")
                 val json = httpClient.getJsonObject(url, SUBTITLE_REQUEST_POLICY)
@@ -573,7 +878,7 @@ class AddonStreamsService(
                 .map { seed ->
                     async(Dispatchers.IO) {
                         val manifest = resolveManifest(seed) ?: return@async null
-                        if (!manifestHasSubtitleResource(manifest)) {
+                        val resource = subtitleResourceFor(manifest) ?: run {
                             Log.d(TAG, "subtitle endpoint dropped (no 'subtitles' resource): ${seed.addonIdHint}")
                             return@async null
                         }
@@ -585,24 +890,39 @@ class AddonStreamsService(
                             providerName = providerName,
                             baseUrl = seed.baseUrl,
                             encodedQuery = seed.encodedQuery.orEmpty(),
+                            types = resource.types,
+                            idPrefixes = resource.idPrefixes,
                         )
                     }
                 }.awaitAll()
         }.filterNotNull()
     }
 
-    private fun manifestHasSubtitleResource(manifest: JSONObject): Boolean {
-        val resources = manifest.optJSONArray("resources") ?: return false
+    private fun subtitleResourceFor(manifest: JSONObject): SubtitleResourceInfo? {
+        val defaultTypes = parseStringList(manifest.optJSONArray("types"))
+        val defaultPrefixes = parseStringList(manifest.optJSONArray("idPrefixes"))
+        val resources = manifest.optJSONArray("resources") ?: return null
         for (index in 0 until resources.length()) {
             when (val resource = resources.opt(index)) {
-                is String -> if (resource.equals("subtitles", ignoreCase = true) || resource.equals("subtitle", ignoreCase = true)) return true
+                is String -> {
+                    if (resource.equals("subtitles", ignoreCase = true) || resource.equals("subtitle", ignoreCase = true)) {
+                        return SubtitleResourceInfo(
+                            types = defaultTypes.toSet(),
+                            idPrefixes = defaultPrefixes.toSet(),
+                        )
+                    }
+                }
+
                 is JSONObject -> {
                     val name = nonBlank(resource.optString("name")) ?: continue
-                    if (name.equals("subtitles", ignoreCase = true) || name.equals("subtitle", ignoreCase = true)) return true
+                    if (!name.equals("subtitles", ignoreCase = true) && !name.equals("subtitle", ignoreCase = true)) continue
+                    val types = parseStringList(resource.optJSONArray("types")).ifEmpty { defaultTypes }.toSet()
+                    val idPrefixes = parseStringList(resource.optJSONArray("idPrefixes")).ifEmpty { defaultPrefixes }.toSet()
+                    return SubtitleResourceInfo(types = types, idPrefixes = idPrefixes)
                 }
             }
         }
-        return false
+        return null
     }
 
     private fun buildSubtitleResourceUrl(
@@ -610,7 +930,7 @@ class AddonStreamsService(
         mediaType: MetadataLabMediaType,
         lookupId: String,
     ): String {
-        val encodedId = URLEncoder.encode(lookupId, StandardCharsets.UTF_8.name())
+        val encodedId = lookupId.encodeAddonPathSegment()
         val base = "${endpoint.baseUrl}/subtitles/${mediaType.asApiPath()}/$encodedId.json"
         return if (endpoint.encodedQuery.isBlank()) base else "$base?${endpoint.encodedQuery}"
     }
@@ -631,7 +951,8 @@ class AddonStreamsService(
                     ?: nonBlank(item.optString("language"))
                     ?: nonBlank(item.optString("languageCode"))
                     ?: nonBlank(item.optString("locale"))
-                    ?: "und"
+                    ?: nonBlank(item.optString("label"))
+                    ?: "unknown"
             val name = nonBlank(item.optString("label")) ?: nonBlank(item.optString("name")) ?: language
             out +=
                 AddonSubtitle(
@@ -650,6 +971,20 @@ class AddonStreamsService(
         val providerName: String,
         val baseUrl: String,
         val encodedQuery: String,
+        val types: Set<String> = emptySet(),
+        val idPrefixes: Set<String> = emptySet(),
+    ) {
+        fun supports(mediaType: MetadataLabMediaType, lookupId: String): Boolean {
+            val canonical = mediaType.asApiPath()
+            val typeMatches = types.isEmpty() || types.any { it.equals(canonical, ignoreCase = true) }
+            if (!typeMatches) return false
+            return idPrefixes.isEmpty() || idPrefixes.any { prefix -> lookupId.startsWith(prefix) }
+        }
+    }
+
+    private data class SubtitleResourceInfo(
+        val types: Set<String>,
+        val idPrefixes: Set<String>,
     )
 
     private data class EndpointsCache(
@@ -660,6 +995,7 @@ class AddonStreamsService(
     private data class StreamSupport(
         val supported: Boolean,
         val types: Set<MetadataLabMediaType>,
+        val idPrefixes: Set<String> = emptySet(),
     )
 
     private data class JsonRequestPolicy(
@@ -694,8 +1030,11 @@ class AddonStreamsService(
         val baseUrl: String,
         val encodedQuery: String,
         val supportedTypes: Set<MetadataLabMediaType>,
+        val idPrefixes: Set<String> = emptySet(),
     ) {
-        fun supports(mediaType: MetadataLabMediaType): Boolean = supportedTypes.contains(mediaType)
+        fun supports(mediaType: MetadataLabMediaType, lookupId: String): Boolean =
+            supportedTypes.contains(mediaType) &&
+                (idPrefixes.isEmpty() || idPrefixes.any { prefix -> lookupId.startsWith(prefix) })
 
         fun formatLookupId(lookupId: String): String? {
             val trimmedLookupId = lookupId.trim()

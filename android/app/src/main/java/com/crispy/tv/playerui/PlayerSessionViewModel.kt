@@ -474,9 +474,9 @@ class PlayerSessionViewModel(
         }
     }
 
-    private fun playResolvedStream(stream: AddonStream, target: PlayerStreamLookupTarget) {
-        val source = stream.toPlaybackSource() ?: run {
-            _uiState.update { it.copy(statusMessage = "Selected stream has no playable URL.") }
+    private suspend fun playResolvedStream(stream: AddonStream, target: PlayerStreamLookupTarget) {
+        val source = stream.toPlaybackSource(torrentResolver, target.lookupId) ?: run {
+            _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
             return
         }
         activePlaybackSource = source
@@ -611,9 +611,8 @@ class PlayerSessionViewModel(
     }
 
     fun onStreamSelected(stream: AddonStream) {
-        val playbackSource = stream.toPlaybackSource()
-        if (playbackSource == null) {
-            _uiState.update { it.copy(statusMessage = "Selected stream has no playable URL.") }
+        if (!stream.hasPlayableSource()) {
+            _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
             return
         }
 
@@ -675,15 +674,22 @@ class PlayerSessionViewModel(
                 nextIdentity.episode == activeIdentity?.episode
         val resumePositionMs = if (sameEpisode) uiState.value.positionMs else 0L
 
-        switchPlayback(
-            source = playbackSource,
-            identity = nextIdentity,
-            title = nextTitle,
-            subtitle = nextSubtitle,
-            artworkUrl = activeArtworkUrl,
-            currentEpisodeId = nextEpisode?.id,
-            resumePositionMs = resumePositionMs,
-        )
+        viewModelScope.launch {
+            val source = stream.toPlaybackSource(torrentResolver, state.streamSelector.lookupId)
+            if (source == null) {
+                _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
+                return@launch
+            }
+            switchPlayback(
+                source = source,
+                identity = nextIdentity,
+                title = nextTitle,
+                subtitle = nextSubtitle,
+                artworkUrl = activeArtworkUrl,
+                currentEpisodeId = nextEpisode?.id,
+                resumePositionMs = resumePositionMs,
+            )
+        }
     }
 
     fun retryPlayback() {
