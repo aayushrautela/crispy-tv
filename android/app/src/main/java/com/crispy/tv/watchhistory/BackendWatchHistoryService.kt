@@ -313,28 +313,33 @@ class BackendWatchHistoryService(
     override suspend fun onPlaybackProgress(identity: PlaybackIdentity, positionMs: Long, durationMs: Long, isPlaying: Boolean) {
         val parts = progressKeyParts(identity) ?: return
 
-        val durationSeconds = durationMs.coerceAtLeast(0L).toDouble() / 1000.0
+        // Server derives runtime from TMDB, so always report position even when the
+        // player doesn't know the duration (torrent/addy sources). Client duration is
+        // only a last-resort hint and is omitted when unknown.
+        val durationSeconds = if (durationMs > 0L) durationMs.toDouble() / 1000.0 else 0.0
         val currentSeconds = positionMs.coerceAtLeast(0L).toDouble() / 1000.0
-        if (durationSeconds <= 0.0) return
 
-        watchProgressStore.setContentDuration(
-            id = parts.id,
-            type = parts.type,
-            durationSeconds = durationSeconds,
-            episodeId = parts.episodeId,
-        )
+        if (durationSeconds > 0.0) {
+            watchProgressStore.setContentDuration(
+                id = parts.id,
+                type = parts.type,
+                durationSeconds = durationSeconds,
+                episodeId = parts.episodeId,
+            )
+        }
 
         val existing = watchProgressStore.getWatchProgress(
             id = parts.id,
             type = parts.type,
             episodeId = parts.episodeId,
         )
+        val storedDuration = if (durationSeconds > 0.0) durationSeconds else existing?.durationSeconds ?: 0.0
         val next =
-            (existing ?: WatchProgress(currentTimeSeconds = 0.0, durationSeconds = durationSeconds, lastUpdatedEpochMs = 0L))
-            .copy(
-                currentTimeSeconds = currentSeconds.coerceIn(0.0, durationSeconds),
-                durationSeconds = durationSeconds,
-            )
+            (existing ?: WatchProgress(currentTimeSeconds = 0.0, durationSeconds = storedDuration, lastUpdatedEpochMs = 0L))
+                .copy(
+                    currentTimeSeconds = if (storedDuration > 0.0) currentSeconds.coerceIn(0.0, storedDuration) else currentSeconds.coerceAtLeast(0.0),
+                    durationSeconds = storedDuration,
+                )
 
         watchProgressStore.setWatchProgress(
             id = parts.id,
@@ -434,7 +439,7 @@ class BackendWatchHistoryService(
             eventType = eventType,
             itemId = itemId,
             positionSeconds = positionMs.coerceAtLeast(0L).toDouble() / 1000.0,
-            durationSeconds = durationMs.coerceAtLeast(0L).toDouble() / 1000.0,
+            durationSeconds = if (durationMs > 0L) durationMs.toDouble() / 1000.0 else null,
             seasonNumber = identity.season,
             episodeNumber = identity.episode,
             occurredAt = Instant.ofEpochMilli(System.currentTimeMillis()).toString(),
@@ -576,10 +581,16 @@ class BackendWatchHistoryService(
         val progressPercent = progress.percent
             ?: progressPercent(progress.positionSeconds?.toDouble(), progress.durationSeconds?.toDouble())
         if (progressPercent == null) {
-            Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): progressPercent null (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")
-            return null
-        }
-        if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+            // A resume position (or last-played timestamp) means the item is still in
+            // progress even when the server could not derive a percent (e.g. missing
+            // metadata runtime). Keep it as "Continue" rather than dropping it.
+            val hasResume = (progress.positionSeconds != null && progress.positionSeconds > 0)
+                || progress.lastPlayedAt != null
+            if (!hasResume) {
+                Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): progressPercent null and no resume (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")
+                return null
+            }
+        } else if (progressPercent <= 0.0 || progressPercent >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
             Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): percent=$progressPercent out of [0, $CONTINUE_WATCHING_COMPLETION_PERCENT]")
             return null
         }
@@ -610,7 +621,7 @@ class BackendWatchHistoryService(
             episodeTitle = title.takeIf { type != MetadataLabMediaType.MOVIE },
             season = seasonNumber,
             episode = episodeNumber,
-            progressPercent = progressPercent.coerceIn(0.0, 100.0),
+            progressPercent = progressPercent?.coerceIn(0.0, 100.0),
             lastUpdatedEpochMs = updatedAt,
             posterUrl = images.poster.medium,
             backdropUrl = images.backdrop.medium,

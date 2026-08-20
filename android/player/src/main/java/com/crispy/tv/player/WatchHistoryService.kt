@@ -25,7 +25,7 @@ data class CanonicalContinueWatchingItem(
     val episodeTitle: String? = null,
     val season: Int?,
     val episode: Int?,
-    val progressPercent: Double,
+    val progressPercent: Double?,
     val lastUpdatedEpochMs: Long,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,

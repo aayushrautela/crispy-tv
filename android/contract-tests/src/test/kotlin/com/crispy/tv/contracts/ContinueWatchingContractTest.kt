@@ -61,8 +61,8 @@ class ContinueWatchingContractTest {
                 assertEquals(expectedItem.lastUpdatedMs, actualItem.lastUpdatedMs, "Timestamp mismatch at index $index in ${path.toDisplayPath()}")
                 assertEquals(expectedItem.isUpNextPlaceholder, actualItem.isUpNextPlaceholder, "Placeholder mismatch at index $index in ${path.toDisplayPath()}")
                 assertEquals(
-                    expectedItem.progressPercent,
-                    actualItem.progressPercent,
+                    expectedItem.progressPercent ?: 0.0,
+                    actualItem.progressPercent ?: 0.0,
                     absoluteTolerance = 0.0001,
                     message = "Progress mismatch at index $index in ${path.toDisplayPath()}"
                 )
@@ -75,7 +75,7 @@ private data class ExpectedItem(
     val contentType: String,
     val contentId: String,
     val episodeKey: String?,
-    val progressPercent: Double,
+    val progressPercent: Double?,
     val lastUpdatedMs: Long,
     val isUpNextPlaceholder: Boolean
 )

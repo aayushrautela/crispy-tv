@@ -79,6 +79,8 @@ provider-key strings for planning purposes, but these are never sent to the serv
     `BaseItemDto.Id`, `SeriesId`, `SeasonId`, and `UserData.ItemId` are all public item IDs.
     Provider-derived strings like `movie:tmdb:550` are no longer public route identity.
   - Continue-watching items derive state from `UserData.PlayedPercentage` (progress), `UserData.LastPlayedDate` (activity), and `UserData.DismissedFromContinueWatching` (dismissible).
+  - **Runtime is canonical from TMDB metadata, not the playing file.** `UserData.RuntimeTicks` and `UserData.PlayedPercentage` are derived server-side by joining the item to its TMDB `runtime` (`movie`) or `episode_run_time` (`show`, average) — torrent/addy file lengths are unreliable, so client-reported `durationSeconds` is only a last-resort fallback. The client reports **position only** (`positionSeconds` + `lastPlayedAt`); it must not be the source of duration.
+  - Continue-watching entries are shown whenever a resume position exists (`PlaybackPositionTicks > 0` / `LastPlayedDate` present), even if `PlayedPercentage` is momentarily null (metadata runtime missing). A null percent is surfaced as "Continue" without a progress bar, never dropped.
 - `watch_sync`
   - Real-time cross-device sync for continue-watching: a server-pushed invalidation channel plus deterministic client connection/refetch policy.
   - Server transport: `GET /v1/profiles/:profileId/watch/stream` (SSE), guarded by the same auth + profile-unlock guard as other watch routes.

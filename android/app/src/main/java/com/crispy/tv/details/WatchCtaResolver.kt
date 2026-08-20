@@ -129,18 +129,15 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
             null
         }
 
+        val hasResume = providerState.resumePositionSeconds != null && providerState.resumePositionSeconds > 0
         val canContinue = if (isSeries) {
-            continueEntry != null &&
-                continueEntry.progressPercent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
-                continueEntry.progressPercent < CTA_CONTINUE_COMPLETION_PERCENT
+            continueEntry != null && isUsableContinueProgress(continueEntry.progressPercent)
         } else {
-            titleProgressPercent != null &&
-                titleProgressPercent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
-                titleProgressPercent < CTA_CONTINUE_COMPLETION_PERCENT
+            isUsableContinueProgress(titleProgressPercent) || (titleProgressPercent == null && hasResume)
         }
 
         if (canContinue) {
-            val progress = if (isSeries) continueEntry!!.progressPercent else titleProgressPercent!!
+            val progress = continueEntry?.progressPercent ?: titleProgressPercent ?: 0.0
             val continueSeason = continueEntry?.season
             val continueEpisode = continueEntry?.episode
             val label =
@@ -209,5 +206,11 @@ val snapshot = userMediaRepository.getCanonicalContinueWatching(limit = 50, nowM
     companion object {
         private const val CTA_CONTINUE_MIN_PROGRESS_PERCENT = 2.0
         private const val CTA_CONTINUE_COMPLETION_PERCENT = 85.0
+
+        private fun isUsableContinueProgress(percent: Double?): Boolean {
+            return percent != null &&
+                percent > CTA_CONTINUE_MIN_PROGRESS_PERCENT &&
+                percent < CTA_CONTINUE_COMPLETION_PERCENT
+        }
     }
 }
