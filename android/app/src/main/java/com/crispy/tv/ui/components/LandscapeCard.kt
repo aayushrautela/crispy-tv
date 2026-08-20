@@ -1,7 +1,8 @@
 package com.crispy.tv.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,11 +41,13 @@ import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateCardCornerRadius
 import com.crispy.tv.ui.navigation.animateCardOverlayAlpha
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LandscapeCard(
     title: String,
     backdropUrl: String?,
     onClick: () -> Unit,
+    onLongPress: () -> Unit = {},
     modifier: Modifier = Modifier,
     posterUrl: String? = null,
     logoUrl: String? = null,
@@ -105,7 +108,7 @@ fun LandscapeCard(
             .shadow(2.dp, cardShape)
             .clip(cardShape)
             .background(fallbackColor)
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
         contentAlignment = Alignment.BottomStart,
     ) {
         if (imageModel != null) {

@@ -420,14 +420,38 @@ suspend fun updateEpisodeWatched(
         } else {
             userMediaRepository.unmarkWatched(request)
         }
-    return DetailsMutationResult(
-        details = details,
-        success = mutationSucceeded(result),
-        statusMessage = result.statusMessage,
-    )
-}
+        return DetailsMutationResult(
+            details = details,
+            success = mutationSucceeded(result),
+            statusMessage = result.statusMessage,
+        )
+    }
 
-suspend fun updateRating(
+    suspend fun updateSeasonWatched(
+        details: MediaDetails,
+        seasonItemId: String,
+        desired: Boolean,
+    ): DetailsMutationResult {
+        val request =
+            WatchHistoryRequest(
+                itemId = seasonItemId,
+                contentType = MetadataLabMediaType.SERIES,
+                title = details.title,
+            )
+        val result =
+            if (desired) {
+                userMediaRepository.markWatched(request)
+            } else {
+                userMediaRepository.unmarkWatched(request)
+            }
+        return DetailsMutationResult(
+            details = details,
+            success = mutationSucceeded(result),
+            statusMessage = result.statusMessage,
+        )
+    }
+
+    suspend fun updateRating(
     details: MediaDetails,
     rating: Int?,
 ): DetailsMutationResult {

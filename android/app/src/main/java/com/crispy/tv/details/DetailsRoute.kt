@@ -105,6 +105,7 @@ fun DetailsRoute(
         onOpenStreamSelector = viewModel::onOpenStreamSelector,
         onEpisodeClick = viewModel::onOpenStreamSelectorForEpisode,
         onToggleEpisodeWatched = viewModel::toggleEpisodeWatched,
+        onToggleSeasonWatched = viewModel::toggleSeasonWatched,
         onDismissStreamSelector = viewModel::onDismissStreamSelector,
         onProviderSelected = viewModel::onProviderSelected,
         onRetryProvider = viewModel::onRetryProvider,

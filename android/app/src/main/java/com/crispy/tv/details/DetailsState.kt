@@ -41,6 +41,8 @@ data class DetailsUiState(
     val continueVideoId: String? = null,
     val selectedSeason: Int? = null,
     val seasons: List<Int> = emptyList(),
+    val seasonItemIds: Map<Int, String> = emptyMap(),
+    val seasonWatchStates: Map<Int, Boolean> = emptyMap(),
     val highlightedEpisodeId: String? = null,
     val seasonEpisodes: List<MediaVideo> = emptyList(),
     val episodeWatchStates: Map<String, EpisodeWatchState> = emptyMap(),

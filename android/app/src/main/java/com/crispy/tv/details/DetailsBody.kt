@@ -23,7 +23,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +52,7 @@ internal fun LazyListScope.detailsBodyContent(
     horizontalPadding: Dp,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
+    onSeasonLongPress: (seasonItemId: String, seasonNumber: Int) -> Unit = {},
     onItemClick: (CatalogItem, String?) -> Unit,
     onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
     onEpisodeClick: (videoId: String) -> Unit = {},
@@ -227,7 +231,19 @@ internal fun LazyListScope.detailsBodyContent(
                             FilterChip(
                                 selected = season == selectedSeason,
                                 onClick = { onSeasonSelected(season) },
+                                onLongClick = { onSeasonLongPress(uiState.seasonItemIds[season] ?: return@FilterChip, season) },
                                 label = { Text("Season $season") },
+                                leadingIcon = if (uiState.seasonWatchStates[season] == true) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                                 shape = RoundedCornerShape(16.dp),
                                 border = null,
                                 colors = FilterChipDefaults.filterChipColors(

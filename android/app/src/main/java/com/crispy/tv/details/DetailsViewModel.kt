@@ -102,6 +102,8 @@ class DetailsViewModel internal constructor(
                     watchCta = WatchCta(),
                     continueVideoId = null,
                     seasons = emptyList(),
+                    seasonItemIds = emptyMap(),
+                    seasonWatchStates = emptyMap(),
                     highlightedEpisodeId = null,
                     seasonEpisodes = emptyList(),
                     episodeWatchStates = emptyMap(),
@@ -210,6 +212,10 @@ class DetailsViewModel internal constructor(
                         ?.distinct()
                         ?.sorted()
                         .orEmpty()
+                    val seasonItemIds = titleExtras?.seasons
+                        ?.filter { it.seasonNumber > 0 }
+                        ?.associate { it.seasonNumber to it.itemId }
+                        .orEmpty()
                     val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
                         videos = titleExtras?.episodes.orEmpty().mapNotNull { it.toMediaVideo() },
                         runtimeEntry = runtimeEntry,
@@ -233,6 +239,7 @@ class DetailsViewModel internal constructor(
                         extrasIsLoading = false,
                         titleExtras = titleExtras,
                         seasons = extrasSeasons,
+                        seasonItemIds = seasonItemIds,
                         selectedSeason = selectedSeason,
                         highlightedEpisodeId = pendingHighlightEpisodeId ?: state.highlightedEpisodeId,
                         seasonEpisodes = selectedSeasonEpisodes.takeIf { it.isNotEmpty() } ?: state.seasonEpisodes,
@@ -529,10 +536,14 @@ class DetailsViewModel internal constructor(
                     }
                 _uiState.update { current ->
                     if (current.selectedSeasonOrFirst != season) current
-                    else current.copy(
-                        highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
-                        episodeWatchStates = episodeWatchStates,
-                    )
+                    else {
+                        val seasonWatched = videos.isNotEmpty() && episodeWatchStates.values.all { it.isWatched }
+                        current.copy(
+                            highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
+                            episodeWatchStates = episodeWatchStates,
+                            seasonWatchStates = current.seasonWatchStates + (season to seasonWatched),
+                        )
+                    }
                 }
                 maybeConsumePendingEpisodeNavigation(videos)
             }
@@ -936,11 +947,6 @@ class DetailsViewModel internal constructor(
 
     fun toggleWatched() {
         val details = uiState.value.details ?: return
-        val mediaType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
-        if (mediaType != MetadataLabMediaType.MOVIE) {
-            _uiState.update { it.copy(statusMessage = "Marking an entire episodic title as watched isn't supported yet. Mark episodes from the episode list.") }
-            return
-        }
         viewModelScope.launch {
             val desired = !_uiState.value.isWatched
             _uiState.update { it.copy(isMutating = true) }
@@ -1043,6 +1049,67 @@ class DetailsViewModel internal constructor(
                     watchCta = ctaResolution.watchCta,
                     continueVideoId = ctaResolution.continueVideoId,
                     highlightedEpisodeId = ctaResolution.continueVideoId ?: it.highlightedEpisodeId,
+                    episodeWatchStates = refreshedWatchStates,
+                    statusMessage = result.statusMessage,
+                )
+            }
+            if (result.success) {
+                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
+            }
+        }
+    }
+
+    fun toggleSeasonWatched(seasonItemId: String, seasonNumber: Int) {
+        val details = uiState.value.details ?: return
+        val currentlyWatched = _uiState.value.seasonWatchStates[seasonNumber] ?: false
+        val desired = !currentlyWatched
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    statusMessage =
+                        if (desired) {
+                            "Marking season $seasonNumber as watched..."
+                        } else {
+                            "Marking season $seasonNumber as unwatched..."
+                        },
+                )
+            }
+
+            val result =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.updateSeasonWatched(details, seasonItemId, desired)
+                }
+
+            detailsUseCases.clearEpisodeWatchStateCache()
+            val refreshedEpisodes = _uiState.value.seasonEpisodes
+            val refreshedWatchStates =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveEpisodeWatchStates(result.details, refreshedEpisodes)
+                }
+            val providerState =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveProviderState(
+                        details = result.details,
+                        itemId = itemId,
+                        requestedMediaType = requestedMediaType,
+                    )
+                }
+            val ctaResolution =
+                withContext(Dispatchers.IO) {
+                    detailsUseCases.resolveWatchCta(
+                        details = result.details,
+                        providerState = providerState,
+                        requestedMediaType = requestedMediaType,
+                        nowMs = System.currentTimeMillis(),
+                    )
+                }
+            _uiState.update {
+                it.copy(
+                    seasonWatchStates = it.seasonWatchStates + (seasonNumber to desired),
+                    details = result.details,
+                    isWatched = providerState.isWatched,
+                    watchCta = ctaResolution.watchCta,
+                    continueVideoId = ctaResolution.continueVideoId,
                     episodeWatchStates = refreshedWatchStates,
                     statusMessage = result.statusMessage,
                 )

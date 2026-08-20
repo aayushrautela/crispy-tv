@@ -35,6 +35,13 @@ import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.BackendContextResolverProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.PlaybackDependencies
+import com.crispy.tv.data.repository.DefaultUserMediaRepository
+import com.crispy.tv.domain.repository.UserMediaRepository
+import com.crispy.tv.home.HomeRefreshBus
+import com.crispy.tv.home.HomeRefreshEvent
+import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -42,7 +49,9 @@ import androidx.compose.material3.FilterChipDefaults
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.theme.Dimensions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,6 +103,7 @@ data class LibraryUiState(
 class LibraryViewModel internal constructor(
     private val backend: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
+    private val userMediaRepository: UserMediaRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
@@ -135,6 +145,20 @@ class LibraryViewModel internal constructor(
         }
     }
 
+    fun setWatched(item: CatalogItem, desired: Boolean) {
+        viewModelScope.launch {
+            val contentType = if (item.type == "movie") MetadataLabMediaType.MOVIE else MetadataLabMediaType.SERIES
+            val request = WatchHistoryRequest(itemId = item.itemId, contentType = contentType, title = item.title)
+            val result =
+                withContext(Dispatchers.IO) {
+                    if (desired) userMediaRepository.markWatched(request) else userMediaRepository.unmarkWatched(request)
+                }
+            if (result.accepted) {
+                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
+            }
+        }
+    }
+
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -145,6 +169,7 @@ class LibraryViewModel internal constructor(
                         return LibraryViewModel(
                             backend = BackendServicesProvider.backendClient(appContext),
                             backendContextResolver = BackendContextResolverProvider.get(appContext),
+                            userMediaRepository = DefaultUserMediaRepository(PlaybackDependencies.watchHistoryServiceFactory(appContext)),
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
@@ -160,16 +185,12 @@ internal fun collapseEpisodesByShow(items: List<CatalogItem>): List<CatalogItem>
     val mergedByShow = mutableMapOf<String, CatalogItem>()
     val out = mutableListOf<CatalogItem>()
     for (item in items) {
-        if (item.episodeCount == null) {
-            out += item
-            continue
-        }
         val existing = mergedByShow[item.itemId]
         if (existing == null) {
             mergedByShow[item.itemId] = item
             out += item
         } else {
-            val updated = existing.copy(episodeCount = (existing.episodeCount ?: 1) + 1)
+            val updated = existing.copy(episodeCount = (existing.episodeCount ?: 0) + (item.episodeCount ?: 1))
             out[out.indexOf(existing)] = updated
             mergedByShow[item.itemId] = updated
         }
@@ -373,6 +394,7 @@ internal fun LazyListScope.historyItems(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
+    onItemLongPress: (CatalogItem) -> Unit,
 ) {
     val monthSections = buildHistoryMonthSections(loadedItems)
     val displayRows = monthSections.flatMap { section ->
@@ -412,6 +434,7 @@ internal fun LazyListScope.historyItems(
                             badge = item.episodeCount?.let { if (it > 1) "$it episodes" else null },
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                             onClick = { onItemClick(item, sharedElementKey) },
+onLongPress = { onItemLongPress(item) },
                             itemId = item.itemId,
                             sharedElementKey = sharedElementKey,
                         )
@@ -426,6 +449,7 @@ internal fun LazyListScope.ratingsItems(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
+    onItemLongPress: (CatalogItem) -> Unit,
 ) {
     val bandSections = buildRatingBandSections(loadedItems)
     val displayRows = bandSections.flatMap { section ->
@@ -464,6 +488,7 @@ internal fun LazyListScope.ratingsItems(
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                             onClick = { onItemClick(item, sharedElementKey) },
+onLongPress = { onItemLongPress(item) },
                             itemId = item.itemId,
                             sharedElementKey = sharedElementKey,
                         )
@@ -478,6 +503,7 @@ internal fun LazyListScope.watchlistItems(
     loadedItems: List<CatalogItem>,
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
+    onItemLongPress: (CatalogItem) -> Unit,
 ) {
     val dateSections = buildWatchlistDateSections(loadedItems)
     val displayRows = dateSections.flatMap { section ->
@@ -516,6 +542,7 @@ internal fun LazyListScope.watchlistItems(
                             genre = item.genre,
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                             onClick = { onItemClick(item, sharedElementKey) },
+onLongPress = { onItemLongPress(item) },
                             itemId = item.itemId,
                             sharedElementKey = sharedElementKey,
                         )

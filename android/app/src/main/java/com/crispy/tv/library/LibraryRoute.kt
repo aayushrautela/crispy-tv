@@ -11,14 +11,23 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
@@ -53,6 +62,8 @@ fun LibraryRoute(
     val horizontalPadding = responsivePageHorizontalPadding()
     val listState = rememberLazyListState()
     val pullToRefreshState = rememberPullToRefreshState()
+    var selectedLibraryItem by remember { mutableStateOf<CatalogItem?>(null) }
+    val librarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scrollBehavior = appBarScrollBehavior()
 
     val sections = uiState.sections
@@ -77,7 +88,8 @@ fun LibraryRoute(
         }
     }
 
-    CrispyScreen(
+    Box(modifier = Modifier.fillMaxSize()) {
+        CrispyScreen(
         topBar = {
             StandardTopAppBar(
                 title = { CrispySectionAppBarTitle(label = "Library") },
@@ -139,9 +151,9 @@ fun LibraryRoute(
             }
         } else {
             when (selectedSectionKey) {
-                HistoryKey -> historyItems(loadedItems, horizontalPadding, onItemClick)
-                RatingsKey -> ratingsItems(loadedItems, horizontalPadding, onItemClick)
-                WatchlistKey -> watchlistItems(loadedItems, horizontalPadding, onItemClick)
+                HistoryKey -> historyItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it })
+                RatingsKey -> ratingsItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it })
+                WatchlistKey -> watchlistItems(loadedItems, horizontalPadding, onItemClick, onItemLongPress = { selectedLibraryItem = it })
             }
 
             item(key = "load-more") {
@@ -151,9 +163,58 @@ fun LibraryRoute(
                 )
             }
         }
-    }
+        }
+        if (selectedLibraryItem != null) {
+            val item = selectedLibraryItem!!
+            val watched = item.watchedAt != null
+            val context = LocalContext.current
+            ModalBottomSheet(
+                onDismissRequest = { selectedLibraryItem = null },
+                sheetState = librarySheetState,
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 6.dp, bottom = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(item.title, style = MaterialTheme.typography.titleMedium)
+                    item.episodeCount?.let { count ->
+                        if (count > 1) {
+                            Text(
+                                text = "$count episodes",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            selectedLibraryItem = null
+                            onItemClick(item, null)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Open") }
+                    TextButton(
+                        onClick = {
+                            selectedLibraryItem = null
+                            val desired = !watched
+                            viewModel.setWatched(item, desired)
+                            pagingItems.refresh()
+                            Toast
+                                .makeText(
+                                    context,
+                                    if (desired) "Marked as watched" else "Marked as unwatched",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                        },
+                        modifier = Modifier.align(Alignment.End),
+                    ) { Text(if (watched) "Mark as unwatched" else "Mark as watched") }
+     }
 }
-
-private object HistoryKey
+    }
+}\n}\n\nprivate object HistoryKey
 private object RatingsKey
 private object WatchlistKey

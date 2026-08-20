@@ -89,6 +89,7 @@ internal fun DetailsScreen(
     onOpenStreamSelector: () -> Unit,
     onEpisodeClick: (String) -> Unit,
     onToggleEpisodeWatched: (MediaVideo) -> Unit,
+    onToggleSeasonWatched: (String, Int) -> Unit,
     onDismissStreamSelector: () -> Unit,
     onProviderSelected: (String?) -> Unit,
     onRetryProvider: (String) -> Unit,
@@ -231,8 +232,10 @@ internal fun DetailsScreen(
     var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
     var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
     var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
+    var selectedSeasonAction by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val episodeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val seasonSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val bodyHorizontalPadding = responsivePageHorizontalPadding()
 
     MaterialTheme(colorScheme = detailsScheme) {
@@ -308,6 +311,8 @@ internal fun DetailsScreen(
                     onPersonClick = onPersonClick,
                     onEpisodeClick = onEpisodeClick,
                     onToggleEpisodeWatched = onToggleEpisodeWatched,
+                    onSeasonLongPress = { seasonItemId, seasonNumber -> selectedSeasonAction = seasonItemId to seasonNumber },
+                    onToggleSeasonWatched = onToggleSeasonWatched,
                     onMakingOfVideoClick = { selectedMakingOfVideo = it },
                     onReviewClick = { expandedReview = it },
                     onEpisodeLongPress = { selectedEpisodeAction = it },
@@ -467,6 +472,41 @@ internal fun DetailsScreen(
                             onClick = {
                                 selectedEpisodeAction = null
                                 onToggleEpisodeWatched(selectedEpisode)
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                        ) { Text(toggleLabel) }
+                    }
+                }
+            }
+
+            if (selectedSeasonAction != null) {
+                val (seasonItemId, seasonNumber) = selectedSeasonAction!!
+                val seasonWatched = visibleUiState.seasonWatchStates[seasonNumber] ?: false
+                val toggleLabel = if (seasonWatched) "Mark season $seasonNumber unwatched" else "Mark season $seasonNumber watched"
+                ModalBottomSheet(
+                    onDismissRequest = { selectedSeasonAction = null },
+                    sheetState = seasonSheetState,
+                ) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 6.dp, bottom = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("Season $seasonNumber", style = MaterialTheme.typography.titleMedium)
+                        Button(
+                            onClick = {
+                                selectedSeasonAction = null
+                                onSeasonSelected(seasonNumber)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Open season") }
+                        TextButton(
+                            onClick = {
+                                selectedSeasonAction = null
+                                onToggleSeasonWatched(seasonItemId, seasonNumber)
                             },
                             modifier = Modifier.align(Alignment.End),
                         ) { Text(toggleLabel) }
