@@ -312,7 +312,6 @@ internal fun DetailsScreen(
                     onEpisodeClick = onEpisodeClick,
                     onToggleEpisodeWatched = onToggleEpisodeWatched,
                     onSeasonLongPress = { seasonItemId, seasonNumber -> selectedSeasonAction = seasonItemId to seasonNumber },
-                    onToggleSeasonWatched = onToggleSeasonWatched,
                     onMakingOfVideoClick = { selectedMakingOfVideo = it },
                     onReviewClick = { expandedReview = it },
                     onEpisodeLongPress = { selectedEpisodeAction = it },
