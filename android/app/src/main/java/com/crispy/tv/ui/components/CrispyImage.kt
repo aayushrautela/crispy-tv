@@ -5,7 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import coil3.Coil
+import androidx.compose.ui.unit.dp
+import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.transformations
@@ -88,7 +89,7 @@ fun preloadCrispyImage(
         heightPx = heightPx,
         memoryCacheKey = memoryCacheKey,
     )
-    Coil.imageLoader(appContext).enqueue(request)
+    SingletonImageLoader.get(appContext).enqueue(request)
 }
 
 @Composable
