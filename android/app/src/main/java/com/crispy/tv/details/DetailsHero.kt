@@ -183,9 +183,9 @@ internal fun HeroSection(
         }
 
         if (!imageUrl.isNullOrBlank()) {
+            val ctx = LocalContext.current
             val memCached = runCatching {
-                val ctx = LocalContext.current
-                SingletonImageLoader.get(ctx).memoryCache.get(MemoryCache.Key(backdropKey ?: "")) != null
+                SingletonImageLoader.get(ctx).memoryCache?.get(MemoryCache.Key(backdropKey ?: "")) != null
             }.getOrElse { false }
             Log.d(
                 "CrispySharedEl",
