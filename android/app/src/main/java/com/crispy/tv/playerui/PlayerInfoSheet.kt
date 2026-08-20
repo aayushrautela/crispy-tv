@@ -131,7 +131,7 @@ private fun InfoSheetContent(
     currentEpisodeId: String?,
 ) {
     val showCast = details?.cast?.any { it.isNotBlank() } == true
-    val showEpisode = details?.seasonNumber != null && details?.episodeNumber != null
+    val showEpisode = details?.seasonNumber != null && details.episodeNumber != null
     val creditLine = buildCreditLine(details)
 
     LazyColumn(
@@ -176,7 +176,7 @@ private fun TitleArea(
             Box(modifier = Modifier.fillMaxWidth(0.81f)) {
                 AsyncImage(
                     model = logoUrl,
-                    contentDescription = details?.title,
+                    contentDescription = details.title,
                     modifier =
                         Modifier
                             .align(Alignment.Center)

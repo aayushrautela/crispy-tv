@@ -89,10 +89,6 @@ class WatchSyncSource(
                     handle(WatchSyncEvent.ConnectionOpened)
                     scheduleMaxDuration()
                     val source = response.body.source()
-                    if (source == null) {
-                        handle(WatchSyncEvent.ConnectionClosed)
-                        return
-                    }
                     try {
                         readLoop(source)
                     } catch (_: IOException) {

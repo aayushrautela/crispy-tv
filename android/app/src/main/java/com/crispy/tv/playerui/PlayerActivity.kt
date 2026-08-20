@@ -98,7 +98,7 @@ class PlayerActivity : ComponentActivity() {
 
         Log.d(
             TAG,
-            "onCreate savedInstanceState=${savedInstanceState != null} title=$title hasIdentity=${identity != null} isInPip=$isInPictureInPictureModeState",
+            "onCreate savedInstanceState=${savedInstanceState != null} title=$title isInPip=$isInPictureInPictureModeState",
         )
 
         maybeRequestNotificationPermission()
