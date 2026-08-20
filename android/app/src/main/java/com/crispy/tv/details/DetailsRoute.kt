@@ -4,11 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import android.util.Log
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.app.appGraph
+import com.crispy.tv.ui.components.preloadCrispyImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.player.PlaybackIdentity
@@ -65,11 +65,16 @@ fun DetailsRoute(
     val playbackSettings by playbackSettingsRepository.settings.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Log.d(
-        "CrispySharedEl",
-        "DetailsRoute enter: t=${System.currentTimeMillis()} itemId=$itemId itemType=$itemType " +
-            "initialBackdropBlank=${initialBackdropUrl.isNullOrBlank()} initialLogoBlank=${initialLogoUrl.isNullOrBlank()} " +
-            "sharedElementKey=$sharedElementKey uiStateDetailsNull=${uiState.details == null}",
+    val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
+    preloadCrispyImage(
+        context = appContext,
+        url = initialBackdropUrl ?: uiState.details?.backdropUrl,
+        memoryCacheKey = resolvedKey?.let { "backdrop-$it" },
+    )
+    preloadCrispyImage(
+        context = appContext,
+        url = initialLogoUrl ?: uiState.details?.logoUrl,
+        memoryCacheKey = resolvedKey?.let { "logo-${it}-hero" },
     )
 
     LaunchedEffect(viewModel) {

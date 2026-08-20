@@ -1,7 +1,5 @@
 package com.crispy.tv.home
 
-import android.util.Log
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -142,14 +140,7 @@ internal fun HomeCatalogSectionRow(
                     HomeCatalogPosterCard(
                         item = item,
                         sharedElementKey = key,
-                        onClick = {
-                            Log.d(
-                                "CrispySharedEl",
-                                "CLICK homecatalog card: t=${System.currentTimeMillis()} key=$key " +
-                                    "itemId=${item.itemId} backdropUrlBlank=${item.backdropUrl.isNullOrBlank()} posterUrlBlank=${item.posterUrl.isNullOrBlank()}",
-                            )
-                            onItemClick(item, key)
-                        }
+                        onClick = { onItemClick(item, key) }
                     )
                 }
             }
