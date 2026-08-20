@@ -2,6 +2,7 @@ package com.crispy.tv.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,7 @@ internal const val PLAYBACK_SETTINGS_KEY_USE_LIBASS = "use_libass"
 internal const val PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE = "libass_render_type"
 internal const val PLAYBACK_SETTINGS_KEY_RESIZE_MODE = "resize_mode"
 internal const val PLAYBACK_SETTINGS_KEY_AUTO_SELECT_STREAM = "auto_select_stream"
+internal const val PLAYBACK_SETTINGS_KEY_PLAYBACK_ENGINE = "playback_engine"
 private const val DEFAULT_SKIP_INTRO_ENABLED = true
 private const val DEFAULT_TRAILER_AUTOPLAY_ENABLED = true
 private const val DEFAULT_TRAILER_MUTED = false
@@ -28,6 +30,7 @@ private const val DEFAULT_USE_LIBASS = false
 private const val DEFAULT_LIBASS_RENDER_TYPE = "OVERLAY_OPEN_GL"
 private const val DEFAULT_RESIZE_MODE = "Fit"
 private const val DEFAULT_AUTO_SELECT_STREAM = false
+private const val DEFAULT_PLAYBACK_ENGINE = "Auto"
 
 data class PlaybackSettings(
     val skipIntroEnabled: Boolean = DEFAULT_SKIP_INTRO_ENABLED,
@@ -41,6 +44,7 @@ data class PlaybackSettings(
     val libassRenderType: String = DEFAULT_LIBASS_RENDER_TYPE,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val autoSelectStream: Boolean = DEFAULT_AUTO_SELECT_STREAM,
+    val playbackEnginePreference: NativePlaybackEnginePreference = NativePlaybackEnginePreference.Auto,
 )
 
 interface PlaybackSettingsRepository {
@@ -56,6 +60,7 @@ interface PlaybackSettingsRepository {
     fun setLibassRenderType(renderType: String)
     fun setAutoSelectStream(enabled: Boolean)
     fun setResizeMode(mode: PlayerResizeMode)
+    fun setPlaybackEnginePreference(preference: NativePlaybackEnginePreference)
 }
 
 private class SharedPreferencesPlaybackSettingsRepository(
@@ -186,6 +191,15 @@ private class SharedPreferencesPlaybackSettingsRepository(
         preferences.edit().putString(PLAYBACK_SETTINGS_KEY_RESIZE_MODE, mode.name).apply()
     }
 
+    override fun setPlaybackEnginePreference(preference: NativePlaybackEnginePreference) {
+        if (_settings.value.playbackEnginePreference == preference) {
+            return
+        }
+
+        _settings.value = _settings.value.copy(playbackEnginePreference = preference)
+        preferences.edit().putString(PLAYBACK_SETTINGS_KEY_PLAYBACK_ENGINE, preference.name).apply()
+    }
+
     companion object {
         private val OBSERVED_KEYS =
             setOf(
@@ -200,6 +214,7 @@ private class SharedPreferencesPlaybackSettingsRepository(
                 PLAYBACK_SETTINGS_KEY_LIBASS_RENDER_TYPE,
                 PLAYBACK_SETTINGS_KEY_RESIZE_MODE,
                 PLAYBACK_SETTINGS_KEY_AUTO_SELECT_STREAM,
+                PLAYBACK_SETTINGS_KEY_PLAYBACK_ENGINE,
             )
 
         fun create(context: Context): PlaybackSettingsRepository {
@@ -262,6 +277,10 @@ private class SharedPreferencesPlaybackSettingsRepository(
                         PLAYBACK_SETTINGS_KEY_AUTO_SELECT_STREAM,
                         DEFAULT_AUTO_SELECT_STREAM,
                     ),
+                playbackEnginePreference =
+                    preferences.getString(PLAYBACK_SETTINGS_KEY_PLAYBACK_ENGINE, DEFAULT_PLAYBACK_ENGINE)
+                        ?.let { runCatching { NativePlaybackEnginePreference.valueOf(it) }.getOrNull() }
+                        ?: NativePlaybackEnginePreference.Auto,
             )
         }
     }

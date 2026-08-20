@@ -10,6 +10,14 @@ enum class NativePlaybackEngine {
     MPV
 }
 
+enum class NativePlaybackEnginePreference(
+    val label: String,
+) {
+    Auto("Auto"),
+    ExoPlayer("ExoPlayer"),
+    Libmpv("libmpv"),
+}
+
 enum class NativePlaybackState {
     IDLE,
     PREPARING,
@@ -79,6 +87,7 @@ data class PlaybackExternalSubtitle(
     val url: String,
     val language: String? = null,
     val name: String? = null,
+    val headers: Map<String, String> = emptyMap(),
 )
 
 data class NativeTrack(

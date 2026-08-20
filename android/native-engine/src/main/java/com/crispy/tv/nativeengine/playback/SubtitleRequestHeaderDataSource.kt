@@ -1,0 +1,57 @@
+package com.crispy.tv.nativeengine.playback
+
+import android.net.Uri
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.TransferListener
+
+/**
+ * DataSource that injects per-subtitle request headers when opening an
+ * external subtitle URL.
+ */
+internal class SubtitleRequestHeaderDataSourceFactory(
+    private val upstreamFactory: DataSource.Factory,
+    private val externalSubtitles: List<PlaybackExternalSubtitle>,
+) : DataSource.Factory {
+    override fun createDataSource(): DataSource =
+        SubtitleRequestHeaderDataSource(
+            upstream = upstreamFactory.createDataSource(),
+            externalSubtitles = externalSubtitles,
+        )
+}
+
+internal class SubtitleRequestHeaderDataSource(
+    private val upstream: DataSource,
+    private val externalSubtitles: List<PlaybackExternalSubtitle>,
+) : DataSource {
+    override fun addTransferListener(transferListener: TransferListener) {
+        upstream.addTransferListener(transferListener)
+    }
+
+    override fun open(dataSpec: DataSpec): Long {
+        val url = dataSpec.uri.toString()
+        val subtitle = externalSubtitles.find { it.url == url }
+        val headers = subtitle?.headers
+
+        return if (headers.isNullOrEmpty()) {
+            upstream.open(dataSpec)
+        } else {
+            val mergedHeaders = dataSpec.httpRequestHeaders.toMutableMap()
+            headers.forEach { (key, value) ->
+                mergedHeaders[key] = value
+            }
+            upstream.open(dataSpec.buildUpon().setHttpRequestHeaders(mergedHeaders).build())
+        }
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+        upstream.read(buffer, offset, length)
+
+    override fun getUri(): Uri? = upstream.uri
+
+    override fun getResponseHeaders(): Map<String, List<String>> = upstream.responseHeaders
+
+    override fun close() {
+        upstream.close()
+    }
+}

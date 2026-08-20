@@ -33,6 +33,7 @@ import com.crispy.tv.home.HomeRefreshEvent
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
+import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.NativePlaybackError
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
@@ -173,6 +174,8 @@ class PlayerSessionViewModel(
             artworkUrl = artworkUrl,
             identity = identity,
         )
+    private val initialEngine: NativePlaybackEngine =
+        resolveInitialEngine(playbackSettingsRepository.settings.value.playbackEnginePreference)
     private val initialSelectedSeason = identity?.season
     private val initialSeasonEpisodes = emptyList<MediaVideo>()
 
@@ -190,6 +193,7 @@ class PlayerSessionViewModel(
                 seasonEpisodes = initialSeasonEpisodes,
                 currentEpisodeId = null,
                 currentPlaybackUrl = null,
+                activeEngine = initialEngine,
                 resizeMode = playbackSettingsRepository.settings.value.resizeMode,
             )
         )
@@ -1087,6 +1091,13 @@ class PlayerSessionViewModel(
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
+    private fun resolveInitialEngine(preference: NativePlaybackEnginePreference): NativePlaybackEngine =
+        if (preference == NativePlaybackEnginePreference.Libmpv) {
+            NativePlaybackEngine.MPV
+        } else {
+            NativePlaybackEngine.EXO
+        }
+
     private fun applyPersistedPlaybackSettings() {
         val settings = playbackSettingsRepository.settings.value
         playbackController.setPlaybackSpeed(settings.playbackSpeed)
@@ -1179,7 +1190,11 @@ class PlayerSessionViewModel(
         }
 
         lastHandledErrorToken = error.token
-        val shouldFallback = error.codecLikely && engine == NativePlaybackEngine.EXO
+        val playbackEnginePreference = playbackSettingsRepository.settings.value.playbackEnginePreference
+        val shouldFallback =
+            error.codecLikely &&
+                engine == NativePlaybackEngine.EXO &&
+                playbackEnginePreference != NativePlaybackEnginePreference.ExoPlayer
         if (!shouldFallback) {
             return false
         }

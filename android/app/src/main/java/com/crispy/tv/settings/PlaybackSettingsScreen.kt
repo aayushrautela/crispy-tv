@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.components.StandardTopAppBar
@@ -36,6 +37,8 @@ fun PlaybackSettingsScreen(
     onAutoSelectStreamChanged: (Boolean) -> Unit,
     onUseLibassChanged: (Boolean) -> Unit,
     onLibassRenderTypeChanged: (String) -> Unit,
+    playbackEnginePreference: NativePlaybackEnginePreference = NativePlaybackEnginePreference.Auto,
+    onPlaybackEnginePreferenceChanged: (NativePlaybackEnginePreference) -> Unit = {},
     onBack: () -> Unit
 ) {
     val scrollBehavior = appBarScrollBehavior()
@@ -152,6 +155,25 @@ fun PlaybackSettingsScreen(
                 )
             }
 
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = {
+                        Text("Playback Engine")
+                    },
+                    supportingContent = {
+                        Text(
+                            "Auto uses ExoPlayer and falls back to libmpv on playback errors. " +
+                                "Force a specific engine if you run into issues."
+                        )
+                    }
+                )
+            }
+
+            EnginePreferenceChips(
+                selected = playbackEnginePreference,
+                onSelect = onPlaybackEnginePreferenceChanged,
+            )
+
             Text(
                 text = "Segment data is fetched from IntroDB first with AniSkip fallback.",
                 style = MaterialTheme.typography.bodySmall,
@@ -168,6 +190,54 @@ private val LIBASS_RENDER_TYPES = listOf(
     "EFFECTS_CANVAS",
     "CUES",
 )
+
+private val ENGINE_PREFERENCES = NativePlaybackEnginePreference.entries
+
+@Composable
+private fun EnginePreferenceChips(
+    selected: NativePlaybackEnginePreference,
+    onSelect: (NativePlaybackEnginePreference) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Engine",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ENGINE_PREFERENCES.forEach { preference ->
+            val isSelected = preference == selected
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onSelect(preference) },
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = preference.label,
+                            style = if (isSelected) MaterialTheme.typography.bodyLarge
+                            else MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
+                        )
+                    },
+                    trailingContent = {
+                        if (isSelected) {
+                            Text(
+                                text = "On",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun LibassRenderTypeChips(

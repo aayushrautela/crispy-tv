@@ -12,7 +12,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.VideoSize
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -36,9 +37,15 @@ class NativePlaybackController(
     private val appContext = context.applicationContext
     private val mainHandler = Handler(appContext.mainLooper)
 
-    private val httpDataSourceFactory =
-        DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
+    private val exoHttpDataSourceFactory: HttpDataSource.Factory =
+        CrispyPlaybackNetworking.createHttpDataSourceFactory()
+    private var exoDataSourceFactory: DataSource.Factory =
+        PlatformPlaybackDataSourceFactory.create(
+            context = appContext,
+            baseHttpDataSourceFactory = exoHttpDataSourceFactory,
+            defaultResponseHeaders = emptyMap(),
+            externalSubtitles = emptyList(),
+        )
 
     private val extractorsFactory =
         DefaultExtractorsFactory()
@@ -67,7 +74,7 @@ class NativePlaybackController(
     private var currentlyBoundPlayerView: PlayerView? = null
 
     private var extensionRendererMode: Int = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-    private var exoPlayer: ExoPlayer = buildExoPlayer(extensionRendererMode)
+    private var exoPlayer: ExoPlayer = buildExoPlayer(extensionRendererMode, exoDataSourceFactory)
     private val mpvRuntime = MpvPlaybackRuntime(appContext)
     private var currentEngine: NativePlaybackEngine = NativePlaybackEngine.EXO
     private var exoVideoLayout: NativeVideoLayout? = null
@@ -139,7 +146,7 @@ class NativePlaybackController(
         exoPlayer.addListener(exoListener)
     }
 
-    private fun buildExoPlayer(rendererMode: Int): ExoPlayer {
+    private fun buildExoPlayer(rendererMode: Int, dataSourceFactory: DataSource.Factory): ExoPlayer {
         val renderersFactory: RenderersFactory =
             DefaultRenderersFactory(appContext)
                 .setExtensionRendererMode(rendererMode)
@@ -152,7 +159,7 @@ class NativePlaybackController(
                 .buildWithAssSupportCompat(
                     context = appContext,
                     renderType = libassRenderType.toAssRenderType(),
-                    dataSourceFactory = httpDataSourceFactory,
+                    dataSourceFactory = dataSourceFactory,
                     extractorsFactory = extractorsFactory,
                     renderersFactory = renderersFactory,
                 ).apply {
@@ -160,7 +167,7 @@ class NativePlaybackController(
                 }
         } else {
             val mediaSourceFactory =
-                DefaultMediaSourceFactory(httpDataSourceFactory, extractorsFactory)
+                DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
 
             ExoPlayer.Builder(appContext)
                 .setRenderersFactory(renderersFactory)
@@ -189,7 +196,7 @@ class NativePlaybackController(
                 decoderPriorityEscalated = false
                 lastExoPositionMs = 0L
                 mpvRuntime.stop()
-                httpDataSourceFactory.setDefaultRequestProperties(source.headers)
+                exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
                 val mediaItem =
                     playbackMediaItemFromUrl(
                         url = url,
@@ -264,7 +271,7 @@ class NativePlaybackController(
         }
         val source = lastPlaybackSource ?: return
         val resumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-        httpDataSourceFactory.setDefaultRequestProperties(source.headers)
+        exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
         val audioIdToPreserve = pendingAudioTrackId ?: selectedExoTrackId(C.TRACK_TYPE_AUDIO)
         if (audioIdToPreserve != null) pendingAudioTrackId = audioIdToPreserve
         pendingSubtitleTrackId = null
@@ -526,7 +533,7 @@ class NativePlaybackController(
         mimeType: String,
     ) {
         exoError = null
-        httpDataSourceFactory.setDefaultRequestProperties(source.headers)
+        exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
         val mediaItem =
             playbackMediaItemFromUrl(
                 url = source.url,
@@ -553,11 +560,11 @@ class NativePlaybackController(
         lastExoPositionMs = 0L
         exoPlayer.removeListener(listener)
         exoPlayer.release()
-        exoPlayer = buildExoPlayer(newMode)
+        exoPlayer = buildExoPlayer(newMode, exoDataSourceFactory)
         exoPlayer.addListener(listener)
         boundView?.let { it.player = exoPlayer }
         if (source != null) {
-            httpDataSourceFactory.setDefaultRequestProperties(source.headers)
+            exoHttpDataSourceFactory.setDefaultRequestProperties(source.headers)
             val mediaItem =
                 playbackMediaItemFromUrl(
                     url = source.url,

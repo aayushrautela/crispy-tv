@@ -100,6 +100,11 @@ internal fun NavGraphBuilder.addSettingsNavGraph(navController: NavHostControlle
                 playbackSettingsRepository.setLibassRenderType(renderType)
                 coroutineScope.launch { cloudSync.pushForActiveProfile() }
             },
+            playbackEnginePreference = playbackSettings.playbackEnginePreference,
+            onPlaybackEnginePreferenceChanged = { preference ->
+                playbackSettingsRepository.setPlaybackEnginePreference(preference)
+                coroutineScope.launch { cloudSync.pushForActiveProfile() }
+            },
             onBack = { navController.popBackStack() }
         )
     }

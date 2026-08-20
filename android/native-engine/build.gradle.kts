@@ -29,6 +29,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     api("androidx.media3:media3-common:1.10.1")
     implementation("androidx.media3:media3-datasource:1.10.1")
+    implementation("androidx.media3:media3-datasource-okhttp:1.10.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.media3:media3-exoplayer:1.10.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.10.1")
     implementation("androidx.media3:media3-exoplayer-dash:1.10.1")
