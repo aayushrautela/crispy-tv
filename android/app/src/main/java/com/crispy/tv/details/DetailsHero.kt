@@ -61,7 +61,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.memory.MemoryCache
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
@@ -115,7 +117,8 @@ internal fun HeroSection(
         "HeroSection enter: t=${System.currentTimeMillis()} sharedElementKey=$sharedElementKey resolvedKey=$resolvedKey " +
             "backdropKey=$backdropKey logoKey=$logoKey detailsNull=${details == null} " +
             "imageUrlBlank=${imageUrl.isNullOrBlank()} logoUrlBlank=${logoUrl.isNullOrBlank()} " +
-            "sharedScope=${sharedTransitionScope != null} animScope=${animatedVisibilityScope != null}",
+            "sharedScope=${sharedTransitionScope != null} animScope=${animatedVisibilityScope != null} " +
+            "isTransitionActive=${sharedTransitionScope?.isTransitionActive}",
     )
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -180,6 +183,15 @@ internal fun HeroSection(
         }
 
         if (!imageUrl.isNullOrBlank()) {
+            val memCached = runCatching {
+                val ctx = LocalContext.current
+                SingletonImageLoader.get(ctx).memoryCache.get(MemoryCache.Key(backdropKey ?: "")) != null
+            }.getOrElse { false }
+            Log.d(
+                "CrispySharedEl",
+                "HeroSection cache PROBE: backdropKey=$backdropKey t=${System.currentTimeMillis()} " +
+                    "memCached=$memCached heroSize=${widthPx}x$heightPx",
+            )
             val heroRequest = crispyImageRequest(
                 url = imageUrl,
                 width = heroMaxWidth,

@@ -1,5 +1,6 @@
 package com.crispy.tv.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +70,12 @@ fun LandscapeCard(
     val backdropKey = resolvedKey?.let { "backdrop-$it" }
     val logoKey = resolvedKey?.let { "logo-$it" }
     val imageModel = crispyImageRequest(url = imageUrl, width = cardWidth, height = cardHeight, memoryCacheKey = backdropKey)
+    Log.d(
+        "CrispySharedEl",
+        "Card compose: t=${System.currentTimeMillis()} key=$resolvedKey backdropKey=$backdropKey " +
+            "hasScope=${sharedTransitionScope != null} hasAnimScope=${animatedVisibilityScope != null} " +
+            "isTransitionActive=${sharedTransitionScope?.isTransitionActive} size=${cardWidth}x${cardHeight}",
+    )
     val logoModel = crispyImageRequest(url = resolvedLogoUrl, width = 112.dp, height = 30.dp, memoryCacheKey = logoKey)
 
     val scrimBrush = remember {
@@ -137,6 +144,13 @@ fun LandscapeCard(
                 contentDescription = title,
                 modifier = backdropModifier,
                 contentScale = ContentScale.Crop,
+                onSuccess = { result ->
+                    Log.d(
+                        "CrispySharedEl",
+                        "Card IMAGE SUCCESS: t=${System.currentTimeMillis()} backdropKey=$backdropKey " +
+                            "dataSource=${result.result.dataSource}",
+                    )
+                },
             )
         } else {
             Text(
