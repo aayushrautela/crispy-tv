@@ -1,6 +1,5 @@
 package com.crispy.tv.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
@@ -18,8 +17,19 @@ import androidx.navigation.compose.NavHost
 
 private const val TopLevelNavigationDurationMillis = 200
 private const val TopLevelNavigationOffsetDivisor = 8
+private const val OverlayNavigationDurationMillis = 220
 
 private val topLevelRouteIndices = TopLevelDestination.entries.mapIndexed { index, destination -> destination.route to index }.toMap()
+
+private enum class NavigationRole { TopLevel, Overlay, Detail }
+
+private fun roleOf(route: String?): NavigationRole {
+    return when {
+        topLevelRouteIndices.containsKey(route) -> NavigationRole.TopLevel
+        route == AppRoutes.SearchRoute -> NavigationRole.Overlay
+        else -> NavigationRole.Detail
+    }
+}
 
 @Composable
 fun AppNavHost(
@@ -34,71 +44,59 @@ fun AppNavHost(
                 startDestination = TopLevelDestination.Home.route,
                 modifier = modifier,
                 enterTransition = {
-                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        EnterTransition.None
-                    } else if (targetRouteIndex > initialRouteIndex) {
-                        slideInHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
-                    } else {
-                        slideInHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    when {
+                        roleOf(targetState.destination.route) == NavigationRole.Overlay -> overlayEnterFromRight()
+                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                            if (topLevelRouteIndex(targetState.destination.route) > topLevelRouteIndex(initialState.destination.route)) {
+                                tabEnterFromRight()
+                            } else {
+                                tabEnterFromLeft()
+                            }
+                        }
+                        else -> EnterTransition.None
                     }
                 },
                 exitTransition = {
-                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        ExitTransition.None
-                    } else if (targetRouteIndex > initialRouteIndex) {
-                        slideOutHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
-                    } else {
-                        slideOutHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    when {
+                        roleOf(targetState.destination.route) == NavigationRole.Overlay -> ExitTransition.None
+                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                            if (topLevelRouteIndex(targetState.destination.route) > topLevelRouteIndex(initialState.destination.route)) {
+                                tabExitToLeft()
+                            } else {
+                                tabExitToRight()
+                            }
+                        }
+                        else -> ExitTransition.None
                     }
                 },
                 popEnterTransition = {
-                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        EnterTransition.None
-                    } else if (initialRouteIndex < targetRouteIndex) {
-                        slideInHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
-                    } else {
-                        slideInHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    when {
+                        roleOf(initialState.destination.route) == NavigationRole.Overlay -> EnterTransition.None
+                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                            if (topLevelRouteIndex(initialState.destination.route) < topLevelRouteIndex(targetState.destination.route)) {
+                                tabEnterFromRight()
+                            } else {
+                                tabEnterFromLeft()
+                            }
+                        }
+                        else -> EnterTransition.None
                     }
                 },
                 popExitTransition = {
-                    val initialRouteIndex = topLevelRouteIndex(initialState.destination.route)
-                    val targetRouteIndex = topLevelRouteIndex(targetState.destination.route)
-                    if (targetRouteIndex == -1 || initialRouteIndex == -1) {
-                        ExitTransition.None
-                    } else if (initialRouteIndex < targetRouteIndex) {
-                        slideOutHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
-                    } else {
-                        slideOutHorizontally(
-                            animationSpec = tween(TopLevelNavigationDurationMillis),
-                            targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
-                        ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+                    when {
+                        roleOf(initialState.destination.route) == NavigationRole.Overlay -> overlayExitToRight()
+                        roleOf(initialState.destination.route) == NavigationRole.TopLevel &&
+                            roleOf(targetState.destination.route) == NavigationRole.TopLevel -> {
+                            if (topLevelRouteIndex(initialState.destination.route) < topLevelRouteIndex(targetState.destination.route)) {
+                                tabExitToLeft()
+                            } else {
+                                tabExitToRight()
+                            }
+                        }
+                        else -> ExitTransition.None
                     }
                 },
             ) {
@@ -116,6 +114,42 @@ fun AppNavHost(
     }
 }
 
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelRouteIndex(route: String?): Int {
+private fun tabEnterFromRight(): EnterTransition =
+    slideInHorizontally(
+        animationSpec = tween(TopLevelNavigationDurationMillis),
+        initialOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+    ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+
+private fun tabEnterFromLeft(): EnterTransition =
+    slideInHorizontally(
+        animationSpec = tween(TopLevelNavigationDurationMillis),
+        initialOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+    ) + fadeIn(animationSpec = tween(TopLevelNavigationDurationMillis))
+
+private fun tabExitToLeft(): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(TopLevelNavigationDurationMillis),
+        targetOffsetX = { fullWidth -> -fullWidth / TopLevelNavigationOffsetDivisor },
+    ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+
+private fun tabExitToRight(): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(TopLevelNavigationDurationMillis),
+        targetOffsetX = { fullWidth -> fullWidth / TopLevelNavigationOffsetDivisor },
+    ) + fadeOut(animationSpec = tween(TopLevelNavigationDurationMillis))
+
+private fun overlayEnterFromRight(): EnterTransition =
+    slideInHorizontally(
+        animationSpec = tween(OverlayNavigationDurationMillis),
+        initialOffsetX = { fullWidth -> fullWidth },
+    ) + fadeIn(animationSpec = tween(OverlayNavigationDurationMillis))
+
+private fun overlayExitToRight(): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(OverlayNavigationDurationMillis),
+        targetOffsetX = { fullWidth -> fullWidth },
+    ) + fadeOut(animationSpec = tween(OverlayNavigationDurationMillis))
+
+private fun topLevelRouteIndex(route: String?): Int {
     return topLevelRouteIndices[route] ?: -1
 }
