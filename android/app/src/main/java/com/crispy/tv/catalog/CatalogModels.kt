@@ -48,6 +48,7 @@ data class CatalogItem(
     val watchedAt: String? = null,
     val ratedAt: String? = null,
     val lastActivityAt: String? = null,
+    val episodeCount: Int? = null,
 )
 
 @Immutable

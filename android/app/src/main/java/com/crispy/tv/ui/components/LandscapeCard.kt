@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -56,6 +57,7 @@ fun LandscapeCard(
     genre: String? = null,
     itemId: String? = null,
     sharedElementKey: String? = null,
+    badge: String? = null,
 ) {
     val fallbackColor = MaterialTheme.colorScheme.surfaceVariant
     val screenBackground = MaterialTheme.colorScheme.background
@@ -159,6 +161,24 @@ fun LandscapeCard(
                 .fillMaxHeight(0.50f)
                 .background(scrimBrush),
         )
+
+        if (badge != null) {
+            Surface(
+                shape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp),
+            ) {
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        }
 
         Column(
             modifier = Modifier

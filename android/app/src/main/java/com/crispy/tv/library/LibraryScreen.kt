@@ -154,6 +154,26 @@ class LibraryViewModel internal constructor(
     }
 }
 
+// region Episode -> show collapse
+
+internal fun collapseEpisodesByShow(items: List<CatalogItem>): List<CatalogItem> {
+    val out = mutableListOf<CatalogItem>()
+    val byShow = linkedMapOf<String, MutableList<CatalogItem>>()
+    for (item in items) {
+        if (item.episodeCount == null) {
+            out += item
+            continue
+        }
+        byShow.getOrPut(item.itemId) { mutableListOf() } += item
+    }
+    for ((_, group) in byShow) {
+        out += group.first().copy(episodeCount = group.size)
+    }
+    return out
+}
+
+// endregion
+
 // region History month grouping
 
 @Immutable
@@ -349,7 +369,7 @@ internal fun LazyListScope.historyItems(
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
 ) {
-    val monthSections = buildHistoryMonthSections(loadedItems)
+    val monthSections = buildHistoryMonthSections(collapseEpisodesByShow(loadedItems))
     val displayRows = monthSections.flatMap { section ->
         listOf(
             HistoryDisplayRow.Header(section.monthKey, section.label),
@@ -384,6 +404,7 @@ internal fun LazyListScope.historyItems(
                             year = item.year,
                             maturityRating = item.maturityRating,
                             genre = item.genre,
+                            badge = item.episodeCount?.let { if (it > 1) "$it episodes" else null },
                             modifier = Modifier.width(CardStyle.landscapeCardWidth()),
                             onClick = { onItemClick(item, sharedElementKey) },
                             itemId = item.itemId,

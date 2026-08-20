@@ -97,10 +97,13 @@ private fun ClientMediaCard.toCatalogItem(
     ratingValue: Int?,
     lastActivityAt: String?,
 ): CatalogItem {
+    val isEpisode = mediaType.equals("episode", ignoreCase = true)
+    val showItemId = if (isEpisode) parent?.seriesItemId else null
+    val showTitle = if (isEpisode) parent?.seriesTitle else null
     return CatalogItem(
         id = itemId,
-        itemId = itemId,
-        title = title,
+        itemId = showItemId ?: itemId,
+        title = showTitle ?: title,
         posterUrl = images.poster.medium,
         backdropUrl = images.backdrop.medium,
         logoUrl = images.logo.medium,
@@ -116,6 +119,7 @@ private fun ClientMediaCard.toCatalogItem(
         watchedAt = watchedAt,
         ratingValue = ratingValue,
         lastActivityAt = lastActivityAt,
+        episodeCount = if (isEpisode) 1 else null,
     )
 }
 
