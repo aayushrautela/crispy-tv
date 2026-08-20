@@ -7,7 +7,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.transformations
@@ -76,32 +75,6 @@ private fun rememberCrispyImageModel(
         }
         buildCrispyImageRequest(appContext, url, widthPx, heightPx, enableCrossfade, memoryCacheKey, transformations)
     }
-}
-
-fun preloadCrispyImage(
-    context: android.content.Context,
-    url: String?,
-    width: Dp = 0.dp,
-    height: Dp = 0.dp,
-    memoryCacheKey: String? = null,
-) {
-    if (url.isNullOrBlank()) return
-    val appContext = context.applicationContext
-    val density = appContext.resources.displayMetrics.density
-    val widthPx = if (width > 0.dp) (width.value * density).toInt().coerceAtLeast(1) else 0
-    val heightPx = if (height > 0.dp) (height.value * density).toInt().coerceAtLeast(1) else 0
-    val request = buildCrispyImageRequest(
-        context = appContext,
-        url = url,
-        widthPx = widthPx,
-        heightPx = heightPx,
-        memoryCacheKey = memoryCacheKey,
-    )
-    Log.d(
-        "CrispySharedEl",
-        "Preload enqueue: t=${System.currentTimeMillis()} memoryCacheKey=$memoryCacheKey urlBlank=${url.isNullOrBlank()} size=${widthPx}x${heightPx}",
-    )
-    SingletonImageLoader.get(appContext).enqueue(request)
 }
 
 @Composable

@@ -9,7 +9,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.app.appGraph
-import com.crispy.tv.ui.components.preloadCrispyImage
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.player.PlaybackIdentity
@@ -74,16 +73,6 @@ fun DetailsRoute(
     )
 
     val resolvedKey = sharedElementKey?.takeIf { it.isNotBlank() } ?: itemId
-    preloadCrispyImage(
-        context = appContext,
-        url = initialBackdropUrl ?: uiState.details?.backdropUrl,
-        memoryCacheKey = resolvedKey?.let { "backdrop-$it" },
-    )
-    preloadCrispyImage(
-        context = appContext,
-        url = initialLogoUrl ?: uiState.details?.logoUrl,
-        memoryCacheKey = resolvedKey?.let { "logo-${it}-hero" },
-    )
 
     LaunchedEffect(viewModel) {
         viewModel.navigationEvents.collectLatest { event ->
