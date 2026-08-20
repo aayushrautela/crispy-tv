@@ -157,17 +157,22 @@ class LibraryViewModel internal constructor(
 // region Episode -> show collapse
 
 internal fun collapseEpisodesByShow(items: List<CatalogItem>): List<CatalogItem> {
+    val mergedByShow = mutableMapOf<String, CatalogItem>()
     val out = mutableListOf<CatalogItem>()
-    val byShow = linkedMapOf<String, MutableList<CatalogItem>>()
     for (item in items) {
         if (item.episodeCount == null) {
             out += item
             continue
         }
-        byShow.getOrPut(item.itemId) { mutableListOf() } += item
-    }
-    for ((_, group) in byShow) {
-        out += group.first().copy(episodeCount = group.size)
+        val existing = mergedByShow[item.itemId]
+        if (existing == null) {
+            mergedByShow[item.itemId] = item
+            out += item
+        } else {
+            val updated = existing.copy(episodeCount = (existing.episodeCount ?: 1) + 1)
+            out[out.indexOf(existing)] = updated
+            mergedByShow[item.itemId] = updated
+        }
     }
     return out
 }
@@ -200,7 +205,7 @@ private fun buildHistoryMonthSections(items: List<CatalogItem>): List<HistoryMon
     if (currentKey != null && currentItems.isNotEmpty()) {
         result.add(HistoryMonthSectionUi(currentKey, historyMonthLabel(currentKey), currentItems.toList()))
     }
-    return result
+    return result.map { section -> section.copy(items = collapseEpisodesByShow(section.items)) }
 }
 
 private fun historyMonthKey(timestamp: String?): String {
@@ -369,7 +374,7 @@ internal fun LazyListScope.historyItems(
     pageHorizontalPadding: Dp,
     onItemClick: (CatalogItem, String?) -> Unit,
 ) {
-    val monthSections = buildHistoryMonthSections(collapseEpisodesByShow(loadedItems))
+    val monthSections = buildHistoryMonthSections(loadedItems)
     val displayRows = monthSections.flatMap { section ->
         listOf(
             HistoryDisplayRow.Header(section.monthKey, section.label),
