@@ -20,9 +20,10 @@ internal suspend fun AddonStream.toPlaybackSource(
     }
 
     val infoHash = p2pInfoHash ?: return null
+    val rawLink = url ?: externalUrl
     val torrentLink =
-        if ((url ?: externalUrl)?.isMagnetLink() == true) {
-            (url ?: externalUrl)!!
+        if (rawLink != null && rawLink.startsWith("magnet:", ignoreCase = true)) {
+            rawLink
         } else {
             "magnet:?xt=urn:btih:$infoHash"
         }

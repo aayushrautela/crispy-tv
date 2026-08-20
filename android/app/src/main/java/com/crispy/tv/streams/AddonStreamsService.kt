@@ -197,6 +197,13 @@ private fun String?.extractBtihInfoHash(): String? {
 
 private val ADDON_URL_HEX = "0123456789ABCDEF"
 
+private fun MetadataLabMediaType.asApiPath(): String =
+    when (this) {
+        MetadataLabMediaType.MOVIE -> "movie"
+        MetadataLabMediaType.SERIES -> "series"
+        MetadataLabMediaType.ANIME -> "series"
+    }
+
 private fun String.encodeAddonPathSegment(): String =
     buildString {
         encodeToByteArray().forEach { byte ->
@@ -823,14 +830,6 @@ class AddonStreamsService(
     private fun buildStableKey(providerId: String, dedupeKey: String): String {
         val hash = dedupeKey.hashCode().toUInt().toString(16)
         return "$providerId-$hash"
-    }
-
-    private fun MetadataLabMediaType.asApiPath(): String {
-        return when (this) {
-            MetadataLabMediaType.MOVIE -> "movie"
-            MetadataLabMediaType.SERIES -> "series"
-            MetadataLabMediaType.ANIME -> "series"
-        }
     }
 
     suspend fun fetchAddonSubtitles(

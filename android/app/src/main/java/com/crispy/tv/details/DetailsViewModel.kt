@@ -809,7 +809,7 @@ class DetailsViewModel internal constructor(
     }
 
     fun onStreamSelected(stream: AddonStream) {
-        if (!stream.hasPlayableSource()) {
+        if (!stream.hasPlayableSource) {
             _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
             return
         }
