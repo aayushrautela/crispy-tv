@@ -1,7 +1,6 @@
 package com.crispy.tv.ui.components
 
 import android.content.Context
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -89,13 +88,6 @@ private fun rememberCrispyImageModel(
         transformations,
         placeholderMemoryCacheKey,
     ) {
-        if (memoryCacheKey != null) {
-            Log.d(
-                "CrispySharedEl",
-                "ImageModel build: t=${System.currentTimeMillis()} memoryCacheKey=$memoryCacheKey " +
-                    "urlBlank=${url.isBlank()} size=${widthPx}x${heightPx} hasPlaceholderKey=${placeholderMemoryCacheKey != null}",
-            )
-        }
         buildCrispyImageRequest(
             appContext,
             url,
