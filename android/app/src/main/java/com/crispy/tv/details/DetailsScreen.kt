@@ -12,13 +12,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -30,9 +27,10 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CheckCircleOutline
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
@@ -443,6 +441,14 @@ internal fun DetailsScreen(
                 val selectedEpisode = selectedEpisodeAction!!
                 val watchState = visibleUiState.episodeWatchStates[selectedEpisode.id] ?: EpisodeWatchState()
                 val showTitle = visibleDetails?.title ?: details?.title
+                val episodeSeason = selectedEpisode.season
+                val seasonItemId = episodeSeason?.let { visibleUiState.seasonItemIds[it] }
+                val seasonWatched = episodeSeason?.let { visibleUiState.seasonWatchStates[it] } ?: false
+                val episodeMeta =
+                    listOfNotNull(
+                        episodeSeason?.let { "Season $it" },
+                        selectedEpisode.episode?.let { "Episode $it" },
+                    ).joinToString(" · ")
                 ModalBottomSheet(
                     onDismissRequest = { selectedEpisodeAction = null },
                     sheetState = episodeSheetState,
@@ -463,6 +469,13 @@ internal fun DetailsScreen(
                                 )
                             }
                             Text(selectedEpisode.title, style = MaterialTheme.typography.titleLarge)
+                            if (episodeMeta.isNotBlank()) {
+                                Text(
+                                    text = episodeMeta,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             formatLongDate(selectedEpisode.released)?.let { released ->
                                 Text(
                                     text = released,
@@ -471,40 +484,51 @@ internal fun DetailsScreen(
                                 )
                             }
                         }
-                        Button(
+                        ListItem(
                             onClick = {
                                 selectedEpisodeAction = null
                                 onToggleEpisodeWatched(selectedEpisode)
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(
-                                imageVector = if (watchState.isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (watchState.isWatched) "Unmark as watched" else "Mark as watched")
-                        }
-                        val episodeSeason = selectedEpisode.season
-                        val seasonItemId = episodeSeason?.let { visibleUiState.seasonItemIds[it] }
-                        val seasonWatched = episodeSeason?.let { visibleUiState.seasonWatchStates[it] } ?: false
+                            trailingContent = {
+                                Icon(
+                                    imageVector = if (watchState.isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                                    contentDescription = null,
+                                )
+                            },
+                            supportingContent = { Text("This episode only") },
+                            content = {
+                                Text(if (watchState.isWatched) "Unmark as watched" else "Mark as watched")
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ),
+                        )
                         if (episodeSeason != null && seasonItemId != null) {
-                            TextButton(
+                            ListItem(
                                 onClick = {
                                     selectedEpisodeAction = null
                                     onToggleSeasonWatched(seasonItemId, episodeSeason)
                                 },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(
-                                    if (seasonWatched) {
-                                        "Unmark season $episodeSeason as watched"
-                                    } else {
-                                        "Mark season $episodeSeason as watched"
-                                    },
-                                )
-                            }
+                                trailingContent = {
+                                    Icon(
+                                        imageVector = if (seasonWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                                        contentDescription = null,
+                                    )
+                                },
+                                supportingContent = { Text("All episodes in this season") },
+                                content = {
+                                    Text(
+                                        if (seasonWatched) {
+                                            "Unmark season $episodeSeason as watched"
+                                        } else {
+                                            "Mark season $episodeSeason as watched"
+                                        },
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                ),
+                            )
                         }
                     }
                 }
