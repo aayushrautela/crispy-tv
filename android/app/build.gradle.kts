@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 val supabaseUrl =
@@ -179,7 +178,6 @@ dependencies {
     implementation("androidx.media:media:1.8.0")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // Encrypted, Keystore-backed token storage (access + refresh tokens).
     implementation("androidx.security:security-crypto:1.1.0")
