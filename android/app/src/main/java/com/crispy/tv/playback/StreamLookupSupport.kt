@@ -182,25 +182,4 @@ fun StreamSelectorUiState.matchesTarget(target: StreamLookupTarget): Boolean {
     return mediaType == target.mediaType && lookupId == target.lookupId
 }
 
-fun buildStreamStatusMessage(
-    providers: List<StreamProviderUiState>,
-    isLoading: Boolean,
-): String {
-    val totalStreams = providers.sumOf { provider -> provider.streams.size }
-    val partialFailure = providers.any { provider -> provider.errorMessage != null }
 
-    if (isLoading) {
-        return if (totalStreams > 0) {
-            "Found $totalStreams stream${if (totalStreams == 1) "" else "s"} so far..."
-        } else {
-            "Fetching streams..."
-        }
-    }
-
-    return when {
-        totalStreams > 0 -> "Found $totalStreams stream${if (totalStreams == 1) "" else "s"}."
-        partialFailure -> "No streams found. Some providers failed to load."
-        providers.isEmpty() -> "No stream providers are available for this title."
-        else -> "No streams found for this title."
-    }
-}

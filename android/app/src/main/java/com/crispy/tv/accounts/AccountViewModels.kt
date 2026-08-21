@@ -374,7 +374,7 @@ class AccountSettingsViewModel internal constructor(
                     ?: throw IllegalStateException("Not signed in.")
                 syncProviderRepository.disconnectImportConnection(session.accessToken, provider)
             }.onSuccess {
-                _state.update { it.copy(isBusy = false, syncProvider = null, statusMessage = "Sync disconnected.") }
+                _state.update { it.copy(isBusy = false, syncProvider = null, statusMessage = null) }
             }.onFailure { error ->
                 _state.update { it.copy(isBusy = false, error = error.message ?: "Failed to disconnect sync.") }
             }

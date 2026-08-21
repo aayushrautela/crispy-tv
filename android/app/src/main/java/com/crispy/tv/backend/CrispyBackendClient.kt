@@ -623,6 +623,7 @@ class CrispyBackendClient(
     data class WatchActionResponse(
         val accepted: Boolean,
         val mode: String,
+        val reason: String? = null,
     )
 
     class CrispyBackendException(

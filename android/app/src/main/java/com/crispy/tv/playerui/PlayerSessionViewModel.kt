@@ -20,7 +20,6 @@ import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.PlayerStreamLookupTarget
 import com.crispy.tv.playback.applyProviderResult
 import com.crispy.tv.playback.buildPlayerSubtitle
-import com.crispy.tv.playback.buildStreamStatusMessage
 import com.crispy.tv.playback.finalizeFrom
 import com.crispy.tv.playback.findEpisodeForLookupId
 import com.crispy.tv.playback.matchesTarget
@@ -421,12 +420,7 @@ class PlayerSessionViewModel(
                                         providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
                                         isLoading = providers.isNotEmpty(),
                                     ),
-                                statusMessage =
-                                    if (providers.isEmpty()) {
-                                        "No stream providers are available for this title."
-                                    } else {
-                                        "Fetching streams..."
-                                    },
+                                statusMessage = "",
                             )
                         }
                     },
@@ -440,7 +434,7 @@ class PlayerSessionViewModel(
                                     providers = updatedProviders,
                                     isLoading = stillLoading,
                                 ),
-                                statusMessage = buildStreamStatusMessage(updatedProviders, stillLoading),
+                                statusMessage = "",
                             )
                         }
                     },
@@ -512,7 +506,7 @@ class PlayerSessionViewModel(
                 positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
-                statusMessage = "Loading...",
+                statusMessage = "",
                 errorMessage = null,
                 videoLayout = null,
                 activeSurface = PlayerSurface.NONE,
@@ -586,7 +580,7 @@ class PlayerSessionViewModel(
                 }
             state.copy(
                 streamSelector = state.streamSelector.copy(providers = providers),
-                statusMessage = "Retrying provider...",
+                statusMessage = "",
             )
         }
 
@@ -608,7 +602,7 @@ class PlayerSessionViewModel(
                     val providers = state.streamSelector.providers.applyProviderResult(result)
                     state.copy(
                         streamSelector = state.streamSelector.copy(providers = providers),
-                        statusMessage = buildStreamStatusMessage(providers, isLoading = false),
+                        statusMessage = "",
                     )
                 }
             }.onFailure { error ->
@@ -717,7 +711,7 @@ class PlayerSessionViewModel(
                 positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
-                statusMessage = "Retrying playback...",
+                statusMessage = "",
                 errorMessage = null,
                 videoLayout = null,
             )
@@ -918,7 +912,7 @@ class PlayerSessionViewModel(
                         headerEpisode = headerEpisode,
                         isLoading = true,
                     ),
-                statusMessage = "Fetching streams...",
+                statusMessage = "",
             )
         }
 
@@ -938,12 +932,7 @@ class PlayerSessionViewModel(
                                         providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
                                         isLoading = providers.isNotEmpty(),
                                     ),
-                                statusMessage =
-                                    if (providers.isEmpty()) {
-                                        "No stream providers are available for this title."
-                                    } else {
-                                        "Fetching streams..."
-                                    },
+                                statusMessage = "",
                             )
                         }
                     },
@@ -957,7 +946,7 @@ class PlayerSessionViewModel(
                                     providers = updatedProviders,
                                     isLoading = stillLoading,
                                 ),
-                                statusMessage = buildStreamStatusMessage(updatedProviders, stillLoading),
+                                statusMessage = "",
                             )
                         }
                     },
@@ -977,7 +966,7 @@ class PlayerSessionViewModel(
                             providers = finalizedProviders,
                             isLoading = false,
                         ),
-                        statusMessage = buildStreamStatusMessage(finalizedProviders, isLoading = false),
+                        statusMessage = "",
                     )
                 }
             }.onFailure { error ->
@@ -1033,7 +1022,7 @@ class PlayerSessionViewModel(
                 positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
-                statusMessage = if (resumePositionMs > 0L) "Switching stream..." else "Loading selection...",
+                statusMessage = "",
                 errorMessage = null,
                 videoLayout = null,
             )
@@ -1231,7 +1220,7 @@ class PlayerSessionViewModel(
                 positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
-                statusMessage = "Switching to fallback engine...",
+                statusMessage = "",
                 errorMessage = null,
                 videoLayout = null,
             )

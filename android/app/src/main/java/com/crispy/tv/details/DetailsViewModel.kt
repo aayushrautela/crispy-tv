@@ -18,7 +18,6 @@ import com.crispy.tv.streams.StreamProviderDescriptor
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.buildPlayerSubtitle
-import com.crispy.tv.playback.buildStreamStatusMessage
 import com.crispy.tv.playback.findEpisodeForLookupId
 import com.crispy.tv.playback.resolveStreamLookupTarget
 import com.crispy.tv.playback.parseLookupId
@@ -329,7 +328,7 @@ class DetailsViewModel internal constructor(
         aiJob =
             viewModelScope.launch {
                 if (announce) {
-                    _uiState.update { it.copy(aiIsLoading = true, statusMessage = "Generating AI insights...") }
+                    _uiState.update { it.copy(aiIsLoading = true) }
                 } else {
                     _uiState.update { it.copy(aiIsLoading = true) }
                 }
@@ -418,7 +417,7 @@ class DetailsViewModel internal constructor(
         val state = _uiState.value
         val details = state.details
         if (details == null) {
-            _uiState.update { it.copy(statusMessage = "Details are still loading.") }
+            _uiState.update { it.copy(statusMessage = "") }
             return
         }
 
@@ -603,7 +602,7 @@ class DetailsViewModel internal constructor(
         val state = _uiState.value
         val details = state.details
         if (details == null) {
-            _uiState.update { it.copy(statusMessage = "Details are still loading.") }
+            _uiState.update { it.copy(statusMessage = "") }
             return
         }
         val episode =
@@ -657,7 +656,7 @@ class DetailsViewModel internal constructor(
                         headerEpisode = headerEpisode,
                         isLoading = true,
                     ),
-                statusMessage = "Fetching streams...",
+                statusMessage = "",
             )
         }
 
@@ -679,12 +678,7 @@ class DetailsViewModel internal constructor(
                                             providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
                                             isLoading = providers.isNotEmpty(),
                                         ),
-                                    statusMessage =
-                                        if (providers.isEmpty()) {
-                                            "No stream providers are available for this title."
-                                        } else {
-                                            "Fetching streams..."
-                                        },
+                                    statusMessage = "",
                                 )
                             }
                         },
@@ -698,9 +692,9 @@ class DetailsViewModel internal constructor(
                                     streamSelector =
                                         previous.streamSelector.copy(
                                             providers = updatedProviders,
-                                            isLoading = stillLoading,
-                                        ),
-                                    statusMessage = buildStreamStatusMessage(updatedProviders, isLoading = stillLoading),
+                                    isLoading = stillLoading,
+                                ),
+                            statusMessage = "",
                                 )
                             }
                         },
@@ -722,7 +716,7 @@ class DetailsViewModel internal constructor(
                                     providers = finalizedProviders,
                                     isLoading = false,
                                 ),
-                            statusMessage = buildStreamStatusMessage(finalizedProviders, isLoading = false),
+                            statusMessage = "",
                         )
                     }
                 }.onFailure { error ->
@@ -786,7 +780,7 @@ class DetailsViewModel internal constructor(
                 }
             state.copy(
                 streamSelector = state.streamSelector.copy(providers = providers),
-                statusMessage = "Retrying ${providers.firstOrNull { it.providerId.equals(normalizedProviderId, true) }?.providerName ?: "provider"}...",
+                statusMessage = "",
             )
         }
 
@@ -830,8 +824,7 @@ class DetailsViewModel internal constructor(
                             when {
                                 updatedProvider == null -> "Provider no longer available."
                                 updatedProvider.errorMessage != null -> updatedProvider.errorMessage
-                                updatedProvider.streams.isEmpty() -> "No streams returned from ${updatedProvider.providerName}."
-                                else -> "Updated ${updatedProvider.providerName}."
+                                else -> ""
                             },
                     )
                 }

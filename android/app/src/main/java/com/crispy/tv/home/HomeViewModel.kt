@@ -255,7 +255,7 @@ class HomeViewModel internal constructor(
             val remainingItems = current.items.filterNot { it.continueWatchingItem?.localKey == item.localKey }
             current.copy(
                 items = remainingItems,
-                statusMessage = if (remainingItems.isEmpty()) "" else "Removing ${item.title}...",
+                statusMessage = "",
             )
         }
 
@@ -266,15 +266,13 @@ class HomeViewModel internal constructor(
                         val dismissId = item.id.trim()
                         watchHistoryService.removeFromPlayback(playbackId = dismissId)
                     } else {
-                        com.crispy.tv.player.WatchHistoryResult(
-                            statusMessage = "Removed ${item.title} from Continue Watching.",
-                        )
+                        com.crispy.tv.player.WatchHistoryResult(accepted = true, statusMessage = "")
                     }
                 }
 
             updateWideRailSection(item.sectionKey()) { current ->
                 current.copy(
-                    statusMessage = removalResult.statusMessage.takeIf { current.items.isNotEmpty() }.orEmpty(),
+                    statusMessage = if (removalResult.accepted) "" else removalResult.statusMessage,
                 )
             }
         }

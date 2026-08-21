@@ -549,6 +549,7 @@ internal fun CrispyBackendClient.parseWatchActionResponse(json: JSONObject): Wat
     return WatchActionResponse(
         accepted = json.optBoolean("accepted", false),
         mode = json.optString("mode").trim().ifBlank { error("Watch action response is missing mode.") },
+        reason = json.optNullableString("reason")?.trim()?.takeIf { it.isNotBlank() },
     )
 }
 

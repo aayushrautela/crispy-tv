@@ -72,11 +72,7 @@ class BackendWatchHistoryService(
         }
 
         return WatchHistoryResult(
-            statusMessage = if (action.accepted) {
-                if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
-            } else {
-                "Watchlist update failed."
-            },
+            statusMessage = if (action.accepted) "" else (action.reason ?: "Rating update failed."),
             accepted = action.accepted,
         )
     }
@@ -110,11 +106,7 @@ class BackendWatchHistoryService(
         }
 
         return WatchHistoryResult(
-            statusMessage = if (action.accepted) {
-                if (inWatchlist) "Saved to watchlist." else "Removed from watchlist."
-            } else {
-                "Watchlist update failed."
-            },
+            statusMessage = if (action.accepted) "" else (action.reason ?: "Watchlist update failed."),
             accepted = action.accepted,
         )
     }
@@ -215,7 +207,7 @@ class BackendWatchHistoryService(
         }
 
         return WatchHistoryResult(
-            statusMessage = if (action.accepted) "Removed from continue watching." else "Continue watching removal unavailable.",
+            statusMessage = if (action.accepted) "" else (action.reason ?: "Continue watching removal unavailable."),
             accepted = action.accepted,
         )
     }
@@ -302,7 +294,7 @@ class BackendWatchHistoryService(
         )
         watchProgressStore.addContinueWatchingRemoved(id = parts.id, type = parts.type)
 
-        return WatchHistoryResult(statusMessage = "Removed local playback progress.")
+        return WatchHistoryResult(statusMessage = "")
     }
 
     override suspend fun onPlaybackStarted(identity: PlaybackIdentity, positionMs: Long, durationMs: Long) {
@@ -387,11 +379,7 @@ class BackendWatchHistoryService(
         } ?: return WatchHistoryResult(statusMessage = "Watched update failed.")
 
         return WatchHistoryResult(
-            statusMessage = if (response.accepted) {
-                if (shouldMark) "Marked watched." else "Removed from watched."
-            } else {
-                "Watched update failed."
-            },
+            statusMessage = if (response.accepted) "" else (response.reason ?: "Watched update failed."),
             accepted = response.accepted,
         )
     }

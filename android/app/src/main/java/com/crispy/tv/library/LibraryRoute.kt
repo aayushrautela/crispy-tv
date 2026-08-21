@@ -30,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import android.widget.Toast
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
@@ -206,12 +205,6 @@ fun LibraryRoute(
                             val desired = !watched
                             viewModel.setWatched(item, desired)
                             pagingItems.refresh()
-                            Toast
-                                .makeText(
-                                    context,
-                                    if (desired) "Marked as watched" else "Marked as unwatched",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
                         },
                         modifier = Modifier.align(Alignment.End),
                     ) { Text(if (watched) "Mark as unwatched" else "Mark as watched") }
