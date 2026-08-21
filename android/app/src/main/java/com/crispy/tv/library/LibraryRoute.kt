@@ -18,7 +18,8 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,7 +67,7 @@ fun LibraryRoute(
     val listState = rememberLazyListState()
     val pullToRefreshState = rememberPullToRefreshState()
     var selectedLibraryItem by remember { mutableStateOf<CatalogItem?>(null) }
-    val librarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val librarySheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
     val scrollBehavior = appBarScrollBehavior()
 
     val sections = uiState.sections

@@ -228,10 +228,11 @@ private fun ProfileMenuRow(
     onClick: () -> Unit,
 ) {
     ListItem(
-        headlineContent = { Text(text = label, style = MaterialTheme.typography.bodyLarge) },
         leadingContent = {
             Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         modifier = Modifier.clickable(onClick = onClick),
-    )
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyLarge) 
+    }
 }

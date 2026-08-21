@@ -41,7 +41,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -228,8 +229,8 @@ internal fun DetailsScreen(
     var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
     var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
     var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
-    val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val episodeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val reviewSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
+    val episodeSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
     val bodyHorizontalPadding = responsivePageHorizontalPadding()
 
     MaterialTheme(colorScheme = detailsScheme) {

@@ -768,14 +768,6 @@ private fun AddonListRow(
                 }
             }
         },
-        headlineContent = {
-            Text(
-                text = addon.name,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
         supportingContent = {
             val details =
                 buildString {
@@ -802,7 +794,14 @@ private fun AddonListRow(
                 )
             }
         }
-    )
+    ) {
+        Text(
+            text = addon.name,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 private fun parseCachedManifest(raw: String?): JSONObject? {

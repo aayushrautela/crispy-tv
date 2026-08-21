@@ -37,15 +37,6 @@ internal fun EpisodeRow(
             ),
     ) {
         ListItem(
-            headlineContent = {
-                Text(
-                    text = episode.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else null,
-                    color = if (isCurrent) palette.accent else palette.onPillBackground,
-                )
-            },
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     episodeRowMeta(episode)?.let { text ->
@@ -77,7 +68,15 @@ internal fun EpisodeRow(
                 } else {
                     null
                 },
-        )
+        ) {
+            Text(
+                text = episode.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else null,
+                color = if (isCurrent) palette.accent else palette.onPillBackground,
+            )
+        }
     }
 }
 

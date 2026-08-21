@@ -40,7 +40,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -82,7 +83,7 @@ fun StreamSelectorModal(
 ) {
     if (!state.visible) return
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = false)
     ModalBottomSheet(
         onDismissRequest = callbacks.onDismiss,
         sheetState = sheetState,
@@ -476,13 +477,6 @@ private fun StreamRow(
         modifier = Modifier.testTag("stream_row_${stream.stableKey}"),
     ) {
         ListItem(
-            headlineContent = {
-                Text(
-                    text = stream.name ?: providerName,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     detailsText?.let { text ->
@@ -513,6 +507,12 @@ private fun StreamRow(
                 } else {
                     null
                 },
-        )
+        ) {
+            Text(
+                text = stream.name ?: providerName,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

@@ -697,7 +697,7 @@ class DetailsViewModel internal constructor(
                             if (season == null || videos.isEmpty()) {
                                 null
                             } else {
-                                (season as Int) to videos.all { watchStates[it.id]?.isWatched == true }
+                                season to videos.all { watchStates[it.id]?.isWatched == true }
                             }
                         }.toMap()
 

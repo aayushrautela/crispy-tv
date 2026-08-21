@@ -550,7 +550,6 @@ private fun DiscoverScreen(
                             }
                             items(DiscoverTypeFilter.entries) { filter ->
                                 ListItem(
-                                    headlineContent = { Text(filter.label) },
                                     trailingContent =
                                         if (uiState.typeFilter == filter) {
                                             {
@@ -569,7 +568,9 @@ private fun DiscoverScreen(
                                             activeSheet = null
                                         }
                                         .padding(horizontal = 4.dp)
-                                )
+                                ) {
+                                    Text(filter.label) 
+                                }
                             }
                         }
                     }
@@ -607,13 +608,6 @@ private fun DiscoverScreen(
                                     key = { it.key }
                                 ) { catalog ->
                                     ListItem(
-                                        headlineContent = {
-                                            Text(
-                                                text = catalog.section.title,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        },
                                          supportingContent = {
                                              Text(
                                                  text = catalog.addonName,
@@ -639,7 +633,13 @@ private fun DiscoverScreen(
                                                 activeSheet = null
                                             }
                                             .padding(horizontal = 4.dp)
-                                    )
+                                    ) {
+                                        Text(
+                                            text = catalog.section.title,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -70,9 +70,6 @@ fun PlaybackSettingsScreen(
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = {
-                        Text("Trailer Autoplay")
-                    },
                     supportingContent = {
                         Text("Automatically start the details-page trailer once the hero settles.")
                     },
@@ -82,14 +79,13 @@ fun PlaybackSettingsScreen(
                             onCheckedChange = onTrailerAutoplayChanged
                         )
                     }
-                )
+                ) {
+                    Text("Trailer Autoplay")
+                }
             }
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = {
-                        Text("Skip Intro")
-                    },
                     supportingContent = {
                         Text("Show skip controls for intro, recap, and ending segments.")
                     },
@@ -99,14 +95,13 @@ fun PlaybackSettingsScreen(
                             onCheckedChange = onSkipIntroChanged
                         )
                     }
-                )
+                ) {
+                    Text("Skip Intro")
+                }
             }
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = {
-                        Text("Auto-select Stream")
-                    },
                     supportingContent = {
                         Text("When a source is picked from details, start playback automatically instead of opening the stream sheet.")
                     },
@@ -116,14 +111,13 @@ fun PlaybackSettingsScreen(
                             onCheckedChange = onAutoSelectStreamChanged
                         )
                     }
-                )
+                ) {
+                    Text("Auto-select Stream")
+                }
             }
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = {
-                        Text("libass Subtitle Rendering")
-                    },
                     supportingContent = {
                         Column(modifier = Modifier.padding(top = 4.dp)) {
                             Text(
@@ -145,7 +139,9 @@ fun PlaybackSettingsScreen(
                             onCheckedChange = onUseLibassChanged
                         )
                     }
-                )
+                ) {
+                    Text("libass Subtitle Rendering")
+                }
             }
 
             if (settings.useLibass) {
@@ -157,16 +153,15 @@ fun PlaybackSettingsScreen(
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ListItem(
-                    headlineContent = {
-                        Text("Playback Engine")
-                    },
                     supportingContent = {
                         Text(
                             "Auto uses ExoPlayer and falls back to libmpv on playback errors. " +
                                 "Force a specific engine if you run into issues."
                         )
                     }
-                )
+                ) {
+                    Text("Playback Engine")
+                }
             }
 
             EnginePreferenceChips(
@@ -216,14 +211,6 @@ private fun EnginePreferenceChips(
                 onClick = { onSelect(preference) },
             ) {
                 ListItem(
-                    headlineContent = {
-                        Text(
-                            text = preference.label,
-                            style = if (isSelected) MaterialTheme.typography.bodyLarge
-                            else MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
-                        )
-                    },
                     trailingContent = {
                         if (isSelected) {
                             Text(
@@ -233,7 +220,14 @@ private fun EnginePreferenceChips(
                             )
                         }
                     },
-                )
+                ) {
+                    Text(
+                        text = preference.label,
+                        style = if (isSelected) MaterialTheme.typography.bodyLarge
+                        else MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
+                    )
+                }
             }
         }
     }
@@ -264,14 +258,6 @@ private fun LibassRenderTypeChips(
                 onClick = { onSelect(type) },
             ) {
                 ListItem(
-                    headlineContent = {
-                        Text(
-                            text = type,
-                            style = if (isSelected) MaterialTheme.typography.bodyLarge
-                            else MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
-                        )
-                    },
                     trailingContent = {
                         if (isSelected) {
                             Text(
@@ -281,7 +267,14 @@ private fun LibassRenderTypeChips(
                             )
                         }
                     },
-                )
+                ) {
+                    Text(
+                        text = type,
+                        style = if (isSelected) MaterialTheme.typography.bodyLarge
+                        else MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected) MaterialTheme.typography.titleMedium.fontWeight else null,
+                    )
+                }
             }
         }
     }

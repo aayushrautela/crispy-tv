@@ -9,14 +9,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
-import android.os.SystemClock
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.session.MediaSessionCompat
-import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.media.app.NotificationCompat as MediaNotificationCompat
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaStyleNotificationHelper
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -41,80 +38,12 @@ internal class PlayerMediaSessionManager(
     private val restorePlaybackIntent = Intent(restorePlaybackIntent)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    private val mediaSession =
-        MediaSessionCompat(appContext, SESSION_TAG).apply {
-            setCallback(
-                object : MediaSessionCompat.Callback() {
-                    override fun onPlay() {
-                        if (released) return
-                        playbackController.setPlaying(true)
-                        currentIsError = false
-                        currentErrorMessage = null
-                        currentIsPlaying = true
-                        currentIsBuffering = false
-                        publishPlaybackState()
-                        publishNotification(force = true)
-                    }
+    private val player = PlaybackSessionControllerPlayer(appContext, playbackController)
 
-                    override fun onPause() {
-                        if (released) return
-                        playbackController.setPlaying(false)
-                        currentIsError = false
-                        currentErrorMessage = null
-                        currentIsPlaying = false
-                        currentIsBuffering = false
-                        publishPlaybackState()
-                        publishNotification(force = true)
-                    }
-
-                    override fun onSeekTo(pos: Long) {
-                        if (released) return
-                        playbackController.seekTo(pos)
-                        currentPositionMs = pos.coerceAtLeast(0L)
-                        publishPlaybackState()
-                    }
-
-                    override fun onRewind() {
-                        if (released) return
-                        val playbackSnapshot = playbackController.snapshot()
-                        val targetPositionMs = (playbackSnapshot.positionMs - REWIND_MS).coerceAtLeast(0L)
-                        playbackController.seekTo(targetPositionMs)
-                        currentPositionMs = targetPositionMs
-                        publishPlaybackState()
-                    }
-
-                    override fun onFastForward() {
-                        if (released) return
-                        val playbackSnapshot = playbackController.snapshot()
-                        val durationMs = playbackSnapshot.durationMs
-                        val unclampedTargetMs = playbackSnapshot.positionMs + FAST_FORWARD_MS
-                        val targetPositionMs =
-                            if (durationMs > 0L) {
-                                unclampedTargetMs.coerceAtMost(durationMs)
-                            } else {
-                                unclampedTargetMs
-                            }
-                        playbackController.seekTo(targetPositionMs)
-                        currentPositionMs = targetPositionMs
-                        currentDurationMs = durationMs.coerceAtLeast(0L)
-                        publishPlaybackState()
-                    }
-
-                    override fun onStop() {
-                        if (released) return
-                        playbackController.setPlaying(false)
-                        currentIsError = false
-                        currentErrorMessage = null
-                        currentIsPlaying = false
-                        currentIsBuffering = false
-                        publishPlaybackState()
-                        publishNotification(force = true)
-                    }
-                },
-            )
-            setSessionActivity(buildContentPendingIntent())
-            isActive = true
-        }
+    private val mediaSession: MediaSession =
+        MediaSession.Builder(appContext, player)
+            .setSessionActivity(buildContentPendingIntent())
+            .build()
 
     private var currentTitle: String = "Player"
     private var currentSubtitle: String? = null
@@ -123,11 +52,6 @@ internal class PlayerMediaSessionManager(
     private var currentIsPlaying: Boolean = false
     private var currentIsBuffering: Boolean = true
     private var currentIsError: Boolean = false
-    private var currentErrorMessage: String? = null
-    private var currentPositionMs: Long = 0L
-    private var currentDurationMs: Long = 0L
-    private var currentPlaybackSpeed: Float = 1f
-    private var currentBufferedPositionMs: Long = 0L
     private var released: Boolean = false
     private var artworkJob: Job? = null
     private var lastNotificationSnapshot: NotificationSnapshot? = null
@@ -184,11 +108,6 @@ internal class PlayerMediaSessionManager(
         currentIsPlaying = isPlaying
         currentIsBuffering = isBuffering
         currentIsError = false
-        currentErrorMessage = null
-        currentPositionMs = positionMs.coerceAtLeast(0L)
-        currentDurationMs = durationMs.coerceAtLeast(0L)
-        currentPlaybackSpeed = if (playbackSpeed.isFinite() && playbackSpeed > 0f) playbackSpeed else 1f
-        currentBufferedPositionMs = bufferedPositionMs.coerceAtLeast(0L)
         publishPlaybackState()
         publishNotification(force = wasError)
     }
@@ -206,11 +125,8 @@ internal class PlayerMediaSessionManager(
         }
         updateMetadata(title = title, subtitle = subtitle, artworkUrl = artworkUrl)
         currentIsError = true
-        currentErrorMessage = errorMessage?.trim()?.ifBlank { null } ?: "Playback error"
         currentIsPlaying = false
         currentIsBuffering = false
-        currentPositionMs = positionMs.coerceAtLeast(0L)
-        currentDurationMs = durationMs.coerceAtLeast(0L)
         publishPlaybackState()
         publishNotification(force = true)
     }
@@ -222,8 +138,8 @@ internal class PlayerMediaSessionManager(
         if (activeManager === this) {
             activeManager = null
         }
-        mediaSession.isActive = false
         mediaSession.release()
+        player.release()
         scope.cancel()
     }
 
@@ -265,65 +181,11 @@ internal class PlayerMediaSessionManager(
     }
 
     private fun publishMetadata() {
-        val metadata =
-            MediaMetadataCompat.Builder()
-                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
-                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, currentTitle)
-                .apply {
-                    currentSubtitle?.let {
-                        putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, it)
-                    }
-                    if (currentDurationMs > 0L) {
-                        putLong(MediaMetadataCompat.METADATA_KEY_DURATION, currentDurationMs)
-                    }
-                    currentArtworkBitmap?.let { bitmap ->
-                        putBitmap(MediaMetadataCompat.METADATA_KEY_ART, bitmap)
-                        putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
-                        putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, bitmap)
-                    }
-                }.build()
-        mediaSession.setMetadata(metadata)
+        player.updateMetadata(currentTitle, currentSubtitle, currentArtworkBitmap)
     }
 
     private fun publishPlaybackState() {
-        val (state, includeSpeed) =
-            when {
-                currentIsError -> PlaybackStateCompat.STATE_ERROR to false
-                currentIsBuffering -> PlaybackStateCompat.STATE_BUFFERING to true
-                currentIsPlaying -> PlaybackStateCompat.STATE_PLAYING to true
-                else -> PlaybackStateCompat.STATE_PAUSED to true
-            }
-
-        val speed = if (includeSpeed && currentIsPlaying) currentPlaybackSpeed else 0f
-
-        val builder =
-            PlaybackStateCompat.Builder()
-                .setActions(
-                    PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_SEEK_TO or
-                        PlaybackStateCompat.ACTION_REWIND or
-                        PlaybackStateCompat.ACTION_FAST_FORWARD or
-                        PlaybackStateCompat.ACTION_STOP,
-                )
-
-        if (currentIsError && currentErrorMessage != null) {
-            builder.setErrorMessage(0, currentErrorMessage)
-        }
-
-        builder.setState(
-            state,
-            currentPositionMs,
-            speed,
-            SystemClock.elapsedRealtime(),
-        )
-
-        if (currentBufferedPositionMs > currentPositionMs) {
-            builder.setBufferedPosition(currentBufferedPositionMs)
-        }
-
-        mediaSession.setPlaybackState(builder.build())
+        player.invalidateState()
     }
 
     private fun publishNotification(force: Boolean = false) {
@@ -345,8 +207,7 @@ internal class PlayerMediaSessionManager(
             return
         }
 
-        NotificationManagerCompat.from(appContext).notify(
-            NOTIFICATION_ID,
+        val notification =
             NotificationCompat.Builder(appContext, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_player)
                 .setContentTitle(currentTitle)
@@ -358,30 +219,12 @@ internal class PlayerMediaSessionManager(
                 .setOngoing(currentIsPlaying || currentIsBuffering)
                 .setShowWhen(false)
                 .setLargeIcon(currentArtworkBitmap)
-                .addAction(
-                    android.R.drawable.ic_media_rew,
-                    "Replay 10 seconds",
-                    buildActionPendingIntent(ACTION_REWIND),
-                ).addAction(
-                    if (currentIsPlaying || currentIsBuffering) {
-                        android.R.drawable.ic_media_pause
-                    } else {
-                        android.R.drawable.ic_media_play
-                    },
-                    if (currentIsPlaying || currentIsBuffering) "Pause" else "Play",
-                    buildActionPendingIntent(
-                        if (currentIsPlaying || currentIsBuffering) ACTION_PAUSE else ACTION_PLAY,
-                    ),
-                ).addAction(
-                    android.R.drawable.ic_media_ff,
-                    "Forward 30 seconds",
-                    buildActionPendingIntent(ACTION_FAST_FORWARD),
-                ).setStyle(
-                    MediaNotificationCompat.MediaStyle()
-                        .setMediaSession(mediaSession.sessionToken)
+                .setStyle(
+                    MediaStyleNotificationHelper.MediaStyle(mediaSession)
                         .setShowActionsInCompactView(0, 1, 2),
-                ).build(),
-        )
+                ).build()
+
+        NotificationManagerCompat.from(appContext).notify(NOTIFICATION_ID, notification)
 
         lastNotificationSnapshot = snapshot
     }
@@ -391,19 +234,6 @@ internal class PlayerMediaSessionManager(
         return PendingIntent.getActivity(
             appContext,
             REQUEST_CODE_CONTENT,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
-
-    private fun buildActionPendingIntent(action: String): PendingIntent {
-        val intent =
-            Intent(appContext, PlayerNotificationActionReceiver::class.java)
-                .setAction(action)
-                .setPackage(appContext.packageName)
-        return PendingIntent.getBroadcast(
-            appContext,
-            action.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -434,16 +264,6 @@ internal class PlayerMediaSessionManager(
         )
     }
 
-    private fun dispatchAction(action: String?) {
-        when (action) {
-            ACTION_PLAY -> mediaSession.controller.transportControls.play()
-            ACTION_PAUSE -> mediaSession.controller.transportControls.pause()
-            ACTION_REWIND -> mediaSession.controller.transportControls.rewind()
-            ACTION_FAST_FORWARD -> mediaSession.controller.transportControls.fastForward()
-            ACTION_STOP -> mediaSession.controller.transportControls.stop()
-        }
-    }
-
     private data class NotificationSnapshot(
         val title: String,
         val subtitle: String?,
@@ -455,23 +275,11 @@ internal class PlayerMediaSessionManager(
     )
 
     companion object {
-        private const val SESSION_TAG = "crispy-player-session"
         private const val NOTIFICATION_CHANNEL_ID = "crispy_player_playback"
         private const val NOTIFICATION_ID = 3001
         private const val REQUEST_CODE_CONTENT = 4001
-        private const val ACTION_PLAY = "com.crispy.tv.playerui.action.PLAY"
-        private const val ACTION_PAUSE = "com.crispy.tv.playerui.action.PAUSE"
-        private const val ACTION_REWIND = "com.crispy.tv.playerui.action.REWIND"
-        private const val ACTION_FAST_FORWARD = "com.crispy.tv.playerui.action.FAST_FORWARD"
-        private const val ACTION_STOP = "com.crispy.tv.playerui.action.STOP"
-        private const val REWIND_MS = 10_000L
-        private const val FAST_FORWARD_MS = 30_000L
 
         @Volatile
         private var activeManager: PlayerMediaSessionManager? = null
-
-        fun handleNotificationAction(action: String?) {
-            activeManager?.dispatchAction(action)
-        }
     }
 }

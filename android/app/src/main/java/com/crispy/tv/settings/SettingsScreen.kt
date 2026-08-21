@@ -246,12 +246,6 @@ private fun SettingsItemRow(
     item: SettingsItem
 ) {
     ListItem(
-        headlineContent = {
-            Text(
-                text = item.label,
-                style = MaterialTheme.typography.bodyLarge
-            )
-        },
         supportingContent = item.description?.let {
             {
                 Text(
@@ -289,5 +283,10 @@ private fun SettingsItemRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = item.onClick)
-    )
+    ) {
+        Text(
+            text = item.label,
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
 }

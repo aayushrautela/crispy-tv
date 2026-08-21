@@ -175,12 +175,9 @@ dependencies {
     implementation("androidx.media3:media3-common:1.11.0")
     implementation("androidx.media3:media3-exoplayer:1.11.0")
     implementation("androidx.media3:media3-ui:1.11.0")
-    implementation("androidx.media:media:1.8.0")
+    implementation("androidx.media3:media3-session:1.11.0")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-
-    // Encrypted, Keystore-backed token storage (access + refresh tokens).
-    implementation("androidx.security:security-crypto:1.1.0")
 
     implementation("androidx.work:work-runtime-ktx:2.11.2")
 

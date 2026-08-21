@@ -25,9 +25,6 @@
             android:resizeableActivity="true"
             android:supportsPictureInPicture="true"
             android:screenOrientation="sensorLandscape" />
-        <receiver
-            android:name="com.crispy.tv.playerui.PlayerNotificationActionReceiver"
-            android:exported="false" />
         <activity
             android:name="com.crispy.tv.MainActivity"
             android:exported="true">

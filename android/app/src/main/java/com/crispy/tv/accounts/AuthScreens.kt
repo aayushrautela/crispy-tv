@@ -741,7 +741,6 @@ private fun ProfileManagementScreen(
 @Composable
 private fun ProfileRow(name: String, isKids: Boolean, avatarUrl: String?) {
     ListItem(
-        headlineContent = { Text(text = name) },
         supportingContent = if (isKids) ({ Text(text = "Kids") }) else null,
         leadingContent = {
             if (avatarUrl != null) {
@@ -750,7 +749,9 @@ private fun ProfileRow(name: String, isKids: Boolean, avatarUrl: String?) {
                 Icon(Icons.Outlined.AccountCircle, contentDescription = null)
             }
         },
-    )
+    ) {
+        Text(text = name) 
+    }
 }
 
 @Composable

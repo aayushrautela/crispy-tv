@@ -85,9 +85,6 @@ fun ImageSettingsScreen(
                     )
                     ImageQuality.entries.forEach { quality ->
                         ListItem(
-                            headlineContent = {
-                                Text(quality.displayName)
-                            },
                             trailingContent = {
                                 RadioButton(
                                     selected = settings.quality == quality,
@@ -95,7 +92,9 @@ fun ImageSettingsScreen(
                                 )
                             },
                             modifier = Modifier.fillMaxWidth()
-                        )
+                        ) {
+                            Text(quality.displayName)
+                        }
                     }
                 }
             }
