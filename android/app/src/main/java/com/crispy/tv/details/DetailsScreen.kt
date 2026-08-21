@@ -32,10 +32,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.CheckCircleOutline
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -514,7 +514,7 @@ internal fun DetailsScreen(
                         WatchActionRow(
                             label = if (watchState.isWatched) "Unmark as watched" else "Mark as watched",
                             supporting = "This episode only",
-                            icon = if (watchState.isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                            icon = if (watchState.isWatched) Icons.Filled.Check else Icons.Outlined.Check,
                             filled = watchState.isWatched,
                             onClick = {
                                 selectedEpisodeAction = null
