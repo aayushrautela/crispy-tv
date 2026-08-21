@@ -47,7 +47,6 @@ fun <T> CrispyShelfSection(
     headerHorizontalPadding: Dp = 0.dp,
     rowContentPadding: PaddingValues = PaddingValues(0.dp),
     itemSpacing: Dp = 12.dp,
-    showHeaderAccent: Boolean = true,
     onViewAllClick: (() -> Unit)? = null,
     viewAllPillSize: CrispyViewAllPillSize = CrispyViewAllPillSize.Default,
     key: ((T) -> Any)? = null,
@@ -63,7 +62,6 @@ fun <T> CrispyShelfSection(
             CrispyShelfSectionHeader(
                 title = title,
                 modifier = Modifier.padding(horizontal = headerHorizontalPadding),
-                showAccent = showHeaderAccent,
                 onViewAllClick = onViewAllClick,
                 viewAllPillSize = viewAllPillSize,
             )
@@ -101,7 +99,6 @@ fun <T> CrispyShelfSection(
 private fun CrispyShelfSectionHeader(
     title: String,
     modifier: Modifier = Modifier,
-    showAccent: Boolean = true,
     onViewAllClick: (() -> Unit)? = null,
     viewAllPillSize: CrispyViewAllPillSize = CrispyViewAllPillSize.Default,
 ) {
@@ -129,16 +126,6 @@ private fun CrispyShelfSectionHeader(
                 onClick = onViewAllClick,
                 size = viewAllPillSize,
                 modifier = viewAllModifier,
-            )
-        }
-        if (showAccent) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .width(80.dp)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.colorScheme.primary),
             )
         }
     }
