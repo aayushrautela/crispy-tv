@@ -1,8 +1,6 @@
 package com.crispy.tv.library
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,10 +13,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -35,6 +31,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.crispy.tv.catalog.CatalogItem
+import com.crispy.tv.ui.components.CardActionSheet
+import com.crispy.tv.ui.components.CardActionSheetItem
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -174,42 +172,33 @@ fun LibraryRoute(
                 onDismissRequest = { selectedLibraryItem = null },
                 sheetState = librarySheetState,
             ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 6.dp, bottom = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(item.title, style = MaterialTheme.typography.titleMedium)
-                    item.episodeCount?.let { count ->
-                        if (count > 1) {
-                            Text(
-                                text = "$count episodes",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    Button(
-                        onClick = {
-                            selectedLibraryItem = null
-                            onItemClick(item, null)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Open") }
-                    TextButton(
-                        onClick = {
-                            selectedLibraryItem = null
-                            val desired = !watched
-                            viewModel.setWatched(item, desired)
-                            pagingItems.refresh()
-                        },
-                        modifier = Modifier.align(Alignment.End),
-                    ) { Text(if (watched) "Mark as unwatched" else "Mark as watched") }
-     }
-}
+                val actions = buildList {
+                    add(
+                        CardActionSheetItem(
+                            label = "Open details",
+                            onClick = {
+                                selectedLibraryItem = null
+                                onItemClick(item, null)
+                            },
+                        ),
+                    )
+                    add(
+                        CardActionSheetItem(
+                            label = if (watched) "Mark as unwatched" else "Mark as watched",
+                            onClick = {
+                                selectedLibraryItem = null
+                                viewModel.setWatched(item, !watched)
+                                pagingItems.refresh()
+                            },
+                        ),
+                    )
+                }
+                CardActionSheet(
+                    title = item.title,
+                    subtitle = item.episodeCount?.takeIf { it > 1 }?.let { "$it episodes" },
+                    items = actions,
+                )
+            }
     }
     }
 }

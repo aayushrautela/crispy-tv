@@ -10,14 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -41,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import coil3.compose.AsyncImage
 import com.crispy.tv.player.CanonicalContinueWatchingItem
+import com.crispy.tv.ui.components.CardActionSheet
+import com.crispy.tv.ui.components.CardActionSheetItem
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
@@ -371,38 +372,13 @@ private fun WideRailActionSheet(
     onDetailsClick: () -> Unit,
     onRemoveClick: (() -> Unit)?,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(bottom = 12.dp),
-    ) {
-        Text(
-            text = item.title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-        )
-        ListItem(
-            headlineContent = { Text("Open details") },
-            supportingContent = {
-                if (item.subtitle.isNotBlank()) {
-                    Text(
-                        text = item.subtitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            },
-            modifier = Modifier.clickable { onDetailsClick() },
-        )
-        if (onRemoveClick != null) {
-            ListItem(
-                headlineContent = { Text("Remove") },
-                modifier = Modifier.clickable { onRemoveClick() },
-            )
-        }
+    val actions = buildList {
+        add(CardActionSheetItem(label = "Open details", onClick = onDetailsClick))
+        onRemoveClick?.let { add(CardActionSheetItem(label = "Remove", onClick = it, destructive = true)) }
     }
+    CardActionSheet(
+        title = item.title,
+        subtitle = item.subtitle.takeIf { it.isNotBlank() },
+        items = actions,
+    )
 }
