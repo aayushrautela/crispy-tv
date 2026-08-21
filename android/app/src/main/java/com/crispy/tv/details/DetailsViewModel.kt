@@ -542,7 +542,7 @@ class DetailsViewModel internal constructor(
                         val seasonWatched = videos.isNotEmpty() && episodeWatchStates.values.all { it.isWatched }
                         val mergedSeasonWatchStates = current.seasonWatchStates + (season to seasonWatched)
                         current.copy(
-                            highlightedEpisodeId = pendingEpisodeNavigation?.highlightedEpisodeId ?: current.highlightedEpisodeId,
+                            highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
                             episodeWatchStates = episodeWatchStates,
                             seasonWatchStates = mergedSeasonWatchStates,
                             isShowFullyWatched = computeShowFullyWatched(mergedSeasonWatchStates, current.seasons),
