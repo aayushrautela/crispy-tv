@@ -158,6 +158,7 @@ internal fun HomeWideRailSection(
                             label = "Remove",
                             icon = Icons.Outlined.Delete,
                             destructive = true,
+                            dividerBefore = true,
                             onClick = {
                                 actionsItemKey = null
                                 onRemoveContinueWatchingItem(cwItem)

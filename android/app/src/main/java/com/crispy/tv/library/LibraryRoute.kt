@@ -186,6 +186,7 @@ fun LibraryRoute(
                         label = if (watched) "Mark as unwatched" else "Mark as watched",
                         icon = if (watched) Icons.Filled.Check else Icons.Outlined.Check,
                         filled = watched,
+                        dividerBefore = true,
                         onClick = {
                             selectedLibraryItem = null
                             viewModel.setWatched(item, !watched)
