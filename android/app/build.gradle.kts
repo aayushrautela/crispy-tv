@@ -49,7 +49,7 @@ android {
     defaultConfig {
         applicationId = "com.crispy.tv"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -145,46 +145,46 @@ dependencies {
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 
-    implementation("androidx.core:core-ktx:1.18.0")
-    implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.appcompat:appcompat:1.8.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.navigation:navigation-compose:2.9.8")
 
-    implementation("androidx.paging:paging-runtime:3.5.0")
-    implementation("androidx.paging:paging-compose:3.5.0")
+    implementation("androidx.paging:paging-runtime:3.5.1")
+    implementation("androidx.paging:paging-compose:3.5.1")
 
-    implementation(platform("androidx.compose:compose-bom:2026.04.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3:1.5.0-alpha19")
+    implementation("androidx.compose.material3:material3:1.5.0-alpha26")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.woowla.compose.icon.collections:simpleicons:16.6.1")
     implementation("com.google.android.material:material:1.12.0")
-    implementation("io.coil-kt.coil3:coil-compose:3.4.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
-    implementation("io.coil-kt.coil3:coil-svg:3.4.0")
-    implementation("io.coil-kt.coil3:coil-core:3.4.0")
-    implementation("com.materialkolor:material-kolor:4.1.1")
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")
+    implementation("io.coil-kt.coil3:coil-svg:3.5.0")
+    implementation("io.coil-kt.coil3:coil-core:3.5.0")
+    implementation("com.materialkolor:material-kolor:5.0.0")
 
     implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:13.0.0")
 
-    implementation("androidx.media3:media3-common:1.10.1")
-    implementation("androidx.media3:media3-exoplayer:1.10.1")
-    implementation("androidx.media3:media3-ui:1.10.1")
-    implementation("androidx.media:media:1.7.0")
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.1")
+    implementation("androidx.media3:media3-common:1.11.0")
+    implementation("androidx.media3:media3-exoplayer:1.11.0")
+    implementation("androidx.media3:media3-ui:1.11.0")
+    implementation("androidx.media:media:1.8.0")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Encrypted, Keystore-backed token storage (access + refresh tokens).
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.1.0")
 
     implementation("androidx.work:work-runtime-ktx:2.11.2")
 
-    androidTestImplementation(platform("androidx.compose:compose-bom:2026.04.01"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.08.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.compose.ui:ui-test")
     androidTestImplementation("androidx.test:core-ktx:1.6.1")
