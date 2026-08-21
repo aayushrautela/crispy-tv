@@ -218,4 +218,3 @@ private fun UserMutation.copyAttempt(attempt: Int): UserMutation =
         is EpisodeWatchedMutation -> copy(attempt = attempt)
         is SeasonWatchedMutation -> copy(attempt = attempt)
     }
-}
