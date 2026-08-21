@@ -201,8 +201,12 @@ fun LibraryRoute(
             ) {
                 ItemActionSheet(
                     title = item.title,
-                    subtitle = item.episodeCount?.takeIf { it > 1 }?.let { "$it episodes" },
-                    imageUrl = item.posterUrl ?: item.backdropUrl,
+                    subtitle = listOfNotNull(
+                        item.year?.takeIf { it.isNotBlank() },
+                        item.genre?.takeIf { it.isNotBlank() },
+                        item.episodeCount?.takeIf { it > 1 }?.let { "$it episodes" },
+                    ).joinToString(" · ").takeIf { it.isNotBlank() },
+                    imageUrl = item.backdropUrl ?: item.posterUrl,
                     actions = actions,
                 )
             }

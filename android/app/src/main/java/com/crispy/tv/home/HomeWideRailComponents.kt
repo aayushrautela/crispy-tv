@@ -173,7 +173,10 @@ internal fun HomeWideRailSection(
             ) {
                 ItemActionSheet(
                     title = actionItem.title,
-                    subtitle = actionItem.subtitle.takeIf { it.isNotBlank() },
+                    subtitle = listOfNotNull(
+                        actionItem.subtitle.takeIf { it.isNotBlank() },
+                        actionItem.continueWatchingItem?.genre?.takeIf { it.isNotBlank() },
+                    ).joinToString(" · ").takeIf { it.isNotBlank() },
                     imageUrl = actionItem.imageUrl,
                     actions = actions,
                 )
