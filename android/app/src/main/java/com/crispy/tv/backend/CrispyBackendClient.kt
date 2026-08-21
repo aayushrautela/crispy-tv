@@ -186,7 +186,6 @@ class CrispyBackendClient(
 
     data class SearchResultsResponse(
         val query: String,
-        val all: List<MediaItem>,
         val movies: List<MediaItem>,
         val series: List<MediaItem>,
         val people: List<PersonSearchResultItem>,

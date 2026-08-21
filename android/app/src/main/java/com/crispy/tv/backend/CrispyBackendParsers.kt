@@ -218,7 +218,6 @@ internal fun CrispyBackendClient.parsePersonSearchResultItem(json: JSONObject): 
 internal fun CrispyBackendClient.parseSearchResultsResponse(json: JSONObject): SearchResultsResponse {
     return SearchResultsResponse(
         query = json.optString("query").trim(),
-        all = parseMediaItems(json.optJSONArray("all")),
         movies = parseMediaItems(json.optJSONArray("movies")),
         series = parseMediaItems(json.optJSONArray("series")),
         people = parsePersonSearchResultItems(json.optJSONArray("people")),
