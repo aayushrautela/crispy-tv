@@ -8,12 +8,12 @@ import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.applyProviderResult
 import com.crispy.tv.playback.finalizeFrom
 import com.crispy.tv.playback.matchesTarget
-import com.crispy.tv.playback.toLoadingUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -39,6 +39,8 @@ class SelectorCoordinator(
 
     private var currentTarget: StreamLookupTarget? = null
     private var onStreamSelected: ((AddonStream) -> Unit)? = null
+    private var resolveJob: Job? = null
+    private var sessionId = 0L
 
     fun open(
         target: StreamLookupTarget,
@@ -51,6 +53,7 @@ class SelectorCoordinator(
         this.currentTarget = target
         _headerEpisode.value = headerEpisode
         _details.value = fallbackDetails
+        val session = ++sessionId
         _state.value =
             StreamSelectorUiState(
                 visible = true,
@@ -61,10 +64,12 @@ class SelectorCoordinator(
                 providers = emptyList(),
                 isLoading = true,
             )
-        scope.launch { resolve(target, itemIdForMetadata) }
+        resolveJob?.cancel()
+        resolveJob = scope.launch { resolve(session, target, itemIdForMetadata) }
     }
 
     private suspend fun resolve(
+        session: Long,
         target: StreamLookupTarget,
         itemIdForMetadata: String?,
     ) {
@@ -74,7 +79,7 @@ class SelectorCoordinator(
                     val token = runCatching { sessionTokenProvider() }.getOrNull() ?: return@launch
                     runCatching { getMetadataItemDetail(token, itemIdForMetadata) }
                         .onSuccess { response ->
-                            if (currentTarget == target) _details.value = response.toMediaDetails()
+                            if (session == sessionId && currentTarget == target) _details.value = response.toMediaDetails()
                         }
                 }
             } else {
@@ -83,18 +88,18 @@ class SelectorCoordinator(
 
         streamResolver.resolve(
             target = target,
-            onProvidersResolved = { descriptors ->
-                if (currentTarget == target) {
-                    _state.update { it.copy(providers = descriptors.map { d -> d.toLoadingUiState() }, isLoading = true) }
+            onProvidersResolved = {
+                if (session == sessionId && currentTarget == target) {
+                    _state.update { it.copy(providers = emptyList(), isLoading = true) }
                 }
             },
             onProviderResult = { result ->
-                if (currentTarget == target) {
+                if (session == sessionId && currentTarget == target) {
                     _state.update { it.copy(providers = it.providers.applyProviderResult(result)) }
                 }
             },
         ).also { results ->
-            if (currentTarget == target) {
+            if (session == sessionId && currentTarget == target) {
                 _state.update { it.copy(providers = it.providers.finalizeFrom(results), isLoading = false) }
             }
         }
@@ -138,6 +143,9 @@ class SelectorCoordinator(
     }
 
     fun dismiss() {
+        ++sessionId
+        resolveJob?.cancel()
+        resolveJob = null
         _state.update { it.copy(visible = false) }
         onStreamSelected = null
         currentTarget = null

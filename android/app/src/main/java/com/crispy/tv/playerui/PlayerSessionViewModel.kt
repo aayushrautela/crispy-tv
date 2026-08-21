@@ -25,7 +25,6 @@ import com.crispy.tv.playback.findEpisodeForLookupId
 import com.crispy.tv.playback.matchesTarget
 import com.crispy.tv.playback.resolveStreamLookupTarget
 import com.crispy.tv.playback.resolveStreamLookupTargetFromIdentity
-import com.crispy.tv.playback.toLoadingUiState
 import com.crispy.tv.playback.toUiState
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
@@ -50,7 +49,6 @@ import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonSubtitle
 import com.crispy.tv.streams.ProviderStreamsResult
-import com.crispy.tv.streams.StreamProviderDescriptor
 import com.crispy.tv.streams.StreamResolver
 import com.crispy.tv.streams.StreamSelectorUiState
 import kotlin.math.abs
@@ -165,6 +163,8 @@ class PlayerSessionViewModel(
     private var hasReportedPlaybackStop = false
     private var lastProgressSyncAtElapsedMs = 0L
     private var pendingInitialSeekMs: Long? = null
+    private var streamSelectorSession = 0L
+    private var streamSelectorJob: Job? = null
 
     private val initialDetails =
         buildFallbackDetails(
@@ -339,6 +339,7 @@ class PlayerSessionViewModel(
     }
 
     fun showInfo() {
+        streamSelectorSession++
         _uiState.update { state ->
             state.copy(
                 activeSurface = PlayerSurface.INFO,
@@ -348,6 +349,7 @@ class PlayerSessionViewModel(
     }
 
     fun showAudioTracks() {
+        streamSelectorSession++
         _uiState.update { state ->
             state.copy(
                 activeSurface = PlayerSurface.AUDIO,
@@ -357,6 +359,7 @@ class PlayerSessionViewModel(
     }
 
     fun showSubtitles() {
+        streamSelectorSession++
         _uiState.update { state ->
             state.copy(
                 activeSurface = PlayerSurface.SUBTITLES,
@@ -367,6 +370,8 @@ class PlayerSessionViewModel(
     }
 
     fun closeActiveSurface() {
+        streamSelectorJob?.cancel()
+        streamSelectorSession++
         _uiState.update { state ->
             state.copy(
                 activeSurface = PlayerSurface.NONE,
@@ -403,22 +408,23 @@ class PlayerSessionViewModel(
 
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
+        val session = streamSelectorSession
 
         val results =
             runCatching {
                 streamResolver.resolve(
                     target = target,
-                    onProvidersResolved = { providers ->
+                    onProvidersResolved = {
                         _uiState.update { previous ->
-                            if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                            if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                             previous.copy(
                                 streamSelector =
                                     previous.streamSelector.copy(
                                         visible = true,
                                         mediaType = target.mediaType,
                                         lookupId = target.lookupId,
-                                        providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
-                                        isLoading = providers.isNotEmpty(),
+                                        providers = emptyList(),
+                                        isLoading = true,
                                     ),
                                 statusMessage = "",
                             )
@@ -426,13 +432,11 @@ class PlayerSessionViewModel(
                     },
                     onProviderResult = { result ->
                         _uiState.update { previous ->
-                            if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                            if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                             val updatedProviders = previous.streamSelector.providers.applyProviderResult(result)
-                            val stillLoading = updatedProviders.any { provider -> provider.isLoading }
                             previous.copy(
                                 streamSelector = previous.streamSelector.copy(
                                     providers = updatedProviders,
-                                    isLoading = stillLoading,
                                 ),
                                 statusMessage = "",
                             )
@@ -513,6 +517,8 @@ class PlayerSessionViewModel(
                 streamSelector = state.streamSelector.copy(visible = false),
             )
         }
+        streamSelectorJob?.cancel()
+        streamSelectorSession++
         requestPlayback(engine = uiState.value.activeEngine)
     }
 
@@ -568,6 +574,7 @@ class PlayerSessionViewModel(
         val selectorState = uiState.value.streamSelector
         val mediaType = selectorState.mediaType ?: return
         val lookupId = selectorState.lookupId ?: return
+        val session = streamSelectorSession
 
         _uiState.update { state ->
             val providers =
@@ -594,6 +601,7 @@ class PlayerSessionViewModel(
                     )
                 }
             }.onSuccess { result ->
+                if (session != streamSelectorSession) return@onSuccess
                 if (result == null) {
                     _uiState.update { it.copy(statusMessage = "Provider is unavailable.") }
                     return@onSuccess
@@ -607,6 +615,7 @@ class PlayerSessionViewModel(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) return@onFailure
+                if (session != streamSelectorSession) return@onFailure
                 _uiState.update { state ->
                     val providers =
                         state.streamSelector.providers.map { provider ->
@@ -901,6 +910,9 @@ class PlayerSessionViewModel(
             return
         }
 
+        streamSelectorJob?.cancel()
+        val session = ++streamSelectorSession
+
         _uiState.update {
             it.copy(
                 activeSurface = PlayerSurface.STREAMS,
@@ -916,21 +928,21 @@ class PlayerSessionViewModel(
             )
         }
 
-        viewModelScope.launch {
+        streamSelectorJob = viewModelScope.launch {
             runCatching {
                 streamResolver.resolve(
                     target = target,
-                    onProvidersResolved = { providers ->
+                    onProvidersResolved = {
                         _uiState.update { previous ->
-                            if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                            if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                             previous.copy(
                                 streamSelector =
                                     previous.streamSelector.copy(
-                                        visible = true,
+                                        visible = previous.streamSelector.visible,
                                         mediaType = target.mediaType,
                                         lookupId = target.lookupId,
-                                        providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
-                                        isLoading = providers.isNotEmpty(),
+                                        providers = emptyList(),
+                                        isLoading = true,
                                     ),
                                 statusMessage = "",
                             )
@@ -938,13 +950,11 @@ class PlayerSessionViewModel(
                     },
                     onProviderResult = { result ->
                         _uiState.update { previous ->
-                            if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                            if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                             val updatedProviders = previous.streamSelector.providers.applyProviderResult(result)
-                            val stillLoading = updatedProviders.any { provider -> provider.isLoading }
                             previous.copy(
                                 streamSelector = previous.streamSelector.copy(
                                     providers = updatedProviders,
-                                    isLoading = stillLoading,
                                 ),
                                 statusMessage = "",
                             )
@@ -953,14 +963,13 @@ class PlayerSessionViewModel(
                 )
             }.onSuccess { results ->
                 _uiState.update { previous ->
-                    if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                    if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                     val finalizedProviders =
                         previous.streamSelector.providers
                             .finalizeFrom(results)
-                            .ifEmpty { results.map(ProviderStreamsResult::toUiState) }
                     previous.copy(
                         streamSelector = previous.streamSelector.copy(
-                            visible = true,
+                            visible = previous.streamSelector.visible,
                             mediaType = target.mediaType,
                             lookupId = target.lookupId,
                             providers = finalizedProviders,
@@ -971,6 +980,7 @@ class PlayerSessionViewModel(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) return@onFailure
+                if (session != streamSelectorSession) return@onFailure
                 _uiState.update { previous ->
                     previous.copy(
                         streamSelector = previous.streamSelector.copy(

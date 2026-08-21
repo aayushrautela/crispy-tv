@@ -14,7 +14,6 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.StreamSelectorUiState
-import com.crispy.tv.streams.StreamProviderDescriptor
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.playback.buildPlayerSubtitle
@@ -23,7 +22,6 @@ import com.crispy.tv.playback.resolveStreamLookupTarget
 import com.crispy.tv.playback.parseLookupId
 import com.crispy.tv.playback.matchesTarget
 import com.crispy.tv.playback.toUiState
-import com.crispy.tv.playback.toLoadingUiState
 import com.crispy.tv.playback.applyProviderResult
 import com.crispy.tv.playback.finalizeFrom
 import kotlinx.coroutines.CancellationException
@@ -57,6 +55,7 @@ class DetailsViewModel internal constructor(
 
     private var aiJob: Job? = null
     private var streamLoadJob: Job? = null
+    private var streamSelectorSession = 0L
     private var episodesJob: Job? = null
     private var reloadJob: Job? = null
     private var extrasJob: Job? = null
@@ -79,6 +78,7 @@ class DetailsViewModel internal constructor(
 
             aiJob?.cancel()
             streamLoadJob?.cancel()
+            streamSelectorSession++
             episodesJob?.cancel()
             extrasJob?.cancel()
             ratingsJob?.cancel()
@@ -646,6 +646,7 @@ class DetailsViewModel internal constructor(
         }
 
         streamLoadJob?.cancel()
+        val session = ++streamSelectorSession
         _uiState.update {
             it.copy(
                 streamSelector =
@@ -666,17 +667,17 @@ class DetailsViewModel internal constructor(
                     detailsUseCases.loadStreams(
                         mediaType = target.mediaType,
                         lookupId = target.lookupId,
-                        onProvidersResolved = { providers ->
+                        onProvidersResolved = {
                             _uiState.update { previous ->
-                                if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                                if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                                 previous.copy(
                                     streamSelector =
                                         previous.streamSelector.copy(
-                                            visible = true,
+                                            visible = previous.streamSelector.visible,
                                             mediaType = target.mediaType,
                                             lookupId = target.lookupId,
-                                            providers = providers.map(StreamProviderDescriptor::toLoadingUiState),
-                                            isLoading = providers.isNotEmpty(),
+                                            providers = emptyList(),
+                                            isLoading = true,
                                         ),
                                     statusMessage = "",
                                 )
@@ -684,15 +685,13 @@ class DetailsViewModel internal constructor(
                         },
                         onProviderResult = { result ->
                             _uiState.update { previous ->
-                                if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                                if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                                 val updatedProviders = previous.streamSelector.providers.applyProviderResult(result)
-                                val stillLoading = updatedProviders.any { provider -> provider.isLoading }
 
                                 previous.copy(
                                     streamSelector =
                                         previous.streamSelector.copy(
                                             providers = updatedProviders,
-                                    isLoading = stillLoading,
                                 ),
                             statusMessage = "",
                                 )
@@ -701,16 +700,15 @@ class DetailsViewModel internal constructor(
                     )
                 }.onSuccess { results ->
                     _uiState.update { previous ->
-                        if (!previous.streamSelector.matchesTarget(target)) return@update previous
+                        if (session != streamSelectorSession || !previous.streamSelector.matchesTarget(target)) return@update previous
                         val finalizedProviders =
                             previous.streamSelector.providers
                                 .finalizeFrom(results)
-                                .ifEmpty { results.map { result -> result.toUiState() } }
 
                         previous.copy(
                             streamSelector =
                                 previous.streamSelector.copy(
-                                    visible = true,
+                                    visible = previous.streamSelector.visible,
                                     mediaType = target.mediaType,
                                     lookupId = target.lookupId,
                                     providers = finalizedProviders,
@@ -721,6 +719,7 @@ class DetailsViewModel internal constructor(
                     }
                 }.onFailure { error ->
                     if (error is CancellationException) return@onFailure
+                    if (session != streamSelectorSession) return@onFailure
                     _uiState.update { previous ->
                         previous.copy(
                             streamSelector =
@@ -739,6 +738,9 @@ class DetailsViewModel internal constructor(
     }
 
     fun onDismissStreamSelector() {
+        ++streamSelectorSession
+        streamLoadJob?.cancel()
+        streamLoadJob = null
         _uiState.update { state ->
             state.copy(
                 streamSelector = state.streamSelector.copy(visible = false),
@@ -765,6 +767,7 @@ class DetailsViewModel internal constructor(
         val selectorState = _uiState.value.streamSelector
         val mediaType = selectorState.mediaType ?: return
         val lookupId = selectorState.lookupId ?: return
+        val session = streamSelectorSession
 
         _uiState.update { state ->
             val providers =
@@ -794,6 +797,7 @@ class DetailsViewModel internal constructor(
                     )
                 }
             }.onSuccess { result ->
+                if (session != streamSelectorSession) return@onSuccess
                 _uiState.update { state ->
                     val providers =
                         state.streamSelector.providers.map { provider ->
@@ -830,6 +834,7 @@ class DetailsViewModel internal constructor(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) return@onFailure
+                if (session != streamSelectorSession) return@onFailure
                 _uiState.update { state ->
                     val providers =
                         state.streamSelector.providers.map { provider ->
