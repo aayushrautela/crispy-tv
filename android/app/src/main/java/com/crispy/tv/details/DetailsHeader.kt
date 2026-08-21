@@ -37,7 +37,6 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -577,20 +576,12 @@ private fun DetailsQuickAction(
             contentColor = palette.onPillBackground
         ) {
             androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                if (sync.status == FieldSync.SYNCING) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = iconTint,
-                    )
-                } else {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint = iconTint,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = iconTint,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
 
