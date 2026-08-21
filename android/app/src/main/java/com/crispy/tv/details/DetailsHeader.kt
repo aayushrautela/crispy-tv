@@ -458,7 +458,6 @@ internal fun HeaderInfoSection(
             enabled = !isMutating,
             isInWatchlist = isInWatchlist,
             isWatched = isWatched,
-            showWatched = details.itemType != "movie",
             isRated = isRated,
             userRating = userRating,
             onToggleWatchlist = onToggleWatchlist,
@@ -487,7 +486,6 @@ private fun DetailsQuickActionsRow(
     enabled: Boolean,
     isInWatchlist: Boolean,
     isWatched: Boolean,
-    showWatched: Boolean,
     isRated: Boolean,
     userRating: Int?,
     onToggleWatchlist: () -> Unit,
@@ -511,16 +509,14 @@ private fun DetailsQuickActionsRow(
             onClick = onToggleWatchlist
         )
 
-        if (showWatched) {
-            DetailsQuickAction(
-                label = "Watched",
-                selected = isWatched,
-                enabled = enabled,
-                palette = palette,
-                icon = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
-                onClick = onToggleWatched
-            )
-        }
+        DetailsQuickAction(
+            label = "Watched",
+            selected = isWatched,
+            enabled = enabled,
+            palette = palette,
+            icon = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+            onClick = onToggleWatched
+        )
 
         val gold = Color(0xFFFFD700)
         DetailsQuickAction(
