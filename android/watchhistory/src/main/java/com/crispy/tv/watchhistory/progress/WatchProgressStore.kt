@@ -23,12 +23,6 @@ data class WatchProgress(
     val lastUpdatedEpochMs: Long,
     val remoteImdbId: String? = null,
     val addonId: String? = null,
-    val traktSynced: Boolean = false,
-    val traktLastSyncedEpochMs: Long? = null,
-    val traktProgressPercent: Double? = null,
-    val simklSynced: Boolean = false,
-    val simklLastSyncedEpochMs: Long? = null,
-    val simklProgressPercent: Double? = null,
 ) {
     fun progressPercentOrZero(): Double {
         val duration = durationSeconds
@@ -36,15 +30,6 @@ data class WatchProgress(
         return (currentTimeSeconds / duration) * 100.0
     }
 }
-
-data class UnsyncedProgressItem(
-    val key: String,
-    val id: String,
-    val type: String,
-    val episodeId: String?,
-    val remoteImdbId: String?,
-    val progress: WatchProgress,
-)
 
 class WatchProgressStore(
     private val prefs: SharedPreferences,
@@ -70,9 +55,7 @@ class WatchProgressStore(
     )
 
     data class SetOptions(
-        val preserveTimestamp: Boolean = false,
         val forceNotify: Boolean = false,
-        val forceWrite: Boolean = false,
     )
 
     fun setContentDuration(id: String, type: String, durationSeconds: Double, episodeId: String? = null) {
@@ -172,23 +155,9 @@ class WatchProgressStore(
             }
         }
 
-        if (!options.forceWrite) {
-            val existing = getWatchProgress(id = id, type = type, episodeId = episodeId)
-            if (existing != null) {
-                val timeDiff = abs(existing.currentTimeSeconds - progress.currentTimeSeconds)
-                val durationDiff = abs(existing.durationSeconds - progress.durationSeconds)
-                if (timeDiff < SIGNIFICANT_TIME_CHANGE_SECONDS && durationDiff < SIGNIFICANT_DURATION_CHANGE_SECONDS) {
-                    return
-                }
-            }
-        }
-
-        val timestamp =
-            if (options.preserveTimestamp && progress.lastUpdatedEpochMs > 0) {
-                progress.lastUpdatedEpochMs
-            } else {
-                nowEpochMs()
-            }
+        // Reporting cadence/floor is enforced upstream (PlayerSessionViewModel +
+        // BackendWatchHistoryService), so every accepted call is a meaningful write.
+        val timestamp = nowEpochMs()
 
         maybeRestoreContinueWatchingVisibility(id = id, type = type, episodeId = episodeId, timestampEpochMs = timestamp)
 
@@ -244,48 +213,6 @@ class WatchProgressStore(
         return result
     }
 
-    fun getUnsyncedProgress(): List<UnsyncedProgressItem> {
-        return runCatching {
-            val all = getAllWatchProgress()
-            val tombstones = getWatchProgressTombstones()
-            val result = ArrayList<UnsyncedProgressItem>()
-
-            for ((key, progress) in all) {
-                val parts = key.split(':')
-                if (parts.size < 2) continue
-
-                val baseKey = "${parts[0]}:${parts[1]}"
-                val tombAt = max(tombstones[key] ?: Long.MIN_VALUE, tombstones[baseKey] ?: Long.MIN_VALUE)
-                    .takeIf { it != Long.MIN_VALUE }
-                if (tombAt != null && progress.lastUpdatedEpochMs <= tombAt) {
-                    continue
-                }
-
-                val needsTrakt = !progress.traktSynced ||
-                    (progress.traktLastSyncedEpochMs != null && progress.lastUpdatedEpochMs > progress.traktLastSyncedEpochMs)
-                val needsSimkl = !progress.simklSynced ||
-                    (progress.simklLastSyncedEpochMs != null && progress.lastUpdatedEpochMs > progress.simklLastSyncedEpochMs)
-                if (!needsTrakt && !needsSimkl) continue
-
-                val episodeId = if (parts.size > 2) parts.subList(2, parts.size).joinToString(":") else null
-                result +=
-                    UnsyncedProgressItem(
-                        key = key,
-                        id = parts[1],
-                        type = parts[0],
-                        episodeId = episodeId,
-                        remoteImdbId = progress.remoteImdbId,
-                        progress = progress,
-                    )
-            }
-
-            result
-        }.getOrElse {
-            Log.w(logTag, "Failed to compute unsynced progress", it)
-            emptyList()
-        }
-    }
-
     fun removeAllWatchProgressForContent(id: String, type: String, addBaseTombstone: Boolean) {
         val all = getAllWatchProgress()
         val prefix = "$type:$id"
@@ -298,206 +225,6 @@ class WatchProgressStore(
         if (addBaseTombstone) {
             addWatchProgressTombstone(id = id, type = type, episodeId = null)
         }
-    }
-
-    fun updateTraktSyncStatus(
-        id: String,
-        type: String,
-        traktSynced: Boolean,
-        traktProgressPercent: Double? = null,
-        episodeId: String? = null,
-        exactTimeSeconds: Double? = null,
-    ) {
-        val existing = getWatchProgress(id = id, type = type, episodeId = episodeId) ?: return
-        val highestProgress = highest(existing.traktProgressPercent, traktProgressPercent)
-        val highestCurrentTime = if (exactTimeSeconds != null) max(exactTimeSeconds, existing.currentTimeSeconds) else existing.currentTimeSeconds
-
-        val updated =
-            existing.copy(
-                currentTimeSeconds = highestCurrentTime,
-                traktSynced = traktSynced,
-                traktLastSyncedEpochMs = if (traktSynced) nowEpochMs() else existing.traktLastSyncedEpochMs,
-                traktProgressPercent = highestProgress,
-            )
-        setWatchProgress(id = id, type = type, progress = updated, episodeId = episodeId, options = SetOptions(preserveTimestamp = true, forceWrite = true))
-    }
-
-    fun mergeWithTraktProgress(
-        id: String,
-        type: String,
-        traktProgressPercent: Double,
-        traktPausedAtEpochMs: Long,
-        episodeId: String? = null,
-        exactTimeSeconds: Double? = null,
-    ) {
-        mergeWithProviderProgress(
-            id = id,
-            type = type,
-            provider = Provider.TRAKT,
-            providerProgressPercent = traktProgressPercent,
-            pausedAtEpochMs = traktPausedAtEpochMs,
-            episodeId = episodeId,
-            exactTimeSeconds = exactTimeSeconds,
-        )
-    }
-
-    fun updateSimklSyncStatus(
-        id: String,
-        type: String,
-        simklSynced: Boolean,
-        simklProgressPercent: Double? = null,
-        episodeId: String? = null,
-        exactTimeSeconds: Double? = null,
-    ) {
-        val existing = getWatchProgress(id = id, type = type, episodeId = episodeId) ?: return
-        val highestProgress = highest(existing.simklProgressPercent, simklProgressPercent)
-        val highestCurrentTime = if (exactTimeSeconds != null) max(exactTimeSeconds, existing.currentTimeSeconds) else existing.currentTimeSeconds
-
-        val updated =
-            existing.copy(
-                currentTimeSeconds = highestCurrentTime,
-                simklSynced = simklSynced,
-                simklLastSyncedEpochMs = if (simklSynced) nowEpochMs() else existing.simklLastSyncedEpochMs,
-                simklProgressPercent = highestProgress,
-            )
-        setWatchProgress(id = id, type = type, progress = updated, episodeId = episodeId, options = SetOptions(preserveTimestamp = true, forceWrite = true))
-    }
-
-    fun mergeWithSimklProgress(
-        id: String,
-        type: String,
-        simklProgressPercent: Double,
-        simklPausedAtEpochMs: Long,
-        episodeId: String? = null,
-        exactTimeSeconds: Double? = null,
-    ) {
-        mergeWithProviderProgress(
-            id = id,
-            type = type,
-            provider = Provider.SIMKL,
-            providerProgressPercent = simklProgressPercent,
-            pausedAtEpochMs = simklPausedAtEpochMs,
-            episodeId = episodeId,
-            exactTimeSeconds = exactTimeSeconds,
-        )
-    }
-
-    private enum class Provider { TRAKT, SIMKL }
-
-    private fun mergeWithProviderProgress(
-        id: String,
-        type: String,
-        provider: Provider,
-        providerProgressPercent: Double,
-        pausedAtEpochMs: Long,
-        episodeId: String?,
-        exactTimeSeconds: Double?,
-    ) {
-        val providerProgress = providerProgressPercent.coerceIn(0.0, 100.0)
-        val timestamp = pausedAtEpochMs.takeIf { it > 0 } ?: nowEpochMs()
-
-        val local = getWatchProgress(id = id, type = type, episodeId = episodeId)
-        if (local == null) {
-            var durationSeconds = getContentDurationSeconds(id = id, type = type, episodeId = episodeId) ?: 0.0
-            var currentTime: Double
-
-            if (exactTimeSeconds != null && exactTimeSeconds > 0.0) {
-                currentTime = exactTimeSeconds
-                if (durationSeconds <= 0.0) {
-                    durationSeconds = if (providerProgress > 0.0) (exactTimeSeconds / providerProgress) * 100.0 else 0.0
-                }
-            } else {
-                if (durationSeconds <= 0.0) {
-                    durationSeconds = estimateDurationSeconds(type = type, episodeId = episodeId)
-                }
-                currentTime = (providerProgress / 100.0) * durationSeconds
-            }
-
-            val base =
-                WatchProgress(
-                    currentTimeSeconds = currentTime,
-                    durationSeconds = durationSeconds,
-                    lastUpdatedEpochMs = timestamp,
-                    remoteImdbId = normalizedImdbIdOrNull(id),
-                    traktSynced = provider == Provider.TRAKT,
-                    simklSynced = provider == Provider.SIMKL,
-                    traktLastSyncedEpochMs = if (provider == Provider.TRAKT) nowEpochMs() else null,
-                    simklLastSyncedEpochMs = if (provider == Provider.SIMKL) nowEpochMs() else null,
-                    traktProgressPercent = if (provider == Provider.TRAKT) providerProgress else null,
-                    simklProgressPercent = if (provider == Provider.SIMKL) providerProgress else null,
-                )
-
-            setWatchProgress(
-                id = id,
-                type = type,
-                progress = base,
-                episodeId = episodeId,
-                options = SetOptions(preserveTimestamp = true, forceWrite = true),
-            )
-            return
-        }
-
-        val localPercent = local.progressPercentOrZero()
-        val diff = abs(providerProgress - localPercent)
-        if (diff < MIN_PROGRESS_DIFF_PERCENT && providerProgress < 100.0 && localPercent < 100.0) {
-            // Still mark provider as synced (and store provider progress) to avoid immediate re-upload loops.
-            when (provider) {
-                Provider.TRAKT -> updateTraktSyncStatus(id, type, traktSynced = true, traktProgressPercent = providerProgress, episodeId = episodeId)
-                Provider.SIMKL -> updateSimklSyncStatus(id, type, simklSynced = true, simklProgressPercent = providerProgress, episodeId = episodeId)
-            }
-            return
-        }
-
-        var duration = local.durationSeconds
-        var currentTime: Double
-
-        if (exactTimeSeconds != null && exactTimeSeconds > 0.0 && local.durationSeconds > 0.0) {
-            currentTime = exactTimeSeconds
-
-            val calculatedDuration = if (providerProgress > 0.0) (exactTimeSeconds / providerProgress) * 100.0 else local.durationSeconds
-            if (abs(calculatedDuration - local.durationSeconds) > DURATION_RECALC_THRESHOLD_SECONDS) {
-                duration = calculatedDuration
-            }
-        } else if (local.durationSeconds > 0.0) {
-            currentTime = (providerProgress / 100.0) * local.durationSeconds
-        } else {
-            val storedDuration = getContentDurationSeconds(id = id, type = type, episodeId = episodeId)
-            duration = storedDuration ?: 0.0
-
-            if (duration <= 0.0) {
-                if (exactTimeSeconds != null && exactTimeSeconds > 0.0) {
-                    duration = if (providerProgress > 0.0) (exactTimeSeconds / providerProgress) * 100.0 else 0.0
-                    currentTime = exactTimeSeconds
-                } else {
-                    duration = estimateDurationSeconds(type = type, episodeId = episodeId)
-                    currentTime = (providerProgress / 100.0) * duration
-                }
-            } else {
-                currentTime = if (exactTimeSeconds != null && exactTimeSeconds > 0.0) exactTimeSeconds else (providerProgress / 100.0) * duration
-            }
-        }
-
-        val updated =
-            local.copy(
-                currentTimeSeconds = currentTime,
-                durationSeconds = duration,
-                lastUpdatedEpochMs = timestamp,
-                remoteImdbId = local.remoteImdbId ?: normalizedImdbIdOrNull(id),
-                traktSynced = if (provider == Provider.TRAKT) true else local.traktSynced,
-                simklSynced = if (provider == Provider.SIMKL) true else local.simklSynced,
-                traktLastSyncedEpochMs = if (provider == Provider.TRAKT) nowEpochMs() else local.traktLastSyncedEpochMs,
-                simklLastSyncedEpochMs = if (provider == Provider.SIMKL) nowEpochMs() else local.simklLastSyncedEpochMs,
-                traktProgressPercent = if (provider == Provider.TRAKT) providerProgress else local.traktProgressPercent,
-                simklProgressPercent = if (provider == Provider.SIMKL) providerProgress else local.simklProgressPercent,
-            )
-
-        setWatchProgress(
-            id = id,
-            type = type,
-            progress = updated,
-            episodeId = episodeId,
-            options = SetOptions(preserveTimestamp = true, forceWrite = true),
-        )
     }
 
     private fun maybeRestoreContinueWatchingVisibility(id: String, type: String, episodeId: String?, timestampEpochMs: Long) {
@@ -612,12 +339,6 @@ class WatchProgressStore(
         updatesFlow.tryEmit(Unit)
     }
 
-    private fun highest(a: Double?, b: Double?): Double? {
-        if (a == null) return b
-        if (b == null) return a
-        return max(a, b)
-    }
-
     private object WatchProgressJson {
         fun fromJson(obj: JSONObject): WatchProgress {
             return WatchProgress(
@@ -626,25 +347,7 @@ class WatchProgressStore(
                 lastUpdatedEpochMs = obj.optLong("lastUpdated", 0L),
                 remoteImdbId = obj.optString("remoteImdbId").trim().ifBlank { null },
                 addonId = obj.optString("addonId").trim().ifBlank { null },
-                traktSynced = obj.optBoolean("traktSynced", false),
-                traktLastSyncedEpochMs = obj.optLongOrNull("traktLastSynced"),
-                traktProgressPercent = obj.optDoubleOrNull("traktProgress"),
-                simklSynced = obj.optBoolean("simklSynced", false),
-                simklLastSyncedEpochMs = obj.optLongOrNull("simklLastSynced"),
-                simklProgressPercent = obj.optDoubleOrNull("simklProgress"),
             )
-        }
-
-        private fun JSONObject.optLongOrNull(key: String): Long? {
-            if (!has(key)) return null
-            val value = optLong(key, Long.MIN_VALUE)
-            return value.takeIf { it != Long.MIN_VALUE }
-        }
-
-        private fun JSONObject.optDoubleOrNull(key: String): Double? {
-            if (!has(key)) return null
-            val value = optDouble(key, Double.NaN)
-            return value.takeIf { !it.isNaN() }
         }
     }
 
@@ -655,14 +358,6 @@ class WatchProgressStore(
         obj.put("lastUpdated", lastUpdatedEpochMs)
         if (!remoteImdbId.isNullOrBlank()) obj.put("remoteImdbId", remoteImdbId)
         if (!addonId.isNullOrBlank()) obj.put("addonId", addonId)
-
-        obj.put("traktSynced", traktSynced)
-        if (traktLastSyncedEpochMs != null) obj.put("traktLastSynced", traktLastSyncedEpochMs)
-        if (traktProgressPercent != null) obj.put("traktProgress", traktProgressPercent)
-
-        obj.put("simklSynced", simklSynced)
-        if (simklLastSyncedEpochMs != null) obj.put("simklLastSynced", simklLastSyncedEpochMs)
-        if (simklProgressPercent != null) obj.put("simklProgress", simklProgressPercent)
 
         return obj
     }
@@ -695,18 +390,6 @@ class WatchProgressStore(
         private const val NOTIFICATION_DEBOUNCE_MS = 1_000L
         private const val MIN_NOTIFICATION_INTERVAL_MS = 500L
 
-        private const val SIGNIFICANT_TIME_CHANGE_SECONDS = 5.0
-        private const val SIGNIFICANT_DURATION_CHANGE_SECONDS = 1.0
         private const val DURATION_UPDATE_THRESHOLD_SECONDS = 60.0
-        private const val DURATION_RECALC_THRESHOLD_SECONDS = 300.0
-        private const val MIN_PROGRESS_DIFF_PERCENT = 5.0
-    }
-}
-
-private fun estimateDurationSeconds(type: String, episodeId: String?): Double {
-    return when {
-        type == "movie" -> 6600.0
-        !episodeId.isNullOrBlank() -> 2700.0
-        else -> 3600.0
     }
 }

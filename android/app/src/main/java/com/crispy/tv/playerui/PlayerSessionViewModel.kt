@@ -162,6 +162,8 @@ class PlayerSessionViewModel(
     private var hasReportedPlaybackStart = false
     private var hasReportedPlaybackStop = false
     private var lastProgressSyncAtElapsedMs = 0L
+    private var seekSettleUntilElapsedMs = 0L
+    private var seekSettleJob: Job? = null
     private var pendingInitialSeekMs: Long? = null
     private var streamSelectorSession = 0L
     private var streamSelectorJob: Job? = null
@@ -271,6 +273,7 @@ class PlayerSessionViewModel(
     fun seekTo(positionMs: Long) {
         playbackController.seekTo(positionMs)
         syncPlaybackSnapshot(playbackController.snapshot())
+        scheduleProgressSyncAfterSeek()
     }
 
     fun setResizeMode(mode: PlayerResizeMode) {
@@ -1011,10 +1014,14 @@ class PlayerSessionViewModel(
         val previousIdentity = activeIdentity
         if (previousIdentity != null && previousIdentity != identity) {
             reportPlaybackStopped(previousIdentity)
-            hasReportedPlaybackStart = false
-            hasReportedPlaybackStop = false
-            lastProgressSyncAtElapsedMs = 0L
         }
+        // Fresh playback session: clear reporting state so the next settled poll emits
+        // a new playback_started event rather than reusing the previous item's flags.
+        hasReportedPlaybackStart = false
+        hasReportedPlaybackStop = false
+        lastProgressSyncAtElapsedMs = 0L
+        seekSettleJob?.cancel()
+        seekSettleUntilElapsedMs = 0L
 
         activePlaybackSource = source
         activeIdentity = identity
@@ -1206,6 +1213,7 @@ class PlayerSessionViewModel(
         }
         playbackController.seekTo(targetPositionMs)
         pendingInitialSeekMs = null
+        scheduleProgressSyncAfterSeek()
     }
 
     private fun maybeHandlePlaybackError(
@@ -1241,6 +1249,14 @@ class PlayerSessionViewModel(
             )
         }
         requestPlayback(engine = NativePlaybackEngine.MPV)
+        // The engine switch is a brand new playback session: drop the stale start/stop
+        // flags and let the settled MPV position emit a fresh playback_started event.
+        hasReportedPlaybackStart = false
+        hasReportedPlaybackStop = false
+        lastProgressSyncAtElapsedMs = 0L
+        seekSettleJob?.cancel()
+        seekSettleUntilElapsedMs = 0L
+        scheduleProgressSyncAfterSeek()
         return true
     }
 
@@ -1275,8 +1291,14 @@ class PlayerSessionViewModel(
             return
         }
 
+        // While the player settles after a seek/load/engine switch the engine reports a
+        // transient 0. Skip reporting until the settle window passes, then resume.
+        if (SystemClock.elapsedRealtime() < seekSettleUntilElapsedMs) {
+            return
+        }
+
         val nowElapsedMs = SystemClock.elapsedRealtime()
-        if (!hasReportedPlaybackStart && isPlaying) {
+        if (!hasReportedPlaybackStart && isPlaying && positionMs >= MIN_PROGRESS_POSITION_MS) {
             hasReportedPlaybackStart = true
             hasReportedPlaybackStop = false
             lastProgressSyncAtElapsedMs = nowElapsedMs
@@ -1302,6 +1324,18 @@ class PlayerSessionViewModel(
                 durationMs = durationMs,
                 isPlaying = isPlaying,
             )
+        }
+    }
+
+    private fun scheduleProgressSyncAfterSeek() {
+        seekSettleJob?.cancel()
+        seekSettleUntilElapsedMs = SystemClock.elapsedRealtime() + PLAYER_SEEK_PROGRESS_SYNC_DEBOUNCE_MS
+        seekSettleJob = backgroundScope.launch {
+            delay(PLAYER_SEEK_PROGRESS_SYNC_DEBOUNCE_MS)
+            // Clearing the settle window also forces an immediate progress push on the
+            // next poll instead of waiting out the full persist interval.
+            seekSettleUntilElapsedMs = 0L
+            lastProgressSyncAtElapsedMs = 0L
         }
     }
 
@@ -1420,4 +1454,6 @@ private class PlaybackMetricsHolder {
 }
 
 private const val TAG = "PlayerSessionViewModel"
-private const val PROGRESS_SYNC_INTERVAL_MS = 15_000L
+private const val PROGRESS_SYNC_INTERVAL_MS = 60_000L
+private const val PLAYER_SEEK_PROGRESS_SYNC_DEBOUNCE_MS = 700L
+private const val MIN_PROGRESS_POSITION_MS = 1000L

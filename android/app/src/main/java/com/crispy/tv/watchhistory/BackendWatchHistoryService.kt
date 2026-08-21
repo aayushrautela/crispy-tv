@@ -18,6 +18,7 @@ import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.player.WatchHistoryResult
 import com.crispy.tv.player.WatchHistoryService
 import com.crispy.tv.player.WatchProgressSnapshot
+import com.crispy.tv.domain.watch.PlaybackProgressPolicy
 import com.crispy.tv.watchhistory.progress.WatchProgress
 import com.crispy.tv.watchhistory.progress.WatchProgressStore
 import java.time.Instant
@@ -299,18 +300,18 @@ class BackendWatchHistoryService(
 
     override suspend fun onPlaybackStarted(identity: PlaybackIdentity, positionMs: Long, durationMs: Long) {
         onPlaybackProgress(identity = identity, positionMs = positionMs, durationMs = durationMs, isPlaying = true)
-        sendPlaybackEvent(identity, positionMs, durationMs, eventType = "playback_progress")
     }
 
     override suspend fun onPlaybackProgress(identity: PlaybackIdentity, positionMs: Long, durationMs: Long, isPlaying: Boolean) {
         val parts = progressKeyParts(identity) ?: return
 
+        // Pure gating/pinning lives in PlaybackProgressPolicy (contract-tested).
+        val resolved = PlaybackProgressPolicy.resolveProgressWrite(positionMs = positionMs, durationMs = durationMs) ?: return
+
         // Server derives runtime from TMDB, so always report position even when the
         // player doesn't know the duration (torrent/addy sources). Client duration is
         // only a last-resort hint and is omitted when unknown.
         val durationSeconds = if (durationMs > 0L) durationMs.toDouble() / 1000.0 else 0.0
-        val currentSeconds = positionMs.coerceAtLeast(0L).toDouble() / 1000.0
-
         if (durationSeconds > 0.0) {
             watchProgressStore.setContentDuration(
                 id = parts.id,
@@ -329,7 +330,7 @@ class BackendWatchHistoryService(
         val next =
             (existing ?: WatchProgress(currentTimeSeconds = 0.0, durationSeconds = storedDuration, lastUpdatedEpochMs = 0L))
                 .copy(
-                    currentTimeSeconds = if (storedDuration > 0.0) currentSeconds.coerceIn(0.0, storedDuration) else currentSeconds.coerceAtLeast(0.0),
+                    currentTimeSeconds = resolved.storedPositionMs.toDouble() / 1000.0,
                     durationSeconds = storedDuration,
                 )
 
@@ -342,20 +343,20 @@ class BackendWatchHistoryService(
 
         sendPlaybackEvent(
             identity = identity,
-            positionMs = positionMs,
+            positionMs = resolved.eventPositionMs,
             durationMs = durationMs,
             eventType = if (isPlaying) "playback_progress" else "playback_progress_snapshot",
         )
     }
 
     override suspend fun onPlaybackStopped(identity: PlaybackIdentity, positionMs: Long, durationMs: Long) {
-        onPlaybackProgress(identity = identity, positionMs = positionMs, durationMs = durationMs, isPlaying = false)
-        val progressPercent = toProgressPercent(positionMs = positionMs, durationMs = durationMs)
+        val resolved = PlaybackProgressPolicy.resolveProgressWrite(positionMs = positionMs, durationMs = durationMs) ?: return
+        onPlaybackProgress(identity = identity, positionMs = resolved.eventPositionMs, durationMs = durationMs, isPlaying = false)
         sendPlaybackEvent(
             identity = identity,
-            positionMs = positionMs,
+            positionMs = resolved.eventPositionMs,
             durationMs = durationMs,
-            eventType = if ((progressPercent ?: 0.0) >= CONTINUE_WATCHING_COMPLETION_PERCENT) {
+            eventType = if (resolved.isCompleted) {
                 "playback_completed"
             } else {
                 "playback_progress_snapshot"
@@ -499,12 +500,6 @@ class BackendWatchHistoryService(
         val id: String,
         val episodeId: String?,
     )
-
-    private fun toProgressPercent(positionMs: Long, durationMs: Long): Double? {
-        if (durationMs <= 0L) return null
-        val percent = (positionMs.coerceAtLeast(0L).toDouble() / durationMs.toDouble()) * 100.0
-        return percent.coerceIn(0.0, 100.0)
-    }
 
     private fun PlaybackIdentity.toPlaybackLookupInput(): ItemLookupInput? {
         val itemId = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null

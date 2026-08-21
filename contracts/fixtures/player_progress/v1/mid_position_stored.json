@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "player_progress",
+  "case_id": "mid_position_stored",
+  "input": {
+    "position_ms": 300000,
+    "duration_ms": 600000
+  },
+  "expected": {
+    "store_or_drop": "store",
+    "is_completed": false,
+    "stored_position_ms": 300000,
+    "event_position_ms": 300000
+  }
+}

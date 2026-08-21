@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "suite": "player_progress",
+  "case_id": "completion_at_boundary_pins_to_duration",
+  "input": {
+    "position_ms": 510000,
+    "duration_ms": 600000
+  },
+  "expected": {
+    "store_or_drop": "store",
+    "is_completed": true,
+    "stored_position_ms": 600000,
+    "event_position_ms": 600000
+  }
+}

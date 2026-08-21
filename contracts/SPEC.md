@@ -33,6 +33,11 @@ provider-key strings for planning purposes, but these are never sent to the serv
 - `player_machine`
   - Event-driven playback transitions and engine fallback behavior.
   - `contract_version` 2 renames the fallback engine identifier from `vlc` to `mpv` (libVLC replaced by libmpv). v1 fixtures are superseded.
+- `player_progress`
+  - Deterministic gating for reporting player progress to our backend (pure rules in `android/core-domain`, mirrored in Swift ContractRunner).
+  - Positions below `MIN_PROGRESS_POSITION_MS` (1000ms) are dropped unless the item is already complete — this filters transient engine 0s during seeks/buffering/engine fallback, not intentional stops.
+  - On completion (>=85% of duration) the stored and event position is pinned to the full `duration_ms`, so a trailing 0 from the engine cannot wipe the resume point.
+  - Unknown duration (0ms) is allowed as long as the position is >= the minimum; completion requires a known duration.
 - `continue_watching`
   - Continue Watching planning: filter, dedupe, and canonical ordering for in-progress items and placeholders.
   - Dedupe: for the same episode/movie, prefer higher progress only if it is > 0.5 percentage points ahead; otherwise prefer newer `last_updated_ms`.
@@ -41,8 +46,6 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - Skip watched episodes using both raw and `tt`-prefixed show ids.
   - Release parsing accepts full ISO instants or `YYYY-MM-DD`; invalid or blank release values are unreleased.
   - Time-sensitive comparisons use fixture-provided `now_ms`.
-- `trakt_scrobble_policy`
-  - Deterministic Trakt scrobble decisions (endpoint + watched/progress flags) based on stage and progress.
 - `trakt_scrobble_policy`
   - Normalize IMDb ids to trimmed lowercase `tt<digits>` form; invalid ids resolve to `null`.
   - Ignore blank and `N/A` fields case-insensitively.

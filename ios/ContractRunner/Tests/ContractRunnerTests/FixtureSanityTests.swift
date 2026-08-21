@@ -10,12 +10,12 @@ final class FixtureSanityTests: XCTestCase {
             "watch_collections_contract",
             "calendar_contract",
             "next_episode",
-            "trakt_scrobble_policy",
             "omdb",
             "home_catalogs",
             "catalog_url_building",
             "sync_planner",
             "storage_v1",
+            "player_progress",
         ]
 
         for suite in suites {

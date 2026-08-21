@@ -16,7 +16,6 @@ SUITE_TO_SCHEMA = {
     "omdb": "omdb.schema.json",
     "home_catalogs": "home_catalogs.schema.json",
     "catalog_url_building": "catalog_url_building.schema.json",
-    "trakt_scrobble_policy": "trakt_scrobble_policy.schema.json",
     "profile_sorting": "profile_sorting.schema.json",
     "profile_name_validation": "profile_name_validation.schema.json",
     "addon_url_normalization": "addon_url_normalization.schema.json",
@@ -28,6 +27,7 @@ SUITE_TO_SCHEMA = {
     "calendar_contract": "calendar_contract.schema.json",
     "watch_sync": "watch_sync.schema.json",
     "optimistic_state": "optimistic_state.schema.json",
+    "player_progress": "player_progress.schema.json",
 }
 
 

@@ -1,12 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "trakt_scrobble_policy fixture",
+  "title": "player_progress fixture",
   "type": "object",
   "required": [
     "contract_version",
     "suite",
     "case_id",
-    "now_ms",
     "input",
     "expected"
   ],
@@ -16,34 +15,24 @@
       "minimum": 1
     },
     "suite": {
-      "const": "trakt_scrobble_policy"
+      "const": "player_progress"
     },
     "case_id": {
       "type": "string",
       "minLength": 1
     },
-    "now_ms": {
-      "type": "integer",
-      "minimum": 0
-    },
     "input": {
       "type": "object",
       "required": [
-        "stage",
-        "progress_percent"
+        "position_ms",
+        "duration_ms"
       ],
       "properties": {
-        "stage": {
-          "type": "string",
-          "enum": [
-            "start",
-            "stop"
-          ]
+        "position_ms": {
+          "type": "integer"
         },
-        "progress_percent": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100
+        "duration_ms": {
+          "type": "integer"
         }
       },
       "additionalProperties": false
@@ -51,23 +40,22 @@
     "expected": {
       "type": "object",
       "required": [
-        "endpoint",
-        "marks_watched",
-        "updates_playback_progress"
+        "store_or_drop",
+        "is_completed"
       ],
       "properties": {
-        "endpoint": {
+        "store_or_drop": {
           "type": "string",
-          "enum": [
-            "/scrobble/start",
-            "/scrobble/stop"
-          ]
+          "enum": ["store", "drop"]
         },
-        "marks_watched": {
+        "is_completed": {
           "type": "boolean"
         },
-        "updates_playback_progress": {
-          "type": "boolean"
+        "stored_position_ms": {
+          "type": "integer"
+        },
+        "event_position_ms": {
+          "type": "integer"
         }
       },
       "additionalProperties": false
