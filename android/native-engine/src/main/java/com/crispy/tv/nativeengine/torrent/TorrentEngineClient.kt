@@ -143,24 +143,15 @@ class TorrentEngineClient(context: Context) : Closeable {
                 throw CancellationException("Torrent stream start was cancelled (generation mismatch)")
             }
 
-            val probeResult = runCatching { probeLocalStream(url) }
-            if (probeResult.isSuccess) {
-                    val statusCode = probeResult.getOrThrow()
+            // Any non-success outcome (HTTP error or transport failure) is treated as transient:
+            // TorrServer answers HTTP 500 while a freshly added/resumed torrent is still loading
+            // metadata and preloading, so only the overall deadline decides readiness.
+            runCatching { probeLocalStream(url) }
+                .onSuccess { statusCode ->
+                    if (statusCode == 200 || statusCode == 206) return
                     lastStatusCode = statusCode
-                    when {
-                    statusCode == 200 || statusCode == 206 -> return
-
-                    statusCode == 404 -> {
-                        throw IllegalStateException("Localhost stream not found: HTTP 404 for url=$url")
-                    }
-
-                    statusCode >= 500 && statusCode != 503 -> {
-                        throw IllegalStateException("Localhost stream probe failed: HTTP $statusCode for url=$url")
-                    }
                 }
-            } else {
-                lastError = probeResult.exceptionOrNull()
-            }
+                .onFailure { error -> lastError = error }
 
             delay(LOCALHOST_POLL_INTERVAL_MS)
         }

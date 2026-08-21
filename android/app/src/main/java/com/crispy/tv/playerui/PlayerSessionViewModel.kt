@@ -474,11 +474,32 @@ class PlayerSessionViewModel(
         }
     }
 
-    private suspend fun playResolvedStream(stream: AddonStream, target: PlayerStreamLookupTarget) {
-        val source = stream.toPlaybackSource(torrentResolver, target.lookupId) ?: run {
-            _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
-            return
+    private suspend fun resolvePlaybackSource(
+        stream: AddonStream,
+        lookupId: String?,
+    ): PlaybackSource? =
+        try {
+            val source = stream.toPlaybackSource(torrentResolver, lookupId)
+            if (source == null) {
+                _uiState.update { it.copy(isBuffering = false, statusMessage = "Selected stream has no playable source.") }
+            }
+            source
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to resolve playback source", error)
+            _uiState.update { state ->
+                state.copy(
+                    isBuffering = false,
+                    statusMessage = error.message?.trim()?.takeIf { it.isNotBlank() }
+                        ?: "Failed to prepare the selected stream.",
+                )
+            }
+            null
         }
+
+    private suspend fun playResolvedStream(stream: AddonStream, target: PlayerStreamLookupTarget) {
+        val source = resolvePlaybackSource(stream, target.lookupId) ?: return
         activePlaybackSource = source
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
@@ -675,11 +696,7 @@ class PlayerSessionViewModel(
         val resumePositionMs = if (sameEpisode) uiState.value.positionMs else 0L
 
         viewModelScope.launch {
-            val source = stream.toPlaybackSource(torrentResolver, state.streamSelector.lookupId)
-            if (source == null) {
-                _uiState.update { it.copy(statusMessage = "Selected stream has no playable source.") }
-                return@launch
-            }
+            val source = resolvePlaybackSource(stream, state.streamSelector.lookupId) ?: return@launch
             switchPlayback(
                 source = source,
                 identity = nextIdentity,
