@@ -18,7 +18,14 @@ import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
+import com.crispy.tv.optimistic.FileBackedPendingMutationStore
+import com.crispy.tv.optimistic.UserMediaMutationExecutor
+import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.streams.StreamResolverProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import java.io.File
 
 class AppGraph(
     context: Context,
@@ -67,7 +74,17 @@ class AppGraph(
             itemType = itemType,
             runtimeEntry = runtimeEntry,
             detailsUseCases = detailsUseCases,
+            outbox = userMutationOutbox,
         )
+    }
+
+    val userMutationOutbox: UserMutationOutbox by lazy {
+        val store = FileBackedPendingMutationStore(
+            File(appContext.filesDir, "pending_mutations.json"),
+        )
+        val executor = UserMediaMutationExecutor(userMediaRepository)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        UserMutationOutbox(store = store, executor = executor, scope = scope)
     }
 
     internal fun detailsUseCases(): DetailsUseCases = detailsUseCases

@@ -37,11 +37,12 @@ import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.data.repository.DefaultUserMediaRepository
+import com.crispy.tv.app.appGraph
+import com.crispy.tv.domain.optimistic.MutationStatus
+import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.repository.UserMediaRepository
-import com.crispy.tv.home.HomeRefreshBus
-import com.crispy.tv.home.HomeRefreshEvent
+import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -49,10 +50,8 @@ import androidx.compose.material3.FilterChipDefaults
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.LandscapeCard
 import com.crispy.tv.ui.theme.Dimensions
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,6 +104,7 @@ class LibraryViewModel internal constructor(
     private val backend: CrispyBackendClient,
     private val backendContextResolver: BackendContextResolver,
     private val userMediaRepository: UserMediaRepository,
+    private val outbox: UserMutationOutbox,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState
@@ -147,17 +147,21 @@ class LibraryViewModel internal constructor(
     }
 
     fun setWatched(item: CatalogItem, desired: Boolean) {
-        viewModelScope.launch {
-            val contentType = if (item.type == "movie") MetadataLabMediaType.MOVIE else MetadataLabMediaType.SERIES
-            val request = WatchHistoryRequest(itemId = item.itemId, contentType = contentType, title = item.title)
-            val result =
-                withContext(Dispatchers.IO) {
-                    if (desired) userMediaRepository.markWatched(request) else userMediaRepository.unmarkWatched(request)
-                }
-            if (result.accepted) {
-                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
-            }
-        }
+        val contentType = if (item.type == "movie") MetadataLabMediaType.MOVIE else MetadataLabMediaType.SERIES
+        val now = System.currentTimeMillis()
+        outbox.enqueue(
+            TitleWatchedMutation(
+                id = UserMutationOutbox.newId(),
+                titleItemId = item.itemId,
+                entityId = item.itemId,
+                createdAtMs = now,
+                attempt = 0,
+                status = MutationStatus.Pending,
+                nextAttemptAtMs = now,
+                contentType = contentType,
+                desired = desired,
+            ),
+        )
     }
 
     companion object {
@@ -171,6 +175,7 @@ class LibraryViewModel internal constructor(
                             backend = BackendServicesProvider.backendClient(appContext),
                             backendContextResolver = BackendContextResolverProvider.get(appContext),
                             userMediaRepository = DefaultUserMediaRepository(PlaybackDependencies.watchHistoryServiceFactory(appContext)),
+                            outbox = appContext.appGraph().userMutationOutbox,
                         ) as T
                     }
                     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

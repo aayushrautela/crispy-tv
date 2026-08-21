@@ -102,6 +102,13 @@ provider-key strings for planning purposes, but these are never sent to the serv
   - `contract_version` 4 uses `PublicItemId` for all item identity.
   - Calendar envelopes: `profileId`, `source`, `generatedAt`, `items: BaseItemDto[]`.
   - Calendar items are raw `BaseItemDto` (no wrapper objects).
+- `optimistic_state`
+  - Pure, deterministic merge of local user intent on top of last-known server truth, plus outbox scheduling.
+  - Local intent is modeled as a `UserMutation` (one of `watchlist`, `title_watched`, `episode_watched`, `season_watched`, `rating`) carrying a client nonce `id` for idempotency, an `entity_id` for coalescing, `attempt`, `status`, and `next_attempt_ms`.
+  - `derive` operation: `deriveUserState(snapshot, mutations)` returns the display state. Within a `(kind, entity_id)` group the most recently created mutation wins. `pending`/`inflight` show the local `desired` value with `sync = syncing`; `failed`/`conflict` fall back to server truth with `sync = error`; no active mutation yields server truth with `sync = idle`.
+  - Rapid double-toggles collapse: two `watchlist` mutations for the same `entity_id` resolve to the latest `desired`.
+  - `plan_outbox` operation: `planOutbox(mutations, now_ms)` returns `OutboxAction`s for `pending` mutations whose `next_attempt_ms <= now_ms`, ordered by `(created_at_ms, id)`. `failed`/`conflict`/`inflight` are never scheduled by this step (the processor re-queues failed writes with a new backoff).
+  - Backoff is `base * 2^(attempt-1)` capped at `max_delay_ms` (`nextBackoffDelayMs`).
 
 ## Breaking Changes
 

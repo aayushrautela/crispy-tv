@@ -1,0 +1,57 @@
+{
+  "contract_version": 2,
+  "suite": "optimistic_state",
+  "case_id": "plan_outbox_selects_due_pending_only",
+  "operation": "plan_outbox",
+  "input": {
+    "snapshot": {
+      "is_in_watchlist": false,
+      "is_watched": false,
+      "is_rated": false,
+      "user_rating": null,
+      "episode_watched": {},
+      "season_watched": {}
+    },
+    "now_ms": 5000,
+    "mutations": [
+      {
+        "kind": "watchlist",
+        "id": "m1",
+        "entity_id": "tt123",
+        "created_at_ms": 1000,
+        "attempt": 0,
+        "status": "pending",
+        "next_attempt_ms": 0,
+        "desired": true
+      },
+      {
+        "kind": "rating",
+        "id": "m2",
+        "entity_id": "tt123",
+        "created_at_ms": 2000,
+        "attempt": 1,
+        "status": "pending",
+        "next_attempt_ms": 9999,
+        "desired": 8
+      },
+      {
+        "kind": "title_watched",
+        "id": "m3",
+        "entity_id": "tt123",
+        "created_at_ms": 3000,
+        "attempt": 2,
+        "status": "failed",
+        "status_reason": "boom",
+        "desired": true
+      }
+    ]
+  },
+  "expected": {
+    "actions": [
+      {
+        "mutation_id": "m1",
+        "kind": "watchlist"
+      }
+    ]
+  }
+}

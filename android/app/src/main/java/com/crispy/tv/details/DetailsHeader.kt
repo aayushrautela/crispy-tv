@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +60,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import com.crispy.tv.domain.optimistic.FieldSync
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
@@ -167,7 +169,7 @@ internal fun HeaderInfoSection(
     isWatched: Boolean,
     isRated: Boolean,
     userRating: Int?,
-    isMutating: Boolean,
+    optimisticSync: OptimisticSync,
     palette: DetailsPaletteColors,
     watchCta: WatchCta,
     aiInsightsIsLoading: Boolean,
@@ -399,7 +401,7 @@ internal fun HeaderInfoSection(
 
         Button(
             onClick = onWatchNow,
-            enabled = !isMutating,
+            enabled = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -455,11 +457,11 @@ internal fun HeaderInfoSection(
 
         DetailsQuickActionsRow(
             palette = palette,
-            enabled = !isMutating,
             isInWatchlist = isInWatchlist,
             isWatched = isWatched,
             isRated = isRated,
             userRating = userRating,
+            optimisticSync = optimisticSync,
             onToggleWatchlist = onToggleWatchlist,
             onToggleWatched = onToggleWatched,
             onRate = {
@@ -483,11 +485,11 @@ internal fun HeaderInfoSection(
 @Composable
 private fun DetailsQuickActionsRow(
     palette: DetailsPaletteColors,
-    enabled: Boolean,
     isInWatchlist: Boolean,
     isWatched: Boolean,
     isRated: Boolean,
     userRating: Int?,
+    optimisticSync: OptimisticSync,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onRate: () -> Unit,
@@ -503,7 +505,7 @@ private fun DetailsQuickActionsRow(
         DetailsQuickAction(
             label = "Watchlist",
             selected = isInWatchlist,
-            enabled = enabled,
+            sync = optimisticSync.watchlist,
             palette = palette,
             icon = if (isInWatchlist) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
             onClick = onToggleWatchlist
@@ -512,7 +514,7 @@ private fun DetailsQuickActionsRow(
         DetailsQuickAction(
             label = "Watched",
             selected = isWatched,
-            enabled = enabled,
+            sync = optimisticSync.watched,
             palette = palette,
             icon = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
             onClick = onToggleWatched
@@ -522,7 +524,7 @@ private fun DetailsQuickActionsRow(
         DetailsQuickAction(
             label = if (isRated) (userRating?.let { "Rated $it" } ?: "Rated") else "Rate",
             selected = isRated,
-            enabled = enabled,
+            sync = optimisticSync.rating,
             palette = palette,
             selectedAccent = gold,
             icon = if (isRated) Icons.Filled.Star else Icons.Outlined.StarBorder,
@@ -532,7 +534,7 @@ private fun DetailsQuickActionsRow(
         DetailsQuickAction(
             label = "Share",
             selected = false,
-            enabled = enabled,
+            sync = OptimisticSyncBadge(),
             palette = palette,
             icon = Icons.Outlined.Share,
             onClick = onShare
@@ -544,7 +546,7 @@ private fun DetailsQuickActionsRow(
 private fun DetailsQuickAction(
     label: String,
     selected: Boolean,
-    enabled: Boolean,
+    sync: OptimisticSyncBadge,
     palette: DetailsPaletteColors,
     selectedAccent: Color? = null,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -552,7 +554,14 @@ private fun DetailsQuickAction(
 ) {
     val accent = selectedAccent ?: palette.accent
     val container = if (selected) lerp(palette.pillBackground, accent, 0.28f) else palette.pillBackground
-    val iconTint = if (selected) accent else palette.onPillBackground.copy(alpha = 0.92f)
+    val isError = sync.status == FieldSync.ERROR
+    val iconTint =
+        when {
+            isError -> Color(0xFFE5484D)
+            selected -> accent
+            else -> palette.onPillBackground.copy(alpha = 0.92f)
+        }
+    val labelAlpha = if (isError) 0.9f else 0.9f
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -563,24 +572,32 @@ private fun DetailsQuickAction(
             modifier = Modifier
                 .size(48.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
-                .clickable(enabled = enabled) { onClick() },
+                .clickable { onClick() },
             color = container,
             contentColor = palette.onPillBackground
         ) {
             androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = iconTint,
-                    modifier = Modifier.size(22.dp)
-                )
+                if (sync.status == FieldSync.SYNCING) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = iconTint,
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = iconTint,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
 
         Text(
-            text = label,
+            text = if (isError) "Retry" else label,
             style = MaterialTheme.typography.labelSmall,
-            color = palette.onPageBackground.copy(alpha = if (enabled) 0.9f else 0.55f)
+            color = palette.onPageBackground.copy(alpha = labelAlpha)
         )
     }
 }

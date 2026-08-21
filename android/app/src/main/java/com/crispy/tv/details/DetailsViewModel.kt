@@ -5,11 +5,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import android.util.Log
-import com.crispy.tv.home.HomeRefreshBus
-import com.crispy.tv.home.HomeRefreshEvent
+import com.crispy.tv.domain.optimistic.EpisodeWatchedMutation
+import com.crispy.tv.domain.optimistic.FieldSync
+import com.crispy.tv.domain.optimistic.MutationStatus
+import com.crispy.tv.domain.optimistic.RatingMutation
+import com.crispy.tv.domain.optimistic.SeasonWatchedMutation
+import com.crispy.tv.domain.optimistic.TitleWatchedMutation
+import com.crispy.tv.domain.optimistic.UserMutation
+import com.crispy.tv.domain.optimistic.UserStateSnapshot
+import com.crispy.tv.domain.optimistic.WatchlistMutation
+import com.crispy.tv.domain.optimistic.deriveUserState
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMediaVideo
+import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.streams.AddonStream
@@ -43,6 +52,7 @@ class DetailsViewModel internal constructor(
     private val itemType: String,
     private val runtimeEntry: RuntimeDetailsEntry?,
     private val detailsUseCases: DetailsUseCases,
+    private val outbox: UserMutationOutbox,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailsUiState(itemId = itemId))
@@ -66,8 +76,110 @@ class DetailsViewModel internal constructor(
     @Volatile
     private var reloadGeneration: Long = 0L
 
+    /** Last known server truth for this title; optimistic pending mutations are merged on top. */
+    private var serverSnapshot: UserStateSnapshot = UserStateSnapshot()
+
     init {
+        viewModelScope.launch {
+            var previous = outbox.mutationsForItem(itemId)
+            outbox.observeItem(itemId).collect { mutations ->
+                val currentIds = mutations.map { it.id }.toSet()
+                // A mutation whose id vanished did so because it flushed
+                // successfully (the outbox removes on success). The server now
+                // agrees with its desired value, so write that straight into the
+                // local source of truth — no re-fetch. Failures stay in the list
+                // (Failed/Conflict) and are excluded here, so they keep showing
+                // server truth plus an error badge until retried.
+                val completed = previous.filter { it.id !in currentIds }
+                    .filter { it.status == MutationStatus.Pending || it.status == MutationStatus.Inflight }
+                previous = mutations
+                if (completed.isNotEmpty()) {
+                    applyCompleted(completed)
+                }
+                recomputeDerived()
+            }
+        }
         reload()
+    }
+
+    /**
+     * Re-derive display state from the server snapshot plus any in-flight
+     * mutations. This is what makes the toggle buttons feel instant: the UI
+     * reflects local intent before the network call resolves, and reverts to
+     * server truth (with an error badge) only if a write fails.
+     */
+    private fun recomputeDerived() {
+        val mutations = outbox.mutationsForItem(itemId)
+        _uiState.update { state ->
+            val episodeServer = state.episodeWatchStates.mapValues { it.value.isWatched }
+            val combined = serverSnapshot.copy(
+                episodeWatched = episodeServer,
+                seasonWatched = state.seasonWatchStates,
+            )
+            val derived = deriveUserState(combined, mutations)
+            val newEpisodeWatchStates = state.episodeWatchStates.mapValues { (key, ews) ->
+                derived.episodeWatched[key]?.first?.let { ews.copy(isWatched = it) } ?: ews
+            }
+            val newSeasonWatchStates = state.seasonWatchStates.mapValues { (key, value) ->
+                derived.seasonWatched[key]?.first ?: value
+            }
+            val isShowFullyWatched =
+                state.seasons.isNotEmpty() && state.seasons.all { derived.seasonWatched[it]?.first == true }
+            state.copy(
+                isInWatchlist = derived.watchlist.first,
+                isWatched = derived.titleWatched.first,
+                isRated = derived.rating.first != null,
+                userRating = derived.rating.first,
+                isShowFullyWatched = isShowFullyWatched,
+                episodeWatchStates = newEpisodeWatchStates,
+                seasonWatchStates = newSeasonWatchStates,
+                optimisticSync = OptimisticSync(
+                    watchlist = toBadge(derived.watchlist.second),
+                    watched = toBadge(derived.titleWatched.second),
+                    rating = toBadge(derived.rating.second),
+                    episodes = derived.episodeWatched.mapValues { (_, view) -> toBadge(view.second) },
+                    seasons = derived.seasonWatched.mapValues { (_, view) -> toBadge(view.second) },
+                ),
+            )
+        }
+    }
+
+    private fun toBadge(view: com.crispy.tv.domain.optimistic.MutationSyncView): OptimisticSyncBadge =
+        OptimisticSyncBadge(status = view.status, errorMessage = view.errorMessage)
+
+    /**
+     * A successful flush means the server now agrees with the mutation's desired
+     * value. Write that straight into the local display sources so the UI keeps
+     * showing the right value with no pending override and no re-fetch. Header
+     * fields live in [serverSnapshot]; episode/season fields live in [UiState]
+     * because they are resolved per-season.
+     */
+    private fun applyCompleted(completed: List<UserMutation>) {
+        var snapshot = serverSnapshot
+        val episodeUpdates = mutableMapOf<String, Boolean>()
+        val seasonUpdates = mutableMapOf<Int, Boolean>()
+        for (mutation in completed) {
+            when (mutation) {
+                is WatchlistMutation -> snapshot = snapshot.copy(isInWatchlist = mutation.desired)
+                is TitleWatchedMutation -> snapshot = snapshot.copy(isWatched = mutation.desired)
+                is RatingMutation -> snapshot = snapshot.copy(isRated = mutation.desired != null, userRating = mutation.desired)
+                is EpisodeWatchedMutation -> episodeUpdates[mutation.videoId] = mutation.desired
+                is SeasonWatchedMutation -> seasonUpdates[mutation.seasonNumber] = mutation.desired
+            }
+        }
+        serverSnapshot = snapshot
+        if (episodeUpdates.isNotEmpty() || seasonUpdates.isNotEmpty()) {
+            _uiState.update { state ->
+                state.copy(
+                    episodeWatchStates = if (episodeUpdates.isEmpty()) state.episodeWatchStates
+                    else state.episodeWatchStates.mapValues { (key, ews) ->
+                        episodeUpdates[key]?.let { ews.copy(isWatched = it) } ?: ews
+                    },
+                    seasonWatchStates = if (seasonUpdates.isEmpty()) state.seasonWatchStates
+                    else state.seasonWatchStates.mapValues { (key, value) -> seasonUpdates[key] ?: value },
+                )
+            }
+        }
     }
 
     fun reload() {
@@ -159,6 +271,14 @@ class DetailsViewModel internal constructor(
                     episodesStatusMessage = "",
                 )
             }
+
+            serverSnapshot = UserStateSnapshot(
+                isInWatchlist = result.providerState.isInWatchlist,
+                isWatched = result.providerState.isWatched,
+                isRated = result.providerState.isRated,
+                userRating = result.providerState.userRating,
+            )
+            recomputeDerived()
 
             if (enrichedDetails != null) {
                 loadExtras(generation)
@@ -970,220 +1090,108 @@ class DetailsViewModel internal constructor(
 
     fun toggleWatchlist() {
         val details = uiState.value.details ?: return
-        viewModelScope.launch {
-            val desired = !_uiState.value.isInWatchlist
-            _uiState.update { it.copy(isMutating = true) }
-
-            val result =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.updateWatchlist(details, desired)
-                }
-            _uiState.update {
-                it.copy(
-                    isMutating = false,
-                    statusMessage = result.statusMessage,
-                    details = result.details,
-                    isInWatchlist = if (result.success) desired else it.isInWatchlist
-                )
-            }
-            if (result.success) {
-                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
-            }
-        }
+        val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
+        val desired = !uiState.value.isInWatchlist
+        val now = System.currentTimeMillis()
+        outbox.enqueue(
+            WatchlistMutation(
+                id = UserMutationOutbox.newId(),
+                titleItemId = targetId,
+                entityId = targetId,
+                createdAtMs = now,
+                attempt = 0,
+                status = MutationStatus.Pending,
+                nextAttemptAtMs = now,
+                desired = desired,
+            ),
+        )
     }
 
     fun toggleWatched() {
         val details = uiState.value.details ?: return
-        viewModelScope.launch {
-            val desired = !_uiState.value.isWatched
-            _uiState.update { it.copy(isMutating = true) }
-
-            val result =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.updateWatched(details, desired)
-                }
-            val providerState =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveProviderState(
-                        details = result.details,
-                        itemId = itemId,
-                        requestedMediaType = requestedMediaType,
-                    )
-                }
-            val ctaResolution =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveWatchCta(
-                        details = result.details,
-                        providerState = providerState,
-                        requestedMediaType = requestedMediaType,
-                        nowMs = System.currentTimeMillis(),
-                    )
-                }
-            _uiState.update {
-                it.copy(
-                    isMutating = false,
-                    details = result.details,
-                    statusMessage = result.statusMessage,
-                    isWatched = providerState.isWatched,
-                    watchCta = ctaResolution.watchCta,
-                    continueVideoId = ctaResolution.continueVideoId,
-                )
-            }
-            if (result.success) {
-                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
-            }
-        }
+        val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
+        val contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        val desired = !uiState.value.isWatched
+        val now = System.currentTimeMillis()
+        outbox.enqueue(
+            TitleWatchedMutation(
+                id = UserMutationOutbox.newId(),
+                titleItemId = targetId,
+                entityId = targetId,
+                createdAtMs = now,
+                attempt = 0,
+                status = MutationStatus.Pending,
+                nextAttemptAtMs = now,
+                contentType = contentType,
+                desired = desired,
+            ),
+        )
     }
 
     fun toggleEpisodeWatched(video: MediaVideo) {
         val details = uiState.value.details ?: return
+        val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
         val season = video.season
         val episode = video.episode
         if (season == null || episode == null) {
             _uiState.update { it.copy(statusMessage = "Episode metadata is incomplete.") }
             return
         }
-
-            viewModelScope.launch {
-                val desired = !(_uiState.value.episodeWatchStates[video.id]?.isWatched ?: false)
-
-                val result =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.updateEpisodeWatched(details, video, desired)
-                }
-
-            detailsUseCases.clearEpisodeWatchStateCache()
-            val refreshedEpisodes = _uiState.value.seasonEpisodes
-            val refreshedWatchStates =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveEpisodeWatchStates(result.details, refreshedEpisodes)
-                }
-            val providerState =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveProviderState(
-                        details = result.details,
-                        itemId = itemId,
-                        requestedMediaType = requestedMediaType,
-                    )
-                }
-            val ctaResolution =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveWatchCta(
-                        details = result.details,
-                        providerState = providerState,
-                        requestedMediaType = requestedMediaType,
-                        nowMs = System.currentTimeMillis(),
-                    )
-                }
-            _uiState.update {
-                val selectedSeason = it.selectedSeasonOrFirst
-                val seasonWatched =
-                    if (selectedSeason != null && refreshedEpisodes.isNotEmpty()) {
-                        refreshedEpisodes.all { refreshedWatchStates[it.id]?.isWatched == true }
-                    } else {
-                        it.seasonWatchStates[selectedSeason]
-                    }
-                val mergedSeasonWatchStates =
-                    if (selectedSeason != null && seasonWatched != null) {
-                        it.seasonWatchStates + (selectedSeason to seasonWatched)
-                    } else {
-                        it.seasonWatchStates
-                    }
-                it.copy(
-                    details = result.details,
-                    isWatched = providerState.isWatched,
-                    isInWatchlist = providerState.isInWatchlist,
-                    isRated = providerState.isRated,
-                    userRating = providerState.userRating,
-                    watchCta = ctaResolution.watchCta,
-                    continueVideoId = ctaResolution.continueVideoId,
-                    highlightedEpisodeId = ctaResolution.continueVideoId ?: it.highlightedEpisodeId,
-                    episodeWatchStates = refreshedWatchStates,
-                    seasonWatchStates = mergedSeasonWatchStates,
-                    isShowFullyWatched = computeShowFullyWatched(mergedSeasonWatchStates, it.seasons),
-                    statusMessage = result.statusMessage,
-                )
-            }
-            if (result.success) {
-                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
-            }
-        }
+        val desired = !(uiState.value.episodeWatchStates[video.id]?.isWatched ?: false)
+        val now = System.currentTimeMillis()
+        outbox.enqueue(
+            EpisodeWatchedMutation(
+                id = UserMutationOutbox.newId(),
+                titleItemId = targetId,
+                entityId = "$targetId#S$season:E$episode",
+                createdAtMs = now,
+                attempt = 0,
+                status = MutationStatus.Pending,
+                nextAttemptAtMs = now,
+                itemId = targetId,
+                season = season,
+                episode = episode,
+                videoId = video.id,
+                desired = desired,
+            ),
+        )
     }
 
     fun toggleSeasonWatched(seasonItemId: String, seasonNumber: Int) {
-        val details = uiState.value.details ?: return
-        val currentlyWatched = _uiState.value.seasonWatchStates[seasonNumber] ?: false
-        val desired = !currentlyWatched
-        viewModelScope.launch {
-            val result =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.updateSeasonWatched(details, seasonItemId, desired)
-                }
-
-            detailsUseCases.clearEpisodeWatchStateCache()
-            val refreshedEpisodes = _uiState.value.seasonEpisodes
-            val refreshedWatchStates =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveEpisodeWatchStates(result.details, refreshedEpisodes)
-                }
-            val providerState =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveProviderState(
-                        details = result.details,
-                        itemId = itemId,
-                        requestedMediaType = requestedMediaType,
-                    )
-                }
-            val ctaResolution =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.resolveWatchCta(
-                        details = result.details,
-                        providerState = providerState,
-                        requestedMediaType = requestedMediaType,
-                        nowMs = System.currentTimeMillis(),
-                    )
-                }
-            _uiState.update {
-                val mergedSeasonWatchStates = it.seasonWatchStates + (seasonNumber to desired)
-                it.copy(
-                    seasonWatchStates = mergedSeasonWatchStates,
-                    details = result.details,
-                    isWatched = providerState.isWatched,
-                    isShowFullyWatched = computeShowFullyWatched(mergedSeasonWatchStates, it.seasons),
-                    watchCta = ctaResolution.watchCta,
-                    continueVideoId = ctaResolution.continueVideoId,
-                    episodeWatchStates = refreshedWatchStates,
-                    statusMessage = result.statusMessage,
-                )
-            }
-            if (result.success) {
-                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
-            }
-        }
+        val desired = !(uiState.value.seasonWatchStates[seasonNumber] ?: false)
+        val now = System.currentTimeMillis()
+        outbox.enqueue(
+            SeasonWatchedMutation(
+                id = UserMutationOutbox.newId(),
+                titleItemId = itemId,
+                entityId = seasonItemId,
+                createdAtMs = now,
+                attempt = 0,
+                status = MutationStatus.Pending,
+                nextAttemptAtMs = now,
+                seasonItemId = seasonItemId,
+                seasonNumber = seasonNumber,
+                desired = desired,
+            ),
+        )
     }
 
     fun setRating(rating: Int?) {
         val details = uiState.value.details ?: return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isMutating = true) }
-
-            val result =
-                withContext(Dispatchers.IO) {
-                    detailsUseCases.updateRating(details, rating)
-                }
-            _uiState.update {
-                it.copy(
-                    isMutating = false,
-                    details = result.details,
-                    statusMessage = result.statusMessage,
-                    isRated = if (result.success) rating != null else it.isRated,
-                    userRating = if (result.success) rating else it.userRating
-                )
-            }
-            if (result.success) {
-                HomeRefreshBus.emit(HomeRefreshEvent.WatchlistChanged)
-            }
-        }
+        val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
+        val now = System.currentTimeMillis()
+        outbox.enqueue(
+            RatingMutation(
+                id = UserMutationOutbox.newId(),
+                titleItemId = targetId,
+                entityId = targetId,
+                createdAtMs = now,
+                attempt = 0,
+                status = MutationStatus.Pending,
+                nextAttemptAtMs = now,
+                desired = rating,
+            ),
+        )
     }
 
     private fun maybeConsumePendingEpisodeNavigation(videos: List<MediaVideo>) {
@@ -1205,6 +1213,7 @@ class DetailsViewModel internal constructor(
             itemType: String,
             runtimeEntry: RuntimeDetailsEntry?,
             detailsUseCases: DetailsUseCases,
+            outbox: UserMutationOutbox,
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -1214,6 +1223,7 @@ class DetailsViewModel internal constructor(
                         itemType = itemType,
                         runtimeEntry = runtimeEntry,
                         detailsUseCases = detailsUseCases,
+                        outbox = outbox,
                     ) as T
                 }
             }

@@ -3,6 +3,7 @@ package com.crispy.tv.details
 import androidx.compose.runtime.Immutable
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.ai.AiInsightsResult
+import com.crispy.tv.domain.optimistic.FieldSync
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
@@ -14,6 +15,22 @@ import com.crispy.tv.streams.StreamSelectorUiState
 data class EpisodeWatchState(
     val progressPercent: Double = 0.0,
     val isWatched: Boolean = false,
+)
+
+/** Per-field optimistic sync status surfaced to the UI (spinner / retry). */
+@Immutable
+data class OptimisticSyncBadge(
+    val status: FieldSync = FieldSync.IDLE,
+    val errorMessage: String? = null,
+)
+
+@Immutable
+data class OptimisticSync(
+    val watchlist: OptimisticSyncBadge = OptimisticSyncBadge(),
+    val watched: OptimisticSyncBadge = OptimisticSyncBadge(),
+    val rating: OptimisticSyncBadge = OptimisticSyncBadge(),
+    val episodes: Map<String, OptimisticSyncBadge> = emptyMap(),
+    val seasons: Map<Int, OptimisticSyncBadge> = emptyMap(),
 )
 
 @Immutable
@@ -37,7 +54,7 @@ data class DetailsUiState(
     val isInWatchlist: Boolean = false,
     val isRated: Boolean = false,
     val userRating: Int? = null,
-    val isMutating: Boolean = false,
+    val optimisticSync: OptimisticSync = OptimisticSync(),
     val watchCta: WatchCta = WatchCta(),
     val continueVideoId: String? = null,
     val selectedSeason: Int? = null,

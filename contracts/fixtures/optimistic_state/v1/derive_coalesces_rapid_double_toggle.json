@@ -1,0 +1,52 @@
+{
+  "contract_version": 2,
+  "suite": "optimistic_state",
+  "case_id": "derive_coalesces_rapid_double_toggle",
+  "operation": "derive",
+  "input": {
+    "snapshot": {
+      "is_in_watchlist": false,
+      "is_watched": false,
+      "is_rated": false,
+      "user_rating": null,
+      "episode_watched": {},
+      "season_watched": {}
+    },
+    "mutations": [
+      {
+        "kind": "watchlist",
+        "id": "m1",
+        "entity_id": "tt123",
+        "created_at_ms": 1000,
+        "attempt": 0,
+        "status": "pending",
+        "desired": true
+      },
+      {
+        "kind": "watchlist",
+        "id": "m2",
+        "entity_id": "tt123",
+        "created_at_ms": 2000,
+        "attempt": 0,
+        "status": "pending",
+        "desired": false
+      }
+    ]
+  },
+  "expected": {
+    "watchlist": {
+      "value": false,
+      "sync": "syncing"
+    },
+    "title_watched": {
+      "value": false,
+      "sync": "idle"
+    },
+    "rating": {
+      "value": null,
+      "sync": "idle"
+    },
+    "episode_watched": {},
+    "season_watched": {}
+  }
+}

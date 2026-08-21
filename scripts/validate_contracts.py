@@ -27,6 +27,7 @@ SUITE_TO_SCHEMA = {
     "watch_collections_contract": "watch_collections_contract.schema.json",
     "calendar_contract": "calendar_contract.schema.json",
     "watch_sync": "watch_sync.schema.json",
+    "optimistic_state": "optimistic_state.schema.json",
 }
 
 

@@ -20,6 +20,11 @@ class CrispyApplication : Application(), SingletonImageLoader.Factory {
         AppGraph(this)
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        appGraph.userMutationOutbox.start()
+    }
+
     override fun newImageLoader(context: Context): ImageLoader {
         val appContext = context.applicationContext
 

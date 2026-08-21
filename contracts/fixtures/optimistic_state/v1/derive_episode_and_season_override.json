@@ -1,0 +1,76 @@
+{
+  "contract_version": 2,
+  "suite": "optimistic_state",
+  "case_id": "derive_episode_and_season_override",
+  "operation": "derive",
+  "input": {
+    "snapshot": {
+      "is_in_watchlist": false,
+      "is_watched": false,
+      "is_rated": false,
+      "user_rating": null,
+      "episode_watched": {
+        "v1": false,
+        "v2": true
+      },
+      "season_watched": {
+        "1": false
+      }
+    },
+    "mutations": [
+      {
+        "kind": "episode_watched",
+        "id": "e1",
+        "entity_id": "tt123#S1:E2",
+        "created_at_ms": 1000,
+        "attempt": 0,
+        "status": "inflight",
+        "season": 1,
+        "episode": 2,
+        "video_id": "v1",
+        "desired": true
+      },
+      {
+        "kind": "season_watched",
+        "id": "s1",
+        "entity_id": "seasonItem1",
+        "created_at_ms": 1100,
+        "attempt": 0,
+        "status": "pending",
+        "season_number": 1,
+        "season_item_id": "seasonItem1",
+        "desired": true
+      }
+    ]
+  },
+  "expected": {
+    "watchlist": {
+      "value": false,
+      "sync": "idle"
+    },
+    "title_watched": {
+      "value": false,
+      "sync": "idle"
+    },
+    "rating": {
+      "value": null,
+      "sync": "idle"
+    },
+    "episode_watched": {
+      "v1": {
+        "value": true,
+        "sync": "syncing"
+      },
+      "v2": {
+        "value": true,
+        "sync": "idle"
+      }
+    },
+    "season_watched": {
+      "1": {
+        "value": true,
+        "sync": "syncing"
+      }
+    }
+  }
+}

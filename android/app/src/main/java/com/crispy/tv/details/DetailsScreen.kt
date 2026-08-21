@@ -284,7 +284,7 @@ internal fun DetailsScreen(
                         isWatched = visibleUiState.isWatched || visibleUiState.isShowFullyWatched,
                         isRated = visibleUiState.isRated,
                         userRating = visibleUiState.userRating,
-                        isMutating = visibleUiState.isMutating,
+                        optimisticSync = visibleUiState.optimisticSync,
                         palette = palette,
                         watchCta = visibleUiState.watchCta,
                         aiInsightsIsLoading = visibleUiState.aiIsLoading,

@@ -1,0 +1,54 @@
+{
+  "contract_version": 2,
+  "suite": "optimistic_state",
+  "case_id": "derive_conflict_rolls_back_to_server",
+  "operation": "derive",
+  "input": {
+    "snapshot": {
+      "is_in_watchlist": false,
+      "is_watched": true,
+      "is_rated": true,
+      "user_rating": 7,
+      "episode_watched": {},
+      "season_watched": {}
+    },
+    "mutations": [
+      {
+        "kind": "watchlist",
+        "id": "m1",
+        "entity_id": "tt123",
+        "created_at_ms": 1000,
+        "attempt": 2,
+        "status": "conflict",
+        "status_server_value": "false",
+        "desired": true
+      },
+      {
+        "kind": "rating",
+        "id": "m2",
+        "entity_id": "tt123",
+        "created_at_ms": 1100,
+        "attempt": 1,
+        "status": "failed",
+        "status_reason": "Network unavailable.",
+        "desired": 9
+      }
+    ]
+  },
+  "expected": {
+    "watchlist": {
+      "value": false,
+      "sync": "error"
+    },
+    "title_watched": {
+      "value": true,
+      "sync": "idle"
+    },
+    "rating": {
+      "value": 7,
+      "sync": "error"
+    },
+    "episode_watched": {},
+    "season_watched": {}
+  }
+}
