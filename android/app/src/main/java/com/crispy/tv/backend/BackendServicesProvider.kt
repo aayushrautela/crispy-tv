@@ -16,6 +16,7 @@ object BackendServicesProvider {
             val created = CrispyBackendClient(
                 httpClient = AppHttp.client(appContext),
                 backendUrl = BuildConfig.CRISPY_BACKEND_URL,
+                aiHttpClient = AppHttp.aiClient(appContext),
             )
             backendClient = created
             return created

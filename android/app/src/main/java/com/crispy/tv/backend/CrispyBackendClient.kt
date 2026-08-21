@@ -15,6 +15,7 @@ data class RemoteTrailerDto(
 class CrispyBackendClient(
     internal val httpClient: CrispyHttpClient,
     backendUrl: String,
+    internal val aiHttpClient: CrispyHttpClient = httpClient,
 ) {
     internal val baseUrl: String = backendUrl.trim().trimEnd('/')
 
@@ -1045,11 +1046,15 @@ class CrispyBackendClient(
     internal val callTimeoutMs: Long
         get() = CALL_TIMEOUT_MS
 
+    internal val aiCallTimeoutMs: Long
+        get() = AI_CALL_TIMEOUT_MS
+
     internal val jsonMediaType
         get() = JSON_MEDIA_TYPE
 
     private companion object {
         private const val CALL_TIMEOUT_MS = 45_000L
+        private const val AI_CALL_TIMEOUT_MS = 120_000L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

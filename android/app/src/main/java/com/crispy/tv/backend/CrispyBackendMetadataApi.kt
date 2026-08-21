@@ -63,11 +63,11 @@ internal suspend fun CrispyBackendClient.searchAiTitlesApi(
         put("query", query.trim())
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
-    val response = httpClient.postJson(
+    val response = aiHttpClient.postJson(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/search".toHttpUrl(),
         jsonBody = payload,
         headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
+        callTimeoutMs = aiCallTimeoutMs,
     )
     val json = requireSuccess(response)
     return parseSearchResultsResponse(json)
@@ -130,11 +130,11 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
         put("itemId", itemId.trim())
         if (!locale.isNullOrBlank()) put("locale", locale)
     }.toString()
-    val response = httpClient.postJson(
+    val response = aiHttpClient.postJson(
         url = "$baseUrl/v1/profiles/${profileId.trim()}/ai/insights".toHttpUrl(),
         jsonBody = payload,
         headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
+        callTimeoutMs = aiCallTimeoutMs,
     )
     val json = requireSuccess(response)
     return AiInsightsResponse(

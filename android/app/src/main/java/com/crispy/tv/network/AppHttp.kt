@@ -14,6 +14,12 @@ object AppHttp {
     @Volatile
     private var httpClient: CrispyHttpClient? = null
 
+    @Volatile
+    private var aiOkHttpClient: OkHttpClient? = null
+
+    @Volatile
+    private var aiHttpClient: CrispyHttpClient? = null
+
     fun okHttp(context: Context): OkHttpClient {
         okHttpClient?.let { return it }
         synchronized(this) {
@@ -37,6 +43,36 @@ object AppHttp {
             httpClient?.let { return it }
             val created = CrispyHttpClient(okHttp(context))
             httpClient = created
+            return created
+        }
+    }
+
+    /**
+     * Long-timeout client scoped to AI endpoints (see [CrispyOkHttpFactory.createAiClient]).
+     * Kept separate from [client] so interactive calls stay on tight, fail-fast timeouts.
+     */
+    fun aiOkHttp(context: Context): OkHttpClient {
+        aiOkHttpClient?.let { return it }
+        synchronized(this) {
+            aiOkHttpClient?.let { return it }
+            val appContext = context.applicationContext
+            val created =
+                CrispyOkHttpFactory.createAiClient(
+                    context = appContext,
+                    userAgent = buildUserAgent(appContext),
+                    debugLogging = BuildConfig.DEBUG,
+                )
+            aiOkHttpClient = created
+            return created
+        }
+    }
+
+    fun aiClient(context: Context): CrispyHttpClient {
+        aiHttpClient?.let { return it }
+        synchronized(this) {
+            aiHttpClient?.let { return it }
+            val created = CrispyHttpClient(aiOkHttp(context))
+            aiHttpClient = created
             return created
         }
     }
