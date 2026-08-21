@@ -41,8 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -233,18 +231,6 @@ internal fun DetailsScreen(
     val containerColor = palette.pageBackground.copy(alpha = topBarAlpha)
     val contentColor = lerp(Color.White, palette.onPageBackground, topBarAlpha)
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    var lastSnackMessage by remember { mutableStateOf("") }
-    LaunchedEffect(uiState.statusMessage) {
-        val message = uiState.statusMessage.trim()
-        if (message.isBlank()) return@LaunchedEffect
-        if (visibleDetails == null && visibleUiState.isLoading) return@LaunchedEffect
-        if (message == lastSnackMessage) return@LaunchedEffect
-
-        lastSnackMessage = message
-        snackbarHostState.showSnackbar(message)
-    }
-
     var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
     var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
     var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
@@ -370,14 +356,6 @@ internal fun DetailsScreen(
                     )
             )
 
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            )
-
             YouTubeExtraVideoDialog(
                 video = selectedMakingOfVideo,
                 onDismiss = { selectedMakingOfVideo = null },
@@ -471,7 +449,7 @@ internal fun DetailsScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp)
                             .padding(top = 8.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                             Column(
@@ -599,7 +577,7 @@ private fun WatchActionRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 4.dp, vertical = 14.dp),
+                .padding(horizontal = 4.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
