@@ -250,14 +250,14 @@ public func coalesceMutations(_ mutations: [any UserMutation]) -> [any UserMutat
     return byKey.values.sorted { ($0.createdAtMs, $0.id) < ($1.createdAtMs, $1.id) }
 }
 
-private func latestOf(_ group: [any UserMutation]) -> any UserMutation? {
+private func latestOf(_ group: [any UserMutation]) -> (any UserMutation)? {
     group.max { ($0.createdAtMs, $0.id) < ($1.createdAtMs, $1.id) }
 }
 
 public func deriveUserState(snapshot: UserStateSnapshot, mutations: [any UserMutation]) -> DerivedUserState {
     let grouped = Dictionary(grouping: mutations, by: { $0.kind })
 
-    func active(_ kind: MutationKind) -> any UserMutation? {
+    func active(_ kind: MutationKind) -> (any UserMutation)? {
         latestOf(grouped[kind] ?? [])
     }
 
