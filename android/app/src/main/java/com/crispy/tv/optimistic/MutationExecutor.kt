@@ -5,6 +5,7 @@ import com.crispy.tv.domain.optimistic.RatingMutation
 import com.crispy.tv.domain.optimistic.SeasonWatchedMutation
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.optimistic.UserMutation
+import com.crispy.tv.domain.optimistic.MediaContentType
 import com.crispy.tv.domain.optimistic.WatchlistMutation
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.player.MetadataLabMediaType
@@ -28,6 +29,22 @@ interface MutationExecutor {
     suspend fun execute(mutation: UserMutation): MutationResult
 }
 
+/** `player`/Android type -> pure [core-domain] type. */
+fun MetadataLabMediaType.toContentType(): MediaContentType =
+    when (this) {
+        MetadataLabMediaType.MOVIE -> MediaContentType.MOVIE
+        MetadataLabMediaType.SERIES -> MediaContentType.SERIES
+        MetadataLabMediaType.ANIME -> MediaContentType.ANIME
+    }
+
+/** Pure [core-domain] type -> `player`/Android type for the repository call. */
+fun MediaContentType.toPlayerType(): MetadataLabMediaType =
+    when (this) {
+        MediaContentType.MOVIE -> MetadataLabMediaType.MOVIE
+        MediaContentType.SERIES -> MetadataLabMediaType.SERIES
+        MediaContentType.ANIME -> MetadataLabMediaType.ANIME
+    }
+
 internal class UserMediaMutationExecutor(
     private val repository: UserMediaRepository,
 ) : MutationExecutor {
@@ -44,7 +61,7 @@ internal class UserMediaMutationExecutor(
                     val request =
                         WatchHistoryRequest(
                             itemId = mutation.entityId,
-                            contentType = mutation.contentType,
+                            contentType = mutation.contentType.toPlayerType(),
                         )
                     if (mutation.desired) {
                         repository.markWatched(request)

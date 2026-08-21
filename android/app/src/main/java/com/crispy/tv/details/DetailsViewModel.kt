@@ -19,6 +19,7 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.optimistic.UserMutationOutbox
+import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.streams.AddonStream
@@ -1110,7 +1111,7 @@ class DetailsViewModel internal constructor(
     fun toggleWatched() {
         val details = uiState.value.details ?: return
         val targetId = details.itemId?.trim()?.ifBlank { null } ?: return
-        val contentType = details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE
+        val contentType = (details.itemType.toMetadataLabMediaTypeOrNull() ?: MetadataLabMediaType.MOVIE).toContentType()
         val desired = !uiState.value.isWatched
         val now = System.currentTimeMillis()
         outbox.enqueue(

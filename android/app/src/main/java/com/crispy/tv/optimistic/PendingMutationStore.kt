@@ -1,6 +1,7 @@
 package com.crispy.tv.optimistic
 
 import com.crispy.tv.domain.optimistic.EpisodeWatchedMutation
+import com.crispy.tv.domain.optimistic.MediaContentType
 import com.crispy.tv.domain.optimistic.MutationKind
 import com.crispy.tv.domain.optimistic.MutationStatus
 import com.crispy.tv.domain.optimistic.RatingMutation
@@ -8,7 +9,6 @@ import com.crispy.tv.domain.optimistic.SeasonWatchedMutation
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.optimistic.UserMutation
 import com.crispy.tv.domain.optimistic.WatchlistMutation
-import com.crispy.tv.player.MetadataLabMediaType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -117,9 +117,9 @@ internal class FileBackedPendingMutationStore(
             MutationKind.TITLE_WATCHED -> {
                 val contentType =
                     try {
-                        MetadataLabMediaType.valueOf(obj.optString("contentType", "MOVIE"))
+                        MediaContentType.valueOf(obj.optString("contentType", "MOVIE"))
                     } catch (_: Exception) {
-                        MetadataLabMediaType.MOVIE
+                        MediaContentType.MOVIE
                     }
                 TitleWatchedMutation(id, titleItemId, entityId, createdAtMs, attempt, status, nextAttemptAtMs, contentType, obj.getBoolean("desired"))
             }

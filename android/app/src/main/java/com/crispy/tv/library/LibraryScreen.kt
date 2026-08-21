@@ -42,6 +42,7 @@ import com.crispy.tv.domain.optimistic.MutationStatus
 import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.optimistic.UserMutationOutbox
+import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.catalog.CatalogItem
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -147,7 +148,8 @@ class LibraryViewModel internal constructor(
     }
 
     fun setWatched(item: CatalogItem, desired: Boolean) {
-        val contentType = if (item.type == "movie") MetadataLabMediaType.MOVIE else MetadataLabMediaType.SERIES
+        val contentType =
+            (if (item.type == "movie") MetadataLabMediaType.MOVIE else MetadataLabMediaType.SERIES).toContentType()
         val now = System.currentTimeMillis()
         outbox.enqueue(
             TitleWatchedMutation(

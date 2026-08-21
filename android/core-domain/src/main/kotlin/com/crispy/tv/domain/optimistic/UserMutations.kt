@@ -19,6 +19,17 @@ enum class MutationKind {
 }
 
 /**
+ * Pure copy of the content-type taxonomy the watch-history backend needs, kept
+ * in [core-domain] so mutations stay free of `player`/Android types. The app
+ * maps to/from [com.crispy.tv.player.MetadataLabMediaType] at the boundary.
+ */
+enum class MediaContentType {
+    MOVIE,
+    SERIES,
+    ANIME,
+}
+
+/**
  * Lifecycle of a single mutation. [Inflight] is transient (never persisted);
  * on reload it is coerced back to [Pending] so a crashed write is retried.
  * A successfully synced mutation is removed entirely from the store.
@@ -76,7 +87,7 @@ data class TitleWatchedMutation(
     override val attempt: Int,
     override val status: MutationStatus,
     override val nextAttemptAtMs: Long,
-    val contentType: com.crispy.tv.player.MetadataLabMediaType,
+    val contentType: MediaContentType,
     val desired: Boolean,
 ) : UserMutation {
     override val kind: MutationKind = MutationKind.TITLE_WATCHED

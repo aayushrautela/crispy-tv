@@ -100,7 +100,7 @@ class UserMutationsContractTest {
                 )
                 MutationKind.TITLE_WATCHED -> TitleWatchedMutation(
                     id, entityId, entityId, createdAtMs, attempt, status, nextAttemptAtMs,
-                    contentType = com.crispy.tv.player.MetadataLabMediaType.MOVIE,
+                    contentType = com.crispy.tv.domain.optimistic.MediaContentType.MOVIE,
                     desired = obj.requireBoolean("desired", path),
                 )
                 MutationKind.RATING -> RatingMutation(
