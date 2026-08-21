@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -59,6 +62,7 @@ import androidx.compose.ui.Alignment
 import coil3.compose.AsyncImage
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -511,6 +515,7 @@ internal fun DetailsScreen(
                             label = if (watchState.isWatched) "Unmark as watched" else "Mark as watched",
                             supporting = "This episode only",
                             icon = if (watchState.isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                            filled = watchState.isWatched,
                             onClick = {
                                 selectedEpisodeAction = null
                                 onToggleEpisodeWatched(selectedEpisode)
@@ -527,6 +532,7 @@ internal fun DetailsScreen(
                                     },
                                 supporting = "All episodes in this season",
                                 icon = if (seasonWatched) Icons.Filled.DoneAll else Icons.Outlined.DoneAll,
+                                filled = seasonWatched,
                                 onClick = {
                                     selectedEpisodeAction = null
                                     onToggleSeasonWatched(seasonItemId, episodeSeason)
@@ -570,6 +576,7 @@ private fun WatchActionRow(
     label: String,
     supporting: String,
     icon: ImageVector,
+    filled: Boolean,
     onClick: () -> Unit,
 ) {
     Row(
@@ -588,10 +595,33 @@ private fun WatchActionRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        color = if (filled) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        shape = CircleShape,
+                    ).then(
+                        if (!filled) {
+                            Modifier.border(
+                                width = 1.5.dp,
+                                color = MaterialTheme.colorScheme.outline,
+                                shape = CircleShape,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (filled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
