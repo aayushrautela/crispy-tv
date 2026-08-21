@@ -20,10 +20,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -37,11 +33,8 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DoneAll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -59,20 +52,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import coil3.compose.AsyncImage
-import com.crispy.tv.ui.components.rememberCrispyImageModel
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import com.crispy.tv.ui.components.ItemActionSheet
+import com.crispy.tv.ui.components.ItemActionSheetItem
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -444,74 +434,9 @@ internal fun DetailsScreen(
                         episodeSeason?.let { "Season $it" },
                         selectedEpisode.episode?.let { "Episode $it" },
                     ).joinToString(" · ")
-                ModalBottomSheet(
-                    onDismissRequest = { selectedEpisodeAction = null },
-                    sheetState = episodeSheetState,
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                            .padding(top = 8.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                    ) {
-                                        val imageUrl =
-                                            selectedEpisode.thumbnailUrl
-                                                ?.trim()
-                                                ?.takeIf { it.isNotBlank() }
-                                                ?: visibleDetails?.backdropUrl
-                                                ?: visibleDetails?.posterUrl
-                                        val imageModel =
-                                            imageUrl?.let {
-                                                rememberCrispyImageModel(url = it, width = 96.dp, height = 56.dp)
-                                            }
-                                        AsyncImage(
-                                            model = imageModel ?: imageUrl,
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.size(width = 96.dp, height = 56.dp),
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(
-                                            text = selectedEpisode.title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        if (episodeMeta.isNotBlank()) {
-                                            Text(
-                                                text = episodeMeta,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                        showTitle?.takeIf { it.isNotBlank() }?.let {
-                                            Text(
-                                                text = it,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        WatchActionRow(
+                val episodeActions = buildList {
+                    add(
+                        ItemActionSheetItem(
                             label = if (watchState.isWatched) "Unmark as watched" else "Mark as watched",
                             supporting = "This episode only",
                             icon = if (watchState.isWatched) Icons.Filled.Check else Icons.Outlined.Check,
@@ -519,10 +444,11 @@ internal fun DetailsScreen(
                             onClick = {
                                 onToggleEpisodeWatched(selectedEpisode)
                             },
-                        )
-                        HorizontalDivider()
-                        if (episodeSeason != null && seasonItemId != null) {
-                            WatchActionRow(
+                        ),
+                    )
+                    if (episodeSeason != null && seasonItemId != null) {
+                        add(
+                            ItemActionSheetItem(
                                 label =
                                     if (seasonWatched) {
                                         "Unmark season $episodeSeason as watched"
@@ -532,12 +458,30 @@ internal fun DetailsScreen(
                                 supporting = "All episodes in this season",
                                 icon = if (seasonWatched) Icons.Filled.DoneAll else Icons.Outlined.DoneAll,
                                 filled = seasonWatched,
+                                dividerBefore = true,
                                 onClick = {
                                     onToggleSeasonWatched(seasonItemId, episodeSeason)
                                 },
-                            )
-                        }
+                            ),
+                        )
                     }
+                }
+                ModalBottomSheet(
+                    onDismissRequest = { selectedEpisodeAction = null },
+                    sheetState = episodeSheetState,
+                ) {
+                    ItemActionSheet(
+                        title = selectedEpisode.title,
+                        subtitle = listOfNotNull(episodeMeta.takeIf { it.isNotBlank() }, showTitle?.takeIf { it.isNotBlank() })
+                            .joinToString(" · "),
+                        imageUrl =
+                            selectedEpisode.thumbnailUrl
+                                ?.trim()
+                                ?.takeIf { it.isNotBlank() }
+                                ?: visibleDetails?.backdropUrl
+                                ?: visibleDetails?.posterUrl,
+                        actions = episodeActions,
+                    )
                 }
             }
 
@@ -565,61 +509,6 @@ internal fun DetailsScreen(
                     },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun WatchActionRow(
-    label: String,
-    supporting: String,
-    icon: ImageVector,
-    filled: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 4.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                supporting,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Box(
-            modifier =
-                Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(
-                        color = if (filled) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = CircleShape,
-                    ).then(
-                        if (!filled) {
-                            Modifier.border(
-                                width = 1.5.dp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                shape = CircleShape,
-                            )
-                        } else {
-                            Modifier
-                        },
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (filled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
-            )
         }
     }
 }

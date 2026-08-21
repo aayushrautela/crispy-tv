@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -31,8 +34,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.ui.components.CardActionSheet
-import com.crispy.tv.ui.components.CardActionSheetItem
+import com.crispy.tv.ui.components.ItemActionSheet
+import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.CrispySectionAppBarTitle
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -167,39 +170,42 @@ fun LibraryRoute(
         if (selectedLibraryItem != null) {
             val item = selectedLibraryItem!!
             val watched = item.watchedAt != null
-            val context = LocalContext.current
+            val actions = buildList {
+                add(
+                    ItemActionSheetItem(
+                        label = "Open details",
+                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        onClick = {
+                            selectedLibraryItem = null
+                            onItemClick(item, null)
+                        },
+                    ),
+                )
+                add(
+                    ItemActionSheetItem(
+                        label = if (watched) "Mark as unwatched" else "Mark as watched",
+                        icon = if (watched) Icons.Filled.Check else Icons.Outlined.Check,
+                        filled = watched,
+                        onClick = {
+                            selectedLibraryItem = null
+                            viewModel.setWatched(item, !watched)
+                            pagingItems.refresh()
+                        },
+                    ),
+                )
+            }
             ModalBottomSheet(
                 onDismissRequest = { selectedLibraryItem = null },
                 sheetState = librarySheetState,
             ) {
-                val actions = buildList {
-                    add(
-                        CardActionSheetItem(
-                            label = "Open details",
-                            onClick = {
-                                selectedLibraryItem = null
-                                onItemClick(item, null)
-                            },
-                        ),
-                    )
-                    add(
-                        CardActionSheetItem(
-                            label = if (watched) "Mark as unwatched" else "Mark as watched",
-                            onClick = {
-                                selectedLibraryItem = null
-                                viewModel.setWatched(item, !watched)
-                                pagingItems.refresh()
-                            },
-                        ),
-                    )
-                }
-                CardActionSheet(
+                ItemActionSheet(
                     title = item.title,
                     subtitle = item.episodeCount?.takeIf { it > 1 }?.let { "$it episodes" },
-                    items = actions,
+                    imageUrl = item.posterUrl ?: item.backdropUrl,
+                    actions = actions,
                 )
             }
-    }
+        }
     }
 }
 

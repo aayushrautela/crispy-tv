@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -40,8 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import coil3.compose.AsyncImage
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import com.crispy.tv.ui.components.CardActionSheet
-import com.crispy.tv.ui.components.CardActionSheetItem
+import com.crispy.tv.ui.components.ItemActionSheet
+import com.crispy.tv.ui.components.ItemActionSheetItem
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.edge_to_edge.crispyRowHuggingPadding
@@ -135,25 +138,43 @@ internal fun HomeWideRailSection(
         val actionItem = section.items.firstOrNull { it.key == key }
         if (actionItem != null) {
             val actionSharedKey = "homerail-${section.kind.name.lowercase()}-${actionItem.key}"
+            val actions = buildList {
+                add(
+                    ItemActionSheetItem(
+                        label = "Open details",
+                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        onClick = {
+                            actionsItemKey = null
+                            when (actionItem.kind) {
+                                HomeWideRailItemKind.WATCH_ACTIVITY -> actionItem.continueWatchingItem?.let { onContinueWatchingOpenDetails(it, actionSharedKey) }
+                                HomeWideRailItemKind.CALENDAR_EPISODE -> actionItem.calendarEpisodeItem?.let { onThisWeekClick(it, actionSharedKey) }
+                            }
+                        },
+                    ),
+                )
+                actionItem.continueWatchingItem?.let { cwItem ->
+                    add(
+                        ItemActionSheetItem(
+                            label = "Remove",
+                            icon = Icons.Outlined.Delete,
+                            destructive = true,
+                            onClick = {
+                                actionsItemKey = null
+                                onRemoveContinueWatchingItem(cwItem)
+                            },
+                        ),
+                    )
+                }
+            }
             ModalBottomSheet(
                 onDismissRequest = { actionsItemKey = null },
                 sheetState = sheetState,
             ) {
-                WideRailActionSheet(
-                    item = actionItem,
-                    onDetailsClick = {
-                        actionsItemKey = null
-                        when (actionItem.kind) {
-                            HomeWideRailItemKind.WATCH_ACTIVITY -> actionItem.continueWatchingItem?.let { onContinueWatchingOpenDetails(it, actionSharedKey) }
-                            HomeWideRailItemKind.CALENDAR_EPISODE -> actionItem.calendarEpisodeItem?.let { onThisWeekClick(it, actionSharedKey) }
-                        }
-                    },
-                    onRemoveClick = actionItem.continueWatchingItem?.let { cwItem ->
-                        {
-                            actionsItemKey = null
-                            onRemoveContinueWatchingItem(cwItem)
-                        }
-                    },
+                ItemActionSheet(
+                    title = actionItem.title,
+                    subtitle = actionItem.subtitle.takeIf { it.isNotBlank() },
+                    imageUrl = actionItem.imageUrl,
+                    actions = actions,
                 )
             }
         }
@@ -363,22 +384,5 @@ internal fun HomeWideRailCard(
                 }
             }
         },
-    )
-}
-
-@Composable
-private fun WideRailActionSheet(
-    item: HomeWideRailItemUi,
-    onDetailsClick: () -> Unit,
-    onRemoveClick: (() -> Unit)?,
-) {
-    val actions = buildList {
-        add(CardActionSheetItem(label = "Open details", onClick = onDetailsClick))
-        onRemoveClick?.let { add(CardActionSheetItem(label = "Remove", onClick = it, destructive = true)) }
-    }
-    CardActionSheet(
-        title = item.title,
-        subtitle = item.subtitle.takeIf { it.isNotBlank() },
-        items = actions,
     )
 }
