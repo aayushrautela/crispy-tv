@@ -33,6 +33,7 @@ data class DetailsUiState(
     val aiInsights: AiInsightsResult? = null,
     val aiStoryVisible: Boolean = false,
     val isWatched: Boolean = false,
+    val isShowFullyWatched: Boolean = false,
     val isInWatchlist: Boolean = false,
     val isRated: Boolean = false,
     val userRating: Int? = null,

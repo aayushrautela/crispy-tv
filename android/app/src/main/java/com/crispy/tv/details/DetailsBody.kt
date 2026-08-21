@@ -1,6 +1,5 @@
 package com.crispy.tv.details
 
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,7 +53,6 @@ internal fun LazyListScope.detailsBodyContent(
     horizontalPadding: Dp,
     onRetry: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
-    onSeasonLongPress: (seasonItemId: String, seasonNumber: Int) -> Unit = { _, _ -> },
     onItemClick: (CatalogItem, String?) -> Unit,
     onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
     onEpisodeClick: (videoId: String) -> Unit = {},
@@ -233,15 +231,6 @@ internal fun LazyListScope.detailsBodyContent(
                             FilterChip(
                                 selected = season == selectedSeason,
                                 onClick = { onSeasonSelected(season) },
-                                modifier = Modifier.pointerInput(season) {
-                                    detectTapGestures(
-                                        onLongPress = {
-                                            uiState.seasonItemIds[season]?.let { itemId ->
-                                                onSeasonLongPress(itemId, season)
-                                            }
-                                        },
-                                    )
-                                },
                                 label = { Text("Season $season") },
                                 leadingIcon = if (uiState.seasonWatchStates[season] == true) {
                                     {

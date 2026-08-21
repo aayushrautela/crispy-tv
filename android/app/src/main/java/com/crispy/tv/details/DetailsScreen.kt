@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -24,7 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -232,10 +236,8 @@ internal fun DetailsScreen(
     var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
     var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
     var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
-    var selectedSeasonAction by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val episodeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val seasonSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val bodyHorizontalPadding = responsivePageHorizontalPadding()
 
     MaterialTheme(colorScheme = detailsScheme) {
@@ -287,7 +289,7 @@ internal fun DetailsScreen(
                     HeaderInfoSection(
                         details = visibleDetails,
                         isInWatchlist = visibleUiState.isInWatchlist,
-                        isWatched = visibleUiState.isWatched,
+                        isWatched = visibleUiState.isWatched || visibleUiState.isShowFullyWatched,
                         isRated = visibleUiState.isRated,
                         userRating = visibleUiState.userRating,
                         isMutating = visibleUiState.isMutating,
@@ -311,7 +313,6 @@ internal fun DetailsScreen(
                     onPersonClick = onPersonClick,
                     onEpisodeClick = onEpisodeClick,
                     onToggleEpisodeWatched = onToggleEpisodeWatched,
-                    onSeasonLongPress = { seasonItemId, seasonNumber -> selectedSeasonAction = seasonItemId to seasonNumber },
                     onMakingOfVideoClick = { selectedMakingOfVideo = it },
                     onReviewClick = { expandedReview = it },
                     onEpisodeLongPress = { selectedEpisodeAction = it },
@@ -440,7 +441,7 @@ internal fun DetailsScreen(
             if (selectedEpisodeAction != null) {
                 val selectedEpisode = selectedEpisodeAction!!
                 val watchState = visibleUiState.episodeWatchStates[selectedEpisode.id] ?: EpisodeWatchState()
-                val toggleLabel = if (watchState.isWatched) "Mark as unwatched" else "Mark as watched"
+                val showTitle = visibleDetails?.title ?: details?.title
                 ModalBottomSheet(
                     onDismissRequest = { selectedEpisodeAction = null },
                     sheetState = episodeSheetState,
@@ -448,67 +449,62 @@ internal fun DetailsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 6.dp, bottom = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                            .padding(horizontal = 20.dp)
+                            .padding(top = 8.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Text(selectedEpisode.title, style = MaterialTheme.typography.titleMedium)
-                        formatLongDate(selectedEpisode.released)?.let { released ->
-                            Text(
-                                text = released,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            showTitle?.takeIf { it.isNotBlank() }?.let {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(selectedEpisode.title, style = MaterialTheme.typography.titleLarge)
+                            formatLongDate(selectedEpisode.released)?.let { released ->
+                                Text(
+                                    text = released,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                         Button(
                             onClick = {
                                 selectedEpisodeAction = null
-                                onEpisodeClick(selectedEpisode.id)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Open episode") }
-                        TextButton(
-                            onClick = {
-                                selectedEpisodeAction = null
                                 onToggleEpisodeWatched(selectedEpisode)
                             },
-                            modifier = Modifier.align(Alignment.End),
-                        ) { Text(toggleLabel) }
-                    }
-                }
-            }
-
-            if (selectedSeasonAction != null) {
-                val (seasonItemId, seasonNumber) = selectedSeasonAction!!
-                val seasonWatched = visibleUiState.seasonWatchStates[seasonNumber] ?: false
-                val toggleLabel = if (seasonWatched) "Mark season $seasonNumber unwatched" else "Mark season $seasonNumber watched"
-                ModalBottomSheet(
-                    onDismissRequest = { selectedSeasonAction = null },
-                    sheetState = seasonSheetState,
-                ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .padding(top = 6.dp, bottom = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text("Season $seasonNumber", style = MaterialTheme.typography.titleMedium)
-                        Button(
-                            onClick = {
-                                selectedSeasonAction = null
-                                onSeasonSelected(seasonNumber)
-                            },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Open season") }
-                        TextButton(
-                            onClick = {
-                                selectedSeasonAction = null
-                                onToggleSeasonWatched(seasonItemId, seasonNumber)
-                            },
-                            modifier = Modifier.align(Alignment.End),
-                        ) { Text(toggleLabel) }
+                        ) {
+                            Icon(
+                                imageVector = if (watchState.isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (watchState.isWatched) "Unmark as watched" else "Mark as watched")
+                        }
+                        val episodeSeason = selectedEpisode.season
+                        val seasonItemId = episodeSeason?.let { visibleUiState.seasonItemIds[it] }
+                        val seasonWatched = episodeSeason?.let { visibleUiState.seasonWatchStates[it] } ?: false
+                        if (episodeSeason != null && seasonItemId != null) {
+                            TextButton(
+                                onClick = {
+                                    selectedEpisodeAction = null
+                                    onToggleSeasonWatched(seasonItemId, episodeSeason)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    if (seasonWatched) {
+                                        "Unmark season $episodeSeason as watched"
+                                    } else {
+                                        "Mark season $episodeSeason as watched"
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }

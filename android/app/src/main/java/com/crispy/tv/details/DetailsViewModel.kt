@@ -62,6 +62,7 @@ class DetailsViewModel internal constructor(
     private var reloadJob: Job? = null
     private var extrasJob: Job? = null
     private var ratingsJob: Job? = null
+    private var allSeasonsWatchJob: Job? = null
     private val seasonEpisodesCache = mutableMapOf<Int, List<MediaVideo>>()
     private var pendingEpisodeNavigation: PendingEpisodeNavigation? = null
     @Volatile
@@ -259,6 +260,7 @@ class DetailsViewModel internal constructor(
                 if (selectedSeason != null && !selectedSeasonEpisodes.isNullOrEmpty()) {
                     loadEpisodeWatchStatesForSeason(selectedSeason, selectedSeasonEpisodes)
                 }
+                loadAllSeasonWatchStates(generation)
             }
     }
 
@@ -538,15 +540,63 @@ class DetailsViewModel internal constructor(
                     if (current.selectedSeasonOrFirst != season) current
                     else {
                         val seasonWatched = videos.isNotEmpty() && episodeWatchStates.values.all { it.isWatched }
+                        val mergedSeasonWatchStates = current.seasonWatchStates + (season to seasonWatched)
                         current.copy(
-                            highlightedEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: current.highlightedEpisodeId,
+                            highlightedEpisodeId = pendingEpisodeNavigation?.highlightedEpisodeId ?: current.highlightedEpisodeId,
                             episodeWatchStates = episodeWatchStates,
-                            seasonWatchStates = current.seasonWatchStates + (season to seasonWatched),
+                            seasonWatchStates = mergedSeasonWatchStates,
+                            isShowFullyWatched = computeShowFullyWatched(mergedSeasonWatchStates, current.seasons),
                         )
                     }
                 }
                 maybeConsumePendingEpisodeNavigation(videos)
             }
+    }
+
+    private fun loadAllSeasonWatchStates(generation: Long) {
+        val details = _uiState.value.details ?: return
+        val contentType = details.itemType.toMetadataLabMediaTypeOrNull()
+        if (contentType != MetadataLabMediaType.SERIES && contentType != MetadataLabMediaType.ANIME) return
+
+        val allEpisodes = seasonEpisodesCache.values.flatten()
+        if (allEpisodes.isEmpty()) return
+
+        allSeasonsWatchJob?.cancel()
+        allSeasonsWatchJob =
+            viewModelScope.launch {
+                val watchStates =
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.resolveEpisodeWatchStates(details, allEpisodes)
+                    }
+                if (!isCurrentGeneration(generation)) return@launch
+
+                val seasonCompletion =
+                    allEpisodes
+                        .groupBy { it.season }
+                        .mapNotNull { (season, videos) ->
+                            if (season == null || videos.isEmpty()) {
+                                null
+                            } else {
+                                (season as Int) to videos.all { watchStates[it.id]?.isWatched == true }
+                            }
+                        }.toMap()
+
+                _uiState.update { state ->
+                    val merged = state.seasonWatchStates + seasonCompletion
+                    state.copy(
+                        seasonWatchStates = merged,
+                        isShowFullyWatched = computeShowFullyWatched(merged, state.seasons),
+                    )
+                }
+            }
+    }
+
+    private fun computeShowFullyWatched(
+        seasonWatchStates: Map<Int, Boolean>,
+        seasons: List<Int>,
+    ): Boolean {
+        if (seasons.isEmpty()) return false
+        return seasons.all { seasonWatchStates[it] == true }
     }
 
     fun onOpenStreamSelectorForEpisode(videoId: String) {
@@ -1039,6 +1089,19 @@ class DetailsViewModel internal constructor(
                     )
                 }
             _uiState.update {
+                val selectedSeason = it.selectedSeasonOrFirst
+                val seasonWatched =
+                    if (selectedSeason != null && refreshedEpisodes.isNotEmpty()) {
+                        refreshedEpisodes.all { refreshedWatchStates[it.id]?.isWatched == true }
+                    } else {
+                        it.seasonWatchStates[selectedSeason]
+                    }
+                val mergedSeasonWatchStates =
+                    if (selectedSeason != null && seasonWatched != null) {
+                        it.seasonWatchStates + (selectedSeason to seasonWatched)
+                    } else {
+                        it.seasonWatchStates
+                    }
                 it.copy(
                     details = result.details,
                     isWatched = providerState.isWatched,
@@ -1049,6 +1112,8 @@ class DetailsViewModel internal constructor(
                     continueVideoId = ctaResolution.continueVideoId,
                     highlightedEpisodeId = ctaResolution.continueVideoId ?: it.highlightedEpisodeId,
                     episodeWatchStates = refreshedWatchStates,
+                    seasonWatchStates = mergedSeasonWatchStates,
+                    isShowFullyWatched = computeShowFullyWatched(mergedSeasonWatchStates, it.seasons),
                     statusMessage = result.statusMessage,
                 )
             }
@@ -1103,10 +1168,12 @@ class DetailsViewModel internal constructor(
                     )
                 }
             _uiState.update {
+                val mergedSeasonWatchStates = it.seasonWatchStates + (seasonNumber to desired)
                 it.copy(
-                    seasonWatchStates = it.seasonWatchStates + (seasonNumber to desired),
+                    seasonWatchStates = mergedSeasonWatchStates,
                     details = result.details,
                     isWatched = providerState.isWatched,
+                    isShowFullyWatched = computeShowFullyWatched(mergedSeasonWatchStates, it.seasons),
                     watchCta = ctaResolution.watchCta,
                     continueVideoId = ctaResolution.continueVideoId,
                     episodeWatchStates = refreshedWatchStates,
