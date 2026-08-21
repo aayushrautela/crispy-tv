@@ -517,7 +517,6 @@ internal fun DetailsScreen(
                             icon = if (watchState.isWatched) Icons.Filled.Check else Icons.Outlined.Check,
                             filled = watchState.isWatched,
                             onClick = {
-                                selectedEpisodeAction = null
                                 onToggleEpisodeWatched(selectedEpisode)
                             },
                         )
@@ -534,7 +533,6 @@ internal fun DetailsScreen(
                                 icon = if (seasonWatched) Icons.Filled.DoneAll else Icons.Outlined.DoneAll,
                                 filled = seasonWatched,
                                 onClick = {
-                                    selectedEpisodeAction = null
                                     onToggleSeasonWatched(seasonItemId, episodeSeason)
                                 },
                             )
@@ -598,7 +596,7 @@ private fun WatchActionRow(
         Box(
             modifier =
                 Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(
                         color = if (filled) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -607,7 +605,7 @@ private fun WatchActionRow(
                         if (!filled) {
                             Modifier.border(
                                 width = 1.5.dp,
-                                color = MaterialTheme.colorScheme.outline,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 shape = CircleShape,
                             )
                         } else {
