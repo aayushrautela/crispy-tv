@@ -234,9 +234,9 @@ public func nextBackoffDelayMs(attempt: Int, policy: RetryPolicy) -> Int64 {
     return min(max(shifted, 0), policy.maxDelayMs)
 }
 
-public func coalesceMutations(_ mutations: [UserMutation]) -> [UserMutation] {
+public func coalesceMutations(_ mutations: [any UserMutation]) -> [any UserMutation] {
     if mutations.isEmpty { return [] }
-    var byKey: [String: UserMutation] = [:]
+    var byKey: [String: any UserMutation] = [:]
     for mutation in mutations {
         let key = mutation.kind.rawValue + "#" + mutation.entityId
         if let existing = byKey[key] {
@@ -250,18 +250,18 @@ public func coalesceMutations(_ mutations: [UserMutation]) -> [UserMutation] {
     return byKey.values.sorted { ($0.createdAtMs, $0.id) < ($1.createdAtMs, $1.id) }
 }
 
-private func latestOf(_ group: [UserMutation]) -> UserMutation? {
+private func latestOf(_ group: [any UserMutation]) -> any UserMutation? {
     group.max { ($0.createdAtMs, $0.id) < ($1.createdAtMs, $1.id) }
 }
 
-public func deriveUserState(snapshot: UserStateSnapshot, mutations: [UserMutation]) -> DerivedUserState {
+public func deriveUserState(snapshot: UserStateSnapshot, mutations: [any UserMutation]) -> DerivedUserState {
     let grouped = Dictionary(grouping: mutations, by: { $0.kind })
 
-    func active(_ kind: MutationKind) -> UserMutation? {
+    func active(_ kind: MutationKind) -> any UserMutation? {
         latestOf(grouped[kind] ?? [])
     }
 
-    func reduce<T>(server: T, mutation: UserMutation?, desiredOf: (UserMutation) -> T) -> (T, MutationSyncView) {
+    func reduce<T>(server: T, mutation: (any UserMutation)?, desiredOf: (any UserMutation) -> T) -> (T, MutationSyncView) {
         guard let mutation = mutation else {
             return (server, MutationSyncView(status: .idle))
         }
@@ -285,7 +285,7 @@ public func deriveUserState(snapshot: UserStateSnapshot, mutations: [UserMutatio
     var episodeSync: [String: MutationSyncView] = [:]
     for mutation in grouped[.episodeWatched] ?? [] {
         let m = mutation as! EpisodeWatchedMutation
-        let derived = reduce(server: episodeWatched[m.videoId] ?? false, mutation: m) { m.desired }
+        let derived = reduce(server: episodeWatched[m.videoId] ?? false, mutation: m) { ($0 as! EpisodeWatchedMutation).desired }
         episodeWatched[m.videoId] = derived.0
         episodeSync[m.videoId] = derived.1
     }
@@ -294,7 +294,7 @@ public func deriveUserState(snapshot: UserStateSnapshot, mutations: [UserMutatio
     var seasonSync: [Int: MutationSyncView] = [:]
     for mutation in grouped[.seasonWatched] ?? [] {
         let m = mutation as! SeasonWatchedMutation
-        let derived = reduce(server: seasonWatched[m.seasonNumber] ?? false, mutation: m) { m.desired }
+        let derived = reduce(server: seasonWatched[m.seasonNumber] ?? false, mutation: m) { ($0 as! SeasonWatchedMutation).desired }
         seasonWatched[m.seasonNumber] = derived.0
         seasonSync[m.seasonNumber] = derived.1
     }
@@ -319,7 +319,7 @@ public func deriveUserState(snapshot: UserStateSnapshot, mutations: [UserMutatio
     )
 }
 
-public func planOutbox(mutations: [UserMutation], nowMs: Int64) -> [OutboxAction] {
+public func planOutbox(mutations: [any UserMutation], nowMs: Int64) -> [OutboxAction] {
     mutations
         .filter { mutation in
             if case .pending = mutation.status { return mutation.nextAttemptAtMs <= nowMs }

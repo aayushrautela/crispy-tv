@@ -52,7 +52,7 @@ final class UserMutationsContractTests: XCTestCase {
         )
     }
 
-    private func parseMutations(_ array: [Any], fixture: URL) throws -> [UserMutation] {
+    private func parseMutations(_ array: [Any], fixture: URL) throws -> [any UserMutation] {
         return try array.enumerated().map { index, value in
             guard let obj = value as? [String: Any] else {
                 throw ContractTestError.invalidFixture("\(fixture.lastPathComponent): expected object at mutations[\(index)]")
