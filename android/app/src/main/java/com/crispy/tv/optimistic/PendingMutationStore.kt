@@ -56,17 +56,17 @@ internal class FileBackedPendingMutationStore(
                 put("createdAtMs", mutation.createdAtMs)
                 put("attempt", mutation.attempt)
                 put("nextAttemptAtMs", mutation.nextAttemptAtMs)
-                when (mutation.status) {
+                when (val s = mutation.status) {
                     MutationStatus.Pending -> put("status", "pending")
                     MutationStatus.Inflight -> put("status", "inflight")
                     is MutationStatus.Failed -> {
                         put("status", "failed")
-                        put("statusReason", mutation.status.reason)
-                        put("retryable", mutation.status.retryable)
+                        put("statusReason", s.reason)
+                        put("retryable", s.retryable)
                     }
                     is MutationStatus.Conflict -> {
                         put("status", "conflict")
-                        put("statusServerValue", mutation.status.serverValue)
+                        put("statusServerValue", s.serverValue)
                     }
                 }
             }

@@ -1,8 +1,13 @@
 package com.crispy.tv.optimistic
 
+import com.crispy.tv.domain.optimistic.EpisodeWatchedMutation
 import com.crispy.tv.domain.optimistic.MutationStatus
+import com.crispy.tv.domain.optimistic.RatingMutation
 import com.crispy.tv.domain.optimistic.RetryPolicy
+import com.crispy.tv.domain.optimistic.SeasonWatchedMutation
+import com.crispy.tv.domain.optimistic.TitleWatchedMutation
 import com.crispy.tv.domain.optimistic.UserMutation
+import com.crispy.tv.domain.optimistic.WatchlistMutation
 import com.crispy.tv.domain.optimistic.nextBackoffDelayMs
 import com.crispy.tv.domain.optimistic.planOutbox
 import com.crispy.tv.home.HomeRefreshBus
@@ -85,7 +90,7 @@ class UserMutationOutbox(
             mutation.copyStatus(MutationStatus.Pending).copyNextAttempt(now)
         val next =
             coalesce(_byItem.value.values.flatten().filter { it.id != pending.id }, pending)
-        commit(next, persist = true)
+        scope.launch { commit(next, persist = true) }
     }
 
     /** Re-attempt a mutation that previously failed. */
@@ -95,7 +100,7 @@ class UserMutationOutbox(
             _byItem.value.values.flatten().map {
                 if (it.id == id) it.copyStatus(MutationStatus.Pending).copyNextAttempt(now) else it
             }
-        commit(next, persist = true)
+        scope.launch { commit(next, persist = true) }
     }
 
     private suspend fun processLoop() {
