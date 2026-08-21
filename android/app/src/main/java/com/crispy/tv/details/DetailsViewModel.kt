@@ -1046,21 +1046,10 @@ class DetailsViewModel internal constructor(
             return
         }
 
-        viewModelScope.launch {
-            val desired = !(_uiState.value.episodeWatchStates[video.id]?.isWatched ?: false)
+            viewModelScope.launch {
+                val desired = !(_uiState.value.episodeWatchStates[selectedEpisode.id]?.isWatched ?: false)
 
-            _uiState.update {
-                it.copy(
-                    statusMessage =
-                        if (desired) {
-                            "Marking ${video.title} as watched..."
-                        } else {
-                            "Marking ${video.title} as unwatched..."
-                        },
-                )
-            }
-
-            val result =
+                val result =
                 withContext(Dispatchers.IO) {
                     detailsUseCases.updateEpisodeWatched(details, video, desired)
                 }
@@ -1128,17 +1117,6 @@ class DetailsViewModel internal constructor(
         val currentlyWatched = _uiState.value.seasonWatchStates[seasonNumber] ?: false
         val desired = !currentlyWatched
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    statusMessage =
-                        if (desired) {
-                            "Marking season $seasonNumber as watched..."
-                        } else {
-                            "Marking season $seasonNumber as unwatched..."
-                        },
-                )
-            }
-
             val result =
                 withContext(Dispatchers.IO) {
                     detailsUseCases.updateSeasonWatched(details, seasonItemId, desired)

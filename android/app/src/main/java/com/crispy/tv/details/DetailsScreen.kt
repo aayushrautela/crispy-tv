@@ -7,6 +7,7 @@ package com.crispy.tv.details
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -25,12 +27,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CheckCircleOutline
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
@@ -54,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -484,50 +488,30 @@ internal fun DetailsScreen(
                                 )
                             }
                         }
-                        ListItem(
+                        WatchActionRow(
+                            label = if (watchState.isWatched) "Unmark as watched" else "Mark as watched",
+                            supporting = "This episode only",
+                            icon = if (watchState.isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
                             onClick = {
                                 selectedEpisodeAction = null
                                 onToggleEpisodeWatched(selectedEpisode)
                             },
-                            trailingContent = {
-                                Icon(
-                                    imageVector = if (watchState.isWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
-                                    contentDescription = null,
-                                )
-                            },
-                            supportingContent = { Text("This episode only") },
-                            content = {
-                                Text(if (watchState.isWatched) "Unmark as watched" else "Mark as watched")
-                            },
-                            colors = ListItemDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            ),
                         )
+                        HorizontalDivider()
                         if (episodeSeason != null && seasonItemId != null) {
-                            ListItem(
+                            WatchActionRow(
+                                label =
+                                    if (seasonWatched) {
+                                        "Unmark season $episodeSeason as watched"
+                                    } else {
+                                        "Mark season $episodeSeason as watched"
+                                    },
+                                supporting = "All episodes in this season",
+                                icon = if (seasonWatched) Icons.Filled.DoneAll else Icons.Outlined.DoneAll,
                                 onClick = {
                                     selectedEpisodeAction = null
                                     onToggleSeasonWatched(seasonItemId, episodeSeason)
                                 },
-                                trailingContent = {
-                                    Icon(
-                                        imageVector = if (seasonWatched) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
-                                        contentDescription = null,
-                                    )
-                                },
-                                supportingContent = { Text("All episodes in this season") },
-                                content = {
-                                    Text(
-                                        if (seasonWatched) {
-                                            "Unmark season $episodeSeason as watched"
-                                        } else {
-                                            "Mark season $episodeSeason as watched"
-                                        },
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                ),
                             )
                         }
                     }
@@ -559,5 +543,36 @@ internal fun DetailsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun WatchActionRow(
+    label: String,
+    supporting: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 4.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                supporting,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
