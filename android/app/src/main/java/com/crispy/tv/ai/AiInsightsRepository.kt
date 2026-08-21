@@ -6,14 +6,12 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.network.CrispyHttpClient
 import java.util.Locale
 
 class AiInsightsRepository(
     private val supabase: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore,
     private val backend: CrispyBackendClient,
-    @Suppress("UNUSED_PARAMETER") httpClient: CrispyHttpClient,
     private val cacheStore: AiInsightsCacheStore,
 ) {
     fun loadCached(
@@ -55,13 +53,12 @@ class AiInsightsRepository(
     }
 
     companion object {
-        fun create(context: Context, httpClient: CrispyHttpClient): AiInsightsRepository {
+        fun create(context: Context): AiInsightsRepository {
             val appContext = context.applicationContext
             return AiInsightsRepository(
                 supabase = SupabaseServicesProvider.accountClient(appContext),
                 activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                 backend = BackendServicesProvider.backendClient(appContext),
-                httpClient = httpClient,
                 cacheStore = AiInsightsCacheStore(appContext),
             )
         }

@@ -5,7 +5,6 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.crispy.tv.network.AppHttp
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -321,10 +320,9 @@ class SearchViewModel(
                         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                     }
 
-                    val httpClient = AppHttp.client(context)
                     val viewModel = SearchViewModel(
                         searchRepository = BackendSearchRepository.create(context),
-                        aiSearchRepository = AiSearchRepository.create(context, httpClient),
+                        aiSearchRepository = AiSearchRepository.create(context),
                         searchHistoryStore = SearchHistoryStore(context),
                     )
                     @Suppress("UNCHECKED_CAST")

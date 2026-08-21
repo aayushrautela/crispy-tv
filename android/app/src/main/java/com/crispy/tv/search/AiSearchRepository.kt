@@ -6,14 +6,12 @@ import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.network.CrispyHttpClient
 import java.util.Locale
 
 class AiSearchRepository(
     private val supabase: SupabaseAccountClient,
     private val activeProfileStore: ActiveProfileStore,
     private val backend: CrispyBackendClient,
-    @Suppress("UNUSED_PARAMETER") httpClient: CrispyHttpClient,
 ) {
     suspend fun search(
         query: String,
@@ -41,13 +39,12 @@ class AiSearchRepository(
     }
 
     companion object {
-        fun create(context: Context, httpClient: CrispyHttpClient): AiSearchRepository {
+        fun create(context: Context): AiSearchRepository {
             val appContext = context.applicationContext
             return AiSearchRepository(
                 supabase = SupabaseServicesProvider.accountClient(appContext),
                 activeProfileStore = SupabaseServicesProvider.activeProfileStore(appContext),
                 backend = BackendServicesProvider.backendClient(appContext),
-                httpClient = httpClient,
             )
         }
     }

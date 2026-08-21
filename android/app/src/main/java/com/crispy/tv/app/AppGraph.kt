@@ -18,7 +18,6 @@ import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.streams.StreamResolverProvider
 
 class AppGraph(
@@ -38,12 +37,8 @@ class AppGraph(
         DefaultUserMediaRepository(PlaybackDependencies.watchHistoryServiceFactory(appContext))
     }
 
-    private val httpClient by lazy {
-        AppHttp.client(appContext)
-    }
-
     private val aiInsightsRepository by lazy {
-        AiInsightsRepository.create(appContext, httpClient)
+        AiInsightsRepository.create(appContext)
     }
 
     private val streamResolver by lazy {
