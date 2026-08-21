@@ -83,7 +83,7 @@ fun StreamSelectorModal(
 ) {
     if (!state.visible) return
 
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = false)
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     ModalBottomSheet(
         onDismissRequest = callbacks.onDismiss,
         sheetState = sheetState,

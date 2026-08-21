@@ -10,8 +10,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.SimpleBasePlayer
-import androidx.media3.common.SinglePeriodTimeline
 import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.source.SinglePeriodTimeline
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
@@ -49,6 +49,10 @@ internal class PlaybackSessionControllerPlayer(
         invalidateState()
     }
 
+    fun invalidatePlaybackState() {
+        invalidateState()
+    }
+
     override fun getState(): State {
         val snapshot: NativePlaybackSnapshot = controller.snapshot()
         val playbackState = when (snapshot.state) {
@@ -77,7 +81,7 @@ internal class PlaybackSessionControllerPlayer(
             .build()
 
         val durationUs = if (snapshot.durationMs > 0L) snapshot.durationMs * 1000L else C.TIME_UNSET
-        val timeline = SinglePeriodTimeline(durationUs, true, false, mediaItem)
+        val timeline = SinglePeriodTimeline(durationUs, true, false, false, null, mediaItem)
 
         val builder = State.Builder()
             .setAvailableCommands(
@@ -92,8 +96,6 @@ internal class PlaybackSessionControllerPlayer(
             .setPlayWhenReady(snapshot.isPlaying, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
             .setPlaybackState(playbackState)
             .setContentPositionMs(snapshot.positionMs)
-            .setContentBufferedPositionMs(snapshot.bufferedPositionMs)
-            .setTotalBufferedDurationMs(snapshot.bufferedPositionMs)
             .setSeekBackIncrementMs(REWIND_MS)
             .setSeekForwardIncrementMs(FAST_FORWARD_MS)
             .setPlaybackParameters(PlaybackParameters(snapshot.playbackSpeed))
@@ -105,6 +107,7 @@ internal class PlaybackSessionControllerPlayer(
                 PlaybackException(
                     snapshot.error?.message ?: "Playback error",
                     null,
+                    PlaybackException.ERROR_CODE_UNSPECIFIED,
                 ),
             )
         }

@@ -67,7 +67,7 @@ fun LibraryRoute(
     val listState = rememberLazyListState()
     val pullToRefreshState = rememberPullToRefreshState()
     var selectedLibraryItem by remember { mutableStateOf<CatalogItem?>(null) }
-    val librarySheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
+    val librarySheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     val scrollBehavior = appBarScrollBehavior()
 
     val sections = uiState.sections

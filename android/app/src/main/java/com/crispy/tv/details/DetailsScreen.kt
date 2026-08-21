@@ -229,8 +229,8 @@ internal fun DetailsScreen(
     var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
     var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
     var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
-    val reviewSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
-    val episodeSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
+    val reviewSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
+    val episodeSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     val bodyHorizontalPadding = responsivePageHorizontalPadding()
 
     MaterialTheme(colorScheme = detailsScheme) {

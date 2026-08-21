@@ -73,7 +73,7 @@ internal fun HomeWideRailSection(
     }
 
     var actionsItemKey by remember { mutableStateOf<String?>(null) }
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(

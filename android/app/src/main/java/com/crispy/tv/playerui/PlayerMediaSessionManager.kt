@@ -185,7 +185,7 @@ internal class PlayerMediaSessionManager(
     }
 
     private fun publishPlaybackState() {
-        player.invalidateState()
+        player.invalidatePlaybackState()
     }
 
     private fun publishNotification(force: Boolean = false) {

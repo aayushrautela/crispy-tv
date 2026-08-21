@@ -161,7 +161,7 @@ internal fun PlayerAudioSheet(
 ) {
     if (!visible) return
 
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     val groups = groupAudioByLanguage(audioTracks)
 
     ModalBottomSheet(
@@ -218,7 +218,7 @@ internal fun PlayerSubtitleSheet(
 ) {
     if (!visible) return
 
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, skipPartiallyExpanded = true)
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
 
     val options =
         buildList<SubtitleOption> {
