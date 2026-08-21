@@ -11,6 +11,14 @@ public enum MutationKind: String, Codable, Equatable {
     case rating
 }
 
+/// Pure copy of the content-type taxonomy the watch-history backend needs.
+/// Mirrors `android/core-domain/.../optimistic/UserMutations.kt`.
+public enum MediaContentType: String, Codable, Equatable {
+    case movie
+    case series
+    case anime
+}
+
 public enum MutationStatus: Equatable {
     case pending
     case inflight
@@ -59,9 +67,10 @@ public struct TitleWatchedMutation: UserMutation {
     public let attempt: Int
     public let status: MutationStatus
     public let nextAttemptAtMs: Int64
+    public let contentType: MediaContentType
     public let desired: Bool
     public var kind: MutationKind { .titleWatched }
-    public init(id: String, titleItemId: String, entityId: String, createdAtMs: Int64, attempt: Int, status: MutationStatus, nextAttemptAtMs: Int64, desired: Bool) {
+    public init(id: String, titleItemId: String, entityId: String, createdAtMs: Int64, attempt: Int, status: MutationStatus, nextAttemptAtMs: Int64, contentType: MediaContentType = .movie, desired: Bool) {
         self.id = id
         self.titleItemId = titleItemId
         self.entityId = entityId
@@ -69,6 +78,7 @@ public struct TitleWatchedMutation: UserMutation {
         self.attempt = attempt
         self.status = status
         self.nextAttemptAtMs = nextAttemptAtMs
+        self.contentType = contentType
         self.desired = desired
     }
 }

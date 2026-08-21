@@ -77,7 +77,8 @@ final class UserMutationsContractTests: XCTestCase {
             case .watchlist:
                 return WatchlistMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, desired: try requireBool(obj, "desired", fixture: fixture))
             case .titleWatched:
-                return TitleWatchedMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, desired: try requireBool(obj, "desired", fixture: fixture))
+                let contentType = MediaContentType(rawValue: optionalString(obj, "content_type") ?? "movie") ?? .movie
+                return TitleWatchedMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, contentType: contentType, desired: try requireBool(obj, "desired", fixture: fixture))
             case .rating:
                 return RatingMutation(id: id, titleItemId: entityId, entityId: entityId, createdAtMs: createdAtMs, attempt: attempt, status: status, nextAttemptAtMs: nextAttemptAtMs, desired: optionalInt(obj, "desired"))
             case .episodeWatched:
@@ -156,6 +157,16 @@ final class UserMutationsContractTests: XCTestCase {
             throw ContractTestError.invalidFixture("invalid sync \(value)")
         }
         return sync
+    }
+
+    private func optionalInt64(_ object: [String: Any], _ key: String) -> Int64? {
+        guard let value = object[key], !(value is NSNull) else {
+            return nil
+        }
+        if let v = value as? Int64 { return v }
+        if let v = value as? Int { return Int64(v) }
+        if let number = value as? NSNumber { return number.int64Value }
+        return nil
     }
 }
 
