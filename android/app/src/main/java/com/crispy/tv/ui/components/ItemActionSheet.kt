@@ -119,7 +119,6 @@ fun ItemActionSheet(
             )
         }
     }
-}
 
 @Composable
 fun WatchActionRow(
