@@ -9,7 +9,6 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.ProviderStreamsResult
-import com.crispy.tv.streams.StreamProviderDescriptor
 import com.crispy.tv.streams.StreamProviderUiState
 import com.crispy.tv.streams.StreamSelectorUiState
 import java.util.Locale
@@ -146,14 +145,6 @@ fun ProviderStreamsResult.toUiState(): StreamProviderUiState {
     )
 }
 
-fun StreamProviderDescriptor.toLoadingUiState(): StreamProviderUiState {
-    return StreamProviderUiState(
-        providerId = providerId,
-        providerName = providerName,
-        isLoading = true,
-    )
-}
-
 fun List<StreamProviderUiState>.applyProviderResult(result: ProviderStreamsResult): List<StreamProviderUiState> {
     var matched = false
     val updated =
@@ -170,12 +161,11 @@ fun List<StreamProviderUiState>.applyProviderResult(result: ProviderStreamsResul
 }
 
 fun List<StreamProviderUiState>.finalizeFrom(results: List<ProviderStreamsResult>): List<StreamProviderUiState> {
-    if (isEmpty()) return emptyList()
-    val byProviderId = results.associateBy { result -> result.providerId.lowercase(Locale.US) }
-
-    return map { provider ->
-        byProviderId[provider.providerId.lowercase(Locale.US)]?.toUiState() ?: provider.copy(isLoading = false)
-    }
+    val knownProviderIds = map { provider -> provider.providerId.lowercase(Locale.US) }.toSet()
+    val appended = results
+        .filter { result -> !knownProviderIds.contains(result.providerId.lowercase(Locale.US)) }
+        .map { result -> result.toUiState() }
+    return this + appended
 }
 
 fun StreamSelectorUiState.matchesTarget(target: StreamLookupTarget): Boolean {

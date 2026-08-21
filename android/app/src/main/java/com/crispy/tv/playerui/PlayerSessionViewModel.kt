@@ -449,6 +449,11 @@ class PlayerSessionViewModel(
                 return
             }
 
+        _uiState.update { previous ->
+            if (!previous.streamSelector.matchesTarget(target)) return@update previous
+            previous.copy(streamSelector = previous.streamSelector.copy(isLoading = false))
+        }
+
         val chosen =
             chosenStreamStableKey?.let { key ->
                 results.firstNotNullOfOrNull { provider ->
