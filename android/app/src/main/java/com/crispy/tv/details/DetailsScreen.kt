@@ -13,11 +13,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +38,7 @@ import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
@@ -53,6 +58,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import coil3.compose.AsyncImage
+import com.crispy.tv.ui.components.rememberCrispyImageModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -62,6 +69,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -464,28 +473,60 @@ internal fun DetailsScreen(
                             .padding(top = 8.dp, bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            showTitle?.takeIf { it.isNotBlank() }?.let {
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Text(selectedEpisode.title, style = MaterialTheme.typography.titleLarge)
-                            if (episodeMeta.isNotBlank()) {
-                                Text(
-                                    text = episodeMeta,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            formatLongDate(selectedEpisode.released)?.let { released ->
-                                Text(
-                                    text = released,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                    ) {
+                                        val imageUrl =
+                                            selectedEpisode.thumbnailUrl
+                                                ?.trim()
+                                                ?.takeIf { it.isNotBlank() }
+                                                ?: visibleDetails?.backdropUrl
+                                                ?: visibleDetails?.posterUrl
+                                        val imageModel =
+                                            imageUrl?.let {
+                                                rememberCrispyImageModel(url = it, width = 96.dp, height = 56.dp)
+                                            }
+                                        AsyncImage(
+                                            model = imageModel ?: imageUrl,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(width = 96.dp, height = 56.dp),
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = selectedEpisode.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        if (episodeMeta.isNotBlank()) {
+                                            Text(
+                                                text = episodeMeta,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        showTitle?.takeIf { it.isNotBlank() }?.let {
+                                            Text(
+                                                text = it,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                         WatchActionRow(
