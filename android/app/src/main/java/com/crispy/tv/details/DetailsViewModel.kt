@@ -1047,7 +1047,7 @@ class DetailsViewModel internal constructor(
         }
 
             viewModelScope.launch {
-                val desired = !(_uiState.value.episodeWatchStates[selectedEpisode.id]?.isWatched ?: false)
+                val desired = !(_uiState.value.episodeWatchStates[video.id]?.isWatched ?: false)
 
                 val result =
                 withContext(Dispatchers.IO) {
