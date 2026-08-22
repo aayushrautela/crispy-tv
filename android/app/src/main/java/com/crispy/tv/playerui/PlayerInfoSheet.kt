@@ -131,7 +131,7 @@ private fun InfoSheetContent(
     headerEpisode: MediaVideo? = null,
 ) {
     val showCast = details?.cast?.any { it.isNotBlank() } == true
-    val episodeContext = details.toPlayerEpisodeContext() ?: headerEpisode?.toPlayerEpisodeContext()
+    val episodeContext = details?.toPlayerEpisodeContext() ?: headerEpisode?.toPlayerEpisodeContext()
     val showEpisode = episodeContext != null
     val creditLine = buildCreditLine(details)
 

@@ -8,6 +8,8 @@ import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleRatingsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleExtrasResponse
+import com.crispy.tv.backend.CrispyBackendClient.MetadataSeriesEpisodesResponse
+import com.crispy.tv.backend.CrispyBackendClient.MetadataView
 import com.crispy.tv.backend.CrispyBackendClient.PlaybackResolveResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
