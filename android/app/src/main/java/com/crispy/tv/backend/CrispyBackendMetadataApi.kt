@@ -209,6 +209,33 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
     }
 }
 
+internal suspend fun CrispyBackendClient.getSeriesEpisodesApi(
+    accessToken: String,
+    seriesItemId: String,
+    season: Int?,
+): MetadataSeriesEpisodesResponse {
+    checkConfigured()
+    val url = buildString {
+        append("$baseUrl/v1/metadata/shows/${seriesItemId.trim()}/episodes")
+        if (season != null) append("?season=$season")
+    }
+    val response = httpClient.get(
+        url = url.toHttpUrl(),
+        headers = authHeaders(accessToken),
+        callTimeoutMs = callTimeoutMs,
+    )
+    val json = requireSuccess(response)
+    val itemsArray = json.optJSONArray("Items")
+    val items = mutableListOf<MetadataView>()
+    if (itemsArray != null) {
+        for (i in 0 until itemsArray.length()) {
+            val itemJson = itemsArray.optJSONObject(i) ?: continue
+            items += parseMetadataView(itemJson)
+        }
+    }
+    return MetadataSeriesEpisodesResponse(items = items)
+}
+
 internal suspend fun CrispyBackendClient.getMetadataItemRatingsApi(
     accessToken: String,
     profileId: String,

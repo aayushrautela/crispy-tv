@@ -310,7 +310,7 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_IMDB_ID = "extra_imdb_id"
         private const val EXTRA_CONTENT_ID = "extra_content_id"
         private const val EXTRA_ITEM_ID = "extra_item_id"
-        private const val EXTRA_TITLE_ITEM_ID = "extra_title_item_id"
+        private const val EXTRA_SERIES_ITEM_ID = "extra_series_item_id"
         private const val EXTRA_MEDIA_TYPE = "extra_media_type"
         private const val EXTRA_SEASON = "extra_season"
         private const val EXTRA_EPISODE = "extra_episode"
@@ -339,7 +339,7 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(EXTRA_SUBTITLE, subtitle)
                 .putExtra(EXTRA_ARTWORK_URL, artworkUrl)
                 .putExtra(EXTRA_ITEM_ID, identity.itemId)
-                .putExtra(EXTRA_TITLE_ITEM_ID, identity.titleItemId)
+                .putExtra(EXTRA_SERIES_ITEM_ID, identity.seriesItemId)
                 .putExtra(EXTRA_IMDB_ID, identity.imdbId)
                 .putExtra(EXTRA_MEDIA_TYPE, identity.contentType.name)
                 .putExtra(EXTRA_SEASON, identity.season ?: -1)
@@ -361,7 +361,7 @@ class PlayerActivity : ComponentActivity() {
 
             val contentId = intent.getStringExtra(EXTRA_CONTENT_ID)?.trim()?.ifBlank { null }
             val itemId = intent.getStringExtra(EXTRA_ITEM_ID)?.trim()?.ifBlank { null }
-            val titleItemId = intent.getStringExtra(EXTRA_TITLE_ITEM_ID)?.trim()?.ifBlank { null }
+            val seriesItemId = intent.getStringExtra(EXTRA_SERIES_ITEM_ID)?.trim()?.ifBlank { null }
             val imdbId = intent.getStringExtra(EXTRA_IMDB_ID)?.trim()?.ifBlank { null }
             val season = intent.getIntExtra(EXTRA_SEASON, -1).takeIf { it > 0 }
             val episode = intent.getIntExtra(EXTRA_EPISODE, -1).takeIf { it > 0 }
@@ -377,7 +377,7 @@ class PlayerActivity : ComponentActivity() {
 
         return PlaybackIdentity(
             itemId = itemId,
-            titleItemId = titleItemId,
+            seriesItemId = seriesItemId,
             imdbId = imdbId,
             contentType = contentType,
             season = season,

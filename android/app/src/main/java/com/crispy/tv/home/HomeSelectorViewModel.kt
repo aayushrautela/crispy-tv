@@ -105,7 +105,7 @@ internal class HomeSelectorViewModel(
             target = target,
             headerEpisode = headerEpisode,
             fallbackDetails = fallbackDetails,
-            itemIdForMetadata = item.titleItemId,
+            itemIdForMetadata = item.id,
             onStreamSelected = { stream -> viewModelScope.launch { emitPlay(item, mediaType, stream) } },
         )
     }
@@ -118,7 +118,7 @@ internal class HomeSelectorViewModel(
         val identity =
             PlaybackIdentity(
                 itemId = item.id,
-                titleItemId = item.titleItemId,
+                seriesItemId = item.titleItemId,
                 imdbId = item.imdbId,
                 contentType = mediaType,
                 season = item.season,

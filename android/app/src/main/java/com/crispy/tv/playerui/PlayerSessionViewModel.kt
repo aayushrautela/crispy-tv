@@ -99,7 +99,6 @@ data class PlayerUiState(
     val seasons: List<Int> = emptyList(),
     val selectedSeason: Int? = null,
     val seasonEpisodes: List<MediaVideo> = emptyList(),
-    val currentEpisodeId: String? = null,
     val episodesIsLoading: Boolean = false,
     val episodesStatusMessage: String = "",
     val streamSelector: StreamSelectorUiState = StreamSelectorUiState(),
@@ -192,7 +191,6 @@ class PlayerSessionViewModel(
                 seasons = emptyList(),
                 selectedSeason = initialSelectedSeason,
                 seasonEpisodes = initialSeasonEpisodes,
-                currentEpisodeId = null,
                 currentPlaybackUrl = null,
                 activeEngine = initialEngine,
                 resizeMode = playbackSettingsRepository.settings.value.resizeMode,
@@ -714,7 +712,6 @@ class PlayerSessionViewModel(
                 title = nextTitle,
                 subtitle = nextSubtitle,
                 artworkUrl = activeArtworkUrl,
-                currentEpisodeId = nextEpisode?.id,
                 resumePositionMs = resumePositionMs,
             )
         }
@@ -740,8 +737,7 @@ class PlayerSessionViewModel(
         val rawId = rawPlaybackId ?: return
         val snapshotDetails = _uiState.value.details
         val itemId =
-            activeIdentity?.titleItemId?.trim()?.takeIf { it.isNotBlank() }
-                ?: activeIdentity?.itemId?.trim()?.takeIf { it.isNotBlank() }
+            activeIdentity?.itemId?.trim()?.takeIf { it.isNotBlank() }
                 ?: snapshotDetails?.itemId?.trim()?.takeIf { it.isNotBlank() }
         val session = withContext(Dispatchers.IO) { runCatching { supabase.ensureValidSession() }.getOrNull() }
         val backendDetail =
@@ -774,10 +770,7 @@ class PlayerSessionViewModel(
 
         val seasonToLoad = _uiState.value.selectedSeason
         if (
-            fetchedDetails.itemType
-                .toMetadataLabMediaTypeOrNull()
-                ?.let { it != MetadataLabMediaType.MOVIE }
-            == true && seasonToLoad != null
+            !fetchedDetails.itemType.equals("movie", ignoreCase = true) && seasonToLoad != null
         ) {
             loadEpisodesForSeason(seasonToLoad, force = true)
         }
@@ -788,7 +781,7 @@ class PlayerSessionViewModel(
         force: Boolean = false,
     ) {
         val details = _uiState.value.details ?: return
-        if (details.itemType.toMetadataLabMediaTypeOrNull()?.let { it != MetadataLabMediaType.MOVIE } != true) return
+        if (details.itemType.equals("movie", ignoreCase = true)) return
         val cached = if (!force) seasonEpisodesCache[season] else null
         if (cached != null) {
             _uiState.update {
@@ -846,10 +839,13 @@ class PlayerSessionViewModel(
             val response =
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        val itemId = details.itemId?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
-                        backendClient.getMetadataItemExtras(
+                        val seriesItemId = activeIdentity?.seriesItemId?.trim()?.takeIf { it.isNotBlank() }
+                            ?: details.itemId?.trim()?.takeIf { it.isNotBlank() }
+                            ?: return@withContext null
+                        backendClient.getSeriesEpisodes(
                             accessToken = session.accessToken,
-                            itemId = itemId,
+                            seriesItemId = seriesItemId,
+                            season = season,
                         )
                     }
                 }.getOrElse {
@@ -878,10 +874,7 @@ class PlayerSessionViewModel(
                     return@launch
                 }
 
-            val videos =
-                response.episodes
-                    .filter { it.seasonNumber == season }
-                    .mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
+            val videos = response.items.mapNotNull { it.toMediaVideo() }
 
             seasonEpisodesCache[season] = videos
             _uiState.update { current ->
@@ -1009,7 +1002,6 @@ class PlayerSessionViewModel(
         title: String,
         subtitle: String?,
         artworkUrl: String?,
-        currentEpisodeId: String?,
         resumePositionMs: Long,
     ) {
         val previousIdentity = activeIdentity
@@ -1036,7 +1028,6 @@ class PlayerSessionViewModel(
                 subtitle = activeSubtitle,
                 artworkUrl = activeArtworkUrl,
                 activeIdentity = identity,
-                currentEpisodeId = currentEpisodeId,
                 currentPlaybackUrl = source.url,
                 activeSurface = PlayerSurface.NONE,
                 streamSelector = state.streamSelector.copy(visible = false),

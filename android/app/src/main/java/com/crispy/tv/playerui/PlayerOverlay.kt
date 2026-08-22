@@ -251,7 +251,7 @@ internal fun PlayerOverlay(
             details = uiState.details,
             palette = palette,
             onClose = onCloseSurface,
-            currentEpisodeId = uiState.currentEpisodeId,
+            headerEpisode = uiState.streamSelector.headerEpisode,
         )
 
         PlayerStreamsSheet(

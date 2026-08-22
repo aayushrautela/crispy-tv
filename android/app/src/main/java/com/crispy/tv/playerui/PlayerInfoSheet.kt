@@ -57,7 +57,7 @@ internal fun PlayerInfoSheet(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
     onClose: () -> Unit,
-    currentEpisodeId: String? = null,
+    headerEpisode: MediaVideo? = null,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(
@@ -99,7 +99,7 @@ internal fun PlayerInfoSheet(
                         InfoSheetContent(
                             details = details,
                             palette = palette,
-                            currentEpisodeId = currentEpisodeId,
+                            headerEpisode = headerEpisode,
                         )
 
                         IconButton(
@@ -128,10 +128,11 @@ internal fun PlayerInfoSheet(
 private fun InfoSheetContent(
     details: MediaDetails?,
     palette: DetailsPaletteColors,
-    currentEpisodeId: String?,
+    headerEpisode: MediaVideo? = null,
 ) {
     val showCast = details?.cast?.any { it.isNotBlank() } == true
-    val showEpisode = details?.seasonNumber != null && details.episodeNumber != null
+    val episodeContext = details.toPlayerEpisodeContext() ?: headerEpisode?.toPlayerEpisodeContext()
+    val showEpisode = episodeContext != null
     val creditLine = buildCreditLine(details)
 
     LazyColumn(
@@ -142,9 +143,9 @@ private fun InfoSheetContent(
         item { TitleArea(details = details, palette = palette) }
         item { MetaRow(details = details, palette = palette) }
         if (showEpisode) {
-            item { EpisodeContextBlock(details = details, currentEpisodeId = currentEpisodeId, palette = palette) }
+            item { EpisodeContextBlock(episodeContext = episodeContext, palette = palette) }
         }
-        item { OverviewBlock(details = details, currentEpisodeId = currentEpisodeId, palette = palette) }
+        item { OverviewBlock(episodeContext = episodeContext, details = details, palette = palette) }
         if (showCast) {
             item { CastBlock(details = details, palette = palette) }
         }
@@ -284,20 +285,16 @@ private fun MetaRow(
 
 @Composable
 private fun EpisodeContextBlock(
-    details: MediaDetails?,
-    currentEpisodeId: String?,
+    episodeContext: PlayerEpisodeContext?,
     palette: DetailsPaletteColors,
 ) {
-    val season = details?.seasonNumber ?: return
-    val episode = details.episodeNumber ?: return
-    val prefix = "S${season}E${episode}"
-    val current = resolveCurrentEpisode(details, currentEpisodeId)
-    val title = current?.title?.trim()?.takeIf { it.isNotBlank() }
+    val context = episodeContext ?: return
+    val title = context.title?.trim()?.takeIf { it.isNotBlank() }
 
     Text(
         text =
             buildString {
-                append("Now Playing · $prefix")
+                append("Now Playing · ${context.seasonEpisodeLabel}")
                 if (title != null) append(" — $title")
             },
         style = MaterialTheme.typography.bodyMedium,
@@ -309,17 +306,14 @@ private fun EpisodeContextBlock(
 
 @Composable
 private fun OverviewBlock(
+    episodeContext: PlayerEpisodeContext?,
     details: MediaDetails?,
-    currentEpisodeId: String?,
     palette: DetailsPaletteColors,
 ) {
-    val baseDescription = details?.description?.trim()?.takeIf { it.isNotBlank() }
-    val episodeDescription =
-        resolveCurrentEpisode(details, currentEpisodeId)
-            ?.overview
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-    val description = episodeDescription ?: baseDescription ?: return
+    val description =
+        episodeContext?.overview
+            ?: details?.description?.trim()?.takeIf { it.isNotBlank() }
+            ?: return
     ExpandableDescription(
         text = description,
         textAlign = TextAlign.Center,
@@ -364,22 +358,6 @@ private fun CastBlock(
             }
         }
     }
-}
-
-private fun resolveCurrentEpisode(
-    details: MediaDetails?,
-    currentEpisodeId: String?,
-): MediaVideo? {
-    val videos = details?.videos ?: return null
-    if (!currentEpisodeId.isNullOrBlank()) {
-        videos.firstOrNull { it.id == currentEpisodeId }?.let { return it }
-    }
-    val season = details.seasonNumber
-    val episode = details.episodeNumber
-    if (season != null && episode != null) {
-        videos.firstOrNull { it.season == season && it.episode == episode }?.let { return it }
-    }
-    return null
 }
 
 private fun parseCastEntry(entry: String): Pair<String, String?> {

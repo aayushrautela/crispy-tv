@@ -483,6 +483,10 @@ class CrispyBackendClient(
         val collection: MetadataCollectionView?,
     )
 
+    data class MetadataSeriesEpisodesResponse(
+        val items: List<MetadataView>,
+    )
+
     data class MetadataCardView(
         val id: String?,
         val itemId: String?,
@@ -829,6 +833,14 @@ class CrispyBackendClient(
 
     suspend fun getMetadataItemExtras(accessToken: String, itemId: String): MetadataTitleExtrasResponse {
         return getMetadataItemExtrasApi(accessToken, itemId)
+    }
+
+    suspend fun getSeriesEpisodes(
+        accessToken: String,
+        seriesItemId: String,
+        season: Int? = null,
+    ): MetadataSeriesEpisodesResponse {
+        return getSeriesEpisodesApi(accessToken, seriesItemId, season)
     }
 
     suspend fun getMetadataItemRatings(

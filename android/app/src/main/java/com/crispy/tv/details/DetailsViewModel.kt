@@ -1047,7 +1047,7 @@ class DetailsViewModel internal constructor(
             val identity =
             PlaybackIdentity(
                 itemId = enriched.itemId,
-                titleItemId = currentState.itemId,
+                seriesItemId = enriched.itemId,
                 imdbId = enriched.imdbId,
                 contentType = resolvedMediaType,
                 season = season,
