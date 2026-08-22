@@ -1044,10 +1044,15 @@ class DetailsViewModel internal constructor(
             val mediaTitle = enriched.title.trim().ifBlank { null } ?: details.title.trim().ifBlank { null }
             val title = selectedEpisodeTitle ?: targetEpisode?.title?.trim()?.takeIf { it.isNotBlank() } ?: mediaTitle ?: "Player"
             val yearInt = enriched.year?.trim()?.toIntOrNull()
+            val playbackItemId = if (isEpisodic) {
+                targetEpisode?.id?.trim()?.takeIf { it.isNotBlank() } ?: enriched.itemId
+            } else {
+                enriched.itemId
+            }
             val identity =
-            PlaybackIdentity(
-                itemId = enriched.itemId,
-                seriesItemId = enriched.itemId,
+                PlaybackIdentity(
+                    itemId = playbackItemId,
+                    seriesItemId = enriched.itemId,
                 imdbId = enriched.imdbId,
                 contentType = resolvedMediaType,
                 season = season,
