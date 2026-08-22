@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.app.appGraph
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.domain.repository.UserMediaRepository
 import com.crispy.tv.metadata.buildAddonEpisodeLookupId
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.CanonicalContinueWatchingItem
@@ -16,9 +18,12 @@ import com.crispy.tv.playback.StreamLookupTarget
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.streams.StreamResolverProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class HomeStreamSelection(
     val identity: PlaybackIdentity,
@@ -36,6 +41,7 @@ internal class HomeSelectorViewModel(
     private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(appContext)
     private val supabase = SupabaseServicesProvider.accountClient(appContext)
     private val streamResolver = StreamResolverProvider.get(appContext)
+    private val userMediaRepository: UserMediaRepository = appContext.appGraph().userMediaRepository
 
     val coordinator =
         SelectorCoordinator(
@@ -100,11 +106,11 @@ internal class HomeSelectorViewModel(
             headerEpisode = headerEpisode,
             fallbackDetails = fallbackDetails,
             itemIdForMetadata = item.titleItemId,
-            onStreamSelected = { stream -> emitPlay(item, mediaType, stream) },
+            onStreamSelected = { stream -> viewModelScope.launch { emitPlay(item, mediaType, stream) } },
         )
     }
 
-    private fun emitPlay(
+    private suspend fun emitPlay(
         item: CanonicalContinueWatchingItem,
         mediaType: MetadataLabMediaType,
         stream: AddonStream,
@@ -112,6 +118,7 @@ internal class HomeSelectorViewModel(
         val identity =
             PlaybackIdentity(
                 itemId = item.id,
+                titleItemId = item.titleItemId,
                 imdbId = item.imdbId,
                 contentType = mediaType,
                 season = item.season,
@@ -120,13 +127,21 @@ internal class HomeSelectorViewModel(
                 showTitle = if (mediaType != MetadataLabMediaType.MOVIE) item.title else null,
                 absoluteEpisodeNumber = item.absoluteEpisodeNumber,
             )
+        val resumePositionMs =
+            withContext(Dispatchers.IO) {
+                userMediaRepository
+                    .getLocalWatchProgress(identity)
+                    ?.takeIf { it.progressPercent in 1.0..95.0 }
+                    ?.let { (it.currentTimeSeconds * 1000.0).toLong() }
+                    ?: 0L
+            }
         _playStream.tryEmit(
             HomeStreamSelection(
                 identity = identity,
                 title = item.title,
                 subtitle = item.subtitle,
                 artworkUrl = item.backdropUrl ?: item.posterUrl,
-                resumePositionMs = 0L,
+                resumePositionMs = resumePositionMs,
                 chosenStreamStableKey = stream.stableKey,
                 chosenProviderId = stream.providerId,
             ),
