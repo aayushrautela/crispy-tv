@@ -740,7 +740,8 @@ class PlayerSessionViewModel(
         val rawId = rawPlaybackId ?: return
         val snapshotDetails = _uiState.value.details
         val itemId =
-            activeIdentity?.itemId?.trim()?.takeIf { it.isNotBlank() }
+            activeIdentity?.titleItemId?.trim()?.takeIf { it.isNotBlank() }
+                ?: activeIdentity?.itemId?.trim()?.takeIf { it.isNotBlank() }
                 ?: snapshotDetails?.itemId?.trim()?.takeIf { it.isNotBlank() }
         val session = withContext(Dispatchers.IO) { runCatching { supabase.ensureValidSession() }.getOrNull() }
         val backendDetail =
