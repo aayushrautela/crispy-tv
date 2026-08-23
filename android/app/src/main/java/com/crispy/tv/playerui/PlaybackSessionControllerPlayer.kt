@@ -85,7 +85,7 @@ internal class PlaybackSessionControllerPlayer(
                     .add(Player.COMMAND_STOP)
                     .build(),
             )
-            .setPlayWhenReady(snapshot.isPlaying, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+            .setPlayWhenReady(snapshot.playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
             .setPlaybackState(playbackState)
             .setContentPositionMs(snapshot.positionMs)
             .setSeekBackIncrementMs(REWIND_MS)

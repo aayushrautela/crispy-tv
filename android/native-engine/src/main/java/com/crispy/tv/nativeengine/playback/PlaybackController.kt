@@ -56,6 +56,7 @@ data class NativeVideoLayout(
 data class NativePlaybackSnapshot(
     val engine: NativePlaybackEngine,
     val state: NativePlaybackState = NativePlaybackState.IDLE,
+    val playWhenReady: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val bufferingPercent: Float? = null,

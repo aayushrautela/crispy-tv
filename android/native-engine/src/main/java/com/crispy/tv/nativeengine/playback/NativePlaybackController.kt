@@ -623,6 +623,7 @@ class NativePlaybackController(
         return NativePlaybackSnapshot(
             engine = NativePlaybackEngine.EXO,
             state = state,
+            playWhenReady = exoPlayer.playWhenReady,
             positionMs = positionMs,
             durationMs = durationMs,
             videoLayout = exoVideoLayout,

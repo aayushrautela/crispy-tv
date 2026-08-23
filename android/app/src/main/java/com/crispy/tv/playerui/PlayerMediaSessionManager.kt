@@ -168,27 +168,22 @@ internal class PlayerMediaSessionManager(
 
         artworkJob =
             scope.launch(Dispatchers.IO) {
-                // Encode the session artwork bytes here, once, off the main thread. The
-                // previous design re-encoded the bitmap on every playback-state publish.
-                val loaded =
-                    runCatching {
-                        val request =
-                            ImageRequest.Builder(appContext)
-                                .data(artworkUrl)
-                                .allowHardware(false)
-                                .size(960, 540)
-                                .build()
-                        val result = appContext.imageLoader.execute(request)
-                        val image = (result as? SuccessResult)?.image ?: return@runCatching null
-                        encodeSessionArtwork(image.toBitmap())
-                    }.getOrNull()
+                val request =
+                    ImageRequest.Builder(appContext)
+                        .data(artworkUrl)
+                        .allowHardware(false)
+                        .size(ARTWORK_MAX_EDGE)
+                        .build()
+                val result = runCatching { appContext.imageLoader.execute(request) }.getOrNull()
+                val bitmap = (result as? SuccessResult)?.image?.toBitmap()
+                val data = bitmap?.let(::encodeSessionArtwork)
 
                 withContext(Dispatchers.Main.immediate) {
                     if (currentArtworkUrl != artworkUrl) {
                         return@withContext
                     }
-                    currentArtworkBitmap = loaded?.bitmap
-                    currentArtworkData = loaded?.data
+                    currentArtworkBitmap = bitmap
+                    currentArtworkData = data
                     publishMetadata()
                     publishNotification(force = true)
                 }
@@ -254,23 +249,29 @@ internal class PlayerMediaSessionManager(
         )
     }
 
-    private data class SessionArtwork(
-        val bitmap: Bitmap,
-        val data: ByteArray,
-    )
-
-    private fun encodeSessionArtwork(bitmap: Bitmap): SessionArtwork? {
-        // JPEG instead of PNG: Media3 ships artworkData across binder to SystemUI and
-        // external controllers, where a full-quality PNG of this size risks hitting the
-        // ~1MB transaction limit.
-        val data = ByteArrayOutputStream().use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, ARTWORK_JPEG_QUALITY, out)
-            out.toByteArray()
+    private fun encodeSessionArtwork(bitmap: Bitmap): ByteArray? {
+        var candidate = bitmap
+        var data = encodeJpeg(candidate)
+        // The encoded payload crosses binder to SystemUI, so it must stay well below the
+        // ~1MB transaction limit; shrink deterministically until the encode fits.
+        while (data == null || data.size > MAX_ARTWORK_DATA_BYTES) {
+            val nextWidth = (candidate.width * ARTWORK_SHRINK_FACTOR).toInt()
+            val nextHeight = (candidate.height * ARTWORK_SHRINK_FACTOR).toInt()
+            if (nextWidth < ARTWORK_MIN_EDGE || nextHeight < ARTWORK_MIN_EDGE) {
+                break
+            }
+            candidate = Bitmap.createScaledBitmap(candidate, nextWidth, nextHeight, true)
+            data = encodeJpeg(candidate)
         }
-        if (data.isEmpty()) {
+        return data
+    }
+
+    private fun encodeJpeg(bitmap: Bitmap): ByteArray? {
+        val out = ByteArrayOutputStream()
+        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, ARTWORK_JPEG_QUALITY, out)) {
             return null
         }
-        return SessionArtwork(bitmap = bitmap, data = data)
+        return out.toByteArray()
     }
 
     private fun canPostNotifications(): Boolean {
@@ -312,7 +313,11 @@ internal class PlayerMediaSessionManager(
         private const val NOTIFICATION_CHANNEL_ID = "crispy_player_playback"
         private const val NOTIFICATION_ID = 3001
         private const val REQUEST_CODE_CONTENT = 4001
+        private const val ARTWORK_MAX_EDGE = 1600
         private const val ARTWORK_JPEG_QUALITY = 90
+        private const val MAX_ARTWORK_DATA_BYTES = 512 * 1024
+        private const val ARTWORK_SHRINK_FACTOR = 0.75f
+        private const val ARTWORK_MIN_EDGE = 320
 
         @Volatile
         private var activeManager: PlayerMediaSessionManager? = null

@@ -435,6 +435,7 @@ internal class MpvPlaybackRuntime(
         return NativePlaybackSnapshot(
             engine = NativePlaybackEngine.MPV,
             state = normalizedState,
+            playWhenReady = playRequested,
             positionMs = positionMs,
             durationMs = durationMs,
             bufferingPercent = lastBufferingPercent,
