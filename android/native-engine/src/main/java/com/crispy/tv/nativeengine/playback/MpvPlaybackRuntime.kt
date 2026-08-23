@@ -319,6 +319,8 @@ internal class MpvPlaybackRuntime(
     }
 
     fun selectAudioTrack(trackId: String?) {
+        val language = trackId?.let { id -> audioTracks.firstOrNull { it.id == id }?.language }
+        Log.d(TAG, "selectAudioTrack id=$trackId language=$language")
         if (trackId == null) {
             runCatching { mpv?.setPropertyInt("aid", 0) }
             selectedAudioTrackId = null
@@ -330,6 +332,8 @@ internal class MpvPlaybackRuntime(
     }
 
     fun selectSubtitleTrack(trackId: String?) {
+        val language = trackId?.let { id -> subtitleTracks.firstOrNull { it.id == id }?.language }
+        Log.d(TAG, "selectSubtitleTrack id=$trackId language=$language")
         if (trackId == null) {
             runCatching { mpv?.setPropertyString("sid", "no") }
             selectedSubtitleTrackId = null
@@ -404,6 +408,12 @@ internal class MpvPlaybackRuntime(
         selectedAudioTrackId = aid?.takeIf { it.isNotBlank() && it != "0" }
         val sid = runCatching { mpv.getPropertyString("sid") }.getOrNull()
         selectedSubtitleTrackId = sid?.takeIf { it.isNotBlank() && it != "0" }
+        Log.d(
+            TAG,
+            "refreshTrackLists audio=${audioTracks.joinToString { "${it.id}:${it.language}" }}" +
+                " subtitle=${subtitleTracks.joinToString { "${it.id}:${it.language}" }}" +
+                " selectedAudioId=$selectedAudioTrackId selectedSubtitleId=$selectedSubtitleTrackId",
+        )
     }
 
     private fun readTrackList(mpv: MPVLib, trackType: String): List<NativeTrack> {

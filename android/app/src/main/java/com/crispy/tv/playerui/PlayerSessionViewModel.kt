@@ -289,14 +289,22 @@ class PlayerSessionViewModel(
     }
 
     fun selectAudioTrack(trackId: String?) {
+        val language = trackId?.let(::languageFromTrack)
+        Log.d(TAG, "selectAudioTrack id=$trackId language=$language")
         playbackController.selectAudioTrack(trackId)
-        trackId?.let { playbackSettingsRepository.setDefaultAudioLanguage(languageFromTrack(trackId) ?: return@let) }
+        if (language != null) {
+            playbackSettingsRepository.setDefaultAudioLanguage(language)
+        }
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
     fun selectSubtitleTrack(trackId: String?) {
+        val language = trackId?.let(::languageFromTrack)
+        Log.d(TAG, "selectSubtitleTrack id=$trackId language=$language")
         playbackController.selectSubtitleTrack(trackId)
-        trackId?.let { playbackSettingsRepository.setDefaultSubtitleLanguage(languageFromTrack(trackId) ?: return@let) }
+        if (language != null) {
+            playbackSettingsRepository.setDefaultSubtitleLanguage(language)
+        }
         syncPlaybackSnapshot(playbackController.snapshot())
     }
 
@@ -992,6 +1000,12 @@ class PlayerSessionViewModel(
 
     private fun applyPersistedPlaybackSettings() {
         val settings = playbackSettingsRepository.settings.value
+        Log.d(
+            TAG,
+            "applyPersistedPlaybackSettings speed=${settings.playbackSpeed} muted=${settings.muted}" +
+                " preferredAudioLanguage=${settings.defaultAudioLanguage}" +
+                " preferredSubtitleLanguage=${settings.defaultSubtitleLanguage}",
+        )
         playbackController.setPlaybackSpeed(settings.playbackSpeed)
         playbackController.setMuted(settings.muted)
     }

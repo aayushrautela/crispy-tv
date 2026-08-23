@@ -124,6 +124,17 @@ class NativePlaybackController(
 
             override fun onTracksChanged(tracks: Tracks) {
                 Log.d(TAG, "Exo onTracksChanged groups=${tracks.groups.size}")
+                tracks.groups.forEachIndexed { groupIndex, group ->
+                    for (formatIndex in 0 until group.length) {
+                        val format = group.getTrackFormat(formatIndex)
+                        Log.d(
+                            TAG,
+                            "Exo track group=$groupIndex type=${trackTypeName(group.type)}" +
+                                " index=$formatIndex id=${format.id} language=${format.language}" +
+                                " label=${format.label} selected=${group.isTrackSelected(formatIndex)}",
+                        )
+                    }
+                }
                 if (pendingAudioTrackId != null && tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
                     val id = pendingAudioTrackId
                     pendingAudioTrackId = null
@@ -134,6 +145,11 @@ class NativePlaybackController(
                     pendingSubtitleTrackId = null
                     applyExoTrackOverride(C.TRACK_TYPE_TEXT, id)
                 }
+                Log.d(
+                    TAG,
+                    "Exo selection after tracks change audioId=${selectedExoTrackId(C.TRACK_TYPE_AUDIO)}" +
+                        " subtitleId=${selectedExoTrackId(C.TRACK_TYPE_TEXT)}",
+                )
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -247,6 +263,7 @@ class NativePlaybackController(
     }
 
     override fun selectAudioTrack(trackId: String?) {
+        Log.d(TAG, "selectAudioTrack engine=$currentEngine id=$trackId")
         if (currentEngine != NativePlaybackEngine.EXO) {
             mpvRuntime.selectAudioTrack(trackId)
             return
@@ -256,6 +273,7 @@ class NativePlaybackController(
     }
 
     override fun selectSubtitleTrack(trackId: String?) {
+        Log.d(TAG, "selectSubtitleTrack engine=$currentEngine id=$trackId")
         if (currentEngine != NativePlaybackEngine.EXO) {
             mpvRuntime.selectSubtitleTrack(trackId)
             return
@@ -319,6 +337,7 @@ class NativePlaybackController(
     private fun applyExoTrackOverride(trackType: Int, trackId: String?) {
         val groups = exoPlayer.currentTracks.groups
         if (trackId == null) {
+            Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} action=disable")
             exoPlayer.trackSelectionParameters =
                 exoPlayer.trackSelectionParameters
                     .buildUpon()
@@ -326,11 +345,26 @@ class NativePlaybackController(
                     .build()
             return
         }
-        val (groupIndex, formatIndex) = parseTrackId(trackId) ?: return
-        val group = groups.getOrNull(groupIndex) ?: return
-        if (group.type != trackType) return
-        if (formatIndex < 0 || formatIndex >= group.length) return
-        if (!group.isTrackSupported(formatIndex)) return
+        val (groupIndex, formatIndex) = parseTrackId(trackId) ?: run {
+            Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=unparseable-id")
+            return
+        }
+        val group = groups.getOrNull(groupIndex) ?: run {
+            Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=group-missing")
+            return
+        }
+        if (group.type != trackType) {
+            Log.d(TAG, "applyExoTrackOverride id=$trackId rejected=type-mismatch group=${trackTypeName(group.type)}")
+            return
+        }
+        if (formatIndex < 0 || formatIndex >= group.length) {
+            Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=index-out-of-bounds")
+            return
+        }
+        if (!group.isTrackSupported(formatIndex)) {
+            Log.d(TAG, "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId rejected=unsupported")
+            return
+        }
         val override = TrackSelectionOverride(group.mediaTrackGroup, formatIndex)
         exoPlayer.trackSelectionParameters =
             exoPlayer.trackSelectionParameters
@@ -338,6 +372,11 @@ class NativePlaybackController(
                 .setTrackTypeDisabled(trackType, false)
                 .setOverrideForType(override)
                 .build()
+        Log.d(
+            TAG,
+            "applyExoTrackOverride type=${trackTypeName(trackType)} id=$trackId applied" +
+                " language=${group.getTrackFormat(formatIndex).language}",
+        )
     }
 
     private fun parseTrackId(trackId: String): Pair<Int, Int>? {
@@ -672,6 +711,14 @@ class NativePlaybackController(
         }
         return null
     }
+
+    private fun trackTypeName(trackType: Int): String =
+        when (trackType) {
+            C.TRACK_TYPE_AUDIO -> "AUDIO"
+            C.TRACK_TYPE_VIDEO -> "VIDEO"
+            C.TRACK_TYPE_TEXT -> "TEXT"
+            else -> "type=$trackType"
+        }
 
     private fun exoDurationMs(): Long {
         val duration = exoPlayer.duration
