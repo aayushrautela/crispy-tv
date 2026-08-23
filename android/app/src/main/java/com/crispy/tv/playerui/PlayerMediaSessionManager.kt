@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -89,6 +90,10 @@ internal class PlayerMediaSessionManager(
         currentTitle = normalizedTitle
         currentSubtitle = normalizedSubtitle
         currentArtworkUrl = normalizedArtworkUrl
+        Log.d(
+            TAG,
+            "updateMetadata title=\"$normalizedTitle\" subtitle=$normalizedSubtitle artworkUrl=$normalizedArtworkUrl",
+        )
 
         if (artworkChanged) {
             currentArtworkBitmap = null
@@ -117,6 +122,11 @@ internal class PlayerMediaSessionManager(
             // position from the controller snapshot, so nothing needs republishing.
             return
         }
+        Log.d(
+            TAG,
+            "updatePlayback isPlaying=$isPlaying isBuffering=$isBuffering" +
+                " (was isPlaying=$currentIsPlaying isBuffering=$currentIsBuffering)",
+        )
         currentIsPlaying = isPlaying
         currentIsBuffering = isBuffering
         currentIsError = false
@@ -139,12 +149,14 @@ internal class PlayerMediaSessionManager(
         currentIsError = true
         currentIsPlaying = false
         currentIsBuffering = false
+        Log.d(TAG, "updatePlaybackError title=$currentTitle")
         publishPlaybackState()
         publishNotification(force = true)
     }
 
     fun release() {
         released = true
+        Log.d(TAG, "release title=$currentTitle")
         artworkJob?.cancel()
         NotificationManagerCompat.from(appContext).cancel(NOTIFICATION_ID)
         if (activeManager === this) {
@@ -161,10 +173,12 @@ internal class PlayerMediaSessionManager(
     private fun loadArtwork(artworkUrl: String?) {
         artworkJob?.cancel()
         if (artworkUrl == null) {
+            Log.d(TAG, "artwork cleared")
             publishMetadata()
             publishNotification(force = true)
             return
         }
+        Log.d(TAG, "artwork load start url=$artworkUrl")
 
         artworkJob =
             scope.launch(Dispatchers.IO) {
@@ -180,7 +194,17 @@ internal class PlayerMediaSessionManager(
 
                 withContext(Dispatchers.Main.immediate) {
                     if (currentArtworkUrl != artworkUrl) {
+                        Log.d(TAG, "artwork discarded stale url=$artworkUrl")
                         return@withContext
+                    }
+                    if (bitmap == null) {
+                        Log.w(TAG, "artwork load failed url=$artworkUrl result=$result")
+                    } else {
+                        Log.d(
+                            TAG,
+                            "artwork loaded ${bitmap.width}x${bitmap.height}" +
+                                " bytes=${data?.size ?: 0}",
+                        )
                     }
                     currentArtworkBitmap = bitmap
                     currentArtworkData = data
@@ -200,6 +224,7 @@ internal class PlayerMediaSessionManager(
 
     private fun publishNotification(force: Boolean = false) {
         if (!canPostNotifications()) {
+            Log.w(TAG, "notification suppressed: POST_NOTIFICATIONS not granted")
             return
         }
 
@@ -219,7 +244,7 @@ internal class PlayerMediaSessionManager(
 
         val notification =
             NotificationCompat.Builder(appContext, NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification_player)
+                .setSmallIcon(R.mipmap.ic_launcher_monochrome)
                 .setContentTitle(currentTitle)
                 .setContentText(currentSubtitle)
                 .setContentIntent(buildContentPendingIntent())
@@ -235,6 +260,12 @@ internal class PlayerMediaSessionManager(
                 ).build()
 
         NotificationManagerCompat.from(appContext).notify(NOTIFICATION_ID, notification)
+        Log.d(
+            TAG,
+            "notification posted title=\"$currentTitle\" art=${currentArtworkBitmap != null}" +
+                " artworkBytes=${currentArtworkData?.size ?: 0} ongoing=${currentIsPlaying || currentIsBuffering}" +
+                " isPlaying=$currentIsPlaying isBuffering=$currentIsBuffering force=$force",
+        )
 
         lastNotificationSnapshot = snapshot
     }
@@ -310,6 +341,7 @@ internal class PlayerMediaSessionManager(
     )
 
     companion object {
+        private const val TAG = "PlayerMediaSessionManager"
         private const val NOTIFICATION_CHANNEL_ID = "crispy_player_playback"
         private const val NOTIFICATION_ID = 3001
         private const val REQUEST_CODE_CONTENT = 4001

@@ -155,7 +155,6 @@ internal fun PlayerBottomControls(
     positionMsState: State<Long>,
     durationMs: Long,
     hasAudioTracks: Boolean,
-    hasSubtitleTracks: Boolean,
     palette: DetailsPaletteColors,
     onSeekTo: (Long) -> Unit,
     onOpenStreams: () -> Unit,
@@ -219,18 +218,16 @@ internal fun PlayerBottomControls(
                             )
                         }
                     }
-                    if (hasSubtitleTracks) {
-                        IconButton(
-                            onClick = onOpenSubtitles,
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Subtitles,
-                                contentDescription = "Subtitles",
-                                tint = palette.onPillBackground,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
+                    IconButton(
+                        onClick = onOpenSubtitles,
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Subtitles,
+                            contentDescription = "Subtitles",
+                            tint = palette.onPillBackground,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                     IconButton(
                         onClick = onOpenStreams,

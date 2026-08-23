@@ -221,7 +221,6 @@ internal fun PlayerOverlay(
                     positionMsState = positionMsState,
                     durationMs = effectiveDurationMs,
                     hasAudioTracks = uiState.audioTracks.isNotEmpty(),
-                    hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),
                     palette = palette,
                     onSeekTo = {
                         resetControlsTimer()
