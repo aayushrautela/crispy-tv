@@ -13,6 +13,12 @@ interface CatalogRepository {
         itemId: String,
     ): CrispyBackendClient.MetadataTitleExtrasResponse
 
+    suspend fun getSeriesEpisodes(
+        accessToken: String,
+        seriesItemId: String,
+        season: Int? = null,
+    ): CrispyBackendClient.MetadataSeriesEpisodesResponse
+
     suspend fun getTitleRatings(
         accessToken: String,
         profileId: String,

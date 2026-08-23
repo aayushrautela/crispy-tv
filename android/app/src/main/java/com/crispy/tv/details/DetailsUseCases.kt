@@ -213,7 +213,7 @@ internal class DetailsUseCases(
                 }.onSuccess { extras ->
                     Log.d(
                         TAG,
-                        "Loaded title extras for itemId=$itemId seasons=${extras.seasons.size} episodes=${extras.episodes.size} reviews=${extras.reviews.size} similar=${extras.similar.size} hasCollection=${extras.collection != null}",
+                        "Loaded title extras for itemId=$itemId seasons=${extras.seasons.size} reviews=${extras.reviews.size} similar=${extras.similar.size} hasCollection=${extras.collection != null}",
                     )
                 }.onFailure { error ->
                     Log.w(TAG, "Failed to load title extras for itemId=$itemId", error)
@@ -221,6 +221,33 @@ internal class DetailsUseCases(
             }
 
         return DetailsExtrasLoadResult(titleExtras = titleExtras)
+    }
+
+    suspend fun loadAllEpisodes(
+        itemId: String,
+    ): List<MediaVideo> {
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
+        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+        if (accessToken == null) {
+            Log.w(TAG, "Skipping series episodes load: missing access token for itemId=$itemId")
+            return emptyList()
+        }
+
+        return runCatching {
+            catalogRepository.getSeriesEpisodes(
+                accessToken = accessToken,
+                seriesItemId = itemId,
+                season = null,
+            )
+        }.onSuccess { response ->
+            Log.d(TAG, "Loaded series episodes for itemId=$itemId count=${response.items.size}")
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to load series episodes for itemId=$itemId", error)
+        }.getOrNull()
+            ?.items
+            ?.mapNotNull(CrispyBackendClient.MetadataView::toMediaVideo)
+            .orEmpty()
     }
 
     suspend fun loadRatings(
@@ -265,24 +292,43 @@ internal class DetailsUseCases(
     suspend fun loadSeasonEpisodes(
         season: Int,
         details: MediaDetails,
-        titleExtras: CrispyBackendClient.MetadataTitleExtrasResponse?,
     ): DetailsSeasonEpisodesResult {
-        val episodesForSeason = titleExtras
-            ?.episodes
-            ?.filter { it.seasonNumber == season }
-            ?.mapNotNull(CrispyBackendClient.MetadataEpisodeView::toMediaVideo)
-            ?.takeIf { it.isNotEmpty() }
-
-        if (episodesForSeason != null) {
-            return DetailsSeasonEpisodesResult(
-                videos = episodesForSeason,
-                episodeWatchStates = resolveEpisodeWatchStates(details, episodesForSeason),
-                effectiveSeasonNumber = season,
-                includedSeasonNumbers = emptyList(),
-            )
+        val seriesItemId = details.itemId?.trim()?.takeIf { it.isNotBlank() }
+        if (seriesItemId.isNullOrBlank()) {
+            return DetailsSeasonEpisodesResult(errorMessage = "No episodes found for this season.")
         }
 
-        return DetailsSeasonEpisodesResult(errorMessage = "No episodes found for this season.")
+        val backendContext = runCatching { backendContextResolver.resolve() }.getOrNull()
+        val session = runCatching { sessionRepository.ensureValidSession() }.getOrNull()
+        val accessToken = backendContext?.accessToken ?: session?.accessToken
+        if (accessToken == null) {
+            return DetailsSeasonEpisodesResult(errorMessage = "Sign in to load episodes.")
+        }
+
+        val response = runCatching {
+            catalogRepository.getSeriesEpisodes(
+                accessToken = accessToken,
+                seriesItemId = seriesItemId,
+                season = season,
+            )
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to load episodes for itemId=$seriesItemId season=$season", error)
+        }.getOrNull()
+
+        val videos = response
+            ?.items
+            ?.mapNotNull(CrispyBackendClient.MetadataView::toMediaVideo)
+            .orEmpty()
+        if (videos.isEmpty()) {
+            return DetailsSeasonEpisodesResult(errorMessage = "No episodes found for this season.")
+        }
+
+        return DetailsSeasonEpisodesResult(
+            videos = videos,
+            episodeWatchStates = resolveEpisodeWatchStates(details, videos),
+            effectiveSeasonNumber = season,
+            includedSeasonNumbers = emptyList(),
+        )
     }
 
     suspend fun resolveEpisodeWatchStates(

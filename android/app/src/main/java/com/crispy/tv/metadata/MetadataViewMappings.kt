@@ -55,29 +55,6 @@ internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
     )
 }
 
-internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo? {
-    val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
-    val season = seasonNumber
-    val episode = episodeNumber
-    val titleText =
-        title?.trim()?.takeIf { it.isNotBlank() }
-            ?: when {
-                episode != null -> "Episode $episode"
-                else -> canonicalId
-            }
-    return MediaVideo(
-        id = canonicalId,
-        title = titleText,
-        season = season,
-        episode = episode,
-        released = airDate,
-        overview = summary,
-        thumbnailUrl = images.stillUrl ?: images.posterUrl,
-        lookupId = buildAddonEpisodeLookupId(showExternalIds.imdb, season, episode) ?: itemId,
-        absoluteEpisodeNumber = absoluteEpisodeNumber,
-    )
-}
-
 internal fun CrispyBackendClient.MetadataView.toMediaVideo(): MediaVideo? {
     val canonicalId = itemId.trim().takeIf { it.isNotBlank() } ?: return null
     val season = seasonNumber

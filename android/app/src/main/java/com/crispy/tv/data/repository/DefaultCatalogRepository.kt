@@ -20,6 +20,18 @@ class DefaultCatalogRepository(
         return backendClient.getMetadataItemExtras(accessToken = accessToken, itemId = itemId)
     }
 
+    override suspend fun getSeriesEpisodes(
+        accessToken: String,
+        seriesItemId: String,
+        season: Int?,
+    ): CrispyBackendClient.MetadataSeriesEpisodesResponse {
+        return backendClient.getSeriesEpisodes(
+            accessToken = accessToken,
+            seriesItemId = seriesItemId,
+            season = season,
+        )
+    }
+
     override suspend fun getTitleRatings(
         accessToken: String,
         profileId: String,

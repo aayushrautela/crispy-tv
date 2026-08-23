@@ -17,7 +17,6 @@ import com.crispy.tv.domain.optimistic.WatchlistMutation
 import com.crispy.tv.domain.optimistic.deriveUserState
 import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.toMediaVideo
 import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
@@ -315,9 +314,17 @@ class DetailsViewModel internal constructor(
                 if (!isCurrentGeneration(generation)) return@launch
 
                 val titleExtras = result.titleExtras
-                if (titleExtras != null) {
-                    titleExtras.episodes
-                        .mapNotNull { it.toMediaVideo() }
+                val isEpisodicTitle = _uiState.value.details
+                    ?.itemType?.let { !it.equals("movie", ignoreCase = true) } == true
+                val allEpisodes = if (titleExtras != null && isEpisodicTitle) {
+                    withContext(Dispatchers.IO) {
+                        detailsUseCases.loadAllEpisodes(itemId = itemId)
+                    }
+                } else {
+                    emptyList()
+                }
+                if (allEpisodes.isNotEmpty()) {
+                    allEpisodes
                         .groupBy { it.season }
                         .forEach { (season, videos) ->
                             if (season != null && videos.isNotEmpty()) {
@@ -338,7 +345,7 @@ class DetailsViewModel internal constructor(
                         ?.associate { it.seasonNumber to it.itemId }
                         .orEmpty()
                     val runtimeEpisodeTarget = detailsUseCases.resolveRuntimeEpisodeTarget(
-                        videos = titleExtras?.episodes.orEmpty().mapNotNull { it.toMediaVideo() },
+                        videos = allEpisodes,
                         runtimeEntry = runtimeEntry,
                     )
                     val pendingHighlightEpisodeId = pendingEpisodeNavigation?.highlightEpisodeId ?: runtimeEpisodeTarget?.episodeId
@@ -606,7 +613,6 @@ class DetailsViewModel internal constructor(
                         detailsUseCases.loadSeasonEpisodes(
                             season = season,
                             details = details,
-                            titleExtras = _uiState.value.titleExtras,
                         )
                     }
 

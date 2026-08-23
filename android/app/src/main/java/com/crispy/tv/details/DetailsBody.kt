@@ -114,7 +114,8 @@ internal fun LazyListScope.detailsBodyContent(
     }
 
     val isShow = details.itemType.equals("show", ignoreCase = true) ||
-        details.itemType.equals("anime", ignoreCase = true)
+        details.itemType.equals("anime", ignoreCase = true) ||
+        details.itemType.equals("episode", ignoreCase = true)
     val leadingPeople = if (isShow) {
         titleDetail?.creators.orEmpty()
     } else {

@@ -461,10 +461,6 @@ class CrispyBackendClient(
             get() = showItemId
     }
 
-    data class MetadataResolveResponse(
-        val item: MetadataView,
-    )
-
     data class MetadataTitleDetailResponse(
         val item: MetadataView,
         val nextEpisode: MetadataEpisodeView?,
@@ -821,10 +817,6 @@ class CrispyBackendClient(
 
     suspend fun getAvatars(): List<Avatar> {
         return getAvatarsApi()
-    }
-
-    suspend fun resolveMetadata(accessToken: String, input: ItemLookupInput): MetadataResolveResponse {
-        return resolveMetadataApi(accessToken, input)
     }
 
     suspend fun getMetadataItemDetail(accessToken: String, itemId: String): MetadataTitleDetailResponse {

@@ -2,7 +2,6 @@ package com.crispy.tv.backend
 
 import com.crispy.tv.backend.CrispyBackendClient.AiInsightsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
-import com.crispy.tv.backend.CrispyBackendClient.MetadataResolveResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
@@ -145,26 +144,6 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
     )
 }
 
-internal suspend fun CrispyBackendClient.resolveMetadataApi(
-    accessToken: String,
-    input: ItemLookupInput,
-): MetadataResolveResponse {
-    checkConfigured()
-    val url = "$baseUrl/v1/metadata/resolve".toHttpUrl().newBuilder()
-        .apply {
-            if (!input.itemId.isNullOrBlank()) addQueryParameter("itemId", input.itemId.trim())
-        }
-        .build()
-    val response = httpClient.get(
-        url = url,
-        headers = authHeaders(accessToken),
-        callTimeoutMs = callTimeoutMs,
-    )
-    val json = requireSuccess(response)
-    val itemJson = json.optJSONObject("Item") ?: throw IllegalStateException("Backend metadata resolve did not return an Item.")
-    return MetadataResolveResponse(item = parseMetadataView(itemJson))
-}
-
 internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(
     accessToken: String,
     itemId: String,
@@ -203,7 +182,6 @@ internal suspend fun CrispyBackendClient.getMetadataItemExtrasApi(
     return withContext(Dispatchers.Default) {
         MetadataTitleExtrasResponse(
             seasons = parseMetadataSeasonViews(json.optJSONArray("Seasons")),
-            episodes = parseMetadataEpisodeViews(json.optJSONArray("Episodes")),
             reviews = parseMetadataReviewViews(json.optJSONArray("Reviews")),
             similar = parseMetadataRelatedItemViews(json.optJSONArray("Similar")),
             collection = parseMetadataCollectionView(json.optJSONObject("Collection")),

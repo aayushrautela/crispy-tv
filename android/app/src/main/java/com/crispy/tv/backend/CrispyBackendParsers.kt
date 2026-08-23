@@ -679,16 +679,6 @@ internal fun CrispyBackendClient.parseMetadataSeasonView(json: JSONObject): Meta
     )
 }
 
-internal fun CrispyBackendClient.parseMetadataEpisodeViews(array: JSONArray?): List<MetadataEpisodeView> {
-    val safeArray = array ?: JSONArray()
-    return buildList {
-        for (index in 0 until safeArray.length()) {
-            val item = safeArray.optJSONObject(index) ?: continue
-            add(parseMetadataEpisodeView(item))
-        }
-    }
-}
-
 internal fun CrispyBackendClient.parseMetadataEpisodeView(json: JSONObject): MetadataEpisodeView {
     val itemId = json.optNullableString("Id")
     if (itemId.isNullOrBlank()) {
