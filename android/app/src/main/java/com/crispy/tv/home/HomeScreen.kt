@@ -84,6 +84,7 @@ internal fun HomeRoute(
                     resumePositionMs = selection.resumePositionMs,
                     chosenStreamStableKey = selection.chosenStreamStableKey,
                     chosenProviderId = selection.chosenProviderId,
+                    chosenStreamHandoffKey = null,
                 )
             )
             selectorViewModel.dismiss()

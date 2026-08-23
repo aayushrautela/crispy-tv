@@ -256,7 +256,7 @@ internal fun PlayerOverlay(
         )
 
         PlayerStreamsSheet(
-            visible = uiState.streamSelector.visible,
+            visible = uiState.activeSurface == PlayerSurface.STREAMS,
             details = uiState.details,
             state = uiState.streamSelector,
             palette = palette,

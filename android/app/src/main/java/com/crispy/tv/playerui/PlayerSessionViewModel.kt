@@ -15,6 +15,7 @@ import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.metadata.toMediaVideo
+import com.crispy.tv.metadata.toMediaDetails
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.PlayerStreamLookupTarget
 import com.crispy.tv.playback.StreamLookupTarget
@@ -118,12 +119,14 @@ class PlayerSessionViewModel(
     resumePositionMs: Long = 0L,
     chosenStreamStableKey: String? = null,
     chosenProviderId: String? = null,
+    chosenStreamHandoffKey: String? = null,
     restorePlaybackIntent: Intent,
 ) : ViewModel() {
     private val appContext = appContext.applicationContext
     private val resumePositionMs = resumePositionMs
     private val chosenStreamStableKey = chosenStreamStableKey?.trim()?.takeIf { it.isNotBlank() }
     private val chosenProviderId = chosenProviderId?.trim()?.takeIf { it.isNotBlank() }
+    private val chosenStreamHandoffKey = chosenStreamHandoffKey?.trim()?.takeIf { it.isNotBlank() }
     private val supabase = SupabaseServicesProvider.accountClient(this.appContext)
     private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(this.appContext)
     private val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(this.appContext)
@@ -396,6 +399,18 @@ class PlayerSessionViewModel(
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
         initialTarget = target
+
+        val handoff = PlayerStreamHandoff.consume(chosenStreamHandoffKey)
+        if (handoff != null) {
+            val (stream, lookupId) = handoff
+            autoSelectPending = false
+            viewModelScope.launch { fetchMetadata(identity.itemId) }
+            viewModelScope.launch {
+                playResolvedStream(stream, PlayerStreamLookupTarget(target.mediaType, lookupId))
+            }
+            return
+        }
+
         autoSelectPending = true
         selectorCoordinator.open(
             target = target,
@@ -404,6 +419,13 @@ class PlayerSessionViewModel(
             itemIdForMetadata = identity.itemId,
             onStreamSelected = ::handleChosenStream,
         )
+    }
+
+    private suspend fun fetchMetadata(itemId: String?) {
+        val id = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return
+        val token = runCatching { supabase.ensureValidSession()?.accessToken }.getOrNull() ?: return
+        runCatching { backendClient.getMetadataItemDetail(accessToken = token, itemId = id) }
+            .onSuccess { response -> onCoordinatorDetailsChanged(response.toMediaDetails()) }
     }
 
     private suspend fun resolvePlaybackSource(
@@ -464,6 +486,7 @@ class PlayerSessionViewModel(
             _uiState.update { it.copy(statusMessage = "Unable to resolve stream lookup id for this title.") }
             return
         }
+        _uiState.update { it.copy(activeSurface = PlayerSurface.STREAMS) }
         selectorCoordinator.open(
             target = target,
             headerEpisode = null,
@@ -492,6 +515,7 @@ class PlayerSessionViewModel(
                 currentEpisodes = uiState.value.seasonEpisodes,
                 cachedEpisodes = seasonEpisodesCache.values,
             )
+        _uiState.update { it.copy(activeSurface = PlayerSurface.STREAMS) }
         selectorCoordinator.open(
             target = target,
             headerEpisode = headerEpisode,
@@ -706,6 +730,8 @@ class PlayerSessionViewModel(
                 }
         if (top != null) {
             viewModelScope.launch { playResolvedStream(top, target) }
+        } else {
+            _uiState.update { it.copy(activeSurface = PlayerSurface.STREAMS) }
         }
     }
 

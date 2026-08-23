@@ -72,6 +72,7 @@ class PlayerActivity : ComponentActivity() {
         val resumePositionMs = intent.getLongExtra(EXTRA_RESUME_POSITION_MS, 0L)
         val chosenStreamStableKey = intent.getStringExtra(EXTRA_CHOSEN_STREAM_KEY)?.trim()?.ifBlank { null }
         val chosenProviderId = intent.getStringExtra(EXTRA_CHOSEN_PROVIDER_ID)?.trim()?.ifBlank { null }
+        val chosenStreamHandoffKey = intent.getStringExtra(EXTRA_CHOSEN_STREAM_HANDOFF_KEY)?.trim()?.ifBlank { null }
         val restorePlaybackIntent =
             Intent(intent).addFlags(
                 Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
@@ -85,6 +86,7 @@ class PlayerActivity : ComponentActivity() {
                     resumePositionMs = resumePositionMs,
                     chosenStreamStableKey = chosenStreamStableKey,
                     chosenProviderId = chosenProviderId,
+                    chosenStreamHandoffKey = chosenStreamHandoffKey,
                     restorePlaybackIntent = restorePlaybackIntent,
                 ),
             )[PlayerSessionViewModel::class.java]
@@ -284,6 +286,7 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_RESUME_POSITION_MS = "extra_resume_position_ms"
         private const val EXTRA_CHOSEN_STREAM_KEY = "extra_chosen_stream_key"
         private const val EXTRA_CHOSEN_PROVIDER_ID = "extra_chosen_provider_id"
+        private const val EXTRA_CHOSEN_STREAM_HANDOFF_KEY = "extra_chosen_stream_handoff_key"
         private const val PIP_MAX_ASPECT_RATIO = 2.39
         private const val PIP_MIN_ASPECT_RATIO = 1.0 / PIP_MAX_ASPECT_RATIO
 
@@ -321,6 +324,7 @@ class PlayerActivity : ComponentActivity() {
             resumePositionMs: Long = 0L,
             chosenStreamStableKey: String? = null,
             chosenProviderId: String? = null,
+            chosenStreamHandoffKey: String? = null,
         ): Intent {
             return Intent(context, PlayerActivity::class.java)
                 .putExtra(EXTRA_ITEM_ID, identity.itemId)
@@ -337,6 +341,7 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(EXTRA_RESUME_POSITION_MS, resumePositionMs)
                 .putExtra(EXTRA_CHOSEN_STREAM_KEY, chosenStreamStableKey)
                 .putExtra(EXTRA_CHOSEN_PROVIDER_ID, chosenProviderId)
+                .putExtra(EXTRA_CHOSEN_STREAM_HANDOFF_KEY, chosenStreamHandoffKey)
         }
 
         private fun parseIdentityFromIntent(intent: Intent): PlaybackIdentity? {

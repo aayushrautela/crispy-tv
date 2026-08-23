@@ -22,6 +22,7 @@ import com.crispy.tv.optimistic.UserMutationOutbox
 import com.crispy.tv.optimistic.toContentType
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
+import com.crispy.tv.playerui.PlayerStreamHandoff
 import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.StreamSelectorUiState
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
@@ -1077,6 +1078,7 @@ class DetailsViewModel internal constructor(
                     resumePositionMs = resumePositionMs,
                     chosenStreamStableKey = stream.stableKey,
                     chosenProviderId = stream.providerId,
+                    chosenStreamHandoffKey = PlayerStreamHandoff.stash(stream, resolvedLookupId),
                 )
             )
         }

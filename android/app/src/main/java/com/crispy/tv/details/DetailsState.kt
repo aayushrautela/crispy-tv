@@ -78,5 +78,6 @@ sealed interface DetailsNavigationEvent {
         val resumePositionMs: Long = 0L,
         val chosenStreamStableKey: String? = null,
         val chosenProviderId: String? = null,
+        val chosenStreamHandoffKey: String? = null,
     ) : DetailsNavigationEvent
 }
