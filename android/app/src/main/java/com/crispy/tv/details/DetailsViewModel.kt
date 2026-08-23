@@ -26,7 +26,6 @@ import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.StreamSelectorUiState
 import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.playback.StreamLookupTarget
-import com.crispy.tv.playback.buildPlayerSubtitle
 import com.crispy.tv.playback.findEpisodeForLookupId
 import com.crispy.tv.playback.resolveStreamLookupTarget
 import com.crispy.tv.playback.parseLookupId
@@ -1064,15 +1063,6 @@ class DetailsViewModel internal constructor(
                 parentMediaType = enriched.parentMediaType ?: parentMediaType,
                 absoluteEpisodeNumber = targetEpisode?.absoluteEpisodeNumber ?: enriched.absoluteEpisodeNumber,
             )
-            val artworkUrl = enriched.backdropUrl?.trim()?.ifBlank { null } ?: enriched.posterUrl?.trim()?.ifBlank { null }
-            val subtitle = buildPlayerSubtitle(
-                mediaType = resolvedMediaType,
-                details = enriched,
-                playerTitle = title,
-                season = season,
-                episode = episode,
-            )
-
             val resumePositionMs = withContext(Dispatchers.IO) {
                 detailsUseCases.userMediaRepository
                     .getLocalWatchProgress(identity)
@@ -1083,10 +1073,7 @@ class DetailsViewModel internal constructor(
 
             _navigationEvents.tryEmit(
                 DetailsNavigationEvent.OpenPlayer(
-                    title = title,
                     identity = identity,
-                    subtitle = subtitle,
-                    artworkUrl = artworkUrl,
                     resumePositionMs = resumePositionMs,
                     chosenStreamStableKey = stream.stableKey,
                     chosenProviderId = stream.providerId,

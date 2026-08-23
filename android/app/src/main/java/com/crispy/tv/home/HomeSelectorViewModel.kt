@@ -27,9 +27,6 @@ import kotlinx.coroutines.withContext
 
 data class HomeStreamSelection(
     val identity: PlaybackIdentity,
-    val title: String,
-    val subtitle: String?,
-    val artworkUrl: String?,
     val resumePositionMs: Long,
     val chosenStreamStableKey: String?,
     val chosenProviderId: String?,
@@ -138,9 +135,6 @@ internal class HomeSelectorViewModel(
         _playStream.tryEmit(
             HomeStreamSelection(
                 identity = identity,
-                title = item.title,
-                subtitle = item.subtitle,
-                artworkUrl = item.backdropUrl ?: item.posterUrl,
                 resumePositionMs = resumePositionMs,
                 chosenStreamStableKey = stream.stableKey,
                 chosenProviderId = stream.providerId,

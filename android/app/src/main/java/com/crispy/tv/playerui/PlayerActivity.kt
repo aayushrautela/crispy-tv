@@ -64,10 +64,7 @@ class PlayerActivity : ComponentActivity() {
 
         isInPictureInPictureModeState = isInPictureInPictureMode
 
-        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
-        val subtitle = intent.getStringExtra(EXTRA_SUBTITLE)?.trim()?.ifBlank { null }
-        val artworkUrl = intent.getStringExtra(EXTRA_ARTWORK_URL)?.trim()?.ifBlank { null }
-        val identity = parseIdentityFromIntent(intent, title)
+        val identity = parseIdentityFromIntent(intent)
         if (identity == null) {
             finish()
             return
@@ -84,9 +81,6 @@ class PlayerActivity : ComponentActivity() {
                 this,
                 PlayerSessionViewModel.factory(
                     appContext = applicationContext,
-                    title = title,
-                    subtitle = subtitle,
-                    artworkUrl = artworkUrl,
                     identity = identity,
                     resumePositionMs = resumePositionMs,
                     chosenStreamStableKey = chosenStreamStableKey,
@@ -287,9 +281,6 @@ class PlayerActivity : ComponentActivity() {
     companion object {
         private const val TAG = "PlayerActivity"
         private const val PIP_EXIT_PAUSE_GUARD_MS = 250L
-        private const val EXTRA_TITLE = "extra_title"
-        private const val EXTRA_SUBTITLE = "extra_subtitle"
-        private const val EXTRA_ARTWORK_URL = "extra_artwork_url"
         private const val EXTRA_RESUME_POSITION_MS = "extra_resume_position_ms"
         private const val EXTRA_CHOSEN_STREAM_KEY = "extra_chosen_stream_key"
         private const val EXTRA_CHOSEN_PROVIDER_ID = "extra_chosen_provider_id"
@@ -327,17 +318,11 @@ class PlayerActivity : ComponentActivity() {
         fun intent(
             context: Context,
             identity: PlaybackIdentity,
-            title: String,
-            subtitle: String? = null,
-            artworkUrl: String? = null,
             resumePositionMs: Long = 0L,
             chosenStreamStableKey: String? = null,
             chosenProviderId: String? = null,
         ): Intent {
             return Intent(context, PlayerActivity::class.java)
-                .putExtra(EXTRA_TITLE, title)
-                .putExtra(EXTRA_SUBTITLE, subtitle)
-                .putExtra(EXTRA_ARTWORK_URL, artworkUrl)
                 .putExtra(EXTRA_ITEM_ID, identity.itemId)
                 .putExtra(EXTRA_SERIES_ITEM_ID, identity.seriesItemId)
                 .putExtra(EXTRA_IMDB_ID, identity.imdbId)
@@ -354,7 +339,7 @@ class PlayerActivity : ComponentActivity() {
                 .putExtra(EXTRA_CHOSEN_PROVIDER_ID, chosenProviderId)
         }
 
-        private fun parseIdentityFromIntent(intent: Intent, title: String): PlaybackIdentity? {
+        private fun parseIdentityFromIntent(intent: Intent): PlaybackIdentity? {
             val mediaTypeName = intent.getStringExtra(EXTRA_MEDIA_TYPE).orEmpty().trim()
             val contentType = runCatching { MetadataLabMediaType.valueOf(mediaTypeName) }.getOrNull()
                 ?: return null
@@ -382,7 +367,7 @@ class PlayerActivity : ComponentActivity() {
             contentType = contentType,
             season = season,
             episode = episode,
-            title = title,
+            title = showTitle ?: "",
             year = year,
             showTitle = showTitle,
             showYear = showYear,

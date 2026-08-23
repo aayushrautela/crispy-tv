@@ -182,6 +182,7 @@ internal fun PlayerOverlay(
                     subtitle = uiState.subtitle ?: uiState.statusMessage.takeIf { it.isNotBlank() && it != "Playing" },
                     errorMessage = uiState.errorMessage,
                     palette = palette,
+                    isMetadataLoaded = uiState.isMetadataLoaded,
                     onBack = {
                         resetControlsTimer()
                         latestOnBack()

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import kotlinx.coroutines.delay
@@ -58,6 +61,7 @@ internal fun PlayerTopBar(
     subtitle: String?,
     errorMessage: String?,
     palette: DetailsPaletteColors,
+    isMetadataLoaded: Boolean,
     onBack: () -> Unit,
     onShowInfo: () -> Unit,
     modifier: Modifier = Modifier,
@@ -77,22 +81,28 @@ internal fun PlayerTopBar(
         }
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title.ifBlank { "Player" },
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            if (subtitle != null) {
+            if (!isMetadataLoaded && title.isBlank()) {
+                PlayerTextSkeleton(width = 200.dp, height = 16.dp, palette = palette)
+                Spacer(modifier = Modifier.height(6.dp))
+                PlayerTextSkeleton(width = 140.dp, height = 12.dp, palette = palette)
+            } else {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.75f),
+                    text = title.ifBlank { "Player" },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
             if (errorMessage != null) {
@@ -106,14 +116,36 @@ internal fun PlayerTopBar(
             }
         }
 
-        IconButton(onClick = onShowInfo) {
+        IconButton(
+            onClick = onShowInfo,
+            enabled = isMetadataLoaded,
+        ) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = "Info",
-                tint = palette.onPillBackground,
+                tint = if (isMetadataLoaded) palette.onPillBackground else palette.onPillBackground.copy(alpha = 0.4f),
             )
         }
     }
+}
+
+@Composable
+private fun PlayerTextSkeleton(
+    width: Dp,
+    height: Dp,
+    palette: DetailsPaletteColors,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .width(width)
+                .height(height)
+                .skeletonElement(
+                    shape = RoundedCornerShape(height / 2),
+                    color = palette.pillBackground,
+                ),
+    )
 }
 
 @Composable

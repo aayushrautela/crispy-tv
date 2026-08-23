@@ -74,10 +74,7 @@ data class DetailsUiState(
 
 sealed interface DetailsNavigationEvent {
     data class OpenPlayer(
-        val title: String,
         val identity: PlaybackIdentity,
-        val subtitle: String?,
-        val artworkUrl: String?,
         val resumePositionMs: Long = 0L,
         val chosenStreamStableKey: String? = null,
         val chosenProviderId: String? = null,

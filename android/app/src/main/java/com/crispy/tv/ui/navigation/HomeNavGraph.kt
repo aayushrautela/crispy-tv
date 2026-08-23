@@ -194,14 +194,11 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                     )
                 },
                 onPersonClick = { personId, profileUrl -> navController.navigate(AppRoutes.personDetailsRoute(personId, profileUrl)) },
-                onOpenPlayer = { identity, title, subtitle, artworkUrl, resumePositionMs, chosenStreamStableKey, chosenProviderId ->
+                onOpenPlayer = { identity, resumePositionMs, chosenStreamStableKey, chosenProviderId ->
                     context.startActivity(
                         PlayerActivity.intent(
                             context = context,
                             identity = identity,
-                            title = title,
-                            subtitle = subtitle,
-                            artworkUrl = artworkUrl,
                             resumePositionMs = resumePositionMs,
                             chosenStreamStableKey = chosenStreamStableKey,
                             chosenProviderId = chosenProviderId,

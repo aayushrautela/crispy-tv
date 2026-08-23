@@ -81,9 +81,6 @@ internal fun HomeRoute(
                 PlayerActivity.intent(
                     context = context,
                     identity = selection.identity,
-                    title = selection.title,
-                    subtitle = selection.subtitle,
-                    artworkUrl = selection.artworkUrl,
                     resumePositionMs = selection.resumePositionMs,
                     chosenStreamStableKey = selection.chosenStreamStableKey,
                     chosenProviderId = selection.chosenProviderId,

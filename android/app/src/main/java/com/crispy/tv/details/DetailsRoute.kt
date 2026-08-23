@@ -29,7 +29,7 @@ fun DetailsRoute(
     onBack: () -> Unit,
     onItemClick: (CatalogItem, String?) -> Unit = { _, _ -> },
     onPersonClick: (personId: String, profileUrl: String?) -> Unit = { _, _ -> },
-        onOpenPlayer: (PlaybackIdentity, String, String?, String?, Long, String?, String?) -> Unit = { _, _, _, _, _, _, _ -> },
+        onOpenPlayer: (PlaybackIdentity, Long, String?, String?) -> Unit = { _, _, _, _ -> },
 ) {
     val appContext = LocalContext.current.applicationContext
 
@@ -72,9 +72,6 @@ fun DetailsRoute(
                 is DetailsNavigationEvent.OpenPlayer -> {
                     onOpenPlayer(
                         event.identity,
-                        event.title,
-                        event.subtitle,
-                        event.artworkUrl,
                         event.resumePositionMs,
                         event.chosenStreamStableKey,
                         event.chosenProviderId,
