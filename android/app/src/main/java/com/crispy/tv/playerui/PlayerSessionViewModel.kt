@@ -1227,6 +1227,7 @@ class PlayerSessionViewModel(
             resumePositionMs: Long = 0L,
             chosenStreamStableKey: String? = null,
             chosenProviderId: String? = null,
+            chosenStreamHandoffKey: String? = null,
             restorePlaybackIntent: Intent,
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
@@ -1238,6 +1239,7 @@ class PlayerSessionViewModel(
                         resumePositionMs = resumePositionMs,
                         chosenStreamStableKey = chosenStreamStableKey,
                         chosenProviderId = chosenProviderId,
+                        chosenStreamHandoffKey = chosenStreamHandoffKey,
                         restorePlaybackIntent = restorePlaybackIntent,
                     ) as T
                 }
