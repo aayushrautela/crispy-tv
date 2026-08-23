@@ -43,6 +43,9 @@ fun PlayerRoute(
     onBack: () -> Unit,
 ) {
     val uiState by session.uiState.collectAsStateWithLifecycle()
+    // Passed down unread so a 500ms position tick only recomposes the seekbar/time-pill
+    // leaves, not the whole overlay tree.
+    val positionMsState = session.playbackPositionMs.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val imageUrl = if (uiState.isMetadataLoaded) uiState.backdropUrl ?: uiState.artworkUrl else null
     val baseScheme = MaterialTheme.colorScheme
@@ -182,6 +185,7 @@ fun PlayerRoute(
         if (!isInPictureInPictureMode) {
             PlayerOverlay(
                 uiState = uiState,
+                positionMsState = positionMsState,
                 palette = palette,
                 onBack = {
                     Log.d(TAG, "overlay back pressed")
@@ -223,10 +227,10 @@ fun PlayerRoute(
                     gestureFeedback.show(
                         scope,
                         GestureFeedbackMessage(
-                            text = playbackSeekDeltaLabel(targetMs, uiState.positionMs),
-                            icon = if (targetMs >= uiState.positionMs) GestureIcons.Forward10 else GestureIcons.Backward10,
+                            text = playbackSeekDeltaLabel(targetMs, positionMsState.value),
+                            icon = if (targetMs >= positionMsState.value) GestureIcons.Forward10 else GestureIcons.Backward10,
                         ),
-                        holdMs = 800,
+                        holdMs = 900,
                     )
                 },
             )

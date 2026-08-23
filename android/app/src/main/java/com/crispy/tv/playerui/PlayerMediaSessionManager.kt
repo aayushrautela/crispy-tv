@@ -21,6 +21,7 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import com.crispy.tv.R
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,6 +50,7 @@ internal class PlayerMediaSessionManager(
     private var currentSubtitle: String? = null
     private var currentArtworkUrl: String? = null
     private var currentArtworkBitmap: Bitmap? = null
+    private var currentArtworkData: ByteArray? = null
     private var currentIsPlaying: Boolean = false
     private var currentIsBuffering: Boolean = true
     private var currentIsError: Boolean = false
@@ -76,12 +78,21 @@ internal class PlayerMediaSessionManager(
         val normalizedArtworkUrl = artworkUrl?.trim()?.ifBlank { null }
 
         val artworkChanged = normalizedArtworkUrl != currentArtworkUrl
+        if (
+            !artworkChanged &&
+            normalizedTitle == currentTitle &&
+            normalizedSubtitle == currentSubtitle
+        ) {
+            // Nothing changed: skip re-publishing so the per-tick poll loop stays cheap.
+            return
+        }
         currentTitle = normalizedTitle
         currentSubtitle = normalizedSubtitle
         currentArtworkUrl = normalizedArtworkUrl
 
         if (artworkChanged) {
             currentArtworkBitmap = null
+            currentArtworkData = null
             loadArtwork(normalizedArtworkUrl)
         }
 
@@ -95,16 +106,17 @@ internal class PlayerMediaSessionManager(
         artworkUrl: String?,
         isPlaying: Boolean,
         isBuffering: Boolean,
-        positionMs: Long,
-        durationMs: Long,
-        playbackSpeed: Float = 1f,
-        bufferedPositionMs: Long = positionMs,
     ) {
         if (released) {
             return
         }
         updateMetadata(title = title, subtitle = subtitle, artworkUrl = artworkUrl)
         val wasError = currentIsError
+        if (!wasError && currentIsPlaying == isPlaying && currentIsBuffering == isBuffering) {
+            // Play/buffer state unchanged: the SimpleBasePlayer already mirrors live
+            // position from the controller snapshot, so nothing needs republishing.
+            return
+        }
         currentIsPlaying = isPlaying
         currentIsBuffering = isBuffering
         currentIsError = false
@@ -116,14 +128,14 @@ internal class PlayerMediaSessionManager(
         title: String,
         subtitle: String?,
         artworkUrl: String?,
-        positionMs: Long,
-        durationMs: Long,
-        errorMessage: String?,
     ) {
         if (released) {
             return
         }
         updateMetadata(title = title, subtitle = subtitle, artworkUrl = artworkUrl)
+        if (currentIsError) {
+            return
+        }
         currentIsError = true
         currentIsPlaying = false
         currentIsBuffering = false
@@ -156,7 +168,9 @@ internal class PlayerMediaSessionManager(
 
         artworkJob =
             scope.launch(Dispatchers.IO) {
-                val bitmap =
+                // Encode the session artwork bytes here, once, off the main thread. The
+                // previous design re-encoded the bitmap on every playback-state publish.
+                val loaded =
                     runCatching {
                         val request =
                             ImageRequest.Builder(appContext)
@@ -166,14 +180,15 @@ internal class PlayerMediaSessionManager(
                                 .build()
                         val result = appContext.imageLoader.execute(request)
                         val image = (result as? SuccessResult)?.image ?: return@runCatching null
-                        image.toBitmap()
+                        encodeSessionArtwork(image.toBitmap())
                     }.getOrNull()
 
                 withContext(Dispatchers.Main.immediate) {
                     if (currentArtworkUrl != artworkUrl) {
                         return@withContext
                     }
-                    currentArtworkBitmap = bitmap
+                    currentArtworkBitmap = loaded?.bitmap
+                    currentArtworkData = loaded?.data
                     publishMetadata()
                     publishNotification(force = true)
                 }
@@ -181,7 +196,7 @@ internal class PlayerMediaSessionManager(
     }
 
     private fun publishMetadata() {
-        player.updateMetadata(currentTitle, currentSubtitle, currentArtworkBitmap)
+        player.updateMetadata(currentTitle, currentSubtitle, currentArtworkData)
     }
 
     private fun publishPlaybackState() {
@@ -239,6 +254,25 @@ internal class PlayerMediaSessionManager(
         )
     }
 
+    private data class SessionArtwork(
+        val bitmap: Bitmap,
+        val data: ByteArray,
+    )
+
+    private fun encodeSessionArtwork(bitmap: Bitmap): SessionArtwork? {
+        // JPEG instead of PNG: Media3 ships artworkData across binder to SystemUI and
+        // external controllers, where a full-quality PNG of this size risks hitting the
+        // ~1MB transaction limit.
+        val data = ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, ARTWORK_JPEG_QUALITY, out)
+            out.toByteArray()
+        }
+        if (data.isEmpty()) {
+            return null
+        }
+        return SessionArtwork(bitmap = bitmap, data = data)
+    }
+
     private fun canPostNotifications(): Boolean {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -278,6 +312,7 @@ internal class PlayerMediaSessionManager(
         private const val NOTIFICATION_CHANNEL_ID = "crispy_player_playback"
         private const val NOTIFICATION_ID = 3001
         private const val REQUEST_CODE_CONTENT = 4001
+        private const val ARTWORK_JPEG_QUALITY = 90
 
         @Volatile
         private var activeManager: PlayerMediaSessionManager? = null

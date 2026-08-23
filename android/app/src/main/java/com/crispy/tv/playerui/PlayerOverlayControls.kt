@@ -36,6 +36,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,7 +152,7 @@ private fun PlayerTextSkeleton(
 
 @Composable
 internal fun PlayerBottomControls(
-    positionMs: Long,
+    positionMsState: State<Long>,
     durationMs: Long,
     hasAudioTracks: Boolean,
     hasSubtitleTracks: Boolean,
@@ -169,7 +170,7 @@ internal fun PlayerBottomControls(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         PlayerSeekBar(
-            positionMs = positionMs,
+            positionMsState = positionMsState,
             durationMs = durationMs,
             palette = palette,
             onSeekTo = onSeekTo,
@@ -184,11 +185,14 @@ internal fun PlayerBottomControls(
                 containerColor = palette.pillBackground,
                 contentColor = palette.onPillBackground,
             ) {
-                    Text(
-                        text = buildTimePillText(positionMs = positionMs, durationMs = durationMs),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
+                // Reading the position State here scopes per-tick recomposition to this
+                // text alone instead of the whole controls column.
+                val positionMs = positionMsState.value
+                Text(
+                    text = buildTimePillText(positionMs = positionMs, durationMs = durationMs),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
             }
 
             PlayerPill(
@@ -267,11 +271,13 @@ internal fun PlayerBottomControls(
 
 @Composable
 private fun PlayerSeekBar(
-    positionMs: Long,
+    positionMsState: State<Long>,
     durationMs: Long,
     palette: DetailsPaletteColors,
     onSeekTo: (Long) -> Unit,
 ) {
+    // Only this composable reads the hot position; ticks never recompose parents.
+    val positionMs = positionMsState.value
     val canSeek = durationMs > 0L
     val scope = rememberCoroutineScope()
     var isSeeking by remember { mutableStateOf(false) }

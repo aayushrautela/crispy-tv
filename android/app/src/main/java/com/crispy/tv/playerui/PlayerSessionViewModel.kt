@@ -48,7 +48,6 @@ import com.crispy.tv.streams.AddonStream
 import com.crispy.tv.streams.AddonSubtitle
 import com.crispy.tv.streams.StreamResolver
 import com.crispy.tv.streams.StreamSelectorUiState
-import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.coroutineContext
@@ -85,7 +84,6 @@ data class PlayerUiState(
     val activeEngine: NativePlaybackEngine = NativePlaybackEngine.EXO,
     val isBuffering: Boolean = true,
     val isPlaying: Boolean = false,
-    val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val stableDurationMs: Long = 0L,
     val statusMessage: String = "Preparing playback...",
@@ -196,6 +194,11 @@ class PlayerSessionViewModel(
             )
         )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    // High-frequency playback position lives in its own flow so a 500ms tick never
+    // invalidates the whole PlayerUiState tree; only seekbar/time-pill leaves read it.
+    private val _playbackPositionMs = MutableStateFlow(0L)
+    val playbackPositionMs: StateFlow<Long> = _playbackPositionMs.asStateFlow()
 
     init {
         audioFocusManager.registerSource("main") { setPlaying(false) }
@@ -458,12 +461,12 @@ class PlayerSessionViewModel(
         activeSubtitleLookupId = target.lookupId
         activeSubtitleMediaType = target.mediaType
         pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
+        resetPlaybackPosition()
         _uiState.update { state ->
             state.copy(
                 currentPlaybackUrl = source.url,
                 isBuffering = true,
                 isPlaying = false,
-                positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
                 statusMessage = "",
@@ -632,7 +635,7 @@ class PlayerSessionViewModel(
             nextIdentity.contentType == activeIdentity?.contentType &&
                 nextIdentity.season == activeIdentity?.season &&
                 nextIdentity.episode == activeIdentity?.episode
-        val resumePositionMs = if (sameEpisode) uiState.value.positionMs else 0L
+        val resumePositionMs = if (sameEpisode) _playbackPositionMs.value else 0L
 
         viewModelScope.launch {
             val source = resolvePlaybackSource(stream, state.streamSelector.lookupId) ?: return@launch
@@ -648,11 +651,11 @@ class PlayerSessionViewModel(
     }
 
     fun retryPlayback() {
+        resetPlaybackPosition()
         _uiState.update { state ->
             state.copy(
                 isBuffering = true,
                 isPlaying = false,
-                positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
                 statusMessage = "",
@@ -876,6 +879,7 @@ class PlayerSessionViewModel(
         activeArtworkUrl = artworkUrl?.trim()?.ifBlank { null }
         pendingInitialSeekMs = resumePositionMs.takeIf { it > 0L }
 
+        resetPlaybackPosition()
         _uiState.update { state ->
             state.copy(
                 title = title.ifBlank { "Player" },
@@ -886,7 +890,6 @@ class PlayerSessionViewModel(
                 activeSurface = PlayerSurface.NONE,
                 isBuffering = true,
                 isPlaying = false,
-                positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
                 statusMessage = "",
@@ -909,6 +912,9 @@ class PlayerSessionViewModel(
         val sanitizedPositionMs = snapshot.positionMs.coerceAtLeast(0L)
         val sanitizedDurationMs = snapshot.durationMs.coerceAtLeast(0L)
 
+        // MutableStateFlow skips equal values, so a paused player emits nothing here.
+        _playbackPositionMs.value = sanitizedPositionMs
+
         _uiState.update { state ->
             val nextStableDurationMs =
                 if (sanitizedDurationMs > 0L) {
@@ -917,11 +923,10 @@ class PlayerSessionViewModel(
                     state.stableDurationMs
                 }
 
-            val shouldUpdatePosition = abs(sanitizedPositionMs - state.positionMs) >= 500L
-            val shouldUpdateDuration =
-                sanitizedDurationMs != state.durationMs || nextStableDurationMs != state.stableDurationMs
             val nextStatusMessage = statusMessage(snapshot)
             val nextErrorMessage = snapshot.error?.message
+            val shouldUpdateDuration =
+                sanitizedDurationMs != state.durationMs || nextStableDurationMs != state.stableDurationMs
             val shouldUpdatePlaybackState =
                 snapshot.engine != state.activeEngine ||
                     snapshot.isBuffering != state.isBuffering ||
@@ -936,14 +941,13 @@ class PlayerSessionViewModel(
                     snapshot.selectedSubtitleTrackId != state.selectedSubtitleTrackId
             val shouldUpdateSubtitleDelay = snapshot.subtitleDelayMs != state.subtitleDelayMs
 
-            if (!(shouldUpdatePosition || shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay)) {
+            if (!(shouldUpdateDuration || shouldUpdatePlaybackState || shouldUpdateTracks || shouldUpdateSubtitleDelay)) {
                 state
             } else {
                 state.copy(
                     activeEngine = snapshot.engine,
                     isBuffering = snapshot.isBuffering,
                     isPlaying = snapshot.isPlaying,
-                    positionMs = sanitizedPositionMs,
                     durationMs = sanitizedDurationMs,
                     stableDurationMs = nextStableDurationMs,
                     statusMessage = nextStatusMessage,
@@ -957,6 +961,10 @@ class PlayerSessionViewModel(
                 )
             }
         }
+    }
+
+    private fun resetPlaybackPosition() {
+        _playbackPositionMs.value = 0L
     }
 
     private fun requestPlayback(engine: NativePlaybackEngine) {
@@ -1009,8 +1017,8 @@ class PlayerSessionViewModel(
                 audioFocusManager.release("main")
             }
             syncWatchHistory(
-                positionMs = uiState.value.positionMs,
-                durationMs = uiState.value.durationMs,
+                positionMs = playbackMetrics.positionMs,
+                durationMs = playbackMetrics.durationMs,
                 isPlaying = uiState.value.isPlaying,
             )
 
@@ -1026,9 +1034,6 @@ class PlayerSessionViewModel(
                 title = uiStateSnapshot.title,
                 subtitle = uiStateSnapshot.subtitle,
                 artworkUrl = uiStateSnapshot.artworkUrl,
-                positionMs = uiStateSnapshot.positionMs,
-                durationMs = uiStateSnapshot.durationMs,
-                errorMessage = errorMessage,
             )
         } else {
             mediaSessionManager.updatePlayback(
@@ -1037,9 +1042,6 @@ class PlayerSessionViewModel(
                 artworkUrl = uiStateSnapshot.artworkUrl,
                 isPlaying = uiStateSnapshot.isPlaying,
                 isBuffering = uiStateSnapshot.isBuffering,
-                positionMs = uiStateSnapshot.positionMs,
-                durationMs = uiStateSnapshot.durationMs,
-                bufferedPositionMs = uiStateSnapshot.positionMs,
             )
         }
     }
@@ -1081,12 +1083,12 @@ class PlayerSessionViewModel(
         }
 
         Log.w(TAG, "ExoPlayer error, retrying on MPV fallback. message=${error.message}")
+        resetPlaybackPosition()
         _uiState.update { state ->
             state.copy(
                 activeEngine = NativePlaybackEngine.MPV,
                 isBuffering = true,
                 isPlaying = false,
-                positionMs = 0L,
                 durationMs = 0L,
                 stableDurationMs = 0L,
                 statusMessage = "",

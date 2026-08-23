@@ -1,7 +1,6 @@
 package com.crispy.tv.playerui
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -17,7 +16,6 @@ import com.crispy.tv.nativeengine.playback.NativePlaybackState
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import java.io.ByteArrayOutputStream
 
 /**
  * Bridges the app's engine-agnostic [PlaybackSessionController] (ExoPlayer or libmpv) to the
@@ -36,15 +34,10 @@ internal class PlaybackSessionControllerPlayer(
     private var subtitle: String? = null
     private var artworkData: ByteArray? = null
 
-    fun updateMetadata(title: String, subtitle: String?, artwork: Bitmap?) {
+    fun updateMetadata(title: String, subtitle: String?, artworkData: ByteArray?) {
         this.title = title
         this.subtitle = subtitle
-        this.artworkData = artwork?.let { bitmap ->
-            ByteArrayOutputStream().use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                out.toByteArray()
-            }
-        }
+        this.artworkData = artworkData
         invalidateState()
     }
 

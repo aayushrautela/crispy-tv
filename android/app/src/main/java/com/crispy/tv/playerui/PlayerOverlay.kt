@@ -22,6 +22,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,7 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun PlayerOverlay(
     uiState: PlayerUiState,
+    positionMsState: State<Long>,
     palette: DetailsPaletteColors,
     onBack: () -> Unit,
     onTogglePlayPause: () -> Unit,
@@ -147,7 +149,7 @@ internal fun PlayerOverlay(
                             onDoubleTap = { offset ->
                                 if (isSurfaceOpen) return@detectTapGestures
                                 if (layoutWidthPx <= 0) return@detectTapGestures
-                                val positionMs = uiState.positionMs.coerceAtLeast(0L)
+                                val positionMs = positionMsState.value.coerceAtLeast(0L)
                                 val maxMs = effectiveDurationMs.takeIf { it > 0L }
                                 val targetMs = when {
                                     offset.x < layoutWidthPx * LEFT_GESTURE_BOUNDARY ->
@@ -216,7 +218,7 @@ internal fun PlayerOverlay(
                 }
 
                 PlayerBottomControls(
-                    positionMs = uiState.positionMs,
+                    positionMsState = positionMsState,
                     durationMs = effectiveDurationMs,
                     hasAudioTracks = uiState.audioTracks.isNotEmpty(),
                     hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),

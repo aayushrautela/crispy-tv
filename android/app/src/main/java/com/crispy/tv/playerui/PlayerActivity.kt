@@ -43,6 +43,7 @@ class PlayerActivity : ComponentActivity() {
     private var pipEnabled: Boolean = false
     private var pipSourceRect: Rect? = null
     private var pipAspectRatio: Rational? = null
+    private var lastAppliedPipConfig: PictureInPictureConfig? = null
     private lateinit var sessionViewModel: PlayerSessionViewModel
     private val pipExitPauseHandler = Handler(Looper.getMainLooper())
     private val pipExitPauseRunnable = Runnable {
@@ -215,9 +216,16 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun updatePictureInPictureConfig(config: PictureInPictureConfig) {
+        // setPictureInPictureParams is a window transaction; skip redundant pushes that
+        // recomposition can fire with an unchanged config.
+        if (config == lastAppliedPipConfig) {
+            Log.d(TAG, "updatePictureInPictureConfig skipped unchanged enabled=${config.enabled}")
+            return
+        }
         pipEnabled = config.enabled
         pipSourceRect = config.sourceRect
         pipAspectRatio = config.aspectRatio
+        lastAppliedPipConfig = config
 
         Log.d(
             TAG,
