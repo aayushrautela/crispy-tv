@@ -1,5 +1,6 @@
 package com.crispy.tv.playerui
 
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -7,7 +8,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,7 +26,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -31,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.nativeengine.playback.NativeTrack
 import com.crispy.tv.streams.AddonSubtitle
+import com.crispy.tv.streams.SHEET_HEIGHT_FRACTION
+import com.crispy.tv.streams.SHEET_MAX_WIDTH
 import java.util.Locale
 
 private val ISO639_2_TO_1 =
@@ -161,39 +166,45 @@ internal fun PlayerAudioSheet(
 ) {
     if (!visible) return
 
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val groups = groupAudioByLanguage(audioTracks)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        sheetMaxWidth = 560.dp,
+        sheetMaxWidth = SHEET_MAX_WIDTH,
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item { SheetTitle("Audio tracks") }
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
+            LazyColumn(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(SHEET_HEIGHT_FRACTION)
+                        .navigationBarsPadding(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item { SheetTitle("Audio tracks") }
 
-            if (audioTracks.isEmpty()) {
-                item { EmptyHint("No audio tracks available") }
-            }
-
-            groups.forEach { group ->
-                item(key = "audio_header_${group.key}") {
-                    LanguageGroupHeader(label = group.label, count = group.items.size)
+                if (audioTracks.isEmpty()) {
+                    item { EmptyHint("No audio tracks available") }
                 }
-                items(group.items, key = { it.id }) { track ->
-                    val title = track.title?.takeIf { it.isNotBlank() }
-                    TrackRow(
-                        label = title ?: languageLabelForCode(track.language),
-                        subtitle = title?.let { languageLabelForCode(track.language) },
-                        isSelected = track.id == selectedAudioTrackId,
-                        palette = palette,
-                        leadingIcon = if (track.language == null) Icons.Filled.MusicNote else Icons.Filled.GraphicEq,
-                        onClick = { onSelectAudioTrack(track.id) },
-                    )
+
+                groups.forEach { group ->
+                    item(key = "audio_header_${group.key}") {
+                        LanguageGroupHeader(label = group.label, count = group.items.size)
+                    }
+                    items(group.items, key = { it.id }) { track ->
+                        val title = track.title?.takeIf { it.isNotBlank() }
+                        TrackRow(
+                            label = title ?: languageLabelForCode(track.language),
+                            subtitle = title?.let { languageLabelForCode(track.language) },
+                            isSelected = track.id == selectedAudioTrackId,
+                            palette = palette,
+                            leadingIcon = if (track.language == null) Icons.Filled.MusicNote else Icons.Filled.GraphicEq,
+                            onClick = { onSelectAudioTrack(track.id) },
+                        )
+                    }
                 }
             }
         }
@@ -218,7 +229,7 @@ internal fun PlayerSubtitleSheet(
 ) {
     if (!visible) return
 
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
 
     val options =
         buildList<SubtitleOption> {
@@ -243,90 +254,91 @@ internal fun PlayerSubtitleSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        sheetMaxWidth = 560.dp,
+        sheetMaxWidth = SHEET_MAX_WIDTH,
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item { SheetTitle("Subtitles") }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = "Addon subtitles",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    TextButton(onClick = onRefreshAddonSubtitles, enabled = !addonSubtitlesLoading) {
-                        Text(if (addonSubtitlesLoading) "Searching..." else "Search")
-                    }
-                }
-            }
-
-            if (addonSubtitlesLoading) {
-                item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
-            }
-
-            addonSubtitlesError?.takeIf { !addonSubtitlesLoading }?.let { error ->
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
+            LazyColumn(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(SHEET_HEIGHT_FRACTION)
+                        .navigationBarsPadding(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 item {
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "Subtitles",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        TextButton(onClick = onRefreshAddonSubtitles, enabled = !addonSubtitlesLoading) {
+                            Text(if (addonSubtitlesLoading) "Searching" else "Search")
+                        }
+                    }
                 }
-            }
 
-            item {
-                LanguagePillsRow(
-                    languages = languagePills,
-                    selectedKey = selectedLang,
-                    palette = palette,
-                    onSelect = { selectedLang = it },
-                )
-            }
-
-            item {
-                TrackRow(
-                    label = "Off",
-                    subtitle = null,
-                    isSelected = offSelected,
-                    palette = palette,
-                    leadingIcon = Icons.Filled.Subtitles,
-                    onClick = { onSelectSubtitleTrack(null) },
-                )
-            }
-
-            if (visibleOptions.isEmpty() && !addonSubtitlesLoading) {
-                item { EmptyHint("No subtitle tracks available") }
-            }
-
-            items(visibleOptions, key = { it.key }) { option ->
-                when (option) {
-                    is EmbeddedSubtitleOption -> {
-                        TrackRow(
-                            label = option.label,
-                            subtitle = option.track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(option.track.language) },
-                            isSelected = option.isSelected,
-                            palette = palette,
-                            leadingIcon = Icons.Filled.Subtitles,
-                            onClick = { onSelectSubtitleTrack(option.track.id) },
+                addonSubtitlesError?.takeIf { !addonSubtitlesLoading }?.let { error ->
+                    item {
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    is AddonSubtitleOption -> {
-                        TrackRow(
-                            label = option.label,
-                            subtitle = option.subtitle.addonName?.takeIf { it.isNotBlank() },
-                            isSelected = option.isSelected,
-                            palette = palette,
-                            leadingIcon = Icons.Filled.Subtitles,
-                            onClick = { onSelectAddonSubtitle(option.subtitle) },
-                        )
+                }
+
+                item {
+                    LanguagePillsRow(
+                        languages = languagePills,
+                        selectedKey = selectedLang,
+                        palette = palette,
+                        onSelect = { selectedLang = it },
+                    )
+                }
+
+                item {
+                    TrackRow(
+                        label = "Off",
+                        subtitle = null,
+                        isSelected = offSelected,
+                        palette = palette,
+                        leadingIcon = Icons.Filled.Subtitles,
+                        onClick = { onSelectSubtitleTrack(null) },
+                    )
+                }
+
+                if (visibleOptions.isEmpty() && !addonSubtitlesLoading) {
+                    item { EmptyHint("No subtitle tracks available") }
+                }
+
+                items(visibleOptions, key = { it.key }) { option ->
+                    when (option) {
+                        is EmbeddedSubtitleOption -> {
+                            TrackRow(
+                                label = option.label,
+                                subtitle = option.track.title?.takeIf { it.isNotBlank() }?.let { languageLabelForCode(option.track.language) },
+                                isSelected = option.isSelected,
+                                palette = palette,
+                                leadingIcon = Icons.Filled.Subtitles,
+                                onClick = { onSelectSubtitleTrack(option.track.id) },
+                            )
+                        }
+                        is AddonSubtitleOption -> {
+                            TrackRow(
+                                label = option.label,
+                                subtitle = option.subtitle.addonName?.takeIf { it.isNotBlank() },
+                                isSelected = option.isSelected,
+                                palette = palette,
+                                leadingIcon = Icons.Filled.Subtitles,
+                                onClick = { onSelectAddonSubtitle(option.subtitle) },
+                            )
+                        }
                     }
                 }
             }

@@ -70,7 +70,9 @@ data class SelectorCallbacks(
     val onStreamSelected: (AddonStream) -> Unit,
 )
 
-private const val STREAM_SHEET_HEIGHT_FRACTION = 0.92f
+internal const val SHEET_HEIGHT_FRACTION = 0.92f
+
+internal val SHEET_MAX_WIDTH = 420.dp
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -87,6 +89,7 @@ fun StreamSelectorModal(
     ModalBottomSheet(
         onDismissRequest = callbacks.onDismiss,
         sheetState = sheetState,
+        sheetMaxWidth = SHEET_MAX_WIDTH,
         scrimColor = chrome.scrimColor ?: BottomSheetDefaults.ScrimColor,
         modifier = Modifier.testTag("stream_sheet"),
     ) {
@@ -95,7 +98,7 @@ fun StreamSelectorModal(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(STREAM_SHEET_HEIGHT_FRACTION),
+                        .fillMaxHeight(SHEET_HEIGHT_FRACTION),
             ) {
                 StreamSelectorContent(
                     state = state,
