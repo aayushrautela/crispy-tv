@@ -43,11 +43,9 @@ internal class HomeRefreshCoordinator(
                 items = heroItems,
                 selectedId = selectedId,
                 isLoading = false,
-                statusMessage = primaryFeedResult.heroResult.statusMessage,
             ),
             headerPills = headerPills,
             catalogSections = catalogSections,
-            catalogStatusMessage = primaryFeedResult.sectionsStatusMessage,
         )
     }
 
@@ -80,48 +78,45 @@ internal class HomeRefreshCoordinator(
                 items = heroItems,
                 selectedId = selectedId,
                 isLoading = false,
-                statusMessage = primaryFeedResult.heroResult.statusMessage,
             ),
             headerPills = headerPills,
             catalogSections = catalogSections,
-            catalogStatusMessage = primaryFeedResult.sectionsStatusMessage,
         )
     }
 
-    suspend fun loadWatchActivitySnapshot(): HomeWatchActivitySnapshot {
+    suspend fun loadContinueWatching(): HomeWideRailSectionUi {
         val suppressionMap = suppressionStore.read()
         val canonicalResult = watchHistoryService.getCanonicalContinueWatching(limit = continueWatchingLimit)
-        val filteredCanonicalResult = canonicalResult.copy(
+        val filtered = canonicalResult.copy(
             entries = applyProviderSuppressionFilter(canonicalResult.entries, suppressionMap),
         )
 
-        val continueWatchingResult = homeWatchActivityService.loadWatchActivity(
-            canonicalResult = filteredCanonicalResult,
+        val result = homeWatchActivityService.loadWatchActivity(
+            canonicalResult = filtered,
             limit = continueWatchingLimit,
         )
+        if (result.isError) {
+            throw IllegalStateException(result.statusMessage.ifBlank { "Unable to load continue watching." })
+        }
 
         val nowMs = System.currentTimeMillis()
-        val railItems = continueWatchingResult.entries
-        val continueWatchingItems = railItems
-
-        return HomeWatchActivitySnapshot(
-            continueWatching = defaultWideRailSection(
-                key = CONTINUE_WATCHING_SECTION_KEY,
-                title = "Continue Watching",
-                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
-            ).copy(
-                items = continueWatchingItems.map { item -> item.toWideRailItem(nowMs) },
-                isLoading = false,
-                statusMessage = continueWatchingResult.statusMessage.takeIf {
-                    continueWatchingItems.isNotEmpty() || continueWatchingResult.isError
-                }.orEmpty(),
-            ),
-            upNext = upNextService.loadUpNext(nowMs),
+        return defaultWideRailSection(
+            key = CONTINUE_WATCHING_SECTION_KEY,
+            title = "Continue Watching",
+            kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+        ).copy(
+            items = result.entries.map { item -> item.toWideRailItem(nowMs) },
+            isLoading = false,
         )
     }
 
+    suspend fun loadUpNext(): HomeWideRailSectionUi = upNextService.loadUpNext(System.currentTimeMillis())
+
     suspend fun loadThisWeekSection(): HomeWideRailSectionUi {
         val thisWeekResult = calendarService.loadThisWeek(System.currentTimeMillis())
+        if (thisWeekResult.isError) {
+            throw IllegalStateException(thisWeekResult.statusMessage ?: "Unable to load this week.")
+        }
 
         return defaultWideRailSection(
             key = THIS_WEEK_SECTION_KEY,
@@ -130,9 +125,6 @@ internal class HomeRefreshCoordinator(
         ).copy(
             items = thisWeekResult.items.map { item -> item.toWideRailItem() },
             isLoading = false,
-            statusMessage = thisWeekResult.statusMessage.takeIf {
-                thisWeekResult.items.isNotEmpty() || thisWeekResult.isError
-            }.orEmpty(),
         )
     }
 

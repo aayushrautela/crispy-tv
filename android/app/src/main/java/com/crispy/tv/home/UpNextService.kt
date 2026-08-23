@@ -12,14 +12,7 @@ class UpNextService internal constructor(
 ) {
     suspend fun loadUpNext(nowMs: Long): HomeWideRailSectionUi {
         val backendContext = backendContextResolver.resolve()
-            ?: return defaultWideRailSection(
-                key = UP_NEXT_SECTION_KEY,
-                title = "Up Next",
-                kind = HomeWideRailSectionKind.UP_NEXT,
-            ).copy(
-                isLoading = false,
-                statusMessage = "Sign in and select a profile to load Up Next.",
-            )
+            ?: throw IllegalStateException("Sign in and select a profile to load Up Next.")
 
         val result = try {
             backendClient.getUpNext(
@@ -29,14 +22,7 @@ class UpNextService internal constructor(
             )
         } catch (error: Exception) {
             Log.w(TAG, "Failed to load up next", error)
-            return defaultWideRailSection(
-                key = UP_NEXT_SECTION_KEY,
-                title = "Up Next",
-                kind = HomeWideRailSectionKind.UP_NEXT,
-            ).copy(
-                isLoading = false,
-                statusMessage = "Unable to load Up Next right now.",
-            )
+            throw IllegalStateException("Unable to load Up Next right now.", error)
         }
 
         val items = result.items.mapNotNull { view -> toCanonicalContinueWatchingItem(view) }
@@ -48,7 +34,6 @@ class UpNextService internal constructor(
         ).copy(
             items = items.map { item -> item.toWideRailItem(nowMs) },
             isLoading = false,
-            statusMessage = if (items.isEmpty()) "No episodes to watch next right now." else "",
         )
     }
 

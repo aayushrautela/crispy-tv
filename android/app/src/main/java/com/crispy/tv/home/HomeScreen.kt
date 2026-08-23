@@ -12,12 +12,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -94,9 +94,16 @@ internal fun HomeRoute(
     val lazyListState = rememberLazyListState()
     val scrollBehavior = appBarScrollBehavior()
     val scrollToTopRequest by scrollToTopRequests.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(viewModel) {
         viewModel.ensureLoaded()
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.errorEvents.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
     }
 
     DisposableEffect(viewModel) {
@@ -136,6 +143,7 @@ internal fun HomeRoute(
         },
         nestedScrollConnection = scrollBehavior.nestedScrollConnection,
         horizontalPadding = 0.dp,
+        snackbarHostState = snackbarHostState,
         topPadding = 0.dp,
         bottomPaddingExtra = Dimensions.PageBottomPadding,
         verticalArrangement = Arrangement.spacedBy(HomeContentSectionSpacing),
@@ -166,7 +174,6 @@ internal fun HomeRoute(
                         is HomeWideRailLayoutUi -> it.kind.name
                         is HomeCatalogRowSectionUi -> "catalogSection"
                         is HomeCollectionShelfSectionUi -> "collectionShelf"
-                        is HomeStatusSectionUi -> "catalogStatus"
                     }
                 },
             ) { block ->
@@ -197,10 +204,6 @@ internal fun HomeRoute(
                                 onCollectionClick = onCatalogSeeAllClick,
                             )
                         }
-                    }
-
-                    is HomeStatusSectionUi -> {
-                        HomeCatalogStatusCard(statusMessage = block.statusMessage)
                     }
 
                     is HomeWideRailLayoutUi -> {
@@ -266,14 +269,7 @@ private fun HomeHeroSection(
             HomeHeroSkeleton(modifier = modifier)
         }
 
-        state.items.isEmpty() -> {
-            Card(modifier = modifier.fillMaxWidth()) {
-                Text(
-                    text = state.statusMessage,
-                    modifier = Modifier.padding(Dimensions.CardInternalPadding),
-                )
-            }
-        }
+        state.items.isEmpty() -> return
 
         else -> {
             HomeHeroCarousel(
@@ -283,16 +279,6 @@ private fun HomeHeroSection(
                 modifier = modifier,
             )
         }
-    }
-}
-
-@Composable
-private fun HomeCatalogStatusCard(statusMessage: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = statusMessage,
-            modifier = Modifier.padding(Dimensions.CardInternalPadding),
-        )
     }
 }
 

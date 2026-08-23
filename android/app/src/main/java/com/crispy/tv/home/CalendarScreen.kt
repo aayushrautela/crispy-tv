@@ -273,7 +273,7 @@ private fun CalendarEpisodeSection(
     if (items.isEmpty()) return
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HomeRailHeader(title = title, statusMessage = "")
+        HomeRailHeader(title = title)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items, key = { it.id }) { item ->
                 val key = "calendar-episode-${item.titleItemId}-${item.id}"
@@ -296,7 +296,7 @@ private fun CalendarSeriesSection(
     if (items.isEmpty()) return
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HomeRailHeader(title = title, statusMessage = "")
+        HomeRailHeader(title = title)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items, key = { it.id }) { item ->
                 val key = "calendar-series-${item.itemId}-${item.id}"

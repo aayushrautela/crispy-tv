@@ -8,7 +8,6 @@ internal data class CatalogSectionLayoutMeta(
 internal fun buildHomeLayoutState(
     wideRails: Map<String, HomeWideRailSectionUi>,
     catalogSectionLayoutMeta: List<CatalogSectionLayoutMeta>,
-    catalogStatusMessage: String,
 ): HomeLayoutState {
     val blocks = mutableListOf<HomeContentSectionUi>()
 
@@ -21,13 +20,6 @@ internal fun buildHomeLayoutState(
         if (section.isVisible()) {
             blocks += HomeWideRailLayoutUi(key = section.key, kind = section.kind)
         }
-    }
-
-    if (catalogSectionLayoutMeta.isEmpty() && catalogStatusMessage.isNotBlank()) {
-        blocks += HomeStatusSectionUi(
-            key = "catalogStatus",
-            statusMessage = catalogStatusMessage,
-        )
     }
 
     var index = 0

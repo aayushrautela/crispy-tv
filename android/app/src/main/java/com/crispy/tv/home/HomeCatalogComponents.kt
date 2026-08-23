@@ -75,7 +75,7 @@ internal fun HomeCatalogSectionRow(
                 } else {
                     Text(
                         text = sectionUi.section.displayTitle,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
@@ -110,15 +110,6 @@ internal fun HomeCatalogSectionRow(
                     modifier = Modifier.size(20.dp)
                 )
             }
-        }
-
-        if (!sectionUi.isLoading && sectionUi.statusMessage.isNotBlank() && sectionUi.items.isEmpty()) {
-            Text(
-                text = sectionUi.statusMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = horizontalPadding),
-            )
         }
 
         LazyRow(

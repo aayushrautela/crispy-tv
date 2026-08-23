@@ -23,7 +23,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -38,6 +41,7 @@ import com.crispy.tv.ui.theme.Dimensions
 fun CrispyScreen(
     modifier: Modifier = Modifier,
     topBar: (@Composable () -> Unit)? = null,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     nestedScrollConnection: NestedScrollConnection? = null,
     pullToRefreshState: androidx.compose.material3.pulltorefresh.PullToRefreshState? = null,
     isRefreshing: Boolean = false,
@@ -58,6 +62,7 @@ fun CrispyScreen(
         modifier = scaffoldModifier,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = topBar ?: {},
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         Box(
             modifier = Modifier

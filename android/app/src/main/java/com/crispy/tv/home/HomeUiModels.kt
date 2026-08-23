@@ -52,7 +52,6 @@ data class HomeWideRailSectionUi(
     val kind: HomeWideRailSectionKind,
     val items: List<HomeWideRailItemUi> = emptyList(),
     val isLoading: Boolean = false,
-    val statusMessage: String = "",
 )
 
 @Immutable
@@ -65,10 +64,4 @@ data class HomeCatalogRowSectionUi(
 data class HomeCollectionShelfSectionUi(
     override val key: String,
     val sectionKeys: List<String>,
-) : HomeContentSectionUi
-
-@Immutable
-data class HomeStatusSectionUi(
-    override val key: String,
-    val statusMessage: String,
 ) : HomeContentSectionUi

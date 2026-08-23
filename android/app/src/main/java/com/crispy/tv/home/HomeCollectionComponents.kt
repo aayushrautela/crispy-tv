@@ -55,7 +55,7 @@ internal fun HomeCollectionSectionRow(
     val visibleSections by remember(sectionUis) {
         derivedStateOf {
             sectionUis.filter {
-                it.isLoading || it.items.isNotEmpty() || it.statusMessage.isNotBlank()
+                it.isLoading || it.items.isNotEmpty()
             }
         }
     }
@@ -82,7 +82,7 @@ internal fun HomeCollectionSectionRow(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = "Collections",
-            statusMessage = sharedSubtitle,
+            subtitle = sharedSubtitle,
             skeleton = collectionsLoading,
             modifier = Modifier.padding(horizontal = horizontalPadding),
         )

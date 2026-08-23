@@ -68,7 +68,7 @@ internal fun HomeWideRailSection(
     onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
 ) {
-    if (section.items.isEmpty() && !section.isLoading && section.statusMessage.isBlank()) {
+    if (section.items.isEmpty() && !section.isLoading) {
         return
     }
 
@@ -78,7 +78,6 @@ internal fun HomeWideRailSection(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = section.title,
-            statusMessage = section.statusMessage,
             skeleton = section.isLoading && section.items.isEmpty(),
             action = onViewAllClick?.let { action ->
                 {
@@ -199,7 +198,7 @@ private fun HomeWideRailSkeletonCard() {
 @Composable
 internal fun HomeRailHeader(
     title: String,
-    statusMessage: String,
+    subtitle: String? = null,
     modifier: Modifier = Modifier,
     skeleton: Boolean = false,
     action: (@Composable () -> Unit)? = null,
@@ -226,7 +225,7 @@ internal fun HomeRailHeader(
                 Text(
                     text = title,
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -234,12 +233,14 @@ internal fun HomeRailHeader(
             action?.invoke()
         }
 
-        if (!skeleton && statusMessage.isNotBlank()) {
-            Text(
-                text = statusMessage,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        if (!skeleton) {
+            subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 

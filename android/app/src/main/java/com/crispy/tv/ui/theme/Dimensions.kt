@@ -21,7 +21,7 @@ object Dimensions {
     val SmallSpacing: Dp = 8.dp
     val ExtraSmallSpacing: Dp = 4.dp
     
-    val WideCardWidth: Dp = 280.dp
+    val WideCardWidth: Dp = 248.dp
     const val WideCardAspectRatio: Float = 16f / 9f
 
     val SearchBarPillHeight: Dp = 56.dp
