@@ -243,7 +243,7 @@ class HomeViewModel internal constructor(
             if (error is CancellationException) throw error
             Log.w(TAG, "Continue watching load failed", error)
             _errorEvents.tryEmit(error.message ?: "Failed to load continue watching.")
-            defaultWideRailSection(CONTINUE_WATCHING_SECTION_KEY, "Continue Watching", CONTINUE_WATCHING).copy(isLoading = false)
+            defaultWideRailSection(CONTINUE_WATCHING_SECTION_KEY, "Continue Watching", HomeWideRailSectionKind.CONTINUE_WATCHING).copy(isLoading = false)
         }
         applyWideRailSection(section)
     }
@@ -253,7 +253,7 @@ class HomeViewModel internal constructor(
             if (error is CancellationException) throw error
             Log.w(TAG, "Up next load failed", error)
             _errorEvents.tryEmit(error.message ?: "Failed to load up next.")
-            defaultWideRailSection(UP_NEXT_SECTION_KEY, "Up Next", UP_NEXT).copy(isLoading = false)
+            defaultWideRailSection(UP_NEXT_SECTION_KEY, "Up Next", HomeWideRailSectionKind.UP_NEXT).copy(isLoading = false)
         }
         applyWideRailSection(section)
     }
@@ -263,7 +263,7 @@ class HomeViewModel internal constructor(
             if (error is CancellationException) throw error
             Log.w(TAG, "This week load failed", error)
             _errorEvents.tryEmit(error.message ?: "Failed to load this week.")
-            defaultWideRailSection(THIS_WEEK_SECTION_KEY, "This Week", THIS_WEEK).copy(isLoading = false)
+            defaultWideRailSection(THIS_WEEK_SECTION_KEY, "This Week", HomeWideRailSectionKind.THIS_WEEK).copy(isLoading = false)
         }
         applyWideRailSection(section)
     }
