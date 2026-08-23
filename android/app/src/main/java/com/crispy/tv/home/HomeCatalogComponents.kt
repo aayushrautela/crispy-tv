@@ -75,7 +75,7 @@ internal fun HomeCatalogSectionRow(
                 } else {
                     Text(
                         text = sectionUi.section.displayTitle,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
