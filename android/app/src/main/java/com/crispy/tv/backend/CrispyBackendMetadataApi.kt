@@ -1,7 +1,8 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.backend.CrispyBackendClient.AiInsightsResponse
+import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
+import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
@@ -125,7 +126,7 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
     profileId: String,
     itemId: String,
     locale: String? = null,
-): AiInsightsResponse {
+): AiInsightsResult {
     checkConfigured()
     val payload = JSONObject().apply {
         put("itemId", itemId.trim())
@@ -138,10 +139,7 @@ internal suspend fun CrispyBackendClient.getAiInsightsApi(
         callTimeoutMs = aiCallTimeoutMs,
     )
     val json = requireSuccess(response)
-    return AiInsightsResponse(
-        insights = parseAiInsightsCards(json.optJSONArray("insights")),
-        trivia = json.optString("trivia").trim(),
-    )
+    return AiInsightsResult(slides = parseAiInsightsSlides(json.optJSONArray("slides")))
 }
 
 internal suspend fun CrispyBackendClient.getMetadataItemDetailApi(

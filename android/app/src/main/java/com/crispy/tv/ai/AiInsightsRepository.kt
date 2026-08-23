@@ -37,17 +37,7 @@ class AiInsightsRepository(
             itemId = itemId,
             locale = locale.toLanguageTag(),
         )
-        return AiInsightsResult(
-            insights = payload.insights.map { card ->
-                AiInsightCard(
-                    type = card.type,
-                    title = card.title,
-                    category = card.category,
-                    content = card.content,
-                )
-            },
-            trivia = payload.trivia,
-        ).also { result ->
+        return payload.also { result ->
             cacheStore.save(itemId, locale, result)
         }
     }

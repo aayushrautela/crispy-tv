@@ -1,5 +1,6 @@
 package com.crispy.tv.backend
 
+import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyHttpResponse
 import okhttp3.Headers
@@ -203,18 +204,6 @@ class CrispyBackendClient(
 
     data class SearchSuggestionsResponse(
         val suggestions: List<SearchSuggestionItem>,
-    )
-
-    data class AiInsightsCard(
-        val type: String,
-        val title: String,
-        val category: String,
-        val content: String,
-    )
-
-    data class AiInsightsResponse(
-        val insights: List<AiInsightsCard>,
-        val trivia: String,
     )
 
     // --- Home ---
@@ -473,7 +462,6 @@ class CrispyBackendClient(
 
     data class MetadataTitleExtrasResponse(
         val seasons: List<MetadataSeasonView>,
-        val episodes: List<MetadataEpisodeView>,
         val reviews: List<MetadataReviewView>,
         val similar: List<MetadataCardView>,
         val collection: MetadataCollectionView?,
@@ -764,7 +752,7 @@ class CrispyBackendClient(
         profileId: String,
         itemId: String,
         locale: String? = null,
-    ): AiInsightsResponse {
+    ): AiInsightsResult {
         return getAiInsightsApi(
             accessToken = accessToken,
             profileId = profileId,

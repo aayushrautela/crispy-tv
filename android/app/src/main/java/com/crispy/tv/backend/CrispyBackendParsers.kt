@@ -2,7 +2,10 @@ package com.crispy.tv.backend
 
 import com.crispy.tv.BuildConfig
 import com.crispy.tv.domain.account.builtInAvatarUrl
-import com.crispy.tv.backend.CrispyBackendClient.AiInsightsCard
+import com.crispy.tv.ai.AiInsightSlide
+import com.crispy.tv.ai.AiInsightSlideKey
+import com.crispy.tv.ai.AiInsightSlideKind
+import com.crispy.tv.ai.AiInsightStandoutTag
 import com.crispy.tv.backend.CrispyBackendClient.ClientImages
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
@@ -890,17 +893,27 @@ internal fun CrispyBackendClient.parseMetadataTitleRatings(json: JSONObject?): M
     )
 }
 
-internal fun CrispyBackendClient.parseAiInsightsCards(array: JSONArray?): List<AiInsightsCard> {
+internal fun parseAiInsightsSlides(array: JSONArray?): List<AiInsightSlide> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {
             val item = safeArray.optJSONObject(index) ?: continue
+            val label = item.optNullableString("label").orEmpty().trim()
+            val body = item.optNullableString("body")?.trim().orEmpty()
+            val focus = item.optNullableString("focus")?.trim().orEmpty()
+            val context = item.optNullableString("context")?.trim().orEmpty()
+            if (label.isEmpty() && body.isEmpty() && focus.isEmpty() && context.isEmpty()) continue
             add(
-                AiInsightsCard(
-                    type = item.optString("type").trim(),
-                    title = item.optString("title").trim(),
-                    category = item.optString("category").trim(),
-                    content = item.optString("content").trim(),
+                AiInsightSlide(
+                    key = AiInsightSlideKey.fromWire(item.optNullableString("key")),
+                    label = label,
+                    kind = AiInsightSlideKind.fromWire(item.optNullableString("kind")),
+                    body = body.takeIf { it.isNotEmpty() },
+                    tag = AiInsightStandoutTag.fromWire(item.optNullableString("tag")),
+                    focus = focus.takeIf { it.isNotEmpty() },
+                    context = context.takeIf { it.isNotEmpty() },
+                    backdrop = parseResponsiveImageSet(item.optJSONObject("backdrop")),
+                    accent = item.optNullableString("accent").orEmpty().trim(),
                 )
             )
         }

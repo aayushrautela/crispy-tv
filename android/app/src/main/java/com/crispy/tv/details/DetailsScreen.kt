@@ -495,7 +495,6 @@ internal fun DetailsScreen(
                     result = visibleUiState.aiInsights,
                     backdropUrls = aiBackdropUrls,
                     onDismiss = onDismissAiInsights,
-                    title = aiOverlayTitle,
                     posterUrl = aiOverlayPosterUrl,
                     backdropUrl = aiOverlayBackdropUrl,
                     palette = palette,
