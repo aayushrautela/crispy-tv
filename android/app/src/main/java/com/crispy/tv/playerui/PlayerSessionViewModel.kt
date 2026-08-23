@@ -312,15 +312,19 @@ class PlayerSessionViewModel(
         _uiState.update { it.copy(subtitleDelayMs = delayMs) }
     }
 
-    fun fetchAddonSubtitles() {
+    fun fetchAddonSubtitles(force: Boolean = false) {
         val lookupId = activeSubtitleLookupId
         val mediaType = activeSubtitleMediaType
         if (lookupId == null || mediaType == null) {
             Log.d(TAG, "fetchAddonSubtitles skipped: activeSubtitleLookupId=$lookupId mediaType=$mediaType")
             return
         }
-        Log.d(TAG, "fetchAddonSubtitles lookupId=$lookupId mediaType=$mediaType")
-        subtitleRepository.fetchAddonSubtitles(mediaType, lookupId)
+        Log.d(TAG, "fetchAddonSubtitles force=$force lookupId=$lookupId mediaType=$mediaType")
+        subtitleRepository.fetchAddonSubtitles(mediaType, lookupId, force)
+    }
+
+    fun refreshAddonSubtitles() {
+        fetchAddonSubtitles(force = true)
     }
 
     fun selectAddonSubtitle(subtitle: AddonSubtitle) {

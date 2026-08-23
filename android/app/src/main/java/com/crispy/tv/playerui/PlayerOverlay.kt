@@ -61,7 +61,7 @@ internal fun PlayerOverlay(
     onRetryPlayback: () -> Unit,
     onSelectAudioTrack: (String?) -> Unit,
     onSelectSubtitleTrack: (String?) -> Unit,
-    onFetchAddonSubtitles: () -> Unit,
+    onRefreshAddonSubtitles: () -> Unit,
     onSelectAddonSubtitle: (AddonSubtitle) -> Unit,
     onCycleResizeMode: () -> Unit,
     onDoubleTapSeek: (Long) -> Unit,
@@ -302,9 +302,9 @@ internal fun PlayerOverlay(
                 resetControlsTimer()
                 onSelectSubtitleTrack(it)
             },
-            onFetchAddonSubtitles = {
+            onRefreshAddonSubtitles = {
                 resetControlsTimer()
-                onFetchAddonSubtitles()
+                onRefreshAddonSubtitles()
             },
             onSelectAddonSubtitle = { subtitle ->
                 resetControlsTimer()

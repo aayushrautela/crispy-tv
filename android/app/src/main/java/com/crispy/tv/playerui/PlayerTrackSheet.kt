@@ -212,7 +212,7 @@ internal fun PlayerSubtitleSheet(
     selectedAddonSubtitleId: String?,
     palette: DetailsPaletteColors,
     onSelectSubtitleTrack: (String?) -> Unit,
-    onFetchAddonSubtitles: () -> Unit = {},
+    onRefreshAddonSubtitles: () -> Unit = {},
     onSelectAddonSubtitle: (AddonSubtitle) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
@@ -262,7 +262,7 @@ internal fun PlayerSubtitleSheet(
                         text = "Addon subtitles",
                         style = MaterialTheme.typography.titleSmall,
                     )
-                    TextButton(onClick = onFetchAddonSubtitles) {
+                    TextButton(onClick = onRefreshAddonSubtitles, enabled = !addonSubtitlesLoading) {
                         Text(if (addonSubtitlesLoading) "Searching..." else "Search")
                     }
                 }

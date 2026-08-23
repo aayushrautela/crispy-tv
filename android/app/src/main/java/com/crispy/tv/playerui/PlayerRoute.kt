@@ -120,6 +120,10 @@ fun PlayerRoute(
         }
 
     LaunchedEffect(videoBounds, uiState.videoLayout, uiState.isPlaying, uiState.isBuffering, uiState.errorMessage, uiState.stableDurationMs) {
+        // Wait for real video geometry before advertising PiP; using the window bounds
+        // ratio while the first frames are still loading produces a wrong-aspect window.
+        // Audio-only streams never report a layout, so a settled duration unlocks them.
+        val playbackGeometryKnown = uiState.videoLayout != null || uiState.stableDurationMs > 0L
         val aspectRatio =
             uiState.videoLayout.toPictureInPictureAspectRatio()
                 ?: videoBounds
@@ -128,6 +132,7 @@ fun PlayerRoute(
         val pipEnabled =
             videoBounds != null &&
                 uiState.errorMessage == null &&
+                playbackGeometryKnown &&
                 (uiState.isPlaying || uiState.isBuffering || uiState.stableDurationMs > 0L)
         Log.d(
             TAG,
@@ -208,7 +213,7 @@ fun PlayerRoute(
                 onRetryPlayback = session::retryPlayback,
                 onSelectAudioTrack = session::selectAudioTrack,
                 onSelectSubtitleTrack = session::selectSubtitleTrack,
-                onFetchAddonSubtitles = session::fetchAddonSubtitles,
+                onRefreshAddonSubtitles = session::refreshAddonSubtitles,
                 onSelectAddonSubtitle = session::selectAddonSubtitle,
                 onCycleResizeMode = {
                     val next = uiState.resizeMode.next()
