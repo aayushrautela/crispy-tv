@@ -90,7 +90,6 @@ private fun MainAppShell(onSignedOut: () -> Unit) {
                     restoreState = true
                 }
             }
-            Unit
         }
     }
 

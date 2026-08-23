@@ -73,41 +73,49 @@ internal fun JSONObject?.optNullableString(key: String): String? {
 }
 
 internal fun JSONObject.optIntOrNull(key: String): Int? {
-    return when (val value = opt(key)) {
-        is Number -> value.toInt()
-        is String -> value.trim().toIntOrNull()
-        else -> null
+    return opt(key)?.let { value ->
+        when (value) {
+            is Number -> value.toInt()
+            is String -> value.trim().toIntOrNull()
+            else -> null
+        }
     }
 }
 
 internal fun JSONObject.optDoubleOrNull(key: String): Double? {
-    return when (val value = opt(key)) {
-        is Number -> value.toDouble()
-        is String -> value.trim().toDoubleOrNull()
-        else -> null
+    return opt(key)?.let { value ->
+        when (value) {
+            is Number -> value.toDouble()
+            is String -> value.trim().toDoubleOrNull()
+            else -> null
+        }
     }
 }
 
 internal fun JSONObject.optLongOrNull(key: String): Long? {
-    return when (val value = opt(key)) {
-        is Number -> value.toLong()
-        is String -> value.trim().toLongOrNull()
-        else -> null
+    return opt(key)?.let { value ->
+        when (value) {
+            is Number -> value.toLong()
+            is String -> value.trim().toLongOrNull()
+            else -> null
+        }
     }
 }
 
 internal fun JSONObject.optBooleanOrNull(key: String): Boolean? {
-    return when (val value = opt(key)) {
-        is Boolean -> value
-        is String -> value.trim().lowercase().let {
-            when (it) {
-                "true" -> true
-                "false" -> false
-                else -> null
+    return opt(key)?.let { value ->
+        when (value) {
+            is Boolean -> value
+            is String -> value.trim().lowercase().let {
+                when (it) {
+                    "true" -> true
+                    "false" -> false
+                    else -> null
+                }
             }
-        }
 
-        else -> null
+            else -> null
+        }
     }
 }
 

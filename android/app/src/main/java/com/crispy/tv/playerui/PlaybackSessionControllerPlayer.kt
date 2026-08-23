@@ -27,7 +27,6 @@ import java.io.ByteArrayOutputStream
  * [SimpleBasePlayer] that mirrors the controller's snapshot into [getState] and forwards transport
  * commands to the controller. Media3 then owns all external session/notification state syncing.
  */
-@OptIn(androidx.media3.common.util.UnstableApi::class)
 internal class PlaybackSessionControllerPlayer(
     context: Context,
     private val controller: PlaybackSessionController,
