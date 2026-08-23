@@ -152,6 +152,7 @@ internal fun MediaDetails.toAddonLookupId(): String? {
 internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
     return when {
         itemType.equals("anime", ignoreCase = true) -> "anime"
+        itemType.equals("episode", ignoreCase = true) -> "episode"
         itemType.equals("show", ignoreCase = true) || itemType.equals("tv", ignoreCase = true) -> "show"
         else -> "movie"
     }
