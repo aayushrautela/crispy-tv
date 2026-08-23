@@ -2,7 +2,6 @@ package com.crispy.tv.backend
 
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.CrispyBackendClient.MetadataPersonDetail
-import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchResultsResponse
 import com.crispy.tv.backend.CrispyBackendClient.SearchSuggestionsResponse
 import com.crispy.tv.backend.CrispyBackendClient.MetadataTitleDetailResponse
