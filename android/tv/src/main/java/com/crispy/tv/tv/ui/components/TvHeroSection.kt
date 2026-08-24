@@ -27,10 +27,9 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 
 /**
- * Full-bleed hero for the top of Home, in the style of the phone app / NuvioTV:
- * backdrop occupies the top region, background-color fades keep the left column and
- * bottom edge readable, logo (or title fallback), metadata row and overview sit at
- * bottom-start.
+ * Full-bleed hero backdrop in the NuvioTV / Google TV style: the caller sizes and
+ * pins the region; background-color fades keep the left text column and bottom edge
+ * readable, logo (or title fallback), metadata row and overview sit at bottom-start.
  */
 @Composable
 fun TvHeroSection(
@@ -39,9 +38,7 @@ fun TvHeroSection(
 ) {
     val bgColor = MaterialTheme.colorScheme.background
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(400.dp),
+        modifier = modifier.fillMaxWidth(),
     ) {
         if (item?.imageUrl != null) {
             AsyncImage(

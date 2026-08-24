@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -19,7 +19,7 @@ fun RailSection(
     items: List<CrispyCardItem>,
     onItemClick: (CrispyCardItem) -> Unit,
     modifier: Modifier = Modifier,
-    onItemFocused: (CrispyCardItem) -> Unit = {},
+    onItemFocused: (index: Int, item: CrispyCardItem) -> Unit = { _, _ -> },
 ) {
     Column(modifier = modifier) {
         Text(
@@ -32,11 +32,11 @@ fun RailSection(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 48.dp),
         ) {
-            items(items, key = { it.id }) { item ->
+            itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
                 CrispyLandscapeCard(
                     item = item,
                     onClick = { onItemClick(item) },
-                    onFocus = { onItemFocused(item) },
+                    onFocus = { onItemFocused(index, item) },
                     modifier = Modifier.width(220.dp),
                 )
             }
