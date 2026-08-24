@@ -34,6 +34,11 @@ final class BootstrapViewModel {
         let onboardingComplete = await profileStore.activeProfileId(userId: session.userId) != nil
         state = onboardingComplete ? .ready : .needsProfileSelection
     }
+
+    /// Called after a completed sign-out so the root gate flips back to auth.
+    func markSignedOut() {
+        state = .needsAuth
+    }
 }
 
 /// Composition root for the iOS app (architecture.md: one AppContainer).

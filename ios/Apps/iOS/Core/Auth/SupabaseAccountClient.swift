@@ -183,7 +183,7 @@ final class SupabaseAccountClient {
     }
 
     private func postAuth(path: String, payload: [String: Any], bearerToken: String? = nil) async throws -> String {
-        let url = URL(string: requireConfiguredBaseURL() + path)
+        let url = URL(string: try requireConfiguredBaseURL() + path)
         let headers = bearerToken.map(authHeaders) ?? baseHeaders()
         let response = try await httpClient.postJson(
             url: try requireValid(url),

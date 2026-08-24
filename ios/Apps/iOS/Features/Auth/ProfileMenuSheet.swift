@@ -86,7 +86,7 @@ struct ProfileMenuSheet: View {
 
     private func signOut() async {
         await environment.signOut()
-        environment.bootstrap.state = .needsAuth
+        environment.bootstrap.markSignedOut()
         onDismissed()
         dismiss()
     }

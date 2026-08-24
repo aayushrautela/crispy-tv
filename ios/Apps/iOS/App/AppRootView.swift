@@ -34,7 +34,7 @@ struct AppRootView: View {
 
     private func signOutAndReset() async {
         await environment.signOut()
-        environment.bootstrap.state = .needsAuth
+        environment.bootstrap.markSignedOut()
     }
 }
 

@@ -38,7 +38,7 @@ extension MediaCard {
             genre: card.genres.first,
             maturityRating: card.maturityRating,
             description: card.overview,
-            progressPercent: card.progress?.percent ?? progressPercent(
+            progressPercent: card.progress?.percent ?? resolvedProgressPercent(
                 positionSeconds: card.progress?.positionSeconds,
                 durationSeconds: card.progress?.durationSeconds
             )
@@ -106,7 +106,7 @@ func normalizeCatalogType(_ raw: String) -> String {
     }
 }
 
-private func progressPercent(positionSeconds: Int?, durationSeconds: Int?) -> Double? {
+private func resolvedProgressPercent(positionSeconds: Int?, durationSeconds: Int?) -> Double? {
     guard let positionSeconds, let durationSeconds, durationSeconds > 0 else { return nil }
     return min(max(Double(positionSeconds) / Double(durationSeconds) * 100.0, 0), 100)
 }
