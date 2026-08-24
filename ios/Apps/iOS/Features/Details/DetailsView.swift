@@ -10,6 +10,7 @@ struct DetailsScreen: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: DetailsViewModel?
     @State private var showPlaybackNotice = false
+    @State private var ratings: TitleRatings?
 
     var body: some View {
         Group {
@@ -26,6 +27,12 @@ struct DetailsScreen: View {
         .task {
             let vm = ensureViewModel()
             await vm.loadIfNeeded(environment: environment)
+            guard let context = await environment.backendContext() else { return }
+            ratings = try? await environment.backend.getMetadataItemRatings(
+                accessToken: context.accessToken,
+                profileId: context.profileId,
+                itemId: itemId
+            )
         }
     }
 
@@ -56,6 +63,22 @@ struct DetailsScreen: View {
                                 .foregroundStyle(.primary.opacity(0.9))
                         }
                         creditsRow(detail)
+
+                        if let ratings, !ratings.visible.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(spacing: 8) {
+                                    ForEach(ratings.visible, id: \.0) { label, value in
+                                        HStack(spacing: 4) {
+                                            Text(label).font(.caption2.weight(.bold))
+                                            Text(value).font(.caption)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .glassEffect(in: .capsule)
+                                    }
+                                }
+                            }
+                        }
                     }
                     .padding(.horizontal, 16)
 
@@ -88,7 +111,74 @@ struct DetailsScreen: View {
                         }
                     }
 
-                    castRail(detail)
+                    if !detail.videos.isEmpty {
+                        RailSectionView(title: "Trailers & more") {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(spacing: Theme.railSpacing) {
+                                    ForEach(detail.videos) { video in
+                                        Button {
+                                            if let url = video.playableURL.flatMap(URL.init(string:)) {
+                                                UIApplication.shared.open(url)
+                                            }
+                                        } label: {
+                                            VStack(alignment: .leading, spacing: 6) {
+                                                ZStack(alignment: .center) {
+                                                    RemoteImage(url: video.thumbnailUrl)
+                                                        .aspectRatio(Theme.landscapeAspectRatio, contentMode: .fit)
+                                                        .clipShape(.rect(cornerRadius: Theme.cardCornerRadius))
+                                                    Image(systemName: "play.circle.fill")
+                                                        .font(.largeTitle)
+                                                        .foregroundStyle(.white.opacity(0.9))
+                                                }
+                                                .frame(width: 200)
+                                                Text(video.name ?? "Video")
+                                                    .font(.caption.weight(.medium))
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+
+                    if !detail.production.isEmpty {
+                        RailSectionView(title: "Production") {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(spacing: 16) {
+                                    ForEach(detail.production) { company in
+                                        VStack(spacing: 6) {
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: 12).fill(Color(.tertiarySystemFill))
+                                                if let logo = company.logoUrl.nilIfBlank {
+                                                    RemoteImage(url: logo)
+                                                        .aspectRatio(contentMode: .fit)
+                                                        .padding(8)
+                                                }
+                                            }
+                                            .frame(width: 84, height: 56)
+                                            Text(company.name)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                                .frame(width: 84)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+
+                    if !detail.cast.isEmpty {
+                        castSection(detail)
+                    } else {
+                        EmptyView()
+                    }
+
+                    reviewsRail(detail)
 
                     if !viewModel.errorMessage.isEmpty {
                         Text(viewModel.errorMessage)
@@ -231,7 +321,34 @@ struct DetailsScreen: View {
     }
 
     @ViewBuilder
-    private func castRail(_ detail: MetadataTitleDetail) -> some View {
+    @ViewBuilder
+    private func reviewsRail(_ detail: MetadataTitleDetail) -> some View {
+        if !detail.reviews.isEmpty {
+            RailSectionView(title: "Reviews") {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: 12) {
+                        ForEach(detail.reviews) { review in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(review.author ?? review.provider)
+                                    .font(.caption.weight(.semibold))
+                                Text(review.content)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(4)
+                            }
+                            .padding(12)
+                            .frame(width: 260, alignment: .topLeading)
+                            .glassEffect(in: .rect(cornerRadius: 14))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func castSection(_ detail: MetadataTitleDetail) -> some View {
         if !detail.cast.isEmpty {
             RailSectionView(title: "Cast") {
                 ScrollView(.horizontal, showsIndicators: false) {

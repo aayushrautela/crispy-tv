@@ -423,3 +423,60 @@ public struct UpNextEntry: Equatable, Identifiable {
 
     public var id: String { showItemId }
 }
+
+public struct MetadataReview: Equatable, Identifiable {
+    public let id: String
+    public let provider: String
+    public let author: String?
+    public let username: String?
+    public let content: String
+    public let rating: Double?
+    public let url: String?
+}
+
+public struct MetadataVideo: Equatable, Identifiable {
+    public let id: String
+    public let name: String?
+    public let site: String?
+    public let key: String
+    public let thumbnailUrl: String?
+    public let url: String?
+
+    public var playableURL: String? {
+        if let url = url?.nilIfBlank { return url }
+        if (site ?? "").lowercased() == "youtube", !key.isEmpty {
+            return "https://www.youtube.com/watch?v=\(key)"
+        }
+        return nil
+    }
+}
+
+public struct TitleRatings: Equatable {
+    public let imdb: Double?
+    public let tmdb: Double?
+    public let trakt: Double?
+    public let metacritic: Double?
+    public let rottenTomatoes: Double?
+    public let audience: Double?
+
+    public var visible: [(String, String)] {
+        [
+            ("IMDb", imdb).map { ($0.0, formatRating($0.1)) },
+            ("TMDB", tmdb).map { ($0.0, formatRating($0.1)) },
+            ("Trakt", trakt.map { $0 * 10 }).map { ($0.0, formatRating($0.1)) },
+            ("MC", metacritic).map { ($0.0, $0.1.map { String(Int($0)) }) },
+            ("RT", rottenTomatoes).map { ($0.0, $0.1.map { String(Int($0)) + "%" }) },
+            ("Aud.", audience).map { ($0.0, $0.1.map { String(Int($0)) + "%" }) },
+        ]
+        .compactMap { pair in
+            guard let value = pair.1 else { return nil }
+            return (pair.0, value)
+        }
+    }
+}
+
+public struct MetadataCompany: Equatable, Identifiable {
+    public let id: String
+    public let name: String
+    public let logoUrl: String?
+}

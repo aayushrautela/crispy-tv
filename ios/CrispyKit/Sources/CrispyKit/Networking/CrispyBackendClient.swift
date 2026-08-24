@@ -291,11 +291,15 @@ public func getMetadataItemDetail(accessToken: String, itemId: String) async thr
         guard let itemJson = json.jsonObject("Item") else {
             throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend item detail is missing Item.", category: nil, retryable: false, requestId: nil, details: nil)
         }
+        let production = (json.jsonObject("Production")?.jsonArray("companies") ?? []) +
+            (json.jsonObject("Production")?.jsonArray("networks") ?? [])
         return MetadataTitleDetail(
             item: try parseMetadataItem(itemJson),
             cast: parsePersonRefs(json.jsonArray("Cast")),
             directors: parsePersonRefs(json.jsonArray("Directors")),
-            creators: parsePersonRefs(json.jsonArray("Creators"))
+            creators: parsePersonRefs(json.jsonArray("Creators")),
+            videos: json.jsonArray("Videos").compactMap(parseMetadataVideo),
+            production: production.compactMap(parseMetadataCompany)
         )
     }
 
@@ -303,7 +307,22 @@ public func getMetadataItemExtras(accessToken: String, itemId: String) async thr
         let json = try await getJson(path: "/v1/metadata/items/\(itemId.trimmingCharacters(in: .whitespacesAndNewlines))/extras", accessToken: accessToken)
         return MetadataTitleExtras(
             seasons: json.jsonArray("Seasons").compactMap(parseMetadataSeason),
-            similar: json.jsonArray("Similar").compactMap(parseMetadataCard)
+            similar: json.jsonArray("Similar").compactMap(parseMetadataCard),
+            reviews: json.jsonArray("Reviews").compactMap(parseMetadataReview),
+            collection: json.jsonObject("Collection").map { $0.jsonArray("Items").compactMap(parseMetadataCard) } ?? []
+        )
+    }
+
+    func getMetadataItemRatings(accessToken: String, profileId: String, itemId: String) async throws -> TitleRatings {
+        let json = try await getJson(path: "/v1/profiles/\(profileId)/metadata/items/\(itemId)/ratings", accessToken: accessToken)
+        let r = json.jsonObject("Ratings")
+        return TitleRatings(
+            imdb: r?.jsonDouble("imdb"),
+            tmdb: r?.jsonDouble("tmdb"),
+            trakt: r?.jsonDouble("trakt"),
+            metacritic: r?.jsonDouble("metacritic"),
+            rottenTomatoes: r?.jsonDouble("rottenTomatoes"),
+            audience: r?.jsonDouble("audience")
         )
     }
 
@@ -518,6 +537,19 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
         }
     }
 
+    private func parseMetadataReview(_ json: [String: Any]) -> MetadataReview? {
+        guard let id = json.jsonString("id"), let content = json.jsonString("content") else { return nil }
+        return MetadataReview(
+            id: id,
+            provider: json.jsonString("provider") ?? "",
+            author: json.jsonString("author") ?? json.jsonString("username"),
+            username: json.jsonString("username"),
+            content: content,
+            rating: json.jsonDouble("rating"),
+            url: json.jsonString("url")
+        )
+    }
+
     private func parseKnownForItem(_ json: [String: Any]) -> PersonKnownForItem? {
         guard let itemId = json.jsonString("itemId"),
               let mediaType = json.jsonString("mediaType"),
@@ -532,6 +564,23 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             rating: json.jsonDouble("rating"),
             releaseYear: json.jsonInt("releaseYear")
         )
+    }
+
+    private func parseMetadataVideo(_ json: [String: Any]) -> MetadataVideo? {
+        guard let id = json.jsonString("id"), let key = json.jsonString("key") else { return nil }
+        return MetadataVideo(
+            id: id,
+            name: json.jsonString("name"),
+            site: json.jsonString("site"),
+            key: key,
+            thumbnailUrl: json.jsonString("thumbnailUrl"),
+            url: json.jsonString("url")
+        )
+    }
+
+    private func parseMetadataCompany(_ json: [String: Any]) -> MetadataCompany? {
+        guard let id = json.jsonString("id"), let name = json.jsonString("name") else { return nil }
+        return MetadataCompany(id: id, name: name, logoUrl: ResponsiveImageSetDto.parse(json.jsonObject("logo")).medium)
     }
 
     private func runtimeMinutes(fromTicks ticks: Int?) -> Int? {
