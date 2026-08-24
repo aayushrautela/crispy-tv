@@ -257,6 +257,33 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         return json.jsonArray("items").compactMap(parseSearchMediaItem)
     }
 
+    public func getUpNext(accessToken: String, profileId: String, limit: Int = 20) async throws -> [UpNextEntry] {
+        let json = try await getJson(path: "/v1/profiles/\(profileId)/watch/episodic-follow", accessToken: accessToken)
+        return json.jsonArray("items").compactMap { item in
+            let show = item.jsonObject("show")
+            guard let showItemId = show?.jsonString("itemId"),
+                  let showTitle = show?.jsonString("title") else { return nil }
+            let images = show?.jsonObject("images")
+            let season = item.jsonInt("nextEpisodeSeasonNumber")
+            let episode = item.jsonInt("nextEpisodeEpisodeNumber")
+            var badge: String?
+            if let season, let episode {
+                badge = "S\(season)E\(episode)"
+            } else if let season {
+                badge = "S\(season)"
+            }
+            return UpNextEntry(
+                showItemId: showItemId,
+                showTitle: showTitle,
+                backdropUrl: images?.jsonObject("backdrop")?.jsonString("medium") ?? images?.jsonObject("backdrop")?.jsonString("large"),
+                posterUrl: images?.jsonObject("poster")?.jsonString("medium") ?? images?.jsonObject("poster")?.jsonString("large"),
+                logoUrl: images?.jsonObject("logo")?.jsonString("medium"),
+                badge: badge,
+                airDate: item.jsonString("nextEpisodeAirDate")
+            )
+        }
+    }
+
     // MARK: - Metadata / details
 
 public func getMetadataItemDetail(accessToken: String, itemId: String) async throws -> MetadataTitleDetail {

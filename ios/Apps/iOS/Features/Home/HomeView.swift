@@ -93,6 +93,31 @@ struct HomeScreen: View {
             }
         }
 
+        if !viewModel.upNextItems.isEmpty {
+            RailSectionView(title: "Up next") {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: Theme.railSpacing) {
+                        ForEach(viewModel.upNextItems) { entry in
+                            NavigationLink(value: AppRoute.details(itemId: entry.showItemId, itemType: "show")) {
+                                LandscapeCardView(
+                                    title: entry.showTitle,
+                                    backdropUrl: entry.backdropUrl ?? entry.posterUrl,
+                                    logoUrl: entry.logoUrl,
+                                    ratingText: nil,
+                                    yearText: nil,
+                                    maturityRating: nil,
+                                    genre: nil,
+                                    badge: entry.badge
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+        }
+
         if !viewModel.thisWeekItems.isEmpty {
             RailSectionView(title: "This week") {
                 ScrollView(.horizontal, showsIndicators: false) {

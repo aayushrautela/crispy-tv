@@ -411,3 +411,15 @@ public struct AvatarItem: Equatable, Identifiable {
     public let id: String
     public let url: String?
 }
+
+public struct UpNextEntry: Equatable, Identifiable {
+    public let showItemId: String
+    public let showTitle: String
+    public let backdropUrl: String?
+    public let posterUrl: String?
+    public let logoUrl: String?
+    public let badge: String?
+    public let airDate: String?
+
+    public var id: String { showItemId }
+}

@@ -48,6 +48,7 @@ public final class HomeViewModel {
     public private(set) var rails: [RailSection] = []
     public private(set) var continueWatchingItems: [MediaCard] = []
     public private(set) var thisWeekItems: [ThisWeekItem] = []
+    public private(set) var upNextItems: [UpNextEntry] = []
     public private(set) var isLoading = false
     public private(set) var statusMessage = ""
 
@@ -78,6 +79,10 @@ public func load(environment: AppEnvironment) async {
                 accessToken: context.accessToken,
                 profileId: context.profileId
             )
+            async let upNextResult = try? environment.backend.getUpNext(
+                accessToken: context.accessToken,
+                profileId: context.profileId
+            )
 
             let response = try await homeResponse
             apply(
@@ -89,6 +94,9 @@ public func load(environment: AppEnvironment) async {
             continueWatchingItems = continueWatching.items.map { MediaCard.from($0) }
             if let thisWeek = await thisWeekResult {
                 thisWeekItems = thisWeek.map(Self.makeThisWeekItem)
+            }
+            if let upNext = await upNextResult {
+                upNextItems = upNext
             }
             didInitialLoad = true
         } catch {
