@@ -80,6 +80,7 @@ data class DetailUiState(
     val reviews: List<ReviewUi> = emptyList(),
     val production: List<CompanyUi> = emptyList(),
     val detailRows: List<Pair<String, String>> = emptyList(),
+    val episodeWatchStates: Map<String, EpisodeWatchStateUi> = emptyMap(),
     val isInWatchlist: Boolean = false,
     val isWatched: Boolean = false,
     val isRated: Boolean = false,
@@ -172,7 +173,7 @@ class DetailViewModel(
         }
     }
 
-    private fun CrispyBackendClient.MetadataTitleRatings?.toBadges(): List<String> {
+    private fun CrispyBackendClient.MetadataTitleRatingsResponse?.toBadges(): List<String> {
         val r = this?.ratings ?: return emptyList()
         return buildList {
             r.imdb?.let { add("IMDb ${formatOneDecimal(it)}") }
@@ -190,7 +191,7 @@ class DetailViewModel(
             id = "$index-${key.name}",
             label = label.ifBlank { key.name.replace('_', ' ') },
             body = listOfNotNull(body, focus, context).filter { it.isNotBlank() }.joinToString("\n\n"),
-            tag = tag,
+            tag = tag?.name?.lowercase()?.replace('_', ' '),
         )
 
     fun selectSeason(season: Int) {
@@ -202,11 +203,6 @@ class DetailViewModel(
             val refreshedLookup = episodes.firstOrNull()?.lookupId
             _state.value = _state.value.copy(
                 episodes = episodes,
-                isInWatchlist = watchState?.isInWatchlist ?: false,
-                isWatched = watchState?.isWatched ?: false,
-                isRated = watchState?.isRated ?: false,
-                userRating = watchState?.userRating,
-                episodeWatchStates = episodeStates,
                 episodesLoading = false,
                 lookupId = refreshedLookup ?: _state.value.lookupId,
             )
@@ -514,8 +510,8 @@ class DetailViewModel(
             add("ORIGIN COUNTRY" to production.originCountries.joinToString(", "))
         }
         production.originalLanguage?.let { add("ORIGINAL LANGUAGE" to it.uppercase()) }
-        if (genres.isNotEmpty()) {
-            add("GENRES" to genres.joinToString(", "))
+        if (item.genres.isNotEmpty()) {
+            add("GENRES" to item.genres.joinToString(", "))
         }
     }
 

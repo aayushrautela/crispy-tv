@@ -52,6 +52,7 @@ import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 
 private val ScreenPadding = 48.dp

@@ -157,7 +157,7 @@ private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem {
         year = year?.toString(),
         certification = maturityRating,
         genre = genres.firstOrNull(),
-        description = overview ?: summary,
+        description = overview,
         badge = metaSubtitle?.takeIf { isEpisode },
         progressFraction = fraction,
     )
@@ -193,5 +193,5 @@ private fun CrispyBackendClient.MediaItem.toCardItem(): CrispyCardItem =
         logoUrl = logo.large ?: logo.medium ?: logo.small,
         rating = rating?.let { formatRating(it) },
         genre = genres.firstOrNull(),
-        description = overview ?: summary,
+        description = overview,
     )

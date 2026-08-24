@@ -160,6 +160,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.tv:tv-material:1.1.0")
+    implementation("androidx.compose.material3:material3")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("com.materialkolor:material-kolor:5.0.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")
