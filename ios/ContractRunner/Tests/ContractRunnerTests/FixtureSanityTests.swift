@@ -16,6 +16,14 @@ final class FixtureSanityTests: XCTestCase {
             "sync_planner",
             "storage_v1",
             "player_progress",
+            "addon_url_normalization",
+            "onboarding_state_machine",
+            "optimistic_state",
+            "profile_name_validation",
+            "profile_settings_sync",
+            "profile_sorting",
+            "signup_profile",
+            "watch_sync",
         ]
 
         for suite in suites {
