@@ -175,6 +175,9 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     onSelectSeason = detailViewModel::selectSeason,
                     onOpenItem = { nextId -> navController.navigate("detail/$nextId") },
                     onBack = { navController.popBackStack() },
+                    onToggleWatchlist = detailViewModel::toggleWatchlist,
+                    onToggleWatched = detailViewModel::toggleWatched,
+                    onToggleEpisodeWatched = detailViewModel::toggleEpisodeWatched,
                     onPlay = { id ->
                         val target = detailState
                         if (target?.lookupMediaTypeName != null && !target.lookupId.isNullOrBlank()) {

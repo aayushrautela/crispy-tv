@@ -3,8 +3,10 @@ package com.crispy.tv.tv.di
 import android.content.Context
 import com.crispy.tv.accounts.ActiveProfileStore
 import com.crispy.tv.accounts.SupabaseAccountClient
+import com.crispy.tv.addons.sources.BackendEpisodeListProvider
 import com.crispy.tv.addons.streams.AddonStreamsService
 import com.crispy.tv.addons.streams.StreamResolver
+import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.backend.BackendContextResolver
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.network.AppHttp
@@ -28,6 +30,9 @@ object TvServices {
 
     @Volatile
     private var streamResolver: StreamResolver? = null
+
+    @Volatile
+    private var watchHistoryService: BackendWatchHistoryService? = null
 
     fun secureTokenStore(context: Context): com.crispy.tv.accounts.SecureTokenStore {
         secureTokenStore?.let { return it }
@@ -111,6 +116,25 @@ object TvServices {
                 ),
             )
             streamResolver = created
+            return created
+        }
+    }
+
+    fun watchHistoryService(context: Context): BackendWatchHistoryService {
+        watchHistoryService?.let { return it }
+        synchronized(this) {
+            watchHistoryService?.let { return it }
+            val appContext = context.applicationContext
+            val created = BackendWatchHistoryService(
+                context = appContext,
+                backend = backendClient(appContext),
+                backendContextResolver = contextResolver(appContext),
+                episodeListProvider = BackendEpisodeListProvider(
+                    supabaseAccountClient = accountClient(appContext),
+                    backendClient = backendClient(appContext),
+                ),
+            )
+            watchHistoryService = created
             return created
         }
     }

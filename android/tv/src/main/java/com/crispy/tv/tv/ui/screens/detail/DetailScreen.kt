@@ -40,11 +40,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.net.Uri
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.crispy.tv.tv.ui.components.CrispyLandscapeCard
 import com.crispy.tv.tv.ui.components.RailSection
+import com.crispy.tv.tv.ui.components.skeletonElement
+import com.crispy.tv.tv.ui.theme.rememberDetailsSeedColor
+import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Star
 
 private val ScreenPadding = 48.dp
 
@@ -55,22 +63,73 @@ fun DetailScreen(
     onOpenItem: (String) -> Unit,
     onBack: () -> Unit,
     onPlay: (String) -> Unit,
+    onToggleWatchlist: () -> Unit = {},
+    onToggleWatched: () -> Unit = {},
+    onToggleEpisodeWatched: (DetailEpisodeUi) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    when {
-        state.loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val seed by rememberDetailsSeedColor(
+        imageUrl = if (state.loading) null else state.backdropUrl,
+        fallbackSeed = MaterialTheme.colorScheme.primary,
+    )
+    val themedScheme = rememberDetailsTvColorScheme(seed)
+    androidx.tv.material3.MaterialTheme(colorScheme = themedScheme) {
+        when {
+            state.loading -> TvDetailSkeleton(modifier = modifier)
+            state.error != null -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(state.error!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> DetailContent(
+                state = state,
+                onSelectSeason = onSelectSeason,
+                onOpenItem = onOpenItem,
+                onPlay = onPlay,
+                modifier = modifier,
+            )
         }
-        state.error != null -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(state.error!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        else -> DetailContent(
-            state = state,
-            onSelectSeason = onSelectSeason,
-            onOpenItem = onOpenItem,
-            onPlay = onPlay,
-            modifier = modifier,
+    }
+}
+
+@Composable
+private fun TvDetailSkeleton(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(360.dp)
+                .skeletonElement(shape = RoundedCornerShape(0.dp)),
         )
+        Spacer(Modifier.height(20.dp))
+        Box(
+            modifier = Modifier
+                .padding(horizontal = ScreenPadding)
+                .fillMaxWidth(0.55f)
+                .height(22.dp)
+                .skeletonElement(),
+        )
+        Spacer(Modifier.height(12.dp))
+        Box(
+            modifier = Modifier
+                .padding(horizontal = ScreenPadding)
+                .fillMaxWidth(0.85f)
+                .height(14.dp)
+                .skeletonElement(),
+        )
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(horizontal = ScreenPadding)) {
+            repeat(4) {
+                Box(
+                    modifier = Modifier
+                        .width(220.dp)
+                        .height(124.dp)
+                        .skeletonElement(),
+                )
+            }
+        }
     }
 }
 
@@ -80,6 +139,9 @@ private fun DetailContent(
     onSelectSeason: (Int) -> Unit,
     onOpenItem: (String) -> Unit,
     onPlay: (String) -> Unit,
+    onToggleWatchlist: () -> Unit,
+    onToggleWatched: () -> Unit,
+    onToggleEpisodeWatched: (DetailEpisodeUi) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scroll = rememberScrollState()
@@ -166,11 +228,33 @@ private fun DetailContent(
                     }
                 }
                 Spacer(Modifier.height(14.dp))
-                SmartPlayButton(
-                    label = state.ctaLabel,
-                    remainingMinutes = state.ctaRemainingMinutes,
-                    onClick = { onPlay(state.itemId) },
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SmartPlayButton(
+                        label = state.ctaLabel,
+                        remainingMinutes = state.ctaRemainingMinutes,
+                        onClick = { onPlay(state.itemId) },
+                    )
+                    HeaderActionButton(
+                        label = if (state.isInWatchlist) "In watchlist" else "Watchlist",
+                        icon = Icons.Filled.Add,
+                        active = state.isInWatchlist,
+                        onClick = onToggleWatchlist,
+                    )
+                    HeaderActionButton(
+                        label = if (state.isWatched) "Watched" else "Mark watched",
+                        icon = Icons.Filled.Check,
+                        active = state.isWatched,
+                        onClick = onToggleWatched,
+                    )
+                    if (state.userRating != null) {
+                        HeaderActionButton(
+                            label = "Your rating ${state.userRating}",
+                            icon = Icons.Filled.Star,
+                            active = true,
+                            onClick = {},
+                        )
+                    }
+                }
             }
         }
 
@@ -247,7 +331,12 @@ private fun DetailContent(
                 fallbackSeasonCount = state.seasonCount,
                 onSelect = onSelectSeason,
             )
-            EpisodeList(episodes = state.episodes, loading = state.episodesLoading)
+            EpisodeList(
+                episodes = state.episodes,
+                loading = state.episodesLoading,
+                watchStates = state.episodeWatchStates,
+                onToggleWatched = onToggleEpisodeWatched,
+            )
         }
 
         if (state.extraVideos.isNotEmpty()) {
@@ -563,19 +652,30 @@ private fun SeasonChips(
 private fun EpisodeList(
     episodes: List<DetailEpisodeUi>,
     loading: Boolean,
+    watchStates: Map<String, EpisodeWatchStateUi>,
+    onToggleWatched: (DetailEpisodeUi) -> Unit,
 ) {
     Spacer(Modifier.height(16.dp))
     when {
-        loading -> Text(
-            text = "Loading episodes…",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = ScreenPadding),
-        )
+        loading -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = ScreenPadding)
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .skeletonElement(),
+                )
+            }
+        }
         episodes.isEmpty() -> {}
         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             episodes.forEach { episode ->
-                EpisodeRow(episode = episode)
+                EpisodeRow(
+                    episode = episode,
+                    watchState = watchStates[episode.itemId],
+                    onToggleWatched = { onToggleWatched(episode) },
+                )
             }
         }
     }
@@ -583,7 +683,11 @@ private fun EpisodeList(
 }
 
 @Composable
-private fun EpisodeRow(episode: DetailEpisodeUi) {
+private fun EpisodeRow(
+    episode: DetailEpisodeUi,
+    watchState: EpisodeWatchStateUi?,
+    onToggleWatched: () -> Unit,
+) {
     var focused by remember { mutableStateOf(false) }
     val background = if (focused) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
@@ -617,13 +721,24 @@ private fun EpisodeRow(episode: DetailEpisodeUi) {
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = episode.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (watchState?.isWatched == true) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = "Watched",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(
+                    text = episode.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             val meta = listOfNotNull(episode.airDate, episode.runtimeMinutes?.let { "${it}m" })
                 .joinToString(" · ")
             if (meta.isNotBlank()) {
@@ -634,7 +749,95 @@ private fun EpisodeRow(episode: DetailEpisodeUi) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            val progress = watchState?.progressPercent?.takeIf { it > 0.0 && it < 100.0 && !watchState.isWatched }
+            if (progress != null) {
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth((progress / 100.0).toFloat())
+                            .height(3.dp)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
+            }
         }
+        Spacer(Modifier.width(10.dp))
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(
+                    if (watchState?.isWatched == true) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                )
+                .clickable(onClick = onToggleWatched),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = "Toggle watched",
+                tint = if (watchState?.isWatched == true) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeaderActionButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                when {
+                    active -> MaterialTheme.colorScheme.secondaryContainer
+                    focused -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (active) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(7.dp))
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            color = if (active) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 

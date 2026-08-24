@@ -10,6 +10,7 @@ import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.MetadataLabMediaType
+import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.tv.di.TvServices
 import com.crispy.tv.tv.ui.components.CrispyCardItem
 import kotlinx.coroutines.async
@@ -79,6 +80,10 @@ data class DetailUiState(
     val reviews: List<ReviewUi> = emptyList(),
     val production: List<CompanyUi> = emptyList(),
     val detailRows: List<Pair<String, String>> = emptyList(),
+    val isInWatchlist: Boolean = false,
+    val isWatched: Boolean = false,
+    val isRated: Boolean = false,
+    val userRating: Int? = null,
 )
 
 data class CastMemberUi(
@@ -192,6 +197,11 @@ class DetailViewModel(
             val refreshedLookup = episodes.firstOrNull()?.lookupId
             _state.value = _state.value.copy(
                 episodes = episodes,
+                isInWatchlist = watchState?.isInWatchlist ?: false,
+                isWatched = watchState?.isWatched ?: false,
+                isRated = watchState?.isRated ?: false,
+                userRating = watchState?.userRating,
+                episodeWatchStates = episodeStates,
                 episodesLoading = false,
                 lookupId = refreshedLookup ?: _state.value.lookupId,
             )
@@ -209,15 +219,9 @@ class DetailViewModel(
                 runCatching { client.getMetadataItemExtras(context.accessToken, itemId) }
                     .getOrNull()
             }
-            val watchStateDeferred = async {
-                runCatching {
-                    client.getWatchState(context.accessToken, context.profileId, itemId)
-                }.getOrNull()?.item
-            }
 
             val detail = detailDeferred.await()
             val extras = extrasDeferred.await()
-            val watchState = watchStateDeferred.await()
             val item = detail.item
             val isSeries = !item.seasonCount.isNullOrEmptyOrZero() ||
                 item.itemType.equals("series", ignoreCase = true)
@@ -231,6 +235,13 @@ class DetailViewModel(
                     seasonEpisodes = emptyList(),
                     fallbackMediaType = fallbackType,
                 )
+
+            val watchState = runCatching {
+                TvServices.watchHistoryService(appContext).getTitleWatchState(
+                    itemId = itemId,
+                    contentType = fallbackType,
+                )
+            }.getOrNull()
 
             val firstSeason = extras?.seasons?.minOfOrNull { it.seasonNumber } ?: 1
             val episodes = if (isSeries) loadEpisodes(context, firstSeason) else emptyList()
@@ -248,6 +259,8 @@ class DetailViewModel(
             }
 
             val cta = resolveWatchCta(item, watchState, isSeries)
+            val episodeIds = episodes.map { it.itemId }
+            val episodeStates = loadEpisodeStates(context, episodeIds)
 
             DetailUiState(
                 loading = false,
@@ -271,6 +284,11 @@ class DetailViewModel(
                 seasons = extras?.seasons.orEmpty().sortedBy { it.seasonNumber },
                 selectedSeason = if (isSeries) firstSeason else null,
                 episodes = episodes,
+                isInWatchlist = watchState?.isInWatchlist ?: false,
+                isWatched = watchState?.isWatched ?: false,
+                isRated = watchState?.isRated ?: false,
+                userRating = watchState?.userRating,
+                episodeWatchStates = episodeStates,
                 cast = detail.cast.map {
                     CastMemberUi(
                         personId = it.personId,
@@ -310,10 +328,10 @@ class DetailViewModel(
 
     private fun resolveWatchCta(
         item: CrispyBackendClient.MetadataView,
-        watchState: CrispyBackendClient.WatchStateResponse?,
+        watchState: com.crispy.tv.player.CanonicalWatchStateSnapshot?,
         isSeries: Boolean,
     ): Triple<String, String, Int?> {
-        val played = watchState?.played == true
+        val played = watchState?.isWatched == true
         val progress = watchState?.progressPercent
         val resume = watchState?.resumePositionSeconds
         val hasResume = (resume != null && resume > 0.0) || (progress != null && progress > 0.0)
@@ -381,6 +399,91 @@ class DetailViewModel(
             url = resolvedUrl,
             thumbnailUrl = thumbnailUrl,
         )
+    }
+
+    fun toggleWatchlist() {
+        val appContext = getApplication<Application>()
+        viewModelScope.launch {
+            val target = !(_state.value.isInWatchlist)
+            _state.value = _state.value.copy(isInWatchlist = target)
+            runCatching {
+                TvServices.watchHistoryService(appContext).setTitleInWatchlist(itemId, target)
+            }
+        }
+    }
+
+    fun toggleWatched() {
+        val appContext = getApplication<Application>()
+        viewModelScope.launch {
+            val target = !(_state.value.isWatched)
+            _state.value = _state.value.copy(isWatched = target)
+            val request = WatchHistoryRequest(
+                itemId = itemId,
+                contentType = currentMediaType(),
+                title = _state.value.title,
+            )
+            runCatching {
+                if (target) {
+                    TvServices.watchHistoryService(appContext).markWatched(request)
+                } else {
+                    TvServices.watchHistoryService(appContext).unmarkWatched(request)
+                }
+            }
+        }
+    }
+
+    fun setRating(rating: Int?) {
+        val appContext = getApplication<Application>()
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isRated = rating != null, userRating = rating)
+            runCatching {
+                TvServices.watchHistoryService(appContext).setTitleRating(itemId, rating)
+            }
+        }
+    }
+
+    private fun currentMediaType(): MetadataLabMediaType =
+        _state.value.lookupMediaTypeName
+            ?.let { name -> runCatching { MetadataLabMediaType.valueOf(name) }.getOrNull() }
+            ?: MetadataLabMediaType.MOVIE
+
+    private suspend fun loadEpisodeStates(
+        context: BackendContext,
+        episodeItemIds: List<String>,
+    ): Map<String, EpisodeWatchStateUi> {
+        if (episodeItemIds.isEmpty()) return emptyMap()
+        return runCatching {
+            val client = TvServices.backendClient(getApplication<Application>())
+            client.getWatchStateMap(context.accessToken, context.profileId, episodeItemIds)
+        }.getOrElse { emptyMap() }.mapValues { (_, ws) ->
+            EpisodeWatchStateUi(
+                progressPercent = ws.progressPercent ?: 0.0,
+                isWatched = ws.played,
+            )
+        }
+    }
+
+    fun toggleEpisodeWatched(episode: DetailEpisodeUi) {
+        val appContext = getApplication<Application>()
+        viewModelScope.launch {
+            val current = _state.value.episodeWatchStates[episode.itemId]?.isWatched == true
+            val next = !current
+            _state.value = _state.value.copy(
+                episodeWatchStates = _state.value.episodeWatchStates +
+                    (episode.itemId to EpisodeWatchStateUi(0.0, next)),
+            )
+            val request = WatchHistoryRequest(
+                itemId = episode.itemId,
+                contentType = MetadataLabMediaType.SERIES,
+                title = _state.value.title,
+                season = episode.seasonNumber,
+                episode = episode.episodeNumber,
+            )
+            runCatching {
+                val service = TvServices.watchHistoryService(appContext)
+                if (next) service.markWatched(request) else service.unmarkWatched(request)
+            }
+        }
     }
 
     private fun roundToOne(value: Double): String =
