@@ -21,4 +21,5 @@ dependencies {
 
     api("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 }

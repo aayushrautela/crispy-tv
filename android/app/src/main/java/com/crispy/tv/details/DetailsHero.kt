@@ -76,7 +76,7 @@ import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.LocalSharedTransitionScope
 import com.crispy.tv.ui.navigation.animateHeroCornerRadius
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.home.TrailerSource
+import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.PlaybackDependencies
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

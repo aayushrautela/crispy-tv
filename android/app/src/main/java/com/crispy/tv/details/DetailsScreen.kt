@@ -73,8 +73,8 @@ import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
 import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.model.MediaVideo
-import com.crispy.tv.home.TrailerSource
-import com.crispy.tv.home.classifyTrailerSource
+import com.crispy.tv.details.trailer.TrailerSource
+import com.crispy.tv.details.trailer.classifyTrailerSource
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.animateContentAlpha
