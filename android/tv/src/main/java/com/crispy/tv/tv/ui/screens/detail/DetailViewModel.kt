@@ -169,7 +169,7 @@ class DetailViewModel(
             val ratings = runCatching {
                 client.getMetadataItemRatings(context.accessToken, context.profileId, itemId)
             }.getOrNull()
-            _state.value = _state.value.copy(ratingBadges = ratings?.ratings.toBadges())
+            _state.value = _state.value.copy(ratingBadges = ratings.toBadges())
         }
     }
 
