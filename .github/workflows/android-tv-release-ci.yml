@@ -1,10 +1,10 @@
-name: Android Release CI
+name: Android TV Release CI
 
 on:
   workflow_dispatch:
 
 jobs:
-  android:
+  android-tv:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -75,73 +75,33 @@ jobs:
       - name: Run JVM contract tests
         run: gradle :android:contract-tests:test
 
-      - name: Assemble Android app
-        run: gradle :android:app:assembleRelease
+      - name: Assemble Android TV
+        run: gradle :android:tv:assembleRelease
 
-      - name: Upload app APK
+      - name: Upload TV universal APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-release-universal
-          path: android/app/build/outputs/apk/release/*-universal-*.apk
-          if-no-files-found: warn
+          name: crispy-rewrite-tv-release-universal
+          path: android/tv/build/outputs/apk/release/*-universal-*.apk
+          if-no-files-found: error
 
-      - name: Upload arm64-v8a APK
+      - name: Upload TV arm64-v8a APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-release-arm64-v8a
-          path: android/app/build/outputs/apk/release/*-arm64-v8a-*.apk
+          name: crispy-rewrite-tv-release-arm64-v8a
+          path: android/tv/build/outputs/apk/release/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
-      - name: Upload armeabi-v7a APK
+      - name: Upload TV armeabi-v7a APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-release-armeabi-v7a
-          path: android/app/build/outputs/apk/release/*-armeabi-v7a-*.apk
+          name: crispy-rewrite-tv-release-armeabi-v7a
+          path: android/tv/build/outputs/apk/release/*-armeabi-v7a-*.apk
           if-no-files-found: warn
 
-      - name: Upload x86_64 APK
+      - name: Upload TV x86_64 APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-release-x86_64
-          path: android/app/build/outputs/apk/release/*-x86_64-*.apk
+          name: crispy-rewrite-tv-release-x86_64
+          path: android/tv/build/outputs/apk/release/*-x86_64-*.apk
           if-no-files-found: warn
-
-  apple:
-    runs-on: macos-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Apple project
-        run: |
-          rm -rf ios/CrispyRewriteApple.xcodeproj
-          cd ios
-          xcodegen generate --spec project.yml
-
-      - name: Build iOS placeholder target
-        run: >-
-          xcodebuild
-          -project ios/CrispyRewriteApple.xcodeproj
-          -scheme CrispyRewriteiOS
-          -sdk iphonesimulator
-          -destination 'generic/platform=iOS Simulator'
-          CODE_SIGNING_ALLOWED=NO
-          build
-
-      - name: Build tvOS placeholder target
-        run: >-
-          xcodebuild
-          -project ios/CrispyRewriteApple.xcodeproj
-          -scheme CrispyRewritetvOS
-          -sdk appletvsimulator
-          -destination 'generic/platform=tvOS Simulator'
-          CODE_SIGNING_ALLOWED=NO
-          build
-
-      - name: Run Swift contract tests
-        run: swift test --package-path ios/ContractRunner

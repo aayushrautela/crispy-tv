@@ -1,10 +1,10 @@
-name: Android Debug CI
+name: Android TV Debug CI
 
 on:
   workflow_dispatch:
 
 jobs:
-  android:
+  android-tv:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -67,76 +67,36 @@ jobs:
       - name: Run JVM contract tests
         run: gradle :android:contract-tests:test
 
-      - name: Lint Android app
-        run: gradle :android:app:lintDebug
+      - name: Lint Android TV
+        run: gradle :android:tv:lintDebug
 
-      - name: Assemble Android app
-        run: gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest
+      - name: Assemble Android TV
+        run: gradle :android:tv:assembleDebug
 
-      - name: Upload app APK
+      - name: Upload TV universal APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-universal
-          path: android/app/build/outputs/apk/debug/*-universal-*.apk
-          if-no-files-found: warn
+          name: crispy-rewrite-tv-debug-universal
+          path: android/tv/build/outputs/apk/debug/*-universal-*.apk
+          if-no-files-found: error
 
-      - name: Upload arm64-v8a APK
+      - name: Upload TV arm64-v8a APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-arm64-v8a
-          path: android/app/build/outputs/apk/debug/*-arm64-v8a-*.apk
+          name: crispy-rewrite-tv-debug-arm64-v8a
+          path: android/tv/build/outputs/apk/debug/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
-      - name: Upload armeabi-v7a APK
+      - name: Upload TV armeabi-v7a APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-armeabi-v7a
-          path: android/app/build/outputs/apk/debug/*-armeabi-v7a-*.apk
+          name: crispy-rewrite-tv-debug-armeabi-v7a
+          path: android/tv/build/outputs/apk/debug/*-armeabi-v7a-*.apk
           if-no-files-found: warn
 
-      - name: Upload x86_64 APK
+      - name: Upload TV x86_64 APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-x86_64
-          path: android/app/build/outputs/apk/debug/*-x86_64-*.apk
+          name: crispy-rewrite-tv-debug-x86_64
+          path: android/tv/build/outputs/apk/debug/*-x86_64-*.apk
           if-no-files-found: warn
-
-  apple:
-    runs-on: macos-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Apple project
-        run: |
-          rm -rf ios/CrispyRewriteApple.xcodeproj
-          cd ios
-          xcodegen generate --spec project.yml
-
-      - name: Build iOS placeholder target
-        run: >-
-          xcodebuild
-          -project ios/CrispyRewriteApple.xcodeproj
-          -scheme CrispyRewriteiOS
-          -sdk iphonesimulator
-          -destination 'generic/platform=iOS Simulator'
-          CODE_SIGNING_ALLOWED=NO
-          build
-
-      - name: Build tvOS placeholder target
-        run: >-
-          xcodebuild
-          -project ios/CrispyRewriteApple.xcodeproj
-          -scheme CrispyRewritetvOS
-          -sdk appletvsimulator
-          -destination 'generic/platform=tvOS Simulator'
-          CODE_SIGNING_ALLOWED=NO
-          build
-
-      - name: Run Swift contract tests
-        run: swift test --package-path ios/ContractRunner
