@@ -30,3 +30,14 @@ extension String {
         return trimmed.isEmpty ? nil : trimmed
     }
 }
+
+extension Optional where Wrapped == String {
+    /// Chains the blank-normalization onto optionals so call sites can write
+    /// `optionalString.nilIfBlank` directly.
+    var nilIfBlank: String? {
+        switch self {
+        case .some(let value): return value.nilIfBlank
+        case .none: return nil
+        }
+    }
+}
