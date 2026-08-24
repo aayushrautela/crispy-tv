@@ -1,6 +1,6 @@
 # Plan: Android TV app (`:android:tv`) — full build-out
 
-## Status: Phase 0 implemented + compiling — Phases 1+ NOT started
+## Status: Phase 0 ✅ + Phase 1 ✅ + Phase 2 in progress — Phases 3+ NOT started
 
 ## Locked decisions
 - **applicationId**: `com.crispy.tv` on both phone and TV apps (same Play listing,
@@ -102,7 +102,7 @@ backgrounds (TV-NP); 64-bit + 16 KB page size required from Aug 2026 (TV-G6).
 - [x] Verified locally: `gradle :android:app:assembleDebug :android:tv:assembleDebug` compiles;
       CI lint initially flagged missing `POST_NOTIFICATIONS` (fixed in `14d1a386`).
 
-### Phase 1 — App shell
+### Phase 1 — App shell  ✅ done (commit `23b7c7c7` + import fix)
 - [ ] Single-activity `TvMainActivity`: Compose `NavHost`, back-stack handling that restores
       focus (NuvioTV `FocusRestoreUtils` pattern).
 - [ ] Left sidebar navigation (Home / Search / Library / Settings) with D-pad focus handling;
@@ -113,13 +113,17 @@ backgrounds (TV-NP); 64-bit + 16 KB page size required from Aug 2026 (TV-G6).
       container (`LazyRow` + focus bring-into-view), progress bar overlay, watched marker,
       shimmer placeholders.
 
-### Phase 2 — Home screen
-- [ ] Hero/backdrop area for featured or focused item (poster-art gradient like NuvioTV
-      `ClassicFocusGradientBackdrop`).
-- [ ] Rails mirroring phone home: Continue Watching (core-domain items via watchhistory),
-      This Week calendar, Up Next (`episodic-follow`), then catalog rails.
-- [ ] CW rail cards show resume position + episode badge; long-press/options removes item.
-- [ ] Refresh strategy identical to phone refresh coordinator semantics.
+### Phase 2 — Home screen (in progress)
+- [x] Auth core moved to `:android:backend` (`Session`, `SecureTokenStore`, `ActiveProfileStore`,
+      `SupabaseAccountClient`, `BackendContextResolver`) — packages unchanged, zero phone churn.
+- [x] TV session gate: `TvServices` provider, `TvSessionViewModel`
+      (Loading → SignedOut → NeedsProfile → SignedIn), minimal sign-in screen
+      (email+password only — no signup per decision) + profile picker.
+- [x] `HomeViewModel`: parallel load of Continue Watching / Up Next / This Week /
+      profile-home sections via shared backend client; mapped to landscape cards with
+      progress fractions + S/E subtitles.
+- [ ] CW item dismiss (options overlay), hero/backdrop area for focused rail item,
+      catalog pagination.
 
 ### Phase 3 — Detail & episodes
 - [ ] Detail screen: hero backdrop, metadata, Resume/Play, watchlist toggle, tracked-state.
