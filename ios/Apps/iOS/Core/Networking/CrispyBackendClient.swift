@@ -322,8 +322,7 @@ final class CrispyBackendClient {
         return url
     }
 
-    private func perform(_ request: () async throws -> CrispyHttpResponse) async throws -> [String: Any] {
-        let response = try await request()
+    private func perform(_ response: CrispyHttpResponse) throws -> [String: Any] {
         if (200...299).contains(response.code) {
             return try dataEnvelope(response.body)
         }
@@ -339,28 +338,25 @@ final class CrispyBackendClient {
         if !queryItems.isEmpty {
             components.queryItems = (components.queryItems ?? []) + queryItems
         }
-        return try await perform(
-            httpClient.get(url: try requireURL(components.url), headers: authHeaders(accessToken))
-        )
+        let response = try await httpClient.get(url: try requireURL(components.url), headers: authHeaders(accessToken))
+        return try perform(response)
     }
 
     private func postJson(path: String, accessToken: String, payload: [String: Any]) async throws -> [String: Any] {
-        try await perform(
-            httpClient.postJson(
-                url: try requireURL(queryComponents(path: path).url),
-                jsonBody: try JsonParser.encodeObject(payload),
-                headers: authHeaders(accessToken)
-            )
+        let response = try await httpClient.postJson(
+            url: try requireURL(queryComponents(path: path).url),
+            jsonBody: try JsonParser.encodeObject(payload),
+            headers: authHeaders(accessToken)
         )
+        return try perform(response)
     }
 
     private func deleteJson(path: String, accessToken: String) async throws -> [String: Any] {
-        try await perform(
-            httpClient.delete(
-                url: try requireURL(queryComponents(path: path).url),
-                headers: authHeaders(accessToken)
-            )
+        let response = try await httpClient.delete(
+            url: try requireURL(queryComponents(path: path).url),
+            headers: authHeaders(accessToken)
         )
+        return try perform(response)
     }
 
     private func dataEnvelope(_ body: String) throws -> [String: Any] {

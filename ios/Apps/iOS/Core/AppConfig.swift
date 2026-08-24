@@ -8,7 +8,7 @@ struct AppConfig {
     static func load(bundle: Bundle = .main, arguments: [String] = ProcessInfo.processInfo.arguments) -> AppConfig {
         func launchArg(_ name: String) -> String? {
             guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
-            return arguments[index + 1].trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank()
+            return arguments[index + 1].trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
         }
 
         func plistString(_ key: String) -> String {

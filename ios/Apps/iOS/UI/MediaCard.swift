@@ -1,4 +1,5 @@
 import Foundation
+import ContractRunner
 
 /// UI-facing media card shared by Home/Discover/Library/Search, mirroring the
 /// fields the Android screens read off `CatalogItem`/`ClientMediaCard`.

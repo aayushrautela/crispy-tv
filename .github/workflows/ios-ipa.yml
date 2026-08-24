@@ -34,6 +34,7 @@ jobs:
       - name: Archive (unsigned, generic iOS device)
         run: |
           set -o pipefail
+          mkdir -p build
           xcodebuild archive \
             -project ios/CrispyRewriteApple.xcodeproj \
             -scheme CrispyRewriteiOS \

@@ -31,7 +31,7 @@ final class BootstrapViewModel {
             state = .needsAuth
             return
         }
-        let onboardingComplete = await profileStore.activeProfileId(userId: session.userId) != nil
+        let onboardingComplete = profileStore.activeProfileId(userId: session.userId) != nil
         state = onboardingComplete ? .ready : .needsProfileSelection
     }
 
