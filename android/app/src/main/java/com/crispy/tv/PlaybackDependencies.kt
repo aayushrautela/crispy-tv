@@ -1,6 +1,7 @@
 package com.crispy.tv
 
 import android.content.Context
+import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.audio.AudioFocusManager
