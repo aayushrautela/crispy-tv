@@ -1,5 +1,6 @@
 package com.crispy.tv.tv.ui.screens.detail
 
+import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect

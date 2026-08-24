@@ -57,6 +57,8 @@ import com.crispy.tv.tv.ui.theme.rememberDetailsSeedColor
 import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -64,8 +66,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
@@ -389,7 +389,7 @@ private fun DetailContent(
                         )
                         HeaderActionButton(
                             label = if (trailerMuted) "Muted" else "Sound on",
-                            icon = if (trailerMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                            icon = if (trailerMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                             active = !trailerMuted,
                             onClick = { trailerMuted = !trailerMuted },
                         )
