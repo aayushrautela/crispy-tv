@@ -1,5 +1,6 @@
 package com.crispy.tv.playerui
 
+import com.crispy.tv.addons.streams.StreamSubtitle
 import com.crispy.tv.TorrentResolver
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
@@ -36,7 +37,7 @@ internal suspend fun AddonStream.toPlaybackSource(
     )
 }
 
-private fun List<com.crispy.tv.streams.StreamSubtitle>.toPlaybackSubtitles(): List<PlaybackExternalSubtitle> =
+private fun List<com.crispy.tv.addons.streams.StreamSubtitle>.toPlaybackSubtitles(): List<PlaybackExternalSubtitle> =
     mapNotNull { subtitle ->
         subtitle.url.trim().takeIf { it.isNotBlank() }?.let { url ->
             PlaybackExternalSubtitle(url = url, language = subtitle.lang, name = subtitle.name)

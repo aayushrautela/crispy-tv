@@ -6,6 +6,9 @@
 
 package com.crispy.tv.streams
 
+import com.crispy.tv.addons.streams.StreamSelectorUiState
+import com.crispy.tv.addons.streams.StreamProviderUiState
+import com.crispy.tv.addons.streams.AddonStream
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.horizontalScroll

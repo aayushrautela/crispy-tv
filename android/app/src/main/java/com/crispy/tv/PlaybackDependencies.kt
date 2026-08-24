@@ -14,7 +14,7 @@ import com.crispy.tv.addons.sources.RemoteMetadataLabDataSource
 import com.crispy.tv.addons.sources.RemoteSupabaseSyncLabService
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.addons.streams.StreamResolver
-import com.crispy.tv.addons.streams.StreamResolverProvider
+import com.crispy.tv.streams.StreamResolverProvider
 import com.crispy.tv.watchhistory.BackendWatchHistoryService
 import com.crispy.tv.watchhistory.WatchHistoryConfig
 import com.crispy.tv.nativeengine.playback.LibassRenderType

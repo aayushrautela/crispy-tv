@@ -19,7 +19,7 @@ internal fun StreamSelectorBottomSheet(
     onDismiss: () -> Unit,
     onProviderSelected: (String?) -> Unit,
     onRetryProvider: (String) -> Unit,
-    onStreamSelected: (com.crispy.tv.streams.AddonStream) -> Unit,
+    onStreamSelected: (com.crispy.tv.addons.streams.AddonStream) -> Unit,
 ) {
     if (!state.visible) return
 
