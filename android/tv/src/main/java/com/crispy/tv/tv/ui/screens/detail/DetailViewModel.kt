@@ -76,6 +76,9 @@ data class DetailUiState(
     val collectionName: String? = null,
     val collectionItems: List<CrispyCardItem> = emptyList(),
     val ratingBadges: List<String> = emptyList(),
+    val reviews: List<ReviewUi> = emptyList(),
+    val production: List<CompanyUi> = emptyList(),
+    val detailRows: List<Pair<String, String>> = emptyList(),
 )
 
 data class CastMemberUi(
@@ -83,6 +86,19 @@ data class CastMemberUi(
     val name: String,
     val role: String?,
     val profileUrl: String?,
+)
+
+data class ReviewUi(
+    val id: String,
+    val author: String,
+    val content: String,
+    val rating: String?,
+)
+
+data class CompanyUi(
+    val id: String,
+    val name: String,
+    val logoUrl: String?,
 )
 
 class DetailViewModel(
@@ -269,6 +285,18 @@ class DetailViewModel(
                 ctaKind = cta.second,
                 ctaRemainingMinutes = cta.third,
                 extraVideos = detail.videos.mapNotNull { it.toExtraVideo() },
+                reviews = extras?.reviews.orEmpty().map { review ->
+                    ReviewUi(
+                        id = review.id,
+                        author = review.author ?: review.username ?: "Anonymous",
+                        content = review.content,
+                        rating = review.rating?.let { "${it.toInt()}/10" },
+                    )
+                },
+                production = (detail.production.companies + detail.production.networks)
+                    .distinctBy { it.id }
+                    .map { company -> CompanyUi(id = company.id, name = company.name, logoUrl = company.logoUrl) },
+                detailRows = buildDetailRows(item, detailsModel, detail.production, isSeries),
                 collectionName = extras?.collection?.name,
                 collectionItems = extras?.collection?.parts.orEmpty()
                     .filter { it.itemId != null }
@@ -357,6 +385,31 @@ class DetailViewModel(
 
     private fun roundToOne(value: Double): String =
         kotlin.math.round(value * 10.0).div(10.0).toString()
+
+    private fun buildDetailRows(
+        item: CrispyBackendClient.MetadataView,
+        detailsModel: com.crispy.tv.addons.model.MediaDetails,
+        production: CrispyBackendClient.MetadataProductionInfoView,
+        isSeries: Boolean,
+    ): List<Pair<String, String>> = buildList {
+        item.status?.takeIf { it.isNotBlank() }?.let { add("STATUS" to it) }
+        if (isSeries) {
+            item.releaseDate?.let { add("FIRST AIR DATE" to it) }
+            item.seasonCount?.takeIf { it > 0 }?.let { add("SEASONS" to "$it") }
+            item.episodeCount?.takeIf { it > 0 }?.let { add("EPISODES" to "$it") }
+            item.runtimeMinutes?.takeIf { it > 0 }?.let { add("EPISODE RUNTIME" to "$it min") }
+        } else {
+            item.releaseDate?.let { add("RELEASE DATE" to it) }
+            detailsModel.runtime?.takeIf { it.isNotBlank() }?.let { add("RUNTIME" to it) }
+        }
+        if (production.originCountries.isNotEmpty()) {
+            add("ORIGIN COUNTRY" to production.originCountries.joinToString(", "))
+        }
+        production.originalLanguage?.let { add("ORIGINAL LANGUAGE" to it.uppercase()) }
+        if (genres.isNotEmpty()) {
+            add("GENRES" to genres.joinToString(", "))
+        }
+    }
 
     private suspend fun loadEpisodes(
         context: BackendContext,
