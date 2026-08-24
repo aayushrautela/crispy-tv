@@ -5,11 +5,6 @@ name: iOS unsigned IPA
 # free Apple ID, or TrollStore). No Apple developer account required.
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - "ios/**"
-      - ".github/workflows/ios-ipa.yml"
 
 jobs:
   ipa:

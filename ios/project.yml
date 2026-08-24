@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.crispy.rewrite
 packages:
   ContractRunner:
-    path: ../ContractRunner
+    path: ContractRunner
 targets:
   CrispyRewriteiOS:
     type: application
