@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.tv.di.TvServices
 import com.crispy.tv.tv.ui.components.CrispyCardItem
 import kotlinx.coroutines.async
@@ -123,6 +124,9 @@ private fun CrispyBackendClient.ClientMediaCard.bestImageUrl(): String? =
         ?: images.still.small
         ?: images.poster.medium
 
+private fun CrispyBackendClient.ClientMediaCard.bestLogoUrl(): String? =
+    images.logo.large ?: images.logo.medium ?: images.logo.small
+
 private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem {
     val parent = parent
     val isEpisode = mediaType.equals("episode", ignoreCase = true)
@@ -131,24 +135,29 @@ private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem {
     } else {
         title
     }
-    val subtitle = when {
-        isEpisode && parent?.seasonNumber != null && parent.episodeNumber != null -> {
-            "S${parent.seasonNumber} E${parent.episodeNumber}" +
-                (title.takeIf { it.isNotBlank() }?.let { " · $it" } ?: "")
-        }
-        else -> year?.toString()
-    }
     val fraction = progress?.let { p ->
         p.percent?.div(100.0)?.toFloat()
             ?: p.positionSeconds?.let { pos ->
                 p.durationSeconds?.takeIf { it > 0 }?.let { dur -> pos.toFloat() / dur }
             }
     }
+    val metaSubtitle = when {
+        isEpisode && parent?.seasonNumber != null && parent.episodeNumber != null -> {
+            "S" + parent.seasonNumber + " E" + parent.episodeNumber +
+                (title.takeIf { it.isNotBlank() }?.let { " · $it" } ?: "")
+        }
+        else -> year?.toString()
+    }
     return CrispyCardItem(
         id = itemId,
         title = displayTitle,
-        subtitle = subtitle,
         imageUrl = bestImageUrl(),
+        logoUrl = bestLogoUrl(),
+        rating = rating?.let { formatRating(it) },
+        year = year?.toString(),
+        certification = maturityRating,
+        genre = genres.firstOrNull(),
+        badge = metaSubtitle?.takeIf { isEpisode },
         progressFraction = fraction,
     )
 }
@@ -162,7 +171,7 @@ private fun CrispyBackendClient.UpNextItem.toCardItem(): CrispyCardItem? {
     return CrispyCardItem(
         id = episodeId,
         title = showTitle ?: "Next episode",
-        subtitle = sequenceOf(seasonEpisode, nextEpisodeTitle)
+        badge = sequenceOf(seasonEpisode, nextEpisodeTitle)
             .filterNotNull()
             .filter { it.isNotBlank() }
             .joinToString(" · "),
@@ -174,9 +183,12 @@ private fun CrispyBackendClient.MediaItem.toCardItem(): CrispyCardItem =
     CrispyCardItem(
         id = itemId,
         title = title,
-        subtitle = releaseDate?.takeIf { it.isNotBlank() },
+        year = releaseYear?.toString(),
         imageUrl = backdrop.large
             ?: backdrop.medium
             ?: backdrop.small
             ?: poster.medium,
+        logoUrl = logo.large ?: logo.medium ?: logo.small,
+        rating = rating?.let { formatRating(it) },
+        genre = genres.firstOrNull(),
     )

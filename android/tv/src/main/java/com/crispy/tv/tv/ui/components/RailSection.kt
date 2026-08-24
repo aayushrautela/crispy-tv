@@ -19,6 +19,7 @@ fun RailSection(
     items: List<CrispyCardItem>,
     onItemClick: (CrispyCardItem) -> Unit,
     modifier: Modifier = Modifier,
+    onItemFocused: (CrispyCardItem) -> Unit = {},
 ) {
     Column(modifier = modifier) {
         Text(
@@ -35,6 +36,7 @@ fun RailSection(
                 CrispyLandscapeCard(
                     item = item,
                     onClick = { onItemClick(item) },
+                    onFocus = { onItemFocused(item) },
                     modifier = Modifier.width(220.dp),
                 )
             }

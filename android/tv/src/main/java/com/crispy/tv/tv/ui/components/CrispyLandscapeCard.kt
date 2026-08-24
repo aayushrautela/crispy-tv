@@ -7,11 +7,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -28,6 +30,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,15 +42,22 @@ import coil3.compose.AsyncImage
 data class CrispyCardItem(
     val id: String,
     val title: String,
-    val subtitle: String? = null,
     val imageUrl: String? = null,
+    val logoUrl: String? = null,
+    val rating: String? = null,
+    val year: String? = null,
+    val certification: String? = null,
+    val genre: String? = null,
     val progressFraction: Float? = null,
     val watched: Boolean = false,
+    val badge: String? = null,
 )
 
 object TvCardStyle {
     const val LandscapeAspectRatio = 16f / 9f
-    val CornerRadius = 12.dp
+    const val CardCornerRadiusDp = 12
+    val CornerRadius = CardCornerRadiusDp.dp
+    fun cardWidth(baseWidthDp: Int = 220): Int = baseWidthDp
 }
 
 @Composable
@@ -55,6 +65,7 @@ fun CrispyLandscapeCard(
     item: CrispyCardItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onFocus: (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -67,22 +78,25 @@ fun CrispyLandscapeCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(TvCardStyle.LandscapeAspectRatio)
-                .onFocusChanged { focused = it.isFocused }
+                .onFocusChanged {
+                    focused = it.isFocused
+                    if (it.isFocused) onFocus?.invoke()
+                }
                 .clickable(onClick = onClick)
                 .clip(RoundedCornerShape(TvCardStyle.CornerRadius))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .then(
                     if (focused) {
-                        Modifier.border(BorderStroke(2.dp, MaterialTheme.colorScheme.primary))
+                        Modifier.border(
+                            BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                            RoundedCornerShape(TvCardStyle.CornerRadius),
+                        )
                     } else {
                         Modifier
                     }
                 ),
+            contentAlignment = Alignment.BottomStart,
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            )
             if (item.imageUrl != null) {
                 AsyncImage(
                     model = item.imageUrl,
@@ -90,27 +104,45 @@ fun CrispyLandscapeCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
+            } else {
+                Text(
+                    text = item.title.take(1).uppercase(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.Center),
+                )
             }
+
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(96.dp)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
-                            startY = 220f,
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.62f)),
                         ),
                     ),
             )
-            Text(
-                text = item.title,
-                fontSize = 13.sp,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-            )
+
+            if (item.badge != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(TvCardStyle.CardCornerRadiusDp.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        text = item.badge,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
+
             if (item.watched) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
@@ -121,6 +153,53 @@ fun CrispyLandscapeCard(
                         .padding(8.dp),
                 )
             }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                if (item.logoUrl != null) {
+                    AsyncImage(
+                        model = item.logoUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
+                        modifier = Modifier
+                            .fillMaxWidth(0.62f)
+                            .height(26.dp),
+                    )
+                } else {
+                    Text(
+                        text = item.title,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.96f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                val metaParts = buildList {
+                    item.year?.let { add(it) }
+                    item.certification?.let { add(it) }
+                    item.genre?.let { add(it) }
+                    item.rating?.let { add("★ $it") }
+                }
+                if (metaParts.isNotEmpty()) {
+                    Row(modifier = Modifier.padding(top = 3.dp)) {
+                        Text(
+                            text = metaParts.joinToString(" · "),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.82f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
             item.progressFraction?.let { fraction ->
                 Box(
                     modifier = Modifier
@@ -137,16 +216,6 @@ fun CrispyLandscapeCard(
                     )
                 }
             }
-        }
-        if (item.subtitle != null) {
-            Text(
-                text = item.subtitle,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp, start = 4.dp),
-            )
         }
     }
 }

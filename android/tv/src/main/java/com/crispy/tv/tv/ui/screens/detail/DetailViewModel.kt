@@ -164,11 +164,16 @@ class DetailViewModel(
                         com.crispy.tv.tv.ui.components.CrispyCardItem(
                             id = card.itemId!!,
                             title = card.title ?: "Untitled",
-                            subtitle = card.releaseYear?.toString(),
                             imageUrl = card.images.backdrop.large
                                 ?: card.images.backdrop.medium
                                 ?: card.images.backdrop.small
                                 ?: card.images.poster.medium,
+                            logoUrl = card.images.logo.large
+                                ?: card.images.logo.medium
+                                ?: card.images.logo.small,
+                            rating = card.rating?.let { com.crispy.tv.addons.util.formatRating(it) },
+                            year = card.releaseYear?.toString(),
+                            genre = card.genre,
                         )
                     },
             )
