@@ -391,3 +391,22 @@ public let placeOfBirth: String?
 public let profileUrl: String?
 public let knownFor: [PersonKnownForItem]
 }
+
+// MARK: - Accounts / settings
+
+public struct ProviderState: Equatable, Identifiable {
+    public let provider: String
+    let connectionState: String
+    let primaryAction: String
+    let canDisconnect: Bool
+    let externalUsername: String?
+    let statusLabel: String
+    let statusMessage: String?
+
+    public var id: String { provider }
+}
+
+public struct AvatarItem: Equatable, Identifiable {
+    public let id: String
+    public let url: String?
+}

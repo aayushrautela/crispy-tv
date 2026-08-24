@@ -57,7 +57,8 @@ public static func from(_ card: ClientMediaCard) -> MediaCard {
                 positionSeconds: card.progress?.positionSeconds,
                 durationSeconds: card.progress?.durationSeconds
             ),
-            parentSeriesId: card.parent?.seriesItemId
+            parentSeriesId: card.parent?.seriesItemId,
+            watchlisted: card.progress?.watchlisted ?? false
         )
     }
 
@@ -75,7 +76,8 @@ public static func from(_ item: HomeCatalogItem) -> MediaCard {
             maturityRating: nil,
             description: item.description,
             progressPercent: nil,
-            parentSeriesId: nil
+            parentSeriesId: nil,
+            watchlisted: false
         )
     }
 
@@ -93,7 +95,8 @@ public static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
             maturityRating: nil,
             description: nil,
             progressPercent: nil,
-            parentSeriesId: nil
+            parentSeriesId: nil,
+            watchlisted: false
         )
     }
 
@@ -111,7 +114,8 @@ public static func from(_ item: SearchMediaItem) -> MediaCard {
             maturityRating: item.maturityRating,
             description: item.overview,
             progressPercent: nil,
-            parentSeriesId: nil
+            parentSeriesId: nil,
+            watchlisted: false
         )
     }
 }

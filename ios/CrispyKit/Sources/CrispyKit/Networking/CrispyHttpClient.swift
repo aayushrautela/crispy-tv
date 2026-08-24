@@ -26,8 +26,12 @@ public func postJson(url: URL, jsonBody: String, headers: [String: String], time
         try await execute(method: "POST", url: url, headers: headers, body: jsonBody, timeout: timeout)
     }
 
-public func putJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public     func putJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "PUT", url: url, headers: headers, body: jsonBody, timeout: timeout)
+    }
+
+    func patchJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+        try await execute(method: "PATCH", url: url, headers: headers, body: jsonBody, timeout: timeout)
     }
 
 public func delete(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {

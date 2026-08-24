@@ -54,6 +54,14 @@ struct LibraryScreen: View {
                             } label: {
                                 Label("Mark unwatched", systemImage: "xmark.circle")
                             }
+                            Button {
+                                Task { await viewModel.toggleWatchlist(item, environment: environment) }
+                            } label: {
+                                Label(
+                                    item.watchlisted ? "Remove from watchlist" : "Add to watchlist",
+                                    systemImage: item.watchlisted ? "minus.circle" : "plus.circle"
+                                )
+                            }
                         }
                         .onAppear {
                             Task { await viewModel.loadNextPageIfNeeded(current: item.id, environment: environment) }

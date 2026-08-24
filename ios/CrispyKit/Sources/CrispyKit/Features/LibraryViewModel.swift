@@ -50,17 +50,49 @@ public func loadNextPageIfNeeded(current itemId: String, environment: AppEnviron
         await fetchNextPage(environment: environment)
     }
 
-    /// Optimistic mark/unmark-watched toggle (server mutation without the
-    /// outbox, which arrives in a later milestone).
-public func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnvironment) async {
+    /// Optimistic mark/unmark-watched toggle; the UI updates immediately and
+    /// the server call follows. Failures surface via statusMessage.
+    public func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else { return }
         if selectedSection == .history && !watched {
             items.removeAll { $0.id == item.id }
         }
-        let result = try? await (watched
-            ? environment.backend.markWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
-            : environment.backend.unmarkWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId))
-        _ = result
+        do {
+            _ = watched
+                ? try await environment.backend.markWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
+                : try await environment.backend.unmarkWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
+            statusMessage = ""
+        } catch {
+            statusMessage = "Sync failed: \(error.localizedDescription)"
+            await reload(environment: environment)
+        }
+    }
+
+    /// Optimistic watchlist add/remove.
+    public func toggleWatchlist(_ item: MediaCard, environment: AppEnvironment) async {
+        guard let context = await environment.backendContext() else { return }
+        let adding = !item.watchlisted
+        if selectedSection == .watchlist && !adding {
+            items.removeAll { $0.id == item.id }
+        } else if let index = items.firstIndex(where: { $0.id == item.id }) {
+            items[index] = MediaCard(
+                itemId: item.itemId, type: item.type, title: item.title,
+                posterUrl: item.posterUrl, backdropUrl: item.backdropUrl, logoUrl: item.logoUrl,
+                ratingText: item.ratingText, yearText: item.yearText, genre: item.genre,
+                maturityRating: item.maturityRating, description: item.description,
+                progressPercent: item.progressPercent, parentSeriesId: item.parentSeriesId,
+                watchlisted: adding
+            )
+        }
+        do {
+            _ = adding
+                ? try await environment.backend.putWatchlist(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
+                : try await environment.backend.deleteWatchlist(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
+            statusMessage = ""
+        } catch {
+            statusMessage = "Sync failed: \(error.localizedDescription)"
+            await reload(environment: environment)
+        }
     }
 
     private func fetchNextPage(environment: AppEnvironment) async {

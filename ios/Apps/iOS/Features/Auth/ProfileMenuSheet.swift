@@ -48,11 +48,23 @@ struct ProfileMenuSheet: View {
                 }
 
                 Section {
+                    NavigationLink(value: MenuRoute.management) {
+                        Label("Manage profiles", systemImage: "person.2")
+                    }
+                    NavigationLink(value: MenuRoute.accountSettings) {
+                        Label("Account settings", systemImage: "gearshape")
+                    }
                     Button(role: .destructive) {
                         Task { await signOut() }
                     } label: {
                         Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
+                }
+            }
+            .navigationDestination(for: MenuRoute.self) { route in
+                switch route {
+                case .management: ProfileManagementScreen()
+                case .accountSettings: AccountSettingsScreen()
                 }
             }
             .navigationTitle("Account")
@@ -91,4 +103,9 @@ struct ProfileMenuSheet: View {
         onDismissed()
         dismiss()
     }
+}
+
+enum MenuRoute: Hashable {
+    case management
+    case accountSettings
 }

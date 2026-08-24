@@ -154,6 +154,100 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         )
     }
 
+    // MARK: - Accounts / settings
+
+    public func updateProfile(
+        accessToken: String,
+        profileId: String,
+        name: String? = nil,
+        isKids: Bool? = nil,
+        avatarUrl: String? = nil,
+        sortOrder: Int? = nil
+    ) async throws -> BackendProfile {
+        var payload: [String: Any] = [:]
+        if let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty { payload["name"] = name }
+        if let isKids { payload["isKids"] = isKids }
+        if let avatarUrl = avatarUrl?.nilIfBlank { payload["avatarUrl"] = avatarUrl }
+        if let sortOrder { payload["sortOrder"] = sortOrder }
+        let json = try await patchJson(path: "/v1/profiles/\(profileId)", accessToken: accessToken, payload: payload)
+        guard let profileJson = json.jsonObject("profile"), let profile = parseProfile(profileJson) else {
+            throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend did not return an updated profile.", category: nil, retryable: false, requestId: nil, details: nil)
+        }
+        return profile
+    }
+
+    public func getAvatars(accessToken: String) async throws -> [AvatarItem] {
+        let json = try await getJson(path: "/v1/avatars", accessToken: accessToken)
+        let array = json.jsonArray("avatars").isEmpty ? json.jsonArray("items") : json.jsonArray("avatars")
+        return array.compactMap { item in
+            guard let id = item.jsonString("id") else { return nil }
+            return AvatarItem(id: id, url: item.jsonString("url"))
+        }
+    }
+
+    public func listImportConnections(accessToken: String, profileId: String) async throws -> [ProviderState] {
+        let json = try await getJson(path: "/v1/profiles/\(profileId)/import-connections", accessToken: accessToken)
+        return json.jsonArray("providerStates").map { item in
+            ProviderState(
+                provider: item.jsonString("provider") ?? "",
+                connectionState: item.jsonString("connectionState") ?? "",
+                primaryAction: item.jsonString("primaryAction") ?? "",
+                canDisconnect: item.jsonBool("canDisconnect", defaultValue: false),
+                externalUsername: item.jsonString("externalUsername"),
+                statusLabel: item.jsonString("statusLabel") ?? "",
+                statusMessage: item.jsonString("statusMessage")
+            )
+        }
+    }
+
+    public func disconnectImportConnection(accessToken: String, profileId: String, provider: String) async throws -> ProviderState {
+        let json = try await deleteJson(path: "/v1/profiles/\(profileId)/import-connections/\(provider)", accessToken: accessToken)
+        guard let stateJson = json.jsonObject("providerState") else {
+            throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend did not return a provider state.", category: nil, retryable: false, requestId: nil, details: nil)
+        }
+        return ProviderState(
+            provider: stateJson.jsonString("provider") ?? provider,
+            connectionState: stateJson.jsonString("connectionState") ?? "",
+            primaryAction: stateJson.jsonString("primaryAction") ?? "",
+            canDisconnect: stateJson.jsonBool("canDisconnect", defaultValue: false),
+            externalUsername: stateJson.jsonString("externalUsername"),
+            statusLabel: stateJson.jsonString("statusLabel") ?? "",
+            statusMessage: stateJson.jsonString("statusMessage")
+        )
+    }
+
+    public func putWatchlist(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
+        try await executeWatchlistMutation(method: "PUT", accessToken: accessToken, profileId: profileId, itemId: itemId)
+    }
+
+    public func deleteWatchlist(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
+        try await executeWatchlistMutation(method: "DELETE", accessToken: accessToken, profileId: profileId, itemId: itemId)
+    }
+
+    private func executeWatchlistMutation(method: String, accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
+        let normalizedItemId = itemId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let response: CrispyHttpResponse
+        if method == "PUT" {
+            response = try await httpClient.putJson(
+                url: try requireURL(queryComponents(path: "/v1/profiles/\(profileId)/watch/watchlist/\(normalizedItemId)").url),
+                jsonBody: "{}",
+                headers: authHeaders(accessToken)
+            )
+        } else {
+            response = try await httpClient.delete(
+                url: try requireURL(queryComponents(path: "/v1/profiles/\(profileId)/watch/watchlist/\(normalizedItemId)").url),
+                headers: authHeaders(accessToken)
+            )
+        }
+        return parseWatchActionResponse(try perform(response))
+    }
+
+    public func deleteAccount(accessToken: String) async throws {
+        _ = try await perform(
+            await httpClient.delete(url: try requireURL(queryComponents(path: "/v1/account").url), headers: authHeaders(accessToken))
+        )
+    }
+
     // MARK: - Metadata / details
 
 public func getMetadataItemDetail(accessToken: String, itemId: String) async throws -> MetadataTitleDetail {
@@ -509,6 +603,15 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
     private func deleteJson(path: String, accessToken: String) async throws -> [String: Any] {
         let response = try await httpClient.delete(
             url: try requireURL(queryComponents(path: path).url),
+            headers: authHeaders(accessToken)
+        )
+        return try perform(response)
+    }
+
+    public     func patchJson(path: String, accessToken: String, payload: [String: Any]) async throws -> [String: Any] {
+        let response = try await httpClient.patchJson(
+            url: try requireURL(queryComponents(path: path).url),
+            jsonBody: try JsonParser.encodeObject(payload),
             headers: authHeaders(accessToken)
         )
         return try perform(response)
