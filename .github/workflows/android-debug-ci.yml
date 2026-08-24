@@ -113,12 +113,18 @@ jobs:
           if-no-files-found: warn
 
   apple:
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Select newest Xcode
+        run: |
+          LATEST_XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$LATEST_XCODE"
+          xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -129,25 +135,27 @@ jobs:
           cd ios
           xcodegen generate --spec project.yml
 
-      - name: Build iOS placeholder target
-        run: >-
-          xcodebuild
-          -project ios/CrispyRewriteApple.xcodeproj
-          -scheme CrispyRewriteiOS
-          -sdk iphonesimulator
-          -destination 'generic/platform=iOS Simulator'
-          CODE_SIGNING_ALLOWED=NO
-          build
+      - name: Build iOS app target
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/CrispyRewriteApple.xcodeproj \
+            -scheme CrispyRewriteiOS \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | xcbeautify --renderer github-actions --quiet
 
-      - name: Build tvOS placeholder target
-        run: >-
-          xcodebuild
-          -project ios/CrispyRewriteApple.xcodeproj
-          -scheme CrispyRewritetvOS
-          -sdk appletvsimulator
-          -destination 'generic/platform=tvOS Simulator'
-          CODE_SIGNING_ALLOWED=NO
-          build
+      - name: Build tvOS target
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/CrispyRewriteApple.xcodeproj \
+            -scheme CrispyRewritetvOS \
+            -sdk appletvsimulator \
+            -destination 'generic/platform=tvOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | xcbeautify --renderer github-actions --quiet
 
       - name: Run Swift contract tests
         run: swift test --package-path ios/ContractRunner
