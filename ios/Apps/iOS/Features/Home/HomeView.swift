@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// Home page mirroring the Android `HomeRoute`: header pills, hero carousel,

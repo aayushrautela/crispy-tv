@@ -4,6 +4,8 @@ options:
 packages:
   ContractRunner:
     path: ContractRunner
+  CrispyKit:
+    path: CrispyKit
 targets:
   CrispyRewriteiOS:
     type: application
@@ -12,7 +14,7 @@ targets:
     sources:
       - path: Apps/iOS
     dependencies:
-      - package: ContractRunner
+      - package: CrispyKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.crispy.rewrite.ios
@@ -26,9 +28,11 @@ targets:
   CrispyRewritetvOS:
     type: application
     platform: tvOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - path: Apps/tvOS
+    dependencies:
+      - package: CrispyKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.crispy.rewrite.tvos

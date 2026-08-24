@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// AsyncImage wrapper standing in for Android's `CrispyImage`/Coil pipeline.

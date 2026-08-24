@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// Full-page catalog grid ("See all" destination), port of the Android

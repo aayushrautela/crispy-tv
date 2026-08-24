@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// Library page mirroring the Android `LibraryScreen`: section chips

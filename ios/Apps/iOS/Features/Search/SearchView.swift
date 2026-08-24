@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// Search page mirroring the Android `SearchScreen`: glass search field,

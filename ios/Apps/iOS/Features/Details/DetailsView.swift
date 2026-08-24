@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// Title details page, port of the Android `DetailsScreen` (hero, meta,

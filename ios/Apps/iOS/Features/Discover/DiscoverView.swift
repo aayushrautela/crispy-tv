@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// Discover page mirroring the Android `DiscoverScreen`: filter + catalog

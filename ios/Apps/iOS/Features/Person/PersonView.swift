@@ -1,3 +1,4 @@
+import CrispyKit
 import SwiftUI
 
 /// Person page, port of the Android `PersonDetailsScreen`: avatar, bio,
