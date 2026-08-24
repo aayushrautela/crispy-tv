@@ -51,6 +51,10 @@ struct HomeScreen: View {
 
     @ViewBuilder
     private var content: some View {
+        if !viewModel.pills.isEmpty {
+            headerPills
+        }
+
         if !viewModel.heroItems.isEmpty {
             heroCarousel
         }
@@ -60,17 +64,20 @@ struct HomeScreen: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: Theme.railSpacing) {
                         ForEach(viewModel.continueWatchingItems) { item in
-                            LandscapeCardView(
-                                title: item.title,
-                                backdropUrl: item.backdropUrl ?? item.posterUrl,
-                                logoUrl: nil,
-                                ratingText: nil,
-                                yearText: nil,
-                                maturityRating: nil,
-                                genre: nil,
-                                badge: nil,
-                                progressPercent: item.progressPercent
-                            )
+                            NavigationLink(value: item.detailsRoute) {
+                                LandscapeCardView(
+                                    title: item.title,
+                                    backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                    logoUrl: nil,
+                                    ratingText: nil,
+                                    yearText: nil,
+                                    maturityRating: nil,
+                                    genre: nil,
+                                    badge: nil,
+                                    progressPercent: item.progressPercent
+                                )
+                            }
+                            .buttonStyle(.plain)
                             .contextMenu {
                                 Button(role: .destructive) {
                                     Task { await viewModel.dismissContinueWatching(item, environment: environment) }
@@ -86,24 +93,47 @@ struct HomeScreen: View {
         }
 
         ForEach(viewModel.rails) { rail in
-            RailSectionView(title: rail.title) {
+            RailSectionView(
+                title: rail.title,
+                seeAllRoute: AppRoute.catalogList(catalogId: rail.catalogId, title: rail.title)
+            ) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: Theme.railSpacing) {
                         ForEach(rail.items) { item in
-                            LandscapeCardView(
-                                title: item.title,
-                                backdropUrl: item.backdropUrl ?? item.posterUrl,
-                                logoUrl: item.logoUrl,
-                                ratingText: item.ratingText,
-                                yearText: item.yearText,
-                                maturityRating: item.maturityRating,
-                                genre: item.genre
-                            )
+                            NavigationLink(value: item.detailsRoute) {
+                                LandscapeCardView(
+                                    title: item.title,
+                                    backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                    logoUrl: item.logoUrl,
+                                    ratingText: item.ratingText,
+                                    yearText: item.yearText,
+                                    maturityRating: item.maturityRating,
+                                    genre: item.genre
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 16)
                 }
             }
+        }
+    }
+
+    /// Header category chips (pill sections from the planner), matching the
+    /// Android `HomeHeaderSectionChips`.
+    private var headerPills: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 8) {
+                ForEach(viewModel.pills) { pill in
+                    NavigationLink(value: AppRoute.catalogList(catalogId: pill.catalogId, title: pill.title)) {
+                        Text(pill.title)
+                    }
+                    .buttonStyle(.plain)
+                    .crispyChip()
+                }
+            }
+            .padding(.horizontal, 16)
         }
     }
 

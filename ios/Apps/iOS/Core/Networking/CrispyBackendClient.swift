@@ -154,6 +154,55 @@ final class CrispyBackendClient {
         )
     }
 
+    // MARK: - Metadata / details
+
+    func getMetadataItemDetail(accessToken: String, itemId: String) async throws -> MetadataTitleDetail {
+        let json = try await getJson(path: "/v1/metadata/items/\(itemId.trimmingCharacters(in: .whitespacesAndNewlines))", accessToken: accessToken)
+        guard let itemJson = json.jsonObject("Item") else {
+            throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend item detail is missing Item.", category: nil, retryable: false, requestId: nil, details: nil)
+        }
+        return MetadataTitleDetail(
+            item: try parseMetadataItem(itemJson),
+            cast: parsePersonRefs(json.jsonArray("Cast")),
+            directors: parsePersonRefs(json.jsonArray("Directors")),
+            creators: parsePersonRefs(json.jsonArray("Creators"))
+        )
+    }
+
+    func getMetadataItemExtras(accessToken: String, itemId: String) async throws -> MetadataTitleExtras {
+        let json = try await getJson(path: "/v1/metadata/items/\(itemId.trimmingCharacters(in: .whitespacesAndNewlines))/extras", accessToken: accessToken)
+        return MetadataTitleExtras(
+            seasons: json.jsonArray("Seasons").compactMap(parseMetadataSeason),
+            similar: json.jsonArray("Similar").compactMap(parseMetadataCard)
+        )
+    }
+
+    func getSeriesEpisodes(accessToken: String, seriesItemId: String, season: Int?) async throws -> [MetadataEpisode] {
+        var query: [URLQueryItem] = []
+        if let season {
+            query.append(URLQueryItem(name: "season", value: String(season)))
+        }
+        let json = try await getJson(path: "/v1/metadata/shows/\(seriesItemId.trimmingCharacters(in: .whitespacesAndNewlines))/episodes", queryItems: query, accessToken: accessToken)
+        return json.jsonArray("Items").compactMap(parseMetadataEpisodeFromView)
+    }
+
+    func getMetadataPersonDetail(accessToken: String, personId: String) async throws -> PersonDetail {
+        let json = try await getJson(path: "/v1/metadata/people/\(personId.trimmingCharacters(in: .whitespacesAndNewlines))", accessToken: accessToken)
+        guard let personIdValue = json.jsonString("personId"), let name = json.jsonString("name") else {
+            throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend person detail is missing required fields.", category: nil, retryable: false, requestId: nil, details: nil)
+        }
+        return PersonDetail(
+            personId: personIdValue,
+            name: name,
+            knownForDepartment: json.jsonString("knownForDepartment"),
+            biography: json.jsonString("biography"),
+            birthday: json.jsonString("birthday"),
+            placeOfBirth: json.jsonString("placeOfBirth"),
+            profileUrl: json.jsonString("profileUrl"),
+            knownFor: json.jsonArray("knownFor").compactMap(parseKnownForItem)
+        )
+    }
+
     // MARK: - Watch mutations
 
     func markWatched(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
@@ -251,6 +300,112 @@ final class CrispyBackendClient {
             mode: json.jsonString("mode") ?? "",
             reason: json.jsonString("reason")
         )
+    }
+
+    // MARK: Metadata parsers (mirror CrispyBackendParsers.kt)
+
+    private func parseMetadataItem(_ json: [String: Any]) throws -> MetadataItem {
+        guard let itemId = json.jsonString("Id"),
+              let type = json.jsonString("Type"),
+              let name = json.jsonString("Name") else {
+            throw CrispyBackendError(httpCode: 200, code: nil, message: "BaseItemDto is missing required identity fields.", category: nil, retryable: false, requestId: nil, details: nil)
+        }
+        let imageTags = json.jsonObject("ImageTags")
+        return MetadataItem(
+            itemId: itemId,
+            itemType: normalizeMediaType(type),
+            title: name,
+            subtitle: json.jsonString("EpisodeTitle") ?? nil,
+            overview: json.jsonString("Overview"),
+            images: MetadataImagesDto.parse(imageTags),
+            releaseDate: json.jsonString("PremiereDate"),
+            releaseYear: json.jsonInt("ProductionYear"),
+            runtimeMinutes: runtimeMinutes(fromTicks: json.jsonInt("RunTimeTicks")),
+            rating: json.jsonDouble("CommunityRating"),
+            certification: json.jsonString("Certification"),
+            status: json.jsonString("Status"),
+            genres: json.jsonStringList("Genres"),
+            seasonNumber: json.jsonInt("ParentIndexNumber"),
+            episodeNumber: json.jsonInt("IndexNumber")
+        )
+    }
+
+    private func parseMetadataEpisodeFromView(_ json: [String: Any]) -> MetadataEpisode? {
+        guard let itemId = json.jsonString("Id") else { return nil }
+        let imageTags = json.jsonObject("ImageTags")
+        return MetadataEpisode(
+            itemId: itemId,
+            seasonNumber: json.jsonInt("ParentIndexNumber"),
+            episodeNumber: json.jsonInt("IndexNumber"),
+            title: json.jsonString("EpisodeTitle") ?? json.jsonString("Name") ?? "Episode",
+            summary: json.jsonString("Overview"),
+            airDate: json.jsonString("AirDate") ?? json.jsonString("PremiereDate"),
+            runtimeMinutes: runtimeMinutes(fromTicks: json.jsonInt("RunTimeTicks")),
+            rating: json.jsonDouble("CommunityRating"),
+            stillUrl: MetadataImagesDto.parse(imageTags).stillUrl,
+            showItemId: json.jsonString("SeriesId")
+        )
+    }
+
+    private func parseMetadataSeason(_ json: [String: Any]) -> MetadataSeason? {
+        guard let itemId = json.jsonString("Id"), let seasonNumber = json.jsonInt("IndexNumber") else { return nil }
+        return MetadataSeason(
+            itemId: itemId,
+            seasonNumber: seasonNumber,
+            title: json.jsonString("Name"),
+            summary: json.jsonString("Overview"),
+            posterUrl: ResponsiveImageSetDto.parse(json.jsonObject("ImageTags")?.jsonObject("Primary")).medium
+        )
+    }
+
+    private func parseMetadataCard(_ json: [String: Any]) -> MetadataCard? {
+        guard let itemId = json.jsonString("Id"),
+              let type = json.jsonString("Type"),
+              let name = json.jsonString("Name") else { return nil }
+        return MetadataCard(
+            itemId: itemId,
+            itemType: normalizeMediaType(type),
+            title: name,
+            images: MetadataImagesDto.parse(json.jsonObject("ImageTags")),
+            releaseYear: json.jsonInt("ProductionYear"),
+            rating: json.jsonDouble("CommunityRating")
+        )
+    }
+
+    private func parsePersonRefs(_ array: [[String: Any]]) -> [MetadataPersonRef] {
+        var seen = Set<String>()
+        return array.compactMap { item in
+            guard let personId = item.jsonString("personId"), let name = item.jsonString("name") else { return nil }
+            guard seen.insert(personId).inserted else { return nil }
+            return MetadataPersonRef(
+                personId: personId,
+                name: name,
+                role: item.jsonString("role"),
+                department: item.jsonString("department"),
+                profileUrl: item.jsonString("profileUrl")
+            )
+        }
+    }
+
+    private func parseKnownForItem(_ json: [String: Any]) -> PersonKnownForItem? {
+        guard let itemId = json.jsonString("itemId"),
+              let mediaType = json.jsonString("mediaType"),
+              let title = json.jsonString("title") else { return nil }
+        return PersonKnownForItem(
+            itemId: itemId,
+            mediaType: mediaType,
+            title: title,
+            posterUrl: ResponsiveImageSetDto.parse(json.jsonObject("poster")).medium,
+            backdropUrl: ResponsiveImageSetDto.parse(json.jsonObject("backdrop")).medium,
+            logoUrl: ResponsiveImageSetDto.parse(json.jsonObject("logo")).medium,
+            rating: json.jsonDouble("rating"),
+            releaseYear: json.jsonInt("releaseYear")
+        )
+    }
+
+    private func runtimeMinutes(fromTicks ticks: Int?) -> Int? {
+        guard let ticks, ticks > 0 else { return nil }
+        return ticks / 600_000_000
     }
 
     private func normalizeMediaType(_ raw: String) -> String {

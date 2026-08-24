@@ -16,8 +16,22 @@ struct MediaCard: Identifiable, Equatable {
     let maturityRating: String?
     let description: String?
     let progressPercent: Double?
+    let parentSeriesId: String?
 
     var id: String { itemId }
+
+    /// The title identity whose details page should open for this card.
+    /// Episode-shaped continue-watching cards route to their parent show.
+    var detailsItemId: String {
+        if type == "episode", let parentSeriesId = parentSeriesId.nilIfBlank {
+            return parentSeriesId
+        }
+        return itemId
+    }
+
+    var detailsRoute: AppRoute {
+        .details(itemId: detailsItemId, itemType: type == "episode" ? "show" : type)
+    }
 }
 
 func formatRating(_ value: Double?) -> String? {
@@ -42,7 +56,8 @@ extension MediaCard {
             progressPercent: card.progress?.percent ?? resolvedProgressPercent(
                 positionSeconds: card.progress?.positionSeconds,
                 durationSeconds: card.progress?.durationSeconds
-            )
+            ),
+            parentSeriesId: card.parent?.seriesItemId
         )
     }
 
@@ -59,7 +74,8 @@ extension MediaCard {
             genre: nil,
             maturityRating: nil,
             description: item.description,
-            progressPercent: nil
+            progressPercent: nil,
+            parentSeriesId: nil
         )
     }
 
@@ -76,7 +92,8 @@ extension MediaCard {
             genre: nil,
             maturityRating: nil,
             description: nil,
-            progressPercent: nil
+            progressPercent: nil,
+            parentSeriesId: nil
         )
     }
 
@@ -93,7 +110,8 @@ extension MediaCard {
             genre: item.genres.first,
             maturityRating: item.maturityRating,
             description: item.overview,
-            progressPercent: nil
+            progressPercent: nil,
+            parentSeriesId: nil
         )
     }
 }

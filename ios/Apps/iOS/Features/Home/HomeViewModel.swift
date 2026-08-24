@@ -16,6 +16,13 @@ final class HomeViewModel {
         var id: String { catalogId }
     }
 
+    struct PillSection: Identifiable, Equatable {
+        let catalogId: String
+        let title: String
+
+        var id: String { catalogId }
+    }
+
     struct HeroItem: Identifiable, Equatable {
         let mediaKey: String
         let title: String
@@ -28,6 +35,7 @@ final class HomeViewModel {
         var id: String { mediaKey }
     }
 
+    private(set) var pills: [PillSection] = []
     private(set) var heroItems: [HeroItem] = []
     private(set) var rails: [RailSection] = []
     private(set) var continueWatchingItems: [MediaCard] = []
@@ -107,6 +115,10 @@ final class HomeViewModel {
             )
             rawByCatalogId[id] = section.items
         }
+
+        pills = planned.sections
+            .filter { $0.presentation == .pill }
+            .map { PillSection(catalogId: $0.catalogId, title: $0.displayTitle) }
 
         rails = []
         for section in planned.sections where section.presentation == .rail {

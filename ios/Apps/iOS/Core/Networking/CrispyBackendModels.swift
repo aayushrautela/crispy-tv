@@ -261,3 +261,133 @@ struct WatchActionResponse: Equatable {
     let mode: String
     let reason: String?
 }
+
+// MARK: - Metadata / details (Jellyfin BaseItemDto shapes, mirrors parseMetadata*)
+
+struct MetadataImagesDto: Equatable {
+    let poster: ResponsiveImageSetDto
+    let backdrop: ResponsiveImageSetDto
+    let still: ResponsiveImageSetDto
+    let logo: ResponsiveImageSetDto
+
+    static func parse(_ json: [String: Any]?) -> MetadataImagesDto {
+        MetadataImagesDto(
+            poster: ResponsiveImageSetDto.parse(json?.jsonObject("Primary")),
+            backdrop: (json?.jsonObject("Backdrop") as? [[String: Any]]).flatMap { $0.first }.map { ResponsiveImageSetDto.parse($0) } ?? .empty(),
+            still: ResponsiveImageSetDto.parse(json?.jsonObject("Thumb")),
+            logo: ResponsiveImageSetDto.parse(json?.jsonObject("Logo"))
+        )
+    }
+
+    var posterUrl: String? { poster.medium ?? poster.large ?? poster.small }
+    var backdropUrl: String? { backdrop.medium ?? backdrop.large ?? backdrop.small }
+    var stillUrl: String? { still.medium ?? still.large ?? still.small }
+    var logoUrl: String? { logo.medium ?? logo.large ?? logo.small }
+}
+
+/// Detail view for a movie/show; also used for episode rows.
+struct MetadataItem: Equatable, Identifiable {
+    let itemId: String
+    let itemType: String
+    let title: String
+    let subtitle: String?
+    let overview: String?
+    let images: MetadataImagesDto
+    let releaseDate: String?
+    let releaseYear: Int?
+    let runtimeMinutes: Int?
+    let rating: Double?
+    let certification: String?
+    let status: String?
+    let genres: [String]
+    let seasonNumber: Int?
+    let episodeNumber: Int?
+
+    var id: String { itemId }
+}
+
+struct MetadataEpisode: Equatable, Identifiable {
+    let itemId: String
+    let seasonNumber: Int?
+    let episodeNumber: Int?
+    let title: String
+    let summary: String?
+    let airDate: String?
+    let runtimeMinutes: Int?
+    let rating: Double?
+    let stillUrl: String?
+    let showItemId: String?
+
+    var id: String { itemId }
+}
+
+struct MetadataSeason: Equatable, Identifiable {
+    let itemId: String
+    let seasonNumber: Int
+    let title: String?
+    let summary: String?
+    let posterUrl: String?
+
+    var id: String { itemId }
+
+    var displayTitle: String {
+        title.nilIfBlank ?? "Season \(seasonNumber)"
+    }
+}
+
+struct MetadataPersonRef: Equatable, Identifiable {
+    let personId: String
+    let name: String
+    let role: String?
+    let department: String?
+    let profileUrl: String?
+
+    var id: String { personId }
+}
+
+struct MetadataCard: Equatable, Identifiable {
+    let itemId: String
+    let itemType: String
+    let title: String
+    let images: MetadataImagesDto
+    let releaseYear: Int?
+    let rating: Double?
+
+    var id: String { itemId }
+}
+
+struct MetadataTitleDetail: Equatable {
+    let item: MetadataItem
+    let cast: [MetadataPersonRef]
+    let directors: [MetadataPersonRef]
+    let creators: [MetadataPersonRef]
+}
+
+struct MetadataTitleExtras: Equatable {
+    let seasons: [MetadataSeason]
+    let similar: [MetadataCard]
+}
+
+struct PersonKnownForItem: Equatable, Identifiable {
+    let itemId: String
+    let mediaType: String
+    let title: String
+    let posterUrl: String?
+    let backdropUrl: String?
+    let logoUrl: String?
+    let rating: Double?
+    let releaseYear: Int?
+
+    var id: String { itemId }
+}
+
+struct PersonDetail: Equatable {
+    let personId: String
+    let name: String
+    let knownForDepartment: String?
+    let biography: String?
+    let birthday: String?
+    let placeOfBirth: String?
+    let profileUrl: String?
+    let knownFor: [PersonKnownForItem]
+}

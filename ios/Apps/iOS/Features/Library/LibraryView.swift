@@ -28,17 +28,20 @@ struct LibraryScreen: View {
                         .padding(.vertical, 32)
                 } else {
                     ForEach(viewModel.items) { item in
-                        LandscapeCardView(
-                            title: item.title,
-                            backdropUrl: item.backdropUrl ?? item.posterUrl,
-                            logoUrl: item.logoUrl,
-                            ratingText: item.ratingText,
-                            yearText: item.yearText,
-                            maturityRating: item.maturityRating,
-                            genre: item.genre,
-                            progressPercent: item.progressPercent,
-                            width: nil
-                        )
+                        NavigationLink(value: item.detailsRoute) {
+                            LandscapeCardView(
+                                title: item.title,
+                                backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                logoUrl: item.logoUrl,
+                                ratingText: item.ratingText,
+                                yearText: item.yearText,
+                                maturityRating: item.maturityRating,
+                                genre: item.genre,
+                                progressPercent: item.progressPercent,
+                                width: nil
+                            )
+                        }
+                        .buttonStyle(.plain)
                         .contextMenu {
                             Button {
                                 Task { await viewModel.setWatched(item, watched: true, environment: environment) }

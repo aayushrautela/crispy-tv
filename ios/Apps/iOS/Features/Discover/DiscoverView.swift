@@ -25,16 +25,19 @@ struct DiscoverScreen: View {
                     emptyState
                 } else {
                     ForEach(viewModel.items) { item in
-                        LandscapeCardView(
-                            title: item.title,
-                            backdropUrl: item.backdropUrl ?? item.posterUrl,
-                            logoUrl: item.logoUrl,
-                            ratingText: item.ratingText,
-                            yearText: item.yearText,
-                            maturityRating: item.maturityRating,
-                            genre: item.genre,
-                            width: nil
-                        )
+                        NavigationLink(value: item.detailsRoute) {
+                            LandscapeCardView(
+                                title: item.title,
+                                backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                logoUrl: item.logoUrl,
+                                ratingText: item.ratingText,
+                                yearText: item.yearText,
+                                maturityRating: item.maturityRating,
+                                genre: item.genre,
+                                width: nil
+                            )
+                        }
+                        .buttonStyle(.plain)
                         .onAppear {
                             if item.id == viewModel.items.last?.id {
                                 Task { await viewModel.loadNextPage(environment: environment) }

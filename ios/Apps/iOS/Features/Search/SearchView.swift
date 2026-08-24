@@ -55,16 +55,19 @@ struct SearchScreen: View {
                         .font(.headline)
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(viewModel.results) { item in
-                            LandscapeCardView(
-                                title: item.title,
-                                backdropUrl: item.backdropUrl ?? item.posterUrl,
-                                logoUrl: item.logoUrl,
-                                ratingText: item.ratingText,
-                                yearText: item.yearText,
-                                maturityRating: item.maturityRating,
-                                genre: item.genre,
-                                width: nil
-                            )
+                            NavigationLink(value: item.detailsRoute) {
+                                LandscapeCardView(
+                                    title: item.title,
+                                    backdropUrl: item.backdropUrl ?? item.posterUrl,
+                                    logoUrl: item.logoUrl,
+                                    ratingText: item.ratingText,
+                                    yearText: item.yearText,
+                                    maturityRating: item.maturityRating,
+                                    genre: item.genre,
+                                    width: nil
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

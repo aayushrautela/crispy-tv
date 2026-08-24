@@ -123,7 +123,7 @@ struct LandscapeCardView: View {
 struct RailSectionView<Content: View>: View {
     let title: String
     var subtitle: String? = nil
-    var onSeeAll: (() -> Void)? = nil
+    var seeAllRoute: AppRoute? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -139,11 +139,14 @@ struct RailSectionView<Content: View>: View {
                     }
                 }
                 Spacer()
-                if let onSeeAll {
-                    Button(action: onSeeAll) {
-                        Label("See all", systemImage: "chevron.right")
-                            .labelStyle(.titleAndIcon)
-                            .font(.footnote.weight(.medium))
+                if let seeAllRoute {
+                    NavigationLink(value: seeAllRoute) {
+                        HStack(spacing: 4) {
+                            Text("See all")
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                        }
+                        .font(.footnote.weight(.medium))
                     }
                     .buttonStyle(.glass)
                     .controlSize(.small)
