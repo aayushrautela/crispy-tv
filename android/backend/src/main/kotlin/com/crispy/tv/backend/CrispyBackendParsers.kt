@@ -892,7 +892,7 @@ internal fun CrispyBackendClient.parseMetadataTitleRatings(json: JSONObject?): M
     )
 }
 
-internal fun parseAiInsightsSlides(array: JSONArray?): List<AiInsightSlide> {
+fun parseAiInsightsSlides(array: JSONArray?): List<AiInsightSlide> {
     val safeArray = array ?: JSONArray()
     return buildList {
         for (index in 0 until safeArray.length()) {

@@ -143,7 +143,7 @@ internal fun JSONObject.optIntList(key: String): List<Int> {
     }
 }
 
-internal fun JSONObject?.toStringMap(): Map<String, String> {
+fun JSONObject?.toStringMap(): Map<String, String> {
     val obj = this ?: return emptyMap()
     val keys = obj.keys()
     val result = linkedMapOf<String, String>()

@@ -567,7 +567,8 @@ class BackendWatchHistoryService(
             // A resume position (or last-played timestamp) means the item is still in
             // progress even when the server could not derive a percent (e.g. missing
             // metadata runtime). Keep it as "Continue" rather than dropping it.
-            val hasResume = (progress.positionSeconds != null && progress.positionSeconds > 0)
+            val positionSeconds = progress.positionSeconds
+            val hasResume = (positionSeconds != null && positionSeconds > 0)
                 || progress.lastPlayedAt != null
             if (!hasResume) {
                 Log.d("CWParse", "drop(itemId=${itemId}, name=${title}): progressPercent null and no resume (pos=${progress.positionSeconds}, dur=${progress.durationSeconds})")

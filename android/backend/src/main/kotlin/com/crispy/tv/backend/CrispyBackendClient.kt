@@ -18,7 +18,7 @@ class CrispyBackendClient(
     backendUrl: String,
     internal val aiHttpClient: CrispyHttpClient = httpClient,
 ) {
-    internal val baseUrl: String = backendUrl.trim().trimEnd('/')
+    val baseUrl: String = backendUrl.trim().trimEnd('/')
 
     data class User(
         val id: String,
