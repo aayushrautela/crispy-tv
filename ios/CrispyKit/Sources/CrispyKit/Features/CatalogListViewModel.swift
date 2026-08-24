@@ -15,16 +15,16 @@ public final class CatalogListViewModel {
     private let catalogId: String
     private var loadedPage = 0
 
-public     init(catalogId: String) {
+public init(catalogId: String) {
         self.catalogId = catalogId
     }
 
-public     func loadIfNeeded(environment: AppEnvironment) async {
+public func loadIfNeeded(environment: AppEnvironment) async {
         guard snapshot == nil else { return }
         await reload(environment: environment)
     }
 
-public     func reload(environment: AppEnvironment) async {
+public func reload(environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else {
             statusMessage = "Sign in to load this collection."
             return
@@ -42,7 +42,7 @@ public     func reload(environment: AppEnvironment) async {
         }
     }
 
-public     func loadNextPage() async {
+public func loadNextPage() async {
         guard let snapshot else { return }
         let nextPage = loadedPage + 1
         let result = buildCatalogPage(

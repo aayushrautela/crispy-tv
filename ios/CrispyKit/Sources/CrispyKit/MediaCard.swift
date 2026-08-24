@@ -4,32 +4,32 @@ import ContractRunner
 /// UI-facing media card shared by Home/Discover/Library/Search, mirroring the
 /// fields the Android screens read off `CatalogItem`/`ClientMediaCard`.
 public struct MediaCard: Identifiable, Equatable {
-public     let itemId: String
-public     let type: String
-public     let title: String
-public     let posterUrl: String?
-public     let backdropUrl: String?
-public     let logoUrl: String?
-public     let ratingText: String?
-public     let yearText: String?
-public     let genre: String?
-public     let maturityRating: String?
-public     let description: String?
-public     let progressPercent: Double?
-public     let parentSeriesId: String?
+public let itemId: String
+public let type: String
+public let title: String
+public let posterUrl: String?
+public let backdropUrl: String?
+public let logoUrl: String?
+public let ratingText: String?
+public let yearText: String?
+public let genre: String?
+public let maturityRating: String?
+public let description: String?
+public let progressPercent: Double?
+public let parentSeriesId: String?
 
-public     var id: String { itemId }
+public var id: String { itemId }
 
     /// The title identity whose details page should open for this card.
     /// Episode-shaped continue-watching cards route to their parent show.
-public     var detailsItemId: String {
+public var detailsItemId: String {
         if type == "episode", let parentSeriesId = parentSeriesId.nilIfBlank {
             return parentSeriesId
         }
         return itemId
     }
 
-public     var detailsRoute: AppRoute {
+public var detailsRoute: AppRoute {
         .details(itemId: detailsItemId, itemType: type == "episode" ? "show" : type)
     }
 }
@@ -40,7 +40,7 @@ public func formatRating(_ value: Double?) -> String? {
 }
 
 extension MediaCard {
-public     static func from(_ card: ClientMediaCard) -> MediaCard {
+public static func from(_ card: ClientMediaCard) -> MediaCard {
         MediaCard(
             itemId: card.itemId,
             type: normalizeCatalogType(card.mediaType),
@@ -61,7 +61,7 @@ public     static func from(_ card: ClientMediaCard) -> MediaCard {
         )
     }
 
-public     static func from(_ item: HomeCatalogItem) -> MediaCard {
+public static func from(_ item: HomeCatalogItem) -> MediaCard {
         MediaCard(
             itemId: item.mediaKey,
             type: item.type,
@@ -79,7 +79,7 @@ public     static func from(_ item: HomeCatalogItem) -> MediaCard {
         )
     }
 
-public     static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
+public static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
         MediaCard(
             itemId: suggestion.itemId,
             type: suggestion.itemType,
@@ -97,7 +97,7 @@ public     static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
         )
     }
 
-public     static func from(_ item: SearchMediaItem) -> MediaCard {
+public static func from(_ item: SearchMediaItem) -> MediaCard {
         MediaCard(
             itemId: item.itemId,
             type: item.itemType,

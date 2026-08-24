@@ -5,7 +5,7 @@ import ContractRunner
 /// planners consume. Mirrors `HomeCatalogService.toSnapshot()` on Android;
 /// shared by Home and Discover so both plan from identical input.
 public enum HomeSnapshotMapper {
-public     static func snapshot(from response: ProfileHomeResponse?) -> HomeCatalogSnapshot {
+public static func snapshot(from response: ProfileHomeResponse?) -> HomeCatalogSnapshot {
         guard let response else {
             return empty("No recommendations available right now.")
         }
@@ -41,7 +41,7 @@ public     static func snapshot(from response: ProfileHomeResponse?) -> HomeCata
         return snapshot(profileId: response.profileId, lists: lists)
     }
 
-public     static func empty(_ statusMessage: String) -> HomeCatalogSnapshot {
+public static func empty(_ statusMessage: String) -> HomeCatalogSnapshot {
         HomeCatalogSnapshot(profileId: nil, lists: [], statusMessage: statusMessage)
     }
 
@@ -56,7 +56,7 @@ public     static func empty(_ statusMessage: String) -> HomeCatalogSnapshot {
 
     /// Backend layout strings → contract presentations. Collection shelves map
     /// to rails for now (dedicated shelf UI arrives with M2).
-public     static func presentation(for layout: String) -> HomeCatalogPresentation {
+public static func presentation(for layout: String) -> HomeCatalogPresentation {
         switch layout.trimmingCharacters(in: .whitespaces).lowercased() {
         case "herocarousel", "hero", "landscape": return .hero
         case "categorytabs": return .pill

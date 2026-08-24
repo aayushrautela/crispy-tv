@@ -6,7 +6,7 @@ import Observation
 @MainActor
 @Observable
 public final class BootstrapViewModel {
-    enum State {
+    public enum State {
         case loading
         case needsAuth
         case needsProfileSelection
@@ -18,14 +18,14 @@ public final class BootstrapViewModel {
     private let supabase: SupabaseAccountClient
     private let profileStore: ActiveProfileStore
 
-public     init(supabase: SupabaseAccountClient, profileStore: ActiveProfileStore) {
+public init(supabase: SupabaseAccountClient, profileStore: ActiveProfileStore) {
         self.supabase = supabase
         self.profileStore = profileStore
     }
 
     /// Re-run bootstrap and flip state accordingly. Safe to call from auth /
     /// profile screens and after sign-out.
-public     func refresh() async {
+public func refresh() async {
         state = .loading
         guard let session = await supabase.ensureValidSession() else {
             state = .needsAuth
@@ -36,7 +36,7 @@ public     func refresh() async {
     }
 
     /// Called after a completed sign-out so the root gate flips back to auth.
-public     func markSignedOut() {
+public func markSignedOut() {
         state = .needsAuth
     }
 }
@@ -45,16 +45,16 @@ public     func markSignedOut() {
 @MainActor
 @Observable
 public final class AppEnvironment {
-public     let config: AppConfig
-public     let httpClient: CrispyHttpClient
-public     let backend: CrispyBackendClient
-public     let supabase: SupabaseAccountClient
-public     let tokenStore: SessionStoring
-public     let profileStore: ActiveProfileStore
-public     let contextResolver: BackendContextResolver
-public     let bootstrap: BootstrapViewModel
+public let config: AppConfig
+public let httpClient: CrispyHttpClient
+public let backend: CrispyBackendClient
+public let supabase: SupabaseAccountClient
+public let tokenStore: SessionStoring
+public let profileStore: ActiveProfileStore
+public let contextResolver: BackendContextResolver
+public let bootstrap: BootstrapViewModel
 
-public     init(config: AppConfig = .load()) {
+public init(config: AppConfig = .load()) {
         self.config = config
         self.httpClient = CrispyHttpClient()
         self.backend = CrispyBackendClient(httpClient: httpClient, backendURL: config.backendURL)
@@ -71,12 +71,12 @@ public     init(config: AppConfig = .load()) {
     }
 
     /// Resolves the current backend context, refreshing the session if needed.
-public     func backendContext() async -> BackendContext? {
+public func backendContext() async -> BackendContext? {
         await contextResolver.resolve()
     }
 
     /// One locked sequence: revoke server-side first, then always wipe local.
-public     func signOut() async {
+public func signOut() async {
         let userId = supabase.currentSession()?.userId
         await supabase.signOut()
         tokenStore.clear()

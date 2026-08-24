@@ -4,18 +4,18 @@ import Security
 /// The single representation of a Supabase auth session, mirroring
 /// `com.crispy.tv.accounts.Session`.
 public struct Session: Codable, Equatable {
-public     let accessToken: String
-public     let refreshToken: String
-public     let expiresAtEpochSec: Int64?
-public     let userId: String?
-public     let email: String?
-public     let anonymous: Bool
+public let accessToken: String
+public let refreshToken: String
+public let expiresAtEpochSec: Int64?
+public let userId: String?
+public let email: String?
+public let anonymous: Bool
 }
 
 public protocol SessionStoring {
-public     func current() -> Session?
-public     func save(_ session: Session)
-public     func clear()
+    func current() -> Session?
+    func save(_ session: Session)
+    func clear()
 }
 
 /// Keychain-backed session persistence (Android uses EncryptedSharedPreferences).
@@ -23,11 +23,11 @@ public final class KeychainSessionStore: SessionStoring {
     private let service: String
     private let account = "default"
 
-public     init(service: String = "com.crispy.rewrite.session") {
+public init(service: String = "com.crispy.rewrite.session") {
         self.service = service
     }
 
-public     func current() -> Session? {
+public func current() -> Session? {
         var query = baseQuery()
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -38,7 +38,7 @@ public     func current() -> Session? {
         return try? JSONDecoder().decode(Session.self, from: data)
     }
 
-public     func save(_ session: Session) {
+public func save(_ session: Session) {
         clear()
         guard let data = try? JSONEncoder().encode(session) else { return }
         var query = baseQuery()
@@ -47,7 +47,7 @@ public     func save(_ session: Session) {
         SecItemAdd(query as CFDictionary, nil)
     }
 
-public     func clear() {
+public func clear() {
         SecItemDelete(baseQuery() as CFDictionary)
     }
 
@@ -64,7 +64,7 @@ public     func clear() {
 public final class ActiveProfileStore {
     private let defaults: UserDefaults
 
-public     init(defaults: UserDefaults = .standard) {
+public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
@@ -72,11 +72,11 @@ public     init(defaults: UserDefaults = .standard) {
         "crispy.activeProfile.\(userId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")"
     }
 
-public     func activeProfileId(userId: String?) -> String? {
+public func activeProfileId(userId: String?) -> String? {
         defaults.string(forKey: key(userId))?.nilIfBlank
     }
 
-public     func setActiveProfileId(_ profileId: String?, userId: String?) {
+public func setActiveProfileId(_ profileId: String?, userId: String?) {
         let storageKey = key(userId)
         if let profileId = profileId?.nilIfBlank {
             defaults.set(profileId, forKey: storageKey)
@@ -85,7 +85,7 @@ public     func setActiveProfileId(_ profileId: String?, userId: String?) {
         }
     }
 
-public     func clear(userId: String?) {
+public func clear(userId: String?) {
         defaults.removeObject(forKey: key(userId))
     }
 }

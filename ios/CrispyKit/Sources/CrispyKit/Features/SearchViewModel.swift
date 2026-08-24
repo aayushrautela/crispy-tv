@@ -17,13 +17,13 @@ public final class SearchViewModel {
     private var suggestionsTask: Task<Void, Never>?
     private let historyStore = SearchHistoryStore()
 
-public     func loadHistoryIfNeeded() {
+public func loadHistoryIfNeeded() {
         if history.isEmpty {
             history = historyStore.recentQueries()
         }
     }
 
-public     func updateQuery(_ text: String, environment: AppEnvironment) {
+public func updateQuery(_ text: String, environment: AppEnvironment) {
         query = text
         results = []
         statusMessage = ""
@@ -40,7 +40,7 @@ public     func updateQuery(_ text: String, environment: AppEnvironment) {
         }
     }
 
-public     func submit(environment: AppEnvironment) async {
+public func submit(environment: AppEnvironment) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         suggestionsTask?.cancel()
@@ -68,12 +68,12 @@ public     func submit(environment: AppEnvironment) async {
         }
     }
 
-public     func submitSuggestion(_ suggestion: MediaCard, environment: AppEnvironment) async {
+public func submitSuggestion(_ suggestion: MediaCard, environment: AppEnvironment) async {
         query = suggestion.title
         await submit(environment: environment)
     }
 
-public     func clearHistory() {
+public func clearHistory() {
         historyStore.clear()
         history = []
     }
@@ -109,15 +109,15 @@ public struct SearchHistoryStore {
     private let key = "crispy.search.history"
     private let limit = 8
 
-public     init(defaults: UserDefaults = .standard) {
+public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
-public     func recentQueries() -> [String] {
+public func recentQueries() -> [String] {
         defaults.stringArray(forKey: key) ?? []
     }
 
-public     func recordQuery(_ raw: String) {
+public func recordQuery(_ raw: String) {
         let query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
         var current = recentQueries().filter { $0.caseInsensitiveCompare(query) != .orderedSame }
@@ -128,7 +128,7 @@ public     func recordQuery(_ raw: String) {
         defaults.set(current, forKey: key)
     }
 
-public     func clear() {
+public func clear() {
         defaults.removeObject(forKey: key)
     }
 }

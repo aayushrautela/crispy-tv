@@ -8,31 +8,31 @@ import ContractRunner
 @MainActor
 @Observable
 public final class HomeViewModel {
-    struct RailSection: Identifiable, Equatable {
-public         let catalogId: String
-public         let title: String
-public         let items: [MediaCard]
+    public struct RailSection: Identifiable, Equatable {
+        public let catalogId: String
+        public let title: String
+        public let items: [MediaCard]
 
-public         var id: String { catalogId }
+        public var id: String { catalogId }
     }
 
-    struct PillSection: Identifiable, Equatable {
-public         let catalogId: String
-public         let title: String
+    public struct PillSection: Identifiable, Equatable {
+        public let catalogId: String
+        public let title: String
 
-public         var id: String { catalogId }
+        public var id: String { catalogId }
     }
 
-    struct HeroItem: Identifiable, Equatable {
-public         let mediaKey: String
-public         let title: String
-public         let descriptionText: String
-public         let ratingText: String?
-public         let yearText: String?
-public         let genres: [String]
-public         let backdropUrl: String?
+    public struct HeroItem: Identifiable, Equatable {
+        public let mediaKey: String
+        public let title: String
+        public let descriptionText: String
+        public let ratingText: String?
+        public let yearText: String?
+        public let genres: [String]
+        public let backdropUrl: String?
 
-public         var id: String { mediaKey }
+        public var id: String { mediaKey }
     }
 
     public private(set) var pills: [PillSection] = []
@@ -44,12 +44,12 @@ public         var id: String { mediaKey }
 
     private var didInitialLoad = false
 
-public     func loadIfNeeded(environment: AppEnvironment) async {
+public func loadIfNeeded(environment: AppEnvironment) async {
         guard !didInitialLoad else { return }
         await load(environment: environment)
     }
 
-public     func load(environment: AppEnvironment) async {
+public func load(environment: AppEnvironment) async {
         isLoading = true
         defer { isLoading = false }
 
@@ -80,7 +80,7 @@ public     func load(environment: AppEnvironment) async {
         }
     }
 
-public     func dismissContinueWatching(_ item: MediaCard, environment: AppEnvironment) async {
+public func dismissContinueWatching(_ item: MediaCard, environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else { return }
         continueWatchingItems.removeAll { $0.id == item.id }
         _ = try? await environment.backend.dismissContinueWatching(

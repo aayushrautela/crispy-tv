@@ -1,13 +1,13 @@
 import Foundation
 
 public struct CrispyBackendError: Error {
-public     let httpCode: Int
-public     let code: String?
-public     let message: String?
-public     let category: String?
-public     let retryable: Bool
-public     let requestId: String?
-public     let details: String?
+public let httpCode: Int
+public let code: String?
+public let message: String?
+public let category: String?
+public let retryable: Bool
+public let requestId: String?
+public let details: String?
 }
 
 /// URLSession port of the Android `CrispyBackendClient`, restricted to the
@@ -17,18 +17,18 @@ public final class CrispyBackendClient {
     private let httpClient: CrispyHttpClient
     private let baseURL: String
 
-public     init(httpClient: CrispyHttpClient, backendURL: String) {
+public init(httpClient: CrispyHttpClient, backendURL: String) {
         self.httpClient = httpClient
         self.baseURL = backendURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
-public     func isConfigured() -> Bool {
+public func isConfigured() -> Bool {
         !baseURL.isEmpty
     }
 
     // MARK: - Account
 
-public     func getMe(accessToken: String) async throws -> MeResponse {
+public func getMe(accessToken: String) async throws -> MeResponse {
         let json = try await getJson(path: "/v1/me", accessToken: accessToken)
         guard let user = json.jsonObject("user") else {
             throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend /v1/me did not return a user.", category: nil, retryable: false, requestId: nil, details: nil)
@@ -39,12 +39,12 @@ public     func getMe(accessToken: String) async throws -> MeResponse {
         )
     }
 
-public     func listProfiles(accessToken: String) async throws -> [BackendProfile] {
+public func listProfiles(accessToken: String) async throws -> [BackendProfile] {
         let json = try await getJson(path: "/v1/profiles", accessToken: accessToken)
         return json.jsonArray("profiles").compactMap(parseProfile)
     }
 
-public     func bootstrapAccount(
+public func bootstrapAccount(
         accessToken: String,
         name: String,
         interfaceLanguage: String,
@@ -66,7 +66,7 @@ public     func bootstrapAccount(
         return profile
     }
 
-public     func createProfile(
+public func createProfile(
         accessToken: String,
         name: String,
         sortOrder: Int?,
@@ -86,7 +86,7 @@ public     func createProfile(
 
     // MARK: - Home
 
-public     func getHome(accessToken: String, profileId: String) async throws -> ProfileHomeResponse? {
+public func getHome(accessToken: String, profileId: String) async throws -> ProfileHomeResponse? {
         let json = try await getJson(path: "/v1/profiles/\(profileId)/home", accessToken: accessToken)
         guard let parsedProfileId = json.jsonString("profileId") else { return nil }
         return ProfileHomeResponse(
@@ -99,30 +99,30 @@ public     func getHome(accessToken: String, profileId: String) async throws -> 
 
     // MARK: - Watch collections
 
-public     func listContinueWatching(accessToken: String, profileId: String, limit: Int = 20, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
+public func listContinueWatching(accessToken: String, profileId: String, limit: Int = 20, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
         try await listWatchCollection(accessToken: accessToken, profileId: profileId, path: "continue-watching", limit: limit, cursor: cursor)
     }
 
-public     func dismissContinueWatching(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
+public func dismissContinueWatching(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
         let json = try await deleteJson(path: "/v1/profiles/\(profileId)/watch/continue-watching/\(itemId)", accessToken: accessToken)
         return parseWatchActionResponse(json)
     }
 
-public     func listWatchHistory(accessToken: String, profileId: String, limit: Int = 50, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
+public func listWatchHistory(accessToken: String, profileId: String, limit: Int = 50, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
         try await listWatchCollection(accessToken: accessToken, profileId: profileId, path: "history", limit: limit, cursor: cursor)
     }
 
-public     func listWatchlist(accessToken: String, profileId: String, limit: Int = 50, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
+public func listWatchlist(accessToken: String, profileId: String, limit: Int = 50, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
         try await listWatchCollection(accessToken: accessToken, profileId: profileId, path: "watchlist", limit: limit, cursor: cursor)
     }
 
-public     func listRatings(accessToken: String, profileId: String, limit: Int = 50, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
+public func listRatings(accessToken: String, profileId: String, limit: Int = 50, cursor: String? = nil) async throws -> ClientMediaCardQueryResult {
         try await listWatchCollection(accessToken: accessToken, profileId: profileId, path: "ratings", limit: limit, cursor: cursor)
     }
 
     // MARK: - Search
 
-public     func searchTitles(accessToken: String, query: String, limit: Int = 20) async throws -> SearchResultsResponse {
+public func searchTitles(accessToken: String, query: String, limit: Int = 20) async throws -> SearchResultsResponse {
         let json = try await getJson(
             path: "/v1/search/titles",
             queryItems: [
@@ -139,7 +139,7 @@ public     func searchTitles(accessToken: String, query: String, limit: Int = 20
         )
     }
 
-public     func searchSuggestions(accessToken: String, query: String, limit: Int = 8) async throws -> SearchSuggestionsResponse {
+public func searchSuggestions(accessToken: String, query: String, limit: Int = 8) async throws -> SearchSuggestionsResponse {
         let json = try await getJson(
             path: "/v1/search/suggestions",
             queryItems: [
@@ -156,7 +156,7 @@ public     func searchSuggestions(accessToken: String, query: String, limit: Int
 
     // MARK: - Metadata / details
 
-public     func getMetadataItemDetail(accessToken: String, itemId: String) async throws -> MetadataTitleDetail {
+public func getMetadataItemDetail(accessToken: String, itemId: String) async throws -> MetadataTitleDetail {
         let json = try await getJson(path: "/v1/metadata/items/\(itemId.trimmingCharacters(in: .whitespacesAndNewlines))", accessToken: accessToken)
         guard let itemJson = json.jsonObject("Item") else {
             throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend item detail is missing Item.", category: nil, retryable: false, requestId: nil, details: nil)
@@ -169,7 +169,7 @@ public     func getMetadataItemDetail(accessToken: String, itemId: String) async
         )
     }
 
-public     func getMetadataItemExtras(accessToken: String, itemId: String) async throws -> MetadataTitleExtras {
+public func getMetadataItemExtras(accessToken: String, itemId: String) async throws -> MetadataTitleExtras {
         let json = try await getJson(path: "/v1/metadata/items/\(itemId.trimmingCharacters(in: .whitespacesAndNewlines))/extras", accessToken: accessToken)
         return MetadataTitleExtras(
             seasons: json.jsonArray("Seasons").compactMap(parseMetadataSeason),
@@ -177,7 +177,7 @@ public     func getMetadataItemExtras(accessToken: String, itemId: String) async
         )
     }
 
-public     func getSeriesEpisodes(accessToken: String, seriesItemId: String, season: Int?) async throws -> [MetadataEpisode] {
+public func getSeriesEpisodes(accessToken: String, seriesItemId: String, season: Int?) async throws -> [MetadataEpisode] {
         var query: [URLQueryItem] = []
         if let season {
             query.append(URLQueryItem(name: "season", value: String(season)))
@@ -186,7 +186,7 @@ public     func getSeriesEpisodes(accessToken: String, seriesItemId: String, sea
         return json.jsonArray("Items").compactMap(parseMetadataEpisodeFromView)
     }
 
-public     func getMetadataPersonDetail(accessToken: String, personId: String) async throws -> PersonDetail {
+public func getMetadataPersonDetail(accessToken: String, personId: String) async throws -> PersonDetail {
         let json = try await getJson(path: "/v1/metadata/people/\(personId.trimmingCharacters(in: .whitespacesAndNewlines))", accessToken: accessToken)
         guard let personIdValue = json.jsonString("personId"), let name = json.jsonString("name") else {
             throw CrispyBackendError(httpCode: 200, code: nil, message: "Backend person detail is missing required fields.", category: nil, retryable: false, requestId: nil, details: nil)
@@ -205,11 +205,11 @@ public     func getMetadataPersonDetail(accessToken: String, personId: String) a
 
     // MARK: - Watch mutations
 
-public     func markWatched(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
+public func markWatched(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
         try await postWatchMutation(accessToken: accessToken, profileId: profileId, path: "mark-watched", itemId: itemId)
     }
 
-public     func unmarkWatched(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
+public func unmarkWatched(accessToken: String, profileId: String, itemId: String) async throws -> WatchActionResponse {
         try await postWatchMutation(accessToken: accessToken, profileId: profileId, path: "unmark-watched", itemId: itemId)
     }
 

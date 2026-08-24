@@ -3,9 +3,9 @@ import Foundation
 /// URLSession port of the Android `SupabaseAccountClient` (email sign-in/up,
 /// token refresh, sign-out). Envelope handling matches the Kotlin client.
 public final class SupabaseAccountClient {
-    struct SignUpResult {
-public         let session: Session?
-public         let message: String
+    public struct SignUpResult {
+        public let session: Session?
+        public let message: String
     }
 
     private let httpClient: CrispyHttpClient
@@ -16,7 +16,7 @@ public         let message: String
 
     private var refreshInFlight: Task<Session?, Never>?
 
-public     init(
+public init(
         httpClient: CrispyHttpClient,
         supabaseURL: String,
         publishableKey: String,
@@ -30,15 +30,15 @@ public     init(
         self.nowEpochSeconds = nowEpochSeconds
     }
 
-public     func isConfigured() -> Bool {
+public func isConfigured() -> Bool {
         !baseURL.isEmpty && !publishableKey.isEmpty
     }
 
-public     func currentSession() -> Session? {
+public func currentSession() -> Session? {
         tokenStore.current()
     }
 
-public     func ensureValidSession() async -> Session? {
+public func ensureValidSession() async -> Session? {
         guard let existing = tokenStore.current() else { return nil }
         if !shouldRefresh(existing) { return existing }
         if !isConfigured() {
@@ -58,7 +58,7 @@ public     func ensureValidSession() async -> Session? {
         return await task.value
     }
 
-public     func signInWithEmail(email: String, password: String) async throws -> Session {
+public func signInWithEmail(email: String, password: String) async throws -> Session {
         try checkConfigured()
         let payload: [String: Any] = [
             "email": email.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -72,7 +72,7 @@ public     func signInWithEmail(email: String, password: String) async throws ->
         return session
     }
 
-public     func signUpWithEmail(email: String, password: String) async throws -> SignUpResult {
+public func signUpWithEmail(email: String, password: String) async throws -> SignUpResult {
         try checkConfigured()
         let payload: [String: Any] = [
             "email": email.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -92,7 +92,7 @@ public     func signUpWithEmail(email: String, password: String) async throws ->
     }
 
     /// Revokes the server-side session. Local wipe stays with the caller.
-public     func signOut() async {
+public func signOut() async {
         guard isConfigured(), let session = tokenStore.current() else { return }
         guard !session.accessToken.hasPrefix("cp_pat_") else { return }
         _ = try? await postAuth(
@@ -236,13 +236,13 @@ public     func signOut() async {
         }
     }
 
-    enum AuthError: Error {
+    public enum AuthError: Error {
         case notConfigured
         case signinFailed(String)
         case invalidRefreshToken
         case http(code: Int, message: String)
 
-public         var localizedMessage: String {
+        public var localizedMessage: String {
             switch self {
             case .notConfigured:
                 return "Supabase is not configured."

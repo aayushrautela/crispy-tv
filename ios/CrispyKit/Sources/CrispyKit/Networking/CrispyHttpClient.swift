@@ -1,14 +1,14 @@
 import Foundation
 
 public struct CrispyHttpResponse {
-public     let code: Int
-public     let body: String
+public let code: Int
+public let body: String
 }
 
 public final class CrispyHttpClient {
     private let session: URLSession
 
-public     init(session: URLSession = {
+public init(session: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 45
         configuration.timeoutIntervalForResource = 120
@@ -18,19 +18,19 @@ public     init(session: URLSession = {
         self.session = session
     }
 
-public     func get(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public func get(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "GET", url: url, headers: headers, body: nil, timeout: timeout)
     }
 
-public     func postJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public func postJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "POST", url: url, headers: headers, body: jsonBody, timeout: timeout)
     }
 
-public     func putJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public func putJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "PUT", url: url, headers: headers, body: jsonBody, timeout: timeout)
     }
 
-public     func delete(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public func delete(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "DELETE", url: url, headers: headers, body: nil, timeout: timeout)
     }
 

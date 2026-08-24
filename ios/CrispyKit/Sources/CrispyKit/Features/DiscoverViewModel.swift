@@ -7,21 +7,21 @@ import ContractRunner
 @MainActor
 @Observable
 public final class DiscoverViewModel {
-    struct CatalogOption: Identifiable, Equatable {
-public         let catalogId: String
-public         let title: String
+    public struct CatalogOption: Identifiable, Equatable {
+        public let catalogId: String
+        public let title: String
 
-public         var id: String { catalogId }
+        public var id: String { catalogId }
     }
 
-    enum TypeFilter: String, CaseIterable, Identifiable {
+    public enum TypeFilter: String, CaseIterable, Identifiable {
         case all = "All"
         case movies = "Movies"
         case series = "Series"
 
-public         var id: String { rawValue }
+public var id: String { rawValue }
 
-public         var mediaType: String? {
+public var mediaType: String? {
             switch self {
             case .all: return nil
             case .movies: return "movie"
@@ -40,12 +40,12 @@ public         var mediaType: String? {
     private var snapshot: HomeCatalogSnapshot?
     private var loadedPage = 0
 
-public     func loadIfNeeded(environment: AppEnvironment) async {
+public func loadIfNeeded(environment: AppEnvironment) async {
         guard snapshot == nil else { return }
         await reload(environment: environment)
     }
 
-public     func reload(environment: AppEnvironment) async {
+public func reload(environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else {
             statusMessage = "Sign in and select a profile to load catalogs."
             return
@@ -67,7 +67,7 @@ public     func reload(environment: AppEnvironment) async {
         }
     }
 
-public     func select(_ option: CatalogOption?, environment: AppEnvironment) async {
+public func select(_ option: CatalogOption?, environment: AppEnvironment) async {
         selectedCatalog = option
         items = []
         loadedPage = 0
@@ -76,7 +76,7 @@ public     func select(_ option: CatalogOption?, environment: AppEnvironment) as
         await loadNextPage(environment: environment)
     }
 
-public     func setTypeFilter(_ filter: TypeFilter, environment: AppEnvironment) async {
+public func setTypeFilter(_ filter: TypeFilter, environment: AppEnvironment) async {
         typeFilter = filter
         refreshCatalogOptions()
         if let selected = selectedCatalog, !catalogs.contains(selected) {
@@ -90,7 +90,7 @@ public     func setTypeFilter(_ filter: TypeFilter, environment: AppEnvironment)
     }
 
     /// Loads the next page when the grid approaches the end.
-public     func loadNextPage(environment: AppEnvironment) async {
+public func loadNextPage(environment: AppEnvironment) async {
         guard let snapshot, let selectedCatalog else { return }
         let nextPage = loadedPage + 1
         let result = buildCatalogPage(

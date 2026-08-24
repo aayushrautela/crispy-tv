@@ -6,12 +6,12 @@ import Observation
 @MainActor
 @Observable
 public final class LibraryViewModel {
-    enum Section: String, CaseIterable, Identifiable {
+    public enum Section: String, CaseIterable, Identifiable {
         case history = "History"
         case watchlist = "Watchlist"
         case ratings = "Ratings"
 
-public         var id: String { rawValue }
+public var id: String { rawValue }
     }
 
     public private(set) var sections: [Section] = Section.allCases
@@ -24,12 +24,12 @@ public         var id: String { rawValue }
     private var hasMore = false
     private var isFetchingNextPage = false
 
-public     func loadIfNeeded(environment: AppEnvironment) async {
+public func loadIfNeeded(environment: AppEnvironment) async {
         guard items.isEmpty else { return }
         await reload(environment: environment)
     }
 
-public     func reload(environment: AppEnvironment) async {
+public func reload(environment: AppEnvironment) async {
         items = []
         nextCursor = nil
         hasMore = true
@@ -38,13 +38,13 @@ public     func reload(environment: AppEnvironment) async {
         await fetchNextPage(environment: environment)
     }
 
-public     func select(_ section: Section, environment: AppEnvironment) async {
+public func select(_ section: Section, environment: AppEnvironment) async {
         guard section != selectedSection else { return }
         selectedSection = section
         await reload(environment: environment)
     }
 
-public     func loadNextPageIfNeeded(current itemId: String, environment: AppEnvironment) async {
+public func loadNextPageIfNeeded(current itemId: String, environment: AppEnvironment) async {
         guard hasMore, !isFetchingNextPage, !isLoadingFirstPage else { return }
         guard itemId == items.last?.id else { return }
         await fetchNextPage(environment: environment)
@@ -52,7 +52,7 @@ public     func loadNextPageIfNeeded(current itemId: String, environment: AppEnv
 
     /// Optimistic mark/unmark-watched toggle (server mutation without the
     /// outbox, which arrives in a later milestone).
-public     func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnvironment) async {
+public func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else { return }
         if selectedSection == .history && !watched {
             items.removeAll { $0.id == item.id }

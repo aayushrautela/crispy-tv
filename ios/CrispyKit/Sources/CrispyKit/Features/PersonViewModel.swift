@@ -5,24 +5,24 @@ import Observation
 @MainActor
 @Observable
 public final class PersonViewModel {
-public     let personId: String
-public     let initialProfileUrl: String?
+public let personId: String
+public let initialProfileUrl: String?
 
     public private(set) var detail: PersonDetail?
     public private(set) var isLoading = false
     public private(set) var errorMessage = ""
 
-public     init(personId: String, initialProfileUrl: String?) {
+public init(personId: String, initialProfileUrl: String?) {
         self.personId = personId
         self.initialProfileUrl = initialProfileUrl
     }
 
-public     func loadIfNeeded(environment: AppEnvironment) async {
+public func loadIfNeeded(environment: AppEnvironment) async {
         guard detail == nil else { return }
         await load(environment: environment)
     }
 
-public     func load(environment: AppEnvironment) async {
+public func load(environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else {
             errorMessage = "Sign in to view this person."
             return
