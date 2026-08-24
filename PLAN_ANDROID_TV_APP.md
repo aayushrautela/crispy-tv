@@ -125,10 +125,13 @@ backgrounds (TV-NP); 64-bit + 16 KB page size required from Aug 2026 (TV-G6).
 - [ ] CW item dismiss (options overlay), hero/backdrop area for focused rail item,
       catalog pagination.
 
-### Phase 3 — Detail & episodes
-- [ ] Detail screen: hero backdrop, metadata, Resume/Play, watchlist toggle, tracked-state.
-- [ ] Season/episode browser (side panel or full-screen list) with watched ticks + progress.
-- [ ] Cast + more-like-this rails reusing network clients.
+### Phase 3 — Detail & episodes  ✅ core done (commit `b5baaeba`)
+- [x] Detail screen: hero backdrop, title/meta/overview, genre chips, Play button
+      (wired to player in Phase 4), season chips + episode rows, cast rail,
+      More-Like-This rail (navigates to nested detail).
+- [x] `detail/{itemId}` route wired from all home-rail card clicks.
+- [ ] Watchlist/tracked-state toggles; watched ticks on episodes (needs watch-state batch);
+      resume-position badges.
 
 ### Phase 4 — Player
 - [ ] Reuse `:android:player` end-to-end; TV control surface (D-pad seek ±10s/±30s,
