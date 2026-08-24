@@ -34,9 +34,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.crispy.tv.R
-import com.crispy.tv.ratings.formatRating
-import com.crispy.tv.ratings.formatRatingOutOfTen
-import com.crispy.tv.ratings.normalizeRatingText
+import com.crispy.tv.addons.util.formatRating
+import com.crispy.tv.addons.util.formatRatingOutOfTen
+import com.crispy.tv.addons.util.normalizeRatingText
 import com.crispy.tv.ui.components.skeletonElement
 
 @Composable

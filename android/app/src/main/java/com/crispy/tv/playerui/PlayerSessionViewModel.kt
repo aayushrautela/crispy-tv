@@ -13,20 +13,20 @@ import com.crispy.tv.PlaybackDependencies
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.metadata.toMediaVideo
-import com.crispy.tv.metadata.toMediaDetails
-import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.playback.PlayerStreamLookupTarget
-import com.crispy.tv.playback.StreamLookupTarget
-import com.crispy.tv.playback.buildPlayerSubtitle
-import com.crispy.tv.playback.findEpisodeForLookupId
-import com.crispy.tv.playback.resolveStreamLookupTarget
-import com.crispy.tv.playback.resolveStreamLookupTargetFromIdentity
+import com.crispy.tv.addons.mapping.toMediaVideo
+import com.crispy.tv.addons.mapping.toMediaDetails
+import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.addons.lookup.PlayerStreamLookupTarget
+import com.crispy.tv.addons.lookup.StreamLookupTarget
+import com.crispy.tv.addons.lookup.buildPlayerSubtitle
+import com.crispy.tv.addons.lookup.findEpisodeForLookupId
+import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
+import com.crispy.tv.addons.lookup.resolveStreamLookupTargetFromIdentity
 import com.crispy.tv.streams.SelectorCoordinator
 import com.crispy.tv.home.HomeRefreshBus
 import com.crispy.tv.home.HomeRefreshEvent
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.nativeengine.playback.NativePlaybackEngine
 import com.crispy.tv.nativeengine.playback.NativePlaybackEnginePreference
 import com.crispy.tv.nativeengine.playback.NativePlaybackError
@@ -43,10 +43,10 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.settings.PlaybackSettingsRepository
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
-import com.crispy.tv.streams.AddonStream
-import com.crispy.tv.streams.AddonSubtitle
-import com.crispy.tv.streams.StreamResolver
-import com.crispy.tv.streams.StreamSelectorUiState
+import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.addons.streams.AddonSubtitle
+import com.crispy.tv.addons.streams.StreamResolver
+import com.crispy.tv.addons.streams.StreamSelectorUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.coroutineContext
@@ -609,7 +609,7 @@ class PlayerSessionViewModel(
                     seasonEpisodes = uiState.value.seasonEpisodes,
                     fallbackMediaType = activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE,
                 ).lookupId
-        val parsedLookupId = com.crispy.tv.playback.parseLookupId(lookupId)
+        val parsedLookupId = com.crispy.tv.addons.lookup.parseLookupId(lookupId)
         val nextMediaType = state.streamSelector.mediaType ?: activeIdentity?.contentType ?: MetadataLabMediaType.MOVIE
         activeSubtitleLookupId = lookupId
         activeSubtitleMediaType = nextMediaType

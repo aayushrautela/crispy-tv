@@ -1,6 +1,6 @@
 package com.crispy.tv.details
 
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.model.MediaVideo
 import kotlin.math.roundToInt
 
 internal fun episodePrefix(video: MediaVideo): String? {

@@ -1,11 +1,9 @@
-package com.crispy.tv.streams
+package com.crispy.tv.addons.streams
 
 import android.content.Context
 import android.util.Log
-import com.crispy.tv.BuildConfig
-import com.crispy.tv.network.AppHttp
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.playback.StreamLookupTarget
+import com.crispy.tv.addons.lookup.StreamLookupTarget
 import java.util.Locale
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -97,35 +95,5 @@ class StreamResolver(
     companion object {
         private const val TAG = "StreamResolver"
         private const val RESOLVE_TTL_MS = 5 * 60 * 1000L
-    }
-}
-
-object StreamResolverProvider {
-    @Volatile
-    private var instance: StreamResolver? = null
-
-    fun get(context: Context): StreamResolver {
-        val existing = instance
-        if (existing != null) {
-            return existing
-        }
-        return synchronized(this) {
-            val synchronizedExisting = instance
-            if (synchronizedExisting != null) {
-                synchronizedExisting
-            } else {
-                create(context.applicationContext).also { created -> instance = created }
-            }
-        }
-    }
-
-    private fun create(appContext: Context): StreamResolver {
-        val addonStreamsService =
-            AddonStreamsService(
-                context = appContext,
-                addonManifestUrlsCsv = BuildConfig.METADATA_ADDON_URLS,
-                httpClient = AppHttp.client(appContext),
-            )
-        return StreamResolver(addonStreamsService)
     }
 }

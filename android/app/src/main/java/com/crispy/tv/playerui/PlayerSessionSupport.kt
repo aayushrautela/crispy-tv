@@ -4,7 +4,7 @@ import com.crispy.tv.TorrentResolver
 import com.crispy.tv.nativeengine.playback.PlaybackExternalSubtitle
 import com.crispy.tv.nativeengine.playback.PlaybackSource
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.addons.streams.AddonStream
 
 internal suspend fun AddonStream.toPlaybackSource(
     torrentResolver: TorrentResolver,

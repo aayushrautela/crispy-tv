@@ -143,6 +143,7 @@ dependencies {
     implementation(project(":android:network"))
     implementation(project(":android:watchhistory"))
     implementation(project(":android:backend"))
+    implementation(project(":android:addons"))
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 

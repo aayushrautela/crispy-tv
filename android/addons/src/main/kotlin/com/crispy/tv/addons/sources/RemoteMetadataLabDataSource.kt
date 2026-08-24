@@ -1,4 +1,4 @@
-package com.crispy.tv.metadata
+package com.crispy.tv.addons.sources
 
 import android.content.Context
 import com.crispy.tv.domain.metadata.AddonMetadataCandidate
@@ -9,7 +9,7 @@ import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.MetadataLabPayload
 import com.crispy.tv.player.MetadataLabRequest
 import com.crispy.tv.player.MetadataTransportStat
-import com.crispy.tv.playback.parseLookupId
+import com.crispy.tv.addons.lookup.parseLookupId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Headers
@@ -19,7 +19,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-internal class RemoteMetadataLabDataSource(
+class RemoteMetadataLabDataSource(
     context: Context,
     addonManifestUrlsCsv: String,
     private val httpClient: CrispyHttpClient,

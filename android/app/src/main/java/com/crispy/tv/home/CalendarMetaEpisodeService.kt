@@ -1,10 +1,10 @@
 package com.crispy.tv.home
 
 import android.content.Context
-import com.crispy.tv.metadata.AddonManifestSeed
-import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.addons.registry.AddonManifestSeed
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.CrispyHttpClient
-import com.crispy.tv.playback.parseLookupId
+import com.crispy.tv.addons.lookup.parseLookupId
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull

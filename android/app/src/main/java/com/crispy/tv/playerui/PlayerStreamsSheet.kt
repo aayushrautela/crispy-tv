@@ -7,11 +7,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
-import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.streams.SelectorChrome
 import com.crispy.tv.streams.SelectorCallbacks
 import com.crispy.tv.streams.StreamSelectorModal
-import com.crispy.tv.streams.StreamSelectorUiState
+import com.crispy.tv.addons.streams.StreamSelectorUiState
 
 @Composable
 internal fun PlayerStreamsSheet(

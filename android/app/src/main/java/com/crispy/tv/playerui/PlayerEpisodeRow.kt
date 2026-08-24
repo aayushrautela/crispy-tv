@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.streams.formatEpisodeReleaseDate
 
 @Composable

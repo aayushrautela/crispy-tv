@@ -47,7 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.nativeengine.playback.NativeTrack
-import com.crispy.tv.streams.AddonSubtitle
+import com.crispy.tv.addons.streams.AddonSubtitle
 import com.crispy.tv.streams.SHEET_HEIGHT_FRACTION
 import com.crispy.tv.streams.SHEET_MAX_WIDTH
 import java.util.Locale

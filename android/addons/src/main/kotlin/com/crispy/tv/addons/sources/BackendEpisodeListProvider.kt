@@ -1,11 +1,11 @@
-package com.crispy.tv.metadata
+package com.crispy.tv.addons.sources
 
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.watch.EpisodeInfo
 import com.crispy.tv.player.EpisodeListProvider
 
-internal class BackendEpisodeListProvider(
+class BackendEpisodeListProvider(
     private val supabaseAccountClient: SupabaseAccountClient,
     private val backendClient: CrispyBackendClient,
 ) : EpisodeListProvider {

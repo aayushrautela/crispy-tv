@@ -1,7 +1,7 @@
 package com.crispy.tv.playerui
 
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
 
 data class PlayerEpisodeContext(
     val season: Int?,

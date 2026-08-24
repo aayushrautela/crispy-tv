@@ -1,10 +1,8 @@
-package com.crispy.tv.streams
+package com.crispy.tv.addons.streams
 
-import androidx.compose.runtime.Immutable
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 
-@Immutable
 data class StreamProviderUiState(
     val providerId: String,
     val providerName: String,
@@ -14,7 +12,6 @@ data class StreamProviderUiState(
     val attemptedUrl: String? = null,
 )
 
-@Immutable
 data class StreamSelectorUiState(
     val visible: Boolean = false,
     val mediaType: MetadataLabMediaType? = null,

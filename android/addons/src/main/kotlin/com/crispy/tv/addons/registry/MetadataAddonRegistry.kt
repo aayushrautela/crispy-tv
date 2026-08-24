@@ -1,4 +1,4 @@
-package com.crispy.tv.metadata
+package com.crispy.tv.addons.registry
 
 import android.content.Context
 import android.net.Uri
@@ -7,7 +7,7 @@ import org.json.JSONObject
 import java.security.MessageDigest
 import java.nio.charset.StandardCharsets
 
-internal data class AddonManifestSeed(
+data class AddonManifestSeed(
     val installationId: String,
     val manifestUrl: String,
     val originalManifestUrl: String,
@@ -17,12 +17,12 @@ internal data class AddonManifestSeed(
     val cachedManifestJson: String?
 )
 
-internal data class CloudAddonRow(
+data class CloudAddonRow(
     val manifestUrl: String,
     val sortOrder: Int
 )
 
-internal class MetadataAddonRegistry(
+class MetadataAddonRegistry(
     context: Context,
     private val configuredManifestUrlsCsv: String
 ) {

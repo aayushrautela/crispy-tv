@@ -2,8 +2,8 @@ package com.crispy.tv.sync
 
 import com.crispy.tv.accounts.SupabaseAccountClient
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.metadata.CloudAddonRow
-import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.addons.registry.CloudAddonRow
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 
 /**
  * Two-way sync of the household addon roster against the account-scoped

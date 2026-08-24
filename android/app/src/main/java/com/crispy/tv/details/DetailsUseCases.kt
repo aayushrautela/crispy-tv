@@ -8,16 +8,16 @@ import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.domain.repository.CatalogRepository
 import com.crispy.tv.domain.repository.SessionRepository
 import com.crispy.tv.domain.repository.UserMediaRepository
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.toMediaDetails
-import com.crispy.tv.metadata.toMediaVideo
-import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
-import com.crispy.tv.playback.StreamLookupTarget
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.addons.mapping.toMediaDetails
+import com.crispy.tv.addons.mapping.toMediaVideo
+import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.addons.lookup.StreamLookupTarget
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.streams.StreamResolver
-import com.crispy.tv.streams.ProviderStreamsResult
-import com.crispy.tv.streams.StreamProviderDescriptor
+import com.crispy.tv.addons.streams.StreamResolver
+import com.crispy.tv.addons.streams.ProviderStreamsResult
+import com.crispy.tv.addons.streams.StreamProviderDescriptor
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 

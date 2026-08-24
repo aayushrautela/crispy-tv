@@ -2,8 +2,8 @@ package com.crispy.tv.playerui
 
 import android.util.Log
 import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.streams.AddonSubtitle
-import com.crispy.tv.streams.StreamResolver
+import com.crispy.tv.addons.streams.AddonSubtitle
+import com.crispy.tv.addons.streams.StreamResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

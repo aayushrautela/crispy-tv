@@ -4,11 +4,11 @@ import androidx.compose.runtime.Immutable
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.domain.optimistic.FieldSync
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.streams.StreamSelectorUiState
+import com.crispy.tv.addons.streams.StreamSelectorUiState
 
 @Immutable
 data class EpisodeWatchState(

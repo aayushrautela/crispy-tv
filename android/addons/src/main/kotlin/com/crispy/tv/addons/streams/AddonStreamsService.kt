@@ -1,10 +1,9 @@
-package com.crispy.tv.streams
+package com.crispy.tv.addons.streams
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.Immutable
-import com.crispy.tv.metadata.AddonManifestSeed
-import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.addons.registry.AddonManifestSeed
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.player.MetadataLabMediaType
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +24,6 @@ import java.util.Locale
 
 private const val TAG = "CrispyAddonSubs"
 
-@Immutable
 data class AddonStream(
     val providerId: String,
     val providerName: String,
@@ -67,14 +65,12 @@ data class AddonStream(
         get() = url != null || infoHash != null || externalUrl != null || clientResolve != null
 }
 
-@Immutable
 data class StreamSubtitle(
     val url: String,
     val lang: String?,
     val name: String?,
 )
 
-@Immutable
 data class StreamBehaviorHints(
     val bingeGroup: String? = null,
     val notWebReady: Boolean = false,
@@ -84,7 +80,6 @@ data class StreamBehaviorHints(
     val proxyRequestHeaders: Map<String, String>? = null,
 )
 
-@Immutable
 data class StreamClientResolve(
     val type: String? = null,
     val infoHash: String? = null,
@@ -111,12 +106,10 @@ data class StreamClientResolve(
             isCached == true
 }
 
-@Immutable
 data class StreamClientResolveStream(
     val raw: StreamClientResolveRaw? = null,
 )
 
-@Immutable
 data class StreamClientResolveRaw(
     val torrentName: String? = null,
     val filename: String? = null,
@@ -128,7 +121,6 @@ data class StreamClientResolveRaw(
     val parsed: StreamClientResolveParsed? = null,
 )
 
-@Immutable
 data class StreamClientResolveParsed(
     val rawTitle: String? = null,
     val parsedTitle: String? = null,
@@ -227,7 +219,6 @@ private fun String.encodeAddonPathSegment(): String =
         }
     }
 
-@Immutable
 data class AddonSubtitle(
     val id: String,
     val url: String,
@@ -237,7 +228,6 @@ data class AddonSubtitle(
     val isSelected: Boolean = false,
 )
 
-@Immutable
 data class ProviderStreamsResult(
     val providerId: String,
     val providerName: String,
@@ -246,7 +236,6 @@ data class ProviderStreamsResult(
     val attemptedUrl: String? = null,
 )
 
-@Immutable
 data class StreamProviderDescriptor(
     val providerId: String,
     val providerName: String,

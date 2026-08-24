@@ -1,15 +1,11 @@
-package com.crispy.tv.metadata
+package com.crispy.tv.addons.mapping
 
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.catalog.CatalogItem
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.player.MetadataLabMediaType
-import com.crispy.tv.ratings.formatRating
-import com.crispy.tv.images.toUiResponsiveImageSet
-import java.util.Locale
 
-internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
+fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): MediaDetails {
     val itemDetails = item.toMediaDetails()
     val episodeVideos = listOfNotNull(nextEpisode?.toMediaVideo())
     val mergedVideos = (episodeVideos + videos.mapNotNull { it.toMediaVideo() }).distinctBy { it.id }
@@ -23,12 +19,12 @@ internal fun CrispyBackendClient.MetadataTitleDetailResponse.toMediaDetails(): M
     )
 }
 
-internal fun CrispyBackendClient.MetadataTitleExtrasResponse.seasonNumbers(): List<Int> {
+fun CrispyBackendClient.MetadataTitleExtrasResponse.seasonNumbers(): List<Int> {
     val seasonNumbers = seasons.map { it.seasonNumber }.filter { it > 0 }.distinct().sorted()
     return seasonNumbers
 }
 
-internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
+fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
     return MediaDetails(
         id = id,
         itemId = itemId,
@@ -55,7 +51,7 @@ internal fun CrispyBackendClient.MetadataView.toMediaDetails(): MediaDetails {
     )
 }
 
-internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo? {
+fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo? {
     val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
     val season = seasonNumber
     val episode = episodeNumber
@@ -78,7 +74,7 @@ internal fun CrispyBackendClient.MetadataEpisodeView.toMediaVideo(): MediaVideo?
     )
 }
 
-internal fun CrispyBackendClient.MetadataView.toMediaVideo(): MediaVideo? {
+fun CrispyBackendClient.MetadataView.toMediaVideo(): MediaVideo? {
     val canonicalId = itemId.trim().takeIf { it.isNotBlank() } ?: return null
     val season = seasonNumber
     val episode = episodeNumber
@@ -101,7 +97,7 @@ internal fun CrispyBackendClient.MetadataView.toMediaVideo(): MediaVideo? {
     )
 }
 
-internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVideo? {
+fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVideo? {
   val canonicalId = id.trim().takeIf { it.isNotBlank() } ?: return null
   val season = seasonNumber
   val episode = episodeNumber
@@ -124,7 +120,7 @@ internal fun CrispyBackendClient.MetadataEpisodePreview.toMediaVideo(): MediaVid
   )
 }
 
-internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
+fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
     val canonicalId = id.trim().ifBlank { key.trim() }.ifBlank { return null }
     val titleText = name?.trim()?.takeIf { it.isNotBlank() } ?: type?.trim()?.takeIf { it.isNotBlank() } ?: canonicalId
     return MediaVideo(
@@ -139,17 +135,7 @@ internal fun CrispyBackendClient.MetadataVideoView.toMediaVideo(): MediaVideo? {
     )
 }
 
-internal fun buildAddonEpisodeLookupId(imdbId: String?, season: Int?, episode: Int?): String? {
-    val normalizedImdbId = imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) } ?: return null
-    if (season == null || season <= 0 || episode == null || episode <= 0) return normalizedImdbId
-    return "$normalizedImdbId:$season:$episode"
-}
-
-internal fun MediaDetails.toAddonLookupId(): String? {
-    return imdbId?.trim()?.takeIf { it.startsWith("tt", ignoreCase = true) } ?: itemId?.trim()?.ifBlank { null } ?: id.trim().ifBlank { null }
-}
-
-internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
+fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): String {
     return when {
         itemType.equals("anime", ignoreCase = true) -> "anime"
         itemType.equals("episode", ignoreCase = true) -> "episode"
@@ -158,43 +144,10 @@ internal fun CrispyBackendClient.MetadataView.normalizedCatalogMediaType(): Stri
     }
 }
 
-internal fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): String {
+fun CrispyBackendClient.MetadataCardView.normalizedCatalogMediaType(): String {
     return when {
         itemType.equals("anime", ignoreCase = true) -> "anime"
         itemType.equals("show", ignoreCase = true) || itemType.equals("tv", ignoreCase = true) -> "show"
         else -> "movie"
     }
-}
-
-internal fun CrispyBackendClient.MetadataCardView.toCatalogItem(): CatalogItem? {
-    val itemTitle = title?.trim()?.takeIf { it.isNotBlank() } ?: subtitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val normalizedItemId = itemId?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val normalizedType = normalizedCatalogMediaType()
-    val normalizedPosterUrl = images.posterUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    return CatalogItem(
-        id = normalizedItemId,
-        itemId = normalizedItemId,
-        title = itemTitle,
-        posterUrl = normalizedPosterUrl,
-        backdropUrl = images.backdropUrl,
-        logoUrl = images.logoUrl,
-        poster = images.poster.toUiResponsiveImageSet(),
-        backdrop = images.backdrop.toUiResponsiveImageSet(),
-        logo = images.logo.toUiResponsiveImageSet(),
-        addonId = "backend",
-        type = normalizedType,
-        rating = formatRating(rating),
-        year = releaseYear?.toString() ?: releaseDate?.take(4),
-        genre = genre,
-        description = summary ?: overview,
-    )
-}
-
-internal fun String?.toMetadataLabMediaTypeOrNull(): MetadataLabMediaType? {
-  return when (this?.lowercase(Locale.US)) {
-    "movie" -> MetadataLabMediaType.MOVIE
-    "series", "show", "tv" -> MetadataLabMediaType.SERIES
-    "anime" -> MetadataLabMediaType.ANIME
-    else -> null
-  }
 }

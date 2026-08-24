@@ -1,4 +1,4 @@
-package com.crispy.tv.metadata
+package com.crispy.tv.addons.sources
 
 import android.content.Context
 import com.crispy.tv.accounts.SupabaseAccountClient

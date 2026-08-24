@@ -74,8 +74,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.ratings.normalizeRatingText
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.util.normalizeRatingText
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
 import java.util.Date

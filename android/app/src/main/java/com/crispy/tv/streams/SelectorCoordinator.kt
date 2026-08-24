@@ -1,13 +1,13 @@
 package com.crispy.tv.streams
 
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.toMediaDetails
-import com.crispy.tv.playback.StreamLookupTarget
-import com.crispy.tv.playback.applyProviderResult
-import com.crispy.tv.playback.finalizeFrom
-import com.crispy.tv.playback.matchesTarget
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.addons.mapping.toMediaDetails
+import com.crispy.tv.addons.lookup.StreamLookupTarget
+import com.crispy.tv.addons.lookup.applyProviderResult
+import com.crispy.tv.addons.lookup.finalizeFrom
+import com.crispy.tv.addons.lookup.matchesTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

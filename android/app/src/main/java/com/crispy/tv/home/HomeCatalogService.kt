@@ -17,7 +17,7 @@ import com.crispy.tv.domain.home.HomeCatalogSource
 import com.crispy.tv.domain.home.buildCatalogPage
 import com.crispy.tv.domain.home.listDiscoverCatalogs
 import com.crispy.tv.domain.home.planPersonalHomeFeed
-import com.crispy.tv.ratings.formatRating
+import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.images.ResponsiveImageSet
 import com.crispy.tv.images.responsiveImageSetFromDomainMap
 import com.crispy.tv.images.toDomainMap
@@ -63,46 +63,6 @@ data class HomePrimaryFeedLoadResult(
     val heroResult: HomeHeroLoadResult = HomeHeroLoadResult(),
     val sections: List<CatalogSectionRef> = emptyList(),
     val sectionsStatusMessage: String = "",
-)
-
-@Immutable
-data class MediaDetails(
-    val id: String,
-    val itemId: String? = null,
-    val imdbId: String?,
-    val itemType: String,
-    val title: String,
-    val posterUrl: String?,
-    val backdropUrl: String?,
-    val logoUrl: String?,
-    val description: String?,
-    val genres: List<String> = emptyList(),
-    val year: String?,
-    val runtime: String?,
-    val certification: String?,
-    val rating: String?,
-    val cast: List<String> = emptyList(),
-    val directors: List<String> = emptyList(),
-    val creators: List<String> = emptyList(),
-    val videos: List<MediaVideo> = emptyList(),
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val addonId: String?,
-    val parentMediaType: String? = null,
-    val absoluteEpisodeNumber: Int? = null,
-)
-
-@Immutable
-data class MediaVideo(
-    val id: String,
-    val title: String,
-    val season: Int?,
-    val episode: Int?,
-    val released: String?,
-    val overview: String?,
-    val thumbnailUrl: String?,
-    val lookupId: String? = null,
-    val absoluteEpisodeNumber: Int? = null,
 )
 
 enum class TrailerSource { DIRECT, YOUTUBE }

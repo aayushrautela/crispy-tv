@@ -47,9 +47,9 @@ import coil3.compose.AsyncImage
 import com.crispy.tv.details.DetailsPaletteColors
 import com.crispy.tv.details.ExpandableDescription
 import com.crispy.tv.details.formatRuntimeForHeader
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.ratings.normalizeRatingText
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.addons.util.normalizeRatingText
 
 @Composable
 internal fun PlayerInfoSheet(

@@ -36,10 +36,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import com.crispy.tv.details.DetailsPaletteColors
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.streams.AddonStream
-import com.crispy.tv.streams.AddonSubtitle
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.addons.streams.AddonSubtitle
 import kotlinx.coroutines.delay
 
 @Composable

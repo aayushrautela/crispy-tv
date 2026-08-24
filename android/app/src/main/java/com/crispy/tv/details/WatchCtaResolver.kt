@@ -1,8 +1,8 @@
 package com.crispy.tv.details
 
 import com.crispy.tv.domain.repository.UserMediaRepository
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.CanonicalContinueWatchingItem
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.watchhistory.matchesMediaType

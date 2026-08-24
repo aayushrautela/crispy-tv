@@ -1,16 +1,16 @@
-package com.crispy.tv.playback
+package com.crispy.tv.addons.lookup
 
-import com.crispy.tv.home.MediaDetails
-import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.buildAddonEpisodeLookupId
-import com.crispy.tv.metadata.toAddonLookupId
-import com.crispy.tv.metadata.toMetadataLabMediaTypeOrNull
+import com.crispy.tv.addons.model.MediaDetails
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.addons.lookup.buildAddonEpisodeLookupId
+import com.crispy.tv.addons.lookup.toAddonLookupId
+import com.crispy.tv.addons.lookup.toMetadataLabMediaTypeOrNull
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.streams.AddonStream
-import com.crispy.tv.streams.ProviderStreamsResult
-import com.crispy.tv.streams.StreamProviderUiState
-import com.crispy.tv.streams.StreamSelectorUiState
+import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.addons.streams.StreamProviderUiState
+import com.crispy.tv.addons.streams.StreamSelectorUiState
+import com.crispy.tv.addons.streams.ProviderStreamsResult
 import java.util.Locale
 
 data class StreamLookupTarget(

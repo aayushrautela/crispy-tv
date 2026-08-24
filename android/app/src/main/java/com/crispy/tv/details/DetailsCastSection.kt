@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.crispy.tv.R
-import com.crispy.tv.ratings.formatRatingOutOfTen
+import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 
 @Composable

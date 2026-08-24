@@ -43,8 +43,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.home.HomeCatalogPosterCard
-import com.crispy.tv.home.MediaVideo
-import com.crispy.tv.metadata.toCatalogItem
+import com.crispy.tv.addons.model.MediaVideo
+import com.crispy.tv.catalog.toCatalogItem
 import com.crispy.tv.ui.components.skeletonElement
 import com.crispy.tv.ui.theme.Dimensions
 

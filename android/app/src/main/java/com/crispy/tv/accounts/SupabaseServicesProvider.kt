@@ -7,7 +7,7 @@ import com.crispy.tv.backend.BackendServicesProvider
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.home.RecommendationCatalogDiskCacheStore
 import com.crispy.tv.home.HomeCatalogService
-import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.network.AppHttp
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.sync.ProfileDataCloudSync

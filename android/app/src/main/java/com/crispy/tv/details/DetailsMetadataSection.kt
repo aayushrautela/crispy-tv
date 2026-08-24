@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.addons.model.MediaDetails
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale

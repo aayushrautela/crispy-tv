@@ -8,7 +8,7 @@ import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCard
 import com.crispy.tv.backend.CrispyBackendClient.ClientMediaCardQueryResult
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.images.toUiResponsiveImageSet
-import com.crispy.tv.ratings.formatRating
+import com.crispy.tv.addons.util.formatRating
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

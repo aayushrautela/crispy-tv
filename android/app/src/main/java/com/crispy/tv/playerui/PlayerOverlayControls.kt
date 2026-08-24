@@ -49,9 +49,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.crispy.tv.details.DetailsPaletteColors
-import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.ui.components.skeletonElement
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.nativeengine.playback.PlayerResizeMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

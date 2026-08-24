@@ -71,8 +71,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.settings.PlaybackSettings
-import com.crispy.tv.streams.AddonStream
-import com.crispy.tv.home.MediaVideo
+import com.crispy.tv.addons.streams.AddonStream
+import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.home.TrailerSource
 import com.crispy.tv.home.classifyTrailerSource
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding

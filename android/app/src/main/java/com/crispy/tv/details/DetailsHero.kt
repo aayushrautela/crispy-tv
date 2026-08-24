@@ -67,7 +67,7 @@ import com.crispy.tv.ui.components.SharedImageMemoryKeys
 import com.crispy.tv.R
 import com.crispy.tv.details.trailer.TrailerPlaybackSource
 import com.crispy.tv.details.trailer.YouTubeTrailerExtractor
-import com.crispy.tv.home.MediaDetails
+import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.ui.components.CardStyle
 import com.crispy.tv.ui.components.crispyImageRequest
 import com.crispy.tv.ui.components.rememberCrispyImageModel

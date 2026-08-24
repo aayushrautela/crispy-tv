@@ -1,6 +1,6 @@
 package com.crispy.tv.playerui
 
-import com.crispy.tv.streams.AddonStream
+import com.crispy.tv.addons.streams.AddonStream
 import java.util.UUID
 
 /**

@@ -62,8 +62,8 @@ import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.components.StandardTopAppBar
 import com.crispy.tv.ui.theme.Dimensions
 import com.crispy.tv.ui.theme.responsivePageHorizontalPadding
-import com.crispy.tv.metadata.CloudAddonRow
-import com.crispy.tv.metadata.MetadataAddonRegistry
+import com.crispy.tv.addons.registry.CloudAddonRow
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import com.crispy.tv.sync.HouseholdAddonsCloudSync
 import com.crispy.tv.ui.utils.appBarScrollBehavior
 import kotlinx.coroutines.Dispatchers
