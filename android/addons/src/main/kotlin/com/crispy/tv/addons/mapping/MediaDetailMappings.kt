@@ -1,5 +1,6 @@
 package com.crispy.tv.addons.mapping
 
+import com.crispy.tv.addons.lookup.buildAddonEpisodeLookupId
 import com.crispy.tv.addons.model.MediaDetails
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.addons.util.formatRating

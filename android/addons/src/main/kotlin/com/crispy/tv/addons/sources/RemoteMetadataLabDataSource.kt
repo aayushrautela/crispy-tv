@@ -10,6 +10,8 @@ import com.crispy.tv.player.MetadataLabPayload
 import com.crispy.tv.player.MetadataLabRequest
 import com.crispy.tv.player.MetadataTransportStat
 import com.crispy.tv.addons.lookup.parseLookupId
+import com.crispy.tv.addons.registry.AddonManifestSeed
+import com.crispy.tv.addons.registry.MetadataAddonRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Headers
