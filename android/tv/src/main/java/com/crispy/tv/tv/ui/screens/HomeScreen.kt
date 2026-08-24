@@ -22,6 +22,7 @@ import com.crispy.tv.tv.ui.components.RailSection
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    onOpenItem: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -59,7 +60,7 @@ fun HomeScreen(
                     RailSection(
                         title = rail.title,
                         items = rail.items,
-                        onItemClick = {},
+                        onItemClick = { item -> onOpenItem(item.id) },
                     )
                 }
                 if (!state.loading && state.rails.isEmpty()) {

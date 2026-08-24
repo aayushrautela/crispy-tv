@@ -14,6 +14,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import android.app.Application
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.crispy.tv.tv.home.HomeViewModel
@@ -22,6 +24,8 @@ import com.crispy.tv.tv.session.TvSessionViewModel
 import com.crispy.tv.tv.ui.components.SidebarNavigation
 import com.crispy.tv.tv.ui.navigation.TvDestination
 import com.crispy.tv.tv.ui.screens.HomeScreen
+import com.crispy.tv.tv.ui.screens.detail.DetailScreen
+import com.crispy.tv.tv.ui.screens.detail.DetailViewModel
 import com.crispy.tv.tv.ui.screens.LibraryScreen
 import com.crispy.tv.tv.ui.screens.SearchScreen
 import com.crispy.tv.tv.ui.screens.SettingsScreen
@@ -99,7 +103,26 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
             startDestination = TvDestination.default.route,
             modifier = Modifier.fillMaxSize(),
         ) {
-            composable(TvDestination.Home.route) { HomeScreen(viewModel = homeViewModel) }
+            composable(TvDestination.Home.route) {
+                HomeScreen(
+                    viewModel = homeViewModel,
+                    onOpenItem = { itemId -> navController.navigate("detail/$itemId") },
+                )
+            }
+            composable("detail/{itemId}") { entry ->
+                val itemId = entry.arguments?.getString("itemId").orEmpty()
+                val app = LocalContext.current.applicationContext as Application
+                val detailViewModel: DetailViewModel = viewModel(
+                    key = "detail-$itemId",
+                    initializer = { DetailViewModel(app, itemId) },
+                )
+                DetailScreen(
+                    state = detailViewModel.state.collectAsStateWithLifecycle().value,
+                    onSelectSeason = detailViewModel::selectSeason,
+                    onOpenItem = { nextId -> navController.navigate("detail/$nextId") },
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable(TvDestination.Search.route) { SearchScreen() }
             composable(TvDestination.Library.route) { LibraryScreen() }
             composable(TvDestination.Settings.route) { SettingsScreen() }
