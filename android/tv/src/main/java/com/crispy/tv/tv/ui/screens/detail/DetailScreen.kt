@@ -84,6 +84,9 @@ fun DetailScreen(
                 onSelectSeason = onSelectSeason,
                 onOpenItem = onOpenItem,
                 onPlay = onPlay,
+                onToggleWatchlist = onToggleWatchlist,
+                onToggleWatched = onToggleWatched,
+                onToggleEpisodeWatched = onToggleEpisodeWatched,
                 modifier = modifier,
             )
         }

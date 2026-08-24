@@ -48,6 +48,7 @@ data class CrispyCardItem(
     val year: String? = null,
     val certification: String? = null,
     val genre: String? = null,
+    val description: String? = null,
     val progressFraction: Float? = null,
     val watched: Boolean = false,
     val badge: String? = null,

@@ -86,6 +86,11 @@ data class DetailUiState(
     val userRating: Int? = null,
 )
 
+data class EpisodeWatchStateUi(
+    val progressPercent: Double = 0.0,
+    val isWatched: Boolean = false,
+)
+
 data class CastMemberUi(
     val personId: String,
     val name: String,

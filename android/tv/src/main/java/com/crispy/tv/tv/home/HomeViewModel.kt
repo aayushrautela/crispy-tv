@@ -157,6 +157,7 @@ private fun CrispyBackendClient.ClientMediaCard.toCardItem(): CrispyCardItem {
         year = year?.toString(),
         certification = maturityRating,
         genre = genres.firstOrNull(),
+        description = overview ?: summary,
         badge = metaSubtitle?.takeIf { isEpisode },
         progressFraction = fraction,
     )
@@ -176,6 +177,7 @@ private fun CrispyBackendClient.UpNextItem.toCardItem(): CrispyCardItem? {
             .filter { it.isNotBlank() }
             .joinToString(" · "),
         imageUrl = showBackdropUrl ?: showPosterUrl,
+        description = reason,
     )
 }
 
@@ -191,4 +193,5 @@ private fun CrispyBackendClient.MediaItem.toCardItem(): CrispyCardItem =
         logoUrl = logo.large ?: logo.medium ?: logo.small,
         rating = rating?.let { formatRating(it) },
         genre = genres.firstOrNull(),
+        description = overview ?: summary,
     )
