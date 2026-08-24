@@ -2,6 +2,7 @@ package com.crispy.tv.playerui
 
 import android.content.Context
 import android.os.Looper
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -10,6 +11,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.source.SinglePeriodTimeline
 import com.crispy.tv.nativeengine.playback.NativePlaybackSnapshot
 import com.crispy.tv.nativeengine.playback.NativePlaybackState
@@ -25,6 +27,7 @@ import com.google.common.util.concurrent.ListenableFuture
  * [SimpleBasePlayer] that mirrors the controller's snapshot into [getState] and forwards transport
  * commands to the controller. Media3 then owns all external session/notification state syncing.
  */
+@OptIn(UnstableApi::class)
 internal class PlaybackSessionControllerPlayer(
     context: Context,
     private val controller: PlaybackSessionController,

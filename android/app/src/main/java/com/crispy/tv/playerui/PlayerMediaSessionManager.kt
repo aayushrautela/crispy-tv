@@ -10,9 +10,11 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaStyleNotificationHelper
 import coil3.imageLoader
@@ -42,6 +44,7 @@ import kotlinx.coroutines.withContext
  * Main-thread contract: [obtain] and [release] construct/tear down binder-backed session objects
  * and must be called on the main looper.
  */
+@OptIn(UnstableApi::class)
 internal class PlayerMediaSessionManager private constructor(
     context: Context,
     private val playbackController: PlaybackSessionController,
@@ -167,7 +170,13 @@ internal class PlayerMediaSessionManager private constructor(
         released = true
         Log.d(TAG, "release title=$currentTitle")
         artworkJob?.cancel()
-        NotificationManagerCompat.from(appContext).cancel(NOTIFICATION_ID)
+        if (
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            NotificationManagerCompat.from(appContext).cancel(NOTIFICATION_ID)
+        }
         if (activeInstance === this) {
             activeInstance = null
         }
@@ -232,7 +241,11 @@ internal class PlayerMediaSessionManager private constructor(
     }
 
     private fun publishNotification(force: Boolean = false) {
-        if (!canPostNotifications()) {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
             Log.w(TAG, "notification suppressed: POST_NOTIFICATIONS not granted")
             return
         }
@@ -317,12 +330,6 @@ internal class PlayerMediaSessionManager private constructor(
             return null
         }
         return out.toByteArray()
-    }
-
-    private fun canPostNotifications(): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
     }
 
     private fun ensureNotificationChannel() {
