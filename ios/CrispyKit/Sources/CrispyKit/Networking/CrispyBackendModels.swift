@@ -480,3 +480,12 @@ public struct MetadataCompany: Equatable, Identifiable {
     public let name: String
     public let logoUrl: String?
 }
+
+public struct WatchState: Equatable {
+    public let itemId: String
+    public let played: Bool
+    public let playCount: Int
+    public let resumePositionSeconds: Double?
+    public let durationSeconds: Double?
+    public let progressPercent: Double?
+}

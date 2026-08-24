@@ -18,6 +18,9 @@ public let itemType: String
     public private(set) var isLoadingDetail = true
     public private(set) var isLoadingEpisodes = false
     public private(set) var errorMessage = ""
+    public private(set) var watchState: WatchState?
+    public private(set) var ctaLabel = "Play"
+    public private(set) var ctaIconSystemName = "play.fill"
 
     private var extrasLoaded = false
 
@@ -26,7 +29,17 @@ public init(itemId: String, itemType: String) {
         self.itemType = itemType
     }
 
-public func loadIfNeeded(environment: AppEnvironment) async {
+    fileprivate static func makeCard(_ card: MetadataCard) -> MediaCard {
+        MediaCard(
+            itemId: card.itemId, type: card.itemType, title: card.title,
+            posterUrl: card.images.posterUrl, backdropUrl: card.images.backdropUrl, logoUrl: card.images.logoUrl,
+            ratingText: formatRating(card.rating), yearText: card.releaseYear.map(String.init),
+            genre: nil, maturityRating: nil, description: nil,
+            progressPercent: nil, parentSeriesId: nil, watchlisted: false
+        )
+    }
+
+    public func loadIfNeeded(environment: AppEnvironment) async {
         guard detail == nil else { return }
         await load(environment: environment)
     }
@@ -67,12 +80,39 @@ public func load(environment: AppEnvironment) async {
             }
             extrasLoaded = true
 
+            if let context2 = await environment.backendContext() {
+                watchState = try? await environment.backend.getWatchState(
+                    accessToken: context2.accessToken,
+                    profileId: context2.profileId,
+                    itemId: itemId
+                )
+                resolveCta()
+            }
+
             if isShow {
                 let targetSeason = selectedSeasonNumber ?? seasons.first?.seasonNumber ?? 1
                 await selectSeason(targetSeason, environment: environment)
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Mirrors WatchCtaResolver: continue (2–85%) → Rewatch (played) → Watch now.
+    private func resolveCta() {
+        guard let state = watchState else { return }
+        let percent = state.progressPercent
+        let hasResume = (state.resumePositionSeconds ?? 0) > 0
+        let usableContinue = (percent.map { $0 >= 2 && $0 < 85 } ?? false) || (percent == nil && hasResume)
+        if usableContinue {
+            ctaLabel = "Resume"
+            ctaIconSystemName = "play.fill"
+        } else if state.played {
+            ctaLabel = "Rewatch"
+            ctaIconSystemName = "arrow.clockwise"
+        } else {
+            ctaLabel = "Watch now"
+            ctaIconSystemName = "play.fill"
         }
     }
 

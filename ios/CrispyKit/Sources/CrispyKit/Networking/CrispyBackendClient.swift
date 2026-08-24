@@ -284,6 +284,24 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         }
     }
 
+    public func getWatchState(accessToken: String, profileId: String, itemId: String) async throws -> WatchState {
+        var components = try queryComponents(path: "/v1/profiles/\(profileId)/watch/state")
+        components.queryItems = [
+            URLQueryItem(name: "itemId", value: itemId.trimmingCharacters(in: .whitespacesAndNewlines)),
+            URLQueryItem(name: "extended", value: "true"),
+        ]
+        let json = try await getJson(url: try requireURL(components.url), accessToken: accessToken)
+        let progress = ClientProgress.parse(json.jsonObject("progress"))
+        return WatchState(
+            itemId: json.jsonString("itemId") ?? itemId,
+            played: progress?.played ?? false,
+            playCount: progress?.playCount ?? 0,
+            resumePositionSeconds: progress?.positionSeconds.map(Double.init),
+            durationSeconds: progress?.durationSeconds.map(Double.init),
+            progressPercent: progress?.percent ?? resolvedPercent(position: progress?.positionSeconds, duration: progress?.durationSeconds)
+        )
+    }
+
     // MARK: - Metadata / details
 
 public func getMetadataItemDetail(accessToken: String, itemId: String) async throws -> MetadataTitleDetail {
@@ -727,4 +745,9 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             details: nil
         )
     }
+}
+
+private func resolvedPercent(position: Int?, duration: Int?) -> Double? {
+    guard let position, let duration, duration > 0 else { return nil }
+    return min(max(Double(position) / Double(duration) * 100.0, 0), 100)
 }
