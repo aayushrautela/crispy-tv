@@ -10,6 +10,16 @@ android {
         minSdk = 26
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+        }
+        create("foss") {
+            dimension = "distribution"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -21,5 +31,5 @@ dependencies {
 
     api("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    fossImplementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
 }

@@ -4,6 +4,7 @@ plugins {
 
 android {
     namespace = "com.crispy.tv.watchhistory"
+    missingDimensionStrategy("distribution", "foss")
     compileSdk = 37
 
     defaultConfig {

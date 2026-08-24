@@ -60,6 +60,17 @@ android {
         buildConfigField("String", "METADATA_ADDON_URLS", "\"$metadataAddonUrls\"")
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+        }
+        create("foss") {
+            dimension = "distribution"
+            versionNameSuffix = "-foss"
+        }
+    }
+
     splits {
         abi {
             isEnable = true

@@ -75,6 +75,7 @@ import com.crispy.tv.addons.streams.AddonStream
 import com.crispy.tv.addons.model.MediaVideo
 import com.crispy.tv.details.trailer.TrailerSource
 import com.crispy.tv.details.trailer.classifyTrailerSource
+import com.crispy.tv.details.trailer.extractYouTubeVideoId
 import com.crispy.tv.ui.edge_to_edge.safeBottomPadding
 import com.crispy.tv.ui.navigation.LocalNavAnimatedContentScope
 import com.crispy.tv.ui.navigation.animateContentAlpha
@@ -199,6 +200,11 @@ internal fun DetailsScreen(
 
         if (trailerKey.isNullOrBlank()) return@LaunchedEffect
         if (!playbackSettings.trailerAutoplayEnabled) return@LaunchedEffect
+        if (!YouTubeInHeroPlaybackSupported &&
+            heroTrailerSources.firstOrNull()?.source == TrailerSource.YOUTUBE
+        ) {
+            return@LaunchedEffect
+        }
 
         delay(2000)
         showTrailer = true
@@ -227,6 +233,7 @@ internal fun DetailsScreen(
     val contentColor = lerp(Color.White, palette.onPageBackground, topBarAlpha)
 
     var selectedMakingOfVideo by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
+    var selectedTrailerEmbed by remember { mutableStateOf<CrispyBackendClient.MetadataVideoView?>(null) }
     var expandedReview by remember { mutableStateOf<CrispyBackendClient.MetadataReviewView?>(null) }
     var selectedEpisodeAction by remember { mutableStateOf<MediaVideo?>(null) }
     val reviewSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
@@ -264,7 +271,10 @@ internal fun DetailsScreen(
                         onHeroImageLoadFailed = {},
                         onToggleTrailer = {
                             if (!trailerKey.isNullOrBlank()) {
-                                if (!showTrailer) {
+                                val primary = heroTrailerSources.firstOrNull()
+                                if (!YouTubeInHeroPlaybackSupported && primary?.source == TrailerSource.YOUTUBE) {
+                                    selectedTrailerEmbed = primary.toEmbeddedVideo()
+                                } else if (!showTrailer) {
                                     showTrailer = true
                                     userPausedTrailer = false
                                 } else {
@@ -354,6 +364,11 @@ internal fun DetailsScreen(
             YouTubeExtraVideoDialog(
                 video = selectedMakingOfVideo,
                 onDismiss = { selectedMakingOfVideo = null },
+            )
+
+            YouTubeExtraVideoDialog(
+                video = selectedTrailerEmbed,
+                onDismiss = { selectedTrailerEmbed = null },
             )
 
             StreamSelectorBottomSheet(
@@ -512,3 +527,16 @@ internal fun DetailsScreen(
         }
     }
 }
+
+private fun HeroTrailerSource.toEmbeddedVideo(): CrispyBackendClient.MetadataVideoView =
+    CrispyBackendClient.MetadataVideoView(
+        id = id,
+        key = extractYouTubeVideoId(id) ?: id,
+        name = "Trailer",
+        site = "YouTube",
+        type = "Trailer",
+        official = true,
+        publishedAt = null,
+        url = null,
+        thumbnailUrl = null,
+    )

@@ -4,6 +4,7 @@ plugins {
 
 android {
     namespace = "com.crispy.tv.nativeengine"
+    missingDimensionStrategy("distribution", "foss")
     compileSdk = 37
 
     defaultConfig {

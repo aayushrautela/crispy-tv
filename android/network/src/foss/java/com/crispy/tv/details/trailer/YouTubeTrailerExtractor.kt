@@ -20,11 +20,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
-data class TrailerPlaybackSource(
-    val videoUrl: String,
-    val audioUrl: String? = null,
-)
-
 object YouTubeTrailerExtractor {
     private val cache = ConcurrentHashMap<String, TrailerPlaybackSource>()
     private val initLock = Any()
@@ -39,8 +34,7 @@ object YouTubeTrailerExtractor {
         viewportWidthPx: Int,
         viewportHeightPx: Int,
     ): TrailerPlaybackSource? {
-        val key = normalizeVideoId(videoId)
-        if (key.isBlank()) return null
+        val key = extractYouTubeVideoId(videoId) ?: return null
         val cacheKey = buildCacheKey(key, viewportWidthPx, viewportHeightPx)
         cache[cacheKey]?.let { return it }
 
@@ -51,13 +45,6 @@ object YouTubeTrailerExtractor {
             val info = StreamInfo.getInfo(url)
             pickBestSource(info, viewportWidthPx)
         }.getOrNull()?.also { cache[cacheKey] = it }
-    }
-
-    /** Accepts bare ids plus watch/shorts/embed/youtu.be links. */
-    private fun normalizeVideoId(value: String): String {
-        val trimmed = value.trim()
-        if (!trimmed.contains("youtu", ignoreCase = true)) return trimmed
-        return VIDEO_ID_REGEX.find(trimmed)?.groupValues?.getOrNull(1) ?: trimmed
     }
 
     private fun ensureInitialized() {
@@ -218,7 +205,6 @@ object YouTubeTrailerExtractor {
 
     private val HEIGHT_REGEX = Regex("(\\d{2,4})p")
     private val DIMENSION_REGEX = Regex("(\\d{2,4})x(\\d{2,4})")
-    private val VIDEO_ID_REGEX = Regex("(?:[?&]v=|youtu\\.be/|/shorts/|/embed/)([A-Za-z0-9_-]{6,})")
 
     private object OkHttpNewPipeDownloader : Downloader() {
         private val client =

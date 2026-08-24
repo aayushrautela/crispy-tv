@@ -68,7 +68,7 @@ jobs:
         run: gradle :android:contract-tests:test
 
       - name: Lint Android app
-        run: gradle :android:app:lintDebug
+        run: gradle :android:app:lintPlayDebug :android:app:lintFossDebug
 
       - name: Upload lint reports
         if: failure()
@@ -76,40 +76,47 @@ jobs:
         with:
           name: lint-reports-app-debug
           path: |
-            android/app/build/reports/lint-results-debug.txt
-            android/app/build/reports/lint-results-debug.html
-            android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            android/app/build/reports/lint-results-*Debug.txt
+            android/app/build/reports/lint-results-*Debug.html
+            android/app/build/intermediates/lint_intermediate_text_report/*/lintReport*/lint-results-*.txt
           if-no-files-found: warn
 
       - name: Assemble Android app
-        run: gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest
+        run: gradle :android:app:assemblePlayDebug :android:app:assembleFossDebug :android:app:assemblePlayDebugAndroidTest :android:app:assembleFossDebugAndroidTest
 
-      - name: Upload app APK
+      - name: Upload play-flavor APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-universal
-          path: android/app/build/outputs/apk/debug/*-universal-*.apk
+          name: crispy-rewrite-app-debug-play-universal
+          path: android/app/build/outputs/apk/play/debug/*-universal-*.apk
           if-no-files-found: warn
 
-      - name: Upload arm64-v8a APK
+      - name: Upload foss-flavor APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-arm64-v8a
-          path: android/app/build/outputs/apk/debug/*-arm64-v8a-*.apk
+          name: crispy-rewrite-app-debug-foss-universal
+          path: android/app/build/outputs/apk/foss/debug/*-universal-*.apk
           if-no-files-found: warn
 
-      - name: Upload armeabi-v7a APK
+      - name: Upload foss arm64-v8a APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-armeabi-v7a
-          path: android/app/build/outputs/apk/debug/*-armeabi-v7a-*.apk
+          name: crispy-rewrite-app-debug-foss-arm64-v8a
+          path: android/app/build/outputs/apk/foss/debug/*-arm64-v8a-*.apk
           if-no-files-found: warn
 
-      - name: Upload x86_64 APK
+      - name: Upload foss armeabi-v7a APK
         uses: actions/upload-artifact@v6
         with:
-          name: crispy-rewrite-app-debug-x86_64
-          path: android/app/build/outputs/apk/debug/*-x86_64-*.apk
+          name: crispy-rewrite-app-debug-foss-armeabi-v7a
+          path: android/app/build/outputs/apk/foss/debug/*-armeabi-v7a-*.apk
+          if-no-files-found: warn
+
+      - name: Upload foss x86_64 APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: crispy-rewrite-app-debug-foss-x86_64
+          path: android/app/build/outputs/apk/foss/debug/*-x86_64-*.apk
           if-no-files-found: warn
 
   apple:
