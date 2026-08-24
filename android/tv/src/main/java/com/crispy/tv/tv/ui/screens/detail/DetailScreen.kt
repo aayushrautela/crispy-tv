@@ -3,6 +3,7 @@ package com.crispy.tv.tv.ui.screens.detail
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,6 +38,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,18 +48,24 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import com.crispy.tv.tv.R
 import com.crispy.tv.tv.ui.components.CrispyLandscapeCard
 import com.crispy.tv.tv.ui.components.RailSection
 import com.crispy.tv.tv.ui.components.skeletonElement
 import com.crispy.tv.tv.ui.theme.rememberDetailsSeedColor
 import com.crispy.tv.tv.ui.theme.rememberDetailsTvColorScheme
+import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Slider
+import androidx.compose.material3.TextButton
 
-private val ScreenPadding = 48.dp
+internal val ScreenPadding = 48.dp
 
 @Composable
 fun DetailScreen(
@@ -67,6 +77,9 @@ fun DetailScreen(
     onToggleWatchlist: () -> Unit = {},
     onToggleWatched: () -> Unit = {},
     onToggleEpisodeWatched: (DetailEpisodeUi) -> Unit = {},
+    onAiInsightsClick: () -> Unit = {},
+    onDismissAiInsights: () -> Unit = {},
+    onSetRating: (Int?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val seed by rememberDetailsSeedColor(
@@ -88,6 +101,9 @@ fun DetailScreen(
                 onToggleWatchlist = onToggleWatchlist,
                 onToggleWatched = onToggleWatched,
                 onToggleEpisodeWatched = onToggleEpisodeWatched,
+                onAiInsightsClick = onAiInsightsClick,
+                onDismissAiInsights = onDismissAiInsights,
+                onSetRating = onSetRating,
                 modifier = modifier,
             )
         }
@@ -146,16 +162,93 @@ private fun DetailContent(
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onToggleEpisodeWatched: (DetailEpisodeUi) -> Unit,
+    onAiInsightsClick: () -> Unit,
+    onDismissAiInsights: () -> Unit,
+    onSetRating: (Int?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scroll = rememberScrollState()
-    var aiSlideExpanded by remember { mutableStateOf<AiSlideUi?>(null) }
+    var expandedReview by remember { mutableStateOf<ReviewUi?>(null) }
+    var showRatingDialog by remember { mutableStateOf(false) }
+    var pendingRating by remember { mutableStateOf(0f) }
+    val context = LocalContext.current
+
+    if (showRatingDialog) {
+        androidx.compose.material3.MaterialTheme(
+            colorScheme = androidx.compose.material3.darkColorScheme(
+                primary = MaterialTheme.colorScheme.primary,
+                onPrimary = MaterialTheme.colorScheme.onPrimary,
+                secondaryContainer = MaterialTheme.colorScheme.secondaryContainer,
+                onSecondaryContainer = MaterialTheme.colorScheme.onSecondaryContainer,
+                background = MaterialTheme.colorScheme.surface,
+                onBackground = MaterialTheme.colorScheme.onSurface,
+                surface = MaterialTheme.colorScheme.surface,
+                onSurface = MaterialTheme.colorScheme.onSurface,
+                onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+            AlertDialog(
+                onDismissRequest = { showRatingDialog = false },
+                title = { Text("Rate") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = if (pendingRating.roundToInt() == 0) "No rating" else "${pendingRating.roundToInt()}/10",
+                        )
+                        Slider(
+                            value = pendingRating,
+                            onValueChange = { pendingRating = it },
+                            valueRange = 0f..10f,
+                            steps = 9,
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val ratingInt = pendingRating.roundToInt().coerceIn(0, 10)
+                            onSetRating(if (ratingInt == 0) null else ratingInt)
+                            showRatingDialog = false
+                        },
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(
+                            onClick = {
+                                onSetRating(null)
+                                showRatingDialog = false
+                            },
+                            enabled = pendingRating.roundToInt() != 0,
+                        ) {
+                            Text("Clear")
+                        }
+                        TextButton(onClick = { showRatingDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                },
+            )
+        }
+    }
+
+    if (state.aiStoryVisible && state.aiInsights != null) {
+        AiInsightsStoryOverlay(
+            result = state.aiInsights,
+            title = state.title,
+            backdropUrl = state.backdropUrl,
+            posterUrl = null,
+            onDismiss = onDismissAiInsights,
+        )
+    }
+
+    if (expandedReview != null) {
+        ReviewOverlay(review = expandedReview!!, onDismiss = { expandedReview = null })
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        aiSlideExpanded?.let { slide ->
-            AiInsightOverlay(slide = slide, onDismiss = { aiSlideExpanded = null })
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -216,21 +309,6 @@ private fun DetailContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (state.ratingBadges.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.ratingBadges.forEach { badge ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                            ) {
-                                Text(badge, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     SmartPlayButton(
@@ -250,14 +328,33 @@ private fun DetailContent(
                         active = state.isWatched,
                         onClick = onToggleWatched,
                     )
-                    if (state.userRating != null) {
-                        HeaderActionButton(
-                            label = "Your rating ${state.userRating}",
-                            icon = Icons.Filled.Star,
-                            active = true,
-                            onClick = {},
-                        )
-                    }
+                    HeaderActionButton(
+                        label = if (state.isRated && state.userRating != null) {
+                            "Rated ${state.userRating}"
+                        } else {
+                            "Rate"
+                        },
+                        icon = Icons.Filled.Star,
+                        active = state.isRated,
+                        onClick = {
+                            pendingRating = (state.userRating ?: 0).toFloat()
+                            showRatingDialog = true
+                        },
+                    )
+                    HeaderActionButton(
+                        label = "Share",
+                        icon = Icons.Filled.Share,
+                        active = false,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, "Check out ${state.title} on Crispy")
+                            }
+                            runCatching {
+                                context.startActivity(Intent.createChooser(intent, "Share ${state.title}"))
+                            }
+                        },
+                    )
                 }
             }
         }
@@ -294,17 +391,29 @@ private fun DetailContent(
             }
         }
 
-        if (state.aiSlides.isNotEmpty() || state.aiLoading) {
-            Spacer(Modifier.height(24.dp))
-            AiInsightsRail(slides = state.aiSlides, loading = state.aiLoading, onExpand = { aiSlideExpanded = it })
+        Spacer(Modifier.height(20.dp))
+        AiInsightsButton(
+            isLoading = state.aiLoading,
+            onClick = onAiInsightsClick,
+            modifier = Modifier.padding(horizontal = ScreenPadding),
+        )
+        if (state.aiUnavailable) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "AI insights are unavailable right now.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = ScreenPadding),
+            )
         }
 
-        if (state.ratingBadges.isNotEmpty()) {
-            Spacer(Modifier.height(20.dp))
-            RatingsSection(badges = state.ratingBadges)
-        }
+        Spacer(Modifier.height(20.dp))
+        RatingsPillsSection(
+            itemRating = state.itemRating,
+            titleRatings = state.titleRatings,
+        )
 
-        // Body order mirrors the phone app: Cast & Crew, Reviews, Production,
+        // Body order mirrors the phone app: Ratings, Cast & Crew, Reviews, Production,
         // Episodes, Making of, Collection, More like this, details rows.
         if (state.cast.isNotEmpty()) {
             Spacer(Modifier.height(24.dp))
@@ -313,7 +422,10 @@ private fun DetailContent(
 
         if (state.reviews.isNotEmpty()) {
             Spacer(Modifier.height(24.dp))
-            ReviewsRail(reviews = state.reviews)
+            ReviewsRail(
+                reviews = state.reviews,
+                onExpand = { expandedReview = it },
+            )
         }
 
         if (state.production.isNotEmpty()) {
@@ -401,110 +513,6 @@ private fun SmartPlayButton(
             color = MaterialTheme.colorScheme.onPrimary,
             fontSize = 17.sp,
         )
-    }
-}
-
-@Composable
-private fun AiInsightsRail(
-    slides: List<AiSlideUi>,
-    loading: Boolean,
-    onExpand: (AiSlideUi) -> Unit,
-) {
-    Column {
-        Text(
-            text = "AI Insights",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 12.dp),
-        )
-        if (loading && slides.isEmpty()) {
-            Text(
-                text = "Generating insights…",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = ScreenPadding),
-            )
-            return
-        }
-        if (slides.isEmpty()) return
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(horizontal = ScreenPadding),
-        ) {
-            items(slides, key = { it.id }) { slide ->
-                var focused by remember { mutableStateOf(false) }
-                Column(
-                    modifier = Modifier
-                        .width(280.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (focused) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            },
-                        )
-                        .onFocusChanged { focused = it.isFocused }
-                        .clickable { onExpand(slide) }
-                        .padding(16.dp),
-                ) {
-                    Text(
-                        text = slide.label.uppercase(),
-                        fontSize = 12.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    slide.tag?.let { tag ->
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = tag,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = slide.body,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AiInsightOverlay(slide: AiSlideUi, onDismiss: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .clickable(onClick = onDismiss),
-    ) {
-        Column(
-            modifier = Modifier
-                .width(520.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(28.dp),
-        ) {
-            Text(
-                text = slide.label.uppercase(),
-                fontSize = 13.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = slide.body,
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
-            )
-        }
     }
 }
 
@@ -846,31 +854,10 @@ private fun HeaderActionButton(
 }
 
 @Composable
-private fun RatingsSection(badges: List<String>) {
-    Column(modifier = Modifier.padding(horizontal = ScreenPadding)) {
-        Text(
-            text = "Ratings",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            badges.forEach { badge ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                ) {
-                    Text(badge, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReviewsRail(reviews: List<ReviewUi>) {
+private fun ReviewsRail(
+    reviews: List<ReviewUi>,
+    onExpand: (ReviewUi) -> Unit,
+) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(horizontal = ScreenPadding),
@@ -889,7 +876,7 @@ private fun ReviewsRail(reviews: List<ReviewUi>) {
                         },
                     )
                     .onFocusChanged { focused = it.isFocused }
-                    .clickable { }
+                    .clickable { onExpand(review) }
                     .padding(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -903,7 +890,9 @@ private fun ReviewsRail(reviews: List<ReviewUi>) {
                     )
                     review.rating?.let { rating ->
                         Text(rating, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
                     }
+                    ReviewProviderBadge(provider = review.provider)
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -914,6 +903,97 @@ private fun ReviewsRail(reviews: List<ReviewUi>) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ReviewProviderBadge(provider: String) {
+    val logoRes = when (provider.trim().lowercase()) {
+        "tmdb" -> R.raw.tmdb
+        "trakt" -> R.raw.trakt
+        else -> null
+    } ?: return
+    AsyncImage(
+        model = logoRes,
+        contentDescription = provider,
+        modifier = Modifier.size(20.dp),
+    )
+}
+
+@Composable
+private fun ReviewOverlay(review: ReviewUi, onDismiss: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.72f))
+            .clickable(onClick = onDismiss),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .width(560.dp)
+                .heightIn(max = 620.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                )
+                .padding(28.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = review.author,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    review.rating?.let { rating ->
+                        Spacer(Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD54F),
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = rating,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                ReviewProviderBadge(provider = review.provider)
+            }
+
+            Text(
+                text = review.content.trim(),
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f),
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+            )
+
+            Text(
+                text = "Close",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.End,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onDismiss)
+                    .padding(vertical = 4.dp),
+            )
         }
     }
 }

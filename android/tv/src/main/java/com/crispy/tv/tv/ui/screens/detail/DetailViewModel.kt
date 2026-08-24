@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.crispy.tv.addons.lookup.buildAddonEpisodeLookupId
 import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.addons.mapping.toMediaDetails
-import com.crispy.tv.ai.AiInsightSlide
+import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.CrispyBackendClient
 import com.crispy.tv.player.MetadataLabMediaType
@@ -31,11 +31,13 @@ data class DetailEpisodeUi(
     val overview: String?,
 )
 
-data class AiSlideUi(
+data class ReviewUi(
     val id: String,
-    val label: String,
-    val body: String,
-    val tag: String?,
+    val author: String,
+    val content: String,
+    val rating: String?,
+    val provider: String,
+    val url: String?,
 )
 
 data class ExtraVideoUi(
@@ -72,11 +74,14 @@ data class DetailUiState(
     val ctaKind: String = "WATCH",
     val ctaRemainingMinutes: Int? = null,
     val aiLoading: Boolean = false,
-    val aiSlides: List<AiSlideUi> = emptyList(),
+    val aiInsights: AiInsightsResult? = null,
+    val aiStoryVisible: Boolean = false,
+    val aiUnavailable: Boolean = false,
     val extraVideos: List<ExtraVideoUi> = emptyList(),
     val collectionName: String? = null,
     val collectionItems: List<CrispyCardItem> = emptyList(),
-    val ratingBadges: List<String> = emptyList(),
+    val titleRatings: CrispyBackendClient.MetadataTitleRatings? = null,
+    val itemRating: Double? = null,
     val reviews: List<ReviewUi> = emptyList(),
     val production: List<CompanyUi> = emptyList(),
     val detailRows: List<Pair<String, String>> = emptyList(),
@@ -97,13 +102,6 @@ data class CastMemberUi(
     val name: String,
     val role: String?,
     val profileUrl: String?,
-)
-
-data class ReviewUi(
-    val id: String,
-    val author: String,
-    val content: String,
-    val rating: String?,
 )
 
 data class CompanyUi(
@@ -149,50 +147,54 @@ class DetailViewModel(
         }
     }
 
-    /** Secondary loads that must never block or fail the page: AI insights, ratings. */
+    /** Secondary loads that must never block or fail the page: title ratings. */
     private fun launchEnrichment(context: BackendContext) {
-        viewModelScope.launch {
-            val appContext = getApplication<Application>()
-            val client = TvServices.backendClient(appContext)
-            _state.value = _state.value.copy(aiLoading = true)
-            val insights = runCatching {
-                client.getAiInsights(context.accessToken, context.profileId, itemId)
-            }.getOrNull()
-            _state.value = _state.value.copy(
-                aiLoading = false,
-                aiSlides = insights?.slides?.mapIndexed { index, slide -> slide.toUi(index) }.orEmpty(),
-            )
-        }
         viewModelScope.launch {
             val appContext = getApplication<Application>()
             val client = TvServices.backendClient(appContext)
             val ratings = runCatching {
                 client.getMetadataItemRatings(context.accessToken, context.profileId, itemId)
             }.getOrNull()
-            _state.value = _state.value.copy(ratingBadges = ratings.toBadges())
+            _state.value = _state.value.copy(titleRatings = ratings?.ratings)
         }
     }
 
-    private fun CrispyBackendClient.MetadataTitleRatingsResponse?.toBadges(): List<String> {
-        val r = this?.ratings ?: return emptyList()
-        return buildList {
-            r.imdb?.let { add("IMDb ${formatOneDecimal(it)}") }
-            r.tmdb?.let { add("TMDB ${it.toInt()}%") }
-            r.rottenTomatoes?.let { add("RT ${it.toInt()}%") }
-            r.metacritic?.let { add("MC ${it.toInt()}") }
-        }.take(3)
+    fun onAiInsightsClick() {
+        val state = _state.value
+        if (state.aiLoading) return
+        if (state.aiInsights != null) {
+            _state.value = state.copy(aiStoryVisible = true)
+            return
+        }
+        viewModelScope.launch {
+            val appContext = getApplication<Application>()
+            val client = TvServices.backendClient(appContext)
+            _state.value = _state.value.copy(aiLoading = true, aiUnavailable = false)
+            val result = runCatching {
+                TvServices.contextResolver(appContext).resolve()?.let { context ->
+                    client.getAiInsights(
+                        accessToken = context.accessToken,
+                        profileId = context.profileId,
+                        itemId = itemId,
+                        locale = java.util.Locale.getDefault().toLanguageTag(),
+                    )
+                }
+            }.getOrNull()
+            if (result == null) {
+                _state.value = _state.value.copy(aiLoading = false, aiUnavailable = true)
+                return@launch
+            }
+            _state.value = _state.value.copy(
+                aiLoading = false,
+                aiInsights = result,
+                aiStoryVisible = true,
+            )
+        }
     }
 
-    private fun formatOneDecimal(value: Double): String =
-        kotlin.math.round(value * 10.0).div(10.0).toString()
-
-    private fun AiInsightSlide.toUi(index: Int): AiSlideUi =
-        AiSlideUi(
-            id = "$index-${key.name}",
-            label = label.ifBlank { key.name.replace('_', ' ') },
-            body = listOfNotNull(body, focus, context).filter { it.isNotBlank() }.joinToString("\n\n"),
-            tag = tag?.name?.lowercase()?.replace('_', ' '),
-        )
+    fun dismissAiInsightsStory() {
+        _state.value = _state.value.copy(aiStoryVisible = false)
+    }
 
     fun selectSeason(season: Int) {
         if (season == _state.value.selectedSeason) return
@@ -268,6 +270,7 @@ class DetailViewModel(
                 itemId = itemId,
                 itemType = item.itemType,
                 title = item.title ?: "Untitled",
+                itemRating = item.rating,
                 subtitleMeta = metaParts.takeIf { it.isNotEmpty() }?.joinToString(" · "),
                 overview = item.overview ?: item.summary,
                 backdropUrl = item.images.backdrop.large
@@ -310,6 +313,8 @@ class DetailViewModel(
                         author = review.author ?: review.username ?: "Anonymous",
                         content = review.content,
                         rating = review.rating?.let { "${it.toInt()}/10" },
+                        provider = review.provider,
+                        url = review.url,
                     )
                 },
                 production = (detail.production.companies + detail.production.networks)
