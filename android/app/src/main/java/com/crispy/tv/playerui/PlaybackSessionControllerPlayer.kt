@@ -87,7 +87,6 @@ internal class PlaybackSessionControllerPlayer(
                     .add(Player.COMMAND_GET_METADATA)
                     .add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
                     .add(Player.COMMAND_GET_TRACKS)
-                    .add(Player.COMMAND_GET_TRACK_SELECTION_PARAMETERS)
                     // Controls forwarded to the playback controller in handle* below.
                     .add(Player.COMMAND_PLAY_PAUSE)
                     .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
