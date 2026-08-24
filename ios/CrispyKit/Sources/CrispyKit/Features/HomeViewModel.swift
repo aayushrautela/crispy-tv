@@ -105,7 +105,7 @@ public     func dismissContinueWatching(_ item: MediaCard, environment: AppEnvir
             )
         }
 
-public         var rawByCatalogId: [String: [ClientMediaCard]] = [:]
+        var rawByCatalogId: [String: [ClientMediaCard]] = [:]
         for section in rawSections {
             let key = section.listKey.trimmingCharacters(in: .whitespaces)
             let id = buildHomeCatalogId(

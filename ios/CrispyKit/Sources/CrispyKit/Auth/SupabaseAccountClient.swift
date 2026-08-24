@@ -49,7 +49,7 @@ public     func ensureValidSession() async -> Session? {
         if let inFlight = refreshInFlight {
             return await inFlight.value
         }
-public         let task = Task<Session?, Never> { [weak self] in
+        let task = Task<Session?, Never> { [weak self] in
             guard let self else { return nil }
             return await self.refreshLocked()
         }
@@ -60,11 +60,11 @@ public         let task = Task<Session?, Never> { [weak self] in
 
 public     func signInWithEmail(email: String, password: String) async throws -> Session {
         try checkConfigured()
-public         let payload: [String: Any] = [
+        let payload: [String: Any] = [
             "email": email.trimmingCharacters(in: .whitespacesAndNewlines),
             "password": password,
         ]
-public         let body = try await postAuth(path: "/auth/v1/token?grant_type=password", payload: payload)
+        let body = try await postAuth(path: "/auth/v1/token?grant_type=password", payload: payload)
         guard let session = parseSession(try JsonParser.parseObject(body)) else {
             throw AuthError.signinFailed("Sign-in did not return a session.")
         }
@@ -74,17 +74,17 @@ public         let body = try await postAuth(path: "/auth/v1/token?grant_type=pa
 
 public     func signUpWithEmail(email: String, password: String) async throws -> SignUpResult {
         try checkConfigured()
-public         let payload: [String: Any] = [
+        let payload: [String: Any] = [
             "email": email.trimmingCharacters(in: .whitespacesAndNewlines),
             "password": password,
         ]
-public         let body = try await postAuth(path: "/auth/v1/signup", payload: payload)
-public         let json = try JsonParser.parseObject(body)
+        let body = try await postAuth(path: "/auth/v1/signup", payload: payload)
+        let json = try JsonParser.parseObject(body)
         if let session = parseSession(json) {
             saveSession(session)
             return SignUpResult(session: session, message: "Account created and signed in.")
         }
-public         let hasUser = json.jsonObject("user")?.jsonString("id") != nil
+        let hasUser = json.jsonObject("user")?.jsonString("id") != nil
         return SignUpResult(
             session: nil,
             message: hasUser ? "Account created. Confirm your email, then sign in." : "Account created."
@@ -137,11 +137,11 @@ public     func signOut() async {
 
     private func parseSession(_ json: [String: Any]) -> Session? {
         guard let accessToken = json.jsonString("access_token") else { return nil }
-public         var expiresAt = json.jsonInt("expires_at").map(Int64.init).flatMap { $0 > 0 ? $0 : nil }
+        var expiresAt = json.jsonInt("expires_at").map(Int64.init).flatMap { $0 > 0 ? $0 : nil }
         if expiresAt == nil, let expiresIn = json.jsonInt("expires_in").map(Int64.init), expiresIn > 0 {
             expiresAt = nowEpochSeconds() + expiresIn
         }
-public         let user = json.jsonObject("user")
+        let user = json.jsonObject("user")
         return Session(
             accessToken: accessToken,
             refreshToken: json.jsonString("refresh_token") ?? "",
@@ -166,7 +166,7 @@ public         let user = json.jsonObject("user")
     }
 
     private func authHeaders(_ token: String) -> [String: String] {
-public         var headers = baseHeaders()
+        var headers = baseHeaders()
         headers["Authorization"] = "Bearer \(token.trimmingCharacters(in: .whitespacesAndNewlines))"
         return headers
     }
@@ -183,9 +183,9 @@ public         var headers = baseHeaders()
     }
 
     private func postAuth(path: String, payload: [String: Any], bearerToken: String? = nil) async throws -> String {
-public         let url = URL(string: try requireConfiguredBaseURL() + path)
-public         let headers = bearerToken.map(authHeaders) ?? baseHeaders()
-public         let response = try await httpClient.postJson(
+        let url = URL(string: try requireConfiguredBaseURL() + path)
+        let headers = bearerToken.map(authHeaders) ?? baseHeaders()
+        let response = try await httpClient.postJson(
             url: try requireValid(url),
             jsonBody: try JsonParser.encodeObject(payload),
             headers: headers,
@@ -203,7 +203,7 @@ public         let response = try await httpClient.postJson(
     }
 
     private func authError(code: Int, body: String) -> AuthError {
-public         let message = extractErrorMessage(body)
+        let message = extractErrorMessage(body)
         if (400...401).contains(code), let lowered = message?.lowercased() {
             let invalidRefresh =
                 lowered.contains("invalid refresh token") ||
@@ -219,7 +219,7 @@ public         let message = extractErrorMessage(body)
     }
 
     private func extractErrorMessage(_ rawBody: String) -> String? {
-public         let trimmed = rawBody.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = rawBody.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         guard let parsed = try? JsonParser.parseObject(trimmed) else { return trimmed }
         for key in ["message", "msg", "error_description", "error"] {

@@ -57,7 +57,7 @@ public     func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnv
         if selectedSection == .history && !watched {
             items.removeAll { $0.id == item.id }
         }
-public         let result = try? await (watched
+        let result = try? await (watched
             ? environment.backend.markWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
             : environment.backend.unmarkWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId))
         _ = result

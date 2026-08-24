@@ -92,8 +92,8 @@ public     func setTypeFilter(_ filter: TypeFilter, environment: AppEnvironment)
     /// Loads the next page when the grid approaches the end.
 public     func loadNextPage(environment: AppEnvironment) async {
         guard let snapshot, let selectedCatalog else { return }
-public         let nextPage = loadedPage + 1
-public         let result = buildCatalogPage(
+        let nextPage = loadedPage + 1
+        let result = buildCatalogPage(
             snapshot: snapshot,
             sectionCatalogId: selectedCatalog.catalogId,
             page: nextPage,
@@ -110,7 +110,7 @@ public         let result = buildCatalogPage(
             catalogs = []
             return
         }
-public         let (refs, message) = listDiscoverCatalogs(snapshot: snapshot, mediaType: typeFilter.mediaType)
+        let (refs, message) = listDiscoverCatalogs(snapshot: snapshot, mediaType: typeFilter.mediaType)
         catalogs = refs.map { ref in
             CatalogOption(catalogId: ref.section.catalogId, title: ref.section.displayTitle)
         }
