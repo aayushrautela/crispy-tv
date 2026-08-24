@@ -1,8 +1,7 @@
 package com.crispy.tv.network
 
 import android.content.Context
-import android.os.Build
-import com.crispy.tv.BuildConfig
+import android.content.pm.ApplicationInfo
 import com.crispy.tv.network.CrispyHttpClient
 import com.crispy.tv.network.CrispyOkHttpFactory
 import okhttp3.OkHttpClient
@@ -30,7 +29,7 @@ object AppHttp {
                 CrispyOkHttpFactory.create(
                     context = appContext,
                     userAgent = userAgent,
-                    debugLogging = BuildConfig.DEBUG,
+                    debugLogging = isDebuggable(context),
                 )
             okHttpClient = created
             return created
@@ -60,7 +59,7 @@ object AppHttp {
                 CrispyOkHttpFactory.createAiClient(
                     context = appContext,
                     userAgent = buildUserAgent(appContext),
-                    debugLogging = BuildConfig.DEBUG,
+                    debugLogging = isDebuggable(context),
                 )
             aiOkHttpClient = created
             return created
@@ -86,9 +85,11 @@ object AppHttp {
         val resolvedVersion =
             versionName
                 .trim()
-                .ifBlank { BuildConfig.VERSION_NAME.trim() }
                 .ifBlank { "dev" }
 
         return "crispytv/$resolvedVersion"
     }
+
+    private fun isDebuggable(context: Context): Boolean =
+        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 }

@@ -163,6 +163,7 @@ private fun CrispyBackendClient.UpNextItem.toCardItem(): CrispyCardItem? {
         id = episodeId,
         title = showTitle ?: "Next episode",
         subtitle = sequenceOf(seasonEpisode, nextEpisodeTitle)
+            .filterNotNull()
             .filter { it.isNotBlank() }
             .joinToString(" · "),
         imageUrl = showBackdropUrl ?: showPosterUrl,
