@@ -207,7 +207,7 @@ internal fun AiInsightsStoryOverlay(
     posterUrl: String?,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onDismiss = onDismiss)
+    BackHandler(onDismiss)
     val slides = remember(result) { result.slides.sortedForDisplay() }
 
     Box(
