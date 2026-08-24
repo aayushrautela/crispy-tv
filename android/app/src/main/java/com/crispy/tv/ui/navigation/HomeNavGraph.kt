@@ -6,7 +6,6 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalContext
 import com.crispy.tv.catalog.CatalogRoute
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.details.DetailsRoute
@@ -17,7 +16,6 @@ import com.crispy.tv.home.HomeRoute
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.person.PersonDetailsRoute
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import com.crispy.tv.playerui.PlayerActivity
 
 internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
     composable(AppRoutes.HomeRoute) { entry ->
@@ -76,6 +74,16 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                     navController.navigate(AppRoutes.ProfileMenuRoute) {
                         launchSingleTop = true
                     }
+                },
+                onOpenPlayer = { identity, resumePositionMs, chosenStreamStableKey, chosenProviderId ->
+                    navController.navigate(
+                        AppRoutes.playerRoute(
+                            identity = identity,
+                            resumePositionMs = resumePositionMs,
+                            chosenStreamStableKey = chosenStreamStableKey,
+                            chosenProviderId = chosenProviderId,
+                        )
+                    )
                 },
                 scrollToTopRequests = entry.savedStateHandle.getStateFlow(AppRoutes.TopLevelScrollToTopRequestKey, 0),
                 onScrollToTopConsumed = {
@@ -170,7 +178,6 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
         val initialBackdropUrl = entry.arguments?.getString(AppRoutes.HomeDetailsBackdropUrlArg)?.ifBlank { null }
         val initialLogoUrl = entry.arguments?.getString(AppRoutes.HomeDetailsLogoUrlArg)?.ifBlank { null }
         val sharedElementKey = entry.arguments?.getString(AppRoutes.HomeDetailsSharedElementKeyArg)?.ifBlank { null }
-        val context = LocalContext.current
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this@composable) {
             DetailsRoute(
                 itemId = itemId,
@@ -195,9 +202,8 @@ internal fun NavGraphBuilder.addHomeNavGraph(navController: NavHostController) {
                 },
                 onPersonClick = { personId, profileUrl -> navController.navigate(AppRoutes.personDetailsRoute(personId, profileUrl)) },
                 onOpenPlayer = { identity, resumePositionMs, chosenStreamStableKey, chosenProviderId, chosenStreamHandoffKey ->
-                    context.startActivity(
-                        PlayerActivity.intent(
-                            context = context,
+                    navController.navigate(
+                        AppRoutes.playerRoute(
                             identity = identity,
                             resumePositionMs = resumePositionMs,
                             chosenStreamStableKey = chosenStreamStableKey,

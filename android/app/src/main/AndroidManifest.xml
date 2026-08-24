@@ -19,15 +19,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CrispyRewrite">
         <activity
-            android:name="com.crispy.tv.playerui.PlayerActivity"
-            android:exported="false"
-            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize"
+            android:name="com.crispy.tv.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
             android:resizeableActivity="true"
             android:supportsPictureInPicture="true"
-            android:screenOrientation="sensorLandscape" />
-        <activity
-            android:name="com.crispy.tv.MainActivity"
-            android:exported="true">
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

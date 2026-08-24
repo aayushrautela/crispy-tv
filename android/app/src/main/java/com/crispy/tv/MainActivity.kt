@@ -1,9 +1,9 @@
 package com.crispy.tv
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -12,15 +12,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import com.crispy.tv.accounts.PendingProviderAuthStore
 import com.crispy.tv.accounts.SupabaseServicesProvider
+import com.crispy.tv.playerui.ComponentActivityPlayerHost
+import com.crispy.tv.playerui.LocalPlayerHost
 import com.crispy.tv.startup.AppStartup
 import com.crispy.tv.ui.AppRoot
 import com.crispy.tv.ui.theme.CrispyRewriteTheme
 
 
 class MainActivity : ComponentActivity() {
+    private lateinit var playerHost: ComponentActivityPlayerHost
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -30,14 +35,18 @@ class MainActivity : ComponentActivity() {
 
         AppStartup.run(applicationContext)
         handleDeepLink(intent)
+        // Registered before composition so activity-result contracts stay valid.
+        playerHost = ComponentActivityPlayerHost(this)
 
         setContent {
-            CrispyRewriteTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    AppRoot()
+            CompositionLocalProvider(LocalPlayerHost provides playerHost) {
+                CrispyRewriteTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        AppRoot()
+                    }
                 }
             }
         }
@@ -47,6 +56,19 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleDeepLink(intent)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        playerHost.onUserLeaveHint()
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        playerHost.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
     }
 
     private fun handleDeepLink(intent: Intent?) {

@@ -109,6 +109,7 @@ fun AppNavHost(
                     navController = navController,
                     onSignedOut = onSignedOut,
                 )
+                addPlayerDestination(navController)
             }
         }
     }

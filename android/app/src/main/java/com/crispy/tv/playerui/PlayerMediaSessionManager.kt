@@ -20,6 +20,7 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
+import com.crispy.tv.MainActivity
 import com.crispy.tv.R
 import com.crispy.tv.nativeengine.playback.PlaybackSessionController
 import java.io.ByteArrayOutputStream
@@ -31,19 +32,28 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal class PlayerMediaSessionManager(
+/**
+ * Owns the single process-wide Media3 [MediaSession] for video playback.
+ *
+ * Media3 requires session IDs to be unique per process. Instances must only be created through
+ * [obtain], which guarantees at most one live manager: any previous instance is fully released
+ * before a new one builds its session, so the fixed [SESSION_ID] can never collide.
+ *
+ * Main-thread contract: [obtain] and [release] construct/tear down binder-backed session objects
+ * and must be called on the main looper.
+ */
+internal class PlayerMediaSessionManager private constructor(
     context: Context,
     private val playbackController: PlaybackSessionController,
-    restorePlaybackIntent: Intent,
 ) {
     private val appContext = context.applicationContext
-    private val restorePlaybackIntent = Intent(restorePlaybackIntent)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val player = PlaybackSessionControllerPlayer(appContext, playbackController)
 
     private val mediaSession: MediaSession =
         MediaSession.Builder(appContext, player)
+            .setId(SESSION_ID)
             .setSessionActivity(buildContentPendingIntent())
             .build()
 
@@ -60,7 +70,6 @@ internal class PlayerMediaSessionManager(
     private var lastNotificationSnapshot: NotificationSnapshot? = null
 
     init {
-        activeManager = this
         ensureNotificationChannel()
         publishPlaybackState()
         publishMetadata()
@@ -159,8 +168,8 @@ internal class PlayerMediaSessionManager(
         Log.d(TAG, "release title=$currentTitle")
         artworkJob?.cancel()
         NotificationManagerCompat.from(appContext).cancel(NOTIFICATION_ID)
-        if (activeManager === this) {
-            activeManager = null
+        if (activeInstance === this) {
+            activeInstance = null
         }
         mediaSession.release()
         player.release()
@@ -271,7 +280,12 @@ internal class PlayerMediaSessionManager(
     }
 
     private fun buildContentPendingIntent(): PendingIntent {
-        val intent = Intent(restorePlaybackIntent).setPackage(appContext.packageName)
+        // Launching the launcher activity (rather than a player-only component) returns the user
+        // to the existing task; the player is a navigation destination inside it.
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            setClass(appContext, MainActivity::class.java)
+        }
         return PendingIntent.getActivity(
             appContext,
             REQUEST_CODE_CONTENT,
@@ -342,6 +356,7 @@ internal class PlayerMediaSessionManager(
 
     companion object {
         private const val TAG = "PlayerMediaSessionManager"
+        private const val SESSION_ID = "crispy_playback"
         private const val NOTIFICATION_CHANNEL_ID = "crispy_player_playback"
         private const val NOTIFICATION_ID = 3001
         private const val REQUEST_CODE_CONTENT = 4001
@@ -352,6 +367,23 @@ internal class PlayerMediaSessionManager(
         private const val ARTWORK_MIN_EDGE = 320
 
         @Volatile
-        private var activeManager: PlayerMediaSessionManager? = null
+        private var activeInstance: PlayerMediaSessionManager? = null
+        private val instantiationLock = Any()
+
+        /**
+         * Returns the single live manager, fully releasing any previous instance first. This is the
+         * only construction path; it makes a duplicate-session crash impossible even if callers
+         * race, because Media3 rejects a second session with the same ID while one is registered.
+         */
+        fun obtain(
+            context: Context,
+            playbackController: PlaybackSessionController,
+        ): PlayerMediaSessionManager {
+            synchronized(instantiationLock) {
+                activeInstance?.release()
+                return PlayerMediaSessionManager(context.applicationContext, playbackController)
+                    .also { activeInstance = it }
+            }
+        }
     }
 }

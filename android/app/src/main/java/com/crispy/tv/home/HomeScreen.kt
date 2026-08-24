@@ -34,7 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.catalog.CatalogSectionRef
 import com.crispy.tv.player.CanonicalContinueWatchingItem
-import com.crispy.tv.playerui.PlayerActivity
+import com.crispy.tv.player.PlaybackIdentity
 import com.crispy.tv.ui.brand.CrispyWordmark
 import com.crispy.tv.ui.components.CrispyScreen
 import com.crispy.tv.ui.components.ProfileIconButton
@@ -59,11 +59,11 @@ internal fun HomeRoute(
     onCatalogItemClick: (CatalogItem, String?) -> Unit,
     onCatalogSeeAllClick: (CatalogSectionRef) -> Unit,
     onOpenAccountsProfiles: () -> Unit,
+    onOpenPlayer: (PlaybackIdentity, Long, String?, String?) -> Unit,
     scrollToTopRequests: StateFlow<Int>,
     onScrollToTopConsumed: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val appContext = remember(context) { context.applicationContext }
+    val appContext = LocalContext.current.applicationContext
     val viewModel: HomeViewModel = viewModel(
         factory = remember(appContext) {
             HomeViewModel.factory(appContext)
@@ -77,15 +77,11 @@ internal fun HomeRoute(
 
     LaunchedEffect(selectorViewModel) {
         selectorViewModel.playStream.collect { selection ->
-            context.startActivity(
-                PlayerActivity.intent(
-                    context = context,
-                    identity = selection.identity,
-                    resumePositionMs = selection.resumePositionMs,
-                    chosenStreamStableKey = selection.chosenStreamStableKey,
-                    chosenProviderId = selection.chosenProviderId,
-                    chosenStreamHandoffKey = null,
-                )
+            onOpenPlayer(
+                selection.identity,
+                selection.resumePositionMs,
+                selection.chosenStreamStableKey,
+                selection.chosenProviderId,
             )
             selectorViewModel.dismiss()
         }

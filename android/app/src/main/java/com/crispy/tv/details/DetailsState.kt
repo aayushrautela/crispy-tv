@@ -8,7 +8,6 @@ import com.crispy.tv.home.MediaDetails
 import com.crispy.tv.home.MediaVideo
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.playerui.PlayerActivity
 import com.crispy.tv.streams.StreamSelectorUiState
 
 @Immutable

@@ -1,7 +1,6 @@
 package com.crispy.tv.playerui
 
 import android.content.Context
-import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
 import android.view.SurfaceView
@@ -53,10 +52,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +61,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 enum class PlayerSurface {
     NONE,
@@ -118,7 +115,6 @@ class PlayerSessionViewModel(
     chosenStreamStableKey: String? = null,
     chosenProviderId: String? = null,
     chosenStreamHandoffKey: String? = null,
-    restorePlaybackIntent: Intent,
 ) : ViewModel() {
     private val appContext = appContext.applicationContext
     private val resumePositionMs = resumePositionMs
@@ -129,6 +125,9 @@ class PlayerSessionViewModel(
     private val backendClient: CrispyBackendClient = BackendServicesProvider.backendClient(this.appContext)
     private val watchHistoryService = PlaybackDependencies.watchHistoryServiceFactory(this.appContext)
     private val streamResolver: StreamResolver = PlaybackDependencies.streamResolverFactory(this.appContext)
+    // Not cancelled in onCleared: bounded reporting jobs must finish flushing after clearing.
+    // Every launch on this scope is timeout-bounded or a short network post, so the scope is
+    // always idle shortly after the ViewModel is gone and becomes garbage together with it.
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playbackMetrics = PlaybackMetricsHolder()
     private val playbackController: PlaybackController = PlaybackDependencies.playbackControllerFactory(this.appContext)
@@ -149,10 +148,9 @@ class PlayerSessionViewModel(
     private var activeSubtitleLookupId: String? = null
     private var activeSubtitleMediaType: MetadataLabMediaType? = null
     private val mediaSessionManager =
-        PlayerMediaSessionManager(
+        PlayerMediaSessionManager.obtain(
             context = this.appContext,
             playbackController = playbackController,
-            restorePlaybackIntent = restorePlaybackIntent,
         )
 
     private val rawPlaybackId = buildPlaybackRawId(identity = identity)
@@ -1205,33 +1203,33 @@ class PlayerSessionViewModel(
         }
     }
 
-    private fun reportPlaybackStopped(playbackIdentity: PlaybackIdentity): Job {
+    private fun reportPlaybackStopped(playbackIdentity: PlaybackIdentity) {
         if (hasReportedPlaybackStop) {
-            return CompletableDeferred(Unit)
+            return
         }
         hasReportedPlaybackStop = true
 
         val lastDurationMs = playbackMetrics.durationMs
         if (lastDurationMs <= 0L) {
-            return CompletableDeferred(Unit)
+            return
         }
 
-        return backgroundScope.launch {
-            watchHistoryService.onPlaybackStopped(
-                identity = playbackIdentity,
-                positionMs = playbackMetrics.positionMs,
-                durationMs = lastDurationMs,
-            )
-            HomeRefreshBus.emit(HomeRefreshEvent.PlaybackEnded)
+        backgroundScope.launch {
+            withTimeoutOrNull(STOP_REPORT_TIMEOUT_MS) {
+                watchHistoryService.onPlaybackStopped(
+                    identity = playbackIdentity,
+                    positionMs = playbackMetrics.positionMs,
+                    durationMs = lastDurationMs,
+                )
+                HomeRefreshBus.emit(HomeRefreshEvent.PlaybackEnded)
+            }
         }
     }
 
     override fun onCleared() {
-        val stopJob = activeIdentity?.let(::reportPlaybackStopped)
-        if (stopJob != null) {
-            runBlocking { stopJob.join() }
-        }
-        backgroundScope.cancel()
+        // Stop reporting is fire-and-forget so teardown never blocks on network I/O; the
+        // media session must be released synchronously to free the process-wide slot.
+        activeIdentity?.let(::reportPlaybackStopped)
         audioFocusManager.release("main")
         audioFocusManager.unregisterSource("main")
         mediaSessionManager.release()
@@ -1248,7 +1246,6 @@ class PlayerSessionViewModel(
             chosenStreamStableKey: String? = null,
             chosenProviderId: String? = null,
             chosenStreamHandoffKey: String? = null,
-            restorePlaybackIntent: Intent,
         ): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
@@ -1260,7 +1257,6 @@ class PlayerSessionViewModel(
                         chosenStreamStableKey = chosenStreamStableKey,
                         chosenProviderId = chosenProviderId,
                         chosenStreamHandoffKey = chosenStreamHandoffKey,
-                        restorePlaybackIntent = restorePlaybackIntent,
                     ) as T
                 }
             }
@@ -1277,3 +1273,4 @@ private const val TAG = "PlayerSessionViewModel"
 private const val PROGRESS_SYNC_INTERVAL_MS = 60_000L
 private const val PLAYER_SEEK_PROGRESS_SYNC_DEBOUNCE_MS = 700L
 private const val MIN_PROGRESS_POSITION_MS = 1000L
+private const val STOP_REPORT_TIMEOUT_MS = 3_000L

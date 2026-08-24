@@ -11,7 +11,6 @@ import com.crispy.tv.app.appGraph
 import com.crispy.tv.catalog.CatalogItem
 import com.crispy.tv.details.RuntimeDetailsEntry
 import com.crispy.tv.player.PlaybackIdentity
-import com.crispy.tv.playerui.PlayerActivity
 import com.crispy.tv.settings.PlaybackSettingsRepositoryProvider
 import kotlinx.coroutines.flow.collectLatest
 import java.util.Locale
