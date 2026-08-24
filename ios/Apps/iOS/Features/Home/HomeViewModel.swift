@@ -65,7 +65,7 @@ final class HomeViewModel {
             )
 
             let continueWatching = try await continueWatchingResult
-            continueWatchingItems = continueWatching.items.map(MediaCard.from)
+            continueWatchingItems = continueWatching.items.map { MediaCard.from($0) }
             didInitialLoad = true
         } catch {
             statusMessage = error.localizedDescription
@@ -111,7 +111,7 @@ final class HomeViewModel {
         rails = []
         for section in planned.sections where section.presentation == .rail {
             let cards = rawByCatalogId[section.catalogId] ?? []
-            let items = cards.map(MediaCard.from)
+            let items = cards.map { MediaCard.from($0) }
             if !items.isEmpty {
                 rails.append(RailSection(catalogId: section.catalogId, title: section.displayTitle, items: items))
             }

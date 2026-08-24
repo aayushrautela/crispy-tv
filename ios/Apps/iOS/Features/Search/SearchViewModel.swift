@@ -57,8 +57,8 @@ final class SearchViewModel {
                 query: trimmed,
                 limit: 30
             )
-            let movies = response.movies.map(MediaCard.from)
-            let series = response.series.map(MediaCard.from)
+            let movies = response.movies.map { MediaCard.from($0) }
+            let series = response.series.map { MediaCard.from($0) }
             results = mergeInterleaved(movies: movies, series: series)
             historyStore.recordQuery(trimmed)
             history = historyStore.recentQueries()
@@ -86,7 +86,7 @@ final class SearchViewModel {
             limit: 8
         )
         if !Task.isCancelled {
-            suggestions = (response?.suggestions ?? []).map(MediaCard.from)
+            suggestions = (response?.suggestions ?? []).map { MediaCard.from($0) }
         }
     }
 

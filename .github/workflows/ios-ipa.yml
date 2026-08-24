@@ -45,7 +45,25 @@ jobs:
             DEVELOPMENT_TEAM="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            2>&1 | xcbeautify --renderer github-actions --quiet
+            2>&1 | tee build/xcodebuild.log | xcbeautify --renderer github-actions --quiet
+
+      - name: Surface compile errors in job summary
+        if: failure()
+        run: |
+          {
+            echo "## Compile errors"
+            echo '```'
+            grep -E "error: " build/xcodebuild.log | sort -u || echo "(no error lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload full build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: build/xcodebuild.log
+          if-no-files-found: warn
 
       - name: Package unsigned IPA
         run: |

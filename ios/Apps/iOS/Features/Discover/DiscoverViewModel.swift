@@ -101,7 +101,7 @@ final class DiscoverViewModel {
         )
         guard !result.items.isEmpty else { return }
         loadedPage = nextPage
-        items.append(contentsOf: result.items.map(MediaCard.from))
+        items.append(contentsOf: result.items.map { MediaCard.from($0) })
         statusMessage = result.statusMessage
     }
 
