@@ -1,10 +1,14 @@
 import SwiftUI
 
 @main
+@MainActor
 struct CrispyRewriteiOSApp: App {
+    @State private var environment = AppEnvironment()
+
     var body: some Scene {
         WindowGroup {
-            CrispyRewriteiOSHomeView()
+            AppRootView()
+                .environment(environment)
                 .preferredColorScheme(.dark)
         }
     }

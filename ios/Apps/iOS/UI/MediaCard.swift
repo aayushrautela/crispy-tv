@@ -1,0 +1,112 @@
+import Foundation
+
+/// UI-facing media card shared by Home/Discover/Library/Search, mirroring the
+/// fields the Android screens read off `CatalogItem`/`ClientMediaCard`.
+struct MediaCard: Identifiable, Equatable {
+    let itemId: String
+    let type: String
+    let title: String
+    let posterUrl: String?
+    let backdropUrl: String?
+    let logoUrl: String?
+    let ratingText: String?
+    let yearText: String?
+    let genre: String?
+    let maturityRating: String?
+    let description: String?
+    let progressPercent: Double?
+
+    var id: String { itemId }
+}
+
+func formatRating(_ value: Double?) -> String? {
+    guard let value, value.isFinite, value > 0 else { return nil }
+    return String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), value)
+}
+
+extension MediaCard {
+    static func from(_ card: ClientMediaCard) -> MediaCard {
+        MediaCard(
+            itemId: card.itemId,
+            type: normalizeCatalogType(card.mediaType),
+            title: card.title,
+            posterUrl: card.posterUrl,
+            backdropUrl: card.backdropUrl,
+            logoUrl: card.logoUrl,
+            ratingText: formatRating(card.rating),
+            yearText: card.year.map(String.init),
+            genre: card.genres.first,
+            maturityRating: card.maturityRating,
+            description: card.overview,
+            progressPercent: card.progress?.percent ?? progressPercent(
+                positionSeconds: card.progress?.positionSeconds,
+                durationSeconds: card.progress?.durationSeconds
+            )
+        )
+    }
+
+    static func from(_ item: HomeCatalogItem) -> MediaCard {
+        MediaCard(
+            itemId: item.mediaKey,
+            type: item.type,
+            title: item.title,
+            posterUrl: item.posterUrl,
+            backdropUrl: item.backdropUrl,
+            logoUrl: nil,
+            ratingText: item.rating,
+            yearText: item.year,
+            genre: nil,
+            maturityRating: nil,
+            description: item.description,
+            progressPercent: nil
+        )
+    }
+
+    static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
+        MediaCard(
+            itemId: suggestion.itemId,
+            type: suggestion.itemType,
+            title: suggestion.title,
+            posterUrl: suggestion.posterUrl,
+            backdropUrl: nil,
+            logoUrl: nil,
+            ratingText: nil,
+            yearText: suggestion.year.map(String.init),
+            genre: nil,
+            maturityRating: nil,
+            description: nil,
+            progressPercent: nil
+        )
+    }
+
+    static func from(_ item: SearchMediaItem) -> MediaCard {
+        MediaCard(
+            itemId: item.itemId,
+            type: item.itemType,
+            title: item.title,
+            posterUrl: item.posterUrl,
+            backdropUrl: item.backdropUrl,
+            logoUrl: item.logoUrl,
+            ratingText: formatRating(item.rating),
+            yearText: item.year.map(String.init),
+            genre: item.genres.first,
+            maturityRating: item.maturityRating,
+            description: item.overview,
+            progressPercent: nil
+        )
+    }
+}
+
+/// Mirrors the Android mediaType → catalog type normalization.
+func normalizeCatalogType(_ raw: String) -> String {
+    switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "anime": return "anime"
+    case "episode", "show", "tv", "series": return "show"
+    default: return "movie"
+    }
+}
+
+private func progressPercent(positionSeconds: Int?, durationSeconds: Int?) -> Double? {
+    guard let positionSeconds, let durationSeconds, durationSeconds > 0 else { return nil }
+    return min(max(Double(positionSeconds) / Double(durationSeconds) * 100.0, 0), 100)
+}

@@ -10,6 +10,11 @@ local.properties
 captures/
 android/native-engine/src/main/jniLibs/
 
+# iOS
+ios/CrispyRewriteApple.xcodeproj/
+**/Payload/
+*.ipa
+
 # IDE
 .idea/
 *.iml

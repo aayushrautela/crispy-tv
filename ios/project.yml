@@ -1,19 +1,28 @@
 name: CrispyRewriteApple
 options:
   bundleIdPrefix: com.crispy.rewrite
+packages:
+  ContractRunner:
+    path: ../ContractRunner
 targets:
   CrispyRewriteiOS:
     type: application
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "26.0"
     sources:
       - path: Apps/iOS
+    dependencies:
+      - package: ContractRunner
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.crispy.rewrite.ios
-        GENERATE_INFOPLIST_FILE: YES
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Apps/iOS/Info.plist
         SWIFT_VERSION: 5.9
         CODE_SIGNING_ALLOWED: NO
+        CRISPY_BACKEND_URL: ""
+        SUPABASE_URL: ""
+        SUPABASE_PUBLISHABLE_KEY: ""
   CrispyRewritetvOS:
     type: application
     platform: tvOS
