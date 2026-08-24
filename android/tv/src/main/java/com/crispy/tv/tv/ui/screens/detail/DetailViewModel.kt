@@ -9,6 +9,8 @@ import com.crispy.tv.addons.mapping.toMediaDetails
 import com.crispy.tv.ai.AiInsightsResult
 import com.crispy.tv.backend.BackendContext
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.details.trailer.TrailerSource
+import com.crispy.tv.details.trailer.classifyTrailerSource
 import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.player.WatchHistoryRequest
 import com.crispy.tv.tv.di.TvServices
@@ -19,6 +21,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+data class TvTrailerEntry(
+    val id: String,
+    val source: TrailerSource,
+)
 
 data class DetailEpisodeUi(
     val itemId: String,
@@ -82,6 +89,7 @@ data class DetailUiState(
     val collectionItems: List<CrispyCardItem> = emptyList(),
     val titleRatings: CrispyBackendClient.MetadataTitleRatings? = null,
     val itemRating: Double? = null,
+    val trailers: List<TvTrailerEntry> = emptyList(),
     val reviews: List<ReviewUi> = emptyList(),
     val production: List<CompanyUi> = emptyList(),
     val detailRows: List<Pair<String, String>> = emptyList(),
@@ -328,8 +336,27 @@ class DetailViewModel(
                 similar = extras?.similar.orEmpty()
                     .filter { it.itemId != null }
                     .map { it.toCardItem() },
+                trailers = buildTrailerSources(item, detail.videos),
             )
         }
+    }
+
+    private fun buildTrailerSources(
+        item: CrispyBackendClient.MetadataView,
+        videos: List<CrispyBackendClient.MetadataVideoView>,
+    ): List<TvTrailerEntry> {
+        val remote = item.remoteTrailers
+        if (remote.isNotEmpty()) {
+            return remote.mapNotNull { dto ->
+                dto.url.trim().takeIf { it.isNotBlank() }
+                    ?.let { TvTrailerEntry(id = it, source = classifyTrailerSource(it)) }
+            }
+        }
+        val trailerVideo = videos.firstOrNull { it.key.isNotBlank() && it.official && it.type.equals("Trailer", true) }
+            ?: videos.firstOrNull { it.key.isNotBlank() && it.type.equals("Trailer", true) }
+            ?: videos.firstOrNull { it.key.isNotBlank() }
+        val key = trailerVideo?.key?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
+        return listOf(TvTrailerEntry(id = key, source = TrailerSource.YOUTUBE))
     }
 
     private fun resolveWatchCta(

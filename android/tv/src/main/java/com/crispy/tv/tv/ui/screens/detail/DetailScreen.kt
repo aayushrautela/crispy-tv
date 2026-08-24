@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,8 +60,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
@@ -171,7 +176,16 @@ private fun DetailContent(
     var expandedReview by remember { mutableStateOf<ReviewUi?>(null) }
     var showRatingDialog by remember { mutableStateOf(false) }
     var pendingRating by remember { mutableStateOf(0f) }
+    var trailerPlaying by remember(state.trailers) { mutableStateOf(state.trailers.isNotEmpty()) }
+    var trailerMuted by remember(state.trailers) { mutableStateOf(true) }
+    var trailerFailed by remember(state.trailers) { mutableStateOf(false) }
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val trailerStopScrollPx = remember(density) { with(density) { 380.dp.toPx() } }
+    val trailerActive = trailerPlaying &&
+        !trailerFailed &&
+        state.trailers.isNotEmpty() &&
+        scroll.value <= trailerStopScrollPx
 
     if (showRatingDialog) {
         androidx.compose.material3.MaterialTheme(
@@ -263,6 +277,17 @@ private fun DetailContent(
                     .fillMaxWidth()
                     .height(360.dp),
             )
+            if (trailerActive) {
+                TvHeroTrailerLayer(
+                    trailers = state.trailers,
+                    shouldPlay = true,
+                    isMuted = trailerMuted,
+                    onAllSourcesFailed = { trailerFailed = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(360.dp),
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -355,6 +380,20 @@ private fun DetailContent(
                             }
                         },
                     )
+                    if (state.trailers.isNotEmpty()) {
+                        HeaderActionButton(
+                            label = if (trailerPlaying) "Pause" else "Trailer",
+                            icon = if (trailerPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            active = trailerPlaying,
+                            onClick = { trailerPlaying = !trailerPlaying },
+                        )
+                        HeaderActionButton(
+                            label = if (trailerMuted) "Muted" else "Sound on",
+                            icon = if (trailerMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                            active = !trailerMuted,
+                            onClick = { trailerMuted = !trailerMuted },
+                        )
+                    }
                 }
             }
         }
