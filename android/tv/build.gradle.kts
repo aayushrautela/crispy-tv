@@ -40,7 +40,6 @@ val debugKeyPassword = providers.gradleProperty("DEBUG_KEY_PASSWORD").orNull
 
 android {
     namespace = "com.crispy.tv.tv"
-    missingDimensionStrategy("distribution", "foss")
     compileSdk {
         version = release(37) {
             minorApiLevel = 0
@@ -49,6 +48,7 @@ android {
 
     defaultConfig {
         applicationId = "com.crispy.tv"
+        missingDimensionStrategy("distribution", "foss")
         minSdk = 26
         targetSdk = 36
         versionCode = 1
