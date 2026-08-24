@@ -48,6 +48,7 @@ fun DetailScreen(
     onSelectSeason: (Int) -> Unit,
     onOpenItem: (String) -> Unit,
     onBack: () -> Unit,
+    onPlay: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -61,6 +62,7 @@ fun DetailScreen(
             state = state,
             onSelectSeason = onSelectSeason,
             onOpenItem = onOpenItem,
+            onPlay = onPlay,
             modifier = modifier,
         )
     }
@@ -71,6 +73,7 @@ private fun DetailContent(
     state: DetailUiState,
     onSelectSeason: (Int) -> Unit,
     onOpenItem: (String) -> Unit,
+    onPlay: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scroll = rememberScrollState()
@@ -119,7 +122,7 @@ private fun DetailContent(
                     )
                 }
                 Spacer(Modifier.height(14.dp))
-                PlayButton(enabled = true, label = "Play", onClick = {})
+                PlayButton(enabled = true, label = "Play", onClick = { onPlay(state.itemId) })
             }
         }
 

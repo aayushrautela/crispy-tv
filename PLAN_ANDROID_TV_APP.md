@@ -133,11 +133,17 @@ backgrounds (TV-NP); 64-bit + 16 KB page size required from Aug 2026 (TV-G6).
 - [ ] Watchlist/tracked-state toggles; watched ticks on episodes (needs watch-state batch);
       resume-position badges.
 
-### Phase 4 — Player
-- [ ] Reuse `:android:player` end-to-end; TV control surface (D-pad seek ±10s/±30s,
-      play/pause, audio/subtitle tracks overlay).
-- [ ] Overlays: stream-sources side panel, subtitle settings, skip-intro, next-episode prompt.
-- [ ] `MediaSession` wiring; pause video on `onStop` (TV-NP); frame-rate API optional.
+### Phase 4 — Player (in progress — shell done)
+- [x] Player shell: Media3 ExoPlayer + custom TV chrome, D-pad controls
+      (center=play/pause, left/right=±10s, up/down wake chrome, auto-hide 4s);
+      lifecycle pause on ON_PAUSE; watch events (`playback_progress`,
+      `playback_progress_snapshot`, `playback_completed`) via shared backend client;
+      `play/{itemId}?streamUrl=` route wired from Detail Play.
+- [ ] Stream-source layer for TV: move/extract addon streams stack
+      (`streams/*`, `metadata/AddonRegistry`) out of the phone module so TV can list
+      and pick sources; then torrent/debrid via native-engine.
+- [ ] Stream-sources side panel, subtitle/audio overlays, skip-intro, next-episode prompt.
+- [ ] `MediaSession` + Now Playing card (Phase 6 tie-in); frame-rate API optional.
 
 ### Phase 5 — Search / Library / Settings
 - [ ] Search: on-screen keyboard + voice (`ACTION_RECOGNIZE_SPEECH`) intent; results grid.

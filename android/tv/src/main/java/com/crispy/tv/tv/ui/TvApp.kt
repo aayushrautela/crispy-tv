@@ -12,12 +12,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import android.app.Application
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.crispy.tv.tv.player.TvPlayerViewModel
+import com.crispy.tv.tv.ui.screens.player.TvPlayerScreen
 import com.crispy.tv.tv.home.HomeViewModel
 import com.crispy.tv.tv.session.TvSessionState
 import com.crispy.tv.tv.session.TvSessionViewModel
@@ -109,6 +114,26 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     onOpenItem = { itemId -> navController.navigate("detail/$itemId") },
                 )
             }
+            composable(
+                "play/{itemId}?streamUrl={streamUrl}",
+                arguments = listOf(
+                    navArgument("itemId") { type = NavType.StringType },
+                    navArgument("streamUrl") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
+                val itemId = entry.arguments?.getString("itemId").orEmpty()
+                val streamUrl = entry.arguments?.getString("streamUrl")
+                val app = LocalContext.current.applicationContext as Application
+                val playerViewModel: TvPlayerViewModel = viewModel(
+                    key = "play-$itemId",
+                    initializer = { TvPlayerViewModel(app, itemId, streamUrl) },
+                )
+                TvPlayerScreen(viewModel = playerViewModel)
+            }
             composable("detail/{itemId}") { entry ->
                 val itemId = entry.arguments?.getString("itemId").orEmpty()
                 val app = LocalContext.current.applicationContext as Application
@@ -116,11 +141,13 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     key = "detail-$itemId",
                     initializer = { DetailViewModel(app, itemId) },
                 )
+                val detailState by detailViewModel.state.collectAsStateWithLifecycle()
                 DetailScreen(
-                    state = detailViewModel.state.collectAsStateWithLifecycle().value,
+                    state = detailState,
                     onSelectSeason = detailViewModel::selectSeason,
                     onOpenItem = { nextId -> navController.navigate("detail/$nextId") },
                     onBack = { navController.popBackStack() },
+                    onPlay = { id -> navController.navigate("play/$id") },
                 )
             }
             composable(TvDestination.Search.route) { SearchScreen() }
