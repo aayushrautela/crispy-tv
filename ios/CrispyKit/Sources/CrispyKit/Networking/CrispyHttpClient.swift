@@ -1,14 +1,14 @@
 import Foundation
 
-struct CrispyHttpResponse {
-    let code: Int
-    let body: String
+public struct CrispyHttpResponse {
+public     let code: Int
+public     let body: String
 }
 
-final class CrispyHttpClient {
+public final class CrispyHttpClient {
     private let session: URLSession
 
-    init(session: URLSession = {
+public     init(session: URLSession = {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 45
         configuration.timeoutIntervalForResource = 120
@@ -18,19 +18,19 @@ final class CrispyHttpClient {
         self.session = session
     }
 
-    func get(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public     func get(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "GET", url: url, headers: headers, body: nil, timeout: timeout)
     }
 
-    func postJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public     func postJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "POST", url: url, headers: headers, body: jsonBody, timeout: timeout)
     }
 
-    func putJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public     func putJson(url: URL, jsonBody: String, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "PUT", url: url, headers: headers, body: jsonBody, timeout: timeout)
     }
 
-    func delete(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
+public     func delete(url: URL, headers: [String: String], timeout: TimeInterval? = nil) async throws -> CrispyHttpResponse {
         try await execute(method: "DELETE", url: url, headers: headers, body: nil, timeout: timeout)
     }
 
@@ -58,6 +58,6 @@ final class CrispyHttpClient {
     }
 }
 
-enum CrispyHttpError: Error {
+public enum CrispyHttpError: Error {
     case invalidResponse
 }

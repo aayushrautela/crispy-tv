@@ -1,11 +1,11 @@
 import Foundation
 
-struct AppConfig {
-    let backendURL: String
-    let supabaseURL: String
-    let supabasePublishableKey: String
+public struct AppConfig {
+public     let backendURL: String
+public     let supabaseURL: String
+public     let supabasePublishableKey: String
 
-    static func load(bundle: Bundle = .main, arguments: [String] = ProcessInfo.processInfo.arguments) -> AppConfig {
+public     static func load(bundle: Bundle = .main, arguments: [String] = ProcessInfo.processInfo.arguments) -> AppConfig {
         func launchArg(_ name: String) -> String? {
             guard let index = arguments.firstIndex(of: name), index + 1 < arguments.count else { return nil }
             return arguments[index + 1].trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
@@ -25,7 +25,7 @@ struct AppConfig {
 }
 
 extension String {
-    var nilIfBlank: String? {
+public     var nilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
@@ -34,7 +34,7 @@ extension String {
 extension Optional where Wrapped == String {
     /// Chains the blank-normalization onto optionals so call sites can write
     /// `optionalString.nilIfBlank` directly.
-    var nilIfBlank: String? {
+public     var nilIfBlank: String? {
         switch self {
         case .some(let value): return value.nilIfBlank
         case .none: return nil

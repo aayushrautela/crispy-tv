@@ -6,32 +6,32 @@ import ContractRunner
 /// title detail + extras (seasons/similar) + season episodes.
 @MainActor
 @Observable
-final class DetailsViewModel {
-    let itemId: String
-    let itemType: String
+public final class DetailsViewModel {
+public     let itemId: String
+public     let itemType: String
 
-    private(set) var detail: MetadataTitleDetail?
-    private(set) var seasons: [MetadataSeason] = []
-    private(set) var similar: [MediaCard] = []
-    private(set) var episodes: [MetadataEpisode] = []
-    private(set) var selectedSeasonNumber: Int?
-    private(set) var isLoadingDetail = true
-    private(set) var isLoadingEpisodes = false
-    private(set) var errorMessage = ""
+    public private(set) var detail: MetadataTitleDetail?
+    public private(set) var seasons: [MetadataSeason] = []
+    public private(set) var similar: [MediaCard] = []
+    public private(set) var episodes: [MetadataEpisode] = []
+    public private(set) var selectedSeasonNumber: Int?
+    public private(set) var isLoadingDetail = true
+    public private(set) var isLoadingEpisodes = false
+    public private(set) var errorMessage = ""
 
     private var extrasLoaded = false
 
-    init(itemId: String, itemType: String) {
+public     init(itemId: String, itemType: String) {
         self.itemId = itemId
         self.itemType = itemType
     }
 
-    func loadIfNeeded(environment: AppEnvironment) async {
+public     func loadIfNeeded(environment: AppEnvironment) async {
         guard detail == nil else { return }
         await load(environment: environment)
     }
 
-    func load(environment: AppEnvironment) async {
+public     func load(environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else {
             errorMessage = "Sign in to view details."
             return
@@ -76,11 +76,11 @@ final class DetailsViewModel {
         }
     }
 
-    var isShow: Bool {
+public     var isShow: Bool {
         itemType == "show" || !seasons.isEmpty || (detail?.item.itemType == "show")
     }
 
-    func selectSeason(_ seasonNumber: Int, environment: AppEnvironment) async {
+public     func selectSeason(_ seasonNumber: Int, environment: AppEnvironment) async {
         guard selectedSeasonNumber != seasonNumber || episodes.isEmpty else { return }
         selectedSeasonNumber = seasonNumber
         guard let context = await environment.backendContext() else { return }

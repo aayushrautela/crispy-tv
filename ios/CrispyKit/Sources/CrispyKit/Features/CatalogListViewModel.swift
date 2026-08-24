@@ -6,25 +6,25 @@ import ContractRunner
 /// `buildCatalogPage` over the loaded home snapshot.
 @MainActor
 @Observable
-final class CatalogListViewModel {
-    private(set) var items: [MediaCard] = []
-    private(set) var isLoading = false
-    private(set) var statusMessage = ""
+public final class CatalogListViewModel {
+    public private(set) var items: [MediaCard] = []
+    public private(set) var isLoading = false
+    public private(set) var statusMessage = ""
 
     private var snapshot: HomeCatalogSnapshot?
     private let catalogId: String
     private var loadedPage = 0
 
-    init(catalogId: String) {
+public     init(catalogId: String) {
         self.catalogId = catalogId
     }
 
-    func loadIfNeeded(environment: AppEnvironment) async {
+public     func loadIfNeeded(environment: AppEnvironment) async {
         guard snapshot == nil else { return }
         await reload(environment: environment)
     }
 
-    func reload(environment: AppEnvironment) async {
+public     func reload(environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else {
             statusMessage = "Sign in to load this collection."
             return
@@ -42,7 +42,7 @@ final class CatalogListViewModel {
         }
     }
 
-    func loadNextPage() async {
+public     func loadNextPage() async {
         guard let snapshot else { return }
         let nextPage = loadedPage + 1
         let result = buildCatalogPage(

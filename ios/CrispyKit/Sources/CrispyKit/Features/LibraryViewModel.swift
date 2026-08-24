@@ -5,31 +5,31 @@ import Observation
 /// sections with cursor-based backend paging.
 @MainActor
 @Observable
-final class LibraryViewModel {
+public final class LibraryViewModel {
     enum Section: String, CaseIterable, Identifiable {
         case history = "History"
         case watchlist = "Watchlist"
         case ratings = "Ratings"
 
-        var id: String { rawValue }
+public         var id: String { rawValue }
     }
 
-    private(set) var sections: [Section] = Section.allCases
-    private(set) var selectedSection: Section = .history
-    private(set) var items: [MediaCard] = []
-    private(set) var isLoadingFirstPage = false
-    private(set) var statusMessage = ""
+    public private(set) var sections: [Section] = Section.allCases
+    public private(set) var selectedSection: Section = .history
+    public private(set) var items: [MediaCard] = []
+    public private(set) var isLoadingFirstPage = false
+    public private(set) var statusMessage = ""
 
     private var nextCursor: String?
     private var hasMore = false
     private var isFetchingNextPage = false
 
-    func loadIfNeeded(environment: AppEnvironment) async {
+public     func loadIfNeeded(environment: AppEnvironment) async {
         guard items.isEmpty else { return }
         await reload(environment: environment)
     }
 
-    func reload(environment: AppEnvironment) async {
+public     func reload(environment: AppEnvironment) async {
         items = []
         nextCursor = nil
         hasMore = true
@@ -38,13 +38,13 @@ final class LibraryViewModel {
         await fetchNextPage(environment: environment)
     }
 
-    func select(_ section: Section, environment: AppEnvironment) async {
+public     func select(_ section: Section, environment: AppEnvironment) async {
         guard section != selectedSection else { return }
         selectedSection = section
         await reload(environment: environment)
     }
 
-    func loadNextPageIfNeeded(current itemId: String, environment: AppEnvironment) async {
+public     func loadNextPageIfNeeded(current itemId: String, environment: AppEnvironment) async {
         guard hasMore, !isFetchingNextPage, !isLoadingFirstPage else { return }
         guard itemId == items.last?.id else { return }
         await fetchNextPage(environment: environment)
@@ -52,12 +52,12 @@ final class LibraryViewModel {
 
     /// Optimistic mark/unmark-watched toggle (server mutation without the
     /// outbox, which arrives in a later milestone).
-    func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnvironment) async {
+public     func setWatched(_ item: MediaCard, watched: Bool, environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else { return }
         if selectedSection == .history && !watched {
             items.removeAll { $0.id == item.id }
         }
-        let result = try? await (watched
+public         let result = try? await (watched
             ? environment.backend.markWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId)
             : environment.backend.unmarkWatched(accessToken: context.accessToken, profileId: context.profileId, itemId: item.itemId))
         _ = result

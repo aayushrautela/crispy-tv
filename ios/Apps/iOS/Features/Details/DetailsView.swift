@@ -139,12 +139,12 @@ struct DetailsScreen: View {
 
     @ViewBuilder
     private func metaLine(_ detail: MetadataTitleDetail) -> some View {
-        let parts = [
-            detail.item.releaseYear.map(String.init),
-            detail.item.certification ?? detail.item.status,
-            detail.item.runtimeMinutes.map { "\($0)m" },
-            formatRating(detail.item.rating).map { "★ \($0)" },
-        ].compactMap { $0 }.filter { !$0.isEmpty }
+        let yearPart: String? = detail.item.releaseYear.map(String.init)
+        let ratingPart: String? = formatRating(detail.item.rating).map { "★ \($0)" }
+        let runtimePart: String? = detail.item.runtimeMinutes.map { "\($0)m" }
+        let parts = [yearPart, detail.item.certification ?? detail.item.status, runtimePart, ratingPart]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
         if !parts.isEmpty {
             Text(parts.joined(separator: " · "))
                 .font(.footnote.weight(.semibold))
@@ -204,7 +204,7 @@ struct DetailsScreen: View {
     @ViewBuilder
     private func episodesSection(_ viewModel: DetailsViewModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Season", selection: Binding(
+            Picker("Season", selection: Binding<Int>(
                 get: { viewModel.selectedSeasonNumber ?? viewModel.seasons.first?.seasonNumber ?? 1 },
                 set: { newValue in
                     Task { await viewModel.selectSeason(newValue, environment: environment) }

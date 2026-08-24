@@ -2,40 +2,40 @@ import Foundation
 
 // MARK: - Account
 
-struct BackendUser: Equatable {
-    let id: String
-    let email: String?
+public struct BackendUser: Equatable {
+public     let id: String
+public     let email: String?
 }
 
-struct BackendProfile: Equatable, Identifiable {
-    let id: String
-    let name: String
-    let avatarUrl: String?
-    let isKids: Bool
-    let sortOrder: Int
+public struct BackendProfile: Equatable, Identifiable {
+public     let id: String
+public     let name: String
+public     let avatarUrl: String?
+public     let isKids: Bool
+public     let sortOrder: Int
 
-    var initials: String? {
+public     var initials: String? {
         let parts = name.split(whereSeparator: { $0 == " " }).prefix(2)
         let joined = parts.compactMap { $0.first.map(String.init) }.joined()
         return joined.isEmpty ? nil : joined.uppercased()
     }
 }
 
-struct MeResponse: Equatable {
-    let user: BackendUser
-    let profiles: [BackendProfile]
+public struct MeResponse: Equatable {
+public     let user: BackendUser
+public     let profiles: [BackendProfile]
 }
 
 // MARK: - Shared card shapes
 
-struct ResponsiveImageSetDto: Equatable {
-    let small: String?
-    let medium: String?
-    let large: String?
+public struct ResponsiveImageSetDto: Equatable {
+public     let small: String?
+public     let medium: String?
+public     let large: String?
 
-    var isEmpty: Bool { small == nil && medium == nil && large == nil }
+public     var isEmpty: Bool { small == nil && medium == nil && large == nil }
 
-    static func parse(_ json: [String: Any]?) -> ResponsiveImageSetDto {
+public     static func parse(_ json: [String: Any]?) -> ResponsiveImageSetDto {
         ResponsiveImageSetDto(
             small: json?.jsonString("small"),
             medium: json?.jsonString("medium"),
@@ -43,17 +43,17 @@ struct ResponsiveImageSetDto: Equatable {
         )
     }
 
-    static func empty() -> ResponsiveImageSetDto {
+public     static func empty() -> ResponsiveImageSetDto {
         ResponsiveImageSetDto(small: nil, medium: nil, large: nil)
     }
 }
 
-struct MediaExternalIds: Equatable {
-    let tmdb: Int?
-    let imdb: String?
-    let tvdb: Int?
+public struct MediaExternalIds: Equatable {
+public     let tmdb: Int?
+public     let imdb: String?
+public     let tvdb: Int?
 
-    static func parse(_ json: [String: Any]?) -> MediaExternalIds {
+public     static func parse(_ json: [String: Any]?) -> MediaExternalIds {
         MediaExternalIds(
             tmdb: json?.jsonInt("tmdb"),
             imdb: json?.jsonString("imdb"),
@@ -61,22 +61,22 @@ struct MediaExternalIds: Equatable {
         )
     }
 
-    static func empty() -> MediaExternalIds {
+public     static func empty() -> MediaExternalIds {
         MediaExternalIds(tmdb: nil, imdb: nil, tvdb: nil)
     }
 }
 
-struct ClientProgress: Equatable {
-    let played: Bool
-    let playCount: Int
-    let positionSeconds: Int?
-    let durationSeconds: Int?
-    let percent: Double?
-    let lastPlayedAt: String?
-    let watchlisted: Bool
-    let userRating: Double?
+public struct ClientProgress: Equatable {
+public     let played: Bool
+public     let playCount: Int
+public     let positionSeconds: Int?
+public     let durationSeconds: Int?
+public     let percent: Double?
+public     let lastPlayedAt: String?
+public     let watchlisted: Bool
+public     let userRating: Double?
 
-    static func parse(_ json: [String: Any]?) -> ClientProgress? {
+public     static func parse(_ json: [String: Any]?) -> ClientProgress? {
         guard let json, !json.isEmpty else { return nil }
         return ClientProgress(
             played: json.jsonBool("played", defaultValue: false),
@@ -91,14 +91,14 @@ struct ClientProgress: Equatable {
     }
 }
 
-struct ClientParentRef: Equatable {
-    let seriesItemId: String?
-    let seriesTitle: String?
-    let seasonItemId: String?
-    let seasonNumber: Int?
-    let episodeNumber: Int?
+public struct ClientParentRef: Equatable {
+public     let seriesItemId: String?
+public     let seriesTitle: String?
+public     let seasonItemId: String?
+public     let seasonNumber: Int?
+public     let episodeNumber: Int?
 
-    static func parse(_ json: [String: Any]?) -> ClientParentRef? {
+public     static func parse(_ json: [String: Any]?) -> ClientParentRef? {
         guard let json, !json.isEmpty else { return nil }
         return ClientParentRef(
             seriesItemId: json.jsonString("seriesItemId"),
@@ -110,13 +110,13 @@ struct ClientParentRef: Equatable {
     }
 }
 
-struct ClientImages: Equatable {
-    let poster: ResponsiveImageSetDto
-    let backdrop: ResponsiveImageSetDto
-    let logo: ResponsiveImageSetDto
-    let still: ResponsiveImageSetDto
+public struct ClientImages: Equatable {
+public     let poster: ResponsiveImageSetDto
+public     let backdrop: ResponsiveImageSetDto
+public     let logo: ResponsiveImageSetDto
+public     let still: ResponsiveImageSetDto
 
-    static func parse(_ json: [String: Any]?) -> ClientImages {
+public     static func parse(_ json: [String: Any]?) -> ClientImages {
         ClientImages(
             poster: ResponsiveImageSetDto.parse(json?.jsonObject("poster")),
             backdrop: ResponsiveImageSetDto.parse(json?.jsonObject("backdrop")),
@@ -126,29 +126,29 @@ struct ClientImages: Equatable {
     }
 }
 
-struct ClientMediaCard: Equatable, Identifiable {
-    let itemId: String
-    let mediaType: String
-    let title: String
-    let overview: String?
-    let year: Int?
-    let releaseDate: String?
-    let rating: Double?
-    let maturityRating: String?
-    let genres: [String]
-    let runtimeSeconds: Int?
-    let images: ClientImages
-    let progress: ClientProgress?
-    let parent: ClientParentRef?
-    let providerIds: MediaExternalIds
+public struct ClientMediaCard: Equatable, Identifiable {
+public     let itemId: String
+public     let mediaType: String
+public     let title: String
+public     let overview: String?
+public     let year: Int?
+public     let releaseDate: String?
+public     let rating: Double?
+public     let maturityRating: String?
+public     let genres: [String]
+public     let runtimeSeconds: Int?
+public     let images: ClientImages
+public     let progress: ClientProgress?
+public     let parent: ClientParentRef?
+public     let providerIds: MediaExternalIds
 
-    var id: String { itemId }
+public     var id: String { itemId }
 
-    var posterUrl: String? { images.poster.medium ?? images.poster.large ?? images.poster.small }
-    var backdropUrl: String? { images.backdrop.medium ?? images.backdrop.large ?? images.backdrop.small }
-    var logoUrl: String? { images.logo.medium ?? images.logo.large ?? images.logo.small }
+public     var posterUrl: String? { images.poster.medium ?? images.poster.large ?? images.poster.small }
+public     var backdropUrl: String? { images.backdrop.medium ?? images.backdrop.large ?? images.backdrop.small }
+public     var logoUrl: String? { images.logo.medium ?? images.logo.large ?? images.logo.small }
 
-    static func parse(_ json: [String: Any]) throws -> ClientMediaCard {
+public     static func parse(_ json: [String: Any]) throws -> ClientMediaCard {
         guard let itemId = json.jsonString("itemId"),
               let mediaType = json.jsonString("mediaType"),
               let title = json.jsonString("title") else {
@@ -173,104 +173,104 @@ struct ClientMediaCard: Equatable, Identifiable {
     }
 }
 
-struct ClientMediaCardQueryResult: Equatable {
-    let items: [ClientMediaCard]
-    let startIndex: Int
-    let totalRecordCount: Int
-    let nextCursor: String?
-    let hasMore: Bool
+public struct ClientMediaCardQueryResult: Equatable {
+public     let items: [ClientMediaCard]
+public     let startIndex: Int
+public     let totalRecordCount: Int
+public     let nextCursor: String?
+public     let hasMore: Bool
 }
 
 // MARK: - Home
 
-struct ProfileHomeSection: Equatable {
-    let listKey: String
-    let title: String
-    let subtitle: String?
-    let layout: String
-    let items: [ClientMediaCard]
-    let meta: [String: String]
+public struct ProfileHomeSection: Equatable {
+public     let listKey: String
+public     let title: String
+public     let subtitle: String?
+public     let layout: String
+public     let items: [ClientMediaCard]
+public     let meta: [String: String]
 }
 
-struct ProfileHomeResponse: Equatable {
-    let profileId: String
-    let generatedAt: String?
-    let expiresAt: String?
-    let sections: [ProfileHomeSection]
+public struct ProfileHomeResponse: Equatable {
+public     let profileId: String
+public     let generatedAt: String?
+public     let expiresAt: String?
+public     let sections: [ProfileHomeSection]
 }
 
 // MARK: - Search
 
-struct PersonSearchResultItem: Equatable, Identifiable {
-    let personId: String
-    let name: String
-    let knownForDepartment: String?
-    let profileUrl: String?
+public struct PersonSearchResultItem: Equatable, Identifiable {
+public     let personId: String
+public     let name: String
+public     let knownForDepartment: String?
+public     let profileUrl: String?
 
-    var id: String { personId }
+public     var id: String { personId }
 }
 
 /// Jellyfin BaseItemDto-shaped result used by /v1/search/titles.
-struct SearchMediaItem: Equatable, Identifiable {
-    let itemId: String
-    let itemType: String
-    let title: String
-    let posterUrl: String?
-    let backdropUrl: String?
-    let logoUrl: String?
-    let year: Int?
-    let rating: Double?
-    let genres: [String]
-    let maturityRating: String?
-    let overview: String?
-    let providerIds: MediaExternalIds
+public struct SearchMediaItem: Equatable, Identifiable {
+public     let itemId: String
+public     let itemType: String
+public     let title: String
+public     let posterUrl: String?
+public     let backdropUrl: String?
+public     let logoUrl: String?
+public     let year: Int?
+public     let rating: Double?
+public     let genres: [String]
+public     let maturityRating: String?
+public     let overview: String?
+public     let providerIds: MediaExternalIds
 
-    var id: String { itemId }
+public     var id: String { itemId }
 }
 
-struct SearchResultsResponse: Equatable {
-    let query: String
-    let movies: [SearchMediaItem]
-    let series: [SearchMediaItem]
-    let people: [PersonSearchResultItem]
+public struct SearchResultsResponse: Equatable {
+public     let query: String
+public     let movies: [SearchMediaItem]
+public     let series: [SearchMediaItem]
+public     let people: [PersonSearchResultItem]
 
-    var allTitles: [SearchMediaItem] {
+public     var allTitles: [SearchMediaItem] {
         let merged = movies + series
         return merged.sorted { ($0.rating ?? 0) > ($1.rating ?? 0) }
     }
 }
 
-struct SearchSuggestionItem: Equatable, Identifiable {
-    let itemId: String
-    let itemType: String
-    let title: String
-    let year: Int?
-    let posterUrl: String?
+public struct SearchSuggestionItem: Equatable, Identifiable {
+public     let itemId: String
+public     let itemType: String
+public     let title: String
+public     let year: Int?
+public     let posterUrl: String?
 
-    var id: String { itemId }
+public     var id: String { itemId }
 }
 
-struct SearchSuggestionsResponse: Equatable {
-    let suggestions: [SearchSuggestionItem]
+public struct SearchSuggestionsResponse: Equatable {
+public     let suggestions: [SearchSuggestionItem]
 }
 
 // MARK: - Watch actions
 
-struct WatchActionResponse: Equatable {
-    let accepted: Bool
-    let mode: String
-    let reason: String?
+public struct WatchActionResponse: Equatable {
+public     let accepted: Bool
+public     let mode: String
+public     let reason: String?
 }
 
 // MARK: - Metadata / details (Jellyfin BaseItemDto shapes, mirrors parseMetadata*)
 
-struct MetadataImagesDto: Equatable {
-    let poster: ResponsiveImageSetDto
-    let backdrop: ResponsiveImageSetDto
-    let still: ResponsiveImageSetDto
-    let logo: ResponsiveImageSetDto
+public struct MetadataImagesDto: Equatable {
+public     let poster: ResponsiveImageSetDto
+public     let backdrop: ResponsiveImageSetDto
+public     let still: ResponsiveImageSetDto
+public     let logo: ResponsiveImageSetDto
 
-    static func parse(_ json: [String: Any]?) -> MetadataImagesDto {
+public     static func parse(_ json: [String: Any]?) -> MetadataImagesDto {
         MetadataImagesDto(
             poster: ResponsiveImageSetDto.parse(json?.jsonObject("Primary")),
             backdrop: (json?.jsonObject("Backdrop") as? [[String: Any]]).flatMap { $0.first }.map { ResponsiveImageSetDto.parse($0) } ?? .empty(),
@@ -279,115 +279,115 @@ struct MetadataImagesDto: Equatable {
         )
     }
 
-    var posterUrl: String? { poster.medium ?? poster.large ?? poster.small }
-    var backdropUrl: String? { backdrop.medium ?? backdrop.large ?? backdrop.small }
-    var stillUrl: String? { still.medium ?? still.large ?? still.small }
-    var logoUrl: String? { logo.medium ?? logo.large ?? logo.small }
+public     var posterUrl: String? { poster.medium ?? poster.large ?? poster.small }
+public     var backdropUrl: String? { backdrop.medium ?? backdrop.large ?? backdrop.small }
+public     var stillUrl: String? { still.medium ?? still.large ?? still.small }
+public     var logoUrl: String? { logo.medium ?? logo.large ?? logo.small }
 }
 
 /// Detail view for a movie/show; also used for episode rows.
-struct MetadataItem: Equatable, Identifiable {
-    let itemId: String
-    let itemType: String
-    let title: String
-    let subtitle: String?
-    let overview: String?
-    let images: MetadataImagesDto
-    let releaseDate: String?
-    let releaseYear: Int?
-    let runtimeMinutes: Int?
-    let rating: Double?
-    let certification: String?
-    let status: String?
-    let genres: [String]
-    let seasonNumber: Int?
-    let episodeNumber: Int?
+public struct MetadataItem: Equatable, Identifiable {
+public     let itemId: String
+public     let itemType: String
+public     let title: String
+public     let subtitle: String?
+public     let overview: String?
+public     let images: MetadataImagesDto
+public     let releaseDate: String?
+public     let releaseYear: Int?
+public     let runtimeMinutes: Int?
+public     let rating: Double?
+public     let certification: String?
+public     let status: String?
+public     let genres: [String]
+public     let seasonNumber: Int?
+public     let episodeNumber: Int?
 
-    var id: String { itemId }
+public     var id: String { itemId }
 }
 
-struct MetadataEpisode: Equatable, Identifiable {
-    let itemId: String
-    let seasonNumber: Int?
-    let episodeNumber: Int?
-    let title: String
-    let summary: String?
-    let airDate: String?
-    let runtimeMinutes: Int?
-    let rating: Double?
-    let stillUrl: String?
-    let showItemId: String?
+public struct MetadataEpisode: Equatable, Identifiable {
+public     let itemId: String
+public     let seasonNumber: Int?
+public     let episodeNumber: Int?
+public     let title: String
+public     let summary: String?
+public     let airDate: String?
+public     let runtimeMinutes: Int?
+public     let rating: Double?
+public     let stillUrl: String?
+public     let showItemId: String?
 
-    var id: String { itemId }
+public     var id: String { itemId }
 }
 
-struct MetadataSeason: Equatable, Identifiable {
-    let itemId: String
-    let seasonNumber: Int
-    let title: String?
-    let summary: String?
-    let posterUrl: String?
+public struct MetadataSeason: Equatable, Identifiable {
+public     let itemId: String
+public     let seasonNumber: Int
+public     let title: String?
+public     let summary: String?
+public     let posterUrl: String?
 
-    var id: String { itemId }
+public     var id: String { itemId }
 
-    var displayTitle: String {
+public     var displayTitle: String {
         title.nilIfBlank ?? "Season \(seasonNumber)"
     }
 }
 
-struct MetadataPersonRef: Equatable, Identifiable {
-    let personId: String
-    let name: String
-    let role: String?
-    let department: String?
-    let profileUrl: String?
+public struct MetadataPersonRef: Equatable, Identifiable {
+public     let personId: String
+public     let name: String
+public     let role: String?
+public     let department: String?
+public     let profileUrl: String?
 
-    var id: String { personId }
+public     var id: String { personId }
 }
 
-struct MetadataCard: Equatable, Identifiable {
-    let itemId: String
-    let itemType: String
-    let title: String
-    let images: MetadataImagesDto
-    let releaseYear: Int?
-    let rating: Double?
+public struct MetadataCard: Equatable, Identifiable {
+public     let itemId: String
+public     let itemType: String
+public     let title: String
+public     let images: MetadataImagesDto
+public     let releaseYear: Int?
+public     let rating: Double?
 
-    var id: String { itemId }
+public     var id: String { itemId }
 }
 
-struct MetadataTitleDetail: Equatable {
-    let item: MetadataItem
-    let cast: [MetadataPersonRef]
-    let directors: [MetadataPersonRef]
-    let creators: [MetadataPersonRef]
+public struct MetadataTitleDetail: Equatable {
+public     let item: MetadataItem
+public     let cast: [MetadataPersonRef]
+public     let directors: [MetadataPersonRef]
+public     let creators: [MetadataPersonRef]
 }
 
-struct MetadataTitleExtras: Equatable {
-    let seasons: [MetadataSeason]
-    let similar: [MetadataCard]
+public struct MetadataTitleExtras: Equatable {
+public     let seasons: [MetadataSeason]
+public     let similar: [MetadataCard]
 }
 
-struct PersonKnownForItem: Equatable, Identifiable {
-    let itemId: String
-    let mediaType: String
-    let title: String
-    let posterUrl: String?
-    let backdropUrl: String?
-    let logoUrl: String?
-    let rating: Double?
-    let releaseYear: Int?
+public struct PersonKnownForItem: Equatable, Identifiable {
+public     let itemId: String
+public     let mediaType: String
+public     let title: String
+public     let posterUrl: String?
+public     let backdropUrl: String?
+public     let logoUrl: String?
+public     let rating: Double?
+public     let releaseYear: Int?
 
-    var id: String { itemId }
+public     var id: String { itemId }
 }
 
-struct PersonDetail: Equatable {
-    let personId: String
-    let name: String
-    let knownForDepartment: String?
-    let biography: String?
-    let birthday: String?
-    let placeOfBirth: String?
-    let profileUrl: String?
-    let knownFor: [PersonKnownForItem]
+public struct PersonDetail: Equatable {
+public     let personId: String
+public     let name: String
+public     let knownForDepartment: String?
+public     let biography: String?
+public     let birthday: String?
+public     let placeOfBirth: String?
+public     let profileUrl: String?
+public     let knownFor: [PersonKnownForItem]
 }

@@ -7,49 +7,49 @@ import ContractRunner
 /// Continue Watching rail on top.
 @MainActor
 @Observable
-final class HomeViewModel {
+public final class HomeViewModel {
     struct RailSection: Identifiable, Equatable {
-        let catalogId: String
-        let title: String
-        let items: [MediaCard]
+public         let catalogId: String
+public         let title: String
+public         let items: [MediaCard]
 
-        var id: String { catalogId }
+public         var id: String { catalogId }
     }
 
     struct PillSection: Identifiable, Equatable {
-        let catalogId: String
-        let title: String
+public         let catalogId: String
+public         let title: String
 
-        var id: String { catalogId }
+public         var id: String { catalogId }
     }
 
     struct HeroItem: Identifiable, Equatable {
-        let mediaKey: String
-        let title: String
-        let descriptionText: String
-        let ratingText: String?
-        let yearText: String?
-        let genres: [String]
-        let backdropUrl: String?
+public         let mediaKey: String
+public         let title: String
+public         let descriptionText: String
+public         let ratingText: String?
+public         let yearText: String?
+public         let genres: [String]
+public         let backdropUrl: String?
 
-        var id: String { mediaKey }
+public         var id: String { mediaKey }
     }
 
-    private(set) var pills: [PillSection] = []
-    private(set) var heroItems: [HeroItem] = []
-    private(set) var rails: [RailSection] = []
-    private(set) var continueWatchingItems: [MediaCard] = []
-    private(set) var isLoading = false
-    private(set) var statusMessage = ""
+    public private(set) var pills: [PillSection] = []
+    public private(set) var heroItems: [HeroItem] = []
+    public private(set) var rails: [RailSection] = []
+    public private(set) var continueWatchingItems: [MediaCard] = []
+    public private(set) var isLoading = false
+    public private(set) var statusMessage = ""
 
     private var didInitialLoad = false
 
-    func loadIfNeeded(environment: AppEnvironment) async {
+public     func loadIfNeeded(environment: AppEnvironment) async {
         guard !didInitialLoad else { return }
         await load(environment: environment)
     }
 
-    func load(environment: AppEnvironment) async {
+public     func load(environment: AppEnvironment) async {
         isLoading = true
         defer { isLoading = false }
 
@@ -80,7 +80,7 @@ final class HomeViewModel {
         }
     }
 
-    func dismissContinueWatching(_ item: MediaCard, environment: AppEnvironment) async {
+public     func dismissContinueWatching(_ item: MediaCard, environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else { return }
         continueWatchingItems.removeAll { $0.id == item.id }
         _ = try? await environment.backend.dismissContinueWatching(
@@ -105,7 +105,7 @@ final class HomeViewModel {
             )
         }
 
-        var rawByCatalogId: [String: [ClientMediaCard]] = [:]
+public         var rawByCatalogId: [String: [ClientMediaCard]] = [:]
         for section in rawSections {
             let key = section.listKey.trimmingCharacters(in: .whitespaces)
             let id = buildHomeCatalogId(

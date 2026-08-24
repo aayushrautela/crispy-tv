@@ -3,44 +3,44 @@ import ContractRunner
 
 /// UI-facing media card shared by Home/Discover/Library/Search, mirroring the
 /// fields the Android screens read off `CatalogItem`/`ClientMediaCard`.
-struct MediaCard: Identifiable, Equatable {
-    let itemId: String
-    let type: String
-    let title: String
-    let posterUrl: String?
-    let backdropUrl: String?
-    let logoUrl: String?
-    let ratingText: String?
-    let yearText: String?
-    let genre: String?
-    let maturityRating: String?
-    let description: String?
-    let progressPercent: Double?
-    let parentSeriesId: String?
+public struct MediaCard: Identifiable, Equatable {
+public     let itemId: String
+public     let type: String
+public     let title: String
+public     let posterUrl: String?
+public     let backdropUrl: String?
+public     let logoUrl: String?
+public     let ratingText: String?
+public     let yearText: String?
+public     let genre: String?
+public     let maturityRating: String?
+public     let description: String?
+public     let progressPercent: Double?
+public     let parentSeriesId: String?
 
-    var id: String { itemId }
+public     var id: String { itemId }
 
     /// The title identity whose details page should open for this card.
     /// Episode-shaped continue-watching cards route to their parent show.
-    var detailsItemId: String {
+public     var detailsItemId: String {
         if type == "episode", let parentSeriesId = parentSeriesId.nilIfBlank {
             return parentSeriesId
         }
         return itemId
     }
 
-    var detailsRoute: AppRoute {
+public     var detailsRoute: AppRoute {
         .details(itemId: detailsItemId, itemType: type == "episode" ? "show" : type)
     }
 }
 
-func formatRating(_ value: Double?) -> String? {
+public func formatRating(_ value: Double?) -> String? {
     guard let value, value.isFinite, value > 0 else { return nil }
     return String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), value)
 }
 
 extension MediaCard {
-    static func from(_ card: ClientMediaCard) -> MediaCard {
+public     static func from(_ card: ClientMediaCard) -> MediaCard {
         MediaCard(
             itemId: card.itemId,
             type: normalizeCatalogType(card.mediaType),
@@ -61,7 +61,7 @@ extension MediaCard {
         )
     }
 
-    static func from(_ item: HomeCatalogItem) -> MediaCard {
+public     static func from(_ item: HomeCatalogItem) -> MediaCard {
         MediaCard(
             itemId: item.mediaKey,
             type: item.type,
@@ -79,7 +79,7 @@ extension MediaCard {
         )
     }
 
-    static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
+public     static func from(_ suggestion: SearchSuggestionItem) -> MediaCard {
         MediaCard(
             itemId: suggestion.itemId,
             type: suggestion.itemType,
@@ -97,7 +97,7 @@ extension MediaCard {
         )
     }
 
-    static func from(_ item: SearchMediaItem) -> MediaCard {
+public     static func from(_ item: SearchMediaItem) -> MediaCard {
         MediaCard(
             itemId: item.itemId,
             type: item.itemType,
@@ -117,7 +117,7 @@ extension MediaCard {
 }
 
 /// Mirrors the Android mediaType → catalog type normalization.
-func normalizeCatalogType(_ raw: String) -> String {
+public func normalizeCatalogType(_ raw: String) -> String {
     switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
     case "anime": return "anime"
     case "episode", "show", "tv", "series": return "show"

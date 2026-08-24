@@ -3,25 +3,25 @@ import Foundation
 /// Lenient JSON accessors mirroring the Kotlin `org.json` opt* helpers used by
 /// the Android backend parsers. Missing keys and wrong types yield nil/defaults.
 extension Dictionary where Key == String, Value == Any {
-    func jsonString(_ key: String) -> String? {
+public     func jsonString(_ key: String) -> String? {
         (self[key] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
     }
 
-    func jsonInt(_ key: String) -> Int? {
+public     func jsonInt(_ key: String) -> Int? {
         let value = self[key]
         if let number = value as? NSNumber { return number.intValue }
         if let string = value as? String { return Int(string.trimmingCharacters(in: .whitespacesAndNewlines)) }
         return nil
     }
 
-    func jsonDouble(_ key: String) -> Double? {
+public     func jsonDouble(_ key: String) -> Double? {
         let value = self[key]
         if let number = value as? NSNumber { return number.doubleValue }
         if let string = value as? String { return Double(string.trimmingCharacters(in: .whitespacesAndNewlines)) }
         return nil
     }
 
-    func jsonBool(_ key: String, defaultValue: Bool) -> Bool {
+public     func jsonBool(_ key: String, defaultValue: Bool) -> Bool {
         let value = self[key]
         if let number = value as? NSNumber { return number.boolValue }
         if let string = value as? String {
@@ -34,21 +34,21 @@ extension Dictionary where Key == String, Value == Any {
         return defaultValue
     }
 
-    func jsonObject(_ key: String) -> [String: Any]? {
+public     func jsonObject(_ key: String) -> [String: Any]? {
         self[key] as? [String: Any]
     }
 
-    func jsonArray(_ key: String) -> [[String: Any]] {
+public     func jsonArray(_ key: String) -> [[String: Any]] {
         guard let array = self[key] as? [Any] else { return [] }
         return array.compactMap { $0 as? [String: Any] }
     }
 
-    func jsonStringList(_ key: String) -> [String] {
+public     func jsonStringList(_ key: String) -> [String] {
         guard let array = self[key] as? [Any] else { return [] }
         return array.compactMap { ($0 as? String)?.nilIfBlank }
     }
 
-    func jsonStringMap(_ key: String) -> [String: String] {
+public     func jsonStringMap(_ key: String) -> [String: String] {
         guard let object = self[key] as? [String: Any] else { return [:] }
         var result: [String: String] = [:]
         for (mapKey, mapValue) in object {
@@ -62,8 +62,8 @@ extension Dictionary where Key == String, Value == Any {
     }
 }
 
-enum JsonParser {
-    static func parseObject(_ body: String) throws -> [String: Any] {
+public enum JsonParser {
+public     static func parseObject(_ body: String) throws -> [String: Any] {
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CrispyParseError.emptyBody
         }
@@ -73,13 +73,13 @@ enum JsonParser {
         return object
     }
 
-    static func encodeObject(_ object: [String: Any]) throws -> String {
+public     static func encodeObject(_ object: [String: Any]) throws -> String {
         let data = try JSONSerialization.data(withJSONObject: object)
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 }
 
-enum CrispyParseError: Error {
+public enum CrispyParseError: Error {
     case emptyBody
     case notAnObject
 }

@@ -3,31 +3,31 @@ import Security
 
 /// The single representation of a Supabase auth session, mirroring
 /// `com.crispy.tv.accounts.Session`.
-struct Session: Codable, Equatable {
-    let accessToken: String
-    let refreshToken: String
-    let expiresAtEpochSec: Int64?
-    let userId: String?
-    let email: String?
-    let anonymous: Bool
+public struct Session: Codable, Equatable {
+public     let accessToken: String
+public     let refreshToken: String
+public     let expiresAtEpochSec: Int64?
+public     let userId: String?
+public     let email: String?
+public     let anonymous: Bool
 }
 
-protocol SessionStoring {
-    func current() -> Session?
-    func save(_ session: Session)
-    func clear()
+public protocol SessionStoring {
+public     func current() -> Session?
+public     func save(_ session: Session)
+public     func clear()
 }
 
 /// Keychain-backed session persistence (Android uses EncryptedSharedPreferences).
-final class KeychainSessionStore: SessionStoring {
+public final class KeychainSessionStore: SessionStoring {
     private let service: String
     private let account = "default"
 
-    init(service: String = "com.crispy.rewrite.session") {
+public     init(service: String = "com.crispy.rewrite.session") {
         self.service = service
     }
 
-    func current() -> Session? {
+public     func current() -> Session? {
         var query = baseQuery()
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -38,7 +38,7 @@ final class KeychainSessionStore: SessionStoring {
         return try? JSONDecoder().decode(Session.self, from: data)
     }
 
-    func save(_ session: Session) {
+public     func save(_ session: Session) {
         clear()
         guard let data = try? JSONEncoder().encode(session) else { return }
         var query = baseQuery()
@@ -47,7 +47,7 @@ final class KeychainSessionStore: SessionStoring {
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    func clear() {
+public     func clear() {
         SecItemDelete(baseQuery() as CFDictionary)
     }
 
@@ -61,10 +61,10 @@ final class KeychainSessionStore: SessionStoring {
 }
 
 /// Persists the active profile per user (Android: SharedPreferences ActiveProfileStore).
-final class ActiveProfileStore {
+public final class ActiveProfileStore {
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+public     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
@@ -72,11 +72,11 @@ final class ActiveProfileStore {
         "crispy.activeProfile.\(userId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")"
     }
 
-    func activeProfileId(userId: String?) -> String? {
+public     func activeProfileId(userId: String?) -> String? {
         defaults.string(forKey: key(userId))?.nilIfBlank
     }
 
-    func setActiveProfileId(_ profileId: String?, userId: String?) {
+public     func setActiveProfileId(_ profileId: String?, userId: String?) {
         let storageKey = key(userId)
         if let profileId = profileId?.nilIfBlank {
             defaults.set(profileId, forKey: storageKey)
@@ -85,7 +85,7 @@ final class ActiveProfileStore {
         }
     }
 
-    func clear(userId: String?) {
+public     func clear(userId: String?) {
         defaults.removeObject(forKey: key(userId))
     }
 }

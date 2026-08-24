@@ -6,24 +6,24 @@ import Observation
 /// with the details milestone.
 @MainActor
 @Observable
-final class SearchViewModel {
-    private(set) var query = ""
-    private(set) var suggestions: [MediaCard] = []
-    private(set) var results: [MediaCard] = []
-    private(set) var history: [String] = []
-    private(set) var isSearching = false
-    private(set) var statusMessage = ""
+public final class SearchViewModel {
+    public private(set) var query = ""
+    public private(set) var suggestions: [MediaCard] = []
+    public private(set) var results: [MediaCard] = []
+    public private(set) var history: [String] = []
+    public private(set) var isSearching = false
+    public private(set) var statusMessage = ""
 
     private var suggestionsTask: Task<Void, Never>?
     private let historyStore = SearchHistoryStore()
 
-    func loadHistoryIfNeeded() {
+public     func loadHistoryIfNeeded() {
         if history.isEmpty {
             history = historyStore.recentQueries()
         }
     }
 
-    func updateQuery(_ text: String, environment: AppEnvironment) {
+public     func updateQuery(_ text: String, environment: AppEnvironment) {
         query = text
         results = []
         statusMessage = ""
@@ -40,7 +40,7 @@ final class SearchViewModel {
         }
     }
 
-    func submit(environment: AppEnvironment) async {
+public     func submit(environment: AppEnvironment) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         suggestionsTask?.cancel()
@@ -68,12 +68,12 @@ final class SearchViewModel {
         }
     }
 
-    func submitSuggestion(_ suggestion: MediaCard, environment: AppEnvironment) async {
+public     func submitSuggestion(_ suggestion: MediaCard, environment: AppEnvironment) async {
         query = suggestion.title
         await submit(environment: environment)
     }
 
-    func clearHistory() {
+public     func clearHistory() {
         historyStore.clear()
         history = []
     }
@@ -104,20 +104,20 @@ final class SearchViewModel {
 
 /// Recent search queries persisted to UserDefaults (Android: SharedPreferences
 /// SearchHistoryStore).
-struct SearchHistoryStore {
+public struct SearchHistoryStore {
     private let defaults: UserDefaults
     private let key = "crispy.search.history"
     private let limit = 8
 
-    init(defaults: UserDefaults = .standard) {
+public     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
-    func recentQueries() -> [String] {
+public     func recentQueries() -> [String] {
         defaults.stringArray(forKey: key) ?? []
     }
 
-    func recordQuery(_ raw: String) {
+public     func recordQuery(_ raw: String) {
         let query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
         var current = recentQueries().filter { $0.caseInsensitiveCompare(query) != .orderedSame }
@@ -128,7 +128,7 @@ struct SearchHistoryStore {
         defaults.set(current, forKey: key)
     }
 
-    func clear() {
+public     func clear() {
         defaults.removeObject(forKey: key)
     }
 }

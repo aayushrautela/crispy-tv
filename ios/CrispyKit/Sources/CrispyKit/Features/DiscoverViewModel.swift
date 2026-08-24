@@ -6,12 +6,12 @@ import ContractRunner
 /// home snapshot via the contract planner, pages built with `buildCatalogPage`.
 @MainActor
 @Observable
-final class DiscoverViewModel {
+public final class DiscoverViewModel {
     struct CatalogOption: Identifiable, Equatable {
-        let catalogId: String
-        let title: String
+public         let catalogId: String
+public         let title: String
 
-        var id: String { catalogId }
+public         var id: String { catalogId }
     }
 
     enum TypeFilter: String, CaseIterable, Identifiable {
@@ -19,9 +19,9 @@ final class DiscoverViewModel {
         case movies = "Movies"
         case series = "Series"
 
-        var id: String { rawValue }
+public         var id: String { rawValue }
 
-        var mediaType: String? {
+public         var mediaType: String? {
             switch self {
             case .all: return nil
             case .movies: return "movie"
@@ -30,22 +30,22 @@ final class DiscoverViewModel {
         }
     }
 
-    private(set) var catalogs: [CatalogOption] = []
-    private(set) var selectedCatalog: CatalogOption?
-    private(set) var typeFilter: TypeFilter = .movies
-    private(set) var items: [MediaCard] = []
-    private(set) var isLoadingFirstPage = false
-    private(set) var statusMessage = ""
+    public private(set) var catalogs: [CatalogOption] = []
+    public private(set) var selectedCatalog: CatalogOption?
+    public private(set) var typeFilter: TypeFilter = .movies
+    public private(set) var items: [MediaCard] = []
+    public private(set) var isLoadingFirstPage = false
+    public private(set) var statusMessage = ""
 
     private var snapshot: HomeCatalogSnapshot?
     private var loadedPage = 0
 
-    func loadIfNeeded(environment: AppEnvironment) async {
+public     func loadIfNeeded(environment: AppEnvironment) async {
         guard snapshot == nil else { return }
         await reload(environment: environment)
     }
 
-    func reload(environment: AppEnvironment) async {
+public     func reload(environment: AppEnvironment) async {
         guard let context = await environment.backendContext() else {
             statusMessage = "Sign in and select a profile to load catalogs."
             return
@@ -67,7 +67,7 @@ final class DiscoverViewModel {
         }
     }
 
-    func select(_ option: CatalogOption?, environment: AppEnvironment) async {
+public     func select(_ option: CatalogOption?, environment: AppEnvironment) async {
         selectedCatalog = option
         items = []
         loadedPage = 0
@@ -76,7 +76,7 @@ final class DiscoverViewModel {
         await loadNextPage(environment: environment)
     }
 
-    func setTypeFilter(_ filter: TypeFilter, environment: AppEnvironment) async {
+public     func setTypeFilter(_ filter: TypeFilter, environment: AppEnvironment) async {
         typeFilter = filter
         refreshCatalogOptions()
         if let selected = selectedCatalog, !catalogs.contains(selected) {
@@ -90,10 +90,10 @@ final class DiscoverViewModel {
     }
 
     /// Loads the next page when the grid approaches the end.
-    func loadNextPage(environment: AppEnvironment) async {
+public     func loadNextPage(environment: AppEnvironment) async {
         guard let snapshot, let selectedCatalog else { return }
-        let nextPage = loadedPage + 1
-        let result = buildCatalogPage(
+public         let nextPage = loadedPage + 1
+public         let result = buildCatalogPage(
             snapshot: snapshot,
             sectionCatalogId: selectedCatalog.catalogId,
             page: nextPage,
@@ -110,7 +110,7 @@ final class DiscoverViewModel {
             catalogs = []
             return
         }
-        let (refs, message) = listDiscoverCatalogs(snapshot: snapshot, mediaType: typeFilter.mediaType)
+public         let (refs, message) = listDiscoverCatalogs(snapshot: snapshot, mediaType: typeFilter.mediaType)
         catalogs = refs.map { ref in
             CatalogOption(catalogId: ref.section.catalogId, title: ref.section.displayTitle)
         }
