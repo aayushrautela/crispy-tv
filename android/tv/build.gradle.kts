@@ -144,6 +144,7 @@ dependencies {
     implementation(project(":android:watchhistory"))
     implementation(project(":android:backend"))
     implementation(project(":android:addons"))
+    implementation(project(":android:ui-assets"))
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 

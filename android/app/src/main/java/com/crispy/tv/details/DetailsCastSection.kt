@@ -35,7 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.crispy.tv.R
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.ui.components.rememberCrispyImageModel
 

@@ -4,7 +4,7 @@ import androidx.annotation.RawRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import coil3.compose.AsyncImage
-import com.crispy.tv.R
+import com.crispy.tv.ui.assets.R
 
 @Composable
 fun CrispyMark(modifier: Modifier = Modifier) {

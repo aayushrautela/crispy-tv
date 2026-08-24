@@ -34,7 +34,7 @@ import com.crispy.tv.addons.util.formatRating
 import com.crispy.tv.addons.util.formatRatingOutOfTen
 import com.crispy.tv.addons.util.normalizeRatingText
 import com.crispy.tv.backend.CrispyBackendClient
-import com.crispy.tv.tv.R
+import com.crispy.tv.ui.assets.R
 
 private data class TvRatingPill(
     val key: String,

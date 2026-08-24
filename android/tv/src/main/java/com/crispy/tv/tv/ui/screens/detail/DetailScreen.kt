@@ -48,7 +48,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import com.crispy.tv.tv.R
+import com.crispy.tv.ui.assets.R
 import com.crispy.tv.tv.ui.components.CrispyLandscapeCard
 import com.crispy.tv.tv.ui.components.RailSection
 import com.crispy.tv.tv.ui.components.skeletonElement
