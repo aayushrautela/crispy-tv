@@ -4,7 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.crispy.tv.backend.BackendContext
+import com.crispy.tv.addons.mapping.toMediaDetails
+import com.crispy.tv.addons.lookup.buildAddonEpisodeLookupId
+import com.crispy.tv.addons.lookup.resolveStreamLookupTarget
 import com.crispy.tv.backend.CrispyBackendClient
+import com.crispy.tv.player.MetadataLabMediaType
 import com.crispy.tv.tv.di.TvServices
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -18,6 +22,7 @@ data class DetailEpisodeUi(
     val seasonNumber: Int?,
     val episodeNumber: Int?,
     val title: String,
+    val lookupId: String? = null,
     val airDate: String?,
     val runtimeMinutes: Int?,
     val overview: String?,
@@ -41,6 +46,8 @@ data class DetailUiState(
     val episodesLoading: Boolean = false,
     val cast: List<String> = emptyList(),
     val similar: List<com.crispy.tv.tv.ui.components.CrispyCardItem> = emptyList(),
+    val lookupMediaTypeName: String? = null,
+    val lookupId: String? = null,
 )
 
 class DetailViewModel(
@@ -110,6 +117,20 @@ class DetailViewModel(
             val firstSeason = extras?.seasons?.minOfOrNull { it.seasonNumber } ?: 1
             val episodes = if (isSeries) loadEpisodes(context, firstSeason) else emptyList()
 
+            val detailsModel = item.toMediaDetails()
+            val fallbackType = if (!item.seasonCount.isNullOrEmptyOrZero()) {
+                MetadataLabMediaType.SERIES
+            } else {
+                MetadataLabMediaType.MOVIE
+            }
+            val lookupTarget =
+                resolveStreamLookupTarget(
+                    details = detailsModel,
+                    selectedSeason = null,
+                    seasonEpisodes = emptyList(),
+                    fallbackMediaType = fallbackType,
+                )
+
             val metaParts = buildList {
                 item.releaseYear?.let { add(it.toString()) }
                 item.runtimeMinutes?.let { add("${it}m") }
@@ -135,6 +156,8 @@ class DetailViewModel(
                 selectedSeason = if (isSeries) firstSeason else null,
                 episodes = episodes,
                 cast = detail.cast.take(12).map { it.name },
+                lookupMediaTypeName = lookupTarget.mediaType.name,
+                lookupId = lookupTarget.lookupId,
                 similar = extras?.similar.orEmpty()
                     .filter { it.itemId != null }
                     .map { card ->
@@ -171,6 +194,8 @@ class DetailViewModel(
                         seasonNumber = ep.seasonNumber,
                         episodeNumber = ep.episodeNumber,
                         title = ep.title ?: "Episode ${ep.episodeNumber ?: ""}".trim(),
+                        lookupId = buildAddonEpisodeLookupId(ep.externalIds.imdb, ep.seasonNumber, ep.episodeNumber)
+                            ?: ep.itemId,
                         airDate = ep.releaseDate,
                         runtimeMinutes = ep.runtimeMinutes,
                         overview = ep.summary ?: ep.overview,

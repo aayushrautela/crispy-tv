@@ -22,7 +22,9 @@ import android.app.Application
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.crispy.tv.tv.player.TvPlayerViewModel
+import com.crispy.tv.tv.sources.TvSourcesViewModel
 import com.crispy.tv.tv.ui.screens.player.TvPlayerScreen
+import com.crispy.tv.tv.ui.sources.TvSourcesScreen
 import com.crispy.tv.tv.home.HomeViewModel
 import com.crispy.tv.tv.session.TvSessionState
 import com.crispy.tv.tv.session.TvSessionViewModel
@@ -115,6 +117,32 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                 )
             }
             composable(
+                "sources/{itemId}/{mediaType}/{lookupId}",
+                arguments = listOf(
+                    navArgument("itemId") { type = NavType.StringType },
+                    navArgument("mediaType") { type = NavType.StringType },
+                    navArgument("lookupId") { type = NavType.StringType },
+                ),
+            ) { entry ->
+                val itemIdArg = entry.arguments?.getString("itemId").orEmpty()
+                val mediaTypeArg = entry.arguments?.getString("mediaType").orEmpty()
+                val lookupIdArg = entry.arguments?.getString("lookupId").orEmpty()
+                val appCtx = LocalContext.current.applicationContext as Application
+                val sourcesViewModel: TvSourcesViewModel = viewModel(
+                    key = "sources-$itemIdArg-$mediaTypeArg-$lookupIdArg",
+                    initializer = { TvSourcesViewModel(appCtx, mediaTypeArg, lookupIdArg) },
+                )
+                val sourcesState by sourcesViewModel.state.collectAsStateWithLifecycle()
+                TvSourcesScreen(
+                    state = sourcesState,
+                    onPick = { row ->
+                        if (sourcesViewModel.onSourcePicked(row) && !row.url.isNullOrBlank()) {
+                            navController.navigate("play/$itemIdArg?streamUrl=" + android.net.Uri.encode(row.url))
+                        }
+                    },
+                )
+            }
+            composable(
                 "play/{itemId}?streamUrl={streamUrl}",
                 arguments = listOf(
                     navArgument("itemId") { type = NavType.StringType },
@@ -147,7 +175,14 @@ private fun SignedInApp(sessionViewModel: TvSessionViewModel) {
                     onSelectSeason = detailViewModel::selectSeason,
                     onOpenItem = { nextId -> navController.navigate("detail/$nextId") },
                     onBack = { navController.popBackStack() },
-                    onPlay = { id -> navController.navigate("play/$id") },
+                    onPlay = { id ->
+                        val target = detailState
+                        if (target?.lookupMediaTypeName != null && !target.lookupId.isNullOrBlank()) {
+                            navController.navigate("sources/$id/${target.lookupMediaTypeName}/${android.net.Uri.encode(target.lookupId)}")
+                        } else {
+                            navController.navigate("play/$id")
+                        }
+                    },
                 )
             }
             composable(TvDestination.Search.route) { SearchScreen() }
