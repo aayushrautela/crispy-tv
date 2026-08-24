@@ -1,6 +1,7 @@
 package com.crispy.tv
 
 import android.content.Context
+import androidx.media3.common.util.UnstableApi
 import com.crispy.tv.accounts.SupabaseServicesProvider
 import com.crispy.tv.audio.AudioFocusManager
 import com.crispy.tv.backend.BackendContextResolverProvider
@@ -98,6 +99,7 @@ private fun newSupabaseSyncService(
     )
 }
 
+@OptIn(UnstableApi::class)
 object PlaybackDependencies {
     @Volatile
     var playbackControllerFactory: (Context) -> PlaybackController =
