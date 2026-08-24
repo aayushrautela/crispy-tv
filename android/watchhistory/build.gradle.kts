@@ -20,5 +20,7 @@ dependencies {
     implementation(project(":android:core-domain"))
     implementation(project(":android:player"))
     implementation(project(":android:network"))
+    implementation(project(":android:backend"))
+
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }
