@@ -954,7 +954,7 @@ class DetailsViewModel internal constructor(
                         statusMessage =
                             when {
                                 updatedProvider == null -> "Provider no longer available."
-                                updatedProvider.errorMessage != null -> updatedProvider.errorMessage
+                                updatedProvider.errorMessage != null -> updatedProvider.errorMessage ?: "" 
                                 else -> ""
                             },
                     )
