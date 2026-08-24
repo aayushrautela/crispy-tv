@@ -1,6 +1,5 @@
 package com.crispy.tv.ai
 
-import androidx.compose.runtime.Immutable
 import com.crispy.tv.backend.CrispyBackendClient
 
 enum class AiInsightSlideKey(val wire: String) {
@@ -41,7 +40,6 @@ enum class AiInsightStandoutTag(val wire: String) {
     }
 }
 
-@Immutable
 data class AiInsightSlide(
     val key: AiInsightSlideKey,
     val label: String,
@@ -54,7 +52,6 @@ data class AiInsightSlide(
     val accent: String,
 )
 
-@Immutable
 data class AiInsightsResult(
     val slides: List<AiInsightSlide>,
 )

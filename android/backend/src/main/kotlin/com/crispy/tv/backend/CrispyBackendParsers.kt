@@ -1,6 +1,5 @@
 package com.crispy.tv.backend
 
-import com.crispy.tv.BuildConfig
 import com.crispy.tv.domain.account.builtInAvatarUrl
 import com.crispy.tv.ai.AiInsightSlide
 import com.crispy.tv.ai.AiInsightSlideKey
@@ -183,7 +182,7 @@ internal fun CrispyBackendClient.parseAvatars(array: JSONArray?): List<Avatar> {
                 Avatar(
                     id = id,
                     url = obj.optString("url").trim().ifBlank { null }
-                        ?: com.crispy.tv.domain.account.builtInAvatarUrl(BuildConfig.CRISPY_BACKEND_URL, id),
+                        ?: com.crispy.tv.domain.account.builtInAvatarUrl(baseUrl, id),
                 ),
             )
         }
