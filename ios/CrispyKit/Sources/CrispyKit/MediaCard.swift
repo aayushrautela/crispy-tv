@@ -17,6 +17,7 @@ public let maturityRating: String?
 public let description: String?
 public let progressPercent: Double?
 public let parentSeriesId: String?
+public let watchlisted: Bool
 
 public var id: String { itemId }
 

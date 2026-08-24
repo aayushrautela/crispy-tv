@@ -243,9 +243,11 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
     }
 
     public func deleteAccount(accessToken: String) async throws {
-        _ = try await perform(
-            await httpClient.delete(url: try requireURL(queryComponents(path: "/v1/account").url), headers: authHeaders(accessToken))
+        let response = try await httpClient.delete(
+            url: try requireURL(queryComponents(path: "/v1/account").url),
+            headers: authHeaders(accessToken)
         )
+        _ = try perform(response)
     }
 
     // MARK: - Metadata / details
