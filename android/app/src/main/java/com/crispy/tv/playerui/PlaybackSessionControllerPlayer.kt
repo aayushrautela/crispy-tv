@@ -78,6 +78,17 @@ internal class PlaybackSessionControllerPlayer(
         val builder = State.Builder()
             .setAvailableCommands(
                 Player.Commands.Builder()
+                    // Reads: getState() mirrors the full controller snapshot, so every
+                    // getter is genuinely supported. SimpleBasePlayer does not add these
+                    // implicitly, and Media3 publishes EMPTY metadata and duration=-1 to
+                    // the platform session without them, which kills the system media
+                    // card's seek bar and artwork.
+                    .add(Player.COMMAND_GET_TIMELINE)
+                    .add(Player.COMMAND_GET_METADATA)
+                    .add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
+                    .add(Player.COMMAND_GET_TRACKS)
+                    .add(Player.COMMAND_GET_TRACK_SELECTION_PARAMETERS)
+                    // Controls forwarded to the playback controller in handle* below.
                     .add(Player.COMMAND_PLAY_PAUSE)
                     .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
                     .add(Player.COMMAND_SEEK_BACK)
