@@ -23,8 +23,16 @@ public final class HomeViewModel {
         public var id: String { catalogId }
     }
 
+    public struct ThisWeekItem: Identifiable, Equatable {
+        public let card: MediaCard
+        public let badge: String?
+
+        public var id: String { card.id }
+    }
+
     public struct HeroItem: Identifiable, Equatable {
         public let mediaKey: String
+        public let type: String
         public let title: String
         public let descriptionText: String
         public let ratingText: String?
@@ -39,6 +47,7 @@ public final class HomeViewModel {
     public private(set) var heroItems: [HeroItem] = []
     public private(set) var rails: [RailSection] = []
     public private(set) var continueWatchingItems: [MediaCard] = []
+    public private(set) var thisWeekItems: [ThisWeekItem] = []
     public private(set) var isLoading = false
     public private(set) var statusMessage = ""
 
@@ -65,6 +74,10 @@ public func load(environment: AppEnvironment) async {
                 profileId: context.profileId,
                 limit: 20
             )
+            async let thisWeekResult = try? environment.backend.getCalendarThisWeek(
+                accessToken: context.accessToken,
+                profileId: context.profileId
+            )
 
             let response = try await homeResponse
             apply(
@@ -74,6 +87,9 @@ public func load(environment: AppEnvironment) async {
 
             let continueWatching = try await continueWatchingResult
             continueWatchingItems = continueWatching.items.map { MediaCard.from($0) }
+            if let thisWeek = await thisWeekResult {
+                thisWeekItems = thisWeek.map(Self.makeThisWeekItem)
+            }
             didInitialLoad = true
         } catch {
             statusMessage = error.localizedDescription
@@ -90,12 +106,33 @@ public func dismissContinueWatching(_ item: MediaCard, environment: AppEnvironme
         )
     }
 
+    private static func makeThisWeekItem(_ item: SearchMediaItem) -> ThisWeekItem {
+        let dateText = item.releaseDate ?? item.airDate
+        let badge = dateText.flatMap(dayLabel(from:))
+        return ThisWeekItem(card: MediaCard.from(item), badge: badge)
+    }
+
+    /// "Mon"-style label for an ISO date string.
+    private static func dayLabel(from isoDate: String) -> String? {
+        guard isoDate.count >= 10 else { return nil }
+        let parts = isoDate.prefix(10).split(separator: "-")
+        guard parts.count == 3,
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]) else { return nil }
+        let components = DateComponents(year: year, month: month, day: day)
+        guard let date = Calendar(identifier: .gregorian).date(from: components) else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.string(from: date)
+    }
+
     // MARK: - Planning
 
     private func apply(planned: HomeCatalogFeedPlan, rawSections: [ProfileHomeSection]) {
         heroItems = planned.heroResult.items.map { item in
             HeroItem(
                 mediaKey: item.mediaKey,
+                type: item.type,
                 title: item.title,
                 descriptionText: item.description,
                 ratingText: item.rating,

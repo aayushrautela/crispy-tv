@@ -93,6 +93,31 @@ struct HomeScreen: View {
             }
         }
 
+        if !viewModel.thisWeekItems.isEmpty {
+            RailSectionView(title: "This week") {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: Theme.railSpacing) {
+                        ForEach(viewModel.thisWeekItems) { entry in
+                            NavigationLink(value: entry.card.detailsRoute) {
+                                LandscapeCardView(
+                                    title: entry.card.title,
+                                    backdropUrl: entry.card.backdropUrl ?? entry.card.posterUrl,
+                                    logoUrl: entry.card.logoUrl,
+                                    ratingText: entry.card.ratingText,
+                                    yearText: nil,
+                                    maturityRating: nil,
+                                    genre: nil,
+                                    badge: entry.badge
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+        }
+
         ForEach(viewModel.rails) { rail in
             RailSectionView(
                 title: rail.title,
@@ -141,8 +166,11 @@ struct HomeScreen: View {
     private var heroCarousel: some View {
         TabView {
             ForEach(viewModel.heroItems) { hero in
-                HeroCardView(hero: hero)
-                    .padding(.horizontal, 16)
+                NavigationLink(value: AppRoute.details(itemId: hero.mediaKey, itemType: hero.type)) {
+                    HeroCardView(hero: hero)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .automatic))

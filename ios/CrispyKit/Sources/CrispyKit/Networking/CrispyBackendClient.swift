@@ -250,6 +250,13 @@ public func searchSuggestions(accessToken: String, query: String, limit: Int = 8
         _ = try perform(response)
     }
 
+    // MARK: - Calendar
+
+    public func getCalendarThisWeek(accessToken: String, profileId: String) async throws -> [SearchMediaItem] {
+        let json = try await getJson(path: "/v1/profiles/\(profileId)/calendar/this-week", accessToken: accessToken)
+        return json.jsonArray("items").compactMap(parseSearchMediaItem)
+    }
+
     // MARK: - Metadata / details
 
 public func getMetadataItemDetail(accessToken: String, itemId: String) async throws -> MetadataTitleDetail {
@@ -362,7 +369,8 @@ public func unmarkWatched(accessToken: String, profileId: String, itemId: String
             genres: json.jsonStringList("Genres"),
             maturityRating: json.jsonString("OfficialRating"),
             overview: json.jsonString("Overview"),
-            providerIds: MediaExternalIds.parse(json.jsonObject("ProviderIds"))
+            providerIds: MediaExternalIds.parse(json.jsonObject("ProviderIds")),
+            seriesItemId: json.jsonString("SeriesId")
         )
     }
 

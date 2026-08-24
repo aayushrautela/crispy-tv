@@ -115,7 +115,7 @@ public static func from(_ item: SearchMediaItem) -> MediaCard {
             maturityRating: item.maturityRating,
             description: item.overview,
             progressPercent: nil,
-            parentSeriesId: nil,
+            parentSeriesId: item.seriesItemIdnil,
             watchlisted: false
         )
     }

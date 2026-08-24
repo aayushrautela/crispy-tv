@@ -224,6 +224,7 @@ public let genres: [String]
 public let maturityRating: String?
 public let overview: String?
 public let providerIds: MediaExternalIds
+public let seriesItemId: String?
 
 public var id: String { itemId }
 }
