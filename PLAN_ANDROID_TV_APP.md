@@ -1,6 +1,6 @@
 # Plan: Android TV app (`:android:tv`) — full build-out
 
-## Status: Phase 0 implemented — Phases 1+ NOT started
+## Status: Phase 0 implemented + compiling — Phases 1+ NOT started
 
 ## Locked decisions
 - **applicationId**: `com.crispy.tv` on both phone and TV apps (same Play listing,
@@ -99,8 +99,8 @@ backgrounds (TV-NP); 64-bit + 16 KB page size required from Aug 2026 (TV-G6).
 - [x] Manifest: INTERNET permission; `touchscreen required=false`;
       `leanback required=true`; LEANBACK_LAUNCHER + banner retained.
 - [x] CI debug workflow: added `:android:app:lintDebug :android:tv:lintDebug` gate.
-- [ ] Local verification pending toolchain (JDK 21 + Android SDK not on PATH in dev env):
-      `gradle :android:app:assembleDebug :android:tv:assembleDebug :android:contract-tests:test`
+- [x] Verified locally: `gradle :android:app:assembleDebug :android:tv:assembleDebug` compiles;
+      CI lint initially flagged missing `POST_NOTIFICATIONS` (fixed in `14d1a386`).
 
 ### Phase 1 — App shell
 - [ ] Single-activity `TvMainActivity`: Compose `NavHost`, back-stack handling that restores
