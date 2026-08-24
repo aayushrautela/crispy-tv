@@ -70,6 +70,17 @@ jobs:
       - name: Lint Android TV
         run: gradle :android:tv:lintDebug
 
+      - name: Upload lint reports
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lint-reports-tv-debug
+          path: |
+            android/tv/build/reports/lint-results-debug.txt
+            android/tv/build/reports/lint-results-debug.html
+            android/tv/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if-no-files-found: warn
+
       - name: Assemble Android TV
         run: gradle :android:tv:assembleDebug
 

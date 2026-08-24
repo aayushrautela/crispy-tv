@@ -70,6 +70,17 @@ jobs:
       - name: Lint Android app
         run: gradle :android:app:lintDebug
 
+      - name: Upload lint reports
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lint-reports-app-debug
+          path: |
+            android/app/build/reports/lint-results-debug.txt
+            android/app/build/reports/lint-results-debug.html
+            android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if-no-files-found: warn
+
       - name: Assemble Android app
         run: gradle :android:app:assembleDebug :android:app:assembleDebugAndroidTest
 
