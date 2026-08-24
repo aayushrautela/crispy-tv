@@ -171,7 +171,7 @@ class DetailViewModel(
                         seasonNumber = ep.seasonNumber,
                         episodeNumber = ep.episodeNumber,
                         title = ep.title ?: "Episode ${ep.episodeNumber ?: ""}".trim(),
-                        airDate = ep.airDate,
+                        airDate = ep.releaseDate,
                         runtimeMinutes = ep.runtimeMinutes,
                         overview = ep.summary ?: ep.overview,
                     )
