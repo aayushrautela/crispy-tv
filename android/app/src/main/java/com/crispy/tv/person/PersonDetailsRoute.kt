@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -71,6 +70,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val PersonAvatarSize = 120.dp
+private val TopAppBarClearanceHeight = 64.dp
 private const val PERSON_PROFILE_KEY_PREFIX = "backdrop-personProfile-"
 
 @Composable
@@ -131,7 +131,7 @@ private fun PersonDetailsScreen(
                     PaddingValues(
                         top =
                             TopAppBarDefaults.windowInsets.asPaddingValues().calculateTopPadding() +
-                                TopAppBarDefaults.TopAppBarHeight +
+                                TopAppBarClearanceHeight +
                                 8.dp,
                         bottom = 28.dp
                     )
