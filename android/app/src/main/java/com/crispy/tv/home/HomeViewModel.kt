@@ -212,7 +212,7 @@ class HomeViewModel internal constructor(
             continueWatchingContentKey(item),
         )
         updateWideRailSection(item.sectionKey()) { current ->
-            val ready = current.state as? RailLoadState.Ready ?: return@update current
+            val ready = current.state as? RailLoadState.Ready ?: return@updateWideRailSection current
             val remainingItems = ready.items.filterNot { it.continueWatchingItem?.localKey == item.localKey }
             current.copy(state = RailLoadState.Ready(remainingItems))
         }
