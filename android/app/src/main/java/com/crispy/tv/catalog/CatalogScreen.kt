@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -107,68 +108,50 @@ fun CatalogRoute(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(
-                        count = pagingItems.itemCount,
-                        key = pagingItems.itemKey { "${it.type}:${it.id}" },
-                        contentType = { "poster" }
-                    ) { index ->
-                        val item = pagingItems[index] ?: return@items
-                        val sharedElementKey = "catalog-${section.key}-${item.itemId}-${index}"
-                        LandscapeCard(
-                            title = item.title,
-                            backdropUrl = item.backdropUrl,
-                            posterUrl = item.posterUrl,
-                            logoUrl = item.logoUrl,
-                            backdrop = item.backdrop,
-                            poster = item.poster,
-                            logo = item.logo,
-                            rating = item.rating,
-                            year = item.year,
-                            genre = item.genre,
-                            onClick = { onItemClick(item, sharedElementKey) },
-                            itemId = item.itemId,
-                            sharedElementKey = sharedElementKey,
-                        )
+                    if (pagingItems.loadState.refresh is LoadState.Loading && pagingItems.itemCount == 0) {
+                        items(CATALOG_SKELETON_COUNT, contentType = { "posterSkeleton" }) {
+                            CatalogPosterSkeleton(modifier = Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        items(
+                            count = pagingItems.itemCount,
+                            key = pagingItems.itemKey { "${it.type}:${it.id}" },
+                            contentType = { "poster" }
+                        ) { index ->
+                            val item = pagingItems[index] ?: return@items
+                            val sharedElementKey = "catalog-${section.key}-${item.itemId}-${index}"
+                            LandscapeCard(
+                                title = item.title,
+                                backdropUrl = item.backdropUrl,
+                                posterUrl = item.posterUrl,
+                                logoUrl = item.logoUrl,
+                                backdrop = item.backdrop,
+                                poster = item.poster,
+                                logo = item.logo,
+                                rating = item.rating,
+                                year = item.year,
+                                genre = item.genre,
+                                onClick = { onItemClick(item, sharedElementKey) },
+                                itemId = item.itemId,
+                                sharedElementKey = sharedElementKey,
+                            )
+                        }
                     }
                 }
 
                 val refreshState = pagingItems.loadState.refresh
-                when (refreshState) {
-                    is LoadState.Loading -> {
-                        if (pagingItems.itemCount == 0) {
-                            CatalogLoadingSkeleton(modifier = Modifier.fillMaxSize())
-                        }
-                    }
-
-                    is LoadState.Error -> {
-                        Text(
-                            text = refreshState.error.message ?: "Failed to load catalog.",
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(24.dp),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    else -> Unit
+                if (refreshState is LoadState.Error) {
+                    Text(
+                        text = refreshState.error.message ?: "Failed to load catalog.",
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(24.dp),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun CatalogLoadingSkeleton(modifier: Modifier = Modifier) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = CardStyle.landscapeCardWidth()),
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(CATALOG_SKELETON_COUNT, contentType = { "posterSkeleton" }) {
-            CatalogPosterSkeleton(modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -179,7 +162,7 @@ private fun CatalogPosterSkeleton(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(CardStyle.LandscapeAspectRatio)
-            .skeletonElement(pulse = false),
+            .skeletonElement(shape = RoundedCornerShape(CardStyle.CardCornerRadiusDp.dp), pulse = false),
     )
 }
 

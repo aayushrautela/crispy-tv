@@ -68,9 +68,10 @@ internal fun HomeWideRailSection(
     onThisWeekClick: (CalendarEpisodeItem, String?) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
 ) {
-    if (section.items.isEmpty() && !section.isLoading) {
+    if (section.state is RailLoadState.Hidden) {
         return
     }
+    val isLoading = section.state is RailLoadState.Loading
 
     var actionsItemKey by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
@@ -78,7 +79,7 @@ internal fun HomeWideRailSection(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeRailHeader(
             title = section.title,
-            skeleton = section.isLoading && section.items.isEmpty(),
+            skeleton = isLoading,
             action = onViewAllClick?.let { action ->
                 {
                     TextButton(onClick = action) {
@@ -93,12 +94,13 @@ internal fun HomeWideRailSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = crispyRowHuggingPadding(horizontalPadding),
         ) {
-            if (section.isLoading && section.items.isEmpty()) {
+            if (isLoading) {
                 items(HOME_WIDE_SKELETON_COUNT, contentType = { "wideSkeleton" }) {
                     HomeWideRailSkeletonCard()
                 }
             } else {
-                items(section.items, key = { it.key }, contentType = { "wideRailCard" }) { item ->
+                val railItems = (section.state as RailLoadState.Ready).items
+                items(railItems, key = { it.key }, contentType = { "wideRailCard" }) { item ->
                     val key = "homerail-${section.kind.name.lowercase()}-${item.key}"
                     HomeWideRailCard(
                         item = item,
@@ -135,7 +137,7 @@ internal fun HomeWideRailSection(
     }
 
     actionsItemKey?.let { key ->
-        val actionItem = section.items.firstOrNull { it.key == key }
+        val actionItem = (section.state as? RailLoadState.Ready)?.items?.firstOrNull { it.key == key }
         if (actionItem != null) {
             val actionSharedKey = "homerail-${section.kind.name.lowercase()}-${actionItem.key}"
             val actions = buildList {

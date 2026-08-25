@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -58,6 +59,9 @@ data class HomePrimarySnapshot(
 internal const val CONTINUE_WATCHING_SECTION_KEY = "continueWatching"
 internal const val UP_NEXT_SECTION_KEY = "upNext"
 internal const val THIS_WEEK_SECTION_KEY = "thisWeek"
+
+private const val RAIL_LOAD_ATTEMPTS = 3
+private const val RAIL_RETRY_BACKOFF_MS = 400L
 
 @Immutable
 data class HomeUiState(
@@ -208,8 +212,9 @@ class HomeViewModel internal constructor(
             continueWatchingContentKey(item),
         )
         updateWideRailSection(item.sectionKey()) { current ->
-            val remainingItems = current.items.filterNot { it.continueWatchingItem?.localKey == item.localKey }
-            current.copy(items = remainingItems)
+            val ready = current.state as? RailLoadState.Ready ?: return@update current
+            val remainingItems = ready.items.filterNot { it.continueWatchingItem?.localKey == item.localKey }
+            current.copy(state = RailLoadState.Ready(remainingItems))
         }
 
         viewModelScope.launch {
@@ -239,33 +244,60 @@ class HomeViewModel internal constructor(
     }
 
     private suspend fun loadContinueWatching() {
-        val section = runCatching { refreshCoordinator.loadContinueWatching() }.getOrElse { error ->
+        val section = runCatching { loadWithRetry { refreshCoordinator.loadContinueWatching() } }.getOrElse { error ->
             if (error is CancellationException) throw error
             Log.w(TAG, "Continue watching load failed", error)
             _errorEvents.tryEmit(error.message ?: "Failed to load continue watching.")
-            defaultWideRailSection(CONTINUE_WATCHING_SECTION_KEY, "Continue Watching", HomeWideRailSectionKind.CONTINUE_WATCHING).copy(isLoading = false)
+            defaultWideRailSection(
+                key = CONTINUE_WATCHING_SECTION_KEY,
+                title = "Continue Watching",
+                kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
+            ).copy(state = RailLoadState.Hidden)
         }
         applyWideRailSection(section)
     }
 
     private suspend fun loadUpNext() {
-        val section = runCatching { refreshCoordinator.loadUpNext() }.getOrElse { error ->
+        val section = runCatching { loadWithRetry { refreshCoordinator.loadUpNext() } }.getOrElse { error ->
             if (error is CancellationException) throw error
             Log.w(TAG, "Up next load failed", error)
             _errorEvents.tryEmit(error.message ?: "Failed to load up next.")
-            defaultWideRailSection(UP_NEXT_SECTION_KEY, "Up Next", HomeWideRailSectionKind.UP_NEXT).copy(isLoading = false)
+            defaultWideRailSection(
+                key = UP_NEXT_SECTION_KEY,
+                title = "Up Next",
+                kind = HomeWideRailSectionKind.UP_NEXT,
+            ).copy(state = RailLoadState.Hidden)
         }
         applyWideRailSection(section)
     }
 
     private suspend fun loadThisWeek() {
-        val section = runCatching { refreshCoordinator.loadThisWeekSection() }.getOrElse { error ->
+        val section = runCatching { loadWithRetry { refreshCoordinator.loadThisWeekSection() } }.getOrElse { error ->
             if (error is CancellationException) throw error
             Log.w(TAG, "This week load failed", error)
             _errorEvents.tryEmit(error.message ?: "Failed to load this week.")
-            defaultWideRailSection(THIS_WEEK_SECTION_KEY, "This Week", HomeWideRailSectionKind.THIS_WEEK).copy(isLoading = false)
+            defaultWideRailSection(
+                key = THIS_WEEK_SECTION_KEY,
+                title = "This Week",
+                kind = HomeWideRailSectionKind.THIS_WEEK,
+            ).copy(state = RailLoadState.Hidden)
         }
         applyWideRailSection(section)
+    }
+
+    private suspend fun <T> loadWithRetry(block: suspend () -> T): T {
+        var lastError: Throwable? = null
+        repeat(RAIL_LOAD_ATTEMPTS) { attempt ->
+            if (attempt > 0) delay(RAIL_RETRY_BACKOFF_MS * attempt)
+            try {
+                return block()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                lastError = error
+            }
+        }
+        throw lastError ?: IllegalStateException("Rail load failed")
     }
 
     private fun applyPrimarySnapshot(snapshot: HomePrimarySnapshot) {
@@ -360,12 +392,12 @@ internal fun defaultWideRailSection(
         key = key,
         title = title,
         kind = kind,
-        isLoading = true,
+        state = RailLoadState.Loading,
     )
 }
 
 internal fun HomeWideRailSectionUi.isVisible(): Boolean {
-    return isLoading || items.isNotEmpty()
+    return state !is RailLoadState.Hidden
 }
 
 private fun CanonicalContinueWatchingItem.sectionKey(): String {

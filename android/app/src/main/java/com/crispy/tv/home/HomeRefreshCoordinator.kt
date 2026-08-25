@@ -105,8 +105,7 @@ internal class HomeRefreshCoordinator(
             title = "Continue Watching",
             kind = HomeWideRailSectionKind.CONTINUE_WATCHING,
         ).copy(
-            items = result.entries.map { item -> item.toWideRailItem(nowMs) },
-            isLoading = false,
+            state = RailLoadState.Ready(items = result.entries.map { item -> item.toWideRailItem(nowMs) }),
         )
     }
 
@@ -123,8 +122,7 @@ internal class HomeRefreshCoordinator(
             title = "This Week",
             kind = HomeWideRailSectionKind.THIS_WEEK,
         ).copy(
-            items = thisWeekResult.items.map { item -> item.toWideRailItem() },
-            isLoading = false,
+            state = RailLoadState.Ready(items = thisWeekResult.items.map { item -> item.toWideRailItem() }),
         )
     }
 

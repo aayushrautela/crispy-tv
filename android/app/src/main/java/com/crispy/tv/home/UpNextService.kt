@@ -32,8 +32,7 @@ class UpNextService internal constructor(
             title = "Up Next",
             kind = HomeWideRailSectionKind.UP_NEXT,
         ).copy(
-            items = items.map { item -> item.toWideRailItem(nowMs) },
-            isLoading = false,
+            state = RailLoadState.Ready(items = items.map { item -> item.toWideRailItem(nowMs) }),
         )
     }
 
